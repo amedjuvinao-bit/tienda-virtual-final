@@ -1,0 +1,33 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "seed:geo:all": "node scripts/seedGeoAll.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate:categories": "node scripts/migrate-categories.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^1.41.3",
+    "cors": "^2.8.5",
+    "country-state-city": "^3.2.1",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.4.0",
+    "i18n-iso-countries": "^7.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.17.0",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^7.0.6",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4",
+    "xmlbuilder2": "^4.0.3"
+  }
+}

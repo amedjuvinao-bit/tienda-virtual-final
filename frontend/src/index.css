@@ -1,0 +1,317 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========= VARIABLES GLOBALES POR DEFECTO =========
+   applyTheme las sobreescribe cuando carga desde /api/site-settings
+---------------------------------------------------- */
+:root {
+  /* Colores generales */
+  --color-primary: #111827;
+  --color-secondary: #4b5563;
+  --color-text: #111827;
+  --color-bg: #ffffff;
+  --color-accent: #ef4444;
+
+  /* ✅ Tipografías globales (las setea applyTheme) */
+  --font-base: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-headings: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-base: 16px;
+  --line-height-base: 1.6;
+
+  /* Header */
+  --header-bg: #ffd7ea;
+
+  /* ✅ Para transparencia SOLO del fondo (no del texto/íconos) */
+  --header-bg-rgb: 255, 215, 234; /* fallback */
+  --header-bg-opacity: 1;
+
+  /* ✅ SEPARACIÓN REAL (MENÚ vs ICONOS) */
+  --header-menu-text: #111827; /* texto del menú */
+  --header-menu-hover: #c2410c; /* hover del menú */
+  --header-icon-color: #111827; /* íconos */
+  --header-icon-hover: #c2410c; /* hover íconos */
+
+  /* Tipografía header */
+  --header-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --header-font-size: 16px;
+
+  /* ✅ Parámetros de animación (menú) */
+  --header-menu-hover-scale: 1.12;
+  --header-menu-hover-ty: 0px;
+  --header-menu-hover-rot: 0deg;
+  --header-menu-hover-glow: 8px;
+
+  /* ✅ Parámetros de animación (íconos) */
+  --header-icon-hover-scale: 1.12;
+  --header-icon-hover-ty: 0px;
+  --header-icon-hover-rot: 0deg;
+  --header-icon-hover-glow: 8px;
+
+  /* ✅ Altura visual del header */
+  --site-header-height: 92px;
+}
+
+/* ========= BASE GLOBAL ========= */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 0;
+}
+
+body {
+  margin: 0;
+  padding-top: 0;
+  background-color: var(--color-bg, #ffffff);
+  color: var(--color-text, #111827);
+
+  font-family: var(--font-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ✅ Headings usando la fuente de títulos del tema */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-headings);
+}
+
+/* ✅ Sin compensación global en secciones */
+section[id] {
+  scroll-margin-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+main,
+section {
+  margin-top: 0;
+}
+
+img,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+/* ========= UTILIDADES PERSONALIZADAS ========= */
+@layer utilities {
+  .shiny-text {
+    background: linear-gradient(90deg, #ffd700, #fff8dc, #ffd700);
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: shine 3s linear infinite;
+  }
+
+  @keyframes shine {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
+}
+
+/* ========= ANIMACIÓN BOTONES LENTOS ========= */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2s infinite;
+}
+
+/* ========= SCROLL SIN BARRA VISIBLE ========= */
+.scroll-sin-barra::-webkit-scrollbar { display: none; }
+.scroll-sin-barra {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========= THEME: HEADER ========= */
+.theme-header {
+  background-color: rgba(var(--header-bg-rgb), var(--header-bg-opacity));
+  color: var(--header-menu-text);
+  font-family: var(--header-font-family);
+  font-size: var(--header-font-size);
+}
+
+/* ✅ MENÚ: color independiente */
+.header-menu a {
+  color: var(--header-menu-text);
+  transition: transform 220ms ease, filter 220ms ease, opacity 220ms ease, color 220ms ease;
+  display: inline-block;
+}
+
+.header-menu a:hover {
+  color: var(--header-menu-hover);
+  opacity: 0.95;
+  transform: translateY(var(--header-menu-hover-ty)) scale(var(--header-menu-hover-scale)) rotate(var(--header-menu-hover-rot));
+  filter: drop-shadow(0 0 var(--header-menu-hover-glow) rgba(255, 255, 255, 0.9));
+}
+
+/* ✅ ICONOS: color independiente */
+.header-icons {
+  color: var(--header-icon-color);
+}
+
+.header-icons svg {
+  color: inherit;
+  transition: transform 220ms ease, filter 220ms ease, color 220ms ease;
+}
+
+.header-icons .header-icon:hover svg {
+  color: var(--header-icon-hover);
+  transform: translateY(var(--header-icon-hover-ty)) scale(var(--header-icon-hover-scale)) rotate(var(--header-icon-hover-rot));
+  filter: drop-shadow(0 0 var(--header-icon-hover-glow) rgba(212, 175, 55, 0.9));
+}
+
+/* ========= ADMIN THEME GLOBAL =========
+   Esta capa solo debe aplicarse dentro de .admin-area
+---------------------------------------------------- */
+.admin-area {
+  color: var(--admin-card-text, #111827);
+}
+
+/* Cards, paneles y contenedores comunes */
+.admin-area .bg-white {
+  background-color: var(--admin-card-bg, #ffffff);
+}
+
+.admin-area .bg-gray-50 {
+  background-color: var(--admin-table-head-bg, #f9fafb);
+}
+
+.admin-area .bg-gray-100 {
+  background-color: var(--admin-primary-soft-bg, #f3f4f6);
+}
+
+.admin-area .bg-pink-50,
+.admin-area .bg-\[\#fff8fb\] {
+  background-color: var(--admin-card-header-bg, #fdf2f8);
+}
+
+/* Textos comunes */
+.admin-area .text-gray-500,
+.admin-area .text-gray-600 {
+  color: var(--admin-card-muted-text, #6b7280);
+}
+
+.admin-area .text-gray-700,
+.admin-area .text-gray-800,
+.admin-area .text-gray-900 {
+  color: var(--admin-card-text, #111827);
+}
+
+.admin-area .text-pink-600,
+.admin-area .text-pink-700 {
+  color: var(--admin-primary-soft-text, #be185d);
+}
+
+/* Bordes comunes */
+.admin-area .border,
+.admin-area .border-t,
+.admin-area .border-b,
+.admin-area .border-l,
+.admin-area .border-r {
+  border-color: var(--admin-card-border, #e5e7eb);
+}
+
+.admin-area .border-gray-100,
+.admin-area .border-gray-200,
+.admin-area .border-gray-300,
+.admin-area .border-pink-100,
+.admin-area .border-pink-200,
+.admin-area .border-amber-200,
+.admin-area .border-amber-300,
+.admin-area .border-red-300 {
+  border-color: var(--admin-card-border, #e5e7eb);
+}
+
+/* Tablas */
+.admin-area table {
+  color: var(--admin-table-text, #111827);
+  border-color: var(--admin-table-border, #e5e7eb);
+}
+
+.admin-area thead {
+  background-color: var(--admin-table-head-bg, #f9fafb);
+  color: var(--admin-table-muted-text, #6b7280);
+}
+
+.admin-area tbody tr {
+  border-color: var(--admin-table-border, #e5e7eb);
+}
+
+.admin-area tbody tr:hover {
+  background-color: var(--admin-table-row-hover, transparent);
+}
+
+/* Inputs y selects */
+.admin-area input,
+.admin-area select,
+.admin-area textarea {
+  background-color: var(--admin-input-bg, #ffffff);
+  border-color: var(--admin-input-border, #d1d5db);
+  color: var(--admin-input-text, #111827);
+}
+
+.admin-area input::placeholder,
+.admin-area textarea::placeholder {
+  color: var(--admin-input-placeholder, #9ca3af);
+}
+
+.admin-area input:focus,
+.admin-area select:focus,
+.admin-area textarea:focus {
+  outline: none;
+  border-color: var(--admin-input-focus, #ec4899);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-input-focus, #ec4899) 25%, transparent);
+}
+
+/* Botones comunes con colores fijos de Tailwind */
+.admin-area .bg-pink-500,
+.admin-area .bg-pink-600,
+.admin-area .bg-red-500,
+.admin-area .bg-red-600 {
+  background-color: var(--admin-button-bg, #ec4899);
+  color: var(--admin-button-text, #ffffff);
+}
+
+.admin-area .hover\:bg-pink-600:hover,
+.admin-area .hover\:bg-red-600:hover {
+  background-color: var(--admin-button-hover, #db2777);
+  color: var(--admin-button-text, #ffffff);
+}
+
+.admin-area .hover\:bg-gray-50:hover,
+.admin-area .hover\:bg-pink-50:hover,
+.admin-area .hover\:bg-amber-50:hover,
+.admin-area .hover\:bg-red-50:hover {
+  background-color: var(--admin-button-soft-bg, #fdf2f8);
+}
+
+/* Botones outline / texto */
+.admin-area .text-red-600,
+.admin-area .text-amber-700 {
+  color: var(--admin-primary, #ec4899);
+}
+
+/* Compatibilidad con botones que tienen border */
+.admin-area button.border {
+  border-color: var(--admin-button-soft-border, var(--admin-card-border, #e5e7eb));
+}
+
+.admin-area button.border:hover {
+  background-color: var(--admin-button-soft-bg, #fdf2f8);
+}
+
+/* ========= ADMIN TABLE BORDER FIX ========= */
+.admin-area table th,
+.admin-area table td,
+.admin-area table tr {
+  border-color: var(--admin-table-border, var(--admin-card-border, #e5e7eb));
+}

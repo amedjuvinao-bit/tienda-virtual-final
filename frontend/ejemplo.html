@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preview Panel Admin Glass</title>
+  <style>
+    :root {
+      --primary: #ec4899;
+      --primary-dark: #be185d;
+      --primary-soft: #fdf2f8;
+      --gold: #d4af37;
+      --text: #35162b;
+      --muted: #8a5f76;
+      --glass: rgba(255, 255, 255, 0.42);
+      --glass-strong: rgba(255, 255, 255, 0.58);
+      --border: rgba(236, 72, 153, 0.22);
+      --shadow: 0 28px 80px rgba(190, 24, 93, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 12%, rgba(236, 72, 153, 0.25), transparent 32%),
+        radial-gradient(circle at 92% 8%, rgba(255, 255, 255, 0.72), transparent 28%),
+        radial-gradient(circle at 80% 92%, rgba(236, 72, 153, 0.16), transparent 34%),
+        linear-gradient(135deg, #fff7fb, #fce7f3 45%, #fff 100%);
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      gap: 22px;
+      height: 100vh;
+      padding: 22px;
+      position: relative;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(70px);
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    .blob.one {
+      width: 460px;
+      height: 460px;
+      background: rgba(236, 72, 153, 0.45);
+      top: -150px;
+      left: -120px;
+    }
+
+    .blob.two {
+      width: 420px;
+      height: 420px;
+      background: rgba(255, 255, 255, 0.8);
+      right: -130px;
+      top: 90px;
+    }
+
+    .sidebar,
+    .topbar,
+    .content-shell {
+      background: linear-gradient(145deg, rgba(255,255,255,0.55), rgba(255,255,255,0.24));
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.75);
+      backdrop-filter: blur(26px) saturate(1.45);
+      -webkit-backdrop-filter: blur(26px) saturate(1.45);
+    }
+
+    .sidebar {
+      width: 250px;
+      border-radius: 30px;
+      padding: 22px 16px;
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-zone {
+      height: 112px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+      isolation: isolate;
+    }
+
+    .logo-zone::before {
+      content: "";
+      position: absolute;
+      width: 155px;
+      height: 155px;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle, rgba(212, 175, 55, 0.35), transparent 48%),
+        radial-gradient(circle, rgba(236, 72, 153, 0.28), transparent 64%);
+      filter: blur(18px);
+      z-index: -1;
+    }
+
+    .logo {
+      font-family: Georgia, serif;
+      font-size: 30px;
+      font-weight: 700;
+      color: #9f1239;
+      letter-spacing: 0.02em;
+      text-align: center;
+      line-height: 0.9;
+      text-shadow:
+        0 12px 22px rgba(0,0,0,0.18),
+        0 0 24px rgba(212,175,55,0.45),
+        0 0 34px rgba(236,72,153,0.28);
+      transform: perspective(900px) translateZ(18px);
+    }
+
+    .logo small {
+      display: block;
+      font-size: 13px;
+      letter-spacing: 0.32em;
+      color: #7f1d1d;
+      margin-top: 7px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin: 18px 12px 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 12px;
+      margin: 3px 0;
+      border-radius: 17px;
+      color: var(--primary-dark);
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .nav-item.active {
+      background: rgba(255, 255, 255, 0.48);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 12px 28px rgba(236,72,153,0.14);
+      color: #9d174d;
+    }
+
+    .nav-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(253, 242, 248, 0.72);
+      border: 1px solid rgba(236,72,153,0.16);
+    }
+
+    .logout {
+      margin-top: auto;
+      border: 0;
+      height: 42px;
+      border-radius: 18px;
+      color: white;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ec4899, #be185d);
+      box-shadow: 0 16px 34px rgba(236,72,153,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .topbar {
+      min-height: 88px;
+      border-radius: 26px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      gap: 22px;
+    }
+
+    .topbar h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .topbar p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .search {
+      flex: 1;
+      height: 44px;
+      border-radius: 18px;
+      border: 1px solid rgba(236,72,153,0.16);
+      background: rgba(255,255,255,0.42);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      color: var(--muted);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+    }
+
+    .button {
+      height: 42px;
+      border-radius: 17px;
+      border: 1px solid rgba(236,72,153,0.18);
+      padding: 0 18px;
+      font-weight: 800;
+      color: #9d174d;
+      background: rgba(255,255,255,0.44);
+      box-shadow: 0 12px 26px rgba(236,72,153,0.12), inset 0 1px 0 rgba(255,255,255,0.72);
+    }
+
+    .button.primary {
+      color: white;
+      background: linear-gradient(135deg, #ec4899, #be185d);
+    }
+
+    .content-shell {
+      flex: 1;
+      border-radius: 34px;
+      padding: 30px 34px;
+      overflow: hidden;
+    }
+
+    .breadcrumb {
+      display: inline-flex;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.38);
+      border: 1px solid rgba(236,72,153,0.16);
+      color: var(--primary-dark);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+
+    .content-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+
+    .content-title h2 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -0.03em;
+    }
+
+    .content-title p {
+      max-width: 700px;
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .soft-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(236,72,153,0.34), transparent);
+      margin: 24px 0;
+    }
+
+    .section-block {
+      padding: 4px 2px;
+    }
+
+    .section-block h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .section-block p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 850;
+      color: #9d174d;
+      margin-bottom: 8px;
+    }
+
+    .select-like {
+      height: 48px;
+      border-radius: 18px;
+      border: 1px solid rgba(236,72,153,0.18);
+      background: rgba(255,255,255,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 15px;
+      color: var(--text);
+      font-weight: 700;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 10px 24px rgba(236,72,153,0.08);
+    }
+
+    .note {
+      margin-top: 26px;
+      padding: 18px 20px;
+      border-radius: 22px;
+      border: 1px solid rgba(236,72,153,0.13);
+      background: rgba(255,255,255,0.28);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+  <div class="blob one"></div>
+  <div class="blob two"></div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo-zone">
+        <div class="logo">Rosa<br><small>BOUTIQUE</small></div>
+      </div>
+
+      <div class="section-label">Principal</div>
+      <div class="nav-item"><span class="nav-icon">⌂</span> Dashboard</div>
+      <div class="nav-item"><span class="nav-icon">□</span> Productos</div>
+      <div class="nav-item"><span class="nav-icon">🛒</span> Carritos</div>
+      <div class="nav-item"><span class="nav-icon">♡</span> Favoritos</div>
+      <div class="nav-item"><span class="nav-icon">▦</span> Órdenes</div>
+
+      <div class="section-label">Diseño</div>
+      <div class="nav-item"><span class="nav-icon">◐</span> Apariencia</div>
+      <div class="nav-item"><span class="nav-icon">▤</span> Páginas</div>
+
+      <div class="section-label">Sistema</div>
+      <div class="nav-item active"><span class="nav-icon">⚙</span> Configuración</div>
+
+      <button class="logout">Cerrar sesión</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>Panel Administrativo</h1>
+          <p>Gestiona tu tienda en tiempo real</p>
+        </div>
+        <div class="search">🔎 Buscar productos, órdenes, páginas...</div>
+        <button class="button">Reseñas</button>
+        <button class="button primary">Salir</button>
+      </header>
+
+      <section class="content-shell">
+        <span class="breadcrumb">Configuración interna</span>
+
+        <div class="content-title">
+          <div>
+            <h2>Centro de configuración interna</h2>
+            <p>
+              Administra desde un solo lugar la tienda, facturación, pagos, envíos,
+              usuarios, permisos y comportamiento del panel administrativo.
+            </p>
+          </div>
+        </div>
+
+        <div class="soft-divider"></div>
+
+        <div class="section-block">
+          <h3>Panel admin</h3>
+          <p>
+            Ajusta la experiencia visual y operativa del panel sin crear bloques separados.
+            Esta sección pertenece al mismo contenedor principal para que todo se vea más limpio.
+          </p>
+        </div>
+
+        <div class="soft-divider"></div>
+
+        <div class="section-block">
+          <h3>Personalización del panel admin</h3>
+          <p>Elige el tema visual y el comportamiento del menú lateral.</p>
+
+          <div class="form-row">
+            <div class="field">
+              <label>Tema del panel</label>
+              <div class="select-like">Rosa neón claro <span>⌄</span></div>
+            </div>
+
+            <div class="field">
+              <label>Estilo del sidebar</label>
+              <div class="select-like">Compacto <span>⌄</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          Vista previa: los tres contenedores se integran en una sola superficie glass.
+          Las divisiones internas se hacen con líneas suaves, no con más tarjetas.
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
