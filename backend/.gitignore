@@ -5,3 +5,4 @@ frontend/node_modules/
 Cloudflared/
 *.exe
 frontend/Cloudflared/
+dist/
