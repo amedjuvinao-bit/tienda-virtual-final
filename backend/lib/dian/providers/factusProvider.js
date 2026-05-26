@@ -160,8 +160,10 @@ function isFactusPendingBillConflict(data, status) {
 
   return (
     Number(status) === 409 &&
-    message.includes('factura pendiente')
-  );
+    message.includes('factura pendiente') ||
+    message.includes('nota crédito pendiente') ||
+    message.includes('nota credito pendiente')
+      );
 }
 
 function extractFactusBillsList(data) {
@@ -626,7 +628,7 @@ function buildFactusCreditNotePayload({
   const total = toMoney(subtotal + ivaAmount);
 
   const payload = {
-    reference_code: `NC-${order?.orderNumber || Date.now()}`,
+    reference_code: `NC-${order?.orderNumber}-${Date.now()}`,
 
     bill_number: invoiceNumber,
 
@@ -731,19 +733,37 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
     if (!result.ok) {
       console.log(
         '❌ FACTUS CREDIT NOTE VALIDATION FULL:',
+        
         JSON.stringify(result.data, null, 2)
+        
       );
+      console.log('❌ FACTUS FULL RESULT OBJECT:', result);
+
+     const providerMessage =
+        result.data?.message ||
+        result.data?.error ||
+        `HTTP ${result.status}`;
+
+      const normalizedMessage = String(providerMessage || '').toLowerCase();
+
+      const isPendingCreditNoteConflict =
+        Number(result.status) === 409 &&
+        (
+          normalizedMessage.includes('nota crédito pendiente') ||
+          normalizedMessage.includes('nota credito pendiente')
+        );
 
       return {
         success: false,
         provider: 'factus',
         stage: 'send_credit_note',
         status: result.status,
-        error:
-          result.data?.message ||
-          result.data?.error ||
-          result.data ||
-          `HTTP ${result.status}`,
+        error: providerMessage,
+        code: isPendingCreditNoteConflict
+          ? 'FACTUS_PENDING_CREDIT_NOTE'
+          : 'FACTUS_CREDIT_NOTE_ERROR',
+        canRetry: !isPendingCreditNoteConflict,
+        requiresSync: isPendingCreditNoteConflict,
         raw: result.data,
         payload,
       };

@@ -1868,7 +1868,11 @@ router.post(
           error:
             creditNoteResult.error ||
             'No se pudo crear la nota crédito.',
+          code: creditNoteResult.code || 'CREDIT_NOTE_ERROR',
+          canRetry: creditNoteResult.canRetry !== false,
+          requiresSync: creditNoteResult.requiresSync === true,
           raw: creditNoteResult.raw || null,
+          payload: creditNoteResult.payload || null,
         });
       }
 

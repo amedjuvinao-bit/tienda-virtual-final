@@ -657,7 +657,322 @@ router.get('/admin', async (req, res) => {
       }
     }
 
+    /* ============================
+    * Filtros operativos admin
+    * printed / archived
+    * ============================ */
+    const printedQ = String(req.query.printed || '').trim().toLowerCase();
+
+    if (printedQ === '1' || printedQ === 'true') {
+      filter.printed = true;
+    }
+
+    if (printedQ === '0' || printedQ === 'false') {
+      filter.$and = [
+        ...(Array.isArray(filter.$and) ? filter.$and : []),
+        {
+          $or: [
+            { printed: false },
+            { printed: { $exists: false } },
+          ],
+        },
+      ];
+    }
+
+    const archivedQ = String(req.query.archived || '').trim().toLowerCase();
+
+    if (archivedQ === '1' || archivedQ === 'true') {
+      filter.archived = true;
+    }
+
+    if (archivedQ === '0' || archivedQ === 'false') {
+      filter.archived = { $ne: true };
+    }
+
+    /* ============================
+    * Filtro admin por factura electrónica
+    * invoiceFilter
+    * ============================ */
+    const invoiceFilterQ = String(req.query.invoiceFilter || '').trim().toLowerCase();
+
+    if (invoiceFilterQ && invoiceFilterQ !== 'all') {
+      const invoiceBaseFilter = {};
+
+      if (invoiceFilterQ === 'validated') {
+        invoiceBaseFilter.$or = [
+          { cufe: { $exists: true, $nin: ['', null] } },
+          { invoiceNumber: { $exists: true, $nin: ['', null] } },
+          { 'provider.cufe': { $exists: true, $nin: ['', null] } },
+          { 'provider.number': { $exists: true, $nin: ['', null] } },
+          { 'provider.isValidated': true },
+          { 'provider.raw.is_validated': true },
+          { 'dianResponse.raw.data.data.is_validated': true },
+          { 'dianResponse.raw.data.data.cufe': { $exists: true, $nin: ['', null] } },
+        ];
+      }
+
+      if (invoiceFilterQ === 'pending') {
+        invoiceBaseFilter.$or = [
+          { status: 'pending' },
+          { status: 'sent' },
+          { status: 'processing' },
+          { 'provider.status': 'pending' },
+          { 'provider.status': 'sent' },
+          { 'provider.status': 'processing' },
+        ];
+      }
+
+      if (invoiceFilterQ === 'rejected' || invoiceFilterQ === 'error') {
+        invoiceBaseFilter.$or = [
+          { status: 'rejected' },
+          { status: 'failed' },
+          { status: 'error' },
+          { 'provider.status': 'rejected' },
+          { 'provider.status': 'failed' },
+          { 'provider.status': 'error' },
+          { errors: { $exists: true, $ne: [] } },
+          { providerErrors: { $exists: true, $ne: [] } },
+        ];
+      }
+
+      if (invoiceFilterQ === 'credit_note') {
+        invoiceBaseFilter.$or = [
+          { creditNotes: { $exists: true, $ne: [] } },
+          { 'creditNotes.0': { $exists: true } },
+        ];
+      }
+
+      const invoiceRows = await ElectronicInvoice.find(invoiceBaseFilter)
+        .select('orderId')
+        .lean();
+
+      const invoiceOrderIds = invoiceRows
+        .map((invoice) => invoice.orderId)
+        .filter(Boolean);
+
+      if (invoiceFilterQ === 'without_invoice') {
+        const ordersWithInvoice = await ElectronicInvoice.find({})
+          .select('orderId')
+          .lean();
+
+        const idsWithInvoice = ordersWithInvoice
+          .map((invoice) => invoice.orderId)
+          .filter(Boolean);
+
+        filter._id = {
+          ...(filter._id && typeof filter._id === 'object' ? filter._id : {}),
+          $nin: idsWithInvoice,
+        };
+      } else {
+        filter._id = {
+          ...(filter._id && typeof filter._id === 'object' ? filter._id : {}),
+          $in: invoiceOrderIds,
+        };
+      }
+    }
+
     const total = await Order.countDocuments(filter);
+    const financialSummaryRows = await Order.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+
+          totalOrders: { $sum: 1 },
+
+          totalSales: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['paid', 'shipped']] },
+                { $ifNull: ['$total', 0] },
+                0,
+              ],
+            },
+          },
+
+          pendingAmount: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['pending', 'processing']] },
+                { $ifNull: ['$total', 0] },
+                0,
+              ],
+            },
+          },
+
+          paidOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['paid', 'shipped']] },
+                1,
+                0,
+              ],
+            },
+          },
+
+          pendingOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['pending', 'processing']] },
+                1,
+                0,
+              ],
+            },
+          },
+
+          cancelledOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['cancelled', 'canceled']] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalOrders: 1,
+          totalSales: 1,
+          pendingAmount: 1,
+          paidOrders: 1,
+          pendingOrders: 1,
+          cancelledOrders: 1,
+          averageTicket: {
+            $cond: [
+              { $gt: ['$paidOrders', 0] },
+              { $divide: ['$totalSales', '$paidOrders'] },
+              0,
+            ],
+          },
+        },
+      },
+    ]);
+
+    const baseFinancialSummary = financialSummaryRows[0] || {
+      totalOrders: 0,
+      totalSales: 0,
+      pendingAmount: 0,
+      paidOrders: 0,
+      pendingOrders: 0,
+      cancelledOrders: 0,
+      averageTicket: 0,
+    };
+
+    const summaryOrders = await Order.find(filter).select('_id').lean();
+
+    const summaryOrderIds = summaryOrders
+      .map((order) => order._id)
+      .filter(Boolean);
+
+    const summaryInvoices = summaryOrderIds.length
+      ? await ElectronicInvoice.find({
+          orderId: { $in: summaryOrderIds },
+        })
+          .select('orderId status provider.status')
+          .lean()
+      : [];
+
+    const ordersWithInvoiceSet = new Set(
+      summaryInvoices
+        .map((invoice) => String(invoice.orderId || ''))
+        .filter(Boolean)
+    );
+
+    const validatedInvoiceSet = new Set(
+    summaryInvoices
+      .filter((invoice) => {
+        const status = String(invoice.status || '').toLowerCase();
+        const providerStatus = String(invoice.provider?.status || '').toLowerCase();
+        const providerRawStatus = String(invoice.provider?.raw?.status || '').toLowerCase();
+        const providerRawDataStatus = String(invoice.provider?.raw?.data?.status || '').toLowerCase();
+
+        const hasValidatedStatus = [
+          status,
+          providerStatus,
+          providerRawStatus,
+          providerRawDataStatus,
+        ].some((value) =>
+          [
+            'validated',
+            'validada',
+            'validado',
+          ].includes(value)
+        );
+
+        const hasDianEvidence =
+          Boolean(invoice.validatedAt) ||
+          Boolean(invoice.cufe) ||
+          Boolean(invoice.provider?.cufe) ||
+          Boolean(invoice.provider?.raw?.cufe) ||
+          Boolean(invoice.provider?.raw?.data?.cufe);
+
+        return hasValidatedStatus || hasDianEvidence;
+      })
+      .map((invoice) => String(invoice.orderId || ''))
+      .filter(Boolean)
+  );
+    
+
+    const financialSummary = {
+      ...baseFinancialSummary,
+      withoutInvoiceOrders: Math.max(
+        0,
+        Number(baseFinancialSummary.totalOrders || 0) - ordersWithInvoiceSet.size
+      ),
+      validatedInvoiceOrders: validatedInvoiceSet.size,
+    };
+
+    const dianValidatedInvoiceCriteria = [
+      { cufe: { $exists: true, $nin: ['', null] } },
+      { invoiceNumber: { $exists: true, $nin: ['', null] } },
+      { validatedAt: { $exists: true, $nin: ['', null] } },
+
+      { 'provider.cufe': { $exists: true, $nin: ['', null] } },
+      { 'provider.number': { $exists: true, $nin: ['', null] } },
+      { 'provider.isValidated': true },
+      { 'provider.validatedAt': { $exists: true, $nin: ['', null] } },
+
+      { 'provider.raw.cufe': { $exists: true, $nin: ['', null] } },
+      { 'provider.raw.number': { $exists: true, $nin: ['', null] } },
+      { 'provider.raw.is_validated': true },
+      { 'provider.raw.validated_at': { $exists: true, $nin: ['', null] } },
+
+      { 'dianResponse.raw.data.data.cufe': { $exists: true, $nin: ['', null] } },
+      { 'dianResponse.raw.data.data.number': { $exists: true, $nin: ['', null] } },
+      { 'dianResponse.raw.data.data.is_validated': true },
+      { 'dianResponse.raw.data.data.validated_at': { $exists: true, $nin: ['', null] } },
+    ];
+
+    const summaryOrderIdsForInvoices = await Order.distinct('_id', filter);
+
+    const ordersWithInvoiceIdsForSummary = summaryOrderIdsForInvoices.length
+      ? await ElectronicInvoice.distinct('orderId', {
+          orderId: { $in: summaryOrderIdsForInvoices },
+        })
+      : [];
+
+    const validatedInvoiceIdsForSummary = summaryOrderIdsForInvoices.length
+      ? await ElectronicInvoice.distinct('orderId', {
+          orderId: { $in: summaryOrderIdsForInvoices },
+          $or: dianValidatedInvoiceCriteria,
+        })
+      : [];
+
+    financialSummary.withoutInvoiceOrders = Math.max(
+      0,
+      Number(financialSummary.totalOrders || 0) - ordersWithInvoiceIdsForSummary.length
+    );
+
+    financialSummary.ordersWithoutInvoice = financialSummary.withoutInvoiceOrders;
+
+    financialSummary.validatedInvoiceOrders = validatedInvoiceIdsForSummary.length;
+    financialSummary.validatedInvoices = validatedInvoiceIdsForSummary.length;
+    financialSummary.validatedDianOrders = validatedInvoiceIdsForSummary.length;
+
+
     const sort = parseSort(req.query.sort);
 
     const docs = await Order.find(filter).sort(sort).skip(skip).limit(limit).lean();
@@ -764,7 +1079,14 @@ router.get('/admin', async (req, res) => {
       return res.status(200).send(rows.join('\n'));
     }
 
-    res.json({ page, limit, total, totalPages, data: withDerived });
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages,
+      financialSummary,
+      data: withDerived,
+    });
   } catch (error) {
     console.error('Error en /api/orders/admin:', error);
     res.status(500).json({ message: 'Error al listar órdenes para admin' });
