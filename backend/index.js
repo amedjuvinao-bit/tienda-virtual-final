@@ -85,8 +85,11 @@ const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest'); // ✅ p
 const uploadRoutes = tryRequire('./routes/uploadRoutes'); // opcional
 const geoRoutes = tryRequire('./routes/geo'); // opcional
 
-// ✅ NUEVA RUTA DE AUTENTICACIÓN ADMIN
+// ✅ RUTAS ADMIN
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
+const adminUsersRoutes = tryRequire('./routes/adminUsers');
+const adminRolesRoutes = tryRequire('./routes/adminRoles');
+const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 
 // ⬇️ Site Settings (Apariencia & Menús)
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
@@ -105,6 +108,15 @@ if (uploadRoutes) app.use('/api/uploads', uploadRoutes);
 
 // ✅ CONEXIÓN DE AUTENTICACIÓN ADMIN CON RATE LIMIT ESPECIAL
 if (adminAuthRoutes) app.use('/api/admin/auth', loginLimiter, adminAuthRoutes);
+
+// ✅ CONEXIÓN DE USUARIOS ADMINISTRATIVOS
+if (adminUsersRoutes) app.use('/api/admin/users', adminUsersRoutes);
+
+// ✅ CONEXIÓN DE ROLES ADMINISTRATIVOS
+if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
+
+// ✅ CONEXIÓN DE SEDES ADMINISTRATIVAS
+if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 
