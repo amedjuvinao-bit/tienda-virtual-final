@@ -25,6 +25,9 @@ import UsuariosSection from './configuracion/sections/UsuariosSection';
 import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
 
+// ✅ NUEVO: página real conectada al backend de usuarios
+import AdminUsersPage from './users/AdminUsersPage';
+
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
   {
@@ -110,8 +113,11 @@ export default function ConfiguracionPage() {
         return <LoginAdminSection />;
       case 'panel-admin':
         return <PanelAdminSection />;
+
+      // ✅ Ahora usuarios se muestra dentro de Configuración
       case 'usuarios':
-        return <UsuariosSection />;
+        return <AdminUsersPage />;
+
       case 'perfiles':
         return <PerfilesSection />;
       case 'logs':
