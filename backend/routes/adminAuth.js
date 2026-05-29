@@ -16,6 +16,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_TIME_MS = 10 * 60 * 1000;
+const MIN_PASSWORD_LENGTH = 8;
 const loginAttempts = new Map();
 
 function isJwtConfigured() {
@@ -199,6 +200,38 @@ function buildUserResponseFromLegacy(username) {
   };
 }
 
+function validateRequiredPasswordChangePayload({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+}) {
+  if (!currentPassword) {
+    return 'Debes escribir la contraseña temporal actual.';
+  }
+
+  if (!newPassword) {
+    return 'Debes escribir la nueva contraseña.';
+  }
+
+  if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
+    return `La nueva contraseña debe tener mínimo ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+
+  if (!confirmPassword) {
+    return 'Debes confirmar la nueva contraseña.';
+  }
+
+  if (String(newPassword) !== String(confirmPassword)) {
+    return 'La confirmación de contraseña no coincide.';
+  }
+
+  if (String(currentPassword) === String(newPassword)) {
+    return 'La nueva contraseña debe ser diferente a la contraseña temporal.';
+  }
+
+  return '';
+}
+
 async function findAdminUserForToken(decoded) {
   if (!decoded?.adminUserId) return null;
 
@@ -206,6 +239,15 @@ async function findAdminUserForToken(decoded) {
     _id: decoded.adminUserId,
     deletedAt: null,
   }).select('+tokenVersion');
+}
+
+async function findAdminUserForPasswordChange(decoded) {
+  if (!decoded?.adminUserId) return null;
+
+  return AdminUser.findOne({
+    _id: decoded.adminUserId,
+    deletedAt: null,
+  }).select('+passwordHash +tokenVersion');
 }
 
 async function verifyAdminToken(req) {
@@ -556,6 +598,124 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: 'Error interno al iniciar sesión.',
+    });
+  }
+});
+
+router.post('/change-password-required', async (req, res) => {
+  try {
+    const authResult = await verifyAdminToken(req);
+
+    if (!authResult.ok) {
+      return res.status(authResult.status || 401).json({
+        ok: false,
+        message: authResult.message,
+      });
+    }
+
+    if (!authResult.decoded?.adminUserId) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El cambio obligatorio de contraseña solo aplica para usuarios administrativos registrados en base de datos.',
+      });
+    }
+
+    const adminUser = await findAdminUserForPasswordChange(authResult.decoded);
+
+    if (!adminUser) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Usuario administrativo no encontrado.',
+      });
+    }
+
+    if (adminUser.deletedAt || adminUser.active !== true || adminUser.status !== 'active') {
+      return res.status(403).json({
+        ok: false,
+        message: 'Usuario administrativo inactivo o bloqueado.',
+      });
+    }
+
+    if (adminUser.mustChangePassword !== true) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Este usuario no tiene cambio obligatorio de contraseña pendiente.',
+      });
+    }
+
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    const confirmPassword = String(req.body?.confirmPassword || '');
+
+    const validationError = validateRequiredPasswordChangePayload({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
+
+    if (validationError) {
+      return res.status(400).json({
+        ok: false,
+        message: validationError,
+      });
+    }
+
+    const isCurrentPasswordValid = await adminUser.comparePassword(currentPassword);
+
+    if (!isCurrentPasswordValid) {
+      await saveLoginAudit(req, {
+        username: adminUser.username,
+        status: 'failed',
+        reason: 'required_password_change_invalid_current_password',
+      });
+
+      return res.status(401).json({
+        ok: false,
+        message: 'La contraseña temporal actual no es válida.',
+      });
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, adminUser.passwordHash);
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La nueva contraseña debe ser diferente a la contraseña temporal.',
+      });
+    }
+
+    adminUser.passwordHash = await bcrypt.hash(newPassword, 12);
+    adminUser.mustChangePassword = false;
+    adminUser.passwordChangedAt = new Date();
+    adminUser.failedLoginAttempts = 0;
+    adminUser.lockedUntil = null;
+    adminUser.tokenVersion = Number(adminUser.tokenVersion || 0) + 1;
+    adminUser.updatedBy = adminUser._id;
+
+    await adminUser.save();
+
+    const token = jwt.sign(buildDbTokenPayload(adminUser), JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    await saveLoginAudit(req, {
+      username: adminUser.username,
+      status: 'success',
+      reason: 'required_password_change_success',
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Contraseña actualizada correctamente.',
+      token,
+      user: buildUserResponseFromDb(adminUser),
+    });
+  } catch (error) {
+    console.error('❌ Error en cambio obligatorio de contraseña:', error.message);
+
+    return res.status(500).json({
+      ok: false,
+      message: 'Error interno al cambiar la contraseña.',
     });
   }
 });

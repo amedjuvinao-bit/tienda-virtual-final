@@ -2,6 +2,7 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
@@ -134,6 +135,17 @@ function sendError(res, status, message, extra = {}) {
     message,
     ...extra,
   });
+}
+
+async function setTemporaryPassword(user, password) {
+  user.passwordHash = await bcrypt.hash(String(password), 12);
+  user.passwordChangedAt = new Date();
+
+  if (typeof user.tokenVersion === 'number') {
+    user.tokenVersion += 1;
+  } else {
+    user.tokenVersion = 1;
+  }
 }
 
 async function countActiveOwners(excludeUserId = null) {
@@ -546,12 +558,13 @@ router.post(
 
       const username = cleanLower(body.username);
       const email = cleanLower(body.email);
+      const temporaryPassword = String(body.password || '');
 
       if (!username) {
         return sendError(res, 400, 'El usuario es obligatorio.');
       }
 
-      if (!body.password) {
+      if (!temporaryPassword) {
         return sendError(res, 400, 'La contraseña inicial es obligatoria.');
       }
 
@@ -625,7 +638,7 @@ router.post(
         updatedBy: getCurrentAdminId(req),
       });
 
-      await user.setPassword(body.password);
+      await setTemporaryPassword(user, temporaryPassword);
 
       user.mustChangePassword = body.mustChangePassword !== false;
 
@@ -959,12 +972,13 @@ router.patch(
     try {
       const { id } = req.params;
       const { password, mustChangePassword = true } = req.body || {};
+      const temporaryPassword = String(password || '');
 
       if (!isValidObjectId(id)) {
         return sendError(res, 400, 'ID de usuario inválido.');
       }
 
-      if (!password) {
+      if (!temporaryPassword) {
         return sendError(res, 400, 'La nueva contraseña es obligatoria.');
       }
 
@@ -979,7 +993,7 @@ router.patch(
         return sendError(res, allowed.status, allowed.message);
       }
 
-      await user.setPassword(password);
+      await setTemporaryPassword(user, temporaryPassword);
 
       user.mustChangePassword = mustChangePassword === true;
       user.updatedBy = getCurrentAdminId(req);

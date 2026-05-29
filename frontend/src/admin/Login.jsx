@@ -1,4 +1,5 @@
-// src/admin/Login.jsx
+// frontend/src/admin/Login.jsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,7 +12,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import api, { setAdminToken } from "../lib/api";
+import { setAdminToken } from "../lib/api";
+import { loginAdmin } from "./api/adminAuthApi";
+import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import {
   LOGIN_THEMES,
   LOGIN_LAYOUTS,
@@ -30,8 +33,6 @@ const LOGIN_BG_OVERLAY_KEY = "admin_login_bg_overlay";
 
 const LOGIN_FAILED_ATTEMPTS_KEY = "admin_login_failed_attempts";
 const LOGIN_LOCK_UNTIL_KEY = "admin_login_lock_until";
-
-const ADMIN_LOGIN_ENDPOINT = "/api/admin/auth/login";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 2 * 60 * 1000;
@@ -95,6 +96,14 @@ function clearLoginSecurityState() {
   } catch {}
 }
 
+function clearTemporaryAdminSession() {
+  try {
+    localStorage.removeItem("admin_token");
+  } catch {}
+
+  setAdminToken("");
+}
+
 function getLockUntil() {
   try {
     return Number(localStorage.getItem(LOGIN_LOCK_UNTIL_KEY) || 0);
@@ -115,6 +124,10 @@ function isDarkTheme(theme) {
 
 function isGoldTheme(theme) {
   return theme?.id === "goldBoutiqueLight" || theme?.id === "goldLuxury";
+}
+
+function extractAdminToken(response) {
+  return response?.token || response?.adminToken || response?.accessToken || "";
 }
 
 function AnimatedBorderBox({
@@ -579,6 +592,9 @@ export default function Login() {
   const [lockRemaining, setLockRemaining] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
   const [loginBg, setLoginBg] = useState(getStoredLoginBg);
+  const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
+    useState(false);
+  const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -635,19 +651,52 @@ export default function Login() {
   };
 
   const authenticateAdmin = async ({ cleanUsername, cleanPassword }) => {
-    const response = await api.post(ADMIN_LOGIN_ENDPOINT, {
+    const response = await loginAdmin({
       username: cleanUsername,
       password: cleanPassword,
     });
 
-    const token =
-      response?.data?.token ||
-      response?.data?.adminToken ||
-      response?.data?.accessToken;
+    const token = extractAdminToken(response);
 
     if (!token) throw new Error("LOGIN_TOKEN_MISSING");
 
-    return token;
+    return {
+      ...response,
+      token,
+    };
+  };
+
+  const handleRequiredPasswordSuccess = (response) => {
+    const token = extractAdminToken(response);
+
+    if (!token) {
+      clearTemporaryAdminSession();
+      setShowRequiredPasswordChange(false);
+      setRequiredPasswordUser(null);
+      setError(
+        "La contraseña se cambió, pero no se recibió una sesión válida. Inicia sesión nuevamente."
+      );
+      return;
+    }
+
+    setAdminToken(token);
+    login(token);
+    clearLoginSecurityState();
+
+    setUsername("");
+    setPassword("");
+    setShowRequiredPasswordChange(false);
+    setRequiredPasswordUser(null);
+
+    navigate("/admin/dashboard");
+  };
+
+  const handleRequiredPasswordCancel = () => {
+    clearTemporaryAdminSession();
+    setShowRequiredPasswordChange(false);
+    setRequiredPasswordUser(null);
+    setPassword("");
+    setError("Debes cambiar la contraseña temporal para ingresar al panel.");
   };
 
   const handleSubmit = async (e) => {
@@ -673,22 +722,34 @@ export default function Login() {
       setIsSubmitting(true);
       setError("");
 
-      const token = await authenticateAdmin({
+      const loginResult = await authenticateAdmin({
         cleanUsername,
         cleanPassword,
       });
 
-      setAdminToken(token);
-      login(token);
+      setAdminToken(loginResult.token);
       clearLoginSecurityState();
+
+      if (loginResult?.user?.mustChangePassword === true) {
+        setRequiredPasswordUser(loginResult.user);
+        setShowRequiredPasswordChange(true);
+        setUsername("");
+        setPassword("");
+        return;
+      }
+
+      login(loginResult.token);
 
       setUsername("");
       setPassword("");
 
       navigate("/admin/dashboard");
-    } catch {
+    } catch (err) {
       registerFailedAttempt();
-      setError("No fue posible iniciar sesión. Verifica tus credenciales.");
+      setError(
+        err?.userMessage ||
+          "No fue posible iniciar sesión. Verifica tus credenciales."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1022,6 +1083,13 @@ export default function Login() {
         <Fingerprint size={14} />
         Sistema protegido con autenticación segura
       </div>
+
+      <RequiredPasswordChangeModal
+        open={showRequiredPasswordChange}
+        user={requiredPasswordUser}
+        onSuccess={handleRequiredPasswordSuccess}
+        onCancel={handleRequiredPasswordCancel}
+      />
     </div>
   );
 }
