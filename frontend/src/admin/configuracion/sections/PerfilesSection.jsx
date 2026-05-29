@@ -1,471 +1,175 @@
-// src/admin/configuracion/sections/PerfilesSection.jsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import InfoCard from '../components/InfoCard';
-import EmptyHint from '../components/EmptyHint';
+// frontend/src/admin/configuracion/sections/PerfilesSection.jsx
+
+import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  Wand2,
+} from 'lucide-react';
+
+import InfoCard from '../components/InfoCard';
+
+import {
+  createAdminRole,
+  deleteAdminRole,
   getAdminRoles,
   getAdminRolesMeta,
+  updateAdminRole,
+  updateAdminRoleStatus,
 } from '../../api/adminRolesApi';
 
-const MODULE_ORDER = [
-  'dashboard',
-  'orders',
-  'pos',
-  'products',
-  'inventory',
-  'customers',
-  'billing',
-  'admin-users',
-  'roles',
-  'branches',
-  'settings',
-  'reports',
-];
+import RolesTable from '../roles/RolesTable';
+import RoleFormModal from '../roles/RoleFormModal';
+import RoleConfirmModal from '../roles/RoleConfirmModal';
+import RolePermissionsModal from '../roles/RolePermissionsModal';
 
-function formatScope(scope) {
-  const value = String(scope || '').toLowerCase();
+const EMPTY_CONFIRM_MODAL = {
+  open: false,
+  action: '',
+  role: null,
+};
 
-  if (value === 'global') return 'Global';
-  if (value === 'branch') return 'Por sede';
-  if (value === 'own') return 'Propio';
+const EMPTY_FORM_MODAL = {
+  open: false,
+  mode: 'create',
+  role: null,
+};
 
-  return scope || 'Sin alcance';
+const THEME = {
+  cardBg: 'var(--admin-card-bg, #ffffff)',
+  cardText: 'var(--admin-card-text, #111827)',
+  mutedText: 'var(--admin-card-muted-text, var(--admin-card-muted, #6b7280))',
+  border:
+    'var(--admin-card-border, var(--admin-border, rgba(148, 163, 184, 0.22)))',
+  softBg: 'var(--admin-soft-bg, rgba(255,255,255,0.55))',
+  primaryBg: 'var(--admin-button-bg, var(--admin-primary, #06b6d4))',
+  primaryText: 'var(--admin-button-text, #ffffff)',
+  lightPanelBg: 'var(--admin-light-panel-bg, rgba(255,255,255,0.08))',
+  lightPanelText:
+    'var(--admin-light-panel-text, var(--admin-card-text, #111827))',
+  lightPanelBorder:
+    'var(--admin-light-panel-border, var(--admin-card-border, rgba(148, 163, 184, 0.22)))',
+  inputBg: 'var(--admin-input-bg, rgba(255,255,255,0.08))',
+  inputText: 'var(--admin-input-text, var(--admin-card-text, #111827))',
+  inputBorder:
+    'var(--admin-input-border, var(--admin-card-border, rgba(148, 163, 184, 0.22)))',
+};
+
+function getRoleId(role) {
+  return role?._id || role?.id || '';
 }
 
-function formatStatus(status) {
-  const value = String(status || '').toLowerCase();
-
-  if (value === 'active') return 'Activo';
-  if (value === 'inactive') return 'Inactivo';
-
-  return status || 'Sin estado';
-}
-
-function getStatusClasses(status) {
-  const value = String(status || '').toLowerCase();
-
-  if (value === 'active') {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+function getAvailablePermissionsFromMeta(meta) {
+  if (Array.isArray(meta?.permissions)) {
+    return meta.permissions;
   }
 
-  return 'border-slate-200 bg-slate-100 text-slate-600';
+  if (meta?.permissions && typeof meta.permissions === 'object') {
+    return Object.keys(meta.permissions);
+  }
+
+  return [];
 }
 
-function getPermissionModule(permission) {
-  const text = String(permission || '');
-  const [moduleName] = text.split(':');
-  return moduleName || 'general';
+function getRoleSearchText(role) {
+  return [
+    role?.name,
+    role?.code,
+    role?.description,
+    role?.scope,
+    role?.status,
+    role?.isSystem ? 'sistema' : 'personalizado',
+    role?.isDefault ? 'predeterminado' : '',
+    ...(Array.isArray(role?.permissions) ? role.permissions : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 }
 
-function formatPermissionModule(moduleName) {
-  const labels = {
-    dashboard: 'Dashboard',
-    orders: 'Órdenes',
-    pos: 'POS',
-    products: 'Productos',
-    inventory: 'Inventario',
-    customers: 'Clientes',
-    billing: 'Facturación',
-    'admin-users': 'Usuarios',
-    roles: 'Roles',
-    branches: 'Sedes',
-    settings: 'Configuración',
-    reports: 'Reportes',
-  };
+function CompactMetricCard({ icon: Icon, label, value }) {
+  return (
+    <div
+      className="rounded-2xl border px-4 py-3 shadow-sm"
+      style={{
+        background: 'rgba(255, 255, 255, 0.96)',
+        borderColor: 'rgba(6, 182, 212, 0.32)',
+        color: '#0f172a',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.18em]"
+            style={{
+              color: '#475569',
+            }}
+          >
+            {label}
+          </p>
 
-  return labels[moduleName] || moduleName;
-}
+          <p
+            className="mt-1 text-2xl font-black leading-none"
+            style={{
+              color: '#0f172a',
+            }}
+          >
+            {value}
+          </p>
+        </div>
 
-function formatPermissionAction(permission) {
-  const text = String(permission || '');
-  const [, action] = text.split(':');
-
-  const labels = {
-    view: 'Ver',
-    create: 'Crear',
-    update: 'Editar',
-    delete: 'Eliminar',
-    disable: 'Desactivar',
-    cancel: 'Cancelar',
-    refund: 'Devolver',
-    export: 'Exportar',
-    discount: 'Descuento',
-    transfer: 'Trasladar',
-    adjust: 'Ajustar',
-    retry: 'Reintentar',
-    'credit-note': 'Nota crédito',
-    download: 'Descargar',
-  };
-
-  return labels[action] || action || permission;
-}
-
-function groupPermissionsByModule(permissions = []) {
-  const grouped = {};
-
-  permissions.forEach((permission) => {
-    const moduleName = getPermissionModule(permission);
-
-    if (!grouped[moduleName]) {
-      grouped[moduleName] = [];
-    }
-
-    grouped[moduleName].push(permission);
-  });
-
-  return grouped;
-}
-
-function sortModuleNames(moduleNames = []) {
-  return [...moduleNames].sort((a, b) => {
-    const indexA = MODULE_ORDER.indexOf(a);
-    const indexB = MODULE_ORDER.indexOf(b);
-
-    if (indexA === -1 && indexB === -1) return a.localeCompare(b);
-    if (indexA === -1) return 1;
-    if (indexB === -1) return -1;
-
-    return indexA - indexB;
-  });
-}
-
-function PermissionsModal({ selectedRole, groupedSelectedPermissions, onClose }) {
-  const moduleNames = useMemo(() => {
-    return sortModuleNames(Object.keys(groupedSelectedPermissions || {}));
-  }, [groupedSelectedPermissions]);
-
-  const [activeModule, setActiveModule] = useState('');
-
-  const activePermissions = useMemo(() => {
-    if (!activeModule) return [];
-    return groupedSelectedPermissions?.[activeModule] || [];
-  }, [activeModule, groupedSelectedPermissions]);
-
-  useEffect(() => {
-    if (moduleNames.length > 0) {
-      setActiveModule((current) => current || moduleNames[0]);
-    }
-  }, [moduleNames]);
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose]);
-
-  if (!selectedRole || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-pink-950/20 p-4 backdrop-blur-[6px]">
-      <button
-        type="button"
-        aria-label="Cerrar ventana de permisos"
-        className="absolute inset-0 h-full w-full cursor-default"
-        onClick={onClose}
-      />
-
-      <div
-        className="relative z-10 flex max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] border shadow-2xl"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
         <div
-          className="shrink-0 border-b px-5 py-4 md:px-6"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
           style={{
-            borderColor: 'var(--admin-card-border)',
-            background:
-              'linear-gradient(135deg, rgba(255,255,255,0.42), rgba(255,255,255,0.10))',
+            background: 'rgba(6, 182, 212, 0.14)',
+            color: '#0891b2',
+            border: '1px solid rgba(6, 182, 212, 0.25)',
           }}
         >
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p
-                className="text-xs font-black uppercase tracking-[0.25em]"
-                style={{ color: 'var(--admin-card-muted-text)' }}
-              >
-                Permisos del perfil
-              </p>
-
-              <h3 className="mt-2 text-2xl font-black">
-                {selectedRole.name}
-              </h3>
-
-              <p
-                className="mt-1 max-w-2xl text-sm leading-6"
-                style={{ color: 'var(--admin-card-muted-text)' }}
-              >
-                {selectedRole.description || 'Sin descripción registrada.'}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-xl font-black transition hover:scale-105"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                color: 'var(--admin-card-text)',
-                background: 'rgba(255,255,255,0.35)',
-              }}
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-pink-200 bg-pink-50 px-4 py-3 text-center">
-              <p className="text-2xl font-black text-pink-700">
-                {Array.isArray(selectedRole.permissions)
-                  ? selectedRole.permissions.length
-                  : 0}
-              </p>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-pink-600">
-                Permisos
-              </p>
-            </div>
-
-            <div
-              className="rounded-2xl border px-4 py-3 text-center"
-              style={{ borderColor: 'var(--admin-card-border)' }}
-            >
-              <p className="text-base font-black">
-                {formatScope(selectedRole.scope)}
-              </p>
-              <p
-                className="text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: 'var(--admin-card-muted-text)' }}
-              >
-                Alcance
-              </p>
-            </div>
-
-            <div
-              className="rounded-2xl border px-4 py-3 text-center"
-              style={{ borderColor: 'var(--admin-card-border)' }}
-            >
-              <p className="text-base font-black">
-                Nivel {selectedRole.level}
-              </p>
-              <p
-                className="text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: 'var(--admin-card-muted-text)' }}
-              >
-                Jerarquía
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_1fr]">
-          <aside
-            className="min-h-0 border-b p-4 md:border-b-0 md:border-r"
-            style={{ borderColor: 'var(--admin-card-border)' }}
-          >
-            <p
-              className="mb-3 text-xs font-black uppercase tracking-[0.22em]"
-              style={{ color: 'var(--admin-card-muted-text)' }}
-            >
-              Módulos
-            </p>
-
-            <div className="max-h-[260px] space-y-2 overflow-y-auto pr-1 md:max-h-full">
-              {moduleNames.map((moduleName) => {
-                const isActive = activeModule === moduleName;
-                const count = groupedSelectedPermissions?.[moduleName]?.length || 0;
-
-                return (
-                  <button
-                    key={moduleName}
-                    type="button"
-                    onClick={() => setActiveModule(moduleName)}
-                    className="flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition hover:translate-x-0.5"
-                    style={{
-                      borderColor: isActive
-                        ? 'var(--admin-primary)'
-                        : 'var(--admin-card-border)',
-                      background: isActive
-                        ? 'linear-gradient(135deg, rgba(236,72,153,0.16), rgba(255,255,255,0.18))'
-                        : 'rgba(255,255,255,0.14)',
-                      color: 'var(--admin-card-text)',
-                    }}
-                  >
-                    <span className="font-bold">
-                      {formatPermissionModule(moduleName)}
-                    </span>
-
-                    <span
-                      className="min-w-8 rounded-lg px-2 py-1 text-center text-xs font-black"
-                      style={{
-                        background: isActive
-                          ? 'var(--admin-primary)'
-                          : 'rgba(255,255,255,0.35)',
-                        color: isActive ? '#ffffff' : 'var(--admin-card-text)',
-                      }}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
-
-          <section className="min-h-0 p-4 md:p-5">
-            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p
-                  className="text-xs font-black uppercase tracking-[0.22em]"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                >
-                  Permisos del módulo
-                </p>
-
-                <h4 className="mt-1 text-xl font-black">
-                  {formatPermissionModule(activeModule)}
-                </h4>
-              </div>
-
-              <div
-                className="rounded-2xl border px-4 py-2 text-sm font-bold"
-                style={{
-                  borderColor: 'var(--admin-card-border)',
-                  background: 'rgba(255,255,255,0.20)',
-                }}
-              >
-                {activePermissions.length} permiso
-                {activePermissions.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-
-            <div
-              className="overflow-hidden rounded-2xl border"
-              style={{ borderColor: 'var(--admin-card-border)' }}
-            >
-              <div
-                className="grid grid-cols-[150px_1fr] gap-3 border-b px-4 py-3 text-[11px] font-black uppercase tracking-wide"
-                style={{
-                  borderColor: 'var(--admin-card-border)',
-                  color: 'var(--admin-card-muted-text)',
-                  background: 'rgba(255,255,255,0.18)',
-                }}
-              >
-                <span>Acción</span>
-                <span>Código interno</span>
-              </div>
-
-              <div className="max-h-[320px] overflow-y-auto">
-                {activePermissions.map((permission, index) => (
-                  <div
-                    key={permission}
-                    className="grid grid-cols-[150px_1fr] gap-3 px-4 py-3 text-sm"
-                    style={{
-                      borderTop:
-                        index === 0 ? 'none' : '1px solid var(--admin-card-border)',
-                      background:
-                        index % 2 === 0
-                          ? 'rgba(255,255,255,0.10)'
-                          : 'rgba(255,255,255,0.18)',
-                    }}
-                  >
-                    <div className="font-bold">
-                      {formatPermissionAction(permission)}
-                    </div>
-
-                    <div
-                      className="break-all font-mono text-xs"
-                      style={{ color: 'var(--admin-card-muted-text)' }}
-                    >
-                      {permission}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div
-          className="flex shrink-0 justify-end border-t px-5 py-4 md:px-6"
-          style={{ borderColor: 'var(--admin-card-border)' }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl bg-pink-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-pink-600"
-          >
-            Cerrar
-          </button>
+          <Icon size={18} />
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
-
 export default function PerfilesSection() {
   const [roles, setRoles] = useState([]);
   const [meta, setMeta] = useState(null);
-  const [selectedRoleId, setSelectedRoleId] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [confirmError, setConfirmError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
   const [search, setSearch] = useState('');
+  const [selectedPermissionsRole, setSelectedPermissionsRole] = useState(null);
+  const [formModal, setFormModal] = useState(EMPTY_FORM_MODAL);
+  const [confirmModal, setConfirmModal] = useState(EMPTY_CONFIRM_MODAL);
+
+  const availablePermissions = useMemo(() => {
+    return getAvailablePermissionsFromMeta(meta);
+  }, [meta]);
 
   const filteredRoles = useMemo(() => {
     const q = search.trim().toLowerCase();
 
     if (!q) return roles;
 
-    return roles.filter((role) => {
-      const text = [
-        role.name,
-        role.code,
-        role.description,
-        role.scope,
-        role.status,
-        ...(Array.isArray(role.permissions) ? role.permissions : []),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return text.includes(q);
-    });
+    return roles.filter((role) => getRoleSearchText(role).includes(q));
   }, [roles, search]);
 
-  const selectedRole = useMemo(() => {
-    return roles.find((role) => role._id === selectedRoleId) || null;
-  }, [roles, selectedRoleId]);
-
-  const groupedSelectedPermissions = useMemo(() => {
-    if (!selectedRole) return {};
-    return groupPermissionsByModule(selectedRole.permissions || []);
-  }, [selectedRole]);
-
-  const totalPermissions = useMemo(() => {
-    if (Array.isArray(meta?.permissions)) return meta.permissions.length;
-    if (meta?.permissions && typeof meta.permissions === 'object') {
-      return Object.keys(meta.permissions).length;
-    }
-    return 0;
-  }, [meta]);
+  const totalPermissions = availablePermissions.length;
+  const customRolesCount = roles.filter((role) => !role.isSystem).length;
 
   const loadMeta = async () => {
     try {
@@ -476,7 +180,11 @@ export default function PerfilesSection() {
       setMeta(response?.data || null);
     } catch (err) {
       console.error('❌ Error cargando meta de perfiles:', err);
-      setError(err?.userMessage || 'No se pudo cargar la información base de perfiles.');
+
+      setError(
+        err?.userMessage ||
+          'No se pudo cargar la información base de perfiles.'
+      );
     } finally {
       setMetaLoading(false);
     }
@@ -496,231 +204,412 @@ export default function PerfilesSection() {
       setRoles(response?.data || []);
     } catch (err) {
       console.error('❌ Error cargando perfiles:', err);
+
       setError(err?.userMessage || 'No se pudieron cargar los perfiles.');
     } finally {
       setLoading(false);
     }
   };
 
+  const reloadAll = async () => {
+    await Promise.all([loadMeta(), loadRoles()]);
+  };
+
+  const openCreateModal = () => {
+    setFormError('');
+    setSuccessMessage('');
+
+    setFormModal({
+      open: true,
+      mode: 'create',
+      role: null,
+    });
+  };
+
+  const openEditModal = (role) => {
+    setFormError('');
+    setSuccessMessage('');
+
+    setFormModal({
+      open: true,
+      mode: 'edit',
+      role,
+    });
+  };
+
+  const closeFormModal = () => {
+    if (saving) return;
+
+    setFormModal(EMPTY_FORM_MODAL);
+    setFormError('');
+  };
+
+  const openPermissionsModal = (role) => {
+    setSelectedPermissionsRole(role);
+  };
+
   const closePermissionsModal = () => {
-    setSelectedRoleId('');
+    setSelectedPermissionsRole(null);
+  };
+
+  const openToggleStatusModal = (role) => {
+    const isActive = role?.active !== false && role?.status !== 'inactive';
+
+    setConfirmError('');
+    setSuccessMessage('');
+
+    setConfirmModal({
+      open: true,
+      action: isActive ? 'deactivate' : 'activate',
+      role,
+    });
+  };
+
+  const openDeleteModal = (role) => {
+    setConfirmError('');
+    setSuccessMessage('');
+
+    setConfirmModal({
+      open: true,
+      action: 'delete',
+      role,
+    });
+  };
+
+  const closeConfirmModal = () => {
+    if (confirmLoading) return;
+
+    setConfirmModal(EMPTY_CONFIRM_MODAL);
+    setConfirmError('');
+  };
+
+  const handleSubmitRole = async (payload) => {
+    try {
+      setSaving(true);
+      setFormError('');
+      setError('');
+      setSuccessMessage('');
+
+      if (formModal.mode === 'edit') {
+        const roleId = getRoleId(formModal.role);
+
+        if (!roleId) {
+          setFormError('No se encontró el ID del perfil a editar.');
+          return;
+        }
+
+        await updateAdminRole(roleId, payload);
+
+        setSuccessMessage('Perfil administrativo actualizado correctamente.');
+      } else {
+        await createAdminRole(payload);
+
+        setSuccessMessage('Perfil administrativo creado correctamente.');
+      }
+
+      setFormModal(EMPTY_FORM_MODAL);
+
+      await loadRoles();
+    } catch (err) {
+      console.error('❌ Error guardando perfil:', err);
+
+      setFormError(
+        err?.userMessage || 'No se pudo guardar el perfil administrativo.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    const { action, role } = confirmModal;
+    const roleId = getRoleId(role);
+
+    if (!roleId) {
+      setConfirmError('No se encontró el ID del perfil.');
+      return;
+    }
+
+    try {
+      setConfirmLoading(true);
+      setConfirmError('');
+      setError('');
+      setSuccessMessage('');
+
+      if (action === 'delete') {
+        await deleteAdminRole(roleId);
+
+        setSuccessMessage('Perfil administrativo eliminado correctamente.');
+      }
+
+      if (action === 'deactivate') {
+        await updateAdminRoleStatus(roleId, {
+          status: 'inactive',
+          active: false,
+        });
+
+        setSuccessMessage('Perfil administrativo desactivado correctamente.');
+      }
+
+      if (action === 'activate') {
+        await updateAdminRoleStatus(roleId, {
+          status: 'active',
+          active: true,
+        });
+
+        setSuccessMessage('Perfil administrativo activado correctamente.');
+      }
+
+      setConfirmModal(EMPTY_CONFIRM_MODAL);
+
+      await loadRoles();
+    } catch (err) {
+      console.error('❌ Error ejecutando acción sobre perfil:', err);
+
+      setConfirmError(
+        err?.userMessage || 'No se pudo completar la acción sobre el perfil.'
+      );
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadMeta();
-    loadRoles();
+    reloadAll();
   }, []);
 
   return (
     <div className="grid gap-4">
       <InfoCard
         title="Roles y permisos"
-        description="Consulta los perfiles del sistema. Los permisos se revisan por módulo para evitar saturación visual."
+        description="Gestiona los perfiles administrativos, sus permisos, alcance, nivel jerárquico y estado dentro del panel."
       >
         <div className="grid gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p
-                className="text-sm"
-                style={{ color: 'var(--admin-card-muted-text)' }}
-              >
-                Perfiles cargados: <strong>{filteredRoles.length}</strong>
-                {totalPermissions > 0 ? (
-                  <> · Permisos disponibles: <strong>{totalPermissions}</strong></>
-                ) : null}
-              </p>
+          <section
+            className="relative overflow-hidden rounded-[1.7rem] border p-4 shadow-sm"
+            style={{
+              background: THEME.cardBg,
+              borderColor: THEME.border,
+              color: THEME.cardText,
+            }}
+          >
+            <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-center">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                  style={{
+                    background: 'rgba(6, 182, 212, 0.12)',
+                    color: 'var(--admin-primary, #06b6d4)',
+                  }}
+                >
+                  <ShieldCheck size={22} />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]"
+                      style={{
+                        background: THEME.lightPanelBg,
+                        borderColor: THEME.lightPanelBorder,
+                        color: THEME.lightPanelText,
+                      }}
+                    >
+                      <Sparkles size={12} />
+                      Administración
+                    </span>
+
+                    <span
+                      className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
+                      style={{
+                        background: 'rgba(212, 175, 55, 0.12)',
+                        borderColor: 'rgba(212, 175, 55, 0.28)',
+                        color: THEME.cardText,
+                      }}
+                    >
+                      Control de accesos
+                    </span>
+                  </div>
+
+                  <h2 className="mt-3 text-xl font-black leading-tight sm:text-2xl">
+                    Perfiles administrativos
+                  </h2>
+
+                  <p
+                    className="mt-2 max-w-2xl text-sm font-semibold leading-6"
+                    style={{
+                      color: THEME.mutedText,
+                    }}
+                  >
+                    Crea perfiles, define permisos por módulo y controla el
+                    alcance de cada usuario dentro del panel.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  disabled={metaLoading || totalPermissions === 0}
+                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-md transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    background: THEME.primaryBg,
+                    color: THEME.primaryText,
+                    border: `1px solid ${THEME.primaryBg}`,
+                  }}
+                >
+                  <Plus size={17} />
+                  Crear perfil
+                </button>
+
+                <button
+                  type="button"
+                  onClick={reloadAll}
+                  disabled={loading || metaLoading}
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    background: THEME.lightPanelBg,
+                    color: THEME.lightPanelText,
+                    borderColor: THEME.lightPanelBorder,
+                  }}
+                >
+                  <RefreshCw
+                    size={16}
+                    className={loading || metaLoading ? 'animate-spin' : ''}
+                  />
+                  {loading || metaLoading ? 'Actualizando...' : 'Actualizar'}
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative mt-4 grid gap-3 md:grid-cols-3">
+              <CompactMetricCard
+                icon={UsersRound}
+                label="Perfiles cargados"
+                value={filteredRoles.length}
+              />
+
+              <CompactMetricCard
+                icon={ShieldCheck}
+                label="Permisos disponibles"
+                value={totalPermissions}
+              />
+
+              <CompactMetricCard
+                icon={Wand2}
+                label="Personalizados"
+                value={customRolesCount}
+              />
+            </div>
+          </section>
+
+          {successMessage ? (
+            <div
+              className="flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm font-bold"
+              style={{
+                background: 'rgba(22, 163, 74, 0.08)',
+                borderColor: 'rgba(22, 163, 74, 0.22)',
+                color: '#15803d',
+              }}
+            >
+              <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          ) : null}
+
+          {error ? (
+            <div
+              className="flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm font-bold"
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                borderColor: 'rgba(239, 68, 68, 0.25)',
+                color: '#b91c1c',
+              }}
+            >
+              <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          ) : null}
+
+          <section
+            className="rounded-[1.7rem] border p-4 shadow-sm"
+            style={{
+              background: THEME.cardBg,
+              borderColor: THEME.border,
+              color: THEME.cardText,
+            }}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-lg font-black">Listado de perfiles</h3>
+
+                <p
+                  className="mt-1 text-sm font-semibold"
+                  style={{
+                    color: THEME.mutedText,
+                  }}
+                >
+                  Consulta permisos, edita perfiles o controla su estado.
+                </p>
+              </div>
+
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar perfil..."
-                className="w-full rounded-xl border px-4 py-2 text-sm outline-none sm:w-72"
+                placeholder="Buscar perfil, permiso, código o estado..."
+                className="w-full rounded-2xl border px-4 py-2.5 text-sm font-bold outline-none transition focus:ring-2 lg:max-w-md"
                 style={{
-                  background: 'var(--admin-input-bg)',
-                  borderColor: 'var(--admin-card-border)',
-                  color: 'var(--admin-card-text)',
+                  background: THEME.inputBg,
+                  borderColor: THEME.inputBorder,
+                  color: THEME.inputText,
+                  '--tw-ring-color': 'rgba(6, 182, 212, 0.22)',
                 }}
               />
-
-              <button
-                type="button"
-                onClick={loadRoles}
-                disabled={loading}
-                className="w-fit rounded-xl bg-pink-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? 'Actualizando...' : 'Actualizar'}
-              </button>
             </div>
-          </div>
 
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-              {error}
+            <div className="mt-4">
+              <RolesTable
+                roles={filteredRoles}
+                loading={loading || metaLoading}
+                currentAdminRole="owner"
+                onViewPermissions={openPermissionsModal}
+                onEdit={openEditModal}
+                onToggleStatus={openToggleStatusModal}
+                onDelete={openDeleteModal}
+              />
             </div>
-          )}
-
-          {(loading || metaLoading) && (
-            <div
-              className="rounded-xl border p-4 text-sm"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                color: 'var(--admin-card-muted-text)',
-              }}
-            >
-              Cargando roles y permisos...
-            </div>
-          )}
-
-          {!loading && !metaLoading && filteredRoles.length === 0 && (
-            <div
-              className="rounded-xl border p-4 text-sm"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                color: 'var(--admin-card-muted-text)',
-              }}
-            >
-              No hay perfiles para mostrar.
-            </div>
-          )}
-
-          {!loading && !metaLoading && filteredRoles.length > 0 && (
-            <div
-              className="overflow-hidden rounded-2xl border"
-              style={{ borderColor: 'var(--admin-card-border)' }}
-            >
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead
-                    style={{
-                      background: 'rgba(255,255,255,0.22)',
-                      color: 'var(--admin-card-muted-text)',
-                    }}
-                  >
-                    <tr>
-                      <th className="px-4 py-3 font-bold">Perfil</th>
-                      <th className="px-4 py-3 font-bold">Descripción</th>
-                      <th className="px-4 py-3 font-bold">Alcance</th>
-                      <th className="px-4 py-3 font-bold">Nivel</th>
-                      <th className="px-4 py-3 font-bold">Permisos</th>
-                      <th className="px-4 py-3 font-bold">Estado</th>
-                      <th className="px-4 py-3 font-bold text-right">Acción</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredRoles.map((role) => {
-                      const permissionsCount = Array.isArray(role.permissions)
-                        ? role.permissions.length
-                        : 0;
-
-                      return (
-                        <tr
-                          key={role._id || role.code}
-                          className="border-t transition hover:bg-white/20"
-                          style={{
-                            borderColor: 'var(--admin-card-border)',
-                          }}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-bold">
-                                  {role.name || role.code}
-                                </span>
-
-                                {role.isSystem && (
-                                  <span className="rounded-full border border-pink-200 bg-pink-50 px-2 py-0.5 text-[11px] font-bold text-pink-700">
-                                    Sistema
-                                  </span>
-                                )}
-
-                                {role.isDefault && (
-                                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
-                                    Predeterminado
-                                  </span>
-                                )}
-                              </div>
-
-                              <span
-                                className="text-xs"
-                                style={{ color: 'var(--admin-card-muted-text)' }}
-                              >
-                                Código: {role.code}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td
-                            className="max-w-[280px] px-4 py-3 text-sm"
-                            style={{ color: 'var(--admin-card-muted-text)' }}
-                          >
-                            {role.description || 'Sin descripción'}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            {formatScope(role.scope)}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            {role.level}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span className="rounded-xl border border-pink-200 bg-pink-50 px-3 py-1 text-xs font-bold text-pink-700">
-                              {permissionsCount}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span
-                              className={`rounded-xl border px-3 py-1 text-xs font-bold ${getStatusClasses(
-                                role.status
-                              )}`}
-                            >
-                              {formatStatus(role.status)}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRoleId(role._id)}
-                              className="rounded-xl border px-3 py-2 text-xs font-bold transition hover:scale-[1.02]"
-                              style={{
-                                borderColor: 'var(--admin-card-border)',
-                                background: 'rgba(255,255,255,0.24)',
-                                color: 'var(--admin-card-text)',
-                              }}
-                            >
-                              Ver permisos
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          </section>
         </div>
       </InfoCard>
 
-      <EmptyHint
-        title="Próximo paso"
-        text="Luego conectaremos creación y edición de perfiles personalizados. Por ahora esta vista queda solo para consulta clara de roles y permisos."
+      <RoleFormModal
+        open={formModal.open}
+        mode={formModal.mode}
+        role={formModal.role}
+        availablePermissions={availablePermissions}
+        loading={saving}
+        error={formError}
+        onClose={closeFormModal}
+        onSubmit={handleSubmitRole}
       />
 
-      {selectedRole && (
-        <PermissionsModal
-          selectedRole={selectedRole}
-          groupedSelectedPermissions={groupedSelectedPermissions}
-          onClose={closePermissionsModal}
-        />
-      )}
+      <RoleConfirmModal
+        open={confirmModal.open}
+        action={confirmModal.action}
+        role={confirmModal.role}
+        loading={confirmLoading}
+        error={confirmError}
+        onClose={closeConfirmModal}
+        onConfirm={handleConfirmAction}
+      />
+
+      <RolePermissionsModal
+        open={Boolean(selectedPermissionsRole)}
+        role={selectedPermissionsRole}
+        onClose={closePermissionsModal}
+      />
     </div>
   );
 }
