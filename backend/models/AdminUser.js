@@ -40,6 +40,10 @@ function normalizeUsername(value) {
   return normalizeLower(value).replace(/\s+/g, '');
 }
 
+function normalizeRoleCode(value) {
+  return normalizeLower(value).replace(/\s+/g, '-');
+}
+
 function normalizePermission(value) {
   return normalizeLower(value).replace(/\s+/g, ':');
 }
@@ -197,8 +201,17 @@ const AdminUserSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ADMIN_USER_ROLES,
+      required: true,
+      trim: true,
+      lowercase: true,
+      minlength: 3,
+      maxlength: 80,
       default: 'seller',
+      set: normalizeRoleCode,
+      match: [
+        /^[a-z0-9][a-z0-9._-]*$/,
+        'El código del perfil solo puede contener letras, números, punto, guion y guion bajo.',
+      ],
     },
 
     roleRef: {
@@ -378,6 +391,7 @@ AdminUserSchema.pre('validate', function (next) {
     this.phone = normalizeText(this.phone);
     this.documentType = normalizeText(this.documentType).toUpperCase();
     this.documentNumber = normalizeText(this.documentNumber);
+    this.role = normalizeRoleCode(this.role || 'seller');
     this.notes = normalizeText(this.notes);
 
     if (!this.displayName) {
@@ -523,7 +537,9 @@ AdminUserSchema.methods.invalidateSessions = async function invalidateSessions()
 AdminUserSchema.methods.hasRole = function hasRole(roles = []) {
   const allowedRoles = Array.isArray(roles) ? roles : [roles];
 
-  return allowedRoles.includes(this.role);
+  return allowedRoles
+    .map((role) => normalizeRoleCode(role))
+    .includes(normalizeRoleCode(this.role));
 };
 
 AdminUserSchema.methods.hasPermission = function hasPermission(permission) {
@@ -531,13 +547,15 @@ AdminUserSchema.methods.hasPermission = function hasPermission(permission) {
 
   if (!cleanPermission) return false;
 
-  if (this.role === 'owner') return true;
+  if (normalizeRoleCode(this.role) === 'owner') return true;
 
   return Array.isArray(this.permissions) && this.permissions.includes(cleanPermission);
 };
 
 AdminUserSchema.methods.canAccessBranch = function canAccessBranch(branchId) {
-  if (this.role === 'owner' || this.role === 'admin') return true;
+  const currentRole = normalizeRoleCode(this.role);
+
+  if (currentRole === 'owner' || currentRole === 'admin') return true;
 
   const target = String(branchId || '');
 
@@ -578,6 +596,7 @@ AdminUserSchema.statics.findByLogin = function findByLogin(login) {
 
 AdminUserSchema.statics.normalizeUsername = normalizeUsername;
 AdminUserSchema.statics.normalizeEmail = normalizeEmail;
+AdminUserSchema.statics.normalizeRoleCode = normalizeRoleCode;
 AdminUserSchema.statics.normalizePermissions = normalizePermissions;
 
 AdminUserSchema.statics.getRoles = function getRoles() {

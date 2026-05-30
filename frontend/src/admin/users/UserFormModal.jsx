@@ -46,6 +46,25 @@ export default function UserFormModal({
     }));
   };
 
+  const selectedRole =
+    roles.find((role) => String(role.code) === String(form.role)) || null;
+
+  const selectedRolePermissionCount = Array.isArray(selectedRole?.permissions)
+    ? selectedRole.permissions.length
+    : 0;
+
+  const roleScopeLabels = {
+    global: 'Global',
+    branch: 'Por sede',
+    branches: 'Por sedes',
+    warehouse: 'Bodega',
+    own: 'Propio',
+    custom: 'Personalizado',
+  };
+
+  const selectedRoleScopeLabel =
+    roleScopeLabels[selectedRole?.scope] || selectedRole?.scope || 'No definido';
+
   const inputStyle = {
     background: 'var(--admin-input-bg)',
     borderColor: 'var(--admin-input-border)',
@@ -106,7 +125,9 @@ export default function UserFormModal({
                 className="text-xs font-black uppercase tracking-[0.25em]"
                 style={mutedTextStyle}
               >
-                {isEditMode ? 'Editar acceso administrativo' : 'Nuevo acceso administrativo'}
+                {isEditMode
+                  ? 'Editar acceso administrativo'
+                  : 'Nuevo acceso administrativo'}
               </p>
 
               <h3
@@ -121,8 +142,8 @@ export default function UserFormModal({
                 style={mutedTextStyle}
               >
                 {isEditMode
-                  ? 'Actualiza los datos, rol, sede y estado del usuario administrativo.'
-                  : 'Registra un usuario interno, asígnale rol, sede y una contraseña temporal.'}
+                  ? 'Actualiza los datos, perfil, sede y estado del usuario administrativo.'
+                  : 'Registra un usuario interno, asígnale perfil, sede y una contraseña temporal.'}
               </p>
             </div>
 
@@ -173,7 +194,9 @@ export default function UserFormModal({
                   <input
                     type="text"
                     value={form.firstName}
-                    onChange={(event) => updateField('firstName', event.target.value)}
+                    onChange={(event) =>
+                      updateField('firstName', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     placeholder="Ej: María"
                     style={inputStyle}
@@ -187,7 +210,9 @@ export default function UserFormModal({
                   <input
                     type="text"
                     value={form.lastName}
-                    onChange={(event) => updateField('lastName', event.target.value)}
+                    onChange={(event) =>
+                      updateField('lastName', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     placeholder="Ej: Pérez"
                     style={inputStyle}
@@ -200,15 +225,27 @@ export default function UserFormModal({
                   </span>
                   <select
                     value={form.documentType}
-                    onChange={(event) => updateField('documentType', event.target.value)}
+                    onChange={(event) =>
+                      updateField('documentType', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={inputStyle}
                   >
-                    <option value="CC" style={optionStyle}>Cédula de ciudadanía</option>
-                    <option value="CE" style={optionStyle}>Cédula de extranjería</option>
-                    <option value="NIT" style={optionStyle}>NIT</option>
-                    <option value="PASSPORT" style={optionStyle}>Pasaporte</option>
-                    <option value="OTHER" style={optionStyle}>Otro</option>
+                    <option value="CC" style={optionStyle}>
+                      Cédula de ciudadanía
+                    </option>
+                    <option value="CE" style={optionStyle}>
+                      Cédula de extranjería
+                    </option>
+                    <option value="NIT" style={optionStyle}>
+                      NIT
+                    </option>
+                    <option value="PASSPORT" style={optionStyle}>
+                      Pasaporte
+                    </option>
+                    <option value="OTHER" style={optionStyle}>
+                      Otro
+                    </option>
                   </select>
                 </label>
 
@@ -219,7 +256,9 @@ export default function UserFormModal({
                   <input
                     type="text"
                     value={form.documentNumber}
-                    onChange={(event) => updateField('documentNumber', event.target.value)}
+                    onChange={(event) =>
+                      updateField('documentNumber', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     placeholder="Ej: 123456789"
                     style={inputStyle}
@@ -244,7 +283,9 @@ export default function UserFormModal({
                   <input
                     type="text"
                     value={form.username}
-                    onChange={(event) => updateField('username', event.target.value)}
+                    onChange={(event) =>
+                      updateField('username', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     placeholder="Ej: cajero2"
                     required
@@ -260,7 +301,9 @@ export default function UserFormModal({
                     <input
                       type="password"
                       value={form.password}
-                      onChange={(event) => updateField('password', event.target.value)}
+                      onChange={(event) =>
+                        updateField('password', event.target.value)
+                      }
                       className="rounded-2xl border px-4 py-3 text-sm outline-none"
                       placeholder="Mínimo 8 caracteres"
                       required
@@ -304,14 +347,15 @@ export default function UserFormModal({
                 className="mb-3 text-sm font-black uppercase tracking-[0.18em]"
                 style={sectionTitleStyle}
               >
-                Rol y sede
+                Perfil y sede
               </h4>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <span className="text-sm font-bold" style={labelStyle}>
-                    Rol *
+                    Perfil administrativo *
                   </span>
+
                   <select
                     value={form.role}
                     onChange={(event) => updateField('role', event.target.value)}
@@ -329,7 +373,67 @@ export default function UserFormModal({
                       </option>
                     ))}
                   </select>
-                </label>
+
+                  <div
+                    className="rounded-2xl border px-4 py-3"
+                    style={{
+                      borderColor: 'var(--admin-primary-soft-border)',
+                      background: 'var(--admin-primary-soft-bg)',
+                      color: 'var(--admin-modal-text)',
+                    }}
+                  >
+                    {selectedRole ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className="rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
+                            style={{
+                              background: 'var(--admin-button-bg)',
+                              color: 'var(--admin-button-text)',
+                            }}
+                          >
+                            {selectedRole.code}
+                          </span>
+
+                          <span
+                            className="text-xs font-black"
+                            style={{ color: 'var(--admin-modal-text)' }}
+                          >
+                            Nivel {selectedRole.level ?? '—'}
+                          </span>
+
+                          <span
+                            className="text-xs font-black"
+                            style={{ color: 'var(--admin-modal-text)' }}
+                          >
+                            {selectedRoleScopeLabel}
+                          </span>
+                        </div>
+
+                        <p
+                          className="mt-2 text-xs leading-5"
+                          style={mutedTextStyle}
+                        >
+                          Este perfil asignará {selectedRolePermissionCount}{' '}
+                          permisos al usuario administrativo.
+                        </p>
+
+                        {selectedRole.description && (
+                          <p
+                            className="mt-1 text-xs leading-5"
+                            style={mutedTextStyle}
+                          >
+                            {selectedRole.description}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs font-semibold" style={mutedTextStyle}>
+                        Selecciona un perfil para ver el resumen de permisos.
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 <label className="grid gap-2">
                   <span className="text-sm font-bold" style={labelStyle}>
@@ -337,14 +441,22 @@ export default function UserFormModal({
                   </span>
                   <select
                     value={form.branchId}
-                    onChange={(event) => updateField('branchId', event.target.value)}
+                    onChange={(event) =>
+                      updateField('branchId', event.target.value)
+                    }
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     required
                     style={inputStyle}
                   >
-                    <option value="" style={optionStyle}>Seleccionar sede</option>
+                    <option value="" style={optionStyle}>
+                      Seleccionar sede
+                    </option>
                     {branches.map((branch) => (
-                      <option key={branch._id} value={branch._id} style={optionStyle}>
+                      <option
+                        key={branch._id}
+                        value={branch._id}
+                        style={optionStyle}
+                      >
                         {branch.name} ({branch.code})
                       </option>
                     ))}
@@ -361,10 +473,18 @@ export default function UserFormModal({
                     className="rounded-2xl border px-4 py-3 text-sm outline-none"
                     style={inputStyle}
                   >
-                    <option value="active" style={optionStyle}>Activo</option>
-                    <option value="inactive" style={optionStyle}>Inactivo</option>
-                    <option value="pending" style={optionStyle}>Pendiente</option>
-                    <option value="blocked" style={optionStyle}>Bloqueado</option>
+                    <option value="active" style={optionStyle}>
+                      Activo
+                    </option>
+                    <option value="inactive" style={optionStyle}>
+                      Inactivo
+                    </option>
+                    <option value="pending" style={optionStyle}>
+                      Pendiente
+                    </option>
+                    <option value="blocked" style={optionStyle}>
+                      Bloqueado
+                    </option>
                   </select>
                 </label>
 

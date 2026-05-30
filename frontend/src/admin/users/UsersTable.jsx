@@ -50,6 +50,50 @@ function getPrimaryBranchLabel(user, branches) {
   return getBranchName(defaultBranch, branches);
 }
 
+function getRoleScopeLabel(scope) {
+  const labels = {
+    global: 'Global',
+    branch: 'Por sede',
+    branches: 'Por sedes',
+    warehouse: 'Bodega',
+    own: 'Propio',
+    custom: 'Personalizado',
+  };
+
+  return labels[scope] || scope || 'Sin alcance';
+}
+
+function getUserRoleDetails(user, roles) {
+  const userRoleCode = String(user.role || '').toLowerCase();
+
+  const roleFromRef =
+    user.roleRef && typeof user.roleRef === 'object' ? user.roleRef : null;
+
+  const roleFromList =
+    roles.find(
+      (role) => String(role.code || '').toLowerCase() === userRoleCode
+    ) || null;
+
+  const roleSource = roleFromRef || roleFromList || null;
+
+  const permissions = Array.isArray(roleSource?.permissions)
+    ? roleSource.permissions
+    : Array.isArray(roleFromList?.permissions)
+      ? roleFromList.permissions
+      : [];
+
+  return {
+    name: roleSource?.name || formatRole(user.role, roles),
+    code: roleSource?.code || user.role || 'sin-rol',
+    level:
+      roleSource?.level !== undefined && roleSource?.level !== null
+        ? roleSource.level
+        : roleFromList?.level,
+    scope: roleSource?.scope || roleFromList?.scope || '',
+    permissionsCount: permissions.length,
+  };
+}
+
 function getStatusStyle(status) {
   const value = String(status || '').toLowerCase();
 
@@ -191,6 +235,11 @@ export default function UsersTable({
         const isOwnerUser = user.username === 'owner' || user.role === 'owner';
         const isActionsOpen = openActionsId === user._id;
         const primaryBranch = getPrimaryBranchLabel(user, branches);
+        const roleDetails = getUserRoleDetails(user, roles);
+        const roleLevelText =
+          roleDetails.level !== undefined && roleDetails.level !== null
+            ? `Nivel ${roleDetails.level}`
+            : 'Sin nivel';
 
         return (
           <article
@@ -211,8 +260,8 @@ export default function UsersTable({
               color: 'var(--admin-card-text)',
             }}
           >
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div className="grid gap-4 xl:grid-cols-[minmax(230px,1fr)_minmax(430px,1.45fr)_96px] xl:items-center">
+              <div className="flex min-w-0 items-center gap-4">
                 <div
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-black"
                   style={{
@@ -227,14 +276,14 @@ export default function UsersTable({
 
                 <div className="min-w-0 flex-1">
                   <h3
-                    className="truncate text-sm font-black"
+                    className="break-words text-sm font-black leading-5"
                     style={{ color: 'var(--admin-card-text)' }}
                   >
                     {displayName}
                   </h3>
 
                   <p
-                    className="mt-0.5 truncate text-xs font-bold"
+                    className="mt-0.5 break-words text-xs font-bold"
                     style={{ color: 'var(--admin-card-muted-text)' }}
                   >
                     @{user.username}
@@ -246,20 +295,20 @@ export default function UsersTable({
                   >
                     <Mail className="h-3.5 w-3.5 shrink-0" />
 
-                    <span className="truncate">
+                    <span className="break-all">
                       {user.email || 'Sin correo'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-3 xl:max-w-[520px]">
+              <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(270px,1.45fr)_minmax(160px,0.75fr)]">
                 <div
-                  className="flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2"
+                  className="flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5"
                   style={getInfoBoxStyle()}
                 >
                   <ShieldCheck
-                    className="h-4 w-4 shrink-0"
+                    className="mt-0.5 h-4 w-4 shrink-0"
                     style={{ color: 'var(--admin-primary)' }}
                   />
 
@@ -268,20 +317,38 @@ export default function UsersTable({
                       className="text-[10px] font-black uppercase tracking-[0.16em]"
                       style={{ color: 'var(--admin-card-muted-text)' }}
                     >
-                      Rol
+                      Perfil
                     </p>
 
                     <p
-                      className="truncate text-xs font-black"
+                      className="break-words text-xs font-black leading-4"
                       style={{ color: 'var(--admin-card-text)' }}
                     >
-                      {formatRole(user.role, roles)}
+                      {roleDetails.name}
+                    </p>
+
+                    <div
+                      className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold leading-4"
+                      style={{ color: 'var(--admin-card-muted-text)' }}
+                    >
+                      <span>{roleDetails.code}</span>
+                      <span>·</span>
+                      <span>{roleLevelText}</span>
+                      <span>·</span>
+                      <span>{getRoleScopeLabel(roleDetails.scope)}</span>
+                    </div>
+
+                    <p
+                      className="mt-1 text-[11px] font-bold leading-4"
+                      style={{ color: 'var(--admin-card-muted-text)' }}
+                    >
+                      {roleDetails.permissionsCount} permisos asignados
                     </p>
                   </div>
                 </div>
 
                 <div
-                  className="flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2"
+                  className="flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5"
                   style={getInfoBoxStyle()}
                 >
                   <Building2
@@ -298,35 +365,30 @@ export default function UsersTable({
                     </p>
 
                     <p
-                      className="truncate text-xs font-black"
+                      className="break-words text-xs font-black leading-4"
                       style={{ color: 'var(--admin-card-text)' }}
                     >
                       {primaryBranch}
                     </p>
                   </div>
                 </div>
-
-                <div
-                  className="flex items-center rounded-2xl border px-3 py-2"
-                  style={getInfoBoxStyle()}
-                >
-                  <span
-                    className="inline-flex rounded-full border px-3 py-1 text-xs font-black"
-                    style={getStatusStyle(user.status)}
-                  >
-                    {formatStatus(user.status)}
-                  </span>
-                </div>
               </div>
 
-              <div className="relative flex shrink-0 justify-start gap-2 xl:justify-end">
+              <div className="relative flex w-full flex-col items-stretch gap-2">
+                <span
+                  className="inline-flex w-full justify-center rounded-full border px-3 py-1 text-xs font-black"
+                  style={getStatusStyle(user.status)}
+                >
+                  {formatStatus(user.status)}
+                </span>
+
                 <button
                   type="button"
                   onClick={() => {
                     closeActions();
                     onEditUser(user);
                   }}
-                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                   style={getReadableButtonStyle()}
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -335,12 +397,12 @@ export default function UsersTable({
 
                 <div
                   ref={isActionsOpen ? actionsRef : null}
-                  className="relative z-[100]"
+                  className="relative z-[100] w-full"
                 >
                   <button
                     type="button"
                     onClick={() => toggleActions(user._id)}
-                    className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                     style={
                       isActionsOpen
                         ? getPrimaryButtonStyle()
