@@ -173,9 +173,9 @@ export default function RoleFormModal({
             onClick={onClose}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
-              borderColor: 'var(--admin-border, rgba(0,0,0,0.14))',
-              color: 'var(--admin-card-text, #1f2937)',
-              background: 'var(--admin-card-bg, #ffffff)',
+              borderColor: 'rgba(244, 114, 182, 0.35)',
+              color: '#0f172a',
+              background: 'rgba(255, 255, 255, 0.96)',
             }}
             aria-label="Cerrar modal"
           >
@@ -226,7 +226,7 @@ export default function RoleFormModal({
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
                     Nombre
                   </label>
 
@@ -247,7 +247,7 @@ export default function RoleFormModal({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
                     Código
                   </label>
 
@@ -271,7 +271,7 @@ export default function RoleFormModal({
               </div>
 
               <div className="mt-3">
-                <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                <label className="block text-[11px] font-black uppercase tracking-[0.12em]">
                   Descripción
                 </label>
 
@@ -295,7 +295,7 @@ export default function RoleFormModal({
 
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
                     Alcance
                   </label>
 
@@ -320,7 +320,7 @@ export default function RoleFormModal({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
                     Nivel
                   </label>
 
@@ -342,7 +342,7 @@ export default function RoleFormModal({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em]">
+                  <label className="block h-[14px] whitespace-nowrap text-[10px] font-black uppercase tracking-[0.1em]">
                     Estado
                   </label>
 
@@ -367,11 +367,24 @@ export default function RoleFormModal({
                 </div>
               </div>
 
+              <div
+                className="mt-2 rounded-xl border px-3 py-2 text-[11px] font-bold leading-snug"
+                style={{
+                  background: 'rgba(6, 182, 212, 0.08)',
+                  borderColor: 'rgba(6, 182, 212, 0.22)',
+                  color: 'var(--admin-card-text, #1f2937)',
+                }}
+              >
+                <span className="font-black">Nivel:</span> menor número = más autoridad.
+                Ej: 1 propietario, 10 administrador, 30 encargado, 50 vendedor/cajero, 80 consulta.
+              </div>
+
               <label
                 className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3"
                 style={{
                   background: 'var(--admin-card-bg, #ffffff)',
                   borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
+                  color: 'var(--admin-card-text, #1f2937)',
                 }}
               >
                 <input
@@ -400,7 +413,13 @@ export default function RoleFormModal({
                 </span>
               </label>
 
-              <details className="mt-3 rounded-2xl border px-4 py-3">
+              <details
+                className="mt-3 rounded-2xl border px-4 py-3"
+                style={{
+                  borderColor: 'var(--admin-border, rgba(0,0,0,0.10))',
+                  color: 'var(--admin-card-text, #1f2937)',
+                }}
+              >
                 <summary className="cursor-pointer text-sm font-black">
                   Opciones avanzadas
                 </summary>
@@ -474,9 +493,9 @@ export default function RoleFormModal({
             onClick={onClose}
             className="rounded-2xl border px-5 py-3 text-sm font-black transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
             style={{
-              background: 'var(--admin-card-bg, #ffffff)',
-              borderColor: 'var(--admin-border, rgba(0,0,0,0.14))',
-              color: 'var(--admin-card-text, #1f2937)',
+              background: 'rgba(255, 255, 255, 0.96)',
+              borderColor: 'rgba(244, 114, 182, 0.35)',
+              color: '#0f172a',
             }}
           >
             Cancelar
@@ -489,7 +508,8 @@ export default function RoleFormModal({
             style={{
               background:
                 'var(--admin-button-bg, var(--admin-primary, #be185d))',
-              color: 'var(--admin-button-text, #ffffff)',
+              color: '#ffffff',
+              border: '1px solid var(--admin-button-bg, var(--admin-primary, #be185d))',
             }}
           >
             <Save size={17} />

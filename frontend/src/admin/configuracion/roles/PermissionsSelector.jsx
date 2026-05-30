@@ -18,7 +18,7 @@ import {
  * - No muestra todos los permisos hacia abajo.
  * - Muestra módulos como pestañas.
  * - Solo muestra permisos del módulo activo.
- * - Pensado para trabajar dentro del modal sin scroll.
+ * - Botones y contadores con contraste corregido.
  * ============================================================ */
 
 const THEME = {
@@ -34,6 +34,36 @@ const THEME = {
   inputText: 'var(--admin-input-text, var(--admin-card-text, #111827))',
   inputBorder:
     'var(--admin-input-border, var(--admin-card-border, rgba(148, 163, 184, 0.22)))',
+};
+
+const LIGHT_BUTTON = {
+  background: 'rgba(255, 255, 255, 0.96)',
+  color: '#0f172a',
+  border: '1px solid rgba(244, 114, 182, 0.35)',
+};
+
+const DISABLED_BUTTON = {
+  background: 'rgba(241, 245, 249, 0.95)',
+  color: '#64748b',
+  border: '1px solid rgba(203, 213, 225, 0.85)',
+};
+
+const PRIMARY_BUTTON = {
+  background: THEME.primaryBg,
+  color: '#ffffff',
+  border: `1px solid ${THEME.primaryBg}`,
+};
+
+const GOLD_BUTTON = {
+  background: 'rgba(212, 175, 55, 0.18)',
+  color: '#0f172a',
+  border: '1px solid rgba(212, 175, 55, 0.45)',
+};
+
+const TOP_COUNTER = {
+  background: 'rgba(255, 255, 255, 0.12)',
+  color: '#ffffff',
+  border: '1px solid rgba(255, 255, 255, 0.24)',
 };
 
 function getGroupSelectedCount(selectedPermissions = [], groupPermissions = []) {
@@ -196,11 +226,7 @@ export default function PermissionsSelector({
         <div className="flex shrink-0 items-center gap-2">
           <span
             className="rounded-full px-3 py-1 text-xs font-black"
-            style={{
-              background: 'rgba(212, 175, 55, 0.14)',
-              color: THEME.cardText,
-              border: '1px solid rgba(212, 175, 55, 0.35)',
-            }}
+            style={TOP_COUNTER}
           >
             {selectedCount}/{totalCount}
           </span>
@@ -209,12 +235,8 @@ export default function PermissionsSelector({
             type="button"
             disabled={disabled || totalCount === 0}
             onClick={handleSelectAll}
-            className="rounded-full px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background: THEME.primaryBg,
-              color: THEME.primaryText,
-              border: `1px solid ${THEME.primaryBg}`,
-            }}
+            className="rounded-full px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
+            style={disabled || totalCount === 0 ? DISABLED_BUTTON : PRIMARY_BUTTON}
           >
             Todo
           </button>
@@ -223,12 +245,8 @@ export default function PermissionsSelector({
             type="button"
             disabled={disabled || selectedCount === 0}
             onClick={handleClearAll}
-            className="rounded-full border px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              borderColor: THEME.border,
-              color: THEME.cardText,
-              background: THEME.cardBg,
-            }}
+            className="rounded-full px-3 py-1 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
+            style={disabled || selectedCount === 0 ? DISABLED_BUTTON : LIGHT_BUTTON}
           >
             Limpiar
           </button>
@@ -269,11 +287,15 @@ export default function PermissionsSelector({
                     setActiveModule(group.module);
                     setSearchTerm('');
                   }}
-                  className="min-h-[42px] rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-[42px] rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
                   style={{
-                    background: isActive ? THEME.primaryBg : THEME.softBg,
-                    color: isActive ? THEME.primaryText : THEME.cardText,
-                    borderColor: isActive ? THEME.primaryBg : THEME.border,
+                    background: isActive
+                      ? THEME.primaryBg
+                      : 'rgba(255, 255, 255, 0.92)',
+                    color: isActive ? '#ffffff' : '#0f172a',
+                    borderColor: isActive
+                      ? THEME.primaryBg
+                      : 'rgba(244, 114, 182, 0.28)',
                   }}
                 >
                   <span className="block truncate text-[11px] font-black">
@@ -283,8 +305,7 @@ export default function PermissionsSelector({
                   <span
                     className="mt-0.5 block text-[10px] font-bold"
                     style={{
-                      color: isActive ? THEME.primaryText : THEME.mutedText,
-                      opacity: isActive ? 0.9 : 1,
+                      color: isActive ? 'rgba(255,255,255,0.92)' : '#334155',
                     }}
                   >
                     {selectedInGroup} de {group.permissions.length}
@@ -297,11 +318,12 @@ export default function PermissionsSelector({
           <section
             className="mt-3 rounded-3xl border p-3"
             style={{
-              background: THEME.softBg,
-              borderColor: THEME.border,
+              background: 'rgba(255, 255, 255, 0.88)',
+              borderColor: 'rgba(244, 114, 182, 0.28)',
+              color: '#0f172a',
             }}
           >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-center">
               <div>
                 <h4 className="text-sm font-black">
                   {activeGroup?.label || 'Permisos'}
@@ -310,7 +332,7 @@ export default function PermissionsSelector({
                 <p
                   className="mt-1 text-xs font-semibold"
                   style={{
-                    color: THEME.mutedText,
+                    color: '#334155',
                   }}
                 >
                   {selectedInActiveGroup} de {activeGroup?.permissions?.length || 0}{' '}
@@ -338,20 +360,16 @@ export default function PermissionsSelector({
                   type="button"
                   disabled={disabled || !activeGroup}
                   onClick={handleToggleActiveGroup}
-                  className="shrink-0 rounded-2xl px-3 py-2 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{
-                    background: activeGroupSelected
-                      ? 'rgba(212, 175, 55, 0.16)'
-                      : THEME.primaryBg,
-                    color: activeGroupSelected
-                      ? THEME.cardText
-                      : THEME.primaryText,
-                    border: activeGroupSelected
-                      ? '1px solid rgba(212, 175, 55, 0.42)'
-                      : `1px solid ${THEME.primaryBg}`,
-                  }}
+                  className="shrink-0 rounded-2xl px-3 py-2 text-xs font-black transition hover:scale-[1.02] disabled:cursor-not-allowed"
+                  style={
+                    disabled || !activeGroup
+                      ? DISABLED_BUTTON
+                      : activeGroupSelected
+                      ? GOLD_BUTTON
+                      : PRIMARY_BUTTON
+                  }
                 >
-                  {activeGroupSelected ? 'Quitar' : 'Módulo'}
+                  {activeGroupSelected ? 'Quitar módulo' : 'Seleccionar'}
                 </button>
               </div>
             </div>
@@ -369,20 +387,27 @@ export default function PermissionsSelector({
                     type="button"
                     disabled={disabled}
                     onClick={() => handleTogglePermission(permission.value)}
-                    className="flex min-h-[42px] items-center gap-3 rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex min-h-[42px] items-center gap-3 rounded-2xl border px-3 py-2 text-left transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-70"
                     style={{
                       background: checked
-                        ? 'rgba(190, 24, 93, 0.10)'
-                        : THEME.cardBg,
-                      borderColor: checked ? THEME.primaryBg : THEME.border,
+                        ? 'rgba(6, 182, 212, 0.14)'
+                        : 'rgba(255, 255, 255, 0.96)',
+                      borderColor: checked
+                        ? 'rgba(6, 182, 212, 0.65)'
+                        : 'rgba(244, 114, 182, 0.26)',
+                      color: '#0f172a',
                     }}
                   >
                     <span
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-black"
                       style={{
-                        background: checked ? THEME.primaryBg : 'transparent',
-                        borderColor: checked ? THEME.primaryBg : THEME.border,
-                        color: checked ? THEME.primaryText : 'transparent',
+                        background: checked
+                          ? 'var(--admin-primary, #06b6d4)'
+                          : 'transparent',
+                        borderColor: checked
+                          ? 'var(--admin-primary, #06b6d4)'
+                          : 'rgba(15, 23, 42, 0.28)',
+                        color: checked ? '#ffffff' : 'transparent',
                       }}
                     >
                       ✓
@@ -391,7 +416,7 @@ export default function PermissionsSelector({
                     <span
                       className="block min-w-0 truncate text-xs font-black"
                       style={{
-                        color: THEME.cardText,
+                        color: '#0f172a',
                       }}
                     >
                       {permission.actionLabel}
