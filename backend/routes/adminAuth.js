@@ -327,6 +327,38 @@ function buildLegacyTokenPayload(username) {
   };
 }
 
+function normalizePermissionList(input) {
+  if (!Array.isArray(input)) return [];
+
+  const seen = new Set();
+  const permissions = [];
+
+  input.forEach((item) => {
+    const permission = String(item || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ':');
+
+    if (!permission) return;
+    if (seen.has(permission)) return;
+
+    seen.add(permission);
+    permissions.push(permission);
+  });
+
+  return permissions;
+}
+
+function getMergedAdminPermissions(adminUser) {
+  const rolePermissions = normalizePermissionList(
+    adminUser?.roleRef?.permissions
+  );
+
+  const userPermissions = normalizePermissionList(adminUser?.permissions);
+
+  return [...new Set([...rolePermissions, ...userPermissions])];
+}
+
 function buildUserResponseFromDb(adminUser) {
   const safeUser =
     typeof adminUser.toSafeObject === 'function'
@@ -345,7 +377,7 @@ function buildUserResponseFromDb(adminUser) {
     actualRole: adminUser.role,
 
     roleRef: adminUser.roleRef || null,
-    permissions: Array.isArray(adminUser.permissions) ? adminUser.permissions : [],
+    permissions: getMergedAdminPermissions(adminUser),
     branches: Array.isArray(adminUser.branches) ? adminUser.branches : [],
     defaultBranch: adminUser.defaultBranch || null,
 
@@ -438,9 +470,11 @@ async function findAdminUserForToken(decoded) {
   if (!decoded?.adminUserId) return null;
 
   return AdminUser.findOne({
-    _id: decoded.adminUserId,
-    deletedAt: null,
-  }).select('+tokenVersion');
+  _id: decoded.adminUserId,
+  deletedAt: null,
+  })
+    .select('+tokenVersion')
+    .populate('roleRef', 'name code level scope permissions');
 }
 
 async function findAdminUserForPasswordChange(decoded) {
@@ -553,6 +587,9 @@ async function verifyAdminToken(req) {
 
 async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
   const adminUser = await AdminUser.findByLogin(cleanUsername);
+  if (adminUser) {
+    await adminUser.populate('roleRef', 'name code level scope permissions');
+  }
 
   if (!adminUser) {
     return {
