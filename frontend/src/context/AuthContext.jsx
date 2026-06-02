@@ -1,5 +1,12 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
 import api, { setAdminToken } from '../lib/api';
 
 const AuthContext = createContext();
@@ -31,9 +38,78 @@ function getTokenExpirationMs(token) {
   return payload.exp * 1000;
 }
 
+function buildFallbackAdminUserFromToken(token) {
+  const payload = decodeJwtPayload(token);
+
+  if (!payload) return null;
+
+  const username = payload.username || '';
+  const adminRole = payload.adminRole || payload.actualRole || payload.role || '';
+
+  return {
+    id: payload.adminUserId || '',
+    username,
+    displayName: username,
+    fullName: username,
+    email: '',
+    role: payload.role || 'admin',
+    adminRole,
+    actualRole: adminRole,
+    roleRef: payload.roleRef || null,
+    defaultBranch: payload.defaultBranch || null,
+    permissions: [],
+    branches: [],
+    status: 'active',
+    active: true,
+    mustChangePassword: false,
+  };
+}
+
+function normalizeAdminUser(user, fallbackToken = '') {
+  if (!user || typeof user !== 'object') {
+    return buildFallbackAdminUserFromToken(fallbackToken);
+  }
+
+  const username = user.username || user.profile?.username || '';
+  const displayName =
+    user.displayName ||
+    user.fullName ||
+    user.profile?.displayName ||
+    user.profile?.fullName ||
+    username ||
+    'Usuario';
+
+  const adminRole =
+    user.adminRole ||
+    user.actualRole ||
+    user.profile?.role ||
+    user.role ||
+    'admin';
+
+  return {
+    ...user,
+    id: user.id || user._id || user.profile?._id || '',
+    username,
+    displayName,
+    fullName: user.fullName || displayName,
+    email: user.email || user.profile?.email || '',
+    role: user.role || 'admin',
+    adminRole,
+    actualRole: user.actualRole || adminRole,
+    roleRef: user.roleRef || user.profile?.roleRef || null,
+    defaultBranch: user.defaultBranch || user.profile?.defaultBranch || null,
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+    branches: Array.isArray(user.branches) ? user.branches : [],
+    status: user.status || user.profile?.status || 'active',
+    active: user.active !== undefined ? user.active : true,
+    mustChangePassword: Boolean(user.mustChangePassword),
+  };
+}
+
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminToken, setAdminTokenState] = useState(null);
+  const [adminUser, setAdminUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const logoutTimerRef = useRef(null);
@@ -49,7 +125,10 @@ export function AuthProvider({ children }) {
     clearLogoutTimer();
     setIsAuthenticated(false);
     setAdminTokenState(null);
+    setAdminUser(null);
     localStorage.removeItem('auth');
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
     setAdminToken(null);
   };
 
@@ -93,11 +172,20 @@ export function AuthProvider({ children }) {
       try {
         setAdminToken(storedToken);
 
-        await api.get('/api/admin/auth/verify');
+        const response = await api.get('/api/admin/auth/verify');
+        const verifiedUser = normalizeAdminUser(response?.data?.user, storedToken);
 
         setIsAuthenticated(true);
         setAdminTokenState(storedToken);
+        setAdminUser(verifiedUser);
         localStorage.setItem('auth', 'true');
+
+        if (verifiedUser) {
+          localStorage.setItem('admin_user', JSON.stringify(verifiedUser));
+        } else {
+          localStorage.removeItem('admin_user');
+        }
+
         scheduleAutoLogout(storedToken);
       } catch {
         logout();
@@ -113,18 +201,55 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = (token) => {
+  const login = (token, user = null) => {
+    const normalizedUser = normalizeAdminUser(user, token);
+
     setIsAuthenticated(true);
     setAdminTokenState(token);
+    setAdminUser(normalizedUser);
+
     localStorage.setItem('auth', 'true');
     localStorage.setItem('admin_token', token);
+
+    if (normalizedUser) {
+      localStorage.setItem('admin_user', JSON.stringify(normalizedUser));
+    } else {
+      localStorage.removeItem('admin_user');
+    }
+
     setAdminToken(token);
     scheduleAutoLogout(token);
   };
 
+  const refreshAdminUser = async () => {
+    if (!adminToken) return null;
+
+    const response = await api.get('/api/admin/auth/verify');
+    const verifiedUser = normalizeAdminUser(response?.data?.user, adminToken);
+
+    setAdminUser(verifiedUser);
+
+    if (verifiedUser) {
+      localStorage.setItem('admin_user', JSON.stringify(verifiedUser));
+    } else {
+      localStorage.removeItem('admin_user');
+    }
+
+    return verifiedUser;
+  };
+
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, adminToken, authLoading, login, logout }}
+      value={{
+        isAuthenticated,
+        adminToken,
+        adminUser,
+        currentAdminUser: adminUser,
+        authLoading,
+        login,
+        logout,
+        refreshAdminUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

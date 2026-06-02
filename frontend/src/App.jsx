@@ -19,6 +19,8 @@ import GlobalPageLoader from "./components/GlobalPageLoader";
 // Páginas principales
 import ProductDetail from "./pages/ProductDetail";
 import Login from "./admin/Login";
+import ForgotPasswordPage from "./admin/ForgotPasswordPage";
+import ResetPasswordPage from "./admin/ResetPasswordPage";
 import GraciasPage from "./pages/GraciasPage";
 import FormularioProducto from "./admin/FormularioProducto";
 import DynamicPage from "./pages/DynamicPage";
@@ -431,6 +433,9 @@ export default function App() {
               <Route path="/p/:id" element={<ProductDetail />} />
 
               <Route path="/admin/login" element={<Login />} />
+              <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+
               <Route path="/carrito" element={<Carrito />} />
               <Route path="/favoritos" element={<Favoritos />} />
               <Route path="/checkout" element={<CheckoutPage />} />
@@ -467,6 +472,7 @@ export default function App() {
                 />
                 <Route path="configuracion/pagos" element={<ConfiguracionPage />} />
                 <Route path="configuracion/envios" element={<ConfiguracionPage />} />
+                <Route path="configuracion/correo" element={<ConfiguracionPage />} />
                 <Route
                   path="configuracion/login-admin"
                   element={<ConfiguracionPage />}

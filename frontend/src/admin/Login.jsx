@@ -33,6 +33,8 @@ const LOGIN_BG_OVERLAY_KEY = "admin_login_bg_overlay";
 
 const LOGIN_FAILED_ATTEMPTS_KEY = "admin_login_failed_attempts";
 const LOGIN_LOCK_UNTIL_KEY = "admin_login_lock_until";
+const LOGIN_REMEMBER_KEY = "admin_login_remember";
+const LOGIN_REMEMBER_USERNAME_KEY = "admin_login_remember_username";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 2 * 60 * 1000;
@@ -115,6 +117,37 @@ function getLockUntil() {
 function setLockUntil(value) {
   try {
     localStorage.setItem(LOGIN_LOCK_UNTIL_KEY, String(value));
+  } catch {}
+}
+
+function getRememberedLogin() {
+  try {
+    const remember = localStorage.getItem(LOGIN_REMEMBER_KEY) === "true";
+    const rememberedUsername =
+      localStorage.getItem(LOGIN_REMEMBER_USERNAME_KEY) || "";
+
+    return {
+      remember,
+      username: remember ? rememberedUsername : "",
+    };
+  } catch {
+    return {
+      remember: false,
+      username: "",
+    };
+  }
+}
+
+function saveRememberedLogin(username, remember) {
+  try {
+    if (remember && username) {
+      localStorage.setItem(LOGIN_REMEMBER_KEY, "true");
+      localStorage.setItem(LOGIN_REMEMBER_USERNAME_KEY, username);
+      return;
+    }
+
+    localStorage.removeItem(LOGIN_REMEMBER_KEY);
+    localStorage.removeItem(LOGIN_REMEMBER_USERNAME_KEY);
   } catch {}
 }
 
@@ -293,6 +326,7 @@ function LoginForm({
   rememberMe,
   setRememberMe,
   handleSubmit,
+  onForgotPassword,
   compact = false,
   variant = "default",
   showBadge = true,
@@ -428,6 +462,7 @@ function LoginForm({
 
         <button
           type="button"
+          onClick={onForgotPassword}
           className="whitespace-nowrap hover:underline"
           style={{ color: theme.mutedColor }}
         >
@@ -465,6 +500,7 @@ function CircleLoginForm({
   rememberMe,
   setRememberMe,
   handleSubmit,
+  onForgotPassword,
 }) {
   const dark = isDarkTheme(theme);
 
@@ -552,6 +588,7 @@ function CircleLoginForm({
 
           <button
             type="button"
+            onClick={onForgotPassword}
             className="hover:underline"
             style={{ color: theme.mutedColor }}
           >
@@ -583,14 +620,16 @@ function CircleLoginForm({
 }
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const rememberedLogin = useMemo(() => getRememberedLogin(), []);
+
+  const [username, setUsername] = useState(rememberedLogin.username);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [activeThemeId, setActiveThemeId] = useState(getSavedLoginThemeId);
   const [activeLayoutId, setActiveLayoutId] = useState(getSavedLoginLayoutId);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lockRemaining, setLockRemaining] = useState(0);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(rememberedLogin.remember);
   const [loginBg, setLoginBg] = useState(getStoredLoginBg);
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
@@ -680,9 +719,9 @@ export default function Login() {
     }
 
     setAdminToken(token);
-    login(token);
+    saveRememberedLogin(username.trim(), rememberMe);
+    login(token, response?.user);
     clearLoginSecurityState();
-
     setUsername("");
     setPassword("");
     setShowRequiredPasswordChange(false);
@@ -697,6 +736,10 @@ export default function Login() {
     setRequiredPasswordUser(null);
     setPassword("");
     setError("Debes cambiar la contraseña temporal para ingresar al panel.");
+  };
+
+  const handleForgotPassword = () => {
+    navigate("/admin/forgot-password");
   };
 
   const handleSubmit = async (e) => {
@@ -738,9 +781,14 @@ export default function Login() {
         return;
       }
 
-      login(loginResult.token);
+      saveRememberedLogin(cleanUsername, rememberMe);
 
-      setUsername("");
+      login(loginResult.token, loginResult.user);
+
+      if (!rememberMe) {
+        setUsername("");
+      }
+
       setPassword("");
 
       navigate("/admin/dashboard");
@@ -777,6 +825,7 @@ export default function Login() {
     rememberMe,
     setRememberMe,
     handleSubmit,
+    onForgotPassword: handleForgotPassword,
   };
 
   const cardStyle = {

@@ -26,9 +26,11 @@ import {
   ReceiptText,
   CreditCard,
   Truck,
+  Mail,
   ShieldCheck,
   Users,
   UserCog,
+  UserRound,
   ScrollText,
   Sparkles,
 } from 'lucide-react';
@@ -45,6 +47,7 @@ const CONFIG_SUBLINKS = [
   { to: '/admin/configuracion/facturacion', label: 'Facturación', icon: ReceiptText },
   { to: '/admin/configuracion/pagos', label: 'Pagos', icon: CreditCard },
   { to: '/admin/configuracion/envios', label: 'Envíos', icon: Truck },
+  { to: '/admin/configuracion/correo', label: 'Correo', icon: Mail },
   { to: '/admin/configuracion/login-admin', label: 'Login admin', icon: ShieldCheck },
   { to: '/admin/configuracion/panel-admin', label: 'Panel admin', icon: Settings },
   { to: '/admin/configuracion/usuarios', label: 'Usuarios', icon: Users },
@@ -57,9 +60,28 @@ function applyHoverColor(e, color) {
 }
 
 export default function AdminLayout() {
-  const { logout } = useAuth();
+  const { logout, adminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+    const activeAdminName =
+    adminUser?.displayName ||
+    adminUser?.fullName ||
+    adminUser?.username ||
+    'Usuario admin';
+
+  const activeAdminRole =
+    adminUser?.adminRole ||
+    adminUser?.actualRole ||
+    adminUser?.role ||
+    'admin';
+
+  const activeAdminInitials = activeAdminName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'UA';
 
   const isConfigRoute = location.pathname.startsWith('/admin/configuracion');
   const [configMenuOpen, setConfigMenuOpen] = useState(isConfigRoute);
@@ -979,7 +1001,44 @@ export default function AdminLayout() {
                 />
               </div>
 
-              <div className="flex items-center admin-inline-gap-sm shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className="flex min-w-[210px] max-w-[260px] items-center gap-3 rounded-[calc(var(--admin-radius)*0.65)] border px-3 py-2"
+                  style={{
+                    borderColor: 'var(--admin-primary-soft-border)',
+                    background: 'var(--admin-primary-soft-bg)',
+                    color: 'var(--admin-primary-soft-text)',
+                    boxShadow: 'var(--admin-shadow-sm, 0 4px 14px rgba(0,0,0,0.08))',
+                  }}
+                >
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border text-xs font-black"
+                    style={{
+                      borderColor: 'var(--admin-primary-soft-border)',
+                      background: 'var(--admin-card-bg)',
+                      color: 'var(--admin-primary)',
+                    }}
+                  >
+                    {activeAdminInitials || <UserRound className="h-4 w-4" />}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-xs font-black leading-4"
+                      style={{ color: 'var(--admin-card-text)' }}
+                    >
+                      {activeAdminName}
+                    </p>
+
+                    <p
+                      className="truncate text-[11px] font-bold leading-4"
+                      style={{ color: 'var(--admin-card-muted-text)' }}
+                    >
+                      Perfil: {activeAdminRole}
+                    </p>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleOpenReviewsModal}

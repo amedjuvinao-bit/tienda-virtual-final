@@ -90,6 +90,7 @@ const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
+const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 
 // ⬇️ Site Settings (Apariencia & Menús)
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
@@ -117,6 +118,11 @@ if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
 
 // ✅ CONEXIÓN DE SEDES ADMINISTRATIVAS
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
+
+// ✅ CONEXIÓN DE CONFIGURACIÓN DE CORREO ADMINISTRATIVO
+if (adminMailSettingsRoutes) {
+  app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+}
 
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 

@@ -2,8 +2,19 @@
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const PASSWORD_HASH_ROUNDS = Number(process.env.ADMIN_PASSWORD_HASH_ROUNDS || 12);
+const PASSWORD_RESET_MINUTES = Number(process.env.ADMIN_PASSWORD_RESET_MINUTES || 30);
+const PASSWORD_RESET_REQUEST_COOLDOWN_MINUTES = Number(
+  process.env.ADMIN_PASSWORD_RESET_REQUEST_COOLDOWN_MINUTES || 2
+);
+const PASSWORD_RESET_REQUEST_WINDOW_MINUTES = Number(
+  process.env.ADMIN_PASSWORD_RESET_REQUEST_WINDOW_MINUTES || 60
+);
+const PASSWORD_RESET_REQUEST_MAX_PER_WINDOW = Number(
+  process.env.ADMIN_PASSWORD_RESET_REQUEST_MAX_PER_WINDOW || 5
+);
 
 const ADMIN_USER_ROLES = [
   'owner',
@@ -46,6 +57,17 @@ function normalizeRoleCode(value) {
 
 function normalizePermission(value) {
   return normalizeLower(value).replace(/\s+/g, ':');
+}
+
+function hashPasswordResetToken(token) {
+  return crypto
+    .createHash('sha256')
+    .update(String(token || ''))
+    .digest('hex');
+}
+
+function minutesToMilliseconds(minutes) {
+  return Number(minutes || 0) * 60 * 1000;
 }
 
 function normalizePermissions(input) {
@@ -197,6 +219,43 @@ const AdminUserSchema = new mongoose.Schema(
     mustChangePassword: {
       type: Boolean,
       default: true,
+    },
+
+    passwordResetTokenHash: {
+      type: String,
+      default: '',
+      select: false,
+    },
+
+    passwordResetExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    passwordResetUsedAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    passwordResetLastRequestedAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    passwordResetRequestWindowStartedAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    passwordResetRequestCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      select: false,
     },
 
     role: {
@@ -363,6 +422,20 @@ AdminUserSchema.index({ 'branches.branch': 1 });
 AdminUserSchema.index({ defaultBranch: 1 });
 AdminUserSchema.index({ deletedAt: 1 });
 
+AdminUserSchema.index(
+  { passwordResetTokenHash: 1 },
+  {
+    sparse: true,
+    partialFilterExpression: {
+      passwordResetTokenHash: { $type: 'string', $gt: '' },
+    },
+  }
+);
+
+AdminUserSchema.index({ passwordResetExpiresAt: 1 });
+AdminUserSchema.index({ passwordResetLastRequestedAt: 1 });
+AdminUserSchema.index({ passwordResetRequestWindowStartedAt: 1 });
+
 /* ============================
  * Virtuales
  * ============================ */
@@ -444,6 +517,13 @@ AdminUserSchema.pre('save', function (next) {
   if (this.isModified('passwordHash')) {
     this.passwordChangedAt = new Date();
     this.tokenVersion = Number(this.tokenVersion || 0) + 1;
+
+    if (this.passwordResetTokenHash || this.passwordResetExpiresAt) {
+      this.passwordResetUsedAt = new Date();
+    }
+
+    this.passwordResetTokenHash = '';
+    this.passwordResetExpiresAt = null;
   }
 
   next();
@@ -484,6 +564,127 @@ AdminUserSchema.methods.comparePassword = async function comparePassword(
 
   return bcrypt.compare(String(plainPassword || ''), this.passwordHash);
 };
+
+AdminUserSchema.methods.getPasswordResetRequestLimitStatus =
+  function getPasswordResetRequestLimitStatus({ now = new Date() } = {}) {
+    const currentTime = now instanceof Date ? now : new Date(now);
+    const lastRequestedAt = this.passwordResetLastRequestedAt || null;
+    const windowStartedAt = this.passwordResetRequestWindowStartedAt || null;
+    const currentCount = Number(this.passwordResetRequestCount || 0);
+
+    const cooldownMs = minutesToMilliseconds(
+      PASSWORD_RESET_REQUEST_COOLDOWN_MINUTES
+    );
+    const windowMs = minutesToMilliseconds(PASSWORD_RESET_REQUEST_WINDOW_MINUTES);
+
+    if (
+      lastRequestedAt &&
+      cooldownMs > 0 &&
+      currentTime.getTime() - lastRequestedAt.getTime() < cooldownMs
+    ) {
+      const retryAfterMs =
+        cooldownMs - (currentTime.getTime() - lastRequestedAt.getTime());
+
+      return {
+        allowed: false,
+        reason: 'cooldown',
+        retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+        message: `Debes esperar ${Math.max(
+          1,
+          Math.ceil(retryAfterMs / 1000)
+        )} segundos antes de solicitar otro enlace.`,
+      };
+    }
+
+    if (
+      windowStartedAt &&
+      windowMs > 0 &&
+      currentTime.getTime() - windowStartedAt.getTime() < windowMs &&
+      currentCount >= PASSWORD_RESET_REQUEST_MAX_PER_WINDOW
+    ) {
+      const retryAfterMs =
+        windowMs - (currentTime.getTime() - windowStartedAt.getTime());
+
+      return {
+        allowed: false,
+        reason: 'window_limit',
+        retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+        message: `Has solicitado demasiados enlaces. Intenta nuevamente en ${Math.max(
+          1,
+          Math.ceil(retryAfterMs / 1000)
+        )} segundos.`,
+      };
+    }
+
+    return {
+      allowed: true,
+      reason: '',
+      retryAfterSeconds: 0,
+      message: '',
+    };
+  };
+
+AdminUserSchema.methods.registerPasswordResetRequest =
+  function registerPasswordResetRequest({ now = new Date() } = {}) {
+    const currentTime = now instanceof Date ? now : new Date(now);
+    const windowStartedAt = this.passwordResetRequestWindowStartedAt || null;
+    const windowMs = minutesToMilliseconds(PASSWORD_RESET_REQUEST_WINDOW_MINUTES);
+
+    if (
+      !windowStartedAt ||
+      windowMs <= 0 ||
+      currentTime.getTime() - windowStartedAt.getTime() >= windowMs
+    ) {
+      this.passwordResetRequestWindowStartedAt = currentTime;
+      this.passwordResetRequestCount = 1;
+    } else {
+      this.passwordResetRequestCount =
+        Number(this.passwordResetRequestCount || 0) + 1;
+    }
+
+    this.passwordResetLastRequestedAt = currentTime;
+
+    return this;
+  };
+
+AdminUserSchema.methods.createPasswordResetToken =
+  function createPasswordResetToken({ minutes = PASSWORD_RESET_MINUTES } = {}) {
+    const expiresMinutes = Number(minutes || PASSWORD_RESET_MINUTES);
+    const rawToken = crypto.randomBytes(32).toString('hex');
+
+    this.passwordResetTokenHash = hashPasswordResetToken(rawToken);
+    this.passwordResetExpiresAt = new Date(
+      Date.now() + expiresMinutes * 60 * 1000
+    );
+    this.passwordResetUsedAt = null;
+
+    return rawToken;
+  };
+
+AdminUserSchema.methods.clearPasswordResetToken =
+  function clearPasswordResetToken({ markAsUsed = false } = {}) {
+    this.passwordResetTokenHash = '';
+    this.passwordResetExpiresAt = null;
+
+    if (markAsUsed) {
+      this.passwordResetUsedAt = new Date();
+    }
+
+    return this;
+  };
+
+AdminUserSchema.methods.isPasswordResetTokenValid =
+  function isPasswordResetTokenValid(rawToken) {
+    const cleanToken = String(rawToken || '').trim();
+
+    if (!cleanToken) return false;
+    if (!this.passwordResetTokenHash) return false;
+    if (!this.passwordResetExpiresAt) return false;
+    if (this.passwordResetUsedAt) return false;
+    if (this.passwordResetExpiresAt <= new Date()) return false;
+
+    return this.passwordResetTokenHash === hashPasswordResetToken(cleanToken);
+  };
 
 AdminUserSchema.methods.isAccountLocked = function isAccountLocked() {
   return Boolean(this.lockedUntil && this.lockedUntil > new Date());
@@ -574,6 +775,12 @@ AdminUserSchema.methods.toSafeObject = function toSafeObject() {
   delete user.lastLoginIp;
   delete user.lastUserAgent;
   delete user.tokenVersion;
+  delete user.passwordResetTokenHash;
+  delete user.passwordResetExpiresAt;
+  delete user.passwordResetUsedAt;
+  delete user.passwordResetLastRequestedAt;
+  delete user.passwordResetRequestWindowStartedAt;
+  delete user.passwordResetRequestCount;
   delete user.__v;
 
   return user;
@@ -594,10 +801,46 @@ AdminUserSchema.statics.findByLogin = function findByLogin(login) {
   );
 };
 
+AdminUserSchema.statics.findByPasswordResetToken =
+  function findByPasswordResetToken(rawToken) {
+    const cleanToken = String(rawToken || '').trim();
+
+    if (!cleanToken) {
+      return null;
+    }
+
+    const tokenHash = hashPasswordResetToken(cleanToken);
+
+    return this.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+      passwordResetUsedAt: null,
+    }).select(
+      '+passwordHash +passwordResetTokenHash +passwordResetExpiresAt +passwordResetUsedAt +tokenVersion'
+    );
+  };
+
+AdminUserSchema.statics.getPasswordResetRequestSelect =
+  function getPasswordResetRequestSelect() {
+    return [
+      '+passwordResetTokenHash',
+      '+passwordResetExpiresAt',
+      '+passwordResetUsedAt',
+      '+passwordResetLastRequestedAt',
+      '+passwordResetRequestWindowStartedAt',
+      '+passwordResetRequestCount',
+      '+tokenVersion',
+    ].join(' ');
+  };
+
 AdminUserSchema.statics.normalizeUsername = normalizeUsername;
 AdminUserSchema.statics.normalizeEmail = normalizeEmail;
 AdminUserSchema.statics.normalizeRoleCode = normalizeRoleCode;
 AdminUserSchema.statics.normalizePermissions = normalizePermissions;
+AdminUserSchema.statics.hashPasswordResetToken = hashPasswordResetToken;
 
 AdminUserSchema.statics.getRoles = function getRoles() {
   return [...ADMIN_USER_ROLES];
@@ -622,6 +865,12 @@ AdminUserSchema.set('toJSON', {
     delete ret.lastLoginIp;
     delete ret.lastUserAgent;
     delete ret.tokenVersion;
+    delete ret.passwordResetTokenHash;
+    delete ret.passwordResetExpiresAt;
+    delete ret.passwordResetUsedAt;
+    delete ret.passwordResetLastRequestedAt;
+    delete ret.passwordResetRequestWindowStartedAt;
+    delete ret.passwordResetRequestCount;
     delete ret.__v;
 
     return ret;

@@ -6,6 +6,7 @@ import {
   Receipt,
   CreditCard,
   Truck,
+  Mail,
   ShieldCheck,
   LayoutPanelTop,
   Settings2,
@@ -19,6 +20,7 @@ import EmpresaSection from './configuracion/sections/EmpresaSection';
 import FacturacionSection from './configuracion/sections/FacturacionSection';
 import PagosSection from './configuracion/sections/PagosSection';
 import EnviosSection from './configuracion/sections/EnviosSection';
+import CorreoSection from './configuracion/sections/CorreoSection';
 import LoginAdminSection from './configuracion/sections/LoginAdminSection';
 import PanelAdminSection from './configuracion/sections/PanelAdminSection';
 import UsuariosSection from './configuracion/sections/UsuariosSection';
@@ -50,6 +52,12 @@ const TABS = [
     label: 'Envíos',
     icon: Truck,
     description: 'Reglas, costos y configuración del sistema de envíos.',
+  },
+  {
+    id: 'correo',
+    label: 'Correo',
+    icon: Mail,
+    description: 'Configuración SMTP para recuperación de contraseña y notificaciones.',
   },
   {
     id: 'login-admin',
@@ -106,6 +114,8 @@ export default function ConfiguracionPage() {
         return <PagosSection />;
       case 'envios':
         return <EnviosSection />;
+      case 'correo':
+        return <CorreoSection />;
       case 'login-admin':
         return <LoginAdminSection />;
       case 'panel-admin':
@@ -174,8 +184,8 @@ export default function ConfiguracionPage() {
               className="mt-2 max-w-3xl text-sm leading-6"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Configura tienda, facturación, pagos, envíos, usuarios, perfiles,
-              seguridad, logs y comportamiento del sistema.
+              Configura tienda, facturación, pagos, envíos, correo, usuarios,
+              perfiles, seguridad, logs y comportamiento del sistema.
             </p>
           </div>
 

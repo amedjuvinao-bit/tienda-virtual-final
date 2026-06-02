@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
+const { sendMail } = require('../lib/mail/mailer');
 
 const router = express.Router();
 
@@ -13,6 +14,37 @@ const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
+
+const FRONTEND_ADMIN_URL =
+  process.env.ADMIN_PASSWORD_RESET_URL ||
+  process.env.FRONTEND_ADMIN_URL ||
+  process.env.ADMIN_FRONTEND_URL ||
+  process.env.FRONTEND_URL ||
+  'http://localhost:5173';
+
+console.log('🔗 URL recuperación admin:', FRONTEND_ADMIN_URL);
+
+const PASSWORD_RESET_MINUTES = Number(process.env.ADMIN_PASSWORD_RESET_MINUTES || 30);
+
+const PASSWORD_RESET_REQUEST_COOLDOWN_MS =
+  Number(process.env.ADMIN_PASSWORD_RESET_REQUEST_COOLDOWN_MINUTES || 2) *
+  60 *
+  1000;
+
+const PASSWORD_RESET_REQUEST_WINDOW_MS =
+  Number(process.env.ADMIN_PASSWORD_RESET_REQUEST_WINDOW_MINUTES || 60) *
+  60 *
+  1000;
+
+const PASSWORD_RESET_REQUEST_MAX_PER_LOGIN = Number(
+  process.env.ADMIN_PASSWORD_RESET_REQUEST_MAX_PER_LOGIN || 5
+);
+
+const PASSWORD_RESET_REQUEST_MAX_PER_IP = Number(
+  process.env.ADMIN_PASSWORD_RESET_REQUEST_MAX_PER_IP || 10
+);
+
+const passwordResetAttempts = new Map();
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_TIME_MS = 10 * 60 * 1000;
@@ -43,6 +75,19 @@ function normalizeLogin(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function getBearerToken(req) {
   const authHeader = req.headers.authorization || '';
 
@@ -51,6 +96,13 @@ function getBearerToken(req) {
   }
 
   return String(req.headers['x-admin-token'] || '').trim();
+}
+
+function buildAdminResetPasswordUrl(rawToken) {
+  const baseUrl = String(FRONTEND_ADMIN_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  const cleanToken = encodeURIComponent(String(rawToken || '').trim());
+
+  return `${baseUrl}/admin/reset-password?token=${cleanToken}`;
 }
 
 async function saveLoginAudit(req, { username = '', status, reason = '' }) {
@@ -118,6 +170,132 @@ function getLockResponse(seconds) {
     message: `Demasiados intentos fallidos. Intenta nuevamente en ${seconds} segundos.`,
     retryAfterSeconds: seconds,
   };
+}
+
+function getPasswordResetAttemptKey(type, value) {
+  return `password-reset:${type}:${String(value || '').trim().toLowerCase()}`;
+}
+
+function getPasswordResetAttemptState(key) {
+  const current = passwordResetAttempts.get(key);
+
+  if (!current) {
+    return {
+      count: 0,
+      windowStartedAt: 0,
+      lastRequestedAt: 0,
+    };
+  }
+
+  if (
+    current.windowStartedAt &&
+    Date.now() - current.windowStartedAt >= PASSWORD_RESET_REQUEST_WINDOW_MS
+  ) {
+    passwordResetAttempts.delete(key);
+
+    return {
+      count: 0,
+      windowStartedAt: 0,
+      lastRequestedAt: 0,
+    };
+  }
+
+  return current;
+}
+
+function checkPasswordResetAttemptLimit(req, login) {
+  const ip = getClientIp(req);
+  const cleanLogin = normalizeLogin(login);
+
+  const loginKey = getPasswordResetAttemptKey('login', cleanLogin);
+  const ipKey = getPasswordResetAttemptKey('ip', ip);
+
+  const loginState = getPasswordResetAttemptState(loginKey);
+  const ipState = getPasswordResetAttemptState(ipKey);
+
+  if (
+    loginState.lastRequestedAt &&
+    Date.now() - loginState.lastRequestedAt < PASSWORD_RESET_REQUEST_COOLDOWN_MS
+  ) {
+    const retryAfterMs =
+      PASSWORD_RESET_REQUEST_COOLDOWN_MS -
+      (Date.now() - loginState.lastRequestedAt);
+
+    const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+
+    return {
+      allowed: false,
+      reason: 'password_reset_cooldown',
+      retryAfterSeconds: seconds,
+      message: `Por seguridad, espera ${seconds} segundos antes de solicitar otro enlace.`,
+    };
+  }
+
+  if (loginState.count >= PASSWORD_RESET_REQUEST_MAX_PER_LOGIN) {
+    const retryAfterMs =
+      PASSWORD_RESET_REQUEST_WINDOW_MS - (Date.now() - loginState.windowStartedAt);
+
+    const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+
+    return {
+      allowed: false,
+      reason: 'password_reset_login_limit',
+      retryAfterSeconds: seconds,
+      message: `Has solicitado demasiados enlaces. Intenta nuevamente en ${seconds} segundos.`,
+    };
+  }
+
+  if (ipState.count >= PASSWORD_RESET_REQUEST_MAX_PER_IP) {
+    const retryAfterMs =
+      PASSWORD_RESET_REQUEST_WINDOW_MS - (Date.now() - ipState.windowStartedAt);
+
+    const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+
+    return {
+      allowed: false,
+      reason: 'password_reset_ip_limit',
+      retryAfterSeconds: seconds,
+      message: `Demasiadas solicitudes desde esta conexión. Intenta nuevamente en ${seconds} segundos.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: '',
+    retryAfterSeconds: 0,
+    message: '',
+  };
+}
+
+function registerPasswordResetAttempt(req, login) {
+  const ip = getClientIp(req);
+  const cleanLogin = normalizeLogin(login);
+
+  const keys = [
+    getPasswordResetAttemptKey('login', cleanLogin),
+    getPasswordResetAttemptKey('ip', ip),
+  ];
+
+  keys.forEach((key) => {
+    const current = getPasswordResetAttemptState(key);
+    const now = Date.now();
+
+    if (!current.windowStartedAt) {
+      passwordResetAttempts.set(key, {
+        count: 1,
+        windowStartedAt: now,
+        lastRequestedAt: now,
+      });
+
+      return;
+    }
+
+    passwordResetAttempts.set(key, {
+      count: Number(current.count || 0) + 1,
+      windowStartedAt: current.windowStartedAt,
+      lastRequestedAt: now,
+    });
+  });
 }
 
 function buildDbTokenPayload(adminUser) {
@@ -232,6 +410,30 @@ function validateRequiredPasswordChangePayload({
   return '';
 }
 
+function validateResetPasswordPayload({ token, newPassword, confirmPassword }) {
+  if (!token) {
+    return 'Token de recuperación requerido.';
+  }
+
+  if (!newPassword) {
+    return 'Debes escribir la nueva contraseña.';
+  }
+
+  if (String(newPassword).length < 10) {
+    return 'La nueva contraseña debe tener mínimo 10 caracteres.';
+  }
+
+  if (!confirmPassword) {
+    return 'Debes confirmar la nueva contraseña.';
+  }
+
+  if (String(newPassword) !== String(confirmPassword)) {
+    return 'La confirmación de contraseña no coincide.';
+  }
+
+  return '';
+}
+
 async function findAdminUserForToken(decoded) {
   if (!decoded?.adminUserId) return null;
 
@@ -248,6 +450,22 @@ async function findAdminUserForPasswordChange(decoded) {
     _id: decoded.adminUserId,
     deletedAt: null,
   }).select('+passwordHash +tokenVersion');
+}
+
+async function findAdminUserForPasswordResetRequest(login) {
+  const cleanLogin = normalizeLogin(login);
+
+  if (!cleanLogin) return null;
+
+  const selectFields =
+    typeof AdminUser.getPasswordResetRequestSelect === 'function'
+      ? AdminUser.getPasswordResetRequestSelect()
+      : '+passwordResetTokenHash +passwordResetExpiresAt +passwordResetUsedAt +tokenVersion';
+
+  return AdminUser.findOne({
+    deletedAt: null,
+    $or: [{ username: cleanLogin }, { email: cleanLogin }],
+  }).select(selectFields);
 }
 
 async function verifyAdminToken(req) {
@@ -598,6 +816,239 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: 'Error interno al iniciar sesión.',
+    });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  const cleanLogin = normalizeLogin(
+    req.body?.login || req.body?.email || req.body?.username
+  );
+
+  const genericMessage =
+    'Si existe un usuario administrativo activo con ese correo, enviaremos un enlace de recuperación.';
+
+  try {
+    if (!cleanLogin) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Debes escribir tu usuario o correo electrónico.',
+      });
+    }
+
+    const requestLimit = checkPasswordResetAttemptLimit(req, cleanLogin);
+
+    if (!requestLimit.allowed) {
+      await saveLoginAudit(req, {
+        username: cleanLogin,
+        status: 'blocked',
+        reason: requestLimit.reason,
+      });
+
+      return res.status(429).json({
+        ok: false,
+        message: requestLimit.message,
+        retryAfterSeconds: requestLimit.retryAfterSeconds,
+      });
+    }
+
+    const adminUser = await findAdminUserForPasswordResetRequest(cleanLogin);
+
+    if (
+      !adminUser ||
+      adminUser.deletedAt ||
+      adminUser.active !== true ||
+      adminUser.status !== 'active' ||
+      !adminUser.email
+    ) {
+      await saveLoginAudit(req, {
+        username: cleanLogin,
+        status: 'failed',
+        reason: 'forgot_password_user_not_available',
+      });
+
+      registerPasswordResetAttempt(req, cleanLogin);
+
+      return res.json({
+        ok: true,
+        message: genericMessage,
+      });
+    }
+
+    if (
+      typeof adminUser.getPasswordResetRequestLimitStatus === 'function' &&
+      typeof adminUser.registerPasswordResetRequest === 'function'
+    ) {
+      const dbRequestLimit = adminUser.getPasswordResetRequestLimitStatus();
+
+      if (!dbRequestLimit.allowed) {
+        await saveLoginAudit(req, {
+          username: adminUser.username,
+          status: 'blocked',
+          reason: dbRequestLimit.reason || 'password_reset_db_limit',
+        });
+
+        return res.status(429).json({
+          ok: false,
+          message: dbRequestLimit.message,
+          retryAfterSeconds: dbRequestLimit.retryAfterSeconds,
+        });
+      }
+
+      adminUser.registerPasswordResetRequest();
+    }
+
+    registerPasswordResetAttempt(req, cleanLogin);
+
+    const rawToken = adminUser.createPasswordResetToken({
+      minutes: PASSWORD_RESET_MINUTES,
+    });
+
+    await adminUser.save();
+
+    const resetUrl = buildAdminResetPasswordUrl(rawToken);
+    const safeName = escapeHtml(
+      adminUser.displayName || adminUser.fullName || adminUser.username
+    );
+
+    await sendMail({
+      to: adminUser.email,
+      subject: 'Recuperación de contraseña - Panel administrativo',
+      text: [
+        `Hola ${adminUser.displayName || adminUser.username}.`,
+        '',
+        'Recibimos una solicitud para recuperar el acceso al panel administrativo.',
+        `Abre este enlace para crear una nueva contraseña: ${resetUrl}`,
+        '',
+        `Este enlace vence en ${PASSWORD_RESET_MINUTES} minutos.`,
+        '',
+        'Si no solicitaste este cambio, puedes ignorar este mensaje.',
+      ].join('\n'),
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+          <h2 style="margin: 0 0 12px;">Recuperación de contraseña</h2>
+          <p>Hola <strong>${safeName}</strong>.</p>
+          <p>Recibimos una solicitud para recuperar el acceso al panel administrativo.</p>
+          <p>
+            <a
+              href="${escapeHtml(resetUrl)}"
+              style="display:inline-block;padding:12px 18px;border-radius:12px;background:#ec4899;color:#ffffff;text-decoration:none;font-weight:bold;"
+            >
+              Crear nueva contraseña
+            </a>
+          </p>
+          <p>Este enlace vence en <strong>${PASSWORD_RESET_MINUTES} minutos</strong>.</p>
+          <p style="font-size:13px;color:#666;">
+            Si no solicitaste este cambio, puedes ignorar este mensaje.
+          </p>
+        </div>
+      `,
+    });
+
+    await saveLoginAudit(req, {
+      username: adminUser.username,
+      status: 'success',
+      reason: 'forgot_password_email_sent',
+    });
+
+    return res.json({
+      ok: true,
+      message: genericMessage,
+    });
+  } catch (error) {
+    console.error('❌ Error en recuperación de contraseña admin:', error.message);
+
+    await saveLoginAudit(req, {
+      username: cleanLogin,
+      status: 'error',
+      reason: 'forgot_password_internal_error',
+    });
+
+    return res.status(500).json({
+      ok: false,
+      message: 'No se pudo procesar la recuperación de contraseña.',
+    });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const newPassword = String(req.body?.newPassword || '');
+    const confirmPassword = String(req.body?.confirmPassword || '');
+
+    const validationError = validateResetPasswordPayload({
+      token,
+      newPassword,
+      confirmPassword,
+    });
+
+    if (validationError) {
+      return res.status(400).json({
+        ok: false,
+        message: validationError,
+      });
+    }
+
+    const adminUser = await AdminUser.findByPasswordResetToken(token);
+
+    if (!adminUser || !adminUser.isPasswordResetTokenValid(token)) {
+      await saveLoginAudit(req, {
+        username: '',
+        status: 'failed',
+        reason: 'reset_password_invalid_or_expired_token',
+      });
+
+      return res.status(400).json({
+        ok: false,
+        message: 'El enlace de recuperación no es válido o ya venció.',
+      });
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, adminUser.passwordHash);
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La nueva contraseña debe ser diferente a la contraseña anterior.',
+      });
+    }
+
+    await adminUser.setPassword(newPassword);
+
+    adminUser.mustChangePassword = false;
+    adminUser.failedLoginAttempts = 0;
+    adminUser.lockedUntil = null;
+    adminUser.status = 'active';
+    adminUser.active = true;
+    adminUser.updatedBy = adminUser._id;
+
+    adminUser.clearPasswordResetToken({ markAsUsed: true });
+
+    await adminUser.save();
+
+    const loginToken = jwt.sign(buildDbTokenPayload(adminUser), JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    await saveLoginAudit(req, {
+      username: adminUser.username,
+      status: 'success',
+      reason: 'reset_password_success',
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Contraseña actualizada correctamente.',
+      token: loginToken,
+      user: buildUserResponseFromDb(adminUser),
+    });
+  } catch (error) {
+    console.error('❌ Error restableciendo contraseña admin:', error.message);
+
+    return res.status(500).json({
+      ok: false,
+      message: error.message || 'No se pudo restablecer la contraseña.',
     });
   }
 });
