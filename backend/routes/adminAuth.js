@@ -354,9 +354,11 @@ function getMergedAdminPermissions(adminUser) {
     adminUser?.roleRef?.permissions
   );
 
-  const userPermissions = normalizePermissionList(adminUser?.permissions);
+  if (rolePermissions.length > 0) {
+    return rolePermissions;
+  }
 
-  return [...new Set([...rolePermissions, ...userPermissions])];
+  return normalizePermissionList(adminUser?.permissions);
 }
 
 function buildUserResponseFromDb(adminUser) {
@@ -364,6 +366,10 @@ function buildUserResponseFromDb(adminUser) {
     typeof adminUser.toSafeObject === 'function'
       ? adminUser.toSafeObject()
       : adminUser.toObject();
+
+  const effectivePermissions = getMergedAdminPermissions(adminUser);
+
+  safeUser.permissions = effectivePermissions;
 
   return {
     id: String(adminUser._id),
@@ -377,7 +383,7 @@ function buildUserResponseFromDb(adminUser) {
     actualRole: adminUser.role,
 
     roleRef: adminUser.roleRef || null,
-    permissions: getMergedAdminPermissions(adminUser),
+    permissions: effectivePermissions,
     branches: Array.isArray(adminUser.branches) ? adminUser.branches : [],
     defaultBranch: adminUser.defaultBranch || null,
 

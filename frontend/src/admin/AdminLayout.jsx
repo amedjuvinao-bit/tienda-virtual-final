@@ -39,6 +39,7 @@ import api, { setAdminToken } from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
+import { canAccessAdminPath } from './security/adminPermissions';
 
 const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
 
@@ -59,11 +60,22 @@ function applyHoverColor(e, color) {
   e.currentTarget.style.backgroundColor = color;
 }
 
+function filterLinksByPermission(adminUser, links) {
+  return links.filter((item) => canAccessAdminPath(adminUser, item.to));
+}
+
+function getFirstAllowedConfigPath(adminUser) {
+  const firstAllowedConfigLink = filterLinksByPermission(adminUser, CONFIG_SUBLINKS)[0];
+
+  return firstAllowedConfigLink?.to || '/admin/dashboard';
+}
+
 export default function AdminLayout() {
   const { logout, adminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-    const activeAdminName =
+
+  const activeAdminName =
     adminUser?.displayName ||
     adminUser?.fullName ||
     adminUser?.username ||
@@ -75,13 +87,14 @@ export default function AdminLayout() {
     adminUser?.role ||
     'admin';
 
-  const activeAdminInitials = activeAdminName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'UA';
+  const activeAdminInitials =
+    activeAdminName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'UA';
 
   const isConfigRoute = location.pathname.startsWith('/admin/configuracion');
   const [configMenuOpen, setConfigMenuOpen] = useState(isConfigRoute);
@@ -142,7 +155,7 @@ export default function AdminLayout() {
 
   const handleConfigMenuClick = () => {
     setConfigMenuOpen((prev) => !prev);
-    navigate('/admin/configuracion/empresa');
+    navigate(getFirstAllowedConfigPath(adminUser));
   };
 
   const getSeenReviewIds = () => {
@@ -272,6 +285,11 @@ export default function AdminLayout() {
     { to: '/admin/apariencia', label: 'Apariencia', icon: Palette },
     { to: '/admin/paginas', label: 'Páginas', icon: FileText },
   ];
+
+  const visibleMainLinks = filterLinksByPermission(adminUser, mainLinks);
+  const visibleDesignLinks = filterLinksByPermission(adminUser, designLinks);
+  const visibleConfigSublinks = filterLinksByPermission(adminUser, CONFIG_SUBLINKS);
+  const hasVisibleConfigLinks = visibleConfigSublinks.length > 0;
 
   const linkBase =
     'group flex items-center admin-nav-item-gap admin-nav-padding rounded-[calc(var(--admin-radius)*0.55)] transition-all duration-200 text-sm font-medium';
@@ -866,92 +884,98 @@ export default function AdminLayout() {
               className="flex-1 overflow-y-auto admin-thin-scrollbar space-y-5 pr-0.5"
               aria-label="Menú lateral admin"
             >
-              <div>
-                <p className="admin-section-label">Principal</p>
-                <div className="space-y-0.5">
-                  {mainLinks.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={`${linkBase} admin-nav-link`}
-                        style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
-                      >
-                        <span className="admin-icon-wrap">
-                          <Icon className="h-3.5 w-3.5" />
-                        </span>
-                        <span>{item.label}</span>
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="admin-section-label">Diseño</p>
-                <div className="space-y-0.5">
-                  {designLinks.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={`${linkBase} admin-nav-link`}
-                        style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
-                      >
-                        <span className="admin-icon-wrap">
-                          <Icon className="h-3.5 w-3.5" />
-                        </span>
-                        <span>{item.label}</span>
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="admin-section-label">Sistema</p>
-                <button
-                  type="button"
-                  onClick={handleConfigMenuClick}
-                  className={`${linkBase} admin-nav-link w-full justify-between`}
-                  style={isConfigRoute ? activeNavStyle : normalNavStyle}
-                >
-                  <span className="flex items-center admin-inline-gap-md">
-                    <span className="admin-icon-wrap">
-                      <Settings className="h-3.5 w-3.5" />
-                    </span>
-                    <span>Configuración</span>
-                  </span>
-                  <ChevronDown
-                    className="h-3.5 w-3.5 transition-transform duration-200"
-                    style={{ transform: configMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                  />
-                </button>
-
-                {configMenuOpen && (
-                  <div
-                    className="admin-config-submenu space-y-0.5 border-l"
-                    style={{ borderColor: 'var(--admin-card-border)' }}
-                  >
-                    {CONFIG_SUBLINKS.map((item) => {
+              {visibleMainLinks.length > 0 && (
+                <div>
+                  <p className="admin-section-label">Principal</p>
+                  <div className="space-y-0.5">
+                    {visibleMainLinks.map((item) => {
                       const Icon = item.icon;
                       return (
                         <NavLink
                           key={item.to}
                           to={item.to}
-                          className={`${subLinkBase} admin-nav-link`}
-                          style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
+                          className={`${linkBase} admin-nav-link`}
+                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <Icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="admin-icon-wrap">
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
                           <span>{item.label}</span>
                         </NavLink>
                       );
                     })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {visibleDesignLinks.length > 0 && (
+                <div>
+                  <p className="admin-section-label">Diseño</p>
+                  <div className="space-y-0.5">
+                    {visibleDesignLinks.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={`${linkBase} admin-nav-link`}
+                          style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                        >
+                          <span className="admin-icon-wrap">
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
+                          <span>{item.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {hasVisibleConfigLinks && (
+                <div>
+                  <p className="admin-section-label">Sistema</p>
+                  <button
+                    type="button"
+                    onClick={handleConfigMenuClick}
+                    className={`${linkBase} admin-nav-link w-full justify-between`}
+                    style={isConfigRoute ? activeNavStyle : normalNavStyle}
+                  >
+                    <span className="flex items-center admin-inline-gap-md">
+                      <span className="admin-icon-wrap">
+                        <Settings className="h-3.5 w-3.5" />
+                      </span>
+                      <span>Configuración</span>
+                    </span>
+                    <ChevronDown
+                      className="h-3.5 w-3.5 transition-transform duration-200"
+                      style={{ transform: configMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    />
+                  </button>
+
+                  {configMenuOpen && (
+                    <div
+                      className="admin-config-submenu space-y-0.5 border-l"
+                      style={{ borderColor: 'var(--admin-card-border)' }}
+                    >
+                      {visibleConfigSublinks.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <NavLink
+                            key={item.to}
+                            to={item.to}
+                            className={`${subLinkBase} admin-nav-link`}
+                            style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          >
+                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                            <span>{item.label}</span>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </nav>
 
             <div
@@ -1108,14 +1132,14 @@ export default function AdminLayout() {
                 className="admin-card-glass admin-mobile-nav-panel flex overflow-x-auto admin-no-scrollbar"
                 aria-label="Tabs admin"
               >
-                {mainLinks.map((item) => {
+                {visibleMainLinks.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink
                       key={item.to}
                       to={item.to}
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
-                      style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
+                      style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
                       <span
                         className="admin-icon-wrap"
@@ -1132,14 +1156,14 @@ export default function AdminLayout() {
                   );
                 })}
 
-                {designLinks.map((item) => {
+                {visibleDesignLinks.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink
                       key={item.to}
                       to={item.to}
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
-                      style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
+                      style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
                       <span
                         className="admin-icon-wrap"
@@ -1156,39 +1180,41 @@ export default function AdminLayout() {
                   );
                 })}
 
-                <button
-                  type="button"
-                  onClick={handleConfigMenuClick}
-                  className={`${mobileLinkBase} admin-nav-link-mobile`}
-                  style={isConfigRoute ? activeNavStyle : normalNavStyle}
-                >
-                  <span
-                    className="admin-icon-wrap"
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 'calc(var(--admin-radius) * 0.38)',
-                    }}
+                {hasVisibleConfigLinks && (
+                  <button
+                    type="button"
+                    onClick={handleConfigMenuClick}
+                    className={`${mobileLinkBase} admin-nav-link-mobile`}
+                    style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
-                    <Settings className="h-3 w-3" />
-                  </span>
-                  Config
-                </button>
+                    <span
+                      className="admin-icon-wrap"
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 'calc(var(--admin-radius) * 0.38)',
+                      }}
+                    >
+                      <Settings className="h-3 w-3" />
+                    </span>
+                    Config
+                  </button>
+                )}
               </nav>
 
-              {configMenuOpen && (
+              {hasVisibleConfigLinks && configMenuOpen && (
                 <div
                   className="flex flex-wrap px-1"
                   style={{ gap: 'calc(var(--admin-gap) * 0.45)' }}
                 >
-                  {CONFIG_SUBLINKS.map((item) => {
+                  {visibleConfigSublinks.map((item) => {
                     const Icon = item.icon;
                     return (
                       <NavLink
                         key={item.to}
                         to={item.to}
                         className={`${mobileLinkBase} admin-nav-link-mobile`}
-                        style={({ isActive }) => isActive ? activeNavStyle : normalNavStyle}
+                        style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                       >
                         <Icon className="h-3 w-3" />
                         {item.label}
