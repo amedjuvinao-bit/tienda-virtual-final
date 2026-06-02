@@ -13,6 +13,7 @@ import {
   Users,
   IdCard,
   FileSearch,
+  Building2,
 } from 'lucide-react';
 
 // 🔹 IMPORTS MODULARES
@@ -26,6 +27,7 @@ import PanelAdminSection from './configuracion/sections/PanelAdminSection';
 import UsuariosSection from './configuracion/sections/UsuariosSection';
 import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
+import SedesSection from './configuracion/sections/SedesSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
@@ -34,6 +36,12 @@ const TABS = [
     label: 'Tienda',
     icon: Store,
     description: 'Datos generales de la tienda y contacto principal.',
+  },
+  {
+    id: 'sedes',
+    label: 'Sedes',
+    icon: Building2,
+    description: 'Gestión de sedes, bodegas, puntos de venta y puntos de recogida.',
   },
   {
     id: 'facturacion',
@@ -108,6 +116,8 @@ export default function ConfiguracionPage() {
     switch (activeTab) {
       case 'empresa':
         return <EmpresaSection />;
+      case 'sedes':
+        return <SedesSection />;
       case 'facturacion':
         return <FacturacionSection />;
       case 'pagos':
@@ -184,8 +194,8 @@ export default function ConfiguracionPage() {
               className="mt-2 max-w-3xl text-sm leading-6"
               style={{ color: 'var(--admin-card-muted-text)' }}
             >
-              Configura tienda, facturación, pagos, envíos, correo, usuarios,
-              perfiles, seguridad, logs y comportamiento del sistema.
+              Configura tienda, sedes, facturación, pagos, envíos, correo,
+              usuarios, perfiles, seguridad, logs y comportamiento del sistema.
             </p>
           </div>
 

@@ -466,6 +466,7 @@ export default function App() {
                   element={<Navigate to="/admin/configuracion/empresa" replace />}
                 />
                 <Route path="configuracion/empresa" element={<ConfiguracionPage />} />
+                <Route path="configuracion/sedes" element={<ConfiguracionPage />} />
                 <Route
                   path="configuracion/facturacion"
                   element={<ConfiguracionPage />}
