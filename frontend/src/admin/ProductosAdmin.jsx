@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Copy } from 'lucide-react';
 import { toast } from 'react-toastify';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Can from './security/Can';
+import useAdminPermissions from './security/useAdminPermissions';
 
 // ✅ usa el cliente que ya agrega x-admin-token / X-Session-Id
 import api from '../lib/api';
@@ -24,6 +26,12 @@ function getDisplayStock(p) {
 }
 
 export default function ProductosAdmin() {
+  const { can } = useAdminPermissions();
+
+  const canUpdateProduct = can('products:update');
+  const canDeleteProduct = can('products:delete');
+  const canUseProductActions = canUpdateProduct || canDeleteProduct;
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,30 +43,41 @@ export default function ProductosAdmin() {
 
   useEffect(() => {
     let cancel = false;
+
     const load = async () => {
       setLoading(true);
       setError('');
+
       try {
         // 🔸 trae TODOS (activos + inactivos) para administración
         const res = await api.get('/api/products', { params: { all: 1 } });
+
         if (cancel) return;
+
         const list = Array.isArray(res.data) ? res.data : [];
         setProducts(list);
       } catch (err) {
         if (cancel) return;
+
         console.error('Error cargando productos:', err?.message || err);
         setError('No se pudieron cargar los productos.');
       } finally {
         if (!cancel) setLoading(false);
       }
     };
+
     load();
-    return () => { cancel = true; };
+
+    return () => {
+      cancel = true;
+    };
   }, []);
 
-  const filtered = products.filter(p => {
+  const filtered = products.filter((p) => {
     if (!q.trim()) return true;
+
     const needle = q.toLowerCase();
+
     return (
       String(p.title || '').toLowerCase().includes(needle) ||
       String(p.description || '').toLowerCase().includes(needle) ||
@@ -69,6 +88,7 @@ export default function ProductosAdmin() {
 
   const copySku = async (sku) => {
     if (!sku) return;
+
     try {
       await navigator.clipboard.writeText(sku);
       toast.success('SKU copiado');
@@ -78,10 +98,18 @@ export default function ProductosAdmin() {
   };
 
   const handleDelete = async () => {
+    if (!canDeleteProduct) {
+      toast.error('No tienes permiso para eliminar productos');
+      setConfirmOpen(false);
+      setProductToDelete(null);
+      return;
+    }
+
     if (!productToDelete) return;
+
     try {
       await api.delete(`/api/products/${productToDelete}`);
-      setProducts(prev => prev.filter(p => p._id !== productToDelete));
+      setProducts((prev) => prev.filter((p) => p._id !== productToDelete));
       toast.success('Producto eliminado');
     } catch (err) {
       console.error(err);
@@ -128,7 +156,8 @@ export default function ProductosAdmin() {
             borderRadius: 'calc(var(--admin-radius) * 0.45)',
             background: 'var(--admin-input-bg)',
             color: 'var(--admin-input-text)',
-            padding: 'calc(var(--admin-padding) * 0.5) calc(var(--admin-padding) * 0.7)',
+            padding:
+              'calc(var(--admin-padding) * 0.5) calc(var(--admin-padding) * 0.7)',
           }}
         />
 
@@ -139,21 +168,25 @@ export default function ProductosAdmin() {
           {loading ? 'Cargando…' : `${filtered.length} de ${products.length}`}
         </span>
 
-        <button
-          onClick={() => navigate('/admin/productos/nuevo')}
-          className="flex items-center ml-auto text-sm font-medium transform transition-all duration-200 hover:scale-105 active:scale-95"
-          style={{
-            gap: 'calc(var(--admin-gap) * 0.45)',
-            padding: 'calc(var(--admin-padding) * 0.5) calc(var(--admin-padding) * 0.9)',
-            background: 'var(--admin-button-bg)',
-            color: 'var(--admin-button-text)',
-            borderRadius: 'calc(var(--admin-radius) * 0.45)',
-            boxShadow: 'var(--admin-shadow-sm, 0 4px 14px rgba(0,0,0,0.08))',
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          Agregar producto
-        </button>
+        <Can permission="products:create">
+          <button
+            onClick={() => navigate('/admin/productos/nuevo')}
+            className="flex items-center ml-auto text-sm font-medium transform transition-all duration-200 hover:scale-105 active:scale-95"
+            style={{
+              gap: 'calc(var(--admin-gap) * 0.45)',
+              padding:
+                'calc(var(--admin-padding) * 0.5) calc(var(--admin-padding) * 0.9)',
+              background: 'var(--admin-button-bg)',
+              color: 'var(--admin-button-text)',
+              borderRadius: 'calc(var(--admin-radius) * 0.45)',
+              boxShadow:
+                'var(--admin-shadow-sm, 0 4px 14px rgba(0,0,0,0.08))',
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Agregar producto
+          </button>
+        </Can>
       </div>
 
       {error && (
@@ -189,20 +222,59 @@ export default function ProductosAdmin() {
             }}
           >
             <tr>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>Nombre</th>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>SKU</th>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>Precio</th>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>Stock</th>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>Activo</th>
-              <th className="text-left p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>ID</th>
-              <th className="text-left p-3 border-b w-40" style={{ borderColor: 'var(--admin-table-border)' }}>Acciones</th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                Nombre
+              </th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                SKU
+              </th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                Precio
+              </th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                Stock
+              </th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                Activo
+              </th>
+              <th
+                className="text-left p-3 border-b"
+                style={{ borderColor: 'var(--admin-table-border)' }}
+              >
+                ID
+              </th>
+
+              {canUseProductActions && (
+                <th
+                  className="text-left p-3 border-b w-40"
+                  style={{ borderColor: 'var(--admin-table-border)' }}
+                >
+                  Acciones
+                </th>
+              )}
             </tr>
           </thead>
+
           <tbody className="text-sm">
             {!loading && filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={canUseProductActions ? 7 : 6}
                   className="p-4 text-center"
                   style={{ color: 'var(--admin-table-muted-text)' }}
                 >
@@ -210,8 +282,10 @@ export default function ProductosAdmin() {
                 </td>
               </tr>
             )}
+
             {filtered.map((p) => {
               const displayStock = getDisplayStock(p);
+
               return (
                 <tr
                   key={p._id}
@@ -219,14 +293,24 @@ export default function ProductosAdmin() {
                     background: 'transparent',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--admin-table-row-hover)';
+                    e.currentTarget.style.background =
+                      'var(--admin-table-row-hover)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>{p.title}</td>
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>
+                  <td
+                    className="p-3 border-b"
+                    style={{ borderColor: 'var(--admin-table-border)' }}
+                  >
+                    {p.title}
+                  </td>
+
+                  <td
+                    className="p-3 border-b"
+                    style={{ borderColor: 'var(--admin-table-border)' }}
+                  >
                     {p.sku ? (
                       <div
                         className="flex items-center"
@@ -243,6 +327,7 @@ export default function ProductosAdmin() {
                         >
                           {p.sku}
                         </span>
+
                         <button
                           onClick={() => copySku(p.sku)}
                           title="Copiar SKU"
@@ -264,65 +349,101 @@ export default function ProductosAdmin() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>
-                    {Number(p.price || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}
+
+                  <td
+                    className="p-3 border-b"
+                    style={{ borderColor: 'var(--admin-table-border)' }}
+                  >
+                    {Number(p.price || 0).toLocaleString('es-CO', {
+                      style: 'currency',
+                      currency: 'COP',
+                    })}
                   </td>
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)', fontVariantNumeric: 'tabular-nums' }}>
+
+                  <td
+                    className="p-3 border-b"
+                    style={{
+                      borderColor: 'var(--admin-table-border)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
                     {displayStock}
                   </td>
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>
+
+                  <td
+                    className="p-3 border-b"
+                    style={{ borderColor: 'var(--admin-table-border)' }}
+                  >
                     <span
                       className="text-xs"
                       style={{
                         padding: '4px 8px',
                         borderRadius: 'calc(var(--admin-radius) * 0.35)',
-                        background: p.active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-button-soft-bg)',
-                        color: p.active ? 'var(--admin-primary-soft-text)' : 'var(--admin-button-soft-text)',
+                        background: p.active
+                          ? 'var(--admin-primary-soft-bg)'
+                          : 'var(--admin-button-soft-bg)',
+                        color: p.active
+                          ? 'var(--admin-primary-soft-text)'
+                          : 'var(--admin-button-soft-text)',
                       }}
                     >
                       {p.active ? 'Sí' : 'No'}
                     </span>
                   </td>
+
                   <td
                     className="p-3 border-b font-mono text-[12px]"
                     style={{ borderColor: 'var(--admin-table-border)' }}
                   >
                     {p._id}
                   </td>
-                  <td className="p-3 border-b" style={{ borderColor: 'var(--admin-table-border)' }}>
-                    <div
-                      className="flex"
-                      style={{ gap: 'calc(var(--admin-gap) * 0.45)' }}
+
+                  {canUseProductActions && (
+                    <td
+                      className="p-3 border-b"
+                      style={{ borderColor: 'var(--admin-table-border)' }}
                     >
-                      <button
-                        style={{
-                          padding: '4px 12px',
-                          borderRadius: 'calc(var(--admin-radius) * 0.35)',
-                          background: 'var(--admin-button-bg)',
-                          color: 'var(--admin-button-text)',
-                          fontSize: 12,
-                        }}
-                        onClick={() => navigate(`/admin/productos/editar/${p._id}`)}
+                      <div
+                        className="flex"
+                        style={{ gap: 'calc(var(--admin-gap) * 0.45)' }}
                       >
-                        Editar
-                      </button>
-                      <button
-                        style={{
-                          padding: '4px 12px',
-                          borderRadius: 'calc(var(--admin-radius) * 0.35)',
-                          background: 'var(--admin-danger)',
-                          color: '#fff',
-                          fontSize: 12,
-                        }}
-                        onClick={() => {
-                          setProductToDelete(p._id);
-                          setConfirmOpen(true);
-                        }}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
+                        <Can permission="products:update">
+                          <button
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: 'calc(var(--admin-radius) * 0.35)',
+                              background: 'var(--admin-button-bg)',
+                              color: 'var(--admin-button-text)',
+                              fontSize: 12,
+                            }}
+                            onClick={() =>
+                              navigate(`/admin/productos/editar/${p._id}`)
+                            }
+                          >
+                            Editar
+                          </button>
+                        </Can>
+
+                        <Can permission="products:delete">
+                          <button
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: 'calc(var(--admin-radius) * 0.35)',
+                              background: 'var(--admin-danger)',
+                              color: '#fff',
+                              fontSize: 12,
+                            }}
+                            onClick={() => {
+                              setProductToDelete(p._id);
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </Can>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
