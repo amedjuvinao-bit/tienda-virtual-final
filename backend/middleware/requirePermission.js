@@ -139,16 +139,19 @@ async function getEffectivePermissions(req) {
 
   const directPermissions = uniqueCleanPermissions(req.adminPermissions || []);
   const rolePermissions = await loadRolePermissions(req);
+  const userHasRoleRef = Boolean(req.adminUserDoc?.roleRef);
 
-  const merged = uniqueCleanPermissions([
-    ...directPermissions,
-    ...rolePermissions,
-  ]);
+  const effectivePermissions = userHasRoleRef
+    ? rolePermissions
+    : uniqueCleanPermissions([
+        ...directPermissions,
+        ...rolePermissions,
+      ]);
 
   req.adminEffectivePermissionsLoaded = true;
-  req.adminEffectivePermissions = merged;
+  req.adminEffectivePermissions = effectivePermissions;
 
-  return merged;
+  return effectivePermissions;
 }
 
 function reject(res, status, error, message, extra = {}) {
