@@ -27,14 +27,14 @@ export const ADMIN_ROUTE_PERMISSIONS = {
 
   configuracion: ['settings:view'],
   'configuracion/empresa': ['settings:store'],
-  'configuracion/sedes': ['settings:branches'],
+  'configuracion/sedes': ['branches:view'],
   'configuracion/facturacion': ['settings:billing'],
   'configuracion/pagos': ['settings:payments'],
   'configuracion/envios': ['settings:shipping'],
   'configuracion/correo': ['settings:mail'],
   'configuracion/login-admin': ['settings:login'],
   'configuracion/panel-admin': ['settings:panel'],
-  'configuracion/usuarios': ['users:view'],
+  'configuracion/usuarios': ['admin-users:view'],
   'configuracion/perfiles': ['roles:view'],
   'configuracion/logs': ['logs:view'],
 };

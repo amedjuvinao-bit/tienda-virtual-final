@@ -23,6 +23,7 @@ import {
   LogOut,
   Search,
   Store,
+  Building2,
   ReceiptText,
   CreditCard,
   Truck,
@@ -53,6 +54,7 @@ const CONFIG_SUBLINKS = [
   { to: '/admin/configuracion/panel-admin', label: 'Panel admin', icon: Settings },
   { to: '/admin/configuracion/usuarios', label: 'Usuarios', icon: Users },
   { to: '/admin/configuracion/perfiles', label: 'Perfiles', icon: UserCog },
+  { to: '/admin/configuracion/sedes', label: 'Sedes', icon: Building2 },
   { to: '/admin/configuracion/logs', label: 'Logs', icon: ScrollText },
 ];
 
