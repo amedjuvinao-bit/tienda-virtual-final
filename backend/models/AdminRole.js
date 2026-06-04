@@ -2,6 +2,11 @@
 
 const mongoose = require('mongoose');
 
+const {
+  ADMIN_PERMISSION_KEYS,
+  canonicalPermission,
+} = require('../security/adminPermissionCatalog');
+
 const ROLE_STATUS = ['active', 'inactive'];
 
 const ROLE_SCOPES = [
@@ -10,74 +15,7 @@ const ROLE_SCOPES = [
   'own',
 ];
 
-const DEFAULT_PERMISSIONS = [
-  // Panel
-  'dashboard:view',
-
-  // Órdenes
-  'orders:view',
-  'orders:create',
-  'orders:update',
-  'orders:cancel',
-  'orders:refund',
-  'orders:export',
-
-  // Ventas manuales / POS
-  'pos:view',
-  'pos:create',
-  'pos:discount',
-  'pos:cancel',
-
-  // Productos
-  'products:view',
-  'products:create',
-  'products:update',
-  'products:delete',
-
-  // Inventario
-  'inventory:view',
-  'inventory:update',
-  'inventory:transfer',
-  'inventory:adjust',
-
-  // Clientes
-  'customers:view',
-  'customers:create',
-  'customers:update',
-
-  // Facturación electrónica
-  'billing:view',
-  'billing:create',
-  'billing:retry',
-  'billing:credit-note',
-  'billing:download',
-
-  // Usuarios administrativos
-  'admin-users:view',
-  'admin-users:create',
-  'admin-users:update',
-  'admin-users:disable',
-
-  // Roles
-  'roles:view',
-  'roles:create',
-  'roles:update',
-  'roles:disable',
-
-  // Sedes
-  'branches:view',
-  'branches:create',
-  'branches:update',
-  'branches:disable',
-
-  // Configuración
-  'settings:view',
-  'settings:update',
-
-  // Reportes
-  'reports:view',
-  'reports:export',
-];
+const DEFAULT_PERMISSIONS = [...ADMIN_PERMISSION_KEYS];
 
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -91,10 +29,7 @@ function normalizeCode(value) {
 }
 
 function normalizePermission(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ':');
+  return canonicalPermission(value);
 }
 
 function normalizePermissions(input) {
@@ -360,13 +295,18 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
     {
       name: 'Administrador',
       code: 'admin',
-      description: 'Gestiona operación general, productos, órdenes, usuarios y reportes.',
+      description: 'Gestiona operación general, productos, órdenes, usuarios, configuración y reportes.',
       scope: 'global',
       level: 10,
       isSystem: true,
       isDefault: true,
       permissions: DEFAULT_PERMISSIONS.filter(
-        (permission) => !['roles:disable'].includes(permission)
+        (permission) =>
+          ![
+            'orders:delete',
+            'roles:disable',
+            'logs:export',
+          ].includes(permission)
       ),
     },
     {
@@ -379,62 +319,116 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
         'orders:create',
         'orders:update',
+        'orders:status',
+        'orders:mark_printed',
+        'orders:archive',
+        'orders:tags',
+        'orders:customer_data',
+        'orders:notes',
+        'orders:email',
         'orders:export',
+
         'pos:view',
         'pos:create',
         'pos:discount',
+        'pos:cancel',
+
         'products:view',
+
         'inventory:view',
         'inventory:update',
         'inventory:transfer',
+        'inventory:adjust',
+        'inventory:export',
+
+        'carts:view',
+        'favorites:view',
+
         'customers:view',
         'customers:create',
         'customers:update',
+
         'billing:view',
         'billing:create',
+        'billing:download',
+
+        'payments:view',
+
+        'branches:view',
+
         'reports:view',
+        'reports:export',
       ],
     },
     {
       name: 'Cajero',
       code: 'cashier',
-      description: 'Registra ventas POS y consulta productos.',
+      description: 'Registra ventas POS, consulta productos y gestiona operación básica de órdenes.',
       scope: 'branch',
       level: 50,
       isSystem: true,
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
+        'orders:create',
+        'orders:status',
+        'orders:mark_printed',
+        'orders:notes',
+
         'pos:view',
         'pos:create',
+        'pos:discount',
+
         'products:view',
+
         'inventory:view',
+
         'customers:view',
         'customers:create',
+
+        'billing:view',
+        'billing:download',
+
+        'payments:view',
       ],
     },
     {
       name: 'Vendedor',
       code: 'seller',
-      description: 'Registra ventas manuales y consulta productos.',
+      description: 'Registra ventas manuales, consulta productos y atiende clientes.',
       scope: 'branch',
       level: 55,
       isSystem: true,
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
         'orders:create',
+        'orders:notes',
+        'orders:email',
+
         'pos:view',
         'pos:create',
+
         'products:view',
+
         'inventory:view',
+
+        'carts:view',
+        'favorites:view',
+
         'customers:view',
         'customers:create',
+        'customers:update',
+
+        'billing:view',
       ],
     },
     {
@@ -447,30 +441,143 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
+        'orders:status',
+        'orders:mark_printed',
+        'orders:notes',
+
         'products:view',
+
         'inventory:view',
         'inventory:update',
         'inventory:transfer',
         'inventory:adjust',
+        'inventory:import',
+        'inventory:export',
+
+        'branches:view',
       ],
     },
     {
       name: 'Facturación',
       code: 'billing',
-      description: 'Gestiona facturación electrónica y documentos DIAN.',
+      description: 'Gestiona facturación electrónica, documentos DIAN/Factus y soportes.',
       scope: 'global',
       level: 65,
       isSystem: true,
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
+        'orders:customer_data',
+        'orders:email',
+        'orders:refund',
+        'orders:export',
+
+        'customers:view',
+
         'billing:view',
         'billing:create',
         'billing:retry',
-        'billing:credit-note',
+        'billing:credit_note',
         'billing:download',
+
+        'payments:view',
+
+        'reports:view',
+        'reports:export',
+      ],
+    },
+    {
+      name: 'Diseñador / contenido',
+      code: 'content',
+      description: 'Gestiona páginas, apariencia, secciones, menús y archivos visuales.',
+      scope: 'global',
+      level: 70,
+      isSystem: true,
+      isDefault: false,
+      permissions: [
+        'dashboard:view',
+
+        'products:view',
+
+        'pages:view',
+        'pages:create',
+        'pages:update',
+        'pages:delete',
+        'pages:system',
+
+        'appearance:view',
+        'appearance:update',
+        'appearance:sections',
+        'appearance:menus',
+
+        'media:view',
+        'media:upload',
+        'media:delete',
+      ],
+    },
+    {
+      name: 'Configuración técnica',
+      code: 'settings-manager',
+      description: 'Gestiona configuración general, correo, pagos, panel y parámetros técnicos.',
+      scope: 'global',
+      level: 75,
+      isSystem: true,
+      isDefault: false,
+      permissions: [
+        'dashboard:view',
+
+        'settings:view',
+        'settings:store',
+        'settings:billing',
+        'settings:payments',
+        'settings:shipping',
+        'settings:mail',
+        'settings:mail_test',
+        'settings:login',
+        'settings:panel',
+
+        'billing:settings',
+        'payments:settings',
+
+        'appearance:view',
+        'appearance:admin',
+
+        'branches:view',
+        'branches:update',
+        'branches:fiscal',
+
+        'geo:view',
+        'geo:update',
+      ],
+    },
+    {
+      name: 'Auditor',
+      code: 'auditor',
+      description: 'Consulta información sensible, reportes y registros de auditoría sin modificar datos operativos.',
+      scope: 'global',
+      level: 80,
+      isSystem: true,
+      isDefault: false,
+      permissions: [
+        'dashboard:view',
+
+        'orders:view',
+        'products:view',
+        'inventory:view',
+        'carts:view',
+        'favorites:view',
+        'customers:view',
+        'billing:view',
+        'payments:view',
+        'branches:view',
+        'reports:view',
+        'reports:export',
+        'logs:view',
+        'logs:export',
       ],
     },
     {
@@ -483,11 +590,19 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
       isDefault: false,
       permissions: [
         'dashboard:view',
+
         'orders:view',
         'products:view',
         'inventory:view',
+        'carts:view',
+        'favorites:view',
         'customers:view',
         'billing:view',
+        'payments:view',
+        'pages:view',
+        'appearance:view',
+        'settings:view',
+        'branches:view',
         'reports:view',
       ],
     },

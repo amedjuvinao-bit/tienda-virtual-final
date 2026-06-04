@@ -12,6 +12,8 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
+const adminAccessGate = require('./middleware/adminAccessGate');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -67,6 +69,19 @@ const loginLimiter = rateLimit({
 });
 
 app.use(globalLimiter);
+
+/* ---------------------------------------------
+ * Seguridad administrativa global
+ * -------------------------------------------
+ * Este middleware consulta el mapa global de rutas admin.
+ * Si la ruta está registrada:
+ * - valida token admin
+ * - valida permiso requerido
+ * - registra auditoría si aplica
+ *
+ * Si la ruta no está registrada, deja continuar normal.
+ */
+app.use(adminAccessGate);
 
 /* ---------------------------------------------
  * Archivos estáticos (/uploads)

@@ -20,6 +20,7 @@ const { sendMail } = require('../lib/mailer');
 
 // nuevos
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
 
@@ -1171,7 +1172,7 @@ router.get('/:id', async (req, res) => {
  * ============================ */
 router.options('/:id/status', (_req, res) => res.sendStatus(204));
 
-router.patch('/:id/status', requireAdmin, async (req, res) => {
+router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), async (req, res) => {
   try {
     const STATUS_MAP = new Map([
       ['pendiente', 'pending'],
