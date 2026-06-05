@@ -77,28 +77,35 @@ function RailStatusCard({ icon, label, value, variant = 'soft' }) {
     <div
       style={{
         minWidth: 0,
-        border: '1px solid rgba(255,255,255,0.28)',
+        minHeight: 82,
+        border: '1px solid rgba(255,255,255,0.30)',
         background: 'rgba(255,255,255,0.18)',
         borderRadius: 18,
-        padding: '13px 12px',
+        padding: '12px 9px',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: 10,
+        justifyContent: 'center',
+        gap: 7,
         color: '#fff',
+        textAlign: 'center',
         backdropFilter: 'blur(10px)',
       }}
     >
-      <IconBadge icon={icon} size={34} iconSize={15} variant={variant} />
-      <div style={{ minWidth: 0 }}>
+      <IconBadge icon={icon} size={30} iconSize={14} variant={variant} />
+
+      <div style={{ minWidth: 0, width: '100%' }}>
         <span
           style={{
             display: 'block',
-            opacity: 0.72,
-            fontSize: 10,
-            fontWeight: 900,
-            letterSpacing: '0.1em',
+            opacity: 0.78,
+            fontSize: 9,
+            fontWeight: 950,
+            letterSpacing: '0.09em',
             textTransform: 'uppercase',
             marginBottom: 4,
+            lineHeight: 1.05,
+            whiteSpace: 'nowrap',
           }}
         >
           {label}
@@ -107,11 +114,13 @@ function RailStatusCard({ icon, label, value, variant = 'soft' }) {
           title={String(value || '')}
           style={{
             display: 'block',
-            fontSize: 12,
+            width: '100%',
+            fontSize: 10.5,
             fontWeight: 950,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            lineHeight: 1.15,
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
           }}
         >
           {value || '—'}
@@ -262,7 +271,7 @@ export default function OrderDetailSummaryRail({ order }) {
             position: 'relative',
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 9,
+            gap: 8,
             marginTop: 12,
           }}
         >
