@@ -99,6 +99,9 @@ const paymentRoutes = tryRequire('./routes/payments'); // ✅ nueva ruta de pago
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest'); // ✅ prueba de proveedor DIAN
 const uploadRoutes = tryRequire('./routes/uploadRoutes'); // opcional
 const geoRoutes = tryRequire('./routes/geo'); // opcional
+const OrderModel = tryRequire('./models/Order');
+const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
+const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 
 // ✅ RUTAS ADMIN
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
@@ -116,6 +119,56 @@ const pageRoutes = tryRequire('./routes/pages');
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
+
+if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
+  app.patch(
+    '/api/orders/:id/status',
+    requireAdminMiddleware,
+    requirePermissionMiddleware('orders:update'),
+    async (req, res, next) => {
+      const rawStatus = String(req.body?.status || '').trim().toLowerCase();
+      const deliveredAliases = ['delivered', 'entregado', 'entregada'];
+
+      if (!deliveredAliases.includes(rawStatus)) {
+        return next();
+      }
+
+      try {
+        const before = await OrderModel.findById(req.params.id).select('status').lean();
+
+        if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
+
+        const updatedOrder = await OrderModel.findByIdAndUpdate(
+          req.params.id,
+          { $set: { status: 'delivered' } },
+          { new: true }
+        ).lean();
+
+        const OrderEventModel = mongoose.models.OrderEvent;
+
+        if (OrderEventModel) {
+          await OrderEventModel.create({
+            orderId: updatedOrder._id,
+            type: 'status_changed',
+            message: `Estado: ${before.status || '—'} -> delivered`,
+            meta: {
+              from: before.status || null,
+              to: 'delivered',
+              ip: req.ip,
+              by: req.headers['x-admin-user'] || null,
+            },
+          });
+        }
+
+        return res.json({ ok: true, order: updatedOrder });
+      } catch (error) {
+        console.error('PATCH /orders/:id/status delivered', error);
+        return res.status(500).json({ error: 'No se pudo actualizar el estado a entregada' });
+      }
+    }
+  );
+}
+
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes); // ✅ conexión de payments
 if (dianProviderTestRoutes) app.use('/api/dian-provider', dianProviderTestRoutes); // ✅ conexión prueba provider
@@ -160,7 +213,7 @@ mongoose
     console.log('✅ Conectado a MongoDB Atlas');
   })
   .catch((error) => {
-    console.error('❌ Error al conectar a MongoDB:', error.message);
+    console.error('❌ Error al conectar MongoDB:', error.message);
     // ⬇️ YA NO HACEMOS process.exit(1)
     console.warn('⚠️ Continuando sin conexión a MongoDB (solo para desarrollo).');
   })
