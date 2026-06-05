@@ -46,6 +46,11 @@ export const ORDER_DETAIL_STATUS_META = {
     className:
       'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200',
   },
+  delivered: {
+    label: 'Entregada',
+    className:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200',
+  },
   cancelled: {
     label: 'Cancelada',
     className:
