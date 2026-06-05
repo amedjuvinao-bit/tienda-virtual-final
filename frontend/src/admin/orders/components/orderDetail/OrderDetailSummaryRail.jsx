@@ -50,7 +50,7 @@ function RailMoneyLine({ label, value, strong = false }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        color: strong ? ORDER_DETAIL_THEME.cardText : ORDER_DETAIL_THEME.mutedText,
+        color: strong ? '#fff' : 'rgba(15, 23, 42, 0.72)',
         fontSize: strong ? 14 : 12,
         fontWeight: strong ? 950 : 750,
         lineHeight: 1.25,
@@ -59,11 +59,12 @@ function RailMoneyLine({ label, value, strong = false }) {
       <span>{label}</span>
       <strong
         style={{
-          color: strong ? ORDER_DETAIL_THEME.primary : ORDER_DETAIL_THEME.cardText,
+          color: strong ? '#fff' : 'rgba(15, 23, 42, 0.95)',
           fontSize: strong ? 22 : 13,
           fontWeight: strong ? 950 : 850,
           letterSpacing: strong ? '-0.04em' : 0,
           whiteSpace: 'nowrap',
+          textShadow: strong ? '0 1px 12px rgba(15, 23, 42, 0.24)' : 'none',
         }}
       >
         {value}
