@@ -117,7 +117,7 @@ export default function OrderDetailActionToolbar({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1.1fr 1.4fr 1fr',
+          gridTemplateColumns: '1fr 1.15fr 1fr',
           gap: 14,
           alignItems: 'stretch',
         }}
@@ -148,15 +148,15 @@ export default function OrderDetailActionToolbar({
               disabled={disabled}
               style={{
                 width: '100%',
-                minHeight: 40,
+                minHeight: 42,
                 border: `1px solid ${ORDER_DETAIL_THEME.inputBorder}`,
-                background: ORDER_DETAIL_THEME.inputBg,
+                background: ORDER_DETAIL_THEME.cardBg,
                 color: ORDER_DETAIL_THEME.inputText,
                 borderRadius: 14,
                 padding: '0 12px',
                 outline: 'none',
                 fontSize: 13,
-                fontWeight: 800,
+                fontWeight: 850,
               }}
             >
               {STATUS_OPTIONS.map((option) => (
@@ -209,9 +209,9 @@ export default function OrderDetailActionToolbar({
               placeholder="vip, urgente, mayorista..."
               style={{
                 width: '100%',
-                minHeight: 40,
+                minHeight: 42,
                 border: `1px solid ${ORDER_DETAIL_THEME.inputBorder}`,
-                background: ORDER_DETAIL_THEME.inputBg,
+                background: ORDER_DETAIL_THEME.cardBg,
                 color: ORDER_DETAIL_THEME.inputText,
                 borderRadius: 14,
                 padding: '0 12px',
@@ -263,42 +263,43 @@ export default function OrderDetailActionToolbar({
 
           <div
             style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: 9,
               marginTop: 8,
             }}
           >
-            <GhostButton
+            <ActionButton
               onClick={togglePrinted}
               disabled={disabled}
               icon={<OrderDetailIcons.FileText size={15} strokeWidth={2.4} />}
             >
-              {printed ? 'Quitar impresa' : 'Marcar impresa'}
-            </GhostButton>
+              {printed ? 'Quitar marca de impresa' : 'Marcar como impresa'}
+            </ActionButton>
 
-            <GhostButton
+            <ActionButton
               onClick={toggleArchived}
               disabled={disabled}
               icon={<OrderDetailIcons.PackageCheck size={15} strokeWidth={2.4} />}
             >
-              {archived ? 'Desarchivar' : 'Archivar'}
-            </GhostButton>
+              {archived ? 'Desarchivar orden' : 'Archivar orden'}
+            </ActionButton>
 
             <div
               ref={emailBtnRef}
               style={{
                 position: 'relative',
-                display: 'inline-flex',
+                display: 'block',
+                width: '100%',
               }}
             >
-              <GhostButton
+              <ActionButton
                 onClick={() => setEmailMenuOpen((value) => !value)}
                 disabled={loadingAux}
                 icon={<OrderDetailIcons.Mail size={15} strokeWidth={2.4} />}
               >
                 Enviar email
-              </GhostButton>
+              </ActionButton>
 
               {emailMenuOpen ? (
                 <div
@@ -337,7 +338,7 @@ export default function OrderDetailActionToolbar({
       <style>
         {`
           @media (max-width: 1100px) {
-            div[style*="grid-template-columns: 1.1fr 1.4fr 1fr"] {
+            div[style*="grid-template-columns: 1fr 1.15fr 1fr"] {
               grid-template-columns: 1fr !important;
             }
           }
@@ -350,6 +351,49 @@ export default function OrderDetailActionToolbar({
         `}
       </style>
     </section>
+  );
+}
+
+function ActionButton({ children, onClick, disabled = false, icon = null }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: '100%',
+        minHeight: 42,
+        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        background: disabled ? ORDER_DETAIL_THEME.inputBg : ORDER_DETAIL_THEME.cardBg,
+        color: disabled ? ORDER_DETAIL_THEME.mutedText : ORDER_DETAIL_THEME.primary,
+        borderRadius: 14,
+        padding: '0 14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        gap: 10,
+        fontSize: 12,
+        fontWeight: 950,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'transform 0.16s ease, filter 0.16s ease, border-color 0.16s ease',
+      }}
+      onMouseEnter={(event) => {
+        if (!disabled) {
+          event.currentTarget.style.transform = 'translateY(-1px)';
+          event.currentTarget.style.filter = 'brightness(1.03)';
+          event.currentTarget.style.borderColor = ORDER_DETAIL_THEME.primary;
+        }
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.transform = 'translateY(0)';
+        event.currentTarget.style.filter = 'brightness(1)';
+        event.currentTarget.style.borderColor = ORDER_DETAIL_THEME.cardBorder;
+      }}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
   );
 }
 
