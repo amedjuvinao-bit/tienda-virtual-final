@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
   { code: 'paid', label: 'Pagado' },
   { code: 'failed', label: 'Fallido / Rechazado' },
   { code: 'shipped', label: 'Enviado' },
+  { code: 'delivered', label: 'Entregado' },
   { code: 'cancelled', label: 'Cancelado' },
   { code: 'refunded', label: 'Reembolsado' },
 ];
