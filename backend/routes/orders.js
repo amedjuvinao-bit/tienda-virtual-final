@@ -15,6 +15,7 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const SiteSettings = require('../models/SiteSettings');
 const Subscriber = require('../models/Subscriber');
 const Product = require('../models/Product');
+const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
 const { sendMail } = require('../lib/mailer');
 
@@ -506,6 +507,251 @@ function getBillingMode(settings = {}) {
   };
 }
 
+function getValidSource(value, hasAdminUser = false) {
+  const source = String(value || '').trim().toLowerCase();
+
+  if (hasAdminUser && ['admin', 'pos', 'manual', 'import', 'system'].includes(source)) {
+    return source;
+  }
+
+  return 'online';
+}
+
+function getBranchIdFromRequest(rawBody = {}, cleaned = {}) {
+  return (
+    rawBody.branch ||
+    rawBody.branchId ||
+    rawBody.defaultBranch ||
+    cleaned.branch ||
+    cleaned.branchId ||
+    cleaned.defaultBranch ||
+    ''
+  );
+}
+
+function buildBranchSnapshot(branch) {
+  if (!branch) {
+    return {
+      name: '',
+      code: '',
+      type: '',
+    };
+  }
+
+  return {
+    name: String(branch.name || '').trim(),
+    code: String(branch.code || '').trim().toUpperCase(),
+    type: String(branch.type || '').trim().toLowerCase(),
+  };
+}
+
+function buildAdminSnapshot(req) {
+  return {
+    username: String(req.adminUsername || req.user?.username || '').trim().toLowerCase(),
+    displayName: String(
+      req.adminDisplayName ||
+        req.user?.displayName ||
+        req.user?.fullName ||
+        req.adminUsername ||
+        ''
+    ).trim(),
+    role: String(req.adminRole || req.user?.role || '').trim().toLowerCase(),
+    adminRole: String(req.adminRole || req.user?.adminRole || '').trim().toLowerCase(),
+  };
+}
+
+async function getDefaultOnlineBranch({ session } = {}) {
+  return (
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+      isDefaultForOnlineOrders: true,
+    })
+      .session(session)
+      .lean()) ||
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+      isMain: true,
+    })
+      .session(session)
+      .lean()) ||
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+    })
+      .session(session)
+      .lean())
+  );
+}
+
+async function resolveOrderBranchData(rawBody = {}, cleaned = {}, { session } = {}) {
+  const requestedBranchId = getBranchIdFromRequest(rawBody, cleaned);
+
+  let branch = null;
+
+  if (requestedBranchId && mongoose.Types.ObjectId.isValid(String(requestedBranchId))) {
+    branch = await Branch.findOne({
+      _id: requestedBranchId,
+      deletedAt: null,
+      active: true,
+      status: 'active',
+    })
+      .session(session)
+      .lean();
+  }
+
+  if (!branch) {
+    branch = await getDefaultOnlineBranch({ session });
+  }
+
+  return {
+    branchId: branch?._id || null,
+    branchSnapshot: buildBranchSnapshot(branch),
+  };
+}
+
+function normalizeBranchId(value) {
+  if (!value) return '';
+
+  if (typeof value === 'object') {
+    if (value._id) return normalizeBranchId(value._id);
+    if (value.id) return normalizeBranchId(value.id);
+    if (value.branch) return normalizeBranchId(value.branch);
+  }
+
+  const id = String(value || '').trim();
+
+  return mongoose.Types.ObjectId.isValid(id) ? id : '';
+}
+
+function getAdminRoleCode(req) {
+  return String(
+    req.adminRole ||
+      req.adminProfile?.adminRole ||
+      req.adminProfile?.actualRole ||
+      req.user?.role ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function canAdminSeeAllBranches(req) {
+  if (req.adminAuthType === 'legacy') return true;
+
+  const role = getAdminRoleCode(req);
+
+  return [
+    'owner',
+    'admin',
+    'administrator',
+    'superadmin',
+    'propietario',
+    'administrador',
+  ].includes(role);
+}
+
+function getAllowedBranchIdsFromRequest(req) {
+  const ids = new Set();
+
+  const defaultBranchId = normalizeBranchId(req.adminDefaultBranch);
+
+  if (defaultBranchId) {
+    ids.add(defaultBranchId);
+  }
+
+  const branches = Array.isArray(req.adminBranches) ? req.adminBranches : [];
+
+  for (const item of branches) {
+    const branchId = normalizeBranchId(item?.branch || item);
+
+    if (branchId) {
+      ids.add(branchId);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+function getRequestedBranchIdFromQuery(req) {
+  const raw =
+    req.query.branchId ||
+    req.query.branch ||
+    req.query.sedeId ||
+    req.query.sede ||
+    '';
+
+  const value = String(raw || '').trim();
+
+  if (!value || value.toLowerCase() === 'all' || value.toLowerCase() === 'todas') {
+    return '';
+  }
+
+  return value;
+}
+
+function applyOrderBranchAccessFilter(req, filter) {
+  const requestedBranchRaw = getRequestedBranchIdFromQuery(req);
+  const requestedBranchId = normalizeBranchId(requestedBranchRaw);
+
+  if (requestedBranchRaw && !requestedBranchId) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'INVALID_BRANCH_ID',
+      message: 'La sede enviada no es válida.',
+    };
+  }
+
+  if (canAdminSeeAllBranches(req)) {
+    if (requestedBranchId) {
+      filter.branch = new mongoose.Types.ObjectId(requestedBranchId);
+    }
+
+    return {
+      ok: true,
+      mode: requestedBranchId ? 'single' : 'all',
+      branchIds: requestedBranchId ? [requestedBranchId] : [],
+    };
+  }
+
+  const allowedBranchIds = getAllowedBranchIdsFromRequest(req);
+
+  if (allowedBranchIds.length === 0) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'NO_BRANCH_ASSIGNED',
+      message: 'Tu usuario no tiene sedes asignadas para consultar órdenes.',
+    };
+  }
+
+  if (requestedBranchId && !allowedBranchIds.includes(requestedBranchId)) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'BRANCH_FORBIDDEN',
+      message: 'No tienes permiso para consultar órdenes de esa sede.',
+    };
+  }
+
+  const branchIdsToUse = requestedBranchId ? [requestedBranchId] : allowedBranchIds;
+
+  filter.branch = {
+    $in: branchIdsToUse.map((id) => new mongoose.Types.ObjectId(id)),
+  };
+
+  return {
+    ok: true,
+    mode: requestedBranchId ? 'single' : 'assigned',
+    branchIds: branchIdsToUse,
+  };
+}
+
 function deriveIdempotencyKey(cleaned) {
   const payload = {
     sessionId: String(cleaned.sessionId || ''),
@@ -568,6 +814,15 @@ router.get('/admin', async (req, res) => {
 
     const filter = {};
 
+    const branchAccess = applyOrderBranchAccessFilter(req, filter);
+
+    if (!branchAccess.ok) {
+      return res.status(branchAccess.status || 403).json({
+        error: branchAccess.error || 'BRANCH_ACCESS_DENIED',
+        message: branchAccess.message || 'No tienes permiso para consultar órdenes de esa sede.',
+      });
+    }
+
     if (q) {
       const rx = new RegExp(escapeRegex(q), 'i');
 
@@ -582,6 +837,8 @@ router.get('/admin', async (req, res) => {
         { 'billing.name': rx },
         { 'billing.lastname': rx },
         { 'billing.id': rx },
+        { 'branchSnapshot.name': rx },
+        { 'branchSnapshot.code': rx },
       ];
 
       if (/^[0-9a-fA-F]{24}$/.test(q)) {
@@ -1561,6 +1818,14 @@ router.post('/', rateLimit, async (req, res) => {
       const settings = await SiteSettings.findOne().session(session).lean();
       const billingMode = getBillingMode(settings);
 
+      const orderBranchData = await resolveOrderBranchData(req.body || {}, cleaned, {
+        session,
+      });
+
+      const hasAdminUser = Boolean(req.adminUserId);
+      const orderSource = getValidSource(req.body?.source || cleaned.source, hasAdminUser);
+      const createdByAdminSnapshot = buildAdminSnapshot(req);
+
       console.log('🧾 MODO FACTURACIÓN:', {
         dianEnabled: billingMode.dianEnabled,
         dianMode: billingMode.dianMode,
@@ -1625,7 +1890,6 @@ router.post('/', rateLimit, async (req, res) => {
         },
       };
 
-      
       const base = {
         ...cleaned,
         orderNumber,
@@ -1633,6 +1897,14 @@ router.post('/', rateLimit, async (req, res) => {
         shipping: shippingAmount,
         total: totalAmount,
         taxes: taxesSnapshot,
+
+        branch: orderBranchData.branchId,
+        branchSnapshot: orderBranchData.branchSnapshot,
+
+        createdByAdmin: hasAdminUser && req.adminUserId ? req.adminUserId : null,
+        createdByAdminSnapshot,
+
+        source: orderSource,
       };
 
       base.status = base.status || 'pending';
@@ -1640,16 +1912,20 @@ router.post('/', rateLimit, async (req, res) => {
       created = await Order.create([{ ...base }], { session });
       created = created[0];
 
-     
-     
-
       await OrderEvent.create(
         [
           {
             orderId: created._id,
             type: 'status_changed',
             message: `Orden creada con estado ${created.status}`,
-            meta: { to: created.status, ip: req.ip },
+            meta: {
+              to: created.status,
+              ip: req.ip,
+              branch: orderBranchData.branchId,
+              branchSnapshot: orderBranchData.branchSnapshot,
+              source: orderSource,
+              by: createdByAdminSnapshot.username || 'system',
+            },
           },
         ],
         { session }
