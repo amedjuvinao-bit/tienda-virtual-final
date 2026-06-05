@@ -74,6 +74,7 @@ function statusBadgeClasses(status) {
   if (s === 'paid') return 'bg-green-100 text-green-700';
   if (s === 'processing') return 'bg-amber-100 text-amber-700';
   if (s === 'shipped') return 'bg-blue-100 text-blue-700';
+  if (s === 'delivered') return 'bg-green-100 text-green-700';
   if (s === 'failed') return 'bg-red-100 text-red-700';
   if (s === 'cancelled' || s === 'canceled') return 'bg-red-100 text-red-700';
   if (s === 'refunded') return 'bg-purple-100 text-purple-700';
@@ -87,6 +88,7 @@ const STATUS_OPTIONS = [
   { code: 'paid', label: 'Pagado' },
   { code: 'failed', label: 'Fallido / Rechazado' },
   { code: 'shipped', label: 'Enviado' },
+  { code: 'delivered', label: 'Entregado' },
   { code: 'cancelled', label: 'Cancelado' },
   { code: 'refunded', label: 'Reembolsado' },
 ];
@@ -97,6 +99,7 @@ const STATUS_FILTERS = [
   { key: 'paid', label: 'Pagadas' },
   { key: 'failed', label: 'Fallidas' },
   { key: 'shipped', label: 'Enviadas' },
+  { key: 'delivered', label: 'Entregadas' },
   { key: 'cancelled', label: 'Canceladas' },
   { key: 'refunded', label: 'Reembolsadas' },
 ];

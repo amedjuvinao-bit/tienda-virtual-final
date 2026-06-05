@@ -108,6 +108,7 @@ const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
+const adminInventoryRoutes = tryRequire('./routes/adminInventory');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 
 // ⬇️ Site Settings (Apariencia & Menús)
@@ -186,6 +187,9 @@ if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
 
 // ✅ CONEXIÓN DE SEDES ADMINISTRATIVAS
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
+
+// ✅ CONEXIÓN DE INVENTARIO POR SEDES
+if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 
 // ✅ CONEXIÓN DE CONFIGURACIÓN DE CORREO ADMINISTRATIVO
 if (adminMailSettingsRoutes) {
