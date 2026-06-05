@@ -1,229 +1,405 @@
-// frontend/src/admin/orders/components/orderDetail/OrderDetailHeader.jsx
+// frontend/src/admin/orders/components/orderDetail/OrderDetailSummaryRail.jsx
 
 import { ORDER_DETAIL_THEME, getOrderStatusMeta } from './orderDetailTheme';
 import {
   fmtDate,
+  getAdminSnapshot,
+  getInvoiceInfo,
   getOrderBranchInfo,
   getOrderSourceLabel,
   getOrderSummary,
+  getPaymentInfo,
   toCOP,
 } from './orderDetailUtils';
 import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
-import { GhostButton, PrimaryButton, SoftBadge } from './OrderDetailPrimitives';
+import {
+  InfoLine,
+  MiniInfoCard,
+  OrderDetailPanel,
+  SectionTitle,
+  SoftBadge,
+} from './OrderDetailPrimitives';
 
-export default function OrderDetailHeader({
-  order,
-  onClose,
-  onDownloadPdf,
-  onOpenInvoice,
-  downloadingPdf = false,
-  invoiceLoading = false,
-}) {
-  const status = getOrderStatusMeta(order?.status);
-  const branchInfo = getOrderBranchInfo(order);
-  const sourceLabel = getOrderSourceLabel(order?.source);
-  const summary = getOrderSummary(order);
+const FLOW_STEPS = ['pending', 'processing', 'shipped', 'delivered'];
+const FLOW_LABELS = {
+  pending: 'Recibida',
+  processing: 'Preparando',
+  shipped: 'Enviada',
+  delivered: 'Entregada',
+};
 
+function getProgressPercent(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+
+  if (normalized === 'paid') return 40;
+  if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'failed') return 0;
+  if (normalized === 'refunded') return 100;
+
+  const index = FLOW_STEPS.indexOf(normalized);
+
+  if (index < 0) return 20;
+
+  return Math.max(20, Math.round(((index + 1) / FLOW_STEPS.length) * 100));
+}
+
+function RailMoneyLine({ label, value, strong = false }) {
   return (
-    <header
+    <div
       style={{
-        position: 'relative',
-        overflow: 'hidden',
-        borderBottom: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-        background: `
-          radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 22%, transparent), transparent 34%),
-          linear-gradient(135deg, var(--admin-card-bg), var(--admin-primary-soft-bg), var(--admin-card-bg))
-        `,
-        color: ORDER_DETAIL_THEME.cardText,
-        padding: '24px 26px 22px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        color: strong ? ORDER_DETAIL_THEME.cardText : ORDER_DETAIL_THEME.mutedText,
+        fontSize: strong ? 14 : 12,
+        fontWeight: strong ? 950 : 750,
+        lineHeight: 1.25,
       }}
     >
-      <div
+      <span>{label}</span>
+      <strong
         style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          opacity: 0.42,
-          background:
-            'linear-gradient(120deg, transparent 0%, color-mix(in srgb, var(--admin-primary) 12%, transparent) 45%, transparent 100%)',
+          color: strong ? ORDER_DETAIL_THEME.primary : ORDER_DETAIL_THEME.cardText,
+          fontSize: strong ? 22 : 13,
+          fontWeight: strong ? 950 : 850,
+          letterSpacing: strong ? '-0.04em' : 0,
+          whiteSpace: 'nowrap',
         }}
-      />
+      >
+        {value}
+      </strong>
+    </div>
+  );
+}
 
-      <div
+function RailStatusCard({ icon, label, value, variant = 'soft' }) {
+  return (
+    <div
+      style={{
+        minWidth: 0,
+        border: '1px solid rgba(255,255,255,0.28)',
+        background: 'rgba(255,255,255,0.18)',
+        borderRadius: 18,
+        padding: '13px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        color: '#fff',
+        backdropFilter: 'blur(10px)',
+      }}
+    >
+      <IconBadge icon={icon} size={34} iconSize={15} variant={variant} />
+      <div style={{ minWidth: 0 }}>
+        <span
+          style={{
+            display: 'block',
+            opacity: 0.72,
+            fontSize: 10,
+            fontWeight: 900,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            marginBottom: 4,
+          }}
+        >
+          {label}
+        </span>
+        <strong
+          title={String(value || '')}
+          style={{
+            display: 'block',
+            fontSize: 12,
+            fontWeight: 950,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {value || '—'}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+export default function OrderDetailSummaryRail({ order }) {
+  const status = getOrderStatusMeta(order?.status);
+  const summary = getOrderSummary(order);
+  const payment = getPaymentInfo(order);
+  const invoice = getInvoiceInfo(order);
+  const branchInfo = getOrderBranchInfo(order);
+  const admin = getAdminSnapshot(order);
+  const sourceLabel = getOrderSourceLabel(order?.source);
+  const progressPercent = getProgressPercent(order?.status);
+
+  return (
+    <aside
+      style={{
+        position: 'sticky',
+        top: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        minWidth: 0,
+      }}
+    >
+      <section
         style={{
           position: 'relative',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) auto',
-          gap: 18,
-          alignItems: 'start',
+          overflow: 'hidden',
+          borderRadius: 28,
+          padding: 22,
+          color: '#fff',
+          background: `
+            radial-gradient(circle at 85% 12%, rgba(255,255,255,0.45), transparent 18%),
+            radial-gradient(circle at 16% 0%, rgba(255,255,255,0.26), transparent 28%),
+            linear-gradient(135deg, ${ORDER_DETAIL_THEME.primaryHover}, ${ORDER_DETAIL_THEME.primary}, #f9a8d4)
+          `,
+          boxShadow: '0 22px 58px rgba(236, 72, 153, 0.26)',
         }}
       >
         <div
           style={{
+            position: 'absolute',
+            right: -24,
+            top: -24,
+            width: 132,
+            height: 132,
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.16)',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'relative',
             display: 'flex',
             alignItems: 'flex-start',
-            gap: 16,
-            minWidth: 0,
+            justifyContent: 'space-between',
+            gap: 14,
+            marginBottom: 20,
           }}
         >
-          <IconBadge
-            icon={OrderDetailIcons.ShoppingBag}
-            size={54}
-            iconSize={23}
-            variant="primary"
-          />
-
-          <div style={{ minWidth: 0 }}>
-            <div
+          <div>
+            <p
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                flexWrap: 'wrap',
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  color: ORDER_DETAIL_THEME.cardText,
-                  fontSize: 28,
-                  fontWeight: 950,
-                  letterSpacing: '-0.045em',
-                  lineHeight: 1.05,
-                }}
-              >
-                Orden #{order?.orderNumber || '—'}
-              </h2>
-
-              <span
-                className={status.className}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  borderRadius: 999,
-                  border: '1px solid',
-                  padding: '7px 11px',
-                  fontSize: 11,
-                  fontWeight: 950,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1,
-                }}
-              >
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 999,
-                    background: 'currentColor',
-                  }}
-                />
-                {status.label}
-              </span>
-            </div>
-
-            <div
-              style={{
-                marginTop: 9,
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: 8,
-                color: ORDER_DETAIL_THEME.mutedText,
+                margin: 0,
+                opacity: 0.86,
                 fontSize: 12,
-                fontWeight: 700,
+                fontWeight: 900,
+                letterSpacing: '0.06em',
               }}
             >
-              <span>Creada el {fmtDate(order?.createdAt)}</span>
-              <span>•</span>
-              <span>Canal: {sourceLabel}</span>
-              <span>•</span>
-              <span>Sede: {branchInfo.name}</span>
-            </div>
-
-            <div
+              Resumen del pedido
+            </p>
+            <span
               style={{
-                marginTop: 14,
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 8,
+                display: 'block',
+                marginTop: 5,
+                opacity: 0.72,
+                fontSize: 11,
+                fontWeight: 750,
               }}
             >
-              <SoftBadge>
-                Total {toCOP(summary.total)}
-              </SoftBadge>
-
-              <SoftBadge variant={branchInfo.hasBranch ? 'primary' : 'warning'}>
-                {branchInfo.code || 'Sin sede'}
-              </SoftBadge>
-
-              <SoftBadge variant="neutral">
-                {summary.totalItems} unidad(es)
-              </SoftBadge>
-
-              <SoftBadge variant="neutral">
-                {summary.itemsCount} producto(s)
-              </SoftBadge>
-            </div>
+              Moneda: COP
+            </span>
           </div>
+
+          <span
+            className={status.className}
+            style={{
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.45)',
+              background: 'rgba(255,255,255,0.18)',
+              color: '#fff',
+              padding: '7px 11px',
+              fontSize: 10,
+              fontWeight: 950,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {status.label}
+          </span>
         </div>
+
+        <strong
+          style={{
+            position: 'relative',
+            display: 'block',
+            marginBottom: 20,
+            fontSize: 34,
+            fontWeight: 950,
+            letterSpacing: '-0.055em',
+            lineHeight: 1,
+          }}
+        >
+          {toCOP(summary.total)}
+        </strong>
+
+        <div
+          style={{
+            position: 'relative',
+            border: '1px solid rgba(255,255,255,0.28)',
+            background: 'rgba(255,255,255,0.16)',
+            borderRadius: 20,
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          <RailMoneyLine label="Subtotal" value={toCOP(summary.subtotal)} />
+          <RailMoneyLine label="Envío" value={toCOP(summary.shipping)} />
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.32)' }} />
+          <RailMoneyLine label="Total" value={toCOP(summary.total)} strong />
+        </div>
+
+        <div
+          style={{
+            position: 'relative',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: 9,
+            marginTop: 12,
+          }}
+        >
+          <RailStatusCard
+            icon={OrderDetailIcons.CreditCard}
+            label="Pago"
+            value={payment.status}
+            variant="success"
+          />
+          <RailStatusCard
+            icon={OrderDetailIcons.ReceiptText}
+            label="Factura"
+            value={invoice.number}
+          />
+          <RailStatusCard
+            icon={OrderDetailIcons.ShieldCheck}
+            label="CUFE"
+            value={invoice.cufe}
+          />
+        </div>
+      </section>
+
+      <OrderDetailPanel style={{ padding: 18 }}>
+        <SectionTitle
+          icon={OrderDetailIcons.Clock3}
+          title="Progreso del pedido"
+          subtitle="Estado operativo actual"
+        />
 
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 9,
-            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 10,
           }}
         >
-          <GhostButton
-            onClick={onDownloadPdf}
-            disabled={downloadingPdf}
-            icon={<OrderDetailIcons.Download size={15} strokeWidth={2.4} />}
-          >
-            {downloadingPdf ? 'Generando...' : 'PDF'}
-          </GhostButton>
-
-          <PrimaryButton
-            onClick={onOpenInvoice}
-            disabled={invoiceLoading}
-            icon={<OrderDetailIcons.FileText size={15} strokeWidth={2.4} />}
-          >
-            {invoiceLoading ? 'Cargando...' : 'Factura'}
-          </PrimaryButton>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar modal"
+          <span
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 15,
-              border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-              background: ORDER_DETAIL_THEME.inputBg,
-              color: ORDER_DETAIL_THEME.cardText,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 0.16s ease, filter 0.16s ease',
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.transform = 'translateY(-1px)';
-              event.currentTarget.style.filter = 'brightness(1.05)';
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.transform = 'translateY(0)';
-              event.currentTarget.style.filter = 'brightness(1)';
+              color: ORDER_DETAIL_THEME.mutedText,
+              fontSize: 12,
+              fontWeight: 750,
             }}
           >
-            <OrderDetailIcons.X size={18} strokeWidth={2.5} />
-          </button>
+            {progressPercent}% completado
+          </span>
+          <SoftBadge>{status.label}</SoftBadge>
         </div>
-      </div>
-    </header>
+
+        <div
+          style={{
+            height: 9,
+            borderRadius: 999,
+            background: ORDER_DETAIL_THEME.primarySoftBg,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              width: `${progressPercent}%`,
+              height: '100%',
+              borderRadius: 999,
+              background: `linear-gradient(90deg, ${ORDER_DETAIL_THEME.primary}, ${ORDER_DETAIL_THEME.primaryHover})`,
+              transition: 'width 0.25s ease',
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            gap: 8,
+            marginTop: 14,
+          }}
+        >
+          {FLOW_STEPS.map((step) => (
+            <span
+              key={step}
+              style={{
+                color: ORDER_DETAIL_THEME.mutedText,
+                fontSize: 10,
+                fontWeight: 850,
+                textAlign: 'center',
+                lineHeight: 1.2,
+              }}
+            >
+              {FLOW_LABELS[step]}
+            </span>
+          ))}
+        </div>
+      </OrderDetailPanel>
+
+      <OrderDetailPanel style={{ padding: 18 }}>
+        <SectionTitle
+          icon={OrderDetailIcons.Store}
+          title="Datos rápidos"
+          subtitle="Información clave de la orden"
+        />
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <MiniInfoCard
+            icon={OrderDetailIcons.ShoppingBag}
+            label="Orden"
+            value={`#${order?.orderNumber || '—'}`}
+            code
+            accent
+          />
+          <MiniInfoCard
+            icon={OrderDetailIcons.PackageCheck}
+            label="Productos"
+            value={`${summary.itemsCount} producto(s) · ${summary.totalItems} unidad(es)`}
+          />
+          <MiniInfoCard
+            icon={OrderDetailIcons.Building2}
+            label="Sede"
+            value={branchInfo.name}
+          />
+        </div>
+      </OrderDetailPanel>
+
+      <OrderDetailPanel style={{ padding: 18 }}>
+        <SectionTitle
+          icon={OrderDetailIcons.ClipboardList}
+          title="Trazabilidad"
+          subtitle="Origen y creación"
+        />
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <InfoLine label="Creada el:" value={fmtDate(order?.createdAt)} />
+          <InfoLine label="Canal:" value={sourceLabel} />
+          <InfoLine label="Código sede:" value={branchInfo.code || 'Sin sede'} />
+          <InfoLine label="Creada por:" value={admin.displayName} strong />
+          <InfoLine label="Rol:" value={admin.role} />
+        </div>
+      </OrderDetailPanel>
+    </aside>
   );
 }
