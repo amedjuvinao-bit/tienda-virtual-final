@@ -89,54 +89,43 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
 
   /* =========================================================
-   * INVENTARIO
+   * INVENTARIO POR SEDES
    * ======================================================= */
   {
     method: 'GET',
-    path: '/api/inventory',
+    path: '/api/admin/inventory/meta',
     permission: 'inventory:view',
-    description: 'Ver inventario.',
+    description: 'Ver información base del módulo de inventario por sedes.',
   },
   {
     method: 'GET',
-    path: '/api/inventory/export',
-    permission: 'inventory:export',
-    description: 'Exportar inventario.',
-    audit: true,
+    path: '/api/admin/inventory/stock',
+    permission: 'inventory:view',
+    description: 'Ver stock actual por sede, producto y variante.',
   },
   {
-    method: 'PUT',
-    path: '/api/inventory/:id',
-    permission: 'inventory:update',
-    description: 'Editar inventario.',
-    audit: true,
+    method: 'GET',
+    path: '/api/admin/inventory/branches/:branchId/stock',
+    permission: 'inventory:view',
+    description: 'Ver resumen de stock de una sede.',
   },
   {
-    method: 'PATCH',
-    path: '/api/inventory/:id',
-    permission: 'inventory:update',
-    description: 'Editar parcialmente inventario.',
-    audit: true,
+    method: 'GET',
+    path: '/api/admin/inventory/movements',
+    permission: 'inventory:view',
+    description: 'Ver historial de movimientos de inventario.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/inventory/movements/:id',
+    permission: 'inventory:view',
+    description: 'Ver detalle de movimiento de inventario.',
   },
   {
     method: 'POST',
-    path: '/api/inventory/adjust',
+    path: '/api/admin/inventory/movements',
     permission: 'inventory:adjust',
-    description: 'Ajustar inventario.',
-    audit: true,
-  },
-  {
-    method: 'POST',
-    path: '/api/inventory/transfer',
-    permission: 'inventory:transfer',
-    description: 'Trasladar inventario entre sedes.',
-    audit: true,
-  },
-  {
-    method: 'POST',
-    path: '/api/inventory/import',
-    permission: 'inventory:import',
-    description: 'Importar inventario masivo.',
+    description: 'Crear movimiento de entrada, salida o ajuste de inventario.',
     audit: true,
   },
 
