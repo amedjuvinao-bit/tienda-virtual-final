@@ -1,217 +1,447 @@
-// frontend/src/admin/orders/components/orderDetail/OrderDetailProgressStepper.jsx
+// backend/models/InventoryStock.js
 
-import { ORDER_DETAIL_THEME } from './orderDetailTheme';
-import { fmtDate, normalizeText } from './orderDetailUtils';
-import { OrderDetailIcons } from './OrderDetailIcons';
+const mongoose = require('mongoose');
 
-const STEPS = [
-  {
-    key: 'received',
-    label: 'Recibida',
-    icon: OrderDetailIcons.ClipboardList,
-  },
-  {
-    key: 'confirmed',
-    label: 'Confirmada',
-    icon: OrderDetailIcons.ShieldCheck,
-  },
-  {
-    key: 'preparing',
-    label: 'Preparando',
-    icon: OrderDetailIcons.PackageCheck,
-  },
-  {
-    key: 'shipped',
-    label: 'Enviada',
-    icon: OrderDetailIcons.Truck,
-  },
-  {
-    key: 'delivered',
-    label: 'Entregada',
-    icon: OrderDetailIcons.CheckCircle2,
-  },
-];
-
-function getActiveStep(order) {
-  const status = normalizeText(order?.status);
-
-  if (status.includes('delivered') || status.includes('entreg')) return 4;
-  if (status.includes('shipped') || status.includes('env')) return 3;
-  if (status.includes('processing') || status.includes('prepar')) return 2;
-  if (status.includes('paid') || status.includes('pag') || status.includes('confirm')) return 1;
-
-  return 0;
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-export default function OrderDetailProgressStepper({ order }) {
-  const activeStep = getActiveStep(order);
-
-  return (
-    <section
-      style={{
-        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-        background: ORDER_DETAIL_THEME.cardBg,
-        color: ORDER_DETAIL_THEME.cardText,
-        borderRadius: 24,
-        padding: '18px 20px',
-        boxShadow: '0 14px 42px rgba(15, 23, 42, 0.08)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 14,
-          marginBottom: 20,
-        }}
-      >
-        <div>
-          <h3
-            style={{
-              margin: 0,
-              color: ORDER_DETAIL_THEME.cardText,
-              fontSize: 15,
-              fontWeight: 950,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Progreso de la orden
-          </h3>
-
-          <p
-            style={{
-              margin: '5px 0 0',
-              color: ORDER_DETAIL_THEME.mutedText,
-              fontSize: 12,
-              fontWeight: 650,
-            }}
-          >
-            Creada el {fmtDate(order?.createdAt)}
-          </p>
-        </div>
-
-        <span
-          style={{
-            border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-            background: ORDER_DETAIL_THEME.primarySoftBg,
-            color: ORDER_DETAIL_THEME.primary,
-            borderRadius: 999,
-            padding: '7px 11px',
-            fontSize: 10,
-            fontWeight: 950,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Paso {activeStep + 1} de {STEPS.length}
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))`,
-          gap: 0,
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 22,
-            left: '8%',
-            right: '8%',
-            height: 3,
-            borderRadius: 999,
-            background: ORDER_DETAIL_THEME.cardBorder,
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              width: `${(activeStep / (STEPS.length - 1)) * 100}%`,
-              height: '100%',
-              borderRadius: 999,
-              background: `linear-gradient(90deg, ${ORDER_DETAIL_THEME.primary}, ${ORDER_DETAIL_THEME.primaryHover})`,
-              transition: 'width 0.25s ease',
-            }}
-          />
-        </div>
-
-        {STEPS.map((step, index) => {
-          const Icon = step.icon;
-          const completed = index <= activeStep;
-          const current = index === activeStep;
-
-          return (
-            <div
-              key={step.key}
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                minWidth: 0,
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  width: current ? 48 : 44,
-                  height: current ? 48 : 44,
-                  borderRadius: 18,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: `1px solid ${
-                    completed ? ORDER_DETAIL_THEME.primary : ORDER_DETAIL_THEME.cardBorder
-                  }`,
-                  background: completed
-                    ? `linear-gradient(135deg, ${ORDER_DETAIL_THEME.primary}, ${ORDER_DETAIL_THEME.primaryHover})`
-                    : ORDER_DETAIL_THEME.inputBg,
-                  color: completed
-                    ? ORDER_DETAIL_THEME.primaryText
-                    : ORDER_DETAIL_THEME.mutedText,
-                  boxShadow: current
-                    ? '0 14px 30px rgba(236, 72, 153, 0.25)'
-                    : 'none',
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                <Icon size={18} strokeWidth={2.4} />
-              </div>
-
-              <strong
-                style={{
-                  display: 'block',
-                  color: completed ? ORDER_DETAIL_THEME.cardText : ORDER_DETAIL_THEME.mutedText,
-                  fontSize: 12,
-                  fontWeight: current ? 950 : 800,
-                  lineHeight: 1.15,
-                }}
-              >
-                {step.label}
-              </strong>
-
-              <span
-                style={{
-                  display: 'block',
-                  color: ORDER_DETAIL_THEME.mutedText,
-                  fontSize: 10,
-                  fontWeight: 650,
-                  lineHeight: 1.2,
-                }}
-              >
-                {index === 0 ? fmtDate(order?.createdAt) : 'Pendiente'}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+function cleanUpper(value) {
+  return cleanText(value).toUpperCase();
 }
+
+function cleanLower(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function cleanNumber(value, fallback = 0) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function cleanPositiveNumber(value, fallback = 0) {
+  return Math.max(0, cleanNumber(value, fallback));
+}
+
+function buildVariantKey(size = '', color = '') {
+  const cleanSize = cleanLower(size);
+  const cleanColor = cleanLower(color);
+
+  return `${cleanSize}__${cleanColor}`;
+}
+
+const BranchSnapshotSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 160,
+    },
+
+    code: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: '',
+      maxlength: 40,
+    },
+
+    type: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+      maxlength: 40,
+    },
+  },
+  { _id: false }
+);
+
+const ProductSnapshotSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 220,
+    },
+
+    sku: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: '',
+      maxlength: 80,
+    },
+
+    image: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 1000,
+    },
+
+    category: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 120,
+    },
+  },
+  { _id: false }
+);
+
+const VariantSnapshotSchema = new mongoose.Schema(
+  {
+    size: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 40,
+    },
+
+    color: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 80,
+    },
+
+    sku: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: '',
+      maxlength: 100,
+    },
+
+    barcode: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 120,
+    },
+  },
+  { _id: false }
+);
+
+const InventoryStockSchema = new mongoose.Schema(
+  {
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: true,
+      index: true,
+    },
+
+    branchSnapshot: {
+      type: BranchSnapshotSchema,
+      default: () => ({
+        name: '',
+        code: '',
+        type: '',
+      }),
+    },
+
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+      index: true,
+    },
+
+    productSnapshot: {
+      type: ProductSnapshotSchema,
+      default: () => ({
+        title: '',
+        sku: '',
+        image: '',
+        category: '',
+      }),
+    },
+
+    variant: {
+      type: VariantSnapshotSchema,
+      default: () => ({
+        size: '',
+        color: '',
+        sku: '',
+        barcode: '',
+      }),
+    },
+
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      required: true,
+      index: true,
+    },
+
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+      set: (value) => cleanPositiveNumber(value),
+    },
+
+    reservedStock: {
+      type: Number,
+      default: 0,
+      min: 0,
+      set: (value) => cleanPositiveNumber(value),
+    },
+
+    availableStock: {
+      type: Number,
+      default: 0,
+      min: 0,
+      set: (value) => cleanPositiveNumber(value),
+    },
+
+    reorderPoint: {
+      type: Number,
+      default: 0,
+      min: 0,
+      set: (value) => cleanPositiveNumber(value),
+    },
+
+    reorderQty: {
+      type: Number,
+      default: 0,
+      min: 0,
+      set: (value) => cleanPositiveNumber(value),
+    },
+
+    warehouseLocation: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 120,
+    },
+
+    lastMovement: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InventoryMovement',
+      default: null,
+    },
+
+    lastMovementAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    lastCountedAt: {
+      type: Date,
+      default: null,
+    },
+
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 800,
+    },
+
+    active: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+/* ============================
+ * Índices
+ * ============================ */
+
+InventoryStockSchema.index(
+  {
+    branch: 1,
+    product: 1,
+    variantKey: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      deletedAt: null,
+    },
+  }
+);
+
+InventoryStockSchema.index({ branch: 1, active: 1, deletedAt: 1 });
+InventoryStockSchema.index({ product: 1, active: 1, deletedAt: 1 });
+InventoryStockSchema.index({ branch: 1, product: 1 });
+InventoryStockSchema.index({ branch: 1, 'productSnapshot.title': 1 });
+InventoryStockSchema.index({ branch: 1, 'productSnapshot.sku': 1 });
+InventoryStockSchema.index({ branch: 1, stock: 1 });
+InventoryStockSchema.index({ availableStock: 1 });
+InventoryStockSchema.index({ lastMovementAt: -1 });
+
+/* ============================
+ * Hooks
+ * ============================ */
+
+InventoryStockSchema.pre('validate', function inventoryStockPreValidate(next) {
+  try {
+    if (!this.variant || typeof this.variant !== 'object') {
+      this.variant = {
+        size: '',
+        color: '',
+        sku: '',
+        barcode: '',
+      };
+    }
+
+    this.variant.size = cleanText(this.variant.size);
+    this.variant.color = cleanText(this.variant.color);
+    this.variant.sku = cleanUpper(this.variant.sku);
+    this.variant.barcode = cleanText(this.variant.barcode);
+
+    this.variantKey = buildVariantKey(this.variant.size, this.variant.color);
+
+    if (!this.variantKey || this.variantKey === '__') {
+      this.variantKey = 'default__default';
+    }
+
+    if (this.branchSnapshot) {
+      this.branchSnapshot.name = cleanText(this.branchSnapshot.name);
+      this.branchSnapshot.code = cleanUpper(this.branchSnapshot.code);
+      this.branchSnapshot.type = cleanLower(this.branchSnapshot.type);
+    }
+
+    if (this.productSnapshot) {
+      this.productSnapshot.title = cleanText(this.productSnapshot.title);
+      this.productSnapshot.sku = cleanUpper(this.productSnapshot.sku);
+      this.productSnapshot.image = cleanText(this.productSnapshot.image);
+      this.productSnapshot.category = cleanText(this.productSnapshot.category);
+    }
+
+    this.stock = cleanPositiveNumber(this.stock);
+    this.reservedStock = cleanPositiveNumber(this.reservedStock);
+
+    if (this.reservedStock > this.stock) {
+      this.reservedStock = this.stock;
+    }
+
+    this.availableStock = Math.max(0, this.stock - this.reservedStock);
+
+    this.reorderPoint = cleanPositiveNumber(this.reorderPoint);
+    this.reorderQty = cleanPositiveNumber(this.reorderQty);
+    this.warehouseLocation = cleanUpper(this.warehouseLocation);
+    this.notes = cleanText(this.notes);
+
+    if (this.deletedAt) {
+      this.active = false;
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* ============================
+ * Métodos de instancia
+ * ============================ */
+
+InventoryStockSchema.methods.canReserve = function canReserve(quantity = 0) {
+  const qty = Math.max(1, Math.floor(Number(quantity || 0)));
+
+  return this.availableStock >= qty;
+};
+
+InventoryStockSchema.methods.isBelowReorderPoint = function isBelowReorderPoint() {
+  return Number(this.reorderPoint || 0) > 0 && this.availableStock <= this.reorderPoint;
+};
+
+InventoryStockSchema.methods.toSafeObject = function toSafeObject() {
+  const stock = this.toObject({ virtuals: true });
+
+  delete stock.__v;
+
+  return stock;
+};
+
+/* ============================
+ * Métodos estáticos
+ * ============================ */
+
+InventoryStockSchema.statics.buildVariantKey = buildVariantKey;
+
+InventoryStockSchema.statics.buildBranchSnapshot = function buildBranchSnapshot(branch) {
+  if (!branch) {
+    return {
+      name: '',
+      code: '',
+      type: '',
+    };
+  }
+
+  return {
+    name: cleanText(branch.name),
+    code: cleanUpper(branch.code),
+    type: cleanLower(branch.type),
+  };
+};
+
+InventoryStockSchema.statics.buildProductSnapshot = function buildProductSnapshot(product) {
+  if (!product) {
+    return {
+      title: '',
+      sku: '',
+      image: '',
+      category: '',
+    };
+  }
+
+  return {
+    title: cleanText(product.title || product.name),
+    sku: cleanUpper(product.sku),
+    image: cleanText(product.image),
+    category: cleanText(product.category),
+  };
+};
+
+InventoryStockSchema.statics.buildVariantSnapshot = function buildVariantSnapshot(variant = {}) {
+  return {
+    size: cleanText(variant.size),
+    color: cleanText(variant.color),
+    sku: cleanUpper(variant.sku),
+    barcode: cleanText(variant.barcode),
+  };
+};
+
+module.exports =
+  mongoose.models.InventoryStock ||
+  mongoose.model('InventoryStock', InventoryStockSchema);
