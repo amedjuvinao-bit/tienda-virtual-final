@@ -850,11 +850,35 @@ router.get('/admin', async (req, res) => {
 
     const { dateFrom, dateTo } = req.query;
 
+    function buildColombiaStartOfDay(dateValue) {
+      const date = String(dateValue || '').trim();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+      return new Date(`${date}T00:00:00.000-05:00`);
+    }
+
+    function buildColombiaEndOfDay(dateValue) {
+      const date = String(dateValue || '').trim();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+      return new Date(`${date}T23:59:59.999-05:00`);
+    }
+
     if (dateFrom || dateTo) {
       filter.createdAt = {};
 
-      if (dateFrom) filter.createdAt.$gte = new Date(`${dateFrom}T00:00:00.000Z`);
-      if (dateTo) filter.createdAt.$lte = new Date(`${dateTo}T23:59:59.999Z`);
+      const fromDate = buildColombiaStartOfDay(dateFrom);
+      const toDate = buildColombiaEndOfDay(dateTo);
+
+      if (fromDate && !Number.isNaN(fromDate.getTime())) {
+        filter.createdAt.$gte = fromDate;
+      }
+
+      if (toDate && !Number.isNaN(toDate.getTime())) {
+        filter.createdAt.$lte = toDate;
+      }
 
       if (Object.keys(filter.createdAt).length === 0) delete filter.createdAt;
     }

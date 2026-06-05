@@ -31,18 +31,18 @@ export default function OrdersTable({
     cardBorder: 'var(--admin-card-border)',
   };
 
-  const getStatusAccent = (status) => {
-    const normalized = String(status || '').toLowerCase();
+    const getStatusAccent = (status) => {
+      const normalized = String(status || '').toLowerCase();
 
-    if (normalized.includes('paid') || normalized.includes('pag')) return 'from-emerald-400 to-green-500';
-    if (normalized.includes('pending') || normalized.includes('pend')) return 'from-amber-300 to-yellow-500';
-    if (normalized.includes('fail') || normalized.includes('fall')) return 'from-rose-400 to-red-500';
-    if (normalized.includes('cancel')) return 'from-gray-300 to-gray-500';
-    if (normalized.includes('refund') || normalized.includes('reemb')) return 'from-violet-400 to-purple-500';
-    if (normalized.includes('sent') || normalized.includes('env')) return 'from-sky-400 to-blue-500';
+      if (normalized.includes('paid') || normalized.includes('pag')) return 'from-emerald-400 to-green-500';
+      if (normalized.includes('pending') || normalized.includes('pend')) return 'from-amber-300 to-yellow-500';
+      if (normalized.includes('fail') || normalized.includes('fall')) return 'from-rose-400 to-red-500';
+      if (normalized.includes('cancel')) return 'from-gray-300 to-gray-500';
+      if (normalized.includes('refund') || normalized.includes('reemb')) return 'from-violet-400 to-purple-500';
+      if (normalized.includes('sent') || normalized.includes('env')) return 'from-sky-400 to-blue-500';
 
-    return 'from-pink-300 to-pink-500';
-  };
+      return 'from-pink-300 to-pink-500';
+    };
 
   const getOrderLevel = (total) => {
     const value = Number(total || 0);
@@ -50,6 +50,36 @@ export default function OrdersTable({
     if (value >= 700000) return 'Ticket alto';
     if (value >= 250000) return 'Ticket medio';
     return 'Orden estándar';
+  };
+
+  const getBranchInfo = (order) => {
+    const branchSnapshot = order?.branchSnapshot || {};
+    const branch = order?.branch || {};
+
+    const name =
+      branchSnapshot.name ||
+      branch.name ||
+      order?.branchName ||
+      order?.branch_label ||
+      '';
+
+    const code =
+      branchSnapshot.code ||
+      branch.code ||
+      order?.branchCode ||
+      '';
+
+    const type =
+      branchSnapshot.type ||
+      branch.type ||
+      '';
+
+    return {
+      name: String(name || '').trim() || 'Sin sede',
+      code: String(code || '').trim().toUpperCase(),
+      type: String(type || '').trim().toLowerCase(),
+      hasBranch: Boolean(name || code),
+    };
   };
 
   return (
@@ -113,7 +143,7 @@ export default function OrdersTable({
             </div>
 
             <div className="text-xs" style={{ color: THEME.mutedText }}>
-              Monitorea ventas, estados y acciones rápidas.
+              Monitorea ventas, estados, sedes y acciones rápidas.
             </div>
           </div>
 
@@ -178,6 +208,7 @@ export default function OrdersTable({
               const cust = o.customer || {};
               const name = [cust.name, cust.lastname].filter(Boolean).join(' ') || 'Cliente';
               const tags = Array.isArray(o.tags) ? o.tags : [];
+              const branchInfo = getBranchInfo(o);
 
               const initials = name
                 .split(' ')
@@ -275,6 +306,22 @@ export default function OrdersTable({
                           >
                             {orderLevel}
                           </span>
+
+                          <span
+                            className="max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-black"
+                            style={{
+                              borderColor: ADMIN_BORDER,
+                              background: branchInfo.hasBranch ? THEME.primarySoftBg : THEME.inputBg,
+                              color: branchInfo.hasBranch ? THEME.primarySoftText : THEME.mutedText,
+                            }}
+                            title={
+                              branchInfo.code
+                                ? `${branchInfo.name} · ${branchInfo.code}`
+                                : branchInfo.name
+                            }
+                          >
+                            Sede: {branchInfo.code || branchInfo.name}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -296,6 +343,42 @@ export default function OrdersTable({
 
                       <div className="mt-1 text-[11px]" style={{ color: THEME.mutedText }}>
                         {fmtDate(o.createdAt)}
+                      </div>
+
+                      <div
+                        className="mt-3 rounded-2xl border px-3 py-2"
+                        style={{
+                          borderColor: ADMIN_BORDER,
+                          background: THEME.inputBg,
+                        }}
+                      >
+                        <div
+                          className="text-[9px] font-black uppercase tracking-[0.16em]"
+                          style={{ color: THEME.mutedText }}
+                        >
+                          Sede
+                        </div>
+
+                        <div
+                          className="mt-0.5 truncate text-[11px] font-black"
+                          style={{ color: branchInfo.hasBranch ? THEME.cardText : THEME.mutedText }}
+                          title={
+                            branchInfo.code
+                              ? `${branchInfo.name} · ${branchInfo.code}`
+                              : branchInfo.name
+                          }
+                        >
+                          {branchInfo.name}
+                        </div>
+
+                        {branchInfo.code && (
+                          <div
+                            className="mt-0.5 font-mono text-[10px] font-black"
+                            style={{ color: THEME.primary }}
+                          >
+                            {branchInfo.code}
+                          </div>
+                        )}
                       </div>
                     </div>
 

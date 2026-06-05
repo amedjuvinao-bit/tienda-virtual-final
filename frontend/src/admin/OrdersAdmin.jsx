@@ -222,6 +222,8 @@ export default function OrdersAdmin() {
   const [populate, setPopulate] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState('');
 
   // ===== ORDENAMIENTO (UI + envío a server) =====
   const [sort, setSort] = useState('createdAt:-1');
@@ -338,6 +340,43 @@ export default function OrdersAdmin() {
   const [tagsMode, setTagsMode] = useState('any'); // any | all
   const parsedTags = useMemo(() => parseTagsInput(tagsStr), [tagsStr]);
 
+  useEffect(() => {
+    let cancel = false;
+
+    api
+      .get('/api/admin/branches', {
+        params: {
+          limit: 100,
+          status: 'active',
+        },
+      })
+      .then((res) => {
+        if (cancel) return;
+
+        const payload = res?.data || {};
+        const list = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload.branches)
+            ? payload.branches
+            : Array.isArray(payload.items)
+              ? payload.items
+              : Array.isArray(payload)
+                ? payload
+                : [];
+
+        setBranches(list);
+      })
+      .catch((error) => {
+        if (cancel) return;
+        console.warn('No se pudieron cargar las sedes para el filtro de órdenes:', error);
+        setBranches([]);
+      });
+
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
   const params = useMemo(
     () => ({
       page,
@@ -349,6 +388,7 @@ export default function OrdersAdmin() {
       ...(dateTo ? { dateTo } : {}),
       ...(statusFilter.length ? { status: statusFilter.join(',') } : {}),
       ...(parsedTags.length ? { tags: parsedTags.join(','), tagsMode } : {}),
+      ...(branchId ? { branchId } : {}),
 
       ...(printedFilter === 'not_printed' ? { printed: 0 } : {}),
       ...(printedFilter === 'printed' ? { printed: 1 } : {}),
@@ -370,6 +410,7 @@ export default function OrdersAdmin() {
       statusFilter,
       parsedTags,
       tagsMode,
+      branchId,
       printedFilter,
       archivedFilter,
       invoiceFilter,
@@ -602,6 +643,10 @@ export default function OrdersAdmin() {
         setTagsStr={setTagsStr}
         tagsMode={tagsMode}
         setTagsMode={setTagsMode}
+
+        branchId={branchId}
+        setBranchId={setBranchId}
+        branches={branches}
 
         setPage={setPage}
         exportCsv={exportCsv}
