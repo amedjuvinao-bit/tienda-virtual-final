@@ -11,6 +11,45 @@ import {
   Building2,
 } from 'lucide-react';
 
+const REQUIRED_STATUS_FILTERS = [
+  { key: 'pending', label: 'Pendientes' },
+  { key: 'processing', label: 'Procesando' },
+  { key: 'paid', label: 'Pagadas' },
+  { key: 'failed', label: 'Fallidas' },
+  { key: 'shipped', label: 'Enviadas' },
+  { key: 'delivered', label: 'Entregadas' },
+  { key: 'cancelled', label: 'Canceladas' },
+  { key: 'refunded', label: 'Reembolsadas' },
+];
+
+function mergeStatusFilters(filters) {
+  const map = new Map();
+
+  for (const item of Array.isArray(filters) ? filters : []) {
+    const key = String(item?.key || '').trim();
+    const label = String(item?.label || '').trim();
+
+    if (key) map.set(key, { key, label: label || key });
+  }
+
+  for (const item of REQUIRED_STATUS_FILTERS) {
+    if (!map.has(item.key)) map.set(item.key, item);
+  }
+
+  const preferredOrder = REQUIRED_STATUS_FILTERS.map((item) => item.key);
+
+  return Array.from(map.values()).sort((a, b) => {
+    const ai = preferredOrder.indexOf(a.key);
+    const bi = preferredOrder.indexOf(b.key);
+
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+
+    return ai - bi;
+  });
+}
+
 export default function OrdersFilters({
   ADMIN_BORDER,
   STATUS_FILTERS,
@@ -43,22 +82,7 @@ export default function OrdersFilters({
   total,
   financialSummary,
 }) {
-  const THEME = {
-    cardBg: 'var(--admin-card-bg)',
-    cardText: 'var(--admin-card-text)',
-    mutedText: 'var(--admin-card-muted-text)',
-    primary: 'var(--admin-primary)',
-    primaryText: 'var(--admin-primary-text)',
-    primarySoftBg: 'var(--admin-primary-soft-bg)',
-    primarySoftText: 'var(--admin-primary-soft-text)',
-    inputBg: 'var(--admin-input-bg)',
-    inputText: 'var(--admin-input-text)',
-    inputBorder: 'var(--admin-input-border)',
-    inputPlaceholder: 'var(--admin-input-placeholder)',
-    cardBorder: 'var(--admin-card-border)',
-  };
-
-  const safeStatusFilters = Array.isArray(STATUS_FILTERS) ? STATUS_FILTERS : [];
+  const safeStatusFilters = mergeStatusFilters(STATUS_FILTERS);
   const safeStatusFilter = Array.isArray(statusFilter) ? statusFilter : [];
   const safeBranches = Array.isArray(branches) ? branches : [];
   const summary = financialSummary || {};
@@ -79,47 +103,6 @@ export default function OrdersFilters({
       currency: 'COP',
       maximumFractionDigits: 0,
     }).format(Number(v || 0));
-
-  const handleClearFilters = () => {
-    setTypingQ('');
-    setDateFrom('');
-    setDateTo('');
-    setTagsStr('');
-    setTagsMode('any');
-
-    if (typeof setBranchId === 'function') {
-      setBranchId('');
-    }
-
-    if (typeof clearStatus === 'function') {
-      clearStatus();
-    }
-
-    setPage(1);
-  };
-
-  const handleStatusChange = (value) => {
-    if (typeof clearStatus === 'function') clearStatus();
-    if (value !== 'all' && typeof toggleStatus === 'function') toggleStatus(value);
-    setPage(1);
-  };
-
-  const handleBranchChange = (value) => {
-    if (typeof setBranchId === 'function') {
-      setBranchId(value);
-    }
-
-    setPage(1);
-  };
-
-  const getBranchValue = (branch) => String(branch?._id || branch?.id || '');
-
-  const getBranchLabel = (branch) => {
-    const name = String(branch?.name || '').trim() || 'Sede sin nombre';
-    const code = String(branch?.code || '').trim().toUpperCase();
-
-    return code ? `${name} (${code})` : name;
-  };
 
   const currentStatus = safeStatusFilter.length === 1 ? safeStatusFilter[0] : 'all';
 
@@ -188,6 +171,39 @@ export default function OrdersFilters({
     },
   ];
 
+  const handleClearFilters = () => {
+    setTypingQ('');
+    setDateFrom('');
+    setDateTo('');
+    setTagsStr('');
+    setTagsMode('any');
+
+    if (typeof setBranchId === 'function') setBranchId('');
+    if (typeof clearStatus === 'function') clearStatus();
+
+    setPage(1);
+  };
+
+  const handleStatusChange = (value) => {
+    if (typeof clearStatus === 'function') clearStatus();
+    if (value !== 'all' && typeof toggleStatus === 'function') toggleStatus(value);
+    setPage(1);
+  };
+
+  const handleBranchChange = (value) => {
+    if (typeof setBranchId === 'function') setBranchId(value);
+    setPage(1);
+  };
+
+  const getBranchValue = (branch) => String(branch?._id || branch?.id || '');
+
+  const getBranchLabel = (branch) => {
+    const name = String(branch?.name || '').trim() || 'Sede sin nombre';
+    const code = String(branch?.code || '').trim().toUpperCase();
+
+    return code ? `${name} (${code})` : name;
+  };
+
   return (
     <section style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <style>{`
@@ -211,21 +227,23 @@ export default function OrdersFilters({
           transform: translateY(-3px);
           box-shadow: 0 18px 40px rgba(0,0,0,0.18) !important;
         }
-        .orf-btn-clear {
-          transition: background 0.15s, transform 0.15s, opacity 0.15s;
-        }
-        .orf-btn-clear:hover:not(:disabled) {
-          transform: translateY(-1px);
-        }
         .orf-icon-wrap {
           transition: transform 0.18s;
         }
         .orf-card-metric:hover .orf-icon-wrap {
           transform: scale(1.1) rotate(-4deg);
         }
+        @media (max-width: 1100px) {
+          .orf-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .orf-filters { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+          .orf-col-4, .orf-col-6, .orf-col-3, .orf-col-2 { grid-column: span 3 !important; }
+        }
+        @media (max-width: 720px) {
+          .orf-metrics, .orf-filters { grid-template-columns: 1fr !important; }
+          .orf-col-4, .orf-col-6, .orf-col-3, .orf-col-2 { grid-column: span 1 !important; }
+        }
       `}</style>
 
-      {/* ── Header ── */}
       <div
         style={{
           display: 'flex',
@@ -275,17 +293,10 @@ export default function OrdersFilters({
             borderRadius: 12,
             fontSize: 13,
             fontWeight: 800,
-            cursor: 'pointer',
+            cursor: loading || total === 0 ? 'not-allowed' : 'pointer',
             letterSpacing: '0.01em',
             boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            transition: 'transform 0.15s, filter 0.15s',
             opacity: loading || total === 0 ? 0.5 : 1,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.filter = 'brightness(1.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.filter = 'brightness(1)';
           }}
         >
           <Download size={16} strokeWidth={2.5} />
@@ -293,8 +304,7 @@ export default function OrdersFilters({
         </button>
       </div>
 
-      {/* ── Metric cards 6-col ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+      <div className="orf-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
         {cards.map(({ key, label, value, helper, Icon, accent }) => (
           <article
             key={key}
@@ -385,7 +395,6 @@ export default function OrdersFilters({
         ))}
       </div>
 
-      {/* ── Filter bar ── */}
       <div
         style={{
           background: 'var(--admin-card-bg)',
@@ -409,6 +418,7 @@ export default function OrdersFilters({
         </div>
 
         <div
+          className="orf-filters"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
@@ -416,19 +426,7 @@ export default function OrdersFilters({
             alignItems: 'end',
           }}
         >
-          {/* Buscar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 4' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Buscar
-            </label>
-
+          <Field className="orf-col-4" label="Buscar" gridColumn="span 4">
             <div style={{ position: 'relative' }}>
               <Search
                 size={16}
@@ -451,34 +449,12 @@ export default function OrdersFilters({
                   setTypingQ(e.target.value);
                   setPage(1);
                 }}
-                style={{
-                  width: '100%',
-                  height: 40,
-                  paddingLeft: 38,
-                  paddingRight: 12,
-                  border: '1px solid',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  boxSizing: 'border-box',
-                }}
+                style={inputStyle({ paddingLeft: 38 })}
               />
             </div>
-          </div>
+          </Field>
 
-          {/* Desde */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 2' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Desde
-            </label>
-
+          <Field className="orf-col-2" label="Desde" gridColumn="span 2">
             <input
               type="date"
               className="orf-field"
@@ -487,32 +463,11 @@ export default function OrdersFilters({
                 setDateFrom(e.target.value);
                 setPage(1);
               }}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 10px',
-                border: '1px solid',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                boxSizing: 'border-box',
-              }}
+              style={inputStyle()}
             />
-          </div>
+          </Field>
 
-          {/* Hasta */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 2' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Hasta
-            </label>
-
+          <Field className="orf-col-2" label="Hasta" gridColumn="span 2">
             <input
               type="date"
               className="orf-field"
@@ -521,46 +476,16 @@ export default function OrdersFilters({
                 setDateTo(e.target.value);
                 setPage(1);
               }}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 10px',
-                border: '1px solid',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                boxSizing: 'border-box',
-              }}
+              style={inputStyle()}
             />
-          </div>
+          </Field>
 
-          {/* Estado */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 4' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Estado
-            </label>
-
+          <Field className="orf-col-4" label="Estado" gridColumn="span 4">
             <select
               className="orf-select orf-field"
               value={currentStatus}
               onChange={(e) => handleStatusChange(e.target.value)}
-              style={{
-                width: '100%',
-                height: 40,
-                padding: '0 10px',
-                border: '1px solid',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                boxSizing: 'border-box',
-              }}
+              style={selectStyle()}
             >
               <option value="all">
                 {safeStatusFilter.length > 1 ? 'Varios estados' : 'Todos los estados'}
@@ -572,21 +497,9 @@ export default function OrdersFilters({
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
 
-          {/* Sede */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 6' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Sede
-            </label>
-
+          <Field className="orf-col-6" label="Sede" gridColumn="span 6">
             <div style={{ position: 'relative' }}>
               <Building2
                 size={15}
@@ -605,16 +518,7 @@ export default function OrdersFilters({
                 className="orf-select orf-field"
                 value={branchId || ''}
                 onChange={(e) => handleBranchChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: 40,
-                  padding: '0 34px 0 34px',
-                  border: '1px solid',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  boxSizing: 'border-box',
-                }}
+                style={selectStyle({ paddingLeft: 34 })}
               >
                 <option value="">Todas las sedes</option>
 
@@ -631,21 +535,9 @@ export default function OrdersFilters({
                 })}
               </select>
             </div>
-          </div>
+          </Field>
 
-          {/* Datos toggle */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 3' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Datos
-            </label>
-
+          <Field className="orf-col-3" label="Datos" gridColumn="span 3">
             <div
               style={{
                 display: 'grid',
@@ -678,7 +570,6 @@ export default function OrdersFilters({
                       populate === opt.val
                         ? 'var(--admin-primary-text)'
                         : 'var(--admin-input-text)',
-                    transition: 'background 0.15s, color 0.15s',
                     letterSpacing: '0.02em',
                   }}
                 >
@@ -686,53 +577,113 @@ export default function OrdersFilters({
                 </button>
               ))}
             </div>
-          </div>
+          </Field>
 
-          {/* Limpiar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: 'span 3' }}>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--admin-card-text)',
-                letterSpacing: '0.03em',
-              }}
-            >
-              Acción
-            </label>
-
+          <Field className="orf-col-3" label="Limpiar" gridColumn="span 3">
             <button
-              className="orf-btn-clear"
               type="button"
-              onClick={handleClearFilters}
               disabled={!hasActiveFilters}
+              onClick={handleClearFilters}
               style={{
+                width: '100%',
+                height: 40,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
-                height: 40,
-                width: '100%',
-                border: '1px solid var(--admin-input-border)',
+                gap: 8,
+                border: `1px solid ${ADMIN_BORDER}`,
                 borderRadius: 10,
-                background: hasActiveFilters
-                  ? 'var(--admin-primary-soft-bg)'
-                  : 'var(--admin-input-bg)',
-                color: hasActiveFilters ? 'var(--admin-primary)' : 'var(--admin-input-text)',
-                fontSize: 12,
-                fontWeight: 800,
+                background: hasActiveFilters ? 'var(--admin-primary-soft-bg)' : 'var(--admin-input-bg)',
+                color: hasActiveFilters ? 'var(--admin-primary-soft-text)' : 'var(--admin-card-muted-text)',
                 cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
-                opacity: hasActiveFilters ? 1 : 0.45,
-                boxSizing: 'border-box',
-                letterSpacing: '0.02em',
+                fontSize: 12,
+                fontWeight: 850,
               }}
             >
-              <FilterX size={14} strokeWidth={2.3} />
-              Limpiar
+              <FilterX size={15} strokeWidth={2.4} />
+              Limpiar filtros
             </button>
-          </div>
+          </Field>
+
+          <Field className="orf-col-6" label="Tags" gridColumn="span 6">
+            <input
+              className="orf-input orf-field"
+              placeholder="vip, urgente, mayorista..."
+              value={tagsStr}
+              onChange={(e) => {
+                setTagsStr(e.target.value);
+                setPage(1);
+              }}
+              style={inputStyle()}
+            />
+          </Field>
+
+          <Field className="orf-col-3" label="Modo tags" gridColumn="span 3">
+            <select
+              className="orf-select orf-field"
+              value={tagsMode}
+              onChange={(e) => {
+                setTagsMode(e.target.value === 'all' ? 'all' : 'any');
+                setPage(1);
+              }}
+              style={selectStyle()}
+            >
+              <option value="any">Cualquier tag</option>
+              <option value="all">Todos los tags</option>
+            </select>
+          </Field>
         </div>
       </div>
     </section>
   );
+}
+
+function Field({ label, children, gridColumn, className = '' }) {
+  return (
+    <div
+      className={className}
+      style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn }}
+    >
+      <label
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: 'var(--admin-card-text)',
+          letterSpacing: '0.03em',
+        }}
+      >
+        {label}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+function inputStyle(extra = {}) {
+  return {
+    width: '100%',
+    height: 40,
+    padding: '0 10px',
+    border: '1px solid',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+    boxSizing: 'border-box',
+    ...extra,
+  };
+}
+
+function selectStyle(extra = {}) {
+  return {
+    width: '100%',
+    height: 40,
+    padding: '0 10px',
+    border: '1px solid',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    boxSizing: 'border-box',
+    ...extra,
+  };
 }
