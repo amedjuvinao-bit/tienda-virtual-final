@@ -9,6 +9,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'productos/nuevo': ['products:create'],
   'productos/editar': ['products:update'],
 
+  inventario: ['inventory:view'],
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],

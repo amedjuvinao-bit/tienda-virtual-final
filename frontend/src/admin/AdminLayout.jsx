@@ -14,6 +14,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Package,
+  PackageSearch,
   ShoppingCart,
   Heart,
   ClipboardList,
@@ -278,6 +279,7 @@ export default function AdminLayout() {
   const mainLinks = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/productos', label: 'Productos', icon: Package },
+    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch },
     { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart },
     { to: '/admin/favoritos', label: 'Favoritos', icon: Heart },
     { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },

@@ -50,6 +50,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import AdminLayout from "./admin/AdminLayout";
 import Dashboard from "./admin/Dashboard";
 import ProductosAdmin from "./admin/ProductosAdmin";
+import InventoryAdmin from "./admin/InventoryAdmin";
 import PagesAdmin from "./admin/pages/PagesAdmin";
 import PageEditor from "./admin/pages/PageEditor";
 import CatalogPageEditor from "./admin/pages/CatalogPageEditor";
@@ -490,6 +491,10 @@ export default function App() {
                 <Route
                   path="productos"
                   element={protectAdminContent(<ProductosAdmin />)}
+                />
+                <Route
+                  path="inventario"
+                  element={protectAdminContent(<InventoryAdmin />)}
                 />
                 <Route
                   path="productos/nuevo"
