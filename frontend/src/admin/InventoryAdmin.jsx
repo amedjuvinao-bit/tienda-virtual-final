@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
+import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
 
 const styles = {
   pageText: {
@@ -185,6 +186,7 @@ export default function InventoryAdmin() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [movementsModalRow, setMovementsModalRow] = useState(null);
 
   const loadInventory = useCallback(async () => {
     try {
@@ -491,6 +493,7 @@ export default function InventoryAdmin() {
                       <td className="px-4 py-4">
                         <button
                           type="button"
+                          onClick={() => setMovementsModalRow(row)}
                           className="admin-inventory-action-button px-3 py-1.5 text-xs font-semibold transition"
                           style={styles.actionButton}
                         >
@@ -510,6 +513,12 @@ export default function InventoryAdmin() {
         onClose={() => setAdjustmentModalOpen(false)}
         stockRows={stockRows}
         onSaved={loadInventory}
+      />
+
+      <InventoryMovementsModal
+        open={Boolean(movementsModalRow)}
+        onClose={() => setMovementsModalRow(null)}
+        stockRow={movementsModalRow}
       />
 
       <style>
