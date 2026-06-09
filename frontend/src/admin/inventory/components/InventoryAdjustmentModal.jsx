@@ -1,6 +1,6 @@
 // frontend/src/admin/inventory/components/InventoryAdjustmentModal.jsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircle,
@@ -14,8 +14,11 @@ import {
 import api from '../../../lib/api';
 
 const INITIAL_FORM = {
-  stockRowId: '',
-  type: 'adjustment_in',
+  productId: '',
+  branchId: '',
+  size: '',
+  color: '',
+  type: 'initial_stock',
   quantity: '',
   reason: '',
   reference: '',
@@ -24,46 +27,53 @@ const INITIAL_FORM = {
 
 const MOVEMENT_TYPES = [
   {
+    value: 'initial_stock',
+    label: 'Stock inicial',
+    action: 'Suma stock',
+    direction: 'in',
+    help: 'Carga inventario por primera vez en una sede o bodega.',
+  },
+  {
     value: 'adjustment_in',
     label: 'Ajuste positivo',
     action: 'Suma stock',
     direction: 'in',
-    help: 'Úsalo cuando el conteo físico muestra más unidades que las registradas en el sistema.',
+    help: 'Suma unidades por corrección de inventario.',
   },
   {
     value: 'adjustment_out',
     label: 'Ajuste negativo',
     action: 'Resta stock',
     direction: 'out',
-    help: 'Úsalo cuando el conteo físico muestra menos unidades que las registradas en el sistema.',
+    help: 'Resta unidades por corrección de inventario.',
   },
   {
     value: 'purchase_in',
     label: 'Entrada por compra',
     action: 'Suma stock',
     direction: 'in',
-    help: 'Úsalo cuando entra mercancía nueva por compra, proveedor o reposición.',
+    help: 'Registra mercancía nueva que entra a la tienda o bodega.',
   },
   {
     value: 'return_in',
     label: 'Entrada por devolución',
     action: 'Suma stock',
     direction: 'in',
-    help: 'Úsalo cuando una devolución vuelve a estar disponible para la venta.',
+    help: 'Registra productos devueltos que vuelven al inventario.',
   },
   {
     value: 'damage_out',
     label: 'Salida por daño',
     action: 'Resta stock',
     direction: 'out',
-    help: 'Úsalo cuando una prenda no debe seguir disponible por daño, mancha o defecto.',
+    help: 'Retira productos dañados del inventario disponible.',
   },
   {
     value: 'loss_out',
     label: 'Salida por pérdida',
     action: 'Resta stock',
     direction: 'out',
-    help: 'Úsalo cuando una unidad no aparece después de una revisión o conteo.',
+    help: 'Retira productos perdidos del inventario disponible.',
   },
 ];
 
@@ -216,6 +226,14 @@ const styles = {
   },
 };
 
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeKey(value) {
+  return cleanText(value).toLowerCase();
+}
+
 function formatNumber(value) {
   const number = Number(value || 0);
   return new Intl.NumberFormat('es-CO').format(number);
@@ -240,12 +258,18 @@ function getProductSku(row) {
   );
 }
 
+function getProductImage(row) {
+  return row?.product?.image || row?.productSnapshot?.image || row?.image || '';
+}
+
 function getProductId(row) {
   return String(
     row?.product?._id ||
       row?.product ||
       row?.productSnapshot?._id ||
       row?.productSnapshot?.id ||
+      row?._id ||
+      row?.id ||
       ''
   );
 }
@@ -255,6 +279,7 @@ function getBranchName(row) {
     row?.branch?.name ||
     row?.branchSnapshot?.name ||
     row?.branchName ||
+    row?.name ||
     'Sede no definida'
   );
 }
@@ -265,16 +290,18 @@ function getBranchId(row) {
       row?.branch ||
       row?.branchSnapshot?._id ||
       row?.branchSnapshot?.id ||
+      row?._id ||
+      row?.id ||
       ''
   );
 }
 
 function getVariantSize(row) {
-  return row?.variant?.size || row?.size || '—';
+  return cleanText(row?.variant?.size || row?.size || '');
 }
 
 function getVariantColor(row) {
-  return row?.variant?.color || row?.color || '—';
+  return cleanText(row?.variant?.color || row?.color || '');
 }
 
 function getAvailableStock(row) {
@@ -284,12 +311,6 @@ function getAvailableStock(row) {
   const reservedStock = Number(row?.reservedStock || 0);
 
   return stock - reservedStock;
-}
-
-function buildOptionLabel(row) {
-  return `${getProductTitle(row)} · ${getBranchName(row)} · Talla ${getVariantSize(
-    row
-  )} · Color ${getVariantColor(row)}`;
 }
 
 function getMovementType(type) {
@@ -311,6 +332,229 @@ function getImpactText(type, quantity) {
     : `Este movimiento sumará ${formatNumber(number)} unidad(es) al inventario.`;
 }
 
+function getProductsFromResponse(response) {
+  const data = response?.data;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.products)) return data.products;
+  if (Array.isArray(data?.data?.products)) return data.data.products;
+
+  return [];
+}
+
+function getBranchesFromResponse(response) {
+  const data = response?.data;
+
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.branches)) return data.branches;
+  if (Array.isArray(data?.data?.branches)) return data.data.branches;
+  if (Array.isArray(data?.data?.data)) return data.data.data;
+
+  return [];
+}
+
+function buildMergedProducts(products = [], stockRows = []) {
+  const productMap = new Map();
+
+  products.forEach((product) => {
+    const productId = getProductId(product);
+
+    if (!productId) return;
+
+    productMap.set(productId, {
+      ...product,
+      _id: productId,
+      title: getProductTitle(product),
+      sku: getProductSku(product),
+      image: getProductImage(product),
+      inventory: Array.isArray(product?.inventory) ? product.inventory : [],
+      sizes: Array.isArray(product?.sizes) ? product.sizes : [],
+      colors: Array.isArray(product?.colors) ? product.colors : [],
+    });
+  });
+
+  stockRows.forEach((row) => {
+    const productId = getProductId(row);
+
+    if (!productId) return;
+
+    const currentProduct = productMap.get(productId) || {
+      _id: productId,
+      title: getProductTitle(row),
+      sku: getProductSku(row),
+      image: getProductImage(row),
+      inventory: [],
+      sizes: [],
+      colors: [],
+    };
+
+    const size = getVariantSize(row);
+    const color = getVariantColor(row);
+
+    const exists = currentProduct.inventory.some(
+      (item) =>
+        normalizeKey(item?.size) === normalizeKey(size) &&
+        normalizeKey(item?.color) === normalizeKey(color)
+    );
+
+    if ((size || color) && !exists) {
+      currentProduct.inventory.push({
+        size,
+        color,
+        sku: row?.variant?.sku || '',
+        barcode: row?.variant?.barcode || '',
+      });
+    }
+
+    productMap.set(productId, currentProduct);
+  });
+
+  return Array.from(productMap.values()).sort((a, b) =>
+    getProductTitle(a).localeCompare(getProductTitle(b), 'es')
+  );
+}
+
+function buildMergedBranches(branches = [], stockRows = []) {
+  const branchMap = new Map();
+
+  branches.forEach((branch) => {
+    const branchId = getBranchId(branch);
+
+    if (!branchId) return;
+
+    branchMap.set(branchId, {
+      ...branch,
+      _id: branchId,
+      name: getBranchName(branch),
+      code: branch?.code || '',
+      type: branch?.type || '',
+    });
+  });
+
+  stockRows.forEach((row) => {
+    const branchId = getBranchId(row);
+
+    if (!branchId || branchMap.has(branchId)) return;
+
+    branchMap.set(branchId, {
+      _id: branchId,
+      name: getBranchName(row),
+      code: row?.branch?.code || row?.branchSnapshot?.code || '',
+      type: row?.branch?.type || row?.branchSnapshot?.type || '',
+    });
+  });
+
+  return Array.from(branchMap.values()).sort((a, b) =>
+    getBranchName(a).localeCompare(getBranchName(b), 'es')
+  );
+}
+
+function buildVariantOptions(product, stockRows = []) {
+  if (!product) return [];
+
+  const productId = getProductId(product);
+  const variantMap = new Map();
+
+  const addVariant = (variant = {}) => {
+    const size = cleanText(variant?.size);
+    const color = cleanText(variant?.color);
+
+    if (!size && !color) return;
+
+    const key = `${normalizeKey(size)}|${normalizeKey(color)}`;
+
+    if (!variantMap.has(key)) {
+      variantMap.set(key, {
+        size,
+        color,
+        sku: cleanText(variant?.sku),
+        barcode: cleanText(variant?.barcode),
+      });
+    }
+  };
+
+  if (Array.isArray(product?.inventory)) {
+    product.inventory.forEach(addVariant);
+  }
+
+  stockRows
+    .filter((row) => getProductId(row) === productId)
+    .forEach((row) => {
+      addVariant({
+        size: getVariantSize(row),
+        color: getVariantColor(row),
+        sku: row?.variant?.sku || '',
+        barcode: row?.variant?.barcode || '',
+      });
+    });
+
+  const sizes = Array.isArray(product?.sizes)
+    ? product.sizes.map((item) => cleanText(item)).filter(Boolean)
+    : [];
+
+  const colors = Array.isArray(product?.colors)
+    ? product.colors
+        .map((item) => {
+          if (typeof item === 'string') return cleanText(item);
+          return cleanText(item?.name || item?.value || item?.hex || item?.color);
+        })
+        .filter(Boolean)
+    : [];
+
+  if (variantMap.size === 0 && sizes.length > 0 && colors.length > 0) {
+    sizes.forEach((size) => {
+      colors.forEach((color) => {
+        addVariant({ size, color });
+      });
+    });
+  }
+
+  if (variantMap.size === 0 && sizes.length > 0) {
+    sizes.forEach((size) => addVariant({ size, color: 'Único' }));
+  }
+
+  if (variantMap.size === 0 && colors.length > 0) {
+    colors.forEach((color) => addVariant({ size: 'Única', color }));
+  }
+
+  return Array.from(variantMap.values()).sort((a, b) => {
+    const sizeCompare = a.size.localeCompare(b.size, 'es', {
+      numeric: true,
+    });
+
+    if (sizeCompare !== 0) return sizeCompare;
+
+    return a.color.localeCompare(b.color, 'es');
+  });
+}
+
+function findExistingStockRow(stockRows = [], { productId, branchId, size, color }) {
+  return (
+    stockRows.find((row) => {
+      const sameProduct = getProductId(row) === productId;
+      const sameBranch = getBranchId(row) === branchId;
+      const sameSize = normalizeKey(getVariantSize(row)) === normalizeKey(size);
+      const sameColor = normalizeKey(getVariantColor(row)) === normalizeKey(color);
+
+      return sameProduct && sameBranch && sameSize && sameColor;
+    }) || null
+  );
+}
+
+function buildVariantValue(variant) {
+  return `${variant?.size || ''}|||${variant?.color || ''}`;
+}
+
+function parseVariantValue(value) {
+  const [size = '', color = ''] = String(value || '').split('|||');
+
+  return {
+    size,
+    color,
+  };
+}
+
 export default function InventoryAdjustmentModal({
   open,
   onClose,
@@ -318,42 +562,149 @@ export default function InventoryAdjustmentModal({
   onSaved,
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
+  const [products, setProducts] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+  const [referenceError, setReferenceError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const stockOptions = useMemo(() => {
-    const seen = new Set();
+  const loadReferences = useCallback(async () => {
+    try {
+      setReferenceLoading(true);
+      setReferenceError('');
 
-    return stockRows.filter((row) => {
-      const productId = getProductId(row);
-      const branchId = getBranchId(row);
-      const key = `${productId}|${branchId}|${getVariantSize(row)}|${getVariantColor(row)}`;
+      const [productsRes, branchesRes] = await Promise.all([
+        api.get('/api/products', {
+          params: {
+            all: 1,
+          },
+        }),
+        api.get('/api/admin/branches', {
+          params: {
+            limit: 100,
+            sort: 'name',
+          },
+        }),
+      ]);
 
-      if (!productId || !branchId || seen.has(key)) return false;
+      setProducts(getProductsFromResponse(productsRes));
+      setBranches(getBranchesFromResponse(branchesRes));
+    } catch (err) {
+      console.error('❌ Error cargando productos o sedes:', err);
 
-      seen.add(key);
-      return true;
-    });
-  }, [stockRows]);
+      setReferenceError(
+        err?.response?.data?.message ||
+          err?.userMessage ||
+          'No se pudieron cargar productos o sedes.'
+      );
+    } finally {
+      setReferenceLoading(false);
+    }
+  }, []);
 
-  const selectedRow = useMemo(() => {
-    if (!form.stockRowId) return null;
-    return stockOptions.find((row) => row?._id === form.stockRowId) || null;
-  }, [form.stockRowId, stockOptions]);
+  const productOptions = useMemo(
+    () => buildMergedProducts(products, stockRows),
+    [products, stockRows]
+  );
+
+  const branchOptions = useMemo(
+    () => buildMergedBranches(branches, stockRows),
+    [branches, stockRows]
+  );
+
+  const selectedProduct = useMemo(() => {
+    if (!form.productId) return null;
+
+    return productOptions.find((product) => getProductId(product) === form.productId) || null;
+  }, [form.productId, productOptions]);
+
+  const selectedBranch = useMemo(() => {
+    if (!form.branchId) return null;
+
+    return branchOptions.find((branch) => getBranchId(branch) === form.branchId) || null;
+  }, [form.branchId, branchOptions]);
+
+  const variantOptions = useMemo(
+    () => buildVariantOptions(selectedProduct, stockRows),
+    [selectedProduct, stockRows]
+  );
 
   const selectedType = useMemo(() => getMovementType(form.type), [form.type]);
+
+  const existingStockRow = useMemo(
+    () =>
+      findExistingStockRow(stockRows, {
+        productId: form.productId,
+        branchId: form.branchId,
+        size: form.size,
+        color: form.color,
+      }),
+    [stockRows, form.productId, form.branchId, form.size, form.color]
+  );
+
+  const currentAvailableStock = existingStockRow
+    ? getAvailableStock(existingStockRow)
+    : 0;
 
   useEffect(() => {
     if (!open) return;
 
     setError('');
     setSuccess('');
-    setForm({
-      ...INITIAL_FORM,
-      stockRowId: stockOptions[0]?._id || '',
+    setReferenceError('');
+    setForm(INITIAL_FORM);
+    loadReferences();
+  }, [open, loadReferences]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setForm((prev) => {
+      if (prev.productId || productOptions.length === 0) return prev;
+
+      return {
+        ...prev,
+        productId: getProductId(productOptions[0]),
+      };
     });
-  }, [open, stockOptions]);
+  }, [open, productOptions]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setForm((prev) => {
+      if (prev.branchId || branchOptions.length === 0) return prev;
+
+      return {
+        ...prev,
+        branchId: getBranchId(branchOptions[0]),
+      };
+    });
+  }, [open, branchOptions]);
+
+  useEffect(() => {
+    if (!open || !selectedProduct) return;
+
+    setForm((prev) => {
+      const currentVariantExists = variantOptions.some(
+        (variant) =>
+          normalizeKey(variant.size) === normalizeKey(prev.size) &&
+          normalizeKey(variant.color) === normalizeKey(prev.color)
+      );
+
+      if (currentVariantExists) return prev;
+
+      const firstVariant = variantOptions[0];
+
+      return {
+        ...prev,
+        size: firstVariant?.size || '',
+        color: firstVariant?.color || '',
+      };
+    });
+  }, [open, selectedProduct, variantOptions]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -362,7 +713,7 @@ export default function InventoryAdjustmentModal({
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !saving) {
         onClose();
       }
     };
@@ -373,7 +724,7 @@ export default function InventoryAdjustmentModal({
       document.body.style.overflow = previousOverflow || '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, saving]);
 
   if (!open) return null;
 
@@ -384,14 +735,54 @@ export default function InventoryAdjustmentModal({
     }));
   };
 
+  const updateProduct = (productId) => {
+    const nextProduct =
+      productOptions.find((product) => getProductId(product) === productId) || null;
+
+    const nextVariants = buildVariantOptions(nextProduct, stockRows);
+    const firstVariant = nextVariants[0];
+
+    setForm((prev) => ({
+      ...prev,
+      productId,
+      size: firstVariant?.size || '',
+      color: firstVariant?.color || '',
+    }));
+  };
+
+  const updateVariant = (value) => {
+    const parsedVariant = parseVariantValue(value);
+
+    setForm((prev) => ({
+      ...prev,
+      size: parsedVariant.size,
+      color: parsedVariant.color,
+    }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError('');
     setSuccess('');
 
-    if (!selectedRow) {
-      setError('Selecciona un producto con sede, talla y color.');
+    if (!form.productId) {
+      setError('Selecciona un producto.');
+      return;
+    }
+
+    if (!form.branchId) {
+      setError('Selecciona una sede o bodega.');
+      return;
+    }
+
+    if (!cleanText(form.size)) {
+      setError('Selecciona la talla.');
+      return;
+    }
+
+    if (!cleanText(form.color)) {
+      setError('Selecciona el color.');
       return;
     }
 
@@ -407,25 +798,12 @@ export default function InventoryAdjustmentModal({
       return;
     }
 
-    const productId = getProductId(selectedRow);
-    const branchId = getBranchId(selectedRow);
-
-    if (!productId) {
-      setError('No se encontró el ID del producto seleccionado.');
-      return;
-    }
-
-    if (!branchId) {
-      setError('No se encontró el ID de la sede seleccionada.');
-      return;
-    }
-
     const payload = {
       type: form.type,
-      productId,
-      branchId,
-      size: getVariantSize(selectedRow),
-      color: getVariantColor(selectedRow),
+      productId: form.productId,
+      branchId: form.branchId,
+      size: cleanText(form.size),
+      color: cleanText(form.color),
       quantity,
       reason: String(form.reason || '').trim(),
       reference: String(form.reference || '').trim(),
@@ -460,6 +838,14 @@ export default function InventoryAdjustmentModal({
     }
   };
 
+  const canSubmit =
+    !saving &&
+    !referenceLoading &&
+    Boolean(form.productId) &&
+    Boolean(form.branchId) &&
+    Boolean(form.size) &&
+    Boolean(form.color);
+
   return createPortal(
     <div
       className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center p-2 md:p-4"
@@ -492,7 +878,7 @@ export default function InventoryAdjustmentModal({
               </h2>
 
               <p className="mt-2 max-w-3xl text-sm leading-6" style={styles.muted}>
-                Selecciona el producto exacto, define si el inventario aumenta o disminuye y deja el soporte administrativo del movimiento.
+                Selecciona producto, sede o bodega, talla, color y cantidad. También puedes cargar stock inicial en una sede sin inventario.
               </p>
             </div>
 
@@ -523,6 +909,16 @@ export default function InventoryAdjustmentModal({
                   </div>
                 )}
 
+                {referenceError && !error && (
+                  <div
+                    className="flex items-start gap-3 px-4 py-3 text-sm font-semibold"
+                    style={styles.dangerBox}
+                  >
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>{referenceError}</p>
+                  </div>
+                )}
+
                 {success && (
                   <div className="px-4 py-3 text-sm font-bold" style={styles.successBox}>
                     {success}
@@ -532,35 +928,114 @@ export default function InventoryAdjustmentModal({
                 <PanelCard>
                   <PanelTitle
                     icon={<PackageSearch size={18} />}
-                    title="Producto y variante"
-                    description="El movimiento se aplica a una combinación exacta: producto, sede, talla y color."
+                    title="Producto, sede y variante"
+                    description="El movimiento se aplica a una combinación exacta: producto, sede o bodega, talla y color."
                   />
 
-                  <div className="mt-4">
-                    <Label>Producto / sede / talla / color</Label>
+                  {referenceLoading && (
+                    <div className="mt-4 flex items-center gap-2 text-sm font-bold" style={styles.cardMuted}>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Cargando productos y sedes...
+                    </div>
+                  )}
 
-                    <select
-                      value={form.stockRowId}
-                      onChange={(event) => updateField('stockRowId', event.target.value)}
-                      disabled={saving || stockOptions.length === 0}
-                      className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                      style={styles.input}
-                    >
-                      <option value="">Seleccionar registro de inventario</option>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Producto</Label>
 
-                      {stockOptions.map((row) => (
-                        <option key={row?._id} value={row?._id}>
-                          {buildOptionLabel(row)}
-                        </option>
-                      ))}
-                    </select>
+                      <select
+                        value={form.productId}
+                        onChange={(event) => updateProduct(event.target.value)}
+                        disabled={saving || referenceLoading || productOptions.length === 0}
+                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
+                        style={styles.input}
+                      >
+                        <option value="">Seleccionar producto</option>
 
-                    <HelpText>
-                      Revisa bien este campo. Si eliges otra sede, talla o color, modificarás otro inventario.
-                    </HelpText>
+                        {productOptions.map((product) => (
+                          <option key={getProductId(product)} value={getProductId(product)}>
+                            {getProductTitle(product)} · SKU {getProductSku(product)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <HelpText>
+                        El producto puede tener inventario en otra sede. Desde aquí puedes cargarlo en una bodega nueva.
+                      </HelpText>
+                    </div>
+
+                    <div>
+                      <Label>Sede o bodega</Label>
+
+                      <select
+                        value={form.branchId}
+                        onChange={(event) => updateField('branchId', event.target.value)}
+                        disabled={saving || referenceLoading || branchOptions.length === 0}
+                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
+                        style={styles.input}
+                      >
+                        <option value="">Seleccionar sede o bodega</option>
+
+                        {branchOptions.map((branch) => (
+                          <option key={getBranchId(branch)} value={getBranchId(branch)}>
+                            {getBranchName(branch)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <HelpText>
+                        Aquí debe aparecer Bodega Principal aunque todavía no tenga stock.
+                      </HelpText>
+                    </div>
                   </div>
 
-                  {selectedRow && (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Talla y color</Label>
+
+                      <select
+                        value={buildVariantValue({
+                          size: form.size,
+                          color: form.color,
+                        })}
+                        onChange={(event) => updateVariant(event.target.value)}
+                        disabled={saving || referenceLoading || variantOptions.length === 0}
+                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
+                        style={styles.input}
+                      >
+                        <option value="">Seleccionar talla y color</option>
+
+                        {variantOptions.map((variant) => (
+                          <option
+                            key={buildVariantValue(variant)}
+                            value={buildVariantValue(variant)}
+                          >
+                            Talla {variant.size || '—'} · Color {variant.color || '—'}
+                          </option>
+                        ))}
+                      </select>
+
+                      <HelpText>
+                        Si el producto tiene varias tallas o colores, selecciona la combinación exacta.
+                      </HelpText>
+                    </div>
+
+                    <div>
+                      <Label>Estado actual</Label>
+
+                      <div className="mt-2 px-4 py-3 text-sm font-black" style={styles.input}>
+                        {existingStockRow
+                          ? `Ya existe inventario: ${formatNumber(currentAvailableStock)} disponible(s)`
+                          : 'Nuevo registro para esta sede'}
+                      </div>
+
+                      <HelpText>
+                        Si dice nuevo registro, al guardar se creará el stock inicial en esa sede.
+                      </HelpText>
+                    </div>
+                  </div>
+
+                  {selectedProduct && selectedBranch && (
                     <div className="mt-4 p-4" style={styles.softCard}>
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
@@ -568,11 +1043,11 @@ export default function InventoryAdjustmentModal({
                             className="text-xs font-black uppercase tracking-[0.2em]"
                             style={styles.eyebrow}
                           >
-                            Producto seleccionado
+                            Selección actual
                           </p>
 
                           <h3 className="mt-1 text-lg font-black" style={styles.cardTitle}>
-                            {getProductTitle(selectedRow)}
+                            {getProductTitle(selectedProduct)}
                           </h3>
                         </div>
 
@@ -585,17 +1060,21 @@ export default function InventoryAdjustmentModal({
                             color: 'var(--admin-button-soft-text)',
                           }}
                         >
-                          SKU: {getProductSku(selectedRow)}
+                          SKU: {getProductSku(selectedProduct)}
                         </span>
                       </div>
 
                       <div className="mt-4 grid gap-3 md:grid-cols-4">
-                        <MiniInfo label="Sede" value={getBranchName(selectedRow)} />
-                        <MiniInfo label="Talla" value={getVariantSize(selectedRow)} />
-                        <MiniInfo label="Color" value={getVariantColor(selectedRow)} />
+                        <MiniInfo label="Sede" value={getBranchName(selectedBranch)} />
+                        <MiniInfo label="Talla" value={form.size || '—'} />
+                        <MiniInfo label="Color" value={form.color || '—'} />
                         <MiniInfo
                           label="Disponible"
-                          value={formatNumber(getAvailableStock(selectedRow))}
+                          value={
+                            existingStockRow
+                              ? formatNumber(currentAvailableStock)
+                              : 'Nuevo'
+                          }
                         />
                       </div>
                     </div>
@@ -628,7 +1107,7 @@ export default function InventoryAdjustmentModal({
                       </select>
 
                       <HelpText>
-                        Entrada o ajuste positivo suma stock. Salida o ajuste negativo resta stock.
+                        Para cargar por primera vez en una bodega, usa Stock inicial.
                       </HelpText>
                     </div>
 
@@ -642,7 +1121,7 @@ export default function InventoryAdjustmentModal({
                         value={form.quantity}
                         onChange={(event) => updateField('quantity', event.target.value)}
                         disabled={saving}
-                        placeholder="Ej: 3"
+                        placeholder="Ej: 10"
                         className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
                         style={styles.input}
                       />
@@ -689,7 +1168,7 @@ export default function InventoryAdjustmentModal({
                       value={form.reason}
                       onChange={(event) => updateField('reason', event.target.value)}
                       disabled={saving}
-                      placeholder="Ej: Ajuste por conteo físico"
+                      placeholder="Ej: Stock inicial en Bodega Principal"
                       className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
                       style={styles.input}
                     />
@@ -710,7 +1189,7 @@ export default function InventoryAdjustmentModal({
                         value={form.reference}
                         onChange={(event) => updateField('reference', event.target.value)}
                         disabled={saving}
-                        placeholder="Ej: AJUSTE-ENERO-001"
+                        placeholder="Ej: STOCK-BODEGA-001"
                         className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
                         style={styles.input}
                       />
@@ -730,7 +1209,7 @@ export default function InventoryAdjustmentModal({
                         value={form.notes}
                         onChange={(event) => updateField('notes', event.target.value)}
                         disabled={saving}
-                        placeholder="Ej: Conteo realizado por administración..."
+                        placeholder="Ej: Carga inicial de inventario en bodega..."
                         className="mt-2 w-full resize-none px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
                         style={styles.input}
                       />
@@ -766,11 +1245,11 @@ export default function InventoryAdjustmentModal({
                         value={form.quantity ? formatNumber(form.quantity) : 'Sin definir'}
                       />
                       <SummaryRow
-                        label="Disponible"
+                        label="Disponible actual"
                         value={
-                          selectedRow
-                            ? formatNumber(getAvailableStock(selectedRow))
-                            : 'Sin seleccionar'
+                          existingStockRow
+                            ? formatNumber(currentAvailableStock)
+                            : 'Nuevo registro'
                         }
                       />
                     </div>
@@ -793,6 +1272,9 @@ export default function InventoryAdjustmentModal({
 
                     <ul className="mt-3 space-y-2 text-sm leading-6">
                       <li>
+                        <b>Stock inicial:</b> crea inventario en una sede o bodega.
+                      </li>
+                      <li>
                         <b>Ajuste positivo:</b> suma unidades por corrección.
                       </li>
                       <li>
@@ -800,9 +1282,6 @@ export default function InventoryAdjustmentModal({
                       </li>
                       <li>
                         <b>Entrada por compra:</b> registra mercancía nueva.
-                      </li>
-                      <li>
-                        <b>Salida por daño o pérdida:</b> retira unidades disponibles.
                       </li>
                     </ul>
                   </div>
@@ -830,7 +1309,7 @@ export default function InventoryAdjustmentModal({
 
                 <button
                   type="submit"
-                  disabled={saving || stockOptions.length === 0}
+                  disabled={!canSubmit}
                   className="inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
                   style={styles.primaryButton}
                 >
@@ -850,24 +1329,6 @@ export default function InventoryAdjustmentModal({
             </div>
           </footer>
         </form>
-
-        <style>
-          {`
-            @media (max-width: 1180px) {
-              div[style*="grid-template-columns: minmax(0,1fr) 360px"] {
-                grid-template-columns: 1fr !important;
-              }
-            }
-
-            @media (max-width: 720px) {
-              div[style*="width: min(1320px, calc(100vw - 34px))"] {
-                width: calc(100vw - 18px) !important;
-                max-height: calc(100vh - 18px) !important;
-                border-radius: 22px !important;
-              }
-            }
-          `}
-        </style>
       </div>
     </div>,
     document.body

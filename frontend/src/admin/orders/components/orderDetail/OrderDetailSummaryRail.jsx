@@ -42,7 +42,142 @@ function getProgressPercent(status) {
   return Math.max(20, Math.round(((index + 1) / FLOW_STEPS.length) * 100));
 }
 
-function RailMoneyLine({ label, value, strong = false }) {
+function toNumber(value) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function firstValidNumber(...values) {
+  const found = values.find((value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0;
+  });
+
+  return found === undefined ? 0 : Number(found);
+}
+
+function getProviderTotals(order) {
+  const invoice =
+    order?.electronicInvoice ||
+    order?.invoice ||
+    order?.factusInvoice ||
+    {};
+
+  const providerRaw = invoice?.provider?.raw || {};
+  const totals = providerRaw?.totals || {};
+
+  return {
+    grossAmount: toNumber(totals.gross_amount),
+    taxableAmount: toNumber(totals.taxable_amount),
+    taxAmount: toNumber(totals.tax_amount),
+    surchargeAmount: toNumber(totals.surcharge_amount),
+    prepaymentAmount: toNumber(totals.prepayment_amount),
+    total: toNumber(totals.total),
+  };
+}
+
+function getOrderTaxes(order) {
+  const ivaAmount = firstValidNumber(
+    order?.taxes?.iva?.amount,
+    order?.taxes?.ivaAmount,
+    order?.taxes?.taxAmount,
+    order?.taxAmount,
+    order?.iva,
+    order?.ivaAmount
+  );
+
+  const ivaRate = firstValidNumber(
+    order?.taxes?.iva?.rate,
+    order?.taxes?.ivaRate,
+    order?.taxRate,
+    19
+  );
+
+  return {
+    ivaAmount,
+    ivaRate,
+  };
+}
+
+function getOrderDiscount(order) {
+  return firstValidNumber(
+    order?.discount,
+    order?.discountAmount,
+    order?.couponDiscount,
+    order?.summary?.discount,
+    order?.totals?.discount
+  );
+}
+
+function getMoneyBreakdown(order, summary) {
+  const providerTotals = getProviderTotals(order);
+  const orderTaxes = getOrderTaxes(order);
+
+  const subtotal = firstValidNumber(
+    summary?.subtotal,
+    order?.subtotal,
+    order?.itemsSubtotal,
+    order?.totals?.subtotal,
+    providerTotals.grossAmount,
+    providerTotals.taxableAmount
+  );
+
+  const shipping = toNumber(
+    order?.shipping ??
+      order?.shippingCost ??
+      order?.shippingAmount ??
+      order?.deliveryFee ??
+      order?.totals?.shipping ??
+      summary?.shipping ??
+      0
+  );
+
+  const discount = getOrderDiscount(order);
+
+  const total = firstValidNumber(
+    summary?.total,
+    order?.total,
+    order?.grandTotal,
+    order?.totals?.total,
+    providerTotals.total,
+    subtotal + shipping + orderTaxes.ivaAmount - discount
+  );
+
+  const inferredTax = Math.max(0, total - subtotal - shipping + discount);
+
+  const ivaAmount = firstValidNumber(
+    orderTaxes.ivaAmount,
+    providerTotals.taxAmount,
+    inferredTax
+  );
+
+  const ivaRate = orderTaxes.ivaRate || 19;
+
+  const surcharge = firstValidNumber(
+    order?.surcharge,
+    order?.surchargeAmount,
+    providerTotals.surchargeAmount
+  );
+
+  const prepayment = firstValidNumber(
+    order?.prepayment,
+    order?.prepaymentAmount,
+    providerTotals.prepaymentAmount
+  );
+
+  return {
+    subtotal,
+    discount,
+    ivaAmount,
+    ivaRate,
+    shipping,
+    surcharge,
+    prepayment,
+    total,
+  };
+}
+
+function RailMoneyLine({ label, value, strong = false, muted = false }) {
   return (
     <div
       style={{
@@ -50,7 +185,7 @@ function RailMoneyLine({ label, value, strong = false }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        color: strong ? '#fff' : 'rgba(15, 23, 42, 0.72)',
+        color: strong ? '#fff' : muted ? 'rgba(255,255,255,0.68)' : 'rgba(15, 23, 42, 0.72)',
         fontSize: strong ? 14 : 12,
         fontWeight: strong ? 950 : 750,
         lineHeight: 1.25,
@@ -59,7 +194,7 @@ function RailMoneyLine({ label, value, strong = false }) {
       <span>{label}</span>
       <strong
         style={{
-          color: strong ? '#fff' : 'rgba(15, 23, 42, 0.95)',
+          color: strong ? '#fff' : muted ? 'rgba(255,255,255,0.78)' : 'rgba(15, 23, 42, 0.95)',
           fontSize: strong ? 22 : 13,
           fontWeight: strong ? 950 : 850,
           letterSpacing: strong ? '-0.04em' : 0,
@@ -140,6 +275,7 @@ export default function OrderDetailSummaryRail({ order }) {
   const admin = getAdminSnapshot(order);
   const sourceLabel = getOrderSourceLabel(order?.source);
   const progressPercent = getProgressPercent(order?.status);
+  const breakdown = getMoneyBreakdown(order, summary);
 
   return (
     <aside
@@ -245,7 +381,7 @@ export default function OrderDetailSummaryRail({ order }) {
             lineHeight: 1,
           }}
         >
-          {toCOP(summary.total)}
+          {toCOP(breakdown.total)}
         </strong>
 
         <div
@@ -261,10 +397,37 @@ export default function OrderDetailSummaryRail({ order }) {
             backdropFilter: 'blur(10px)',
           }}
         >
-          <RailMoneyLine label="Subtotal" value={toCOP(summary.subtotal)} />
-          <RailMoneyLine label="Envío" value={toCOP(summary.shipping)} />
+          <RailMoneyLine label="Subtotal productos" value={toCOP(breakdown.subtotal)} />
+
+          {breakdown.discount > 0 ? (
+            <RailMoneyLine
+              label="Descuento"
+              value={`-${toCOP(breakdown.discount)}`}
+              muted
+            />
+          ) : null}
+
+          <RailMoneyLine
+            label={`IVA ${breakdown.ivaRate || 19}%`}
+            value={toCOP(breakdown.ivaAmount)}
+          />
+
+          <RailMoneyLine label="Envío" value={toCOP(breakdown.shipping)} />
+
+          {breakdown.surcharge > 0 ? (
+            <RailMoneyLine label="Recargo" value={toCOP(breakdown.surcharge)} />
+          ) : null}
+
+          {breakdown.prepayment > 0 ? (
+            <RailMoneyLine
+              label="Anticipo"
+              value={`-${toCOP(breakdown.prepayment)}`}
+              muted
+            />
+          ) : null}
+
           <div style={{ height: 1, background: 'rgba(255,255,255,0.32)' }} />
-          <RailMoneyLine label="Total" value={toCOP(summary.total)} strong />
+          <RailMoneyLine label="Total pagado" value={toCOP(breakdown.total)} strong />
         </div>
 
         <div

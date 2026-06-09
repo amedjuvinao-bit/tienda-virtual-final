@@ -16,62 +16,146 @@ import {
   SoftBadge,
 } from './OrderDetailPrimitives';
 
+function firstValidText(...values) {
+  const found = values
+    .map((value) => String(value || '').trim())
+    .find((value) => value && value !== '—');
+
+  return found || '—';
+}
+
+function firstValidValue(...values) {
+  const found = values.find((value) => {
+    if (value === undefined || value === null || value === '') return false;
+
+    const numberValue = Number(value);
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) && value > 0;
+    }
+
+    if (Number.isFinite(numberValue)) {
+      return numberValue > 0;
+    }
+
+    return String(value).trim() !== '';
+  });
+
+  return found || 0;
+}
+
+function getInvoiceData(order) {
+  return (
+    order?.electronicInvoice ||
+    order?.invoice ||
+    order?.factusInvoice ||
+    {}
+  );
+}
+
 function getPaymentDetails(order) {
   const payment = order?.payment || {};
   const paymentDetails = order?.paymentDetails || {};
   const wompi = order?.wompi || {};
+  const payu = order?.payu || {};
   const transaction = order?.transaction || {};
+  const invoice = getInvoiceData(order);
+  const dianResponse = invoice?.dianResponse || {};
+  const providerRaw = invoice?.provider?.raw || {};
+  const providerPaymentDetails = Array.isArray(providerRaw?.payment_details)
+    ? providerRaw.payment_details[0] || {}
+    : {};
 
-  const method =
-    payment.method ||
-    payment.paymentMethod ||
-    paymentDetails.method ||
-    paymentDetails.paymentMethod ||
-    wompi.payment_method_type ||
-    transaction.payment_method_type ||
-    '—';
+  const method = firstValidText(
+    payment.methodLabel,
+    payment.methodType,
+    payment.method,
+    payment.paymentMethod,
+    paymentDetails.methodLabel,
+    paymentDetails.methodType,
+    paymentDetails.method,
+    paymentDetails.paymentMethod,
+    wompi.payment_method_type,
+    wompi.paymentMethodType,
+    wompi.payment_method?.type,
+    payu.paymentMethod,
+    transaction.payment_method_type,
+    transaction.payment_method?.type,
+    providerPaymentDetails?.payment_method?.name,
+    providerPaymentDetails?.payment_method?.code
+  );
 
-  const reference =
-    payment.reference ||
-    payment.referenceCode ||
-    paymentDetails.reference ||
-    paymentDetails.referenceCode ||
-    wompi.reference ||
-    transaction.reference ||
-    order?.paymentReference ||
-    '—';
+  const reference = firstValidText(
+    payment.reference,
+    payment.referenceCode,
+    paymentDetails.reference,
+    paymentDetails.referenceCode,
+    wompi.reference,
+    payu.reference,
+    transaction.reference,
+    order?.paymentReference,
+    dianResponse.paymentReference,
+    invoice?.provider?.referenceCode,
+    providerRaw?.reference_code,
+    order?.orderNumber ? `ORDER-${order.orderNumber}` : ''
+  );
 
-  const transactionId =
-    payment.transactionId ||
-    payment.transaction_id ||
-    paymentDetails.transactionId ||
-    paymentDetails.transaction_id ||
-    wompi.id ||
-    transaction.id ||
-    order?.transactionId ||
-    '—';
+  const transactionId = firstValidText(
+    payment.transactionId,
+    payment.transaction_id,
+    paymentDetails.transactionId,
+    paymentDetails.transaction_id,
+    wompi.id,
+    wompi.transactionId,
+    payu.transactionId,
+    transaction.id,
+    transaction.transactionId,
+    transaction.transaction_id,
+    order?.transactionId,
+    dianResponse.transactionId,
+    dianResponse.paymentTransactionId
+  );
 
-  const authorization =
-    payment.authorization ||
-    payment.authorizationCode ||
-    paymentDetails.authorization ||
-    paymentDetails.authorizationCode ||
-    transaction.authorization_code ||
-    '—';
+  const authorization = firstValidText(
+    payment.authorization,
+    payment.authorizationCode,
+    payment.authCode,
+    payment.approvalCode,
+    paymentDetails.authorization,
+    paymentDetails.authorizationCode,
+    paymentDetails.authCode,
+    transaction.authorization_code,
+    transaction.authorizationCode,
+    transaction.approval_code,
+    transaction.approvalCode,
+    providerRaw?.number,
+    invoice?.provider?.number,
+    invoice?.invoiceNumber
+  );
 
   const paidAt =
     payment.paidAt ||
+    payment.paymentDate ||
     paymentDetails.paidAt ||
+    paymentDetails.paymentDate ||
+    transaction.finalized_at ||
     transaction.created_at ||
+    dianResponse.generatedAt ||
+    invoice?.generatedAt ||
+    invoice?.createdAt ||
     order?.paidAt ||
+    order?.updatedAt ||
     '';
 
-  const amount =
-    payment.amount ||
-    paymentDetails.amount ||
-    transaction.amount_in_cents / 100 ||
-    order?.total ||
-    0;
+  const amount = firstValidValue(
+    payment.amount,
+    payment.paidAmount,
+    paymentDetails.amount,
+    paymentDetails.paidAmount,
+    transaction.amount_in_cents ? Number(transaction.amount_in_cents) / 100 : 0,
+    providerRaw?.totals?.total,
+    order?.total
+  );
 
   return {
     method: cleanText(method),

@@ -11,6 +11,11 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const requireAdmin = require('../middleware/requireAdmin');
 
+const {
+  confirmInventoryReservation,
+  releaseInventoryReservation,
+} = require('../services/inventoryReservationService');
+
 const WOMPI_ENVIRONMENTS = {
   sandbox: 'https://sandbox.wompi.co/v1',
   production: 'https://production.wompi.co/v1',
@@ -558,6 +563,147 @@ async function restockOrderIfNeeded(order, session) {
 
   return true;
 }
+
+async function handleInventoryReservationAfterPayment({
+  order,
+  mapped,
+  transaction = {},
+  reference = '',
+  provider = '',
+  session,
+}) {
+  if (!order || !mapped) return null;
+
+  const paymentStatus = String(mapped.paymentStatus || '').trim().toLowerCase();
+  const orderNumber = String(order.orderNumber || '').trim();
+
+  if (!orderNumber) return null;
+
+  try {
+    if (paymentStatus === 'paid') {
+      const reservation = await confirmInventoryReservation(
+        orderNumber,
+        {
+          order: order._id,
+          orderNumber: order.orderNumber,
+          paymentReference: reference || order.payment?.reference || '',
+          paymentTransactionId:
+            transaction?.id ||
+            order.payment?.transactionId ||
+            '',
+        },
+        {
+          session,
+        }
+      );
+
+      order.inventoryControl = {
+        ...(order.inventoryControl && typeof order.inventoryControl === 'object'
+          ? order.inventoryControl
+          : {}),
+        discountedAtCheckout: true,
+        restockedOnFailure: false,
+        restockedAt: null,
+      };
+
+      await OrderEvent.create(
+        [
+          {
+            orderId: order._id,
+            type: 'inventory_reservation_confirmed',
+            message: 'Reserva de inventario confirmada por pago aprobado.',
+            meta: {
+              provider,
+              orderNumber: order.orderNumber,
+              reservationId: reservation?._id || null,
+              reservationCode: reservation?.reservationCode || '',
+              paymentReference: reference || '',
+              paymentTransactionId: transaction?.id || '',
+            },
+          },
+        ],
+        { session }
+      );
+
+      return reservation;
+    }
+
+    if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
+      const reservation = await releaseInventoryReservation(
+        orderNumber,
+        {
+          status: paymentStatus === 'cancelled' ? 'cancelled' : 'failed',
+          releaseReason: `Pago ${paymentStatus} desde ${provider || 'pasarela'}`,
+        },
+        {
+          session,
+        }
+      );
+
+      order.inventoryControl = {
+        ...(order.inventoryControl && typeof order.inventoryControl === 'object'
+          ? order.inventoryControl
+          : {}),
+        discountedAtCheckout: false,
+        restockedOnFailure: true,
+        restockedAt: new Date(),
+      };
+
+      await OrderEvent.create(
+        [
+          {
+            orderId: order._id,
+            type: 'inventory_reservation_released',
+            message: 'Reserva de inventario liberada porque el pago no fue aprobado.',
+            meta: {
+              provider,
+              orderNumber: order.orderNumber,
+              reservationId: reservation?._id || null,
+              reservationCode: reservation?.reservationCode || '',
+              paymentStatus,
+              paymentReference: reference || '',
+              paymentTransactionId: transaction?.id || '',
+            },
+          },
+        ],
+        { session }
+      );
+
+      return reservation;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('❌ Error procesando reserva de inventario después del pago:', {
+      orderNumber: order.orderNumber,
+      paymentStatus,
+      provider,
+      error: error.message,
+      code: error.code,
+    });
+
+    await OrderEvent.create(
+      [
+        {
+          orderId: order._id,
+          type: 'inventory_reservation_error',
+          message: 'No se pudo procesar la reserva de inventario después del pago.',
+          meta: {
+            provider,
+            orderNumber: order.orderNumber,
+            paymentStatus,
+            error: error.message,
+            code: error.code || '',
+          },
+        },
+      ],
+      { session }
+    );
+
+    return null;
+  }
+}
+
 
 async function getSiteSettingsDoc() {
   const doc = await SiteSettings.findOne().lean();
@@ -1319,8 +1465,17 @@ router.post('/wompi/webhook', async (req, res) => {
             { session }
           );
         }
+        await handleInventoryReservationAfterPayment({
+          order,
+          mapped,
+          transaction,
+          reference,
+          provider: 'wompi',
+          session,
+        });
 
         if (shouldRestock) {
+       
           await restockOrderIfNeeded(order, session);
         }
 
@@ -1559,6 +1714,17 @@ router.post(
               at: new Date(),
             });
           }
+
+          await handleInventoryReservationAfterPayment({
+            order,
+            mapped,
+            transaction: {
+              id: txId,
+            },
+            reference,
+            provider: 'payu',
+            session,
+          });
 
           if (shouldRestock) {
             await restockOrderIfNeeded(order, session);

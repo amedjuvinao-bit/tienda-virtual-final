@@ -7,10 +7,37 @@ import {
   Plus,
   ArrowRightLeft,
   AlertCircle,
+  MapPin,
+  Boxes,
+  Warehouse,
+  Ruler,
+  Palette,
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
 import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
+import InventoryTransferModal from './inventory/components/InventoryTransferModal';
+
+const LOW_STOCK_LIMIT = 5;
+
+const STOCK_FILTERS = [
+  {
+    value: 'all',
+    label: 'Todos',
+  },
+  {
+    value: 'withStock',
+    label: 'Con stock',
+  },
+  {
+    value: 'withoutStock',
+    label: 'Sin stock',
+  },
+  {
+    value: 'lowStock',
+    label: 'Bajo stock',
+  },
+];
 
 const styles = {
   pageText: {
@@ -39,6 +66,13 @@ const styles = {
     background: 'var(--admin-glass-bg)',
     color: 'var(--admin-card-text)',
     boxShadow: 'var(--admin-glass-shadow)',
+  },
+
+  filterCard: {
+    borderRadius: 'calc(var(--admin-radius) + 2px)',
+    border: '1px solid var(--admin-card-border)',
+    background: 'var(--admin-card-bg)',
+    color: 'var(--admin-card-text)',
   },
 
   eyebrow: {
@@ -73,6 +107,13 @@ const styles = {
     boxShadow: '0 12px 26px color-mix(in srgb, var(--admin-primary) 22%, transparent)',
   },
 
+  softButton: {
+    borderRadius: 'var(--admin-radius)',
+    border: '1px solid var(--admin-button-soft-border)',
+    background: 'var(--admin-button-soft-bg)',
+    color: 'var(--admin-button-soft-text)',
+  },
+
   errorBox: {
     borderRadius: 'var(--admin-radius)',
     border: '1px solid var(--admin-danger)',
@@ -88,39 +129,124 @@ const styles = {
     outline: 'none',
   },
 
-  tableWrapper: {
-    borderRadius: 'calc(var(--admin-radius) + 2px)',
-    border: '1px solid var(--admin-table-border)',
+  inventoryList: {
+    borderRadius: 'calc(var(--admin-radius) + 6px)',
+    border: '1px solid var(--admin-card-border)',
+    background:
+      'linear-gradient(180deg, color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%), var(--admin-card-bg))',
     overflow: 'hidden',
   },
 
-  tableHead: {
+  listHeader: {
+    borderBottom: '1px solid var(--admin-card-border)',
     background: 'var(--admin-table-head-bg)',
     color: 'var(--admin-table-head-text)',
   },
 
-  tableBody: {
-    background: 'var(--admin-card-bg)',
-    color: 'var(--admin-table-text)',
+  inventoryCard: {
+    borderRadius: 'calc(var(--admin-radius) + 8px)',
+    border: '1px solid var(--admin-card-border)',
+    background:
+      'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 90%, var(--admin-primary) 10%), var(--admin-card-bg))',
+    color: 'var(--admin-card-text)',
+    boxShadow: '0 16px 38px color-mix(in srgb, var(--admin-primary) 10%, transparent)',
   },
 
-  tableRow: {
-    borderTop: '1px solid var(--admin-table-border)',
-    color: 'var(--admin-table-text)',
+  productIconBox: {
+    borderRadius: 'var(--admin-radius)',
+    border: '1px solid var(--admin-primary-soft-border)',
+    background: 'var(--admin-primary-soft-bg)',
+    color: 'var(--admin-primary)',
   },
 
   skuBadge: {
-    borderRadius: 'calc(var(--admin-radius) - 8px)',
+    borderRadius: '999px',
+    border: '1px solid var(--admin-primary-soft-border)',
+    background: 'var(--admin-primary-soft-bg)',
+    color: 'var(--admin-primary-soft-text)',
+    whiteSpace: 'nowrap',
+  },
+
+  branchBadge: {
+    borderRadius: '999px',
+    border: '1px solid var(--admin-button-soft-border)',
+    background: 'var(--admin-button-soft-bg)',
+    color: 'var(--admin-button-soft-text)',
+    whiteSpace: 'nowrap',
+  },
+
+  sectionBlock: {
+    borderRadius: 'calc(var(--admin-radius) + 2px)',
+    border: '1px solid var(--admin-card-border)',
+    background: 'color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 12%)',
+  },
+
+  sectionIconBox: {
+    borderRadius: 'calc(var(--admin-radius) - 4px)',
+    border: '1px solid var(--admin-primary-soft-border)',
+    background: 'var(--admin-primary-soft-bg)',
+    color: 'var(--admin-primary)',
+  },
+
+  valuePill: {
+    borderRadius: '999px',
+    border: '1px solid var(--admin-card-border)',
+    background: 'var(--admin-card-bg)',
+    color: 'var(--admin-card-text)',
+    whiteSpace: 'nowrap',
+  },
+
+  stockBox: {
+    borderRadius: 'calc(var(--admin-radius) + 2px)',
     border: '1px solid var(--admin-primary-soft-border)',
     background: 'var(--admin-primary-soft-bg)',
     color: 'var(--admin-primary-soft-text)',
   },
 
+  availableBox: {
+    borderRadius: 'calc(var(--admin-radius) + 2px)',
+    border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
+    background: 'color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))',
+    color: 'var(--admin-card-text)',
+  },
+
+  lowStockBadge: {
+    borderRadius: '999px',
+    border: '1px solid var(--admin-warning)',
+    background: 'var(--admin-warning-soft-bg)',
+    color: 'var(--admin-warning-text)',
+    whiteSpace: 'nowrap',
+  },
+
+  outStockBadge: {
+    borderRadius: '999px',
+    border: '1px solid var(--admin-danger)',
+    background: 'var(--admin-danger-soft-bg)',
+    color: 'var(--admin-danger-text)',
+    whiteSpace: 'nowrap',
+  },
+
+  goodStockBadge: {
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
+    background: 'color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))',
+    color: 'var(--admin-card-text)',
+    whiteSpace: 'nowrap',
+  },
+
   actionButton: {
-    borderRadius: 'calc(var(--admin-radius) - 8px)',
+    borderRadius: 'var(--admin-radius)',
     border: '1px solid var(--admin-button-bg)',
     background: 'var(--admin-button-bg)',
     color: 'var(--admin-button-text)',
+    boxShadow: '0 10px 22px color-mix(in srgb, var(--admin-primary) 20%, transparent)',
+  },
+
+  cardSoftActionButton: {
+    borderRadius: 'var(--admin-radius)',
+    border: '1px solid var(--admin-button-soft-border)',
+    background: 'var(--admin-button-soft-bg)',
+    color: 'var(--admin-button-soft-text)',
   },
 };
 
@@ -158,6 +284,36 @@ function getBranchName(row) {
   );
 }
 
+function getBranchOptionName(branch) {
+  if (typeof branch === 'string') return branch;
+
+  return (
+    branch?.name ||
+    branch?.title ||
+    branch?.label ||
+    branch?.branchName ||
+    'Sede sin nombre'
+  );
+}
+
+function getBranchType(row) {
+  const type = String(
+    row?.branch?.type ||
+      row?.branchSnapshot?.type ||
+      row?.type ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+
+  const branchName = getBranchName(row).toLowerCase();
+
+  if (type.includes('warehouse') || type.includes('bodega')) return 'Bodega';
+  if (branchName.includes('bodega')) return 'Bodega';
+
+  return 'Sede';
+}
+
 function getVariantSize(row) {
   return row?.variant?.size || row?.size || '—';
 }
@@ -179,19 +335,93 @@ function getAvailableStock(row) {
   return stock - reservedStock;
 }
 
+function getLowStockLimit(row) {
+  const reorderPoint = Number(
+    row?.reorderPoint ||
+      row?.product?.reorderPoint ||
+      row?.productSnapshot?.reorderPoint ||
+      LOW_STOCK_LIMIT
+  );
+
+  return Number.isFinite(reorderPoint) && reorderPoint > 0
+    ? reorderPoint
+    : LOW_STOCK_LIMIT;
+}
+
+function getStockStatus(row) {
+  const availableStock = Number(getAvailableStock(row) || 0);
+  const lowStockLimit = getLowStockLimit(row);
+
+  if (availableStock <= 0) {
+    return {
+      label: 'Sin stock',
+      style: styles.outStockBadge,
+    };
+  }
+
+  if (availableStock <= lowStockLimit) {
+    return {
+      label: 'Bajo stock',
+      style: styles.lowStockBadge,
+    };
+  }
+
+  return {
+    label: 'Disponible',
+    style: styles.goodStockBadge,
+  };
+}
+
+function matchesStockFilter(row, stockFilter) {
+  const availableStock = Number(getAvailableStock(row) || 0);
+  const lowStockLimit = getLowStockLimit(row);
+
+  if (stockFilter === 'withStock') {
+    return availableStock > 0;
+  }
+
+  if (stockFilter === 'withoutStock') {
+    return availableStock <= 0;
+  }
+
+  if (stockFilter === 'lowStock') {
+    return availableStock > 0 && availableStock <= lowStockLimit;
+  }
+
+  return true;
+}
+
+function getBranchesFromResponse(response) {
+  const data = response?.data;
+
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.branches)) return data.branches;
+  if (Array.isArray(data?.data?.branches)) return data.data.branches;
+  if (Array.isArray(data?.data?.data)) return data.data.data;
+
+  return [];
+}
+
 export default function InventoryAdmin() {
   const [stockRows, setStockRows] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [branchesWarning, setBranchesWarning] = useState('');
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [stockFilter, setStockFilter] = useState('all');
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [initialTransferStockRow, setInitialTransferStockRow] = useState(null);
   const [movementsModalRow, setMovementsModalRow] = useState(null);
 
   const loadInventory = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
+      setBranchesWarning('');
 
       const [stockRes, movementsRes] = await Promise.all([
         api.get('/api/admin/inventory/stock'),
@@ -208,6 +438,24 @@ export default function InventoryAdmin() {
 
       setStockRows(stockData);
       setMovements(movementsData);
+
+      try {
+        const branchesRes = await api.get('/api/admin/branches', {
+          params: {
+            limit: 100,
+            sort: 'name',
+          },
+        });
+
+        setBranches(getBranchesFromResponse(branchesRes));
+      } catch (branchesError) {
+        console.warn('⚠️ No se pudieron cargar todas las sedes:', branchesError);
+
+        setBranches([]);
+        setBranchesWarning(
+          'No se pudieron cargar todas las sedes. El filtro mostrará solo sedes con inventario.'
+        );
+      }
     } catch (err) {
       console.error('❌ Error cargando inventario:', err);
       setError(
@@ -224,27 +472,57 @@ export default function InventoryAdmin() {
     loadInventory();
   }, [loadInventory]);
 
+  const branchOptions = useMemo(() => {
+    const branchMap = new Map();
+
+    branches.forEach((branch) => {
+      const branchName = getBranchOptionName(branch);
+
+      if (!branchName || branchName === 'Sede sin nombre') return;
+
+      branchMap.set(branchName, branchName);
+    });
+
+    stockRows.forEach((row) => {
+      const branchName = getBranchName(row);
+
+      if (!branchName || branchName === 'Sede no definida') return;
+
+      branchMap.set(branchName, branchName);
+    });
+
+    return Array.from(branchMap.values()).sort((a, b) =>
+      a.localeCompare(b, 'es')
+    );
+  }, [branches, stockRows]);
+
   const filteredStockRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-
-    if (!term) return stockRows;
 
     return stockRows.filter((row) => {
       const productTitle = getProductTitle(row).toLowerCase();
       const productSku = getProductSku(row).toLowerCase();
-      const branchName = getBranchName(row).toLowerCase();
+      const branchName = getBranchName(row);
+      const branchNameLower = branchName.toLowerCase();
       const size = String(getVariantSize(row)).toLowerCase();
       const color = String(getVariantColor(row)).toLowerCase();
 
-      return (
+      const matchesSearch =
+        !term ||
         productTitle.includes(term) ||
         productSku.includes(term) ||
-        branchName.includes(term) ||
+        branchNameLower.includes(term) ||
         size.includes(term) ||
-        color.includes(term)
-      );
+        color.includes(term);
+
+      const matchesBranch =
+        branchFilter === 'all' || branchName === branchFilter;
+
+      const matchesStock = matchesStockFilter(row, stockFilter);
+
+      return matchesSearch && matchesBranch && matchesStock;
     });
-  }, [stockRows, searchTerm]);
+  }, [stockRows, searchTerm, branchFilter, stockFilter]);
 
   const summary = useMemo(() => {
     const productsWithStock = new Set();
@@ -278,6 +556,32 @@ export default function InventoryAdmin() {
       totalMovements: movements.length,
     };
   }, [stockRows, movements]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    branchFilter !== 'all' ||
+    stockFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setBranchFilter('all');
+    setStockFilter('all');
+  };
+
+  const openGeneralTransferModal = () => {
+    setInitialTransferStockRow(null);
+    setTransferModalOpen(true);
+  };
+
+  const openTransferFromCard = (row) => {
+    setInitialTransferStockRow(row);
+    setTransferModalOpen(true);
+  };
+
+  const closeTransferModal = () => {
+    setTransferModalOpen(false);
+    setInitialTransferStockRow(null);
+  };
 
   return (
     <section className="space-y-6" style={styles.pageText}>
@@ -324,6 +628,16 @@ export default function InventoryAdmin() {
               <Plus size={16} />
               Nuevo ajuste
             </button>
+
+            <button
+              type="button"
+              onClick={openGeneralTransferModal}
+              className="admin-inventory-secondary-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              style={styles.secondaryButton}
+            >
+              <ArrowRightLeft size={16} />
+              Trasladar
+            </button>
           </div>
         </div>
 
@@ -334,6 +648,16 @@ export default function InventoryAdmin() {
           >
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <p>{error}</p>
+          </div>
+        )}
+
+        {branchesWarning && !error && (
+          <div
+            className="mt-5 flex items-start gap-3 px-4 py-3 text-sm"
+            style={styles.errorBox}
+          >
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p>{branchesWarning}</p>
           </div>
         )}
       </div>
@@ -380,131 +704,278 @@ export default function InventoryAdmin() {
             </p>
           </div>
 
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar producto, SKU o sede..."
-            className="admin-inventory-search w-full px-4 py-2 text-sm transition md:max-w-sm"
-            style={styles.input}
-          />
+          <p className="text-sm font-semibold" style={styles.muted}>
+            Mostrando {formatNumber(filteredStockRows.length)} de{' '}
+            {formatNumber(stockRows.length)} registros
+          </p>
         </div>
 
-        <div className="mt-6 overflow-x-auto" style={styles.tableWrapper}>
-          <table className="min-w-full text-sm">
-            <thead
-              className="text-left text-xs font-bold uppercase tracking-wide"
-              style={styles.tableHead}
+        <div className="mt-5 p-4" style={styles.filterCard}>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto] lg:items-end">
+            <div>
+              <label
+                className="text-xs font-black uppercase tracking-wide"
+                style={styles.muted}
+              >
+                Buscar
+              </label>
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Buscar producto, SKU, sede, talla o color..."
+                className="admin-inventory-search mt-2 w-full px-4 py-3 text-sm transition"
+                style={styles.input}
+              />
+            </div>
+
+            <div>
+              <label
+                className="text-xs font-black uppercase tracking-wide"
+                style={styles.muted}
+              >
+                Sede
+              </label>
+
+              <select
+                value={branchFilter}
+                onChange={(event) => setBranchFilter(event.target.value)}
+                className="mt-2 w-full px-4 py-3 text-sm font-semibold transition"
+                style={styles.input}
+              >
+                <option value="all">Todas las sedes</option>
+
+                {branchOptions.map((branchName) => (
+                  <option key={branchName} value={branchName}>
+                    {branchName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                className="text-xs font-black uppercase tracking-wide"
+                style={styles.muted}
+              >
+                Estado de stock
+              </label>
+
+              <select
+                value={stockFilter}
+                onChange={(event) => setStockFilter(event.target.value)}
+                className="mt-2 w-full px-4 py-3 text-sm font-semibold transition"
+                style={styles.input}
+              >
+                {STOCK_FILTERS.map((filter) => (
+                  <option key={filter.value} value={filter.value}>
+                    {filter.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="admin-inventory-soft-button inline-flex items-center justify-center px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
+              style={styles.softButton}
             >
-              <tr>
-                <th className="px-4 py-3">Producto</th>
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3">Sede</th>
-                <th className="px-4 py-3">Talla</th>
-                <th className="px-4 py-3">Color</th>
-                <th className="px-4 py-3">Stock</th>
-                <th className="px-4 py-3">Disponible</th>
-                <th className="px-4 py-3">Acciones</th>
-              </tr>
-            </thead>
+              Limpiar filtros
+            </button>
+          </div>
 
-            <tbody style={styles.tableBody}>
-              {loading && (
-                <tr style={styles.tableRow}>
-                  <td
-                    colSpan="8"
-                    className="px-4 py-10 text-center"
-                    style={styles.muted}
+          <p className="mt-3 text-xs leading-5" style={styles.muted}>
+            Bajo stock se calcula con el punto de reorden del producto si existe.
+            Si no existe, se toma como referencia {LOW_STOCK_LIMIT} unidades disponibles.
+          </p>
+        </div>
+
+        <div className="mt-6" style={styles.inventoryList}>
+          <div className="px-5 py-4" style={styles.listHeader}>
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <p className="text-xs font-black uppercase tracking-[0.18em]">
+                Fichas de inventario
+              </p>
+
+              <p className="text-xs font-semibold opacity-80">
+                Producto → ubicación → variante → cantidades → historial
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 p-4">
+            {loading && (
+              <div className="px-4 py-12 text-center text-sm" style={styles.muted}>
+                Cargando inventario...
+              </div>
+            )}
+
+            {!loading && filteredStockRows.length === 0 && (
+              <div className="px-4 py-12 text-center text-sm" style={styles.muted}>
+                No hay registros de inventario para mostrar.
+              </div>
+            )}
+
+            {!loading &&
+              filteredStockRows.map((row) => {
+                const color = getVariantColor(row);
+                const stockStatus = getStockStatus(row);
+                const availableStock = Number(getAvailableStock(row) || 0);
+                const canTransferFromCard = availableStock > 0;
+
+                return (
+                  <article
+                    key={row?._id}
+                    className="admin-inventory-readable-card p-4 transition md:p-5"
+                    style={styles.inventoryCard}
                   >
-                    Cargando inventario...
-                  </td>
-                </tr>
-              )}
-
-              {!loading && filteredStockRows.length === 0 && (
-                <tr style={styles.tableRow}>
-                  <td
-                    colSpan="8"
-                    className="px-4 py-10 text-center"
-                    style={styles.muted}
-                  >
-                    No hay registros de inventario para mostrar.
-                  </td>
-                </tr>
-              )}
-
-              {!loading &&
-                filteredStockRows.map((row) => {
-                  const color = getVariantColor(row);
-
-                  return (
-                    <tr
-                      key={row?._id}
-                      className="admin-inventory-table-row"
-                      style={styles.tableRow}
-                    >
-                      <td className="px-4 py-4 font-semibold" style={styles.title}>
-                        {getProductTitle(row)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className="px-2 py-1 text-xs font-semibold"
-                          style={styles.skuBadge}
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div
+                          className="flex h-12 w-12 shrink-0 items-center justify-center"
+                          style={styles.productIconBox}
                         >
-                          {getProductSku(row)}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4">
-                        {getBranchName(row)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        {getVariantSize(row)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          {isHexColor(color) && (
-                            <span
-                              className="h-4 w-4 rounded-full"
-                              style={{
-                                backgroundColor: color,
-                                border: '1px solid var(--admin-table-border)',
-                              }}
-                            />
-                          )}
-                          <span>{color}</span>
+                          <Boxes size={21} />
                         </div>
-                      </td>
 
-                      <td className="px-4 py-4 font-bold" style={styles.title}>
-                        {formatNumber(row?.stock)}
-                      </td>
+                        <div className="min-w-0">
+                          <p
+                            className="text-lg font-black leading-6"
+                            style={styles.title}
+                          >
+                            {getProductTitle(row)}
+                          </p>
 
-                      <td
-                        className="px-4 py-4 font-bold"
-                        style={{ color: 'var(--admin-primary)' }}
-                      >
-                        {formatNumber(getAvailableStock(row))}
-                      </td>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span
+                              className="inline-flex items-center px-3 py-1 text-xs font-black"
+                              style={styles.skuBadge}
+                            >
+                              SKU: {getProductSku(row)}
+                            </span>
 
-                      <td className="px-4 py-4">
+                            <span
+                              className="inline-flex items-center px-3 py-1 text-xs font-black"
+                              style={stockStatus.style}
+                            >
+                              {stockStatus.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => openTransferFromCard(row)}
+                          disabled={!canTransferFromCard}
+                          className="admin-inventory-card-soft-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          style={styles.cardSoftActionButton}
+                          title={
+                            canTransferFromCard
+                              ? 'Trasladar este inventario'
+                              : 'No hay stock disponible para trasladar'
+                          }
+                        >
+                          <ArrowRightLeft size={15} />
+                          Trasladar desde aquí
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => setMovementsModalRow(row)}
-                          className="admin-inventory-action-button px-3 py-1.5 text-xs font-semibold transition"
+                          className="admin-inventory-action-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition sm:w-auto"
                           style={styles.actionButton}
                         >
+                          <ArrowRightLeft size={15} />
                           Ver movimientos
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]">
+                      <InfoBlock
+                        icon={<Warehouse size={17} />}
+                        label="Ubicación"
+                        title={getBranchName(row)}
+                      >
+                        <span
+                          className="inline-flex w-fit items-center px-3 py-1 text-xs font-black"
+                          style={styles.branchBadge}
+                        >
+                          {getBranchType(row)}
+                        </span>
+                      </InfoBlock>
+
+                      <InfoBlock
+                        icon={<Ruler size={17} />}
+                        label="Variante"
+                        title="Talla y color"
+                      >
+                        <div className="flex flex-wrap gap-2">
+                          <span
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black"
+                            style={styles.valuePill}
+                          >
+                            <Ruler size={13} style={styles.icon} />
+                            Talla {getVariantSize(row)}
+                          </span>
+
+                          <span
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black"
+                            style={styles.valuePill}
+                          >
+                            {isHexColor(color) ? (
+                              <span
+                                className="h-4 w-4 rounded-full"
+                                style={{
+                                  backgroundColor: color,
+                                  border: '1px solid var(--admin-table-border)',
+                                }}
+                              />
+                            ) : (
+                              <Palette size={13} style={styles.icon} />
+                            )}
+                            {color}
+                          </span>
+                        </div>
+                      </InfoBlock>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="px-4 py-4" style={styles.stockBox}>
+                          <p
+                            className="text-[10px] font-black uppercase tracking-wide"
+                            style={styles.muted}
+                          >
+                            Stock físico
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black" style={styles.title}>
+                            {formatNumber(row?.stock)}
+                          </p>
+                        </div>
+
+                        <div className="px-4 py-4" style={styles.availableBox}>
+                          <p
+                            className="text-[10px] font-black uppercase tracking-wide"
+                            style={styles.muted}
+                          >
+                            Disponible
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black" style={styles.title}>
+                            {formatNumber(availableStock)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
         </div>
       </div>
 
@@ -512,6 +983,14 @@ export default function InventoryAdmin() {
         open={adjustmentModalOpen}
         onClose={() => setAdjustmentModalOpen(false)}
         stockRows={stockRows}
+        onSaved={loadInventory}
+      />
+
+      <InventoryTransferModal
+        open={transferModalOpen}
+        onClose={closeTransferModal}
+        stockRows={stockRows}
+        initialStockRow={initialTransferStockRow}
         onSaved={loadInventory}
       />
 
@@ -531,12 +1010,21 @@ export default function InventoryAdmin() {
             border-color: var(--admin-button-hover) !important;
           }
 
-          .admin-inventory-table-row:hover {
-            background: var(--admin-table-row-hover) !important;
+          .admin-inventory-card-soft-button:hover:not(:disabled) {
+            background: var(--admin-primary-soft-hover) !important;
+          }
+
+          .admin-inventory-soft-button:hover {
+            background: var(--admin-primary-soft-hover) !important;
           }
 
           .admin-inventory-search::placeholder {
             color: var(--admin-input-placeholder);
+          }
+
+          .admin-inventory-readable-card:hover {
+            background: linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 82%, var(--admin-primary) 18%), var(--admin-card-bg)) !important;
+            transform: translateY(-1px);
           }
         `}
       </style>
@@ -565,5 +1053,35 @@ function SummaryCard({ label, value, description, icon }) {
         {description}
       </p>
     </article>
+  );
+}
+
+function InfoBlock({ icon, label, title, children }) {
+  return (
+    <div className="p-4" style={styles.sectionBlock}>
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center"
+          style={styles.sectionIconBox}
+        >
+          {icon}
+        </div>
+
+        <div className="min-w-0">
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.14em]"
+            style={styles.muted}
+          >
+            {label}
+          </p>
+
+          <p className="mt-1 text-sm font-black leading-5" style={styles.title}>
+            {title}
+          </p>
+
+          {children && <div className="mt-3">{children}</div>}
+        </div>
+      </div>
+    </div>
   );
 }

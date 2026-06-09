@@ -24,6 +24,10 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
+const {
+  createInventoryReservation,
+  expireInventoryReservations,
+} = require('../services/inventoryReservationService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -1791,20 +1795,20 @@ router.post('/', rateLimit, async (req, res) => {
     console.error('Idempotency lookup error:', err);
   }
 
-  const check = await dryRunCheck(cleaned.cart);
-
-  if (!check.ok) {
-    return res.status(409).json({
-      error: 'No hay stock suficiente para uno o más artículos.',
-      code: 'NO_STOCK',
-      details: check.details,
-    });
+    try {
+    await expireInventoryReservations({ limit: 25 });
+  } catch (expirationError) {
+    console.warn(
+      '⚠️ No se pudieron liberar reservas vencidas antes de crear la orden:',
+      expirationError.message
+    );
   }
 
   const session = await mongoose.startSession();
 
   try {
     let created;
+    let inventoryReservation = null;
 
     await session.withTransaction(async () => {
       if (idempoKey) {
@@ -1836,7 +1840,7 @@ router.post('/', rateLimit, async (req, res) => {
 
       if (created) return;
 
-      await decrementStock(cleaned.cart, { session });
+      
 
       const orderNumber = await getNextOrderNumber({ session });
       const settings = await SiteSettings.findOne().session(session).lean();
@@ -1929,12 +1933,52 @@ router.post('/', rateLimit, async (req, res) => {
         createdByAdminSnapshot,
 
         source: orderSource,
+
+        inventoryControl: {
+          discountedAtCheckout: false,
+          restockedOnFailure: false,
+          restockedAt: null,
+        },
       };
 
       base.status = base.status || 'pending';
 
       created = await Order.create([{ ...base }], { session });
       created = created[0];
+
+      inventoryReservation = await createInventoryReservation(
+        {
+          sessionId: cleaned.sessionId,
+          order: created._id,
+          orderNumber: created.orderNumber,
+          paymentReference:
+            req.body?.paymentReference ||
+            req.body?.payment?.reference ||
+            req.body?.payment?.transactionId ||
+            '',
+          paymentTransactionId:
+            req.body?.paymentTransactionId ||
+            req.body?.payment?.transactionId ||
+            '',
+          source: 'checkout',
+          items: cleaned.cart,
+          branchPriorityIds: orderBranchData.branchId
+            ? [String(orderBranchData.branchId)]
+            : [],
+          expiresInMinutes: 20,
+          currency: cleaned.payment?.currency || 'COP',
+          metadata: {
+            orderSource,
+            idempotencyKey: idempoKey || '',
+            orderBranch: orderBranchData.branchId
+              ? String(orderBranchData.branchId)
+              : '',
+            orderBranchSnapshot: orderBranchData.branchSnapshot,
+          },
+          notes: 'Reserva automática creada al generar la orden online.',
+        },
+        { session }
+      );
 
       await OrderEvent.create(
         [
@@ -1948,6 +1992,10 @@ router.post('/', rateLimit, async (req, res) => {
               branch: orderBranchData.branchId,
               branchSnapshot: orderBranchData.branchSnapshot,
               source: orderSource,
+              reservationId: inventoryReservation?._id || null,
+              reservationCode: inventoryReservation?.reservationCode || '',
+              reservationStatus: inventoryReservation?.status || '',
+              reservationExpiresAt: inventoryReservation?.expiresAt || null,
               by: createdByAdminSnapshot.username || 'system',
             },
           },
@@ -1978,6 +2026,9 @@ router.post('/', rateLimit, async (req, res) => {
               response: {
                 _id: created._id,
                 orderNumber: created.orderNumber,
+                reservationId: inventoryReservation?._id || null,
+                reservationCode: inventoryReservation?.reservationCode || '',
+                
               },
               completedAt: new Date(),
             },
@@ -1993,9 +2044,13 @@ router.post('/', rateLimit, async (req, res) => {
       return res.status(statusCode).json({
         _id: created._id,
         orderNumber: created.orderNumber,
+        reservationId: inventoryReservation?._id || null,
+        reservationCode: inventoryReservation?.reservationCode || '',
+        reservationStatus: inventoryReservation?.status || '',
+        reservationExpiresAt: inventoryReservation?.expiresAt || null,
         ...(created.idempotent || created.reused
           ? { idempotent: true, reused: true }
-          : {}),
+          : {}),     
       });
     }
 
@@ -2036,6 +2091,36 @@ router.post('/', rateLimit, async (req, res) => {
     }
 
     const code = String(error?.code || '');
+    if (code === 'INSUFFICIENT_STOCK') {
+      return res.status(error.statusCode || 409).json({
+        error: 'No hay inventario suficiente para completar la compra.',
+        code,
+        details: error.details || {},
+      });
+    }
+
+    if (code === 'CONCURRENT_STOCK_CHANGE') {
+      return res.status(error.statusCode || 409).json({
+        error: 'El inventario cambió mientras se intentaba reservar. Intenta nuevamente.',
+        code,
+        details: error.details || {},
+      });
+    }
+
+    if (
+      [
+        'INVALID_PRODUCT_ID',
+        'MISSING_SIZE',
+        'MISSING_COLOR',
+        'INVALID_QUANTITY',
+      ].includes(code)
+    ) {
+      return res.status(error.statusCode || 400).json({
+        error: error.message || 'Datos inválidos para reservar inventario.',
+        code,
+        details: error.details || {},
+      });
+    }
 
     if (isDuplicateOrderNumberError(error)) {
       return res.status(409).json({
