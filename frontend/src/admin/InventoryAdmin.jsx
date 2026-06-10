@@ -16,6 +16,7 @@ import {
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
 import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
+import InventoryReservationsPanel from './inventory/components/InventoryReservationsPanel';
 import InventoryTransferModal from './inventory/components/InventoryTransferModal';
 
 const LOW_STOCK_LIMIT = 5;
@@ -92,19 +93,25 @@ const styles = {
   },
 
   secondaryButton: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-button-bg)',
-    background: 'var(--admin-button-bg)',
-    color: 'var(--admin-button-text)',
-    boxShadow: '0 12px 26px color-mix(in srgb, var(--admin-primary) 22%, transparent)',
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.45) 30%)',
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 74%, #0f172a 26%), color-mix(in srgb, var(--admin-button-bg) 56%, #0f172a 44%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.30)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.52)',
   },
 
   primaryButton: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-button-bg)',
-    background: 'var(--admin-button-bg)',
-    color: 'var(--admin-button-text)',
-    boxShadow: '0 12px 26px color-mix(in srgb, var(--admin-primary) 22%, transparent)',
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.45) 30%)',
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 80%, #0f172a 20%), color-mix(in srgb, var(--admin-button-bg) 62%, #0f172a 38%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 26%, transparent), inset 0 1px 0 rgba(255,255,255,0.32)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.52)',
   },
 
   softButton: {
@@ -235,18 +242,25 @@ const styles = {
   },
 
   actionButton: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-button-bg)',
-    background: 'var(--admin-button-bg)',
-    color: 'var(--admin-button-text)',
-    boxShadow: '0 10px 22px color-mix(in srgb, var(--admin-primary) 20%, transparent)',
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.42) 30%)',
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 78%, #0f172a 22%), color-mix(in srgb, var(--admin-button-bg) 58%, #0f172a 42%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 10px 24px color-mix(in srgb, var(--admin-button-bg) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.30)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.55)',
   },
 
   cardSoftActionButton: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-button-soft-border)',
-    background: 'var(--admin-button-soft-bg)',
-    color: 'var(--admin-button-soft-text)',
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 65%, rgba(255,255,255,0.38) 35%)',
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 74%, #0f172a 26%), color-mix(in srgb, var(--admin-button-bg) 52%, #0f172a 48%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 10px 24px color-mix(in srgb, var(--admin-button-bg) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.26)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.55)',
   },
 };
 
@@ -604,12 +618,12 @@ export default function InventoryAdmin() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex w-full shrink-0 flex-nowrap items-center justify-start gap-3 overflow-visible whitespace-nowrap lg:w-auto lg:justify-end">
             <button
               type="button"
               onClick={loadInventory}
               disabled={loading}
-              className="admin-inventory-secondary-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
               style={styles.secondaryButton}
             >
               <RefreshCw
@@ -622,7 +636,7 @@ export default function InventoryAdmin() {
             <button
               type="button"
               onClick={() => setAdjustmentModalOpen(true)}
-              className="admin-inventory-primary-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
               style={styles.primaryButton}
             >
               <Plus size={16} />
@@ -632,12 +646,14 @@ export default function InventoryAdmin() {
             <button
               type="button"
               onClick={openGeneralTransferModal}
-              className="admin-inventory-secondary-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
               style={styles.secondaryButton}
             >
               <ArrowRightLeft size={16} />
               Trasladar
             </button>
+
+            <InventoryReservationsPanel />
           </div>
         </div>
 
@@ -872,7 +888,7 @@ export default function InventoryAdmin() {
                           type="button"
                           onClick={() => openTransferFromCard(row)}
                           disabled={!canTransferFromCard}
-                          className="admin-inventory-card-soft-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                          className="admin-inventory-card-soft-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed sm:w-auto"
                           style={styles.cardSoftActionButton}
                           title={
                             canTransferFromCard
@@ -1002,16 +1018,66 @@ export default function InventoryAdmin() {
 
       <style>
         {`
-          .admin-inventory-primary-button:hover,
-          .admin-inventory-secondary-button:hover,
-          .admin-inventory-action-button:hover {
-            background: var(--admin-button-hover) !important;
-            color: var(--admin-button-hover-text) !important;
-            border-color: var(--admin-button-hover) !important;
+          .admin-inventory-theme-button,
+          .admin-inventory-action-button,
+          .admin-inventory-card-soft-button {
+            position: relative;
+            overflow: hidden;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
           }
 
+          .admin-inventory-theme-button *,
+          .admin-inventory-action-button *,
+          .admin-inventory-card-soft-button * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            stroke: currentColor !important;
+          }
+
+          .admin-inventory-theme-button::before,
+          .admin-inventory-action-button::before,
+          .admin-inventory-card-soft-button::before {
+            content: '';
+            position: absolute;
+            inset: 1px auto 1px -55%;
+            width: 46%;
+            border-radius: inherit;
+            background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.50) 48%, transparent 100%);
+            transform: skewX(-18deg);
+            opacity: 0.55;
+            pointer-events: none;
+            transition: left 0.48s ease, opacity 0.25s ease;
+          }
+
+          .admin-inventory-theme-button:hover,
+          .admin-inventory-action-button:hover,
           .admin-inventory-card-soft-button:hover:not(:disabled) {
-            background: var(--admin-primary-soft-hover) !important;
+            filter: saturate(1.12) brightness(1.05);
+          }
+
+          .admin-inventory-theme-button:hover::before,
+          .admin-inventory-action-button:hover::before,
+          .admin-inventory-card-soft-button:hover:not(:disabled)::before {
+            left: 108%;
+            opacity: 0.92;
+          }
+
+          .admin-inventory-theme-button:disabled,
+          .admin-inventory-action-button:disabled,
+          .admin-inventory-card-soft-button:disabled {
+            opacity: 0.88 !important;
+            cursor: not-allowed;
+            color: rgba(255,255,255,0.92) !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.92) !important;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 28%, #0f172a 72%), color-mix(in srgb, var(--admin-button-bg) 16%, #0f172a 84%)) !important;
+            border-color: color-mix(in srgb, var(--admin-button-bg) 40%, rgba(255,255,255,0.36) 60%) !important;
+          }
+
+          .admin-inventory-theme-button:disabled::before,
+          .admin-inventory-action-button:disabled::before,
+          .admin-inventory-card-soft-button:disabled::before {
+            display: none;
           }
 
           .admin-inventory-soft-button:hover {

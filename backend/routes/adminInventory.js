@@ -8,6 +8,7 @@ const requirePermission = require('../middleware/requirePermission');
 
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
+const InventoryReservation = require('../models/InventoryReservation');
 const { createInventoryMovement, getBranchStockSummary } = require('../services/inventoryService');
 
 const router = express.Router();
@@ -67,6 +68,50 @@ function parseSort(query = {}) {
     'direction',
     'quantity',
     'postedAt',
+  ]);
+
+  let field = sort;
+  let direction = -1;
+
+  if (sort.startsWith('-')) {
+    field = sort.slice(1);
+    direction = -1;
+  }
+
+  if (sort.startsWith('+')) {
+    field = sort.slice(1);
+    direction = 1;
+  }
+
+  if (!allowedFields.has(field)) {
+    return {
+      createdAt: -1,
+    };
+  }
+
+  return {
+    [field]: direction,
+    createdAt: -1,
+  };
+}
+
+function parseReservationSort(query = {}) {
+  const sort = cleanText(query.sort || '-createdAt');
+
+  const allowedFields = new Set([
+    'createdAt',
+    'updatedAt',
+    'reservationCode',
+    'orderNumber',
+    'status',
+    'expiresAt',
+    'confirmedAt',
+    'releasedAt',
+    'expiredAt',
+    'failedAt',
+    'totalQuantity',
+    'subtotal',
+    'total',
   ]);
 
   let field = sort;
@@ -276,6 +321,108 @@ function buildMovementFilter(query = {}) {
   };
 }
 
+function buildReservationFilter(query = {}) {
+  const filter = {};
+
+  const branchId = cleanText(query.branchId || query.branch || '');
+  const productId = cleanText(query.productId || query.product || '');
+  const orderId = cleanText(query.orderId || query.order || '');
+  const orderNumber = cleanText(query.orderNumber || '');
+  const status = cleanLower(query.status || '');
+  const q = cleanText(query.q || query.search || '');
+  const expired = cleanLower(query.expired || '');
+
+  if (branchId) {
+    if (!isValidObjectId(branchId)) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'La sede enviada no es válida.',
+      };
+    }
+
+    filter['items.branch'] = toObjectId(branchId);
+  }
+
+  if (productId) {
+    if (!isValidObjectId(productId)) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'El producto enviado no es válido.',
+      };
+    }
+
+    filter['items.product'] = toObjectId(productId);
+  }
+
+  if (orderId) {
+    if (!isValidObjectId(orderId)) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'La orden enviada no es válida.',
+      };
+    }
+
+    filter.order = toObjectId(orderId);
+  }
+
+  if (orderNumber) {
+    filter.orderNumber = new RegExp(`^${escapeRegex(orderNumber)}$`, 'i');
+  }
+
+  if (status && status !== 'all') {
+    filter.status = status;
+  }
+
+  if (expired === 'true' || expired === '1') {
+    filter.status = 'pending';
+    filter.expiresAt = {
+      $lte: new Date(),
+    };
+  }
+
+  if (q) {
+    const regex = new RegExp(escapeRegex(q), 'i');
+
+    const searchFilter = {
+      $or: [
+        { reservationCode: regex },
+        { orderNumber: regex },
+        { paymentReference: regex },
+        { paymentTransactionId: regex },
+        { releaseReason: regex },
+        { notes: regex },
+        { 'items.productSnapshot.title': regex },
+        { 'items.productSnapshot.sku': regex },
+        { 'items.branchSnapshot.name': regex },
+        { 'items.branchSnapshot.code': regex },
+        { 'items.size': regex },
+        { 'items.color': regex },
+      ],
+    };
+
+    if (filter.$or) {
+      filter.$and = [
+        {
+          $or: filter.$or,
+        },
+        searchFilter,
+      ];
+
+      delete filter.$or;
+    } else {
+      Object.assign(filter, searchFilter);
+    }
+  }
+
+  return {
+    ok: true,
+    filter,
+  };
+}
+
 function requireMovementPermission(req, res, next) {
   const type = cleanLower(req.body?.type || '');
 
@@ -397,6 +544,87 @@ router.get(
     }
   }
 );
+
+/* ============================
+ * RESERVAS DE INVENTARIO
+ * GET /api/admin/inventory/reservations
+ * ============================ */
+
+router.get('/reservations', requirePermission('inventory:view'), async (req, res) => {
+  try {
+    const parsedFilter = buildReservationFilter(req.query);
+
+    if (!parsedFilter.ok) {
+      return sendError(res, parsedFilter.status, parsedFilter.message);
+    }
+
+    const { page, limit, skip } = parsePagination(req.query);
+    const sort = parseReservationSort(req.query);
+
+    const [total, reservations, statusSummary] = await Promise.all([
+      InventoryReservation.countDocuments(parsedFilter.filter),
+
+      InventoryReservation.find(parsedFilter.filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('order', 'orderNumber status total customer createdAt')
+        .populate('items.product', 'title sku image price stock')
+        .populate('items.branch', 'name code type status active')
+        .lean({ virtuals: true }),
+
+      InventoryReservation.aggregate([
+        {
+          $match: parsedFilter.filter,
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: {
+              $sum: 1,
+            },
+            totalQuantity: {
+              $sum: '$totalQuantity',
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const byStatus = statusSummary.reduce((acc, row) => {
+      const key = row?._id || 'unknown';
+
+      acc[key] = {
+        count: Number(row?.count || 0),
+        totalQuantity: Number(row?.totalQuantity || 0),
+      };
+
+      return acc;
+    }, {});
+
+    return res.json({
+      ok: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
+      summary: {
+        byStatus,
+        pending: byStatus.pending?.count || 0,
+        confirmed: byStatus.confirmed?.count || 0,
+        released: byStatus.released?.count || 0,
+        expired: byStatus.expired?.count || 0,
+        cancelled: byStatus.cancelled?.count || 0,
+        failed: byStatus.failed?.count || 0,
+      },
+      data: reservations,
+    });
+  } catch (error) {
+    console.error('❌ Error listando reservas de inventario:', error.message);
+
+    return sendError(res, 500, 'Error listando reservas de inventario.');
+  }
+});
 
 /* ============================
  * HISTORIAL DE MOVIMIENTOS
