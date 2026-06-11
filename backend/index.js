@@ -31,6 +31,7 @@ function tryRequire(relPath) {
       console.warn(`⚠️  Ruta NO encontrada, se omite: ${relPath}`);
       return null;
     }
+
     // Otros errores reales sí deben verse
     console.error(`❌ Error al cargar ${relPath}:`, e.message);
     return null;
@@ -102,6 +103,9 @@ const geoRoutes = tryRequire('./routes/geo'); // opcional
 const OrderModel = tryRequire('./models/Order');
 const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
 const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
+
+// ✅ SERVICIO DE RESERVAS DE INVENTARIO
+const inventoryReservationService = tryRequire('./services/inventoryReservationService');
 
 // ✅ RUTAS ADMIN
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
@@ -202,6 +206,105 @@ if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);
 
 /* ---------------------------------------------
+ * Job automático: expiración de reservas
+ * -------------------------------------------
+ * Este proceso:
+ * - busca reservas pending vencidas
+ * - libera reservedStock
+ * - marca la reserva como expired
+ * - NO descuenta stock físico
+ *
+ * Variables opcionales .env:
+ * INVENTORY_RESERVATION_EXPIRATION_ENABLED=true
+ * INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS=60000
+ * INVENTORY_RESERVATION_EXPIRATION_LIMIT=50
+ * ------------------------------------------- */
+const INVENTORY_RESERVATION_EXPIRATION_ENABLED =
+  String(process.env.INVENTORY_RESERVATION_EXPIRATION_ENABLED || 'true')
+    .trim()
+    .toLowerCase() !== 'false';
+
+const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = Math.max(
+  30_000,
+  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS || 60_000)
+);
+
+const INVENTORY_RESERVATION_EXPIRATION_LIMIT = Math.max(
+  1,
+  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT || 50)
+);
+
+let inventoryReservationExpirationTimer = null;
+let inventoryReservationExpirationRunning = false;
+
+function startInventoryReservationExpirationJob() {
+  if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
+    console.log('ℹ️ Job de expiración de reservas desactivado por configuración.');
+    return;
+  }
+
+  const expireInventoryReservations =
+    inventoryReservationService?.expireInventoryReservations;
+
+  if (typeof expireInventoryReservations !== 'function') {
+    console.warn(
+      '⚠️ No se inició el job de expiración: expireInventoryReservations no está disponible.'
+    );
+    return;
+  }
+
+  if (inventoryReservationExpirationTimer) {
+    console.log('ℹ️ Job de expiración de reservas ya estaba iniciado.');
+    return;
+  }
+
+  const runExpiration = async () => {
+    if (inventoryReservationExpirationRunning) return;
+
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️ Job de reservas omitido: MongoDB no está conectado.');
+      return;
+    }
+
+    inventoryReservationExpirationRunning = true;
+
+    try {
+      const result = await expireInventoryReservations({
+        limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
+      });
+
+      const expiredCount = Number(result?.count || 0);
+
+      if (expiredCount > 0) {
+        console.log(`⏱️ Reservas vencidas liberadas automáticamente: ${expiredCount}`);
+      }
+    } catch (error) {
+      console.error('❌ Error expirando reservas de inventario:', error.message);
+    } finally {
+      inventoryReservationExpirationRunning = false;
+    }
+  };
+
+  // Primera ejecución corta después de conectar.
+  setTimeout(runExpiration, 5_000);
+
+  inventoryReservationExpirationTimer = setInterval(
+    runExpiration,
+    INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS
+  );
+
+  if (typeof inventoryReservationExpirationTimer.unref === 'function') {
+    inventoryReservationExpirationTimer.unref();
+  }
+
+  console.log(
+    `✅ Job de expiración de reservas iniciado cada ${Math.round(
+      INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
+    )} segundos. Límite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
+  );
+}
+
+/* ---------------------------------------------
  * Ruta de salud
  * ------------------------------------------- */
 app.get('/', (_req, res) => {
@@ -215,6 +318,9 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ Conectado a MongoDB Atlas');
+
+    // ✅ Se inicia solo después de conectar correctamente a MongoDB.
+    startInventoryReservationExpirationJob();
   })
   .catch((error) => {
     console.error('❌ Error al conectar MongoDB:', error.message);

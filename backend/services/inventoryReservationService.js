@@ -8,7 +8,12 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 
-const DEFAULT_RESERVATION_MINUTES = 20;
+const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
+
+const DEFAULT_RESERVATION_MINUTES =
+  Number.isFinite(RAW_DEFAULT_RESERVATION_MINUTES) && RAW_DEFAULT_RESERVATION_MINUTES > 0
+    ? RAW_DEFAULT_RESERVATION_MINUTES
+    : 30;
 
 function createServiceError(message, code, details = {}, statusCode = 400) {
   const error = new Error(message);
@@ -714,9 +719,12 @@ async function createInventoryReservation({
   notes = '',
 } = {}, options = {}) {
   return withTransaction(async (session) => {
-    const expiresAt = new Date(
-      Date.now() + Number(expiresInMinutes || DEFAULT_RESERVATION_MINUTES) * 60 * 1000
-    );
+    const safeExpiresInMinutes =
+      Number.isFinite(Number(expiresInMinutes)) && Number(expiresInMinutes) > 0
+        ? Number(expiresInMinutes)
+        : DEFAULT_RESERVATION_MINUTES;
+
+    const expiresAt = new Date(Date.now() + safeExpiresInMinutes * 60 * 1000);
 
     const { reservationItems, usedBranchIds } = await allocateReservationItems({
       items,
