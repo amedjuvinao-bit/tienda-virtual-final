@@ -4,7 +4,7 @@ import DashboardKpiCard from './DashboardKpiCard';
 
 export default function DashboardKpiGrid({ items = [] }) {
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <section className="grid gap-3 lg:grid-cols-5">
       {items.map((item) => (
         <DashboardKpiCard key={item.id} item={item} />
       ))}
