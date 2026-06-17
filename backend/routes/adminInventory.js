@@ -872,6 +872,130 @@ function parseAlertsLimit(query = {}) {
   return Math.min(Math.floor(rawLimit), 100);
 }
 
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) return '';
+
+  const stringValue = String(value)
+    .replace(/\r?\n|\r/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (
+    stringValue.includes(',') ||
+    stringValue.includes('"') ||
+    stringValue.includes(';')
+  ) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  return stringValue;
+}
+
+function getInventoryExportStatus(row = {}) {
+  const availableStock = getAvailableStockForAlert(row);
+  const lowStockLimit = getLowStockLimitForAlert(row);
+
+  if (availableStock <= 0) return 'Agotado';
+  if (availableStock <= lowStockLimit) return 'Bajo stock';
+
+  return 'Disponible';
+}
+
+function getInventoryExportRows(rows = []) {
+  return rows.map((row) => {
+    const physicalStock = Number(row?.stock || 0);
+    const reservedStock = Number(row?.reservedStock || 0);
+    const availableStock = getAvailableStockForAlert(row);
+    const lowStockLimit = getLowStockLimitForAlert(row);
+    const updatedAt = row?.updatedAt
+      ? new Date(row.updatedAt).toISOString()
+      : '';
+
+    return {
+      producto: cleanText(row?.product?.title || row?.productSnapshot?.title || ''),
+      sku: cleanText(row?.product?.sku || row?.productSnapshot?.sku || row?.variant?.sku || ''),
+      sede: cleanText(row?.branch?.name || row?.branchSnapshot?.name || ''),
+      codigoSede: cleanText(row?.branch?.code || row?.branchSnapshot?.code || ''),
+      tipoSede: cleanText(row?.branch?.type || row?.branchSnapshot?.type || ''),
+      talla: cleanText(row?.variant?.size || row?.size || ''),
+      color: cleanText(row?.variant?.color || row?.color || ''),
+      codigoVariante: cleanText(row?.variant?.sku || ''),
+      barcode: cleanText(row?.variant?.barcode || ''),
+      stockFisico: physicalStock,
+      reservado: reservedStock,
+      disponible: availableStock,
+      puntoMinimo: lowStockLimit,
+      estado: getInventoryExportStatus(row),
+      ubicacion: cleanText(row?.warehouseLocation || ''),
+      actualizado: updatedAt,
+    };
+  });
+}
+
+function buildInventoryCsv(rows = []) {
+  const headers = [
+    'Producto',
+    'SKU',
+    'Sede',
+    'Codigo sede',
+    'Tipo sede',
+    'Talla',
+    'Color',
+    'Codigo variante',
+    'Barcode',
+    'Stock fisico',
+    'Reservado',
+    'Disponible',
+    'Punto minimo',
+    'Estado',
+    'Ubicacion',
+    'Ultima actualizacion',
+  ];
+
+  const lines = [
+    headers.map(escapeCsvValue).join(','),
+  ];
+
+  rows.forEach((row) => {
+    lines.push(
+      [
+        row.producto,
+        row.sku,
+        row.sede,
+        row.codigoSede,
+        row.tipoSede,
+        row.talla,
+        row.color,
+        row.codigoVariante,
+        row.barcode,
+        row.stockFisico,
+        row.reservado,
+        row.disponible,
+        row.puntoMinimo,
+        row.estado,
+        row.ubicacion,
+        row.actualizado,
+      ]
+        .map(escapeCsvValue)
+        .join(',')
+    );
+  });
+
+  return `\uFEFF${lines.join('\n')}`;
+}
+
+function getExportFileName(prefix = 'inventario') {
+  const now = new Date();
+
+  const stamp = now
+    .toISOString()
+    .slice(0, 19)
+    .replace(/[-:T]/g, '');
+
+  return `${prefix}_${stamp}.csv`;
+}
+
+
 /* ============================
  * PROTECCIÓN GENERAL
  * ============================ */
@@ -944,6 +1068,49 @@ router.get('/stock', requirePermission('inventory:view'), async (req, res) => {
     console.error('❌ Error listando stock por sede:', error.message);
 
     return sendError(res, 500, 'Error listando stock por sede.');
+  }
+});
+
+
+/* ============================
+ * EXPORTAR INVENTARIO CSV
+ * GET /api/admin/inventory/export
+ * ============================ */
+
+router.get('/export', requirePermission('inventory:view'), async (req, res) => {
+  try {
+    const parsedFilter = buildStockFilter(req.query);
+
+    if (!parsedFilter.ok) {
+      return sendError(res, parsedFilter.status, parsedFilter.message);
+    }
+
+    const rows = await InventoryStock.find(parsedFilter.filter)
+      .sort({
+        'branchSnapshot.name': 1,
+        'productSnapshot.title': 1,
+        'variant.size': 1,
+        'variant.color': 1,
+      })
+      .populate('branch', 'name code type status active')
+      .populate('product', 'title sku image price stock reorderPoint stockMin')
+      .lean({ virtuals: true });
+
+    const exportRows = getInventoryExportRows(rows);
+    const csv = buildInventoryCsv(exportRows);
+    const fileName = getExportFileName('inventario_por_sedes');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileName}"`
+    );
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error('❌ Error exportando inventario:', error.message);
+
+    return sendError(res, 500, 'Error exportando inventario.');
   }
 });
 

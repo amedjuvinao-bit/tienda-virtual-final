@@ -15,6 +15,7 @@ import {
   Warehouse,
   Ruler,
   Palette,
+  Download,
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
@@ -117,6 +118,22 @@ const styles = {
     boxShadow:
       '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 26%, transparent), inset 0 1px 0 rgba(255,255,255,0.32)',
     textShadow: '0 1px 8px rgba(0,0,0,0.52)',
+  },
+
+  exportButtonSmall: {
+    position: 'absolute',
+    top: '18px',
+    right: '18px',
+    width: '42px',
+    height: '42px',
+    borderRadius: '14px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 55%, rgba(255,255,255,0.55) 45%)',
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 72%, #0f172a 28%), color-mix(in srgb, var(--admin-button-bg) 52%, #0f172a 48%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.28)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.50)',
   },
 
   softButton: {
@@ -600,6 +617,49 @@ export default function InventoryAdmin() {
     branchFilter !== 'all' ||
     stockFilter !== 'all';
 
+    const exportInventoryCsv = useCallback(async () => {
+    try {
+      setError('');
+
+      const response = await api.get('/api/admin/inventory/export', {
+        responseType: 'blob',
+        params: {
+          q: searchTerm.trim() || undefined,
+          branchId: undefined,
+        },
+      });
+
+      const blob = new Blob([response.data], {
+        type: response.headers?.['content-type'] || 'text/csv;charset=utf-8',
+      });
+
+      const disposition = response.headers?.['content-disposition'] || '';
+      const fileNameMatch = disposition.match(/filename="(.+)"/i);
+
+      const fileName =
+        fileNameMatch?.[1] || `inventario_por_sedes_${Date.now()}.csv`;
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('❌ Error exportando inventario CSV:', err);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.userMessage ||
+          'No se pudo exportar el inventario.'
+      );
+    }
+  }, [searchTerm]);
+
   const clearFilters = () => {
     setSearchTerm('');
     setBranchFilter('all');
@@ -623,7 +683,9 @@ export default function InventoryAdmin() {
 
   return (
     <section className="space-y-6" style={styles.pageText}>
-      <div className="p-6 backdrop-blur" style={styles.headerCard}>
+       
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"></div>
+      <div className="relative p-6 backdrop-blur" style={styles.headerCard}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p
@@ -711,6 +773,16 @@ export default function InventoryAdmin() {
           </div>
         )}
       </div>
+      <button
+        type="button"
+        onClick={exportInventoryCsv}
+        className="inline-flex items-center justify-center transition hover:-translate-y-0.5"
+        style={styles.exportButtonSmall}
+        title="Exportar inventario CSV"
+        aria-label="Exportar inventario CSV"
+      >
+        <Download size={18} />
+      </button>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
