@@ -22,51 +22,59 @@ const iconMap = {
 export default function DashboardKpiCard({ item = {} }) {
   const Icon = iconMap[item?.icon] || Package;
   const isWarning = item?.trendType === 'warning';
-  const trendLabel = isWarning ? 'Atención' : item?.trend;
 
   return (
-    <article className="group relative min-h-[118px] overflow-hidden p-[1px]" style={styles.kpiFrame}>
-      <div className="relative h-full overflow-hidden rounded-[25px] px-4 py-4" style={styles.kpiGlass}>
-        <span className="pointer-events-none absolute inset-x-6 top-0 h-px" style={styles.kpiTopLight} />
-        <span className="pointer-events-none absolute -left-14 -top-16 h-40 w-24 rotate-[28deg]" style={styles.kpiShine} />
-        <span className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full" style={styles.kpiGlow} />
+    <article
+      className="relative min-h-[154px] w-[430px] shrink-0 overflow-hidden p-[2px] sm:w-[455px] lg:w-[470px]"
+      style={styles.kpiFrame}
+    >
+      <div className="relative h-full overflow-hidden rounded-[31px] px-8 py-7" style={styles.kpiGlass}>
+        <span className="pointer-events-none absolute inset-x-8 top-[5px] h-px" style={styles.kpiTopLight} />
+        <span className="pointer-events-none absolute -right-10 -top-28 h-[240px] w-[92px] rotate-[39deg]" style={styles.kpiShine} />
+        <span className="pointer-events-none absolute inset-0 rounded-[31px]" style={styles.kpiInnerBorder} />
 
-        <div className="relative z-10 flex h-full flex-col justify-between gap-3">
-          <div className="flex items-start justify-between gap-3">
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px]"
-              style={isWarning ? styles.warningIcon : styles.kpiIcon}
-            >
-              <Icon size={20} strokeWidth={2.4} />
-            </span>
+        <div className="relative z-10 flex h-full gap-7">
+          <span
+            className="mt-1 flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-[24px]"
+            style={isWarning ? styles.warningIcon : styles.kpiIcon}
+          >
+            <Icon size={42} strokeWidth={2.15} />
+          </span>
 
-            {trendLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black leading-none"
-                style={isWarning ? styles.kpiWarningPill : styles.kpiTrendPill}
+          <div className="flex min-w-0 flex-1 flex-col justify-between pt-1">
+            <div className="min-w-0">
+              <p className="truncate text-[23px] font-black leading-7 tracking-[-0.02em]" style={styles.title}>
+                {item?.title}
+              </p>
+
+              <p
+                className="mt-5 truncate text-[39px] font-black leading-none tracking-[-0.04em]"
+                style={styles.title}
+                title={item?.value}
               >
-                {isWarning ? <AlertTriangle size={12} /> : <TrendingUp size={12} />}
-                {trendLabel}
+                {item?.value}
+              </p>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-2 text-[18px] font-black leading-6">
+              {isWarning ? (
+                <>
+                  <AlertTriangle size={20} strokeWidth={2.6} style={styles.kpiWarningMark} />
+                  <span style={styles.kpiWarningText}>Atención</span>
+                </>
+              ) : (
+                item?.trend && (
+                  <>
+                    <TrendingUp size={20} strokeWidth={2.8} style={styles.kpiTrendArrow} />
+                    <span style={styles.kpiTrendText}>{item.trend}</span>
+                  </>
+                )
+              )}
+
+              <span className="min-w-0 truncate font-extrabold" style={styles.kpiHelperText} title={item?.helper}>
+                {item?.helper}
               </span>
-            ) : null}
-          </div>
-
-          <div className="relative z-10 min-w-0">
-            <p className="text-[12px] font-black leading-4 tracking-[0.01em]" style={styles.muted}>
-              {item?.title}
-            </p>
-
-            <p
-              className="mt-1 truncate text-[24px] font-black leading-none tracking-tight sm:text-[22px] xl:text-[24px]"
-              style={styles.title}
-              title={item?.value}
-            >
-              {item?.value}
-            </p>
-
-            <p className="mt-2 truncate text-[11px] font-bold leading-4" style={styles.muted} title={item?.helper}>
-              {item?.helper}
-            </p>
+            </div>
           </div>
         </div>
       </div>
