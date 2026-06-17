@@ -19,99 +19,56 @@ const iconMap = {
   product: Package,
 };
 
-function getSparklinePath(values = []) {
-  if (!Array.isArray(values) || values.length === 0) return '';
-
-  const width = 118;
-  const height = 30;
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-
-  return values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-}
-
-function getSparklineAreaPath(values = []) {
-  const path = getSparklinePath(values);
-  if (!path) return '';
-  return `${path} L 118 30 L 0 30 Z`;
-}
-
-export default function DashboardKpiCard({ item }) {
+export default function DashboardKpiCard({ item = {} }) {
   const Icon = iconMap[item?.icon] || Package;
-  const hasSparkline = Array.isArray(item?.sparkline) && item.sparkline.length > 0;
   const isWarning = item?.trendType === 'warning';
+  const trendLabel = isWarning ? 'Atención' : item?.trend;
 
   return (
-    <article className="relative min-h-[116px] overflow-hidden p-4" style={styles.compactCard}>
-      <div className="relative z-10 grid h-full grid-rows-[auto_1fr_auto] gap-2">
-        <div className="flex items-start gap-3">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center"
-            style={isWarning ? styles.warningIcon : styles.kpiIcon}
-          >
-            <Icon size={19} />
-          </span>
+    <article className="group relative min-h-[118px] overflow-hidden p-[1px]" style={styles.kpiFrame}>
+      <div className="relative h-full overflow-hidden rounded-[25px] px-4 py-4" style={styles.kpiGlass}>
+        <span className="pointer-events-none absolute inset-x-6 top-0 h-px" style={styles.kpiTopLight} />
+        <span className="pointer-events-none absolute -left-14 -top-16 h-40 w-24 rotate-[28deg]" style={styles.kpiShine} />
+        <span className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full" style={styles.kpiGlow} />
 
-          <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-black leading-4" style={styles.title}>
+        <div className="relative z-10 flex h-full flex-col justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px]"
+              style={isWarning ? styles.warningIcon : styles.kpiIcon}
+            >
+              <Icon size={20} strokeWidth={2.4} />
+            </span>
+
+            {trendLabel ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black leading-none"
+                style={isWarning ? styles.kpiWarningPill : styles.kpiTrendPill}
+              >
+                {isWarning ? <AlertTriangle size={12} /> : <TrendingUp size={12} />}
+                {trendLabel}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="relative z-10 min-w-0">
+            <p className="text-[12px] font-black leading-4 tracking-[0.01em]" style={styles.muted}>
               {item?.title}
             </p>
 
             <p
-              className="mt-1 whitespace-nowrap text-[20px] font-black leading-none tracking-tight"
+              className="mt-1 truncate text-[24px] font-black leading-none tracking-tight sm:text-[22px] xl:text-[24px]"
               style={styles.title}
               title={item?.value}
             >
               {item?.value}
             </p>
+
+            <p className="mt-2 truncate text-[11px] font-bold leading-4" style={styles.muted} title={item?.helper}>
+              {item?.helper}
+            </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5 text-[11px] font-black leading-4">
-          {item?.trend && (
-            <span className="inline-flex shrink-0 items-center gap-1 text-emerald-600">
-              <TrendingUp size={12} />
-              {item.trend}
-            </span>
-          )}
-
-          <span className="min-w-0" style={styles.muted}>
-            {item?.helper}
-          </span>
-        </div>
-
-        {hasSparkline ? (
-          <svg viewBox="0 0 118 30" className="h-[30px] w-full" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id={`kpi-fill-${item.id}`} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="var(--admin-primary)" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="var(--admin-primary)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            <path d={getSparklineAreaPath(item.sparkline)} fill={`url(#kpi-fill-${item.id})`} />
-            <path
-              d={getSparklinePath(item.sparkline)}
-              fill="none"
-              stroke="var(--admin-primary)"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : (
-          <div className="inline-flex items-center gap-2 text-[12px] font-black text-rose-700">
-            <AlertTriangle size={14} />
-            Requieren atención
-          </div>
-        )}
       </div>
     </article>
   );
