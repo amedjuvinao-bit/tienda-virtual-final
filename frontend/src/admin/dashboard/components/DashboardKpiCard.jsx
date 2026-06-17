@@ -24,31 +24,28 @@ export default function DashboardKpiCard({ item = {} }) {
   const isWarning = item?.trendType === 'warning';
 
   return (
-    <article
-      className="relative min-h-[154px] w-[430px] shrink-0 overflow-hidden p-[2px] sm:w-[455px] lg:w-[470px]"
-      style={styles.kpiFrame}
-    >
-      <div className="relative h-full overflow-hidden rounded-[31px] px-8 py-7" style={styles.kpiGlass}>
-        <span className="pointer-events-none absolute inset-x-8 top-[5px] h-px" style={styles.kpiTopLight} />
-        <span className="pointer-events-none absolute -right-10 -top-28 h-[240px] w-[92px] rotate-[39deg]" style={styles.kpiShine} />
-        <span className="pointer-events-none absolute inset-0 rounded-[31px]" style={styles.kpiInnerBorder} />
+    <article className="relative min-h-[116px] overflow-hidden p-[1px]" style={styles.kpiFrame}>
+      <div className="relative h-full overflow-hidden rounded-[23px] px-4 py-4" style={styles.kpiGlass}>
+        <span className="pointer-events-none absolute inset-x-5 top-[3px] h-px" style={styles.kpiTopLight} />
+        <span className="pointer-events-none absolute -right-8 -top-14 h-[170px] w-[54px] rotate-[38deg]" style={styles.kpiShine} />
+        <span className="pointer-events-none absolute inset-0 rounded-[23px]" style={styles.kpiInnerBorder} />
 
-        <div className="relative z-10 flex h-full gap-7">
+        <div className="relative z-10 flex h-full gap-3.5">
           <span
-            className="mt-1 flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-[24px]"
+            className="mt-1 flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[17px]"
             style={isWarning ? styles.warningIcon : styles.kpiIcon}
           >
-            <Icon size={42} strokeWidth={2.15} />
+            <Icon size={27} strokeWidth={2.2} />
           </span>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-between pt-1">
+          <div className="flex min-w-0 flex-1 flex-col justify-between pt-0.5">
             <div className="min-w-0">
-              <p className="truncate text-[23px] font-black leading-7 tracking-[-0.02em]" style={styles.title}>
+              <p className="truncate text-[12px] font-black leading-4 tracking-[-0.01em]" style={styles.title}>
                 {item?.title}
               </p>
 
               <p
-                className="mt-5 truncate text-[39px] font-black leading-none tracking-[-0.04em]"
+                className="mt-2 truncate text-[23px] font-black leading-none tracking-[-0.045em] xl:text-[22px] 2xl:text-[23px]"
                 style={styles.title}
                 title={item?.value}
               >
@@ -56,24 +53,30 @@ export default function DashboardKpiCard({ item = {} }) {
               </p>
             </div>
 
-            <div className="flex min-w-0 items-center gap-2 text-[18px] font-black leading-6">
+            <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-black leading-4">
               {isWarning ? (
                 <>
-                  <AlertTriangle size={20} strokeWidth={2.6} style={styles.kpiWarningMark} />
-                  <span style={styles.kpiWarningText}>Atención</span>
+                  <AlertTriangle size={13} strokeWidth={2.6} style={styles.kpiWarningMark} />
+                  <span className="truncate" style={styles.kpiWarningText} title={item?.helper}>
+                    {item?.helper}
+                  </span>
                 </>
               ) : (
-                item?.trend && (
-                  <>
-                    <TrendingUp size={20} strokeWidth={2.8} style={styles.kpiTrendArrow} />
-                    <span style={styles.kpiTrendText}>{item.trend}</span>
-                  </>
-                )
-              )}
+                <>
+                  {item?.trend ? (
+                    <>
+                      <TrendingUp size={13} strokeWidth={2.8} style={styles.kpiTrendArrow} />
+                      <span className="shrink-0" style={styles.kpiTrendText}>
+                        {item.trend}
+                      </span>
+                    </>
+                  ) : null}
 
-              <span className="min-w-0 truncate font-extrabold" style={styles.kpiHelperText} title={item?.helper}>
-                {item?.helper}
-              </span>
+                  <span className="min-w-0 truncate font-extrabold" style={styles.kpiHelperText} title={item?.helper}>
+                    {item?.helper}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
