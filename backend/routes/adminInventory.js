@@ -551,6 +551,326 @@ function populateMovementForResponse(query) {
     .populate('reversedByMovement', 'movementNumber type status createdAt')
     .populate('reversalOfMovement', 'movementNumber type status createdAt');
 }
+function buildKardexFilter(query = {}) {
+  const productId = cleanText(query.productId || query.product || '');
+  const branchId = cleanText(query.branchId || query.branch || '');
+  const size = cleanText(query.size || query.talla || '');
+  const color = cleanText(query.color || '');
+
+  if (!productId || !isValidObjectId(productId)) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'El producto enviado no es válido.',
+    };
+  }
+
+  if (!branchId || !isValidObjectId(branchId)) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'La sede enviada no es válida.',
+    };
+  }
+
+  if (!size) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Debes enviar la talla para consultar el Kardex.',
+    };
+  }
+
+  if (!color) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Debes enviar el color para consultar el Kardex.',
+    };
+  }
+
+  const productObjectId = toObjectId(productId);
+  const branchObjectId = toObjectId(branchId);
+
+  return {
+    ok: true,
+    productId,
+    branchId,
+    productObjectId,
+    branchObjectId,
+    size,
+    color,
+    filter: {
+      deletedAt: null,
+      product: productObjectId,
+      status: {
+        $in: ['posted', 'reversed'],
+      },
+      'variant.size': size,
+      'variant.color': color,
+      $or: [
+        { branchFrom: branchObjectId },
+        { branchTo: branchObjectId },
+      ],
+    },
+  };
+}
+
+function buildKardexStockFilter({ productObjectId, branchObjectId, size, color }) {
+  return {
+    deletedAt: null,
+    product: productObjectId,
+    branch: branchObjectId,
+    $or: [
+      {
+        size,
+        color,
+      },
+      {
+        'variant.size': size,
+        'variant.color': color,
+      },
+    ],
+  };
+}
+
+function getDocumentIdValue(value) {
+  if (!value) return '';
+
+  if (typeof value === 'object') {
+    return String(value._id || value.id || '');
+  }
+
+  return String(value || '');
+}
+
+function getKardexBranchSnapshot(branchValue = {}, fallbackSnapshot = {}) {
+  const branch = typeof branchValue === 'object' && branchValue ? branchValue : {};
+
+  return {
+    id: getDocumentIdValue(branchValue),
+    name: cleanText(branch.name || fallbackSnapshot.name || ''),
+    code: cleanText(branch.code || fallbackSnapshot.code || ''),
+    type: cleanText(branch.type || fallbackSnapshot.type || ''),
+  };
+}
+
+function getKardexProductSnapshot(productValue = {}, fallbackSnapshot = {}) {
+  const product = typeof productValue === 'object' && productValue ? productValue : {};
+
+  return {
+    id: getDocumentIdValue(productValue),
+    title: cleanText(product.title || fallbackSnapshot.title || ''),
+    sku: cleanText(product.sku || fallbackSnapshot.sku || ''),
+    image: cleanText(product.image || fallbackSnapshot.image || ''),
+    price: Number(product.price || fallbackSnapshot.price || 0),
+    stock: Number(product.stock || fallbackSnapshot.stock || 0),
+  };
+}
+
+function getKardexEffect(movement, branchObjectId) {
+  const quantity = Math.max(0, Number(movement?.quantity || 0));
+  const direction = cleanLower(movement?.direction || '');
+  const branchId = getDocumentIdValue(branchObjectId);
+  const branchFromId = getDocumentIdValue(movement?.branchFrom);
+  const branchToId = getDocumentIdValue(movement?.branchTo);
+
+  if (!quantity) {
+    return {
+      entry: 0,
+      exit: 0,
+      effect: 'none',
+    };
+  }
+
+  if (direction === 'transfer') {
+    if (branchToId === branchId) {
+      return {
+        entry: quantity,
+        exit: 0,
+        effect: 'in',
+      };
+    }
+
+    if (branchFromId === branchId) {
+      return {
+        entry: 0,
+        exit: quantity,
+        effect: 'out',
+      };
+    }
+
+    return {
+      entry: 0,
+      exit: 0,
+      effect: 'none',
+    };
+  }
+
+  if (direction === 'in') {
+    return {
+      entry: quantity,
+      exit: 0,
+      effect: 'in',
+    };
+  }
+
+  if (direction === 'out') {
+    return {
+      entry: 0,
+      exit: quantity,
+      effect: 'out',
+    };
+  }
+
+  return {
+    entry: 0,
+    exit: 0,
+    effect: 'none',
+  };
+}
+
+function getCurrentStockValues(stockRow = {}) {
+  const physicalStock = Number(stockRow?.stock || 0);
+  const reservedStock = Number(stockRow?.reservedStock || 0);
+  const availableStockFromRow = Number(stockRow?.availableStock);
+  const availableStock = Number.isFinite(availableStockFromRow)
+    ? availableStockFromRow
+    : Math.max(0, physicalStock - reservedStock);
+
+  return {
+    physicalStock,
+    reservedStock,
+    availableStock,
+  };
+}
+
+function getAvailableStockForAlert(row = {}) {
+  const stock = Number(row?.stock || 0);
+  const reservedStock = Number(row?.reservedStock || 0);
+  const availableStockFromRow = Number(row?.availableStock);
+
+  if (Number.isFinite(availableStockFromRow)) {
+    return Math.max(0, availableStockFromRow);
+  }
+
+  return Math.max(0, stock - reservedStock);
+}
+
+function getLowStockLimitForAlert(row = {}, defaultLimit = 5) {
+  const candidates = [
+    row?.reorderPoint,
+    row?.product?.reorderPoint,
+    row?.productSnapshot?.reorderPoint,
+    row?.product?.stockMin,
+    row?.productSnapshot?.stockMin,
+    defaultLimit,
+  ];
+
+  const value = candidates
+    .map((item) => Number(item))
+    .find((item) => Number.isFinite(item) && item > 0);
+
+  return value || defaultLimit;
+}
+
+function mapStockAlertItem(row = {}, type = 'lowStock') {
+  const physicalStock = Number(row?.stock || 0);
+  const reservedStock = Number(row?.reservedStock || 0);
+  const availableStock = getAvailableStockForAlert(row);
+  const lowStockLimit = getLowStockLimitForAlert(row);
+
+  return {
+    id: String(row?._id || ''),
+    type,
+    severity: type === 'outOfStock' ? 'critical' : 'warning',
+    product: {
+      id: getDocumentIdValue(row?.product),
+      title: cleanText(row?.product?.title || row?.productSnapshot?.title || ''),
+      sku: cleanText(row?.product?.sku || row?.productSnapshot?.sku || ''),
+      image: cleanText(row?.product?.image || row?.productSnapshot?.image || ''),
+    },
+    branch: {
+      id: getDocumentIdValue(row?.branch),
+      name: cleanText(row?.branch?.name || row?.branchSnapshot?.name || ''),
+      code: cleanText(row?.branch?.code || row?.branchSnapshot?.code || ''),
+      type: cleanText(row?.branch?.type || row?.branchSnapshot?.type || ''),
+    },
+    variant: {
+      size: cleanText(row?.variant?.size || row?.size || ''),
+      color: cleanText(row?.variant?.color || row?.color || ''),
+      sku: cleanText(row?.variant?.sku || ''),
+      barcode: cleanText(row?.variant?.barcode || ''),
+    },
+    stock: {
+      physicalStock,
+      reservedStock,
+      availableStock,
+      lowStockLimit,
+    },
+    message:
+      type === 'outOfStock'
+        ? 'Producto agotado en esta sede y variante.'
+        : 'Producto con inventario bajo para esta sede y variante.',
+    updatedAt: row?.updatedAt || null,
+  };
+}
+
+function mapReservationAlertItem(reservation = {}, type = 'pendingReservation') {
+  const now = new Date();
+  const expiresAt = reservation?.expiresAt ? new Date(reservation.expiresAt) : null;
+  const isExpired =
+    expiresAt instanceof Date &&
+    !Number.isNaN(expiresAt.getTime()) &&
+    expiresAt.getTime() <= now.getTime();
+
+  const firstItem = Array.isArray(reservation?.items) ? reservation.items[0] : null;
+
+  return {
+    id: String(reservation?._id || ''),
+    type,
+    severity: isExpired ? 'critical' : 'info',
+    reservationCode: reservation?.reservationCode || '',
+    orderNumber: reservation?.orderNumber || '',
+    status: reservation?.status || '',
+    totalQuantity: Number(reservation?.totalQuantity || 0),
+    total: Number(reservation?.total || reservation?.subtotal || 0),
+    expiresAt: reservation?.expiresAt || null,
+    expiredAt: reservation?.expiredAt || null,
+    createdAt: reservation?.createdAt || null,
+    minutesToExpire:
+      expiresAt instanceof Date && !Number.isNaN(expiresAt.getTime())
+        ? Math.ceil((expiresAt.getTime() - now.getTime()) / 60000)
+        : null,
+    product: {
+      id: getDocumentIdValue(firstItem?.product),
+      title: cleanText(firstItem?.product?.title || firstItem?.productSnapshot?.title || ''),
+      sku: cleanText(firstItem?.product?.sku || firstItem?.productSnapshot?.sku || ''),
+      image: cleanText(firstItem?.product?.image || firstItem?.productSnapshot?.image || ''),
+    },
+    branch: {
+      id: getDocumentIdValue(firstItem?.branch),
+      name: cleanText(firstItem?.branch?.name || firstItem?.branchSnapshot?.name || ''),
+      code: cleanText(firstItem?.branch?.code || firstItem?.branchSnapshot?.code || ''),
+      type: cleanText(firstItem?.branch?.type || firstItem?.branchSnapshot?.type || ''),
+    },
+    variant: {
+      size: cleanText(firstItem?.size || ''),
+      color: cleanText(firstItem?.color || ''),
+    },
+    message: isExpired
+      ? 'Reserva pendiente vencida. Debe ser liberada por el job automático.'
+      : 'Reserva pendiente activa que mantiene unidades apartadas.',
+  };
+}
+
+function parseAlertsLimit(query = {}) {
+  const rawLimit = Number(query.limit || 20);
+
+  if (!Number.isFinite(rawLimit) || rawLimit <= 0) return 20;
+
+  return Math.min(Math.floor(rawLimit), 100);
+}
 
 /* ============================
  * PROTECCIÓN GENERAL
@@ -739,6 +1059,281 @@ router.get('/reservations', requirePermission('inventory:view'), async (req, res
     console.error('❌ Error listando reservas de inventario:', error.message);
 
     return sendError(res, 500, 'Error listando reservas de inventario.');
+  }
+});
+
+/* ============================
+ * ALERTAS DE INVENTARIO
+ * GET /api/admin/inventory/alerts
+ * ============================ */
+
+router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
+  try {
+    const limit = parseAlertsLimit(req.query);
+    const now = new Date();
+
+    const stockRows = await InventoryStock.find({
+      deletedAt: null,
+      active: true,
+    })
+      .populate('product', 'title sku image price stock reorderPoint stockMin')
+      .populate('branch', 'name code type status active')
+      .sort({
+        'productSnapshot.title': 1,
+        'branchSnapshot.name': 1,
+        'variant.size': 1,
+        'variant.color': 1,
+      })
+      .limit(1000)
+      .lean({ virtuals: true });
+
+    const outOfStockItems = [];
+    const lowStockItems = [];
+
+    stockRows.forEach((row) => {
+      const availableStock = getAvailableStockForAlert(row);
+      const lowStockLimit = getLowStockLimitForAlert(row);
+
+      if (availableStock <= 0) {
+        outOfStockItems.push(mapStockAlertItem(row, 'outOfStock'));
+        return;
+      }
+
+      if (availableStock <= lowStockLimit) {
+        lowStockItems.push(mapStockAlertItem(row, 'lowStock'));
+      }
+    });
+
+    const [expiredReservationsRaw, pendingReservationsRaw] = await Promise.all([
+      InventoryReservation.find({
+        status: 'pending',
+        expiresAt: {
+          $lte: now,
+        },
+      })
+        .sort({
+          expiresAt: 1,
+        })
+        .limit(limit)
+        .populate('order', 'orderNumber status total customer createdAt')
+        .populate('items.product', 'title sku image price stock')
+        .populate('items.branch', 'name code type status active')
+        .lean({ virtuals: true }),
+
+      InventoryReservation.find({
+        status: 'pending',
+        expiresAt: {
+          $gt: now,
+        },
+      })
+        .sort({
+          expiresAt: 1,
+        })
+        .limit(limit)
+        .populate('order', 'orderNumber status total customer createdAt')
+        .populate('items.product', 'title sku image price stock')
+        .populate('items.branch', 'name code type status active')
+        .lean({ virtuals: true }),
+    ]);
+
+    const expiredReservations = expiredReservationsRaw.map((reservation) =>
+      mapReservationAlertItem(reservation, 'expiredReservation')
+    );
+
+    const pendingReservations = pendingReservationsRaw.map((reservation) =>
+      mapReservationAlertItem(reservation, 'pendingReservation')
+    );
+
+    const sortedOutOfStockItems = outOfStockItems
+      .sort((a, b) => {
+        const productA = a.product.title || '';
+        const productB = b.product.title || '';
+
+        return productA.localeCompare(productB, 'es');
+      })
+      .slice(0, limit);
+
+    const sortedLowStockItems = lowStockItems
+      .sort((a, b) => {
+        const availableA = Number(a.stock.availableStock || 0);
+        const availableB = Number(b.stock.availableStock || 0);
+
+        if (availableA !== availableB) return availableA - availableB;
+
+        const productA = a.product.title || '';
+        const productB = b.product.title || '';
+
+        return productA.localeCompare(productB, 'es');
+      })
+      .slice(0, limit);
+
+    const criticalCount = outOfStockItems.length + expiredReservations.length;
+    const warningCount = lowStockItems.length;
+    const infoCount = pendingReservations.length;
+
+    return res.json({
+      ok: true,
+      data: {
+        generatedAt: now,
+        summary: {
+          critical: criticalCount,
+          warning: warningCount,
+          info: infoCount,
+          lowStock: lowStockItems.length,
+          outOfStock: outOfStockItems.length,
+          expiredReservations: expiredReservations.length,
+          pendingReservations: pendingReservations.length,
+          total:
+            criticalCount +
+            warningCount +
+            infoCount,
+        },
+        lowStockItems: sortedLowStockItems,
+        outOfStockItems: sortedOutOfStockItems,
+        expiredReservations,
+        pendingReservations,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo alertas de inventario:', error.message);
+
+    return sendError(res, 500, 'Error obteniendo alertas de inventario.');
+  }
+});
+
+/* ============================
+ * KARDEX DE INVENTARIO
+ * GET /api/admin/inventory/kardex
+ * ============================ */
+
+router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
+  try {
+    const parsedFilter = buildKardexFilter(req.query);
+
+    if (!parsedFilter.ok) {
+      return sendError(res, parsedFilter.status, parsedFilter.message);
+    }
+
+    const {
+      productObjectId,
+      branchObjectId,
+      size,
+      color,
+      filter,
+    } = parsedFilter;
+
+    const stockFilter = buildKardexStockFilter({
+      productObjectId,
+      branchObjectId,
+      size,
+      color,
+    });
+
+    const [stockRow, movements] = await Promise.all([
+      InventoryStock.findOne(stockFilter)
+        .populate('product', 'title sku image price stock')
+        .populate('branch', 'name code type status active')
+        .lean({ virtuals: true }),
+
+      InventoryMovement.find(filter)
+        .sort({
+          postedAt: 1,
+          createdAt: 1,
+          _id: 1,
+        })
+        .populate('product', 'title sku image price stock')
+        .populate('branchFrom', 'name code type status active')
+        .populate('branchTo', 'name code type status active')
+        .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('reversedByMovement', 'movementNumber type status createdAt')
+        .populate('reversalOfMovement', 'movementNumber type status createdAt')
+        .lean({ virtuals: true }),
+    ]);
+
+    let runningBalance = 0;
+    let totalIn = 0;
+    let totalOut = 0;
+
+    const kardexMovements = movements.map((movement) => {
+      const effect = getKardexEffect(movement, branchObjectId);
+
+      totalIn += effect.entry;
+      totalOut += effect.exit;
+      runningBalance += effect.entry - effect.exit;
+
+      return {
+        id: String(movement._id),
+        movementNumber: movement.movementNumber || '',
+        type: movement.type || '',
+        direction: movement.direction || '',
+        status: movement.status || '',
+        date: movement.postedAt || movement.createdAt || null,
+        quantity: Number(movement.quantity || 0),
+        entry: effect.entry,
+        exit: effect.exit,
+        balance: runningBalance,
+        effect: effect.effect,
+        product: getKardexProductSnapshot(movement.product, movement.productSnapshot),
+        variant: {
+          size: movement?.variant?.size || size,
+          color: movement?.variant?.color || color,
+          sku: movement?.variant?.sku || '',
+          barcode: movement?.variant?.barcode || '',
+        },
+        branchFrom: getKardexBranchSnapshot(
+          movement.branchFrom,
+          movement.branchFromSnapshot
+        ),
+        branchTo: getKardexBranchSnapshot(
+          movement.branchTo,
+          movement.branchToSnapshot
+        ),
+        reason: movement.reason || '',
+        notes: movement.notes || '',
+        reference: movement.reference || '',
+        order: movement.order || null,
+        orderNumber: movement.orderNumber || '',
+        createdAt: movement.createdAt || null,
+        postedAt: movement.postedAt || null,
+        reversedByMovement: movement.reversedByMovement || null,
+        reversalOfMovement: movement.reversalOfMovement || null,
+      };
+    });
+
+    const currentStock = getCurrentStockValues(stockRow || {});
+    const closingBalance = runningBalance;
+
+    return res.json({
+      ok: true,
+      data: {
+        product: stockRow
+          ? getKardexProductSnapshot(stockRow.product, stockRow.productSnapshot)
+          : getKardexProductSnapshot(movements[0]?.product, movements[0]?.productSnapshot),
+        branch: stockRow
+          ? getKardexBranchSnapshot(stockRow.branch, stockRow.branchSnapshot)
+          : getKardexBranchSnapshot(branchObjectId, {}),
+        variant: {
+          size,
+          color,
+        },
+        stock: currentStock,
+        summary: {
+          openingBalance: 0,
+          totalIn,
+          totalOut,
+          closingBalance,
+          currentPhysicalStock: currentStock.physicalStock,
+          currentReservedStock: currentStock.reservedStock,
+          currentAvailableStock: currentStock.availableStock,
+          differenceWithCurrentStock: currentStock.physicalStock - closingBalance,
+        },
+        movements: kardexMovements,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo Kardex de inventario:', error.message);
+
+    return sendError(res, 500, 'Error obteniendo Kardex de inventario.');
   }
 });
 

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   PackageSearch,
+  BellRing,
   RefreshCw,
   Plus,
   ArrowRightLeft,
+  BookOpen,
   AlertCircle,
   MapPin,
   Boxes,
@@ -16,6 +18,8 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
+import InventoryAlertsPanel from './inventory/components/InventoryAlertsPanel';
+import InventoryKardexModal from './inventory/components/InventoryKardexModal';
 import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
 import InventoryReservationsPanel from './inventory/components/InventoryReservationsPanel';
 import InventoryTransferModal from './inventory/components/InventoryTransferModal';
@@ -444,6 +448,8 @@ export default function InventoryAdmin() {
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [initialTransferStockRow, setInitialTransferStockRow] = useState(null);
   const [movementsModalRow, setMovementsModalRow] = useState(null);
+  const [kardexModalRow, setKardexModalRow] = useState(null);
+  const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
 
   const loadInventory = useCallback(async () => {
     try {
@@ -669,6 +675,16 @@ export default function InventoryAdmin() {
             >
               <ArrowRightLeft size={16} />
               Trasladar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAlertsPanelOpen(true)}
+              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
+              style={styles.secondaryButton}
+            >
+              <BellRing size={16} />
+              Alertas
             </button>
 
             <InventoryReservationsPanel />
@@ -936,6 +952,16 @@ export default function InventoryAdmin() {
                           <ArrowRightLeft size={15} />
                           Ver movimientos
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setKardexModalRow(row)}
+                          className="admin-inventory-action-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition sm:w-auto"
+                          style={styles.actionButton}
+                        >
+                          <BookOpen size={15} />
+                          Ver Kardex
+                        </button>
                       </div>
                     </div>
 
@@ -1055,6 +1081,17 @@ export default function InventoryAdmin() {
         onClose={() => setMovementsModalRow(null)}
         stockRow={movementsModalRow}
         onChanged={loadInventory}
+      />
+
+      <InventoryKardexModal
+        open={Boolean(kardexModalRow)}
+        onClose={() => setKardexModalRow(null)}
+        stockRow={kardexModalRow}
+      />
+
+      <InventoryAlertsPanel
+        open={alertsPanelOpen}
+        onClose={() => setAlertsPanelOpen(false)}
       />
 
       <style>
