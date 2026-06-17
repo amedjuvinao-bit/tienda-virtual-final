@@ -11,6 +11,7 @@ import {
   History,
   Loader2,
   PackageSearch,
+  RotateCcw,
   Search,
   X,
 } from 'lucide-react';
@@ -134,6 +135,20 @@ const styles = {
     border: '1px solid var(--admin-button-soft-border)',
   },
 
+  dangerButton: {
+    borderRadius: 'var(--admin-radius)',
+    background: 'var(--admin-danger)',
+    color: '#ffffff',
+    border: '1px solid var(--admin-danger)',
+  },
+
+  warningButton: {
+    borderRadius: 'var(--admin-radius)',
+    background: 'var(--admin-warning-soft-bg)',
+    color: 'var(--admin-warning-text)',
+    border: '1px solid var(--admin-warning)',
+  },
+
   primaryBadge: {
     borderRadius: '999px',
     background: 'var(--admin-primary-soft-bg)',
@@ -146,6 +161,20 @@ const styles = {
     border: '1px solid var(--admin-danger)',
     background: 'var(--admin-danger-soft-bg)',
     color: 'var(--admin-danger-text)',
+  },
+
+  successBox: {
+    borderRadius: 'var(--admin-radius)',
+    border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
+    background: 'color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))',
+    color: 'var(--admin-card-text)',
+  },
+
+  warningBox: {
+    borderRadius: 'calc(var(--admin-radius) + 6px)',
+    border: '1px solid var(--admin-warning)',
+    background: 'var(--admin-warning-soft-bg)',
+    color: 'var(--admin-warning-text)',
   },
 
   tableWrap: {
@@ -350,15 +379,49 @@ function movementMatchesSelectedVariant(movement, selectedStockRow) {
   return selectedSize === movementSize && selectedColor === movementColor;
 }
 
+function canReverseMovement(movement) {
+  if (!movement) return false;
+
+  if (movement.status !== 'posted') return false;
+  if (movement.reversedByMovement) return false;
+  if (movement.reversalOfMovement) return false;
+
+  return ['in', 'out', 'transfer'].includes(movement.direction);
+}
+
+function getReverseDescription(movement) {
+  if (!movement) return '';
+
+  if (movement.direction === 'in') {
+    return 'Se creará una salida por la misma cantidad para devolver el stock al estado anterior.';
+  }
+
+  if (movement.direction === 'out') {
+    return 'Se creará una entrada por la misma cantidad para devolver el stock al estado anterior.';
+  }
+
+  if (movement.direction === 'transfer') {
+    return 'Se creará un traslado contrario, desde la sede destino hacia la sede origen.';
+  }
+
+  return 'Este movimiento no tiene reverso automático.';
+}
+
 export default function InventoryMovementsModal({
   open,
   onClose,
   stockRow,
+  onChanged,
 }) {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [reversingId, setReversingId] = useState('');
+  const [reverseTarget, setReverseTarget] = useState(null);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reverseError, setReverseError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const productId = useMemo(() => getProductId(stockRow), [stockRow]);
   const branchId = useMemo(() => getBranchId(stockRow), [stockRow]);
@@ -403,6 +466,11 @@ export default function InventoryMovementsModal({
     setMovements([]);
     setError('');
     setSearchTerm('');
+    setReversingId('');
+    setReverseTarget(null);
+    setReverseReason('');
+    setReverseError('');
+    setSuccessMessage('');
     loadMovements();
   }, [open, loadMovements]);
 
@@ -472,6 +540,62 @@ export default function InventoryMovementsModal({
     };
   }, [movements]);
 
+  const isBusy = loading || Boolean(reversingId);
+
+  const openReverseConfirm = useCallback((movement) => {
+    setReverseTarget(movement);
+    setReverseReason('');
+    setReverseError('');
+    setSuccessMessage('');
+  }, []);
+
+  const closeReverseConfirm = useCallback(() => {
+    if (reversingId) return;
+
+    setReverseTarget(null);
+    setReverseReason('');
+    setReverseError('');
+  }, [reversingId]);
+
+  const confirmReverseMovement = useCallback(async () => {
+    if (!reverseTarget?._id || reversingId) return;
+
+    try {
+      setReversingId(String(reverseTarget._id));
+      setReverseError('');
+      setSuccessMessage('');
+
+      const response = await api.post(
+        `/api/admin/inventory/movements/${reverseTarget._id}/reverse`,
+        {
+          reason: reverseReason,
+        }
+      );
+
+      setSuccessMessage(
+        response?.data?.message || 'Movimiento reversado correctamente.'
+      );
+      setReverseTarget(null);
+      setReverseReason('');
+
+      await loadMovements();
+
+      if (typeof onChanged === 'function') {
+        onChanged();
+      }
+    } catch (err) {
+      console.error('❌ Error reversando movimiento:', err);
+
+      setReverseError(
+        err?.response?.data?.message ||
+          err?.userMessage ||
+          'No se pudo reversar el movimiento.'
+      );
+    } finally {
+      setReversingId('');
+    }
+  }, [loadMovements, onChanged, reverseReason, reverseTarget, reversingId]);
+
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
@@ -480,7 +604,7 @@ export default function InventoryMovementsModal({
       aria-modal="true"
       role="dialog"
       onClick={(event) => {
-        if (event.target === event.currentTarget && !loading) {
+        if (event.target === event.currentTarget && !isBusy) {
           onClose();
         }
       }}
@@ -513,7 +637,7 @@ export default function InventoryMovementsModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
+              disabled={isBusy}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center transition disabled:cursor-not-allowed disabled:opacity-60"
               style={styles.closeButton}
               title="Cerrar"
@@ -525,7 +649,7 @@ export default function InventoryMovementsModal({
 
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5" style={styles.body}>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="flex flex-col gap-4">
               <main className="flex min-w-0 flex-col gap-4">
                 {error && (
                   <div
@@ -535,6 +659,89 @@ export default function InventoryMovementsModal({
                     <AlertCircle size={18} className="mt-0.5 shrink-0" />
                     <p>{error}</p>
                   </div>
+                )}
+
+                {successMessage && (
+                  <div
+                    className="flex items-start gap-3 px-4 py-3 text-sm font-semibold"
+                    style={styles.successBox}
+                  >
+                    <RotateCcw size={18} className="mt-0.5 shrink-0" />
+                    <p>{successMessage}</p>
+                  </div>
+                )}
+
+                {reverseTarget && (
+                  <section className="p-5" style={styles.warningBox}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <RotateCcw size={19} />
+                          <h3 className="text-base font-black">
+                            Confirmar reverso de movimiento
+                          </h3>
+                        </div>
+
+                        <p className="mt-2 text-sm font-semibold leading-6">
+                          Movimiento: {reverseTarget?.movementNumber || 'Sin número'} · {getMovementTypeLabel(reverseTarget?.type)} · Cantidad {formatNumber(reverseTarget?.quantity)}
+                        </p>
+
+                        <p className="mt-1 text-sm leading-6">
+                          {getReverseDescription(reverseTarget)}
+                        </p>
+
+                        {reverseError && (
+                          <p className="mt-3 text-sm font-black">
+                            {reverseError}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="w-full lg:max-w-md">
+                        <label className="text-xs font-black uppercase tracking-wide">
+                          Motivo del reverso
+                        </label>
+
+                        <textarea
+                          value={reverseReason}
+                          onChange={(event) => setReverseReason(event.target.value)}
+                          rows={3}
+                          maxLength={220}
+                          disabled={Boolean(reversingId)}
+                          placeholder="Ejemplo: error de digitación, movimiento duplicado..."
+                          className="mt-2 w-full resize-none px-4 py-3 text-sm font-semibold"
+                          style={styles.input}
+                        />
+
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                          <button
+                            type="button"
+                            onClick={closeReverseConfirm}
+                            disabled={Boolean(reversingId)}
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+                            style={styles.softButton}
+                          >
+                            Cancelar
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={confirmReverseMovement}
+                            disabled={Boolean(reversingId)}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+                            style={styles.dangerButton}
+                          >
+                            {reversingId ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <RotateCcw size={16} />
+                            )}
+                            Reversar ahora
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 )}
 
                 <section className="p-5" style={styles.card}>
@@ -609,7 +816,7 @@ export default function InventoryMovementsModal({
                   </div>
 
                   <div className="mt-5 overflow-x-auto" style={styles.tableWrap}>
-                    <table className="min-w-full text-sm">
+                    <table className="w-full text-sm" style={{ minWidth: '1080px' }}>
                       <thead
                         className="text-left text-xs font-black uppercase tracking-wide"
                         style={styles.tableHead}
@@ -622,13 +829,14 @@ export default function InventoryMovementsModal({
                           <th className="px-4 py-3">Estado</th>
                           <th className="px-4 py-3">Fecha</th>
                           <th className="px-4 py-3">Motivo</th>
+                          <th className="px-4 py-3 text-right" style={{ width: '170px', minWidth: '170px' }}>Acciones</th>
                         </tr>
                       </thead>
 
                       <tbody style={styles.tableBody}>
                         {loading && (
                           <tr style={styles.tableRow}>
-                            <td colSpan="7" className="px-4 py-10 text-center">
+                            <td colSpan="8" className="px-4 py-10 text-center">
                               <div className="inline-flex items-center gap-2" style={styles.cardMuted}>
                                 <Loader2 size={18} className="animate-spin" />
                                 Cargando movimientos...
@@ -639,7 +847,7 @@ export default function InventoryMovementsModal({
 
                         {!loading && filteredMovements.length === 0 && (
                           <tr style={styles.tableRow}>
-                            <td colSpan="7" className="px-4 py-10 text-center" style={styles.cardMuted}>
+                            <td colSpan="8" className="px-4 py-10 text-center" style={styles.cardMuted}>
                               No hay movimientos para mostrar.
                             </td>
                           </tr>
@@ -720,6 +928,26 @@ export default function InventoryMovementsModal({
                                   )}
                                 </div>
                               </td>
+
+                              <td className="px-4 py-4 text-right" style={{ width: '170px', minWidth: '170px' }}>
+                                {canReverseMovement(movement) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openReverseConfirm(movement)}
+                                    disabled={Boolean(reversingId)}
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+                                    style={styles.warningButton}
+                                    title="Reversar movimiento"
+                                  >
+                                    <RotateCcw size={14} />
+                                    Reversar
+                                  </button>
+                                ) : (
+                                  <span className="text-xs font-black" style={styles.cardMuted}>
+                                    —
+                                  </span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                       </tbody>
@@ -729,7 +957,7 @@ export default function InventoryMovementsModal({
               </main>
 
               <aside className="min-w-0">
-                <div className="sticky top-0 flex flex-col gap-4">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <section className="p-5" style={styles.card}>
                     <div className="flex items-center gap-3">
                       <div
@@ -783,7 +1011,7 @@ export default function InventoryMovementsModal({
                           Nota
                         </p>
                         <p className="mt-1 text-sm leading-6" style={styles.cardMuted}>
-                          Este historial muestra los movimientos del producto, sede, talla y color seleccionados. Más adelante podemos agregar filtros por fecha, tipo y exportación.
+                          Este historial muestra los movimientos del producto, sede, talla y color seleccionados. Los movimientos aplicados se pueden reversar sin borrar el historial.
                         </p>
                       </div>
                     </div>
@@ -802,7 +1030,8 @@ export default function InventoryMovementsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center justify-center px-6 py-3 text-sm font-black transition"
+                disabled={isBusy}
+                className="inline-flex items-center justify-center px-6 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
                 style={styles.softButton}
               >
                 Cerrar

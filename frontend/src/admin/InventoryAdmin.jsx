@@ -9,6 +9,7 @@ import {
   AlertCircle,
   MapPin,
   Boxes,
+  Clock,
   Warehouse,
   Ruler,
   Palette,
@@ -210,6 +211,13 @@ const styles = {
     color: 'var(--admin-primary-soft-text)',
   },
 
+  reservedBox: {
+    borderRadius: 'calc(var(--admin-radius) + 2px)',
+    border: '1px solid color-mix(in srgb, var(--admin-warning) 55%, var(--admin-card-border))',
+    background: 'color-mix(in srgb, var(--admin-warning-soft-bg) 70%, var(--admin-card-bg) 30%)',
+    color: 'var(--admin-card-text)',
+  },
+
   availableBox: {
     borderRadius: 'calc(var(--admin-radius) + 2px)',
     border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
@@ -340,13 +348,19 @@ function isHexColor(value) {
   return /^#([0-9A-F]{3}){1,2}$/i.test(String(value || '').trim());
 }
 
+function getReservedStock(row) {
+  const reservedStock = Number(row?.reservedStock || 0);
+
+  return Number.isFinite(reservedStock) && reservedStock > 0 ? reservedStock : 0;
+}
+
 function getAvailableStock(row) {
   if (typeof row?.availableStock === 'number') return row.availableStock;
 
   const stock = Number(row?.stock || 0);
-  const reservedStock = Number(row?.reservedStock || 0);
+  const reservedStock = getReservedStock(row);
 
-  return stock - reservedStock;
+  return Math.max(0, stock - reservedStock);
 }
 
 function getLowStockLimit(row) {
@@ -542,13 +556,16 @@ export default function InventoryAdmin() {
     const productsWithStock = new Set();
 
     let totalStock = 0;
+    let totalReserved = 0;
     let totalAvailable = 0;
 
     stockRows.forEach((row) => {
       const stock = Number(row?.stock || 0);
+      const reservedStock = Number(getReservedStock(row) || 0);
       const availableStock = Number(getAvailableStock(row) || 0);
 
       totalStock += stock;
+      totalReserved += reservedStock;
       totalAvailable += availableStock;
 
       if (stock > 0) {
@@ -566,6 +583,7 @@ export default function InventoryAdmin() {
     return {
       productsWithStock: productsWithStock.size,
       totalStock,
+      totalReserved,
       totalAvailable,
       totalMovements: movements.length,
     };
@@ -614,7 +632,7 @@ export default function InventoryAdmin() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm" style={styles.muted}>
-              Controla el stock disponible por sede, producto, talla, color y movimientos de inventario.
+              Controla el stock físico, reservado y disponible por sede, producto, talla, color y movimientos de inventario.
             </p>
           </div>
 
@@ -678,7 +696,7 @@ export default function InventoryAdmin() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           label="Productos con stock"
           value={summary.productsWithStock}
@@ -691,6 +709,13 @@ export default function InventoryAdmin() {
           value={summary.totalStock}
           description="Todas las sedes"
           icon={<PackageSearch size={20} />}
+        />
+
+        <SummaryCard
+          label="Reservado"
+          value={summary.totalReserved}
+          description="Apartado por órdenes pendientes"
+          icon={<Clock size={20} />}
         />
 
         <SummaryCard
@@ -716,7 +741,7 @@ export default function InventoryAdmin() {
             </h2>
 
             <p className="text-sm" style={styles.muted}>
-              Aquí se muestra el inventario detallado por producto, sede, talla y color.
+              Aquí se muestra el inventario detallado por producto, sede, talla y color, separando stock físico, reservado y disponible.
             </p>
           </div>
 
@@ -806,6 +831,7 @@ export default function InventoryAdmin() {
           <p className="mt-3 text-xs leading-5" style={styles.muted}>
             Bajo stock se calcula con el punto de reorden del producto si existe.
             Si no existe, se toma como referencia {LOW_STOCK_LIMIT} unidades disponibles.
+            El disponible se calcula como stock físico menos unidades reservadas.
           </p>
         </div>
 
@@ -839,6 +865,7 @@ export default function InventoryAdmin() {
               filteredStockRows.map((row) => {
                 const color = getVariantColor(row);
                 const stockStatus = getStockStatus(row);
+                const reservedStock = Number(getReservedStock(row) || 0);
                 const availableStock = Number(getAvailableStock(row) || 0);
                 const canTransferFromCard = availableStock > 0;
 
@@ -960,7 +987,7 @@ export default function InventoryAdmin() {
                         </div>
                       </InfoBlock>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-3">
                         <div className="px-4 py-4" style={styles.stockBox}>
                           <p
                             className="text-[10px] font-black uppercase tracking-wide"
@@ -971,6 +998,19 @@ export default function InventoryAdmin() {
 
                           <p className="mt-1 text-2xl font-black" style={styles.title}>
                             {formatNumber(row?.stock)}
+                          </p>
+                        </div>
+
+                        <div className="px-4 py-4" style={styles.reservedBox}>
+                          <p
+                            className="text-[10px] font-black uppercase tracking-wide"
+                            style={styles.muted}
+                          >
+                            Reservado
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black" style={styles.title}>
+                            {formatNumber(reservedStock)}
                           </p>
                         </div>
 
@@ -1014,6 +1054,7 @@ export default function InventoryAdmin() {
         open={Boolean(movementsModalRow)}
         onClose={() => setMovementsModalRow(null)}
         stockRow={movementsModalRow}
+        onChanged={loadInventory}
       />
 
       <style>

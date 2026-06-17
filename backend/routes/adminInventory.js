@@ -436,6 +436,122 @@ function requireMovementPermission(req, res, next) {
   return requirePermission(permission)(req, res, next);
 }
 
+function canReverseMovement(movement) {
+  if (!movement) return false;
+
+  if (movement.status !== 'posted') return false;
+  if (movement.reversedByMovement) return false;
+  if (movement.reversalOfMovement) return false;
+
+  return ['in', 'out', 'transfer'].includes(movement.direction);
+}
+
+function buildReversalPayload(movement, reason = '') {
+  const cleanReason = cleanText(reason);
+  const baseReason = cleanReason || `Reverso del movimiento ${movement.movementNumber || movement._id}`;
+  const reference = `REV-${movement.movementNumber || String(movement._id).slice(-8)}`;
+  const productId = getObjectIdFromDocumentField(movement.product);
+  const quantity = Number(movement.quantity || 0);
+  const variant = movement.variant || {};
+
+  if (!productId) {
+    throw new Error('El movimiento original no tiene producto válido para reversar.');
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('El movimiento original no tiene una cantidad válida para reversar.');
+  }
+
+  const basePayload = {
+    product: productId,
+    productId,
+    size: variant.size || '',
+    color: variant.color || '',
+    variant: {
+      size: variant.size || '',
+      color: variant.color || '',
+      sku: variant.sku || '',
+      barcode: variant.barcode || '',
+    },
+    quantity,
+    reason: baseReason,
+    reference,
+    notes: `Movimiento generado automáticamente para reversar ${movement.movementNumber || movement._id}.`,
+    order: movement.order || null,
+    orderNumber: movement.orderNumber || '',
+    sourceModel: 'InventoryMovement',
+    sourceId: movement._id,
+  };
+
+  if (movement.direction === 'in') {
+    const branchId = getObjectIdFromDocumentField(movement.branchTo || movement.branchFrom);
+
+    if (!branchId) {
+      throw new Error('El movimiento original no tiene sede para reversar la entrada.');
+    }
+
+    return {
+      ...basePayload,
+      type: 'adjustment_out',
+      branch: branchId,
+      branchFrom: branchId,
+      branchId,
+    };
+  }
+
+  if (movement.direction === 'out') {
+    const branchId = getObjectIdFromDocumentField(movement.branchFrom || movement.branchTo);
+
+    if (!branchId) {
+      throw new Error('El movimiento original no tiene sede para reversar la salida.');
+    }
+
+    return {
+      ...basePayload,
+      type: 'adjustment_in',
+      branch: branchId,
+      branchTo: branchId,
+      branchId,
+    };
+  }
+
+  if (movement.direction === 'transfer') {
+    const originalFromId = getObjectIdFromDocumentField(movement.branchFrom);
+    const originalToId = getObjectIdFromDocumentField(movement.branchTo);
+
+    if (!originalFromId || !originalToId) {
+      throw new Error('El traslado original no tiene sede origen o sede destino válida.');
+    }
+
+    return {
+      ...basePayload,
+      type: 'transfer',
+      branchFrom: originalToId,
+      branchTo: originalFromId,
+    };
+  }
+
+  throw new Error('Este tipo de movimiento no se puede reversar.');
+}
+
+function getObjectIdFromDocumentField(value) {
+  if (!value) return null;
+
+  const candidate = value?._id || value?.id || value;
+
+  return isValidObjectId(candidate) ? toObjectId(candidate) : null;
+}
+
+function populateMovementForResponse(query) {
+  return query
+    .populate('product', 'title sku image price stock')
+    .populate('branchFrom', 'name code type status active')
+    .populate('branchTo', 'name code type status active')
+    .populate('createdBy', 'username displayName firstName lastName role')
+    .populate('reversedByMovement', 'movementNumber type status createdAt')
+    .populate('reversalOfMovement', 'movementNumber type status createdAt');
+}
+
 /* ============================
  * PROTECCIÓN GENERAL
  * ============================ */
@@ -653,6 +769,8 @@ router.get('/movements', requirePermission('inventory:view'), async (req, res) =
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
         .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('reversedByMovement', 'movementNumber type status createdAt')
+        .populate('reversalOfMovement', 'movementNumber type status createdAt')
         .lean({ virtuals: true }),
     ]);
 
@@ -703,6 +821,103 @@ router.post('/movements', requireMovementPermission, async (req, res) => {
 });
 
 /* ============================
+ * REVERSAR MOVIMIENTO
+ * POST /api/admin/inventory/movements/:id/reverse
+ * ============================ */
+
+router.post(
+  '/movements/:id/reverse',
+  requirePermission('inventory:adjust'),
+  async (req, res) => {
+    const session = await mongoose.startSession();
+
+    try {
+      const { id } = req.params;
+
+      if (!isValidObjectId(id)) {
+        await session.endSession();
+        return sendError(res, 400, 'ID de movimiento inválido.');
+      }
+
+      const adminId = getCurrentAdminId(req);
+      const reason = cleanText(req.body?.reason || '');
+      let responsePayload = null;
+
+      await session.withTransaction(async () => {
+        const movement = await InventoryMovement.findOne({
+          _id: toObjectId(id),
+          deletedAt: null,
+        }).session(session);
+
+        if (!movement) {
+          throw Object.assign(new Error('Movimiento de inventario no encontrado.'), {
+            statusCode: 404,
+          });
+        }
+
+        if (!canReverseMovement(movement)) {
+          throw Object.assign(
+            new Error('Este movimiento no se puede reversar. Solo se reversan movimientos aplicados que no hayan sido reversados.'),
+            {
+              statusCode: 409,
+            }
+          );
+        }
+
+        const reversalPayload = buildReversalPayload(movement, reason);
+
+        const reversalMovement = await createInventoryMovement(reversalPayload, {
+          adminId,
+          postNow: true,
+          session,
+        });
+
+        movement.status = 'reversed';
+        movement.reversedByMovement = reversalMovement._id;
+        movement.updatedBy = adminId;
+
+        reversalMovement.reversalOfMovement = movement._id;
+        reversalMovement.updatedBy = adminId;
+
+        await movement.save({ session });
+        await reversalMovement.save({ session });
+
+        const [updatedOriginal, updatedReversal] = await Promise.all([
+          populateMovementForResponse(
+            InventoryMovement.findById(movement._id).session(session)
+          ).lean({ virtuals: true }),
+
+          populateMovementForResponse(
+            InventoryMovement.findById(reversalMovement._id).session(session)
+          ).lean({ virtuals: true }),
+        ]);
+
+        responsePayload = {
+          original: updatedOriginal,
+          reversal: updatedReversal,
+        };
+      });
+
+      return res.json({
+        ok: true,
+        message: 'Movimiento reversado correctamente.',
+        data: responsePayload,
+      });
+    } catch (error) {
+      console.error('❌ Error reversando movimiento de inventario:', error.message);
+
+      return sendError(
+        res,
+        error.statusCode || 400,
+        error.message || 'Error reversando movimiento de inventario.'
+      );
+    } finally {
+      await session.endSession();
+    }
+  }
+);
+
+/* ============================
  * DETALLE DE MOVIMIENTO
  * GET /api/admin/inventory/movements/:id
  * ============================ */
@@ -726,6 +941,8 @@ router.get(
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
         .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('reversedByMovement', 'movementNumber type status createdAt')
+        .populate('reversalOfMovement', 'movementNumber type status createdAt')
         .lean({ virtuals: true });
 
       if (!movement) {
