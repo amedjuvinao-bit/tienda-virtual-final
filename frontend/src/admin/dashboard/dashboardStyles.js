@@ -44,31 +44,38 @@ export const dashboardStyles = {
   },
 
   kpiFrame: {
-    borderRadius: '26px',
+    borderRadius: '34px',
+    border: '1px solid rgba(255,255,255,0.66)',
     background:
-      'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,213,229,0.38) 48%, rgba(255,255,255,0.70))',
+      'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,236,243,0.52) 46%, rgba(255,255,255,0.88))',
     boxShadow:
-      '0 18px 34px rgba(148,68,92,0.11), 0 4px 12px rgba(148,68,92,0.06), inset 0 1px 0 rgba(255,255,255,0.96)',
+      '0 26px 44px rgba(148,68,92,0.13), 0 10px 18px rgba(148,68,92,0.07), inset 0 1px 0 rgba(255,255,255,0.96)',
+    backdropFilter: 'blur(20px)',
   },
 
   kpiGlass: {
-    border: '1px solid rgba(255,255,255,0.82)',
+    border: '2px solid rgba(255,255,255,0.78)',
     background:
-      'linear-gradient(138deg, rgba(255,255,255,0.74) 0%, rgba(255,247,250,0.66) 47%, rgba(255,231,240,0.46) 100%)',
+      'linear-gradient(136deg, rgba(255,255,255,0.58) 0%, rgba(255,247,250,0.43) 46%, rgba(255,237,244,0.30) 100%)',
     boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -24px 46px rgba(255,255,255,0.26), inset 0 0 28px rgba(255,255,255,0.26)',
-    backdropFilter: 'blur(22px) saturate(135%)',
+      'inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -34px 58px rgba(255,255,255,0.18), inset 0 0 44px rgba(255,255,255,0.30)',
+    backdropFilter: 'blur(24px) saturate(142%)',
+  },
+
+  kpiInnerBorder: {
+    border: '1px solid rgba(255,255,255,0.54)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.28)',
   },
 
   kpiTopLight: {
-    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)',
+    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.96), transparent)',
   },
 
   kpiShine: {
     background:
-      'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.32) 38%, rgba(255,255,255,0.76) 50%, rgba(255,255,255,0.26) 62%, transparent 100%)',
-    filter: 'blur(0.4px)',
-    opacity: 0.74,
+      'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 28%, rgba(255,255,255,0.82) 50%, rgba(255,255,255,0.18) 70%, transparent 100%)',
+    filter: 'blur(0.7px)',
+    opacity: 0.88,
   },
 
   kpiGlow: {
@@ -115,35 +122,46 @@ export const dashboardStyles = {
   },
 
   kpiIcon: {
-    border: '1px solid rgba(255,255,255,0.86)',
+    border: '2px solid rgba(255,255,255,0.72)',
     background:
-      'linear-gradient(145deg, rgba(255,255,255,0.90), rgba(255,240,246,0.72)), radial-gradient(circle at 30% 20%, rgba(255,255,255,0.96), transparent 38%)',
+      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 33%), linear-gradient(145deg, rgba(255,255,255,0.62), rgba(255,240,248,0.42))',
     color: 'var(--admin-primary)',
     boxShadow:
-      '0 13px 28px rgba(219,39,119,0.16), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -10px 18px rgba(219,39,119,0.07)',
+      '0 18px 30px rgba(219,39,119,0.16), inset 0 2px 0 rgba(255,255,255,0.96), inset 0 -18px 28px rgba(219,39,119,0.08)',
+    backdropFilter: 'blur(16px)',
   },
 
   warningIcon: {
-    border: '1px solid rgba(255,255,255,0.88)',
+    border: '2px solid rgba(255,255,255,0.76)',
     background:
-      'linear-gradient(145deg, rgba(255,255,255,0.92), rgba(255,247,222,0.74)), radial-gradient(circle at 30% 20%, rgba(255,255,255,0.96), transparent 38%)',
+      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 33%), linear-gradient(145deg, rgba(255,255,255,0.68), rgba(255,247,225,0.46))',
     color: '#f59e0b',
     boxShadow:
-      '0 13px 28px rgba(251,146,60,0.17), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -10px 18px rgba(245,158,11,0.08)',
+      '0 18px 30px rgba(251,146,60,0.15), inset 0 2px 0 rgba(255,255,255,0.96), inset 0 -18px 28px rgba(245,158,11,0.08)',
+    backdropFilter: 'blur(16px)',
   },
 
-  kpiTrendPill: {
-    border: '1px solid rgba(255,255,255,0.82)',
-    background: 'rgba(255,255,255,0.58)',
-    color: '#16a34a',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.86), 0 8px 16px rgba(22,163,74,0.08)',
+  kpiTrendArrow: {
+    color: '#ea8a2f',
   },
 
-  kpiWarningPill: {
-    border: '1px solid rgba(255,255,255,0.82)',
-    background: 'rgba(255,255,255,0.62)',
+  kpiTrendText: {
+    color: '#58bd76',
+    textShadow: '0 1px 0 rgba(255,255,255,0.72)',
+  },
+
+  kpiHelperText: {
+    color: 'rgba(15,23,42,0.78)',
+    textShadow: '0 1px 0 rgba(255,255,255,0.62)',
+  },
+
+  kpiWarningMark: {
+    color: '#f59e0b',
+  },
+
+  kpiWarningText: {
     color: '#d97706',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.86), 0 8px 16px rgba(217,119,6,0.08)',
+    textShadow: '0 1px 0 rgba(255,255,255,0.72)',
   },
 
   alertItem: {
