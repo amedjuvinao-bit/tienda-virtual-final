@@ -44,27 +44,27 @@ export const dashboardStyles = {
   },
 
   kpiFrame: {
-    borderRadius: '34px',
-    border: '1px solid rgba(255,255,255,0.66)',
+    borderRadius: '24px',
+    border: '1px solid rgba(255,255,255,0.70)',
     background:
-      'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,236,243,0.52) 46%, rgba(255,255,255,0.88))',
+      'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(255,236,244,0.46) 50%, rgba(255,255,255,0.88))',
     boxShadow:
-      '0 26px 44px rgba(148,68,92,0.13), 0 10px 18px rgba(148,68,92,0.07), inset 0 1px 0 rgba(255,255,255,0.96)',
-    backdropFilter: 'blur(20px)',
+      '0 16px 30px rgba(148,68,92,0.10), 0 5px 12px rgba(148,68,92,0.05), inset 0 1px 0 rgba(255,255,255,0.96)',
+    backdropFilter: 'blur(18px)',
   },
 
   kpiGlass: {
-    border: '2px solid rgba(255,255,255,0.78)',
+    border: '1.5px solid rgba(255,255,255,0.82)',
     background:
-      'linear-gradient(136deg, rgba(255,255,255,0.58) 0%, rgba(255,247,250,0.43) 46%, rgba(255,237,244,0.30) 100%)',
+      'linear-gradient(136deg, rgba(255,255,255,0.62) 0%, rgba(255,247,250,0.45) 48%, rgba(255,237,244,0.30) 100%)',
     boxShadow:
-      'inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -34px 58px rgba(255,255,255,0.18), inset 0 0 44px rgba(255,255,255,0.30)',
-    backdropFilter: 'blur(24px) saturate(142%)',
+      'inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -20px 40px rgba(255,255,255,0.18), inset 0 0 30px rgba(255,255,255,0.24)',
+    backdropFilter: 'blur(22px) saturate(140%)',
   },
 
   kpiInnerBorder: {
-    border: '1px solid rgba(255,255,255,0.54)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.28)',
+    border: '1px solid rgba(255,255,255,0.42)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.18)',
   },
 
   kpiTopLight: {
@@ -74,13 +74,12 @@ export const dashboardStyles = {
   kpiShine: {
     background:
       'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 28%, rgba(255,255,255,0.82) 50%, rgba(255,255,255,0.18) 70%, transparent 100%)',
-    filter: 'blur(0.7px)',
-    opacity: 0.88,
+    filter: 'blur(0.5px)',
+    opacity: 0.82,
   },
 
   kpiGlow: {
-    background:
-      'radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 24%, transparent) 0%, transparent 68%)',
+    background: 'radial-gradient(circle, rgba(236,72,153,0.24) 0%, transparent 68%)',
     filter: 'blur(2px)',
     opacity: 0.62,
   },
@@ -122,23 +121,23 @@ export const dashboardStyles = {
   },
 
   kpiIcon: {
-    border: '2px solid rgba(255,255,255,0.72)',
+    border: '1.5px solid rgba(255,255,255,0.78)',
     background:
-      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 33%), linear-gradient(145deg, rgba(255,255,255,0.62), rgba(255,240,248,0.42))',
+      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.62), rgba(255,240,248,0.42))',
     color: 'var(--admin-primary)',
     boxShadow:
-      '0 18px 30px rgba(219,39,119,0.16), inset 0 2px 0 rgba(255,255,255,0.96), inset 0 -18px 28px rgba(219,39,119,0.08)',
-    backdropFilter: 'blur(16px)',
+      '0 12px 22px rgba(219,39,119,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -12px 22px rgba(219,39,119,0.07)',
+    backdropFilter: 'blur(14px)',
   },
 
   warningIcon: {
-    border: '2px solid rgba(255,255,255,0.76)',
+    border: '1.5px solid rgba(255,255,255,0.80)',
     background:
-      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 33%), linear-gradient(145deg, rgba(255,255,255,0.68), rgba(255,247,225,0.46))',
+      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.66), rgba(255,247,225,0.44))',
     color: '#f59e0b',
     boxShadow:
-      '0 18px 30px rgba(251,146,60,0.15), inset 0 2px 0 rgba(255,255,255,0.96), inset 0 -18px 28px rgba(245,158,11,0.08)',
-    backdropFilter: 'blur(16px)',
+      '0 12px 22px rgba(251,146,60,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -12px 22px rgba(245,158,11,0.07)',
+    backdropFilter: 'blur(14px)',
   },
 
   kpiTrendArrow: {
@@ -146,12 +145,12 @@ export const dashboardStyles = {
   },
 
   kpiTrendText: {
-    color: '#58bd76',
+    color: '#4fbd72',
     textShadow: '0 1px 0 rgba(255,255,255,0.72)',
   },
 
   kpiHelperText: {
-    color: 'rgba(15,23,42,0.78)',
+    color: 'rgba(15,23,42,0.76)',
     textShadow: '0 1px 0 rgba(255,255,255,0.62)',
   },
 
@@ -160,7 +159,7 @@ export const dashboardStyles = {
   },
 
   kpiWarningText: {
-    color: '#d97706',
+    color: 'var(--admin-primary)',
     textShadow: '0 1px 0 rgba(255,255,255,0.72)',
   },
 
