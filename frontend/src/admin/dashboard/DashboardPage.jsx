@@ -10,7 +10,6 @@ import {
   salesChartData,
   topProducts,
 } from './dashboardMockData';
-import { dashboardStyles as styles } from './dashboardStyles';
 import DashboardModelOne from './layouts/DashboardModelOne';
 
 const DASHBOARD_MODELS = {
@@ -22,7 +21,7 @@ export default function DashboardPage() {
   const SelectedDashboardModel = DASHBOARD_MODELS[selectedModel] || DashboardModelOne;
 
   return (
-    <section className="space-y-6" style={styles.page}>
+    <section className="space-y-4 text-slate-950">
       <SelectedDashboardModel
         quickActions={dashboardQuickActions}
         kpis={dashboardKpis}
