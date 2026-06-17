@@ -24,56 +24,54 @@ export default function DashboardKpiCard({ item = {} }) {
   const isWarning = item?.trendType === 'warning';
 
   return (
-    <article className="relative min-h-[116px] overflow-hidden p-[1px]" style={styles.kpiFrame}>
-      <div className="relative h-full overflow-hidden rounded-[23px] px-[14px] py-[15px]" style={styles.kpiGlass}>
-        <span className="pointer-events-none absolute inset-x-5 top-[3px] h-px" style={styles.kpiTopLight} />
-        <span className="pointer-events-none absolute -right-7 -top-14 h-[172px] w-[48px] rotate-[38deg]" style={styles.kpiShine} />
-        <span className="pointer-events-none absolute inset-0 rounded-[23px]" style={styles.kpiInnerBorder} />
+    <article className="relative h-[116px] overflow-hidden rounded-[22px] p-[1px]" style={styles.kpiFrame}>
+      <div className="relative h-full overflow-hidden rounded-[21px] px-3 py-3.5 xl:px-4" style={styles.kpiGlass}>
+        <span className="pointer-events-none absolute inset-x-4 top-[2px] h-px" style={styles.kpiTopLight} />
+        <span className="pointer-events-none absolute -right-8 -top-14 h-[170px] w-[46px] rotate-[38deg]" style={styles.kpiShine} />
+        <span className="pointer-events-none absolute inset-0 rounded-[21px]" style={styles.kpiInnerBorder} />
 
-        <div className="relative z-10 flex h-full items-start gap-3">
+        <div className="relative z-10 grid h-full grid-cols-[42px_minmax(0,1fr)] gap-2.5 xl:grid-cols-[48px_minmax(0,1fr)] xl:gap-3">
           <span
-            className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[16px]"
+            className="mt-1 flex h-[42px] w-[42px] items-center justify-center rounded-[15px] xl:h-[48px] xl:w-[48px] xl:rounded-[17px]"
             style={isWarning ? styles.warningIcon : styles.kpiIcon}
           >
-            <Icon size={24} strokeWidth={2.25} />
+            <Icon size={22} strokeWidth={2.35} />
           </span>
 
-          <div className="flex min-w-0 flex-1 flex-col pt-0.5">
-            <p className="whitespace-nowrap text-[12px] font-black leading-4 tracking-[-0.01em]" style={styles.title}>
+          <div className="min-w-0 pt-1">
+            <p className="text-[11px] font-black leading-4 tracking-[-0.02em] xl:text-[12px]" style={styles.title}>
               {item?.title}
             </p>
 
             <p
-              className="mt-2 whitespace-nowrap text-[21px] font-black leading-none tracking-[-0.04em]"
+              className="mt-2 text-[20px] font-black leading-none tracking-[-0.055em] xl:text-[21px]"
               style={styles.title}
               title={item?.value}
             >
               {item?.value}
             </p>
+          </div>
 
-            <div className="mt-[17px] flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-black leading-4">
-              {isWarning ? (
-                <>
-                  <AlertTriangle size={12} strokeWidth={2.6} style={styles.kpiWarningMark} />
-                  <span style={styles.kpiWarningText} title={item?.helper}>
-                    {item?.helper}
-                  </span>
-                </>
-              ) : (
-                <>
-                  {item?.trend ? (
-                    <>
-                      <TrendingUp size={12} strokeWidth={2.8} style={styles.kpiTrendArrow} />
-                      <span style={styles.kpiTrendText}>{item.trend}</span>
-                    </>
-                  ) : null}
+          <div className="col-span-2 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[9.5px] font-black leading-4 xl:text-[10.5px]">
+            {isWarning ? (
+              <>
+                <AlertTriangle size={11} strokeWidth={2.7} style={styles.kpiWarningMark} />
+                <span style={styles.kpiWarningText}>{item?.helper}</span>
+              </>
+            ) : (
+              <>
+                {item?.trend ? (
+                  <>
+                    <TrendingUp size={11} strokeWidth={2.8} style={styles.kpiTrendArrow} />
+                    <span style={styles.kpiTrendText}>{item.trend}</span>
+                  </>
+                ) : null}
 
-                  <span className="font-extrabold" style={styles.kpiHelperText} title={item?.helper}>
-                    {item?.helper}
-                  </span>
-                </>
-              )}
-            </div>
+                <span className="font-extrabold" style={styles.kpiHelperText}>
+                  {item?.helper}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
