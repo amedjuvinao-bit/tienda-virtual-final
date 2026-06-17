@@ -44,27 +44,26 @@ export const dashboardStyles = {
   },
 
   kpiFrame: {
-    borderRadius: '24px',
-    border: '1px solid rgba(255,255,255,0.78)',
+    border: '1px solid rgba(255,255,255,0.86)',
     background:
-      'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,239,246,0.42) 50%, rgba(255,255,255,0.88))',
+      'linear-gradient(145deg, rgba(255,255,255,0.94), rgba(255,235,244,0.42) 48%, rgba(255,255,255,0.78))',
     boxShadow:
-      '0 16px 30px rgba(148,68,92,0.10), 0 5px 12px rgba(148,68,92,0.05), inset 0 1px 0 rgba(255,255,255,0.98)',
+      '0 15px 28px rgba(148,68,92,0.10), 0 4px 10px rgba(148,68,92,0.05), inset 0 1px 0 rgba(255,255,255,0.98)',
     backdropFilter: 'blur(18px)',
   },
 
   kpiGlass: {
-    border: '1.5px solid rgba(255,255,255,0.86)',
+    border: '1.5px solid rgba(255,255,255,0.88)',
     background:
-      'linear-gradient(136deg, rgba(255,255,255,0.66) 0%, rgba(255,248,251,0.48) 50%, rgba(255,238,245,0.32) 100%)',
+      'linear-gradient(136deg, rgba(255,255,255,0.64) 0%, rgba(255,248,251,0.48) 50%, rgba(255,238,246,0.30) 100%)',
     boxShadow:
-      'inset 0 1px 0 rgba(255,255,255,0.94), inset 0 -20px 38px rgba(255,255,255,0.18), inset 0 0 28px rgba(255,255,255,0.22)',
+      'inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -18px 36px rgba(255,255,255,0.18), inset 0 0 24px rgba(255,255,255,0.22)',
     backdropFilter: 'blur(22px) saturate(140%)',
   },
 
   kpiInnerBorder: {
-    border: '1px solid rgba(255,255,255,0.46)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.18)',
+    border: '1px solid rgba(255,255,255,0.42)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.16)',
   },
 
   kpiTopLight: {
@@ -73,9 +72,9 @@ export const dashboardStyles = {
 
   kpiShine: {
     background:
-      'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.10) 28%, rgba(255,255,255,0.82) 50%, rgba(255,255,255,0.16) 70%, transparent 100%)',
+      'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 28%, rgba(255,255,255,0.80) 50%, rgba(255,255,255,0.14) 70%, transparent 100%)',
     filter: 'blur(0.45px)',
-    opacity: 0.82,
+    opacity: 0.78,
   },
 
   kpiGlow: {
@@ -121,22 +120,22 @@ export const dashboardStyles = {
   },
 
   kpiIcon: {
-    border: '1.5px solid rgba(255,255,255,0.82)',
+    border: '1.5px solid rgba(255,255,255,0.86)',
     background:
-      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.68), rgba(255,241,248,0.44))',
+      'radial-gradient(circle at 26% 18%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.70), rgba(255,241,248,0.44))',
     color: 'var(--admin-primary)',
     boxShadow:
-      '0 11px 20px rgba(219,39,119,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -10px 20px rgba(219,39,119,0.07)',
+      '0 10px 18px rgba(219,39,119,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -10px 20px rgba(219,39,119,0.07)',
     backdropFilter: 'blur(14px)',
   },
 
   warningIcon: {
-    border: '1.5px solid rgba(255,255,255,0.84)',
+    border: '1.5px solid rgba(255,255,255,0.86)',
     background:
-      'radial-gradient(circle at 26% 20%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.70), rgba(255,247,225,0.46))',
+      'radial-gradient(circle at 26% 18%, rgba(255,255,255,0.98), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.72), rgba(255,247,225,0.46))',
     color: '#f59e0b',
     boxShadow:
-      '0 11px 20px rgba(251,146,60,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -10px 20px rgba(245,158,11,0.07)',
+      '0 10px 18px rgba(251,146,60,0.14), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -10px 20px rgba(245,158,11,0.07)',
     backdropFilter: 'blur(14px)',
   },
 
@@ -150,7 +149,7 @@ export const dashboardStyles = {
   },
 
   kpiHelperText: {
-    color: 'rgba(15,23,42,0.76)',
+    color: 'rgba(15,23,42,0.74)',
     textShadow: '0 1px 0 rgba(255,255,255,0.62)',
   },
 
