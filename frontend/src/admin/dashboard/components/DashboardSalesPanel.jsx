@@ -3,26 +3,61 @@
 import { ChevronDown, LineChart, Sparkles } from 'lucide-react';
 import { dashboardStyles as styles } from '../dashboardStyles';
 
+const CHART_BOUNDS = {
+  left: 58,
+  right: 596,
+  top: 30,
+  bottom: 148,
+};
+
+function toSafeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function getNiceChartMax(value) {
+  const rawValue = Math.max(toSafeNumber(value, 0), 0);
+
+  if (rawValue <= 0) return 1;
+
+  const magnitude = 10 ** Math.floor(Math.log10(rawValue));
+  const normalized = rawValue / magnitude;
+
+  let niceNormalized = 1;
+
+  if (normalized <= 1) niceNormalized = 1;
+  else if (normalized <= 2) niceNormalized = 2;
+  else if (normalized <= 5) niceNormalized = 5;
+  else niceNormalized = 10;
+
+  return niceNormalized * magnitude;
+}
+
+function getChartMaxValue(data = []) {
+  const maxValue = Math.max(
+    ...data.map((item) => Math.max(toSafeNumber(item?.value, 0), 0)),
+    0
+  );
+
+  return getNiceChartMax(maxValue);
+}
+
 function getChartPoints(data = []) {
-  const chart = {
-    left: 58,
-    right: 596,
-    top: 30,
-    bottom: 148,
-    maxValue: 50000,
-  };
+  const chartMaxValue = getChartMaxValue(data);
 
   return data.map((item, index) => {
-    const rawValue = Number(item.value || 0);
-    const safeValue = Math.min(rawValue, chart.maxValue);
+    const rawValue = Math.max(toSafeNumber(item?.value, 0), 0);
+    const safeValue = Math.min(rawValue, chartMaxValue);
 
     const x =
-      chart.left +
-      (index / Math.max(data.length - 1, 1)) * (chart.right - chart.left);
+      CHART_BOUNDS.left +
+      (index / Math.max(data.length - 1, 1)) *
+        (CHART_BOUNDS.right - CHART_BOUNDS.left);
 
     const y =
-      chart.bottom -
-      (safeValue / chart.maxValue) * (chart.bottom - chart.top);
+      CHART_BOUNDS.bottom -
+      (safeValue / chartMaxValue) *
+        (CHART_BOUNDS.bottom - CHART_BOUNDS.top);
 
     return { ...item, x, y, rawValue };
   });
@@ -79,11 +114,42 @@ function getSparklinePath(values = []) {
 }
 
 function formatMoney(value) {
-  const number = Number(value || 0);
+  const number = toSafeNumber(value, 0);
 
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 0,
   }).format(number);
+}
+
+function formatAxisLabel(value) {
+  const number = toSafeNumber(value, 0);
+
+  if (number >= 1000000) {
+    return `${Number((number / 1000000).toFixed(1)).toLocaleString('en-US')}M`;
+  }
+
+  if (number >= 1000) {
+    return `${Number((number / 1000).toFixed(1)).toLocaleString('en-US')}K`;
+  }
+
+  return String(Math.round(number));
+}
+
+function getYAxisLabels(maxValue, hasRealSales) {
+  if (!hasRealSales) {
+    return [{ label: '0', y: 150 }];
+  }
+
+  const scale = Math.max(toSafeNumber(maxValue, 1), 1);
+
+  return [
+    { label: formatAxisLabel(scale), y: 30 },
+    { label: formatAxisLabel(scale * 0.8), y: 54 },
+    { label: formatAxisLabel(scale * 0.6), y: 78 },
+    { label: formatAxisLabel(scale * 0.4), y: 102 },
+    { label: formatAxisLabel(scale * 0.2), y: 126 },
+    { label: '0', y: 150 },
+  ];
 }
 
 function DiamondGlints({ small = false }) {
@@ -144,10 +210,16 @@ function DiamondGlints({ small = false }) {
 }
 
 export default function DashboardSalesPanel({ chartData = [], topProducts = [] }) {
+  const chartMaxValue = getChartMaxValue(chartData);
   const points = getChartPoints(chartData);
   const linePath = getSmoothPath(points);
   const areaPath = getAreaPath(points);
-  const highlightPoint = points[3] || points[points.length - 1];
+  const hasRealSales = points.some((point) => point.rawValue > 0);
+  const highlightPoint = hasRealSales
+    ? points.reduce((bestPoint, point) => (
+        point.rawValue > bestPoint.rawValue ? point : bestPoint
+      ), points[0])
+    : null;
 
   const tooltipBox = highlightPoint
     ? {
@@ -159,14 +231,7 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
       }
     : null;
 
-  const yLabels = [
-    { label: '50K', y: 30 },
-    { label: '40K', y: 54 },
-    { label: '30K', y: 78 },
-    { label: '20K', y: 102 },
-    { label: '10K', y: 126 },
-    { label: '0', y: 150 },
-  ];
+  const yLabels = getYAxisLabels(chartMaxValue, hasRealSales);
 
   const diamondChipStyle = {
     border:
@@ -620,44 +685,73 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
               />
             ) : null}
 
-            <path className="dashboard-sales-area-animated" d={areaPath} fill="url(#sales-area-clean)" />
+            {hasRealSales ? (
+              <>
+                <path className="dashboard-sales-area-animated" d={areaPath} fill="url(#sales-area-clean)" />
 
-            <path
-              className="dashboard-sales-line-animated"
-              d={linePath}
-              pathLength="1"
-              fill="none"
-              stroke="var(--admin-primary)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.04"
-              filter="url(#sales-line-glow-clean)"
-            />
+                <path
+                  className="dashboard-sales-line-animated"
+                  d={linePath}
+                  pathLength="1"
+                  fill="none"
+                  stroke="var(--admin-primary)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.04"
+                  filter="url(#sales-line-glow-clean)"
+                />
 
-            <path
-              className="dashboard-sales-line-animated"
-              d={linePath}
-              pathLength="1"
-              fill="none"
-              stroke="url(#sales-line-clean)"
-              strokeWidth="1.65"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#sales-line-glow-clean)"
-            />
+                <path
+                  className="dashboard-sales-line-animated"
+                  d={linePath}
+                  pathLength="1"
+                  fill="none"
+                  stroke="url(#sales-line-clean)"
+                  strokeWidth="1.65"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#sales-line-glow-clean)"
+                />
 
-            <path
-              className="dashboard-sales-line-animated"
-              d={linePath}
-              pathLength="1"
-              fill="none"
-              stroke="rgba(255,255,255,0.42)"
-              strokeWidth="0.55"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.34"
-            />
+                <path
+                  className="dashboard-sales-line-animated"
+                  d={linePath}
+                  pathLength="1"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.42)"
+                  strokeWidth="0.55"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.34"
+                />
+              </>
+            ) : (
+              <g pointerEvents="none">
+                <text
+                  x="327"
+                  y="82"
+                  textAnchor="middle"
+                  fontSize="13"
+                  fontWeight="900"
+                  fill="var(--admin-card-text)"
+                  opacity="0.54"
+                >
+                  Sin ventas registradas esta semana
+                </text>
+                <text
+                  x="327"
+                  y="101"
+                  textAnchor="middle"
+                  fontSize="10.5"
+                  fontWeight="800"
+                  fill="var(--admin-card-muted-text)"
+                  opacity="0.58"
+                >
+                  El gráfico se actualizará cuando ingresen pedidos pagados o activos.
+                </text>
+              </g>
+            )}
 
             {tooltipBox ? (
               <g filter="url(#sales-tooltip-shadow)">
@@ -703,7 +797,7 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
                   fontWeight="950"
                   fill="var(--admin-card-text)"
                 >
-                  ${formatMoney(highlightPoint.rawValue || 41230)}
+                  ${formatMoney(highlightPoint.rawValue)}
                 </text>
               </g>
             ) : null}
@@ -753,7 +847,7 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
             </span>
 
             <h3 className="text-[15px] font-black leading-none" style={styles.title}>
-              Top productos
+              Top productos últimos 30 días
             </h3>
           </div>
 

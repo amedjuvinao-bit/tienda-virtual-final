@@ -113,6 +113,7 @@ const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
+const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 
 // ⬇️ Site Settings (Apariencia & Menús)
@@ -195,6 +196,9 @@ if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 // ✅ CONEXIÓN DE INVENTARIO POR SEDES
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 
+// ✅ CONEXIÓN DEL DASHBOARD ADMINISTRATIVO
+if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
+
 // ✅ CONEXIÓN DE CONFIGURACIÓN DE CORREO ADMINISTRATIVO
 if (adminMailSettingsRoutes) {
   app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
@@ -210,7 +214,12 @@ if (pageRoutes) app.use('/api/pages', pageRoutes);
  * -------------------------------------------
  * Este proceso:
  * - busca reservas pending vencidas
- * - libera reservedStock
+ * - libera reservedapi/admin/mail-settings', adminMailSettingsRoutes);
+}
+
+if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
+
+// ✅Stock
  * - marca la reserva como expired
  * - NO descuenta stock físico
  *
