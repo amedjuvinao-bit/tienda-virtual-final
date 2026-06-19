@@ -6,6 +6,11 @@ const Cart = require('../models/Cart');
 const Favorite = require('../models/Favorite');
 const Branch = require('../models/Branch');
 const InventoryStock = require('../models/InventoryStock');
+const {
+  getMonthPeriodKey,
+  getMonthlyGoal,
+  buildDashboardGoalSummary,
+} = require('../services/dashboardGoalService');
 
 const TIMEZONE = 'America/Bogota';
 
@@ -109,17 +114,13 @@ function getCurrentMonthRange() {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  return {
-    start,
-    end,
-  };
+  return { start, end };
 }
 
 function getLastSevenRange() {
   const today = startOfDay(new Date());
   const currentStart = addDays(today, -6);
   const currentEnd = addDays(today, 1);
-
   const previousStart = addDays(currentStart, -7);
   const previousEnd = currentStart;
 
@@ -165,10 +166,7 @@ function buildSparkline(values = []) {
     .filter((value) => Number.isFinite(value));
 
   if (cleanValues.length === 0) return [];
-
-  if (cleanValues.length >= 10) {
-    return cleanValues.slice(-10);
-  }
+  if (cleanValues.length >= 10) return cleanValues.slice(-10);
 
   const firstValue = cleanValues[0] || 0;
   const missing = 10 - cleanValues.length;
@@ -178,7 +176,6 @@ function buildSparkline(values = []) {
 
 function getStatusLabel(status = '') {
   const value = String(status || '').toLowerCase();
-
   const labels = {
     pending: 'Pendiente',
     processing: 'En proceso',
@@ -662,8 +659,8 @@ async function getAlerts({
 async function getDashboardSummary(req, res) {
   try {
     const { currentStart, currentEnd, previousStart, previousEnd } = getLastSevenRange();
-
     const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
+    const goalPeriodKey = getMonthPeriodKey();
 
     const [
       currentSales,
@@ -686,6 +683,7 @@ async function getDashboardSummary(req, res) {
       inventoryByBranch,
       recentOrders,
       monthSales,
+      monthlyGoalDoc,
       totalBranches,
       orderStatusBreakdown,
     ] = await Promise.all([
@@ -823,6 +821,11 @@ async function getDashboardSummary(req, res) {
         },
       }),
 
+      getMonthlyGoal({
+        periodKey: goalPeriodKey,
+        createIfMissing: true,
+      }),
+
       Branch.countDocuments({
         deletedAt: null,
         active: true,
@@ -840,10 +843,10 @@ async function getDashboardSummary(req, res) {
     const favoritesTrend = calculateTrend(favoriteItems, previousFavoriteItems);
 
     const salesSparkline = buildSparkline(salesChartData.map((item) => item.value));
-
-    const monthlyGoalValue = toNumber(process.env.DASHBOARD_MONTHLY_GOAL, 250000);
-    const monthlyGoalPercentage =
-      monthlyGoalValue > 0 ? Math.min(100, Math.round((monthSales / monthlyGoalValue) * 100)) : 0;
+    const monthlyGoal = buildDashboardGoalSummary({
+      goal: monthlyGoalDoc,
+      currentAmount: monthSales,
+    });
 
     const kpis = [
       {
@@ -911,14 +914,6 @@ async function getDashboardSummary(req, res) {
       withoutImageCount,
       pendingOrdersCount,
     });
-
-    const monthlyGoal = {
-      title: 'Meta de ingresos',
-      goal: formatCurrency(monthlyGoalValue),
-      current: formatCurrency(monthSales),
-      percentage: monthlyGoalPercentage,
-      detail: `${formatCurrency(monthSales)} / ${formatCurrency(monthlyGoalValue)}`,
-    };
 
     return res.json({
       ok: true,
