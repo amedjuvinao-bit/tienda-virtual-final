@@ -1,18 +1,40 @@
 // frontend/src/admin/dashboard/components/DashboardAlertsPanel.jsx
 
-import { AlertTriangle, ChevronRight, Clock3, PackageSearch, Tags } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronRight,
+  Clock3,
+  ImageOff,
+  PackageSearch,
+  Tags,
+} from 'lucide-react';
 import { dashboardStyles as styles } from '../dashboardStyles';
+
+const MAX_VISIBLE_ALERTS = 3;
 
 const alertIconMap = {
   stock: PackageSearch,
   category: Tags,
+  image: ImageOff,
   orders: Clock3,
 };
 
-function GlassIcon({ children }) {
+function normalizeAlert(alert = {}, index = 0) {
+  return {
+    id: alert.id || `dashboard-alert-${index + 1}`,
+    title: alert.title || 'Alerta pendiente',
+    description: alert.description || 'Revisa esta información del dashboard.',
+    action: alert.action || 'Revisar',
+    type: alert.type || 'general',
+  };
+}
+
+function GlassIcon({ children, large = false }) {
   return (
     <span
-      className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[13px]"
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden ${
+        large ? 'h-11 w-11 rounded-[18px]' : 'h-8 w-8 rounded-[13px]'
+      }`}
       style={{
         border:
           '1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.38))',
@@ -67,11 +89,13 @@ function GlassIcon({ children }) {
   );
 }
 
-function GlassButton({ children }) {
+function GlassButton({ children, large = false }) {
   return (
     <button
       type="button"
-      className="alert-pro-button relative inline-flex h-8 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[13px] px-2.5 text-[10.5px] font-black"
+      className={`alert-pro-button relative inline-flex shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[13px] font-black ${
+        large ? 'h-9 px-3 text-[11px]' : 'h-8 px-2.5 text-[10.5px]'
+      }`}
       style={{
         border:
           '1px solid color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,0.36))',
@@ -109,7 +133,12 @@ function GlassButton({ children }) {
 }
 
 export default function DashboardAlertsPanel({ alerts = [] }) {
-  const visibleAlerts = alerts.slice(0, 3);
+  const visibleAlerts = alerts
+    .slice(0, MAX_VISIBLE_ALERTS)
+    .map((alert, index) => normalizeAlert(alert, index));
+
+  const hasAlerts = visibleAlerts.length > 0;
+  const isSingleAlert = visibleAlerts.length === 1;
 
   return (
     <section
@@ -321,87 +350,136 @@ export default function DashboardAlertsPanel({ alerts = [] }) {
           <GlassButton>Ver todas</GlassButton>
         </div>
 
-        <div className="relative z-10 grid min-h-0 flex-1 grid-rows-3 gap-2">
-          {visibleAlerts.map((alert, index) => {
-            const Icon = alertIconMap[alert.type] || AlertTriangle;
+        <div
+          className={
+            isSingleAlert
+              ? 'relative z-10 flex min-h-[132px] flex-1 items-stretch'
+              : 'relative z-10 grid min-h-0 flex-1 gap-2'
+          }
+          style={
+            isSingleAlert
+              ? undefined
+              : {
+                  gridTemplateRows: hasAlerts
+                    ? `repeat(${visibleAlerts.length}, minmax(0, 1fr))`
+                    : '1fr',
+                }
+          }
+        >
+          {hasAlerts ? (
+            visibleAlerts.map((alert, index) => {
+              const Icon = alertIconMap[alert.type] || AlertTriangle;
 
-            return (
-              <article
-                key={alert.id}
-                className="alert-pro-row relative grid min-h-0 grid-cols-[32px_minmax(0,1fr)_76px] items-center gap-2 overflow-hidden rounded-[18px] px-2.5 py-2"
-                style={{
-                  border:
-                    '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.30))',
-                  background: `
-                    linear-gradient(
-                      145deg,
-                      rgba(255,255,255,0.034) 0%,
-                      rgba(255,255,255,0.008) 52%,
-                      color-mix(in srgb, var(--admin-primary) 4%, transparent) 100%
-                    )
-                  `,
-                  boxShadow: `
-                    inset 0 1px 0 rgba(255,255,255,0.28),
-                    inset 0 -1px 0 rgba(15,23,42,0.10),
-                    0 8px 16px rgba(12,6,35,0.040),
-                    0 0 10px color-mix(in srgb, var(--admin-primary) 7%, transparent)
-                  `,
-                  backdropFilter: 'blur(13px) saturate(160%)',
-                  WebkitBackdropFilter: 'blur(13px) saturate(160%)',
-                  animationDelay: `${120 + index * 80}ms`,
-                }}
-              >
-                <span
-                  className="alert-row-accent pointer-events-none absolute left-0 top-3 h-[calc(100%-24px)] w-px opacity-70"
+              return (
+                <article
+                  key={`${alert.id}-${index}`}
+                  className={`
+                    alert-pro-row relative grid min-h-0 items-center overflow-hidden rounded-[18px]
+                    ${
+                      isSingleAlert
+                        ? 'h-full w-full grid-cols-[46px_minmax(0,1fr)_86px] gap-3 px-3.5 py-5'
+                        : 'grid-cols-[32px_minmax(0,1fr)_76px] gap-2 px-2.5 py-2'
+                    }
+                  `}
                   style={{
-                    background:
-                      'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 68%, rgba(255,255,255,0.48)), transparent)',
-                    boxShadow:
-                      '0 0 10px color-mix(in srgb, var(--admin-primary) 28%, transparent)',
-                    transition: 'opacity 180ms ease',
+                    border:
+                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.30))',
+                    background: `
+                      linear-gradient(
+                        145deg,
+                        rgba(255,255,255,0.034) 0%,
+                        rgba(255,255,255,0.008) 52%,
+                        color-mix(in srgb, var(--admin-primary) 4%, transparent) 100%
+                      )
+                    `,
+                    boxShadow: `
+                      inset 0 1px 0 rgba(255,255,255,0.28),
+                      inset 0 -1px 0 rgba(15,23,42,0.10),
+                      0 8px 16px rgba(12,6,35,0.040),
+                      0 0 10px color-mix(in srgb, var(--admin-primary) 7%, transparent)
+                    `,
+                    backdropFilter: 'blur(13px) saturate(160%)',
+                    WebkitBackdropFilter: 'blur(13px) saturate(160%)',
+                    animationDelay: `${120 + index * 80}ms`,
                   }}
-                />
-
-                <span
-                  className="pointer-events-none absolute inset-x-5 top-0 h-px"
-                  style={{
-                    background:
-                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
-                  }}
-                />
-
-                <GlassIcon>
-                  <Icon size={15} strokeWidth={2.5} />
-                </GlassIcon>
-
-                <div className="min-w-0">
-                  <h3
-                    className="truncate text-[12px] font-black leading-[15px]"
-                    style={styles.title}
-                    title={alert.title}
-                  >
-                    {alert.title}
-                  </h3>
-
-                  <p
-                    className="mt-0.5 text-[10.8px] font-semibold leading-[13px]"
+                >
+                  <span
+                    className="alert-row-accent pointer-events-none absolute left-0 top-3 h-[calc(100%-24px)] w-px opacity-70"
                     style={{
-                      ...styles.muted,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
+                      background:
+                        'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 68%, rgba(255,255,255,0.48)), transparent)',
+                      boxShadow:
+                        '0 0 10px color-mix(in srgb, var(--admin-primary) 28%, transparent)',
+                      transition: 'opacity 180ms ease',
                     }}
-                    title={alert.description}
-                  >
-                    {alert.description}
-                  </p>
-                </div>
+                  />
 
-                <GlassButton>{alert.action}</GlassButton>
-              </article>
-            );
-          })}
+                  <span
+                    className="pointer-events-none absolute inset-x-5 top-0 h-px"
+                    style={{
+                      background:
+                        'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+                    }}
+                  />
+
+                  <GlassIcon large={isSingleAlert}>
+                    <Icon size={isSingleAlert ? 18 : 15} strokeWidth={2.5} />
+                  </GlassIcon>
+
+                  <div className="min-w-0">
+                    <h3
+                      className={
+                        isSingleAlert
+                          ? 'text-[13px] font-black leading-[17px]'
+                          : 'truncate text-[12px] font-black leading-[15px]'
+                      }
+                      style={{
+                        ...styles.title,
+                        ...(isSingleAlert
+                          ? {
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }
+                          : {}),
+                      }}
+                      title={alert.title}
+                    >
+                      {alert.title}
+                    </h3>
+
+                    <p
+                      className={
+                        isSingleAlert
+                          ? 'mt-1.5 text-[11.4px] font-semibold leading-[15px]'
+                          : 'mt-0.5 text-[10.8px] font-semibold leading-[13px]'
+                      }
+                      style={{
+                        ...styles.muted,
+                        display: '-webkit-box',
+                        WebkitLineClamp: isSingleAlert ? 3 : 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                      title={alert.description}
+                    >
+                      {alert.description}
+                    </p>
+                  </div>
+
+                  <GlassButton large={isSingleAlert}>{alert.action}</GlassButton>
+                </article>
+              );
+            })
+          ) : (
+            <div
+              className="flex h-full items-center justify-center px-4 text-center text-[12px] font-bold leading-5"
+              style={styles.muted}
+            >
+              No hay alertas importantes por revisar.
+            </div>
+          )}
         </div>
       </div>
     </section>

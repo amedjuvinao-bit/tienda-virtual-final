@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { dashboardStyles as styles } from '../dashboardStyles';
 
+const MAX_VISIBLE_ORDERS = 5;
+
 function getStatusStyle(statusType) {
   const statusMap = {
     success: {
@@ -88,8 +90,19 @@ function DiamondGlints({ small = false }) {
   );
 }
 
+function normalizeOrder(order = {}, index = 0) {
+  return {
+    id: order.id || `ORD-${index + 1}`,
+    customer: order.customer || 'Cliente sin nombre',
+    total: order.total || '$0.00',
+    status: order.status || 'Pendiente',
+    statusType: order.statusType || 'warning',
+    date: order.date || 'Sin fecha',
+  };
+}
+
 export default function DashboardRecentOrders({ orders = [] }) {
-  const visibleOrders = orders.slice(0, 5);
+  const visibleOrders = orders.slice(0, MAX_VISIBLE_ORDERS).map(normalizeOrder);
 
   const rootStyle = {
     border:
@@ -194,7 +207,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
 
   return (
     <section
-      className="dashboard-recent-orders-panel relative flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] p-[1px]"
+      className="dashboard-recent-orders-panel relative flex h-full min-h-0 max-h-full self-stretch overflow-hidden rounded-[28px] p-[1px]"
       style={rootStyle}
     >
       <style>
@@ -295,6 +308,12 @@ export default function DashboardRecentOrders({ orders = [] }) {
               0 10px 20px rgba(12,6,35,0.08) !important;
           }
 
+          @media (max-width: 1280px) {
+            .recent-orders-grid {
+              grid-template-columns: minmax(0, 1.55fr) 84px 96px 78px;
+            }
+          }
+
           @media (prefers-reduced-motion: reduce) {
             .dashboard-recent-orders-panel,
             .recent-orders-row,
@@ -313,7 +332,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
       </style>
 
       <div
-        className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[27px] px-5 py-4 lg:px-6 lg:py-5"
+        className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[27px] px-5 py-4 lg:px-6 lg:py-5"
         style={shellStyle}
       >
         <span
@@ -335,7 +354,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
           }}
         />
 
-        <div className="relative z-10 mb-4 flex items-start justify-between gap-4">
+        <div className="relative z-10 mb-3 flex shrink-0 items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <span
               className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px]"
@@ -396,8 +415,9 @@ export default function DashboardRecentOrders({ orders = [] }) {
 
           <div
             className="
-              grid shrink-0 grid-cols-[minmax(0,1.35fr)_92px_104px_92px]
-              items-center gap-2 px-4 py-3
+              recent-orders-grid grid shrink-0
+              grid-cols-[minmax(0,1.6fr)_88px_100px_82px]
+              items-center gap-2 px-4 py-2.5
               text-[10px] font-black uppercase tracking-[0.07em]
             "
             style={{
@@ -414,19 +434,19 @@ export default function DashboardRecentOrders({ orders = [] }) {
             <span className="text-right">Fecha</span>
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-rows-5">
+          <div className="grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] overflow-hidden">
             {visibleOrders.length > 0 ? (
               visibleOrders.map((order, index) => (
                 <article
-                  key={order.id}
+                  key={`${order.id}-${index}`}
                   className="
-                    recent-orders-row grid min-h-0
-                    grid-cols-[minmax(0,1.35fr)_92px_104px_92px]
-                    items-center gap-2 px-4
+                    recent-orders-row recent-orders-grid grid min-h-0
+                    grid-cols-[minmax(0,1.6fr)_88px_100px_82px]
+                    items-center gap-2 px-4 py-1.5
                   "
                   style={{
                     borderBottom:
-                      index === visibleOrders.length - 1
+                      index === MAX_VISIBLE_ORDERS - 1
                         ? 'none'
                         : '1px solid color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.34))',
                     background:
@@ -444,7 +464,11 @@ export default function DashboardRecentOrders({ orders = [] }) {
                         style={{ color: 'var(--admin-primary)' }}
                       />
 
-                      <p className="truncate text-[12.5px] font-black" style={styles.title}>
+                      <p
+                        className="truncate text-[12.5px] font-black"
+                        style={styles.title}
+                        title={order.id}
+                      >
                         {order.id}
                       </p>
                     </div>
@@ -470,7 +494,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
                     />
 
                     <p
-                      className="truncate text-[11.5px] font-black"
+                      className="truncate text-[11.2px] font-black"
                       style={styles.title}
                       title={order.total}
                     >
@@ -479,7 +503,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
                   </div>
 
                   <span
-                    className="inline-flex w-full items-center justify-center rounded-full px-2 py-1.5 text-[10.5px] font-black"
+                    className="inline-flex w-full min-w-0 items-center justify-center rounded-full px-2 py-1.5 text-[10.2px] font-black"
                     style={getStatusStyle(order.statusType)}
                     title={order.status}
                   >
@@ -494,7 +518,7 @@ export default function DashboardRecentOrders({ orders = [] }) {
                     />
 
                     <p
-                      className="min-w-0 truncate text-right text-[10.8px] font-semibold"
+                      className="min-w-0 truncate text-right text-[10.5px] font-semibold"
                       style={styles.muted}
                       title={order.date}
                     >
@@ -504,7 +528,10 @@ export default function DashboardRecentOrders({ orders = [] }) {
                 </article>
               ))
             ) : (
-              <div className="flex h-full items-center justify-center text-sm font-bold" style={styles.muted}>
+              <div
+                className="col-span-full row-span-full flex h-full items-center justify-center px-5 text-center text-sm font-bold"
+                style={styles.muted}
+              >
                 No hay órdenes recientes para mostrar.
               </div>
             )}

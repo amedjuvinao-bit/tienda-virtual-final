@@ -638,7 +638,7 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
             </defs>
 
             {yLabels.map((item) => (
-              <g key={item.label}>
+              <g key={`y-label-${item.label}-${item.y}`}>
                 <text
                   x="18"
                   y={item.y + 4}
@@ -804,7 +804,7 @@ export default function DashboardSalesPanel({ chartData = [], topProducts = [] }
 
             {points.map((point, index) => (
               <g
-                key={point.label}
+                key={`sales-point-${point.label}-${index}`}
                 className="dashboard-sales-point"
                 tabIndex={0}
                 style={{

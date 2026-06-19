@@ -9,7 +9,8 @@ const InventoryStock = require('../models/InventoryStock');
 
 const TIMEZONE = 'America/Bogota';
 
-const VALID_SALE_STATUSES = ['pending', 'processing', 'paid', 'shipped'];
+const VALID_SALE_STATUSES = ['paid', 'confirmed', 'shipped', 'delivered', 'completed'];
+const ACTIONABLE_ORDER_STATUSES = ['pending', 'processing'];
 const CANCELLED_STATUSES = ['cancelled', 'canceled', 'refunded', 'failed'];
 
 const QUICK_ACTIONS = [
@@ -67,6 +68,10 @@ function formatPlainNumber(value) {
   return roundNumber(value).toLocaleString('en-US');
 }
 
+function pluralize(value, singular, plural) {
+  return Number(value) === 1 ? singular : plural;
+}
+
 function startOfDay(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -90,9 +95,11 @@ function getLastSevenDays() {
     return {
       date,
       key,
-      label: date.toLocaleDateString('es-CO', {
-        weekday: 'short',
-      }).replace('.', ''),
+      label: date
+        .toLocaleDateString('es-CO', {
+          weekday: 'short',
+        })
+        .replace('.', ''),
     };
   });
 }
@@ -166,10 +173,7 @@ function buildSparkline(values = []) {
   const firstValue = cleanValues[0] || 0;
   const missing = 10 - cleanValues.length;
 
-  return [
-    ...Array.from({ length: missing }, () => firstValue),
-    ...cleanValues,
-  ];
+  return [...Array.from({ length: missing }, () => firstValue), ...cleanValues];
 }
 
 function getStatusLabel(status = '') {
@@ -179,7 +183,10 @@ function getStatusLabel(status = '') {
     pending: 'Pendiente',
     processing: 'En proceso',
     paid: 'Confirmada',
+    confirmed: 'Confirmada',
     shipped: 'Enviado',
+    delivered: 'Entregada',
+    completed: 'Completada',
     cancelled: 'Cancelada',
     canceled: 'Cancelada',
     refunded: 'Reembolsada',
@@ -192,7 +199,7 @@ function getStatusLabel(status = '') {
 function getStatusType(status = '') {
   const value = String(status || '').toLowerCase();
 
-  if (['paid'].includes(value)) return 'success';
+  if (['paid', 'confirmed', 'delivered', 'completed'].includes(value)) return 'success';
   if (['processing', 'pending'].includes(value)) return 'warning';
   if (['shipped'].includes(value)) return 'info';
   if (['cancelled', 'canceled', 'refunded', 'failed'].includes(value)) return 'danger';
@@ -204,7 +211,7 @@ function formatRecentDate(date) {
   if (!date) return '';
 
   return new Date(date).toLocaleString('es-CO', {
-    day: '2-digit',
+    day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
@@ -213,18 +220,29 @@ function formatRecentDate(date) {
 }
 
 function getCustomerName(customer = {}) {
-  const fullName = `${customer.name || ''} ${customer.lastname || ''}`
+  const fullName = String(
+    customer.fullName ||
+      `${customer.name || customer.firstName || ''} ${
+        customer.lastname || customer.lastName || ''
+      }`
+  )
     .trim()
     .replace(/\s+/g, ' ');
 
-  return fullName || customer.email || customer.phone || customer.emailOrPhone || 'Cliente sin nombre';
+  return (
+    fullName ||
+    customer.email ||
+    customer.phone ||
+    customer.emailOrPhone ||
+    'Cliente sin nombre'
+  );
 }
 
 async function getSalesTotal(match = {}) {
   const result = await Order.aggregate([
     {
       $match: {
-        status: { $nin: CANCELLED_STATUSES },
+        status: { $in: VALID_SALE_STATUSES },
         ...match,
       },
     },
@@ -251,6 +269,11 @@ async function getOrdersCount(match = {}) {
 }
 
 async function getLowStockCount() {
+  const hasInventoryStock = await InventoryStock.exists({
+    active: true,
+    deletedAt: null,
+  });
+
   const inventoryResult = await InventoryStock.aggregate([
     {
       $match: {
@@ -285,7 +308,7 @@ async function getLowStockCount() {
 
   const inventoryCount = toNumber(inventoryResult?.[0]?.count, 0);
 
-  if (inventoryCount > 0) return inventoryCount;
+  if (hasInventoryStock) return inventoryCount;
 
   return Product.countDocuments({
     active: true,
@@ -304,7 +327,7 @@ async function getSalesChartData() {
   const rows = await Order.aggregate([
     {
       $match: {
-        status: { $nin: CANCELLED_STATUSES },
+        status: { $in: VALID_SALE_STATUSES },
         createdAt: {
           $gte: startDate,
           $lt: endDate,
@@ -329,9 +352,7 @@ async function getSalesChartData() {
     },
   ]);
 
-  const valuesByDate = new Map(
-    rows.map((row) => [row._id, toNumber(row.value, 0)])
-  );
+  const valuesByDate = new Map(rows.map((row) => [row._id, toNumber(row.value, 0)]));
 
   return days.map((day) => ({
     label: day.label.charAt(0).toUpperCase() + day.label.slice(1),
@@ -345,7 +366,7 @@ async function getTopProducts() {
   const rows = await Order.aggregate([
     {
       $match: {
-        status: { $nin: CANCELLED_STATUSES },
+        status: { $in: VALID_SALE_STATUSES },
         createdAt: {
           $gte: thirtyDaysAgo,
         },
@@ -546,13 +567,47 @@ async function getRecentOrders() {
   }));
 }
 
-async function getAlerts({ lowStockCount, withoutCategoryCount, withoutImageCount, pendingOrdersCount }) {
+async function getOrderStatusBreakdown() {
+  const rows = await Order.aggregate([
+    {
+      $group: {
+        _id: {
+          $ifNull: ['$status', 'unknown'],
+        },
+        count: {
+          $sum: 1,
+        },
+      },
+    },
+    {
+      $sort: {
+        count: -1,
+      },
+    },
+  ]);
+
+  return rows.reduce((acc, row) => {
+    acc[row._id] = row.count;
+    return acc;
+  }, {});
+}
+
+async function getAlerts({
+  lowStockCount,
+  withoutCategoryCount,
+  withoutImageCount,
+  pendingOrdersCount,
+}) {
   const alerts = [];
 
   if (lowStockCount > 0) {
     alerts.push({
       id: 'alert-stock',
-      title: `${lowStockCount} productos con stock bajo`,
+      title: `${lowStockCount} ${pluralize(
+        lowStockCount,
+        'producto con stock bajo',
+        'productos con stock bajo'
+      )}`,
       description: 'Revisa el inventario para evitar quiebres.',
       action: 'Revisar',
       type: 'stock',
@@ -562,7 +617,11 @@ async function getAlerts({ lowStockCount, withoutCategoryCount, withoutImageCoun
   if (withoutCategoryCount > 0) {
     alerts.push({
       id: 'alert-category',
-      title: `${withoutCategoryCount} productos sin categoría`,
+      title: `${withoutCategoryCount} ${pluralize(
+        withoutCategoryCount,
+        'producto sin categoría',
+        'productos sin categoría'
+      )}`,
       description: 'Organiza tus productos para mejor visibilidad.',
       action: 'Revisar',
       type: 'category',
@@ -572,7 +631,11 @@ async function getAlerts({ lowStockCount, withoutCategoryCount, withoutImageCoun
   if (withoutImageCount > 0) {
     alerts.push({
       id: 'alert-image',
-      title: `${withoutImageCount} productos sin imagen`,
+      title: `${withoutImageCount} ${pluralize(
+        withoutImageCount,
+        'producto sin imagen',
+        'productos sin imagen'
+      )}`,
       description: 'Agrega imágenes para mejorar la presentación.',
       action: 'Revisar',
       type: 'image',
@@ -582,8 +645,12 @@ async function getAlerts({ lowStockCount, withoutCategoryCount, withoutImageCoun
   if (pendingOrdersCount > 0) {
     alerts.push({
       id: 'alert-orders',
-      title: `${pendingOrdersCount} órdenes por confirmar`,
-      description: 'Tienes órdenes pendientes de revisión.',
+      title: `${pendingOrdersCount} ${pluralize(
+        pendingOrdersCount,
+        'orden pendiente de revisión',
+        'órdenes pendientes de revisión'
+      )}`,
+      description: 'Revisa pedidos pendientes o en proceso.',
       action: 'Revisar',
       type: 'orders',
     });
@@ -594,12 +661,7 @@ async function getAlerts({ lowStockCount, withoutCategoryCount, withoutImageCoun
 
 async function getDashboardSummary(req, res) {
   try {
-    const {
-      currentStart,
-      currentEnd,
-      previousStart,
-      previousEnd,
-    } = getLastSevenRange();
+    const { currentStart, currentEnd, previousStart, previousEnd } = getLastSevenRange();
 
     const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
 
@@ -625,6 +687,7 @@ async function getDashboardSummary(req, res) {
       recentOrders,
       monthSales,
       totalBranches,
+      orderStatusBreakdown,
     ] = await Promise.all([
       getSalesTotal({
         createdAt: {
@@ -731,24 +794,17 @@ async function getDashboardSummary(req, res) {
         active: true,
         $and: [
           {
-            $or: [
-              { image: { $exists: false } },
-              { image: null },
-              { image: '' },
-            ],
+            $or: [{ image: { $exists: false } }, { image: null }, { image: '' }],
           },
           {
-            $or: [
-              { images: { $exists: false } },
-              { images: { $size: 0 } },
-            ],
+            $or: [{ images: { $exists: false } }, { images: { $size: 0 } }],
           },
         ],
       }),
 
       Order.countDocuments({
         status: {
-          $in: ['pending', 'processing'],
+          $in: ACTIONABLE_ORDER_STATUSES,
         },
       }),
 
@@ -771,6 +827,8 @@ async function getDashboardSummary(req, res) {
         deletedAt: null,
         active: true,
       }),
+
+      getOrderStatusBreakdown(),
     ]);
 
     const favoriteItems = toNumber(favoriteItemsResult?.[0]?.count, 0);
@@ -784,9 +842,8 @@ async function getDashboardSummary(req, res) {
     const salesSparkline = buildSparkline(salesChartData.map((item) => item.value));
 
     const monthlyGoalValue = toNumber(process.env.DASHBOARD_MONTHLY_GOAL, 250000);
-    const monthlyGoalPercentage = monthlyGoalValue > 0
-      ? Math.min(100, Math.round((monthSales / monthlyGoalValue) * 100))
-      : 0;
+    const monthlyGoalPercentage =
+      monthlyGoalValue > 0 ? Math.min(100, Math.round((monthSales / monthlyGoalValue) * 100)) : 0;
 
     const kpis = [
       {
@@ -809,7 +866,9 @@ async function getDashboardSummary(req, res) {
         trendType: ordersTrend.trendType,
         icon: 'cart',
         accent: 'rose',
-        sparkline: buildSparkline(salesChartData.map((item) => item.value > 0 ? item.value / 1000 : 0)),
+        sparkline: buildSparkline(
+          salesChartData.map((item) => (item.value > 0 ? item.value / 1000 : 0))
+        ),
       },
       {
         id: 'active-carts',
@@ -883,6 +942,7 @@ async function getDashboardSummary(req, res) {
           monthSales,
           activeCarts,
           favorites: favoriteItems,
+          orderStatusBreakdown,
         },
       },
     });
