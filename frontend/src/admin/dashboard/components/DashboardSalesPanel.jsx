@@ -7,10 +7,12 @@ import { dashboardStyles as styles } from '../dashboardStyles';
 const CHART_BOUNDS = {
   left: 58,
   right: 596,
-  top: 30,
-  bottom: 148,
+  top: 78,
+  bottom: 150,
 };
 
+const SVG_WIDTH = 620;
+const SVG_HEIGHT = 200;
 const FALLBACK_RANGE_OPTIONS = [{ value: 'this_week', label: 'Esta semana' }];
 
 function toSafeNumber(value, fallback = 0) {
@@ -124,18 +126,19 @@ function getAreaPath(points = []) {
 
 function getYAxisLabels(maxValue, hasRealSales) {
   if (!hasRealSales) {
-    return [{ label: '0', y: 150 }];
+    return [{ label: '0', y: CHART_BOUNDS.bottom }];
   }
 
   const scale = Math.max(toSafeNumber(maxValue, 1), 1);
+  const step = (CHART_BOUNDS.bottom - CHART_BOUNDS.top) / 5;
 
   return [
-    { label: formatAxisLabel(scale), y: 30 },
-    { label: formatAxisLabel(scale * 0.8), y: 54 },
-    { label: formatAxisLabel(scale * 0.6), y: 78 },
-    { label: formatAxisLabel(scale * 0.4), y: 102 },
-    { label: formatAxisLabel(scale * 0.2), y: 126 },
-    { label: '0', y: 150 },
+    { label: formatAxisLabel(scale), y: CHART_BOUNDS.top },
+    { label: formatAxisLabel(scale * 0.8), y: CHART_BOUNDS.top + step },
+    { label: formatAxisLabel(scale * 0.6), y: CHART_BOUNDS.top + step * 2 },
+    { label: formatAxisLabel(scale * 0.4), y: CHART_BOUNDS.top + step * 3 },
+    { label: formatAxisLabel(scale * 0.2), y: CHART_BOUNDS.top + step * 4 },
+    { label: '0', y: CHART_BOUNDS.bottom },
   ];
 }
 
@@ -168,6 +171,17 @@ function getComparisonText(currentValue, previousValue) {
   const sign = percent >= 0 ? '+' : '';
 
   return `${sign}${percent.toFixed(1)}% vs periodo anterior`;
+}
+
+function getTooltipPlacement(point) {
+  if (!point) {
+    return { left: 50, top: 50 };
+  }
+
+  return {
+    left: Math.min(Math.max((point.x / SVG_WIDTH) * 100, 16), 84),
+    top: Math.min(Math.max((point.y / SVG_HEIGHT) * 100, 43), 78),
+  };
 }
 
 function DiamondGlints({ small = false }) {
@@ -214,7 +228,9 @@ function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle,
   const dropdownRef = useRef(null);
   const safeOptions = options.length ? options : FALLBACK_RANGE_OPTIONS;
   const selectedOption =
-    safeOptions.find((option) => option.value === value) || safeOptions[0] || FALLBACK_RANGE_OPTIONS[0];
+    safeOptions.find((option) => option.value === value) ||
+    safeOptions[0] ||
+    FALLBACK_RANGE_OPTIONS[0];
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -370,7 +386,7 @@ export default function DashboardSalesPanel({
 
       return currentValue > bestValue ? index : bestIndex;
     }, 0);
-  }, [points]);
+  }, [chartData, chartMaxValue]);
 
   const [activePointIndex, setActivePointIndex] = useState(defaultPointIndex);
 
@@ -386,12 +402,12 @@ export default function DashboardSalesPanel({
     activePoint?.orders ?? activePoint?.ordersCount ?? activePoint?.orderCount,
     0
   );
-  const tooltipLeft = activePoint
-    ? Math.min(Math.max((activePoint.x / 620) * 100, 13), 87)
-    : 50;
-  const tooltipTop = activePoint
-    ? Math.min(Math.max((activePoint.y / 200) * 100, 18), 76)
-    : 50;
+  const tooltipPosition = getTooltipPlacement(activePoint);
+
+  const selectedRangeOptions = useMemo(
+    () => (rangeOptions.length ? rangeOptions : FALLBACK_RANGE_OPTIONS),
+    [rangeOptions]
+  );
 
   const diamondChipStyle = {
     border:
@@ -461,11 +477,6 @@ export default function DashboardSalesPanel({
     WebkitBackdropFilter: 'blur(14px) saturate(170%)',
   };
 
-  const selectedRangeOptions = useMemo(
-    () => (rangeOptions.length ? rangeOptions : FALLBACK_RANGE_OPTIONS),
-    [rangeOptions]
-  );
-
   return (
     <section
       className="dashboard-sales-enter relative self-start overflow-visible rounded-[28px] p-[1px]"
@@ -529,12 +540,13 @@ export default function DashboardSalesPanel({
           .dashboard-sales-point:focus,
           .dashboard-sales-point:focus-visible { outline: none !important; }
           .dashboard-sales-point .point-core,
-          .dashboard-sales-point .point-halo,
-          .dashboard-sales-point .point-cross { transition: transform 180ms ease, opacity 180ms ease, filter 180ms ease; transform-box: fill-box; transform-origin: center; }
+          .dashboard-sales-point .point-halo { transition: transform 180ms ease, opacity 180ms ease, filter 180ms ease; transform-box: fill-box; transform-origin: center; }
           .dashboard-sales-point:hover .point-core,
-          .dashboard-sales-point:focus-visible .point-core { transform: scale(1.65); opacity: 1; filter: drop-shadow(0 0 6px rgba(255,255,255,0.86)) drop-shadow(0 0 12px color-mix(in srgb, var(--admin-primary) 34%, transparent)); }
+          .dashboard-sales-point:focus-visible .point-core,
+          .dashboard-sales-point.is-active .point-core { transform: scale(1.65); opacity: 1; filter: drop-shadow(0 0 6px rgba(255,255,255,0.86)) drop-shadow(0 0 12px color-mix(in srgb, var(--admin-primary) 34%, transparent)); }
           .dashboard-sales-point:hover .point-halo,
-          .dashboard-sales-point:focus-visible .point-halo { transform: scale(1.55); opacity: 0.7; }
+          .dashboard-sales-point:focus-visible .point-halo,
+          .dashboard-sales-point.is-active .point-halo { transform: scale(1.55); opacity: 0.7; }
           .dashboard-sales-tooltip { animation: dashboardTooltipIn 180ms ease-out both; }
           .dashboard-glass-main-button { animation: dashboardGlassPulse 3.8s ease-in-out infinite; }
           .dashboard-glass-main-button:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--admin-primary) 30%, rgba(255,255,255,0.42)) !important; }
@@ -593,7 +605,9 @@ export default function DashboardSalesPanel({
               </h2>
               <p className="mt-1 text-[10.5px] font-bold" style={styles.muted}>
                 {rangeLabel}
-                {compareEnabled && salesSummary?.trend ? ` · ${salesSummary.trend} vs. periodo anterior` : ''}
+                {compareEnabled && salesSummary?.trend
+                  ? ` · ${salesSummary.trend} vs. periodo anterior`
+                  : ''}
               </p>
             </div>
           </div>
@@ -629,7 +643,7 @@ export default function DashboardSalesPanel({
 
         <div className="relative z-10 mt-1 overflow-visible rounded-[20px]">
           <svg
-            viewBox="0 0 620 200"
+            viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
             className="h-[200px] w-full"
             preserveAspectRatio="none"
             role="img"
@@ -679,11 +693,15 @@ export default function DashboardSalesPanel({
                 </text>
 
                 <line
-                  x1="58"
-                  x2="596"
+                  x1={CHART_BOUNDS.left}
+                  x2={CHART_BOUNDS.right}
                   y1={item.y}
                   y2={item.y}
-                  stroke={item.label === '0' ? 'rgba(15,23,42,0.08)' : 'color-mix(in srgb, var(--admin-primary) 10%, transparent)'}
+                  stroke={
+                    item.label === '0'
+                      ? 'rgba(15,23,42,0.08)'
+                      : 'color-mix(in srgb, var(--admin-primary) 10%, transparent)'
+                  }
                   strokeOpacity="0.14"
                   strokeDasharray={item.label === '0' ? undefined : '6 12'}
                 />
@@ -713,7 +731,7 @@ export default function DashboardSalesPanel({
                   pathLength="1"
                   fill="none"
                   stroke="url(#sales-line-clean)"
-                  strokeWidth="1.65"
+                  strokeWidth="1.75"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   filter="url(#sales-line-glow-clean)"
@@ -723,7 +741,7 @@ export default function DashboardSalesPanel({
               <g pointerEvents="none">
                 <text
                   x="327"
-                  y="82"
+                  y="92"
                   textAnchor="middle"
                   fontSize="13"
                   fontWeight="900"
@@ -734,7 +752,7 @@ export default function DashboardSalesPanel({
                 </text>
                 <text
                   x="327"
-                  y="101"
+                  y="111"
                   textAnchor="middle"
                   fontSize="10.5"
                   fontWeight="800"
@@ -746,60 +764,79 @@ export default function DashboardSalesPanel({
               </g>
             )}
 
-            {points.map((point, index) => (
-              <g
-                key={`sales-point-${point.label}-${index}`}
-                className="dashboard-sales-point"
-                tabIndex={0}
-                role="button"
-                aria-label={`${point.label}: $${formatMoney(point.rawValue)} en ventas`}
-                onMouseEnter={() => setActivePointIndex(index)}
-                onFocus={() => setActivePointIndex(index)}
-                onClick={() => setActivePointIndex(index)}
-                style={{
-                  animationDelay: `${260 + index * 70}ms`,
-                  outline: 'none',
-                }}
-              >
-                <circle className="point-halo" cx={point.x} cy={point.y} r="6.2" fill="rgba(255,255,255,0.36)" opacity="0.38" filter="url(#sales-point-glow-clean)" />
-                <circle className="point-core" cx={point.x} cy={point.y} r="2.9" fill="rgba(255,255,255,0.98)" filter="url(#sales-point-glow-clean)" />
-                <circle cx={point.x} cy={point.y} r="15" fill="transparent" pointerEvents="all" />
+            {points.map((point, index) => {
+              const active = index === activePointIndex;
 
-                <text
-                  x={point.x}
-                  y="182"
-                  textAnchor="middle"
-                  fontSize="12"
-                  fontWeight="900"
-                  fill="var(--admin-card-muted-text)"
-                  opacity="0.84"
-                  pointerEvents="none"
+              return (
+                <g
+                  key={`sales-point-${point.label}-${index}`}
+                  className={`dashboard-sales-point${active ? ' is-active' : ''}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${point.label}: $${formatMoney(point.rawValue)} en ventas`}
+                  onMouseEnter={() => setActivePointIndex(index)}
+                  onFocus={() => setActivePointIndex(index)}
+                  onClick={() => setActivePointIndex(index)}
+                  style={{
+                    animationDelay: `${260 + index * 70}ms`,
+                    outline: 'none',
+                  }}
                 >
-                  {point.label}
-                </text>
-              </g>
-            ))}
+                  <circle
+                    className="point-halo"
+                    cx={point.x}
+                    cy={point.y}
+                    r="6.2"
+                    fill="rgba(255,255,255,0.36)"
+                    opacity="0.38"
+                    filter="url(#sales-point-glow-clean)"
+                  />
+                  <circle
+                    className="point-core"
+                    cx={point.x}
+                    cy={point.y}
+                    r="2.9"
+                    fill="rgba(255,255,255,0.98)"
+                    filter="url(#sales-point-glow-clean)"
+                  />
+                  <circle cx={point.x} cy={point.y} r="15" fill="transparent" pointerEvents="all" />
+
+                  <text
+                    x={point.x}
+                    y="182"
+                    textAnchor="middle"
+                    fontSize="12"
+                    fontWeight="900"
+                    fill="var(--admin-card-muted-text)"
+                    opacity="0.84"
+                    pointerEvents="none"
+                  >
+                    {point.label}
+                  </text>
+                </g>
+              );
+            })}
           </svg>
 
           {activePoint ? (
             <div
-              className="dashboard-sales-tooltip pointer-events-none absolute z-30 min-w-[154px] rounded-[18px] p-[1px]"
+              className="dashboard-sales-tooltip pointer-events-none absolute z-[80] w-[190px] rounded-[18px] p-[1px]"
               style={{
-                left: `${tooltipLeft}%`,
-                top: `${tooltipTop}%`,
+                left: `${tooltipPosition.left}%`,
+                top: `${tooltipPosition.top}%`,
                 transform: 'translate(-50%, calc(-100% - 14px))',
                 border:
                   '1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.62))',
                 background: `
                   linear-gradient(
                     145deg,
-                    rgba(255,255,255,0.82) 0%,
-                    rgba(255,255,255,0.48) 54%,
-                    color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,0.18)) 100%
+                    rgba(255,255,255,0.88) 0%,
+                    rgba(255,255,255,0.58) 54%,
+                    color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,0.20)) 100%
                   )
                 `,
                 boxShadow: `
-                  inset 0 1px 0 rgba(255,255,255,0.82),
+                  inset 0 1px 0 rgba(255,255,255,0.92),
                   0 16px 34px rgba(12,6,35,0.15),
                   0 0 18px color-mix(in srgb, var(--admin-primary) 14%, transparent)
                 `,
@@ -807,27 +844,42 @@ export default function DashboardSalesPanel({
                 WebkitBackdropFilter: 'blur(18px) saturate(175%)',
               }}
             >
-              <div className="relative rounded-[17px] px-3.5 py-3 text-left">
-                <p
-                  className="text-[10px] font-black uppercase tracking-[0.12em]"
-                  style={styles.muted}
-                >
-                  {activePoint.label}
-                </p>
+              <div className="relative rounded-[17px] px-3.5 py-2.5 text-left">
+                <div className="flex items-start justify-between gap-2">
+                  <p
+                    className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.12em]"
+                    style={styles.muted}
+                    title={activePoint.label}
+                  >
+                    {activePoint.label}
+                  </p>
 
-                <p className="mt-1 text-[17px] font-black leading-none" style={styles.title}>
+                  {activeOrders > 0 ? (
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black"
+                      style={{
+                        color: 'var(--admin-primary)',
+                        background:
+                          'color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.56))',
+                      }}
+                    >
+                      {activeOrders} {activeOrders === 1 ? 'pedido' : 'pedidos'}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mt-1 text-[18px] font-black leading-none" style={styles.title}>
                   ${formatMoney(activePoint.rawValue)}
                 </p>
 
-                {activeOrders > 0 ? (
-                  <p className="mt-1 text-[10.5px] font-black" style={styles.muted}>
-                    {activeOrders} {activeOrders === 1 ? 'pedido' : 'pedidos'} en el periodo
-                  </p>
-                ) : null}
-
                 <p
-                  className="mt-1.5 text-[10.5px] font-black"
+                  className="mt-1.5 truncate text-[10.5px] font-black leading-[13px]"
                   style={{ color: 'var(--admin-primary)' }}
+                  title={
+                    compareEnabled && activeComparisonPoint
+                      ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
+                      : 'Ventas del periodo'
+                  }
                 >
                   {compareEnabled && activeComparisonPoint
                     ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
@@ -835,7 +887,7 @@ export default function DashboardSalesPanel({
                 </p>
 
                 {compareEnabled && activeComparisonPoint ? (
-                  <p className="mt-1 text-[9.5px] font-bold" style={styles.muted}>
+                  <p className="mt-1 truncate text-[9.5px] font-bold leading-[12px]" style={styles.muted}>
                     Anterior: ${formatMoney(activeComparisonPoint.rawValue)}
                   </p>
                 ) : null}
@@ -843,7 +895,7 @@ export default function DashboardSalesPanel({
                 <span
                   className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1.5 rotate-45"
                   style={{
-                    background: 'rgba(255,255,255,0.58)',
+                    background: 'rgba(255,255,255,0.72)',
                     borderRight:
                       '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.48))',
                     borderBottom:
@@ -911,7 +963,10 @@ export default function DashboardSalesPanel({
                 key={product.id || product.name || index}
                 className="grid grid-cols-[minmax(0,1.7fr)_78px_120px_105px] items-center px-3 py-2 text-[12px] font-black"
                 style={{
-                  borderTop: index > 0 ? '1px solid color-mix(in srgb, var(--admin-primary) 8%, transparent)' : 'none',
+                  borderTop:
+                    index > 0
+                      ? '1px solid color-mix(in srgb, var(--admin-primary) 8%, transparent)'
+                      : 'none',
                   color: 'var(--admin-card-text)',
                 }}
               >
