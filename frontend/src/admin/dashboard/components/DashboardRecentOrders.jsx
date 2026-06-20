@@ -110,11 +110,23 @@ export default function DashboardRecentOrders({ orders = [], onViewOrders }) {
   };
 
   const tableStyle = {
-    border: '1px solid color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.36))',
-    background: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.050)) 0%, rgba(255,255,255,0.010) 54%, color-mix(in srgb, var(--admin-primary) 6%, transparent) 100%)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -1px 0 rgba(15,23,42,0.13), 0 14px 28px rgba(12,6,35,0.075), 0 0 20px color-mix(in srgb, var(--admin-primary) 14%, transparent)',
-    backdropFilter: 'blur(16px) saturate(175%)',
-    WebkitBackdropFilter: 'blur(16px) saturate(175%)',
+    border: '1px solid color-mix(in srgb, var(--admin-primary) 15%, rgba(255,255,255,0.22))',
+    background: `
+      linear-gradient(
+        145deg,
+        rgba(255,255,255,0.018) 0%,
+        rgba(255,255,255,0.004) 52%,
+        color-mix(in srgb, var(--admin-primary) 2%, transparent) 100%
+      )
+    `,
+    boxShadow: `
+      inset 0 1px 0 rgba(255,255,255,0.20),
+      inset 0 -1px 0 rgba(15,23,42,0.08),
+      0 8px 16px rgba(12,6,35,0.028),
+      0 0 8px color-mix(in srgb, var(--admin-primary) 4%, transparent)
+    `,
+    backdropFilter: 'blur(12px) saturate(150%)',
+    WebkitBackdropFilter: 'blur(12px) saturate(150%)',
   };
 
   return (
@@ -132,7 +144,7 @@ export default function DashboardRecentOrders({ orders = [], onViewOrders }) {
 
           .dashboard-recent-orders-panel { animation: recentOrdersEnter 520ms ease-out both; }
           .recent-orders-row { animation: recentOrdersRowEnter 420ms ease-out both; transition: background 180ms ease, transform 180ms ease, filter 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
-          .recent-orders-row:hover { transform: translateY(-2px); filter: brightness(1.03) saturate(1.06); background: linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.052)) 0%, rgba(255,255,255,0.014) 56%, color-mix(in srgb, var(--admin-primary) 7%, transparent) 100%) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(15,23,42,0.12), 0 10px 18px rgba(12,6,35,0.055), 0 0 14px color-mix(in srgb, var(--admin-primary) 10%, transparent) !important; }
+          .recent-orders-row:hover { transform: translateY(-2px); filter: brightness(1.03) saturate(1.06); background: linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.035)) 0%, rgba(255,255,255,0.006) 56%, color-mix(in srgb, var(--admin-primary) 6%, transparent) 100%) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -1px 0 rgba(15,23,42,0.10), 0 8px 16px rgba(12,6,35,0.040), 0 0 10px color-mix(in srgb, var(--admin-primary) 8%, transparent) !important; }
           .recent-orders-table-shine { animation: recentOrdersShine 4.2s ease-in-out infinite; }
           .recent-orders-diamond-dot { animation: recentOrdersDotPulse 3.4s ease-in-out infinite; }
           .recent-orders-panel-edge { animation: recentOrdersEdgePulse 3.8s ease-in-out infinite; }
@@ -171,12 +183,12 @@ export default function DashboardRecentOrders({ orders = [], onViewOrders }) {
         </div>
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px]" style={tableStyle}>
-          <span className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 20%, transparent) 0%, transparent 64%)', opacity: 0.22, filter: 'blur(13px)' }} />
-          <span className="pointer-events-none absolute inset-x-6 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.76), transparent)' }} />
-          <span className="pointer-events-none absolute left-0 top-6 h-[calc(100%-48px)] w-px" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 72%, rgba(255,255,255,0.50)), transparent)', boxShadow: '0 0 12px color-mix(in srgb, var(--admin-primary) 34%, transparent)' }} />
-          <span className="recent-orders-table-shine pointer-events-none absolute -left-12 top-0 h-full w-[18px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)', opacity: 0.48 }} />
+          <span className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 20%, transparent) 0%, transparent 64%)', opacity: 0.06, filter: 'blur(13px)' }} />
+          <span className="pointer-events-none absolute inset-x-6 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.58), transparent)' }} />
+          <span className="pointer-events-none absolute left-0 top-6 h-[calc(100%-48px)] w-px" style={{ background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 64%, rgba(255,255,255,0.42)), transparent)', boxShadow: '0 0 10px color-mix(in srgb, var(--admin-primary) 24%, transparent)' }} />
+          <span className="recent-orders-table-shine pointer-events-none absolute -left-12 top-0 h-full w-[18px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)', opacity: 0.22 }} />
 
-          <div className="recent-orders-grid relative z-10 grid shrink-0 grid-cols-[minmax(0,1.6fr)_88px_100px_82px] items-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.07em]" style={{ color: 'var(--admin-card-muted-text)', borderBottom: '1px solid color-mix(in srgb, var(--admin-primary) 15%, rgba(255,255,255,0.24))', background: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary) 4%, rgba(255,255,255,0.014)), rgba(255,255,255,0.004))' }}>
+          <div className="recent-orders-grid relative z-10 grid shrink-0 grid-cols-[minmax(0,1.6fr)_88px_100px_82px] items-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.07em]" style={{ color: 'var(--admin-card-muted-text)', borderBottom: '1px solid color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.18))', background: 'transparent' }}>
             <span>Orden / cliente</span>
             <span>Total</span>
             <span>Estado</span>
@@ -186,7 +198,7 @@ export default function DashboardRecentOrders({ orders = [], onViewOrders }) {
           <div className="relative z-10 grid min-h-0 flex-1 grid-rows-[repeat(5,minmax(0,1fr))] overflow-hidden">
             {visibleOrders.length > 0 ? (
               visibleOrders.map((order, index) => (
-                <article key={`${order.id}-${index}`} className="recent-orders-row recent-orders-grid grid min-h-0 grid-cols-[minmax(0,1.6fr)_88px_100px_82px] items-center gap-2 px-4 py-1.5" style={{ borderBottom: index === MAX_VISIBLE_ORDERS - 1 ? 'none' : '1px solid color-mix(in srgb, var(--admin-primary) 11%, rgba(255,255,255,0.18))', background: index % 2 === 0 ? 'linear-gradient(145deg, rgba(255,255,255,0.012), rgba(255,255,255,0.002))' : 'linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 3%, rgba(255,255,255,0.010)), rgba(255,255,255,0.002))', animationDelay: `${110 + index * 55}ms` }}>
+                <article key={`${order.id}-${index}`} className="recent-orders-row recent-orders-grid grid min-h-0 grid-cols-[minmax(0,1.6fr)_88px_100px_82px] items-center gap-2 px-4 py-1.5" style={{ borderBottom: index === MAX_VISIBLE_ORDERS - 1 ? 'none' : '1px solid color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.14))', background: 'transparent', animationDelay: `${110 + index * 55}ms` }}>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <Hash size={13} strokeWidth={2.4} style={{ color: 'var(--admin-primary)' }} />
