@@ -78,6 +78,15 @@ export default function DashboardModelOne(props) {
         >
           <DashboardSalesPanel
             chartData={props.salesChartData || []}
+            comparisonData={props.comparisonSalesChartData || []}
+            salesSummary={props.salesSummary}
+            salesPeriod={props.salesPeriod}
+            range={props.salesRange}
+            rangeOptions={props.salesRangeOptions || []}
+            compareEnabled={props.salesCompare}
+            loading={props.salesLoading}
+            onRangeChange={props.onSalesRangeChange}
+            onToggleCompare={props.onSalesCompareToggle}
             topProducts={props.topProducts || []}
             onViewProducts={navigation.viewProducts}
           />
