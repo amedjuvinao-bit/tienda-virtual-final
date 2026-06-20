@@ -1,6 +1,7 @@
 // frontend/src/admin/dashboard/DashboardPage.jsx
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   dashboardAlerts,
@@ -32,6 +33,7 @@ const fallbackDashboardData = {
 };
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const selectedModel = 'modelOne';
   const SelectedDashboardModel = DASHBOARD_MODELS[selectedModel] || DashboardModelOne;
 
@@ -68,6 +70,25 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const dashboardNavigation = useMemo(
+    () => ({
+      viewProducts: () => navigate('/admin/productos'),
+      viewInventory: () => navigate('/admin/inventario'),
+      viewOrders: () => navigate('/admin/ordenes'),
+      reviewOrders: () => navigate('/admin/ordenes?status=pending,processing&source=dashboard-alerts'),
+    }),
+    [navigate]
+  );
+
+  const handleDashboardAction = useCallback(
+    (action) => {
+      if (typeof action === 'function') {
+        action();
+      }
+    },
+    []
+  );
+
   return (
     <section className="space-y-4 text-slate-950">
       <SelectedDashboardModel
@@ -79,6 +100,8 @@ export default function DashboardPage() {
         monthlyGoal={dashboardData.monthlyGoal}
         inventoryByBranch={dashboardData.inventoryByBranch}
         recentOrders={dashboardData.recentOrders}
+        navigation={dashboardNavigation}
+        onDashboardAction={handleDashboardAction}
       />
     </section>
   );
