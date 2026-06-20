@@ -8,11 +8,53 @@ import DashboardKpiGrid from '../components/DashboardKpiGrid';
 import DashboardRecentOrders from '../components/DashboardRecentOrders';
 import DashboardSalesPanel from '../components/DashboardSalesPanel';
 
+function getButtonText(target) {
+  const button = target?.closest?.('button');
+  return button ? String(button.textContent || '').replace(/\s+/g, ' ').trim() : '';
+}
+
+function isInsideSection(target, sectionTitle) {
+  const section = target?.closest?.('section');
+  if (!section) return false;
+  return String(section.textContent || '').includes(sectionTitle);
+}
+
 export default function DashboardModelOne(props) {
   const navigation = props.navigation || {};
 
+  const handleDashboardClick = (event) => {
+    const text = getButtonText(event.target);
+    if (!text) return;
+
+    if (text.includes('Revisar')) {
+      navigation.reviewOrders?.();
+      return;
+    }
+
+    if (text.includes('Ver todos los productos')) {
+      navigation.viewProducts?.();
+      return;
+    }
+
+    if (text.includes('Ver detalle')) {
+      navigation.viewInventory?.();
+      return;
+    }
+
+    if (text.includes('Ver todas')) {
+      if (isInsideSection(event.target, 'Alertas importantes')) {
+        navigation.reviewOrders?.();
+        return;
+      }
+
+      if (isInsideSection(event.target, 'Órdenes recientes')) {
+        navigation.viewOrders?.();
+      }
+    }
+  };
+
   return (
-    <div className="space-y-2 xl:space-y-2">
+    <div className="space-y-2 xl:space-y-2" onClick={handleDashboardClick}>
       <DashboardHero actions={props.quickActions || []} />
 
       <div className="-mt-1">
