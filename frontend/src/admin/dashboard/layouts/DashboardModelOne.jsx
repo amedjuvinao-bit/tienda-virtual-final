@@ -9,6 +9,8 @@ import DashboardRecentOrders from '../components/DashboardRecentOrders';
 import DashboardSalesPanel from '../components/DashboardSalesPanel';
 
 export default function DashboardModelOne(props) {
+  const navigation = props.navigation || {};
+
   return (
     <div className="space-y-2 xl:space-y-2">
       <DashboardHero actions={props.quickActions || []} />
@@ -35,6 +37,7 @@ export default function DashboardModelOne(props) {
           <DashboardSalesPanel
             chartData={props.salesChartData || []}
             topProducts={props.topProducts || []}
+            onViewProducts={navigation.viewProducts}
           />
         </div>
 
@@ -53,7 +56,11 @@ export default function DashboardModelOne(props) {
               xl:[&>section>div]:h-full
             "
           >
-            <DashboardAlertsPanel alerts={props.alerts || []} />
+            <DashboardAlertsPanel
+              alerts={props.alerts || []}
+              onViewAlerts={navigation.reviewOrders || navigation.viewOrders}
+              onReviewAlert={navigation.reviewOrders || navigation.viewOrders}
+            />
           </div>
 
           <div
@@ -69,8 +76,14 @@ export default function DashboardModelOne(props) {
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
-        <DashboardInventoryByBranch items={props.inventoryByBranch || []} />
-        <DashboardRecentOrders orders={props.recentOrders || []} />
+        <DashboardInventoryByBranch
+          items={props.inventoryByBranch || []}
+          onViewInventory={navigation.viewInventory}
+        />
+        <DashboardRecentOrders
+          orders={props.recentOrders || []}
+          onViewOrders={navigation.viewOrders}
+        />
       </div>
     </div>
   );
