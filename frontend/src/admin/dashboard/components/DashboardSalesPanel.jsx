@@ -1,6 +1,7 @@
 // frontend/src/admin/dashboard/components/DashboardSalesPanel.jsx
 
-import { ChevronDown, LineChart, Loader2, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, LineChart, Loader2, Sparkles } from 'lucide-react';
 import { dashboardStyles as styles } from '../dashboardStyles';
 
 const CHART_BOUNDS = {
@@ -9,6 +10,8 @@ const CHART_BOUNDS = {
   top: 30,
   bottom: 148,
 };
+
+const FALLBACK_RANGE_OPTIONS = [{ value: 'this_week', label: 'Esta semana' }];
 
 function toSafeNumber(value, fallback = 0) {
   const number = Number(value);
@@ -193,6 +196,127 @@ function DiamondGlints({ small = false }) {
   );
 }
 
+function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const safeOptions = options.length ? options : FALLBACK_RANGE_OPTIONS;
+  const selectedOption =
+    safeOptions.find((option) => option.value === value) || safeOptions[0] || FALLBACK_RANGE_OPTIONS[0];
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!dropdownRef.current || dropdownRef.current.contains(event.target)) return;
+      setIsOpen(false);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={dropdownRef} className="relative z-40">
+      <button
+        type="button"
+        disabled={loading}
+        onClick={() => setIsOpen((current) => !current)}
+        className="relative inline-flex h-9 min-w-[132px] items-center justify-between gap-2 overflow-hidden rounded-[12px] px-3.5 text-[11px] font-black transition duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        style={buttonStyle}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label="Rango de ventas"
+      >
+        <DiamondGlints small />
+        <span className="relative z-10 truncate">{selectedOption.label}</span>
+        <ChevronDown
+          size={13}
+          className="relative z-10 shrink-0 transition-transform duration-200"
+          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute right-0 top-[calc(100%+8px)] z-[90] w-[178px] overflow-hidden rounded-[16px] p-[1px]"
+          style={{
+            border:
+              '1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.56))',
+            background: `
+              linear-gradient(
+                145deg,
+                rgba(255,255,255,0.72) 0%,
+                rgba(255,255,255,0.36) 54%,
+                color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.10)) 100%
+              )
+            `,
+            boxShadow: `
+              inset 0 1px 0 rgba(255,255,255,0.78),
+              0 18px 34px rgba(12,6,35,0.15),
+              0 0 18px color-mix(in srgb, var(--admin-primary) 13%, transparent)
+            `,
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          }}
+        >
+          <div
+            role="listbox"
+            className="rounded-[15px] p-1"
+            style={{
+              background: `
+                linear-gradient(
+                  145deg,
+                  rgba(255,255,255,0.52) 0%,
+                  rgba(255,255,255,0.22) 100%
+                )
+              `,
+            }}
+          >
+            {safeOptions.map((option) => {
+              const selected = option.value === selectedOption.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    if (option.value !== value) onChange?.(option.value);
+                    setIsOpen(false);
+                  }}
+                  className="relative flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-[11px] font-black transition duration-150 hover:-translate-y-[1px]"
+                  style={{
+                    color: selected ? 'var(--admin-primary)' : 'var(--admin-card-text)',
+                    background: selected
+                      ? 'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.48))'
+                      : 'transparent',
+                    boxShadow: selected
+                      ? 'inset 0 1px 0 rgba(255,255,255,0.58), 0 6px 14px rgba(12,6,35,0.055)'
+                      : 'none',
+                  }}
+                >
+                  <span className="truncate">{option.label}</span>
+                  {selected ? <Check size={13} className="shrink-0" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function DashboardSalesPanel({
   chartData = [],
   comparisonData = [],
@@ -306,9 +430,14 @@ export default function DashboardSalesPanel({
     WebkitBackdropFilter: 'blur(14px) saturate(170%)',
   };
 
+  const selectedRangeOptions = useMemo(
+    () => (rangeOptions.length ? rangeOptions : FALLBACK_RANGE_OPTIONS),
+    [rangeOptions]
+  );
+
   return (
     <section
-      className="dashboard-sales-enter relative self-start overflow-hidden rounded-[28px] p-[1px]"
+      className="dashboard-sales-enter relative self-start overflow-visible rounded-[28px] p-[1px]"
       style={{
         border: '1px solid rgba(255,255,255,0.44)',
         background: `
@@ -381,7 +510,7 @@ export default function DashboardSalesPanel({
       </style>
 
       <div
-        className="relative overflow-hidden rounded-[27px] px-5 pb-2 pt-4"
+        className="relative overflow-visible rounded-[27px] px-5 pb-2 pt-4"
         style={{
           background: `
             linear-gradient(
@@ -408,7 +537,7 @@ export default function DashboardSalesPanel({
           }}
         />
 
-        <div className="relative z-10 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="relative z-30 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2.5">
             <span
               className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-[12px]"
@@ -430,33 +559,19 @@ export default function DashboardSalesPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <label
-              className="relative inline-flex items-center gap-2 overflow-hidden rounded-[12px] px-3.5 py-1.5 text-[11px] font-black transition duration-200 hover:-translate-y-0.5"
-              style={diamondButtonStyle}
-            >
-              <DiamondGlints small />
-              <select
-                value={range}
-                disabled={loading}
-                onChange={(event) => onRangeChange?.(event.target.value)}
-                className="relative z-10 cursor-pointer appearance-none border-0 bg-transparent pr-5 text-[11px] font-black outline-none disabled:cursor-not-allowed"
-                style={{ color: 'var(--admin-card-text)' }}
-                aria-label="Rango de ventas"
-              >
-                {(rangeOptions.length ? rangeOptions : [{ value: 'this_week', label: 'Esta semana' }]).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="pointer-events-none relative z-10 -ml-5" />
-            </label>
+            <SalesRangeDropdown
+              value={range}
+              options={selectedRangeOptions}
+              loading={loading}
+              buttonStyle={diamondButtonStyle}
+              onChange={onRangeChange}
+            />
 
             <button
               type="button"
               onClick={() => onToggleCompare?.()}
               disabled={loading}
-              className="relative inline-flex items-center gap-2 overflow-hidden rounded-[12px] px-3.5 py-1.5 text-[11px] font-black transition duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-[12px] px-3.5 text-[11px] font-black transition duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 ...diamondButtonStyle,
                 border: compareEnabled
