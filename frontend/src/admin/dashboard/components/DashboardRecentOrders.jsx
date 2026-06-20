@@ -61,10 +61,10 @@ function DiamondGlints({ small = false }) {
         style={{
           width: size,
           height: size,
-          background: 'rgba(255,255,255,0.88)',
+          background: 'rgba(255,255,255,0.92)',
           boxShadow: `
-            0 0 5px rgba(255,255,255,0.76),
-            0 0 10px color-mix(in srgb, var(--admin-primary) 20%, transparent)
+            0 0 6px rgba(255,255,255,0.82),
+            0 0 12px color-mix(in srgb, var(--admin-primary) 28%, transparent)
           `,
         }}
       />
@@ -73,8 +73,8 @@ function DiamondGlints({ small = false }) {
         className="pointer-events-none absolute right-[1px] top-[8px] h-px w-[16px]"
         style={{
           background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.70), transparent)',
-          opacity: 0.7,
+            'linear-gradient(90deg, transparent, rgba(255,255,255,0.78), transparent)',
+          opacity: 0.72,
         }}
       />
 
@@ -82,8 +82,8 @@ function DiamondGlints({ small = false }) {
         className="pointer-events-none absolute right-[8px] top-[1px] h-[16px] w-px"
         style={{
           background:
-            'linear-gradient(180deg, transparent, rgba(255,255,255,0.60), transparent)',
-          opacity: 0.56,
+            'linear-gradient(180deg, transparent, rgba(255,255,255,0.66), transparent)',
+          opacity: 0.58,
         }}
       />
     </>
@@ -101,108 +101,110 @@ function normalizeOrder(order = {}, index = 0) {
   };
 }
 
-export default function DashboardRecentOrders({ orders = [] }) {
+export default function DashboardRecentOrders({ orders = [], onViewOrders }) {
   const visibleOrders = orders.slice(0, MAX_VISIBLE_ORDERS).map(normalizeOrder);
 
   const rootStyle = {
     border:
-      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.78))',
+      '1px solid color-mix(in srgb, var(--admin-primary) 20%, rgba(255,255,255,0.46))',
     background: `
       linear-gradient(
         145deg,
-        rgba(255,255,255,0.40) 0%,
-        rgba(255,255,255,0.18) 48%,
-        color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.10)) 100%
+        rgba(255,255,255,0.055) 0%,
+        rgba(255,255,255,0.012) 48%,
+        color-mix(in srgb, var(--admin-primary) 5%, transparent) 100%
       )
     `,
     boxShadow: `
-      inset 0 1px 0 rgba(255,255,255,1),
-      inset 0 -1px 0 rgba(15,23,42,0.05),
-      0 18px 38px rgba(12,6,35,0.08),
-      0 0 18px color-mix(in srgb, var(--admin-primary) 10%, transparent)
+      inset 0 1px 0 rgba(255,255,255,0.52),
+      inset 0 -1px 0 rgba(15,23,42,0.12),
+      0 16px 32px rgba(12,6,35,0.065),
+      0 0 20px color-mix(in srgb, var(--admin-primary) 10%, transparent)
     `,
-    backdropFilter: 'blur(26px) saturate(185%)',
-    WebkitBackdropFilter: 'blur(26px) saturate(185%)',
+    backdropFilter: 'blur(18px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(180%)',
   };
 
   const shellStyle = {
     background: `
       linear-gradient(
         145deg,
-        rgba(255,255,255,0.28) 0%,
-        rgba(255,255,255,0.10) 48%,
-        color-mix(in srgb, var(--admin-primary) 6%, rgba(255,255,255,0.04)) 100%
+        rgba(255,255,255,0.044) 0%,
+        rgba(255,255,255,0.010) 52%,
+        color-mix(in srgb, var(--admin-primary) 3%, transparent) 100%
       )
     `,
     boxShadow: `
-      inset 0 1px 0 rgba(255,255,255,0.86),
-      inset 0 -1px 0 rgba(15,23,42,0.05)
-    `,
-    backdropFilter: 'blur(20px) saturate(170%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(170%)',
-  };
-
-  const iconChipStyle = {
-    border:
-      '1px solid color-mix(in srgb, var(--admin-primary) 20%, rgba(255,255,255,0.78))',
-    background: `
-      linear-gradient(
-        145deg,
-        rgba(255,255,255,0.58) 0%,
-        rgba(255,255,255,0.24) 52%,
-        color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.10)) 100%
-      )
-    `,
-    color: 'var(--admin-primary)',
-    boxShadow: `
-      inset 0 1px 0 rgba(255,255,255,1),
-      inset 0 -1px 0 rgba(15,23,42,0.08),
-      0 10px 24px rgba(12,6,35,0.08),
-      0 0 14px color-mix(in srgb, var(--admin-primary) 14%, transparent)
-    `,
-    backdropFilter: 'blur(18px) saturate(175%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(175%)',
-  };
-
-  const buttonStyle = {
-    border:
-      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.72))',
-    background: `
-      linear-gradient(
-        145deg,
-        rgba(255,255,255,0.44) 0%,
-        rgba(255,255,255,0.18) 52%,
-        color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.08)) 100%
-      )
-    `,
-    color: 'var(--admin-card-text)',
-    boxShadow: `
-      inset 0 1px 0 rgba(255,255,255,0.92),
-      inset 0 -1px 0 rgba(15,23,42,0.07),
-      0 8px 18px rgba(12,6,35,0.07)
+      inset 0 1px 0 rgba(255,255,255,0.34),
+      inset 0 -1px 0 rgba(15,23,42,0.10)
     `,
     backdropFilter: 'blur(14px) saturate(165%)',
     WebkitBackdropFilter: 'blur(14px) saturate(165%)',
   };
 
-  const tableStyle = {
+  const iconChipStyle = {
     border:
-      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.76))',
+      '1px solid color-mix(in srgb, var(--admin-primary) 26%, rgba(255,255,255,0.42))',
     background: `
       linear-gradient(
         145deg,
-        rgba(255,255,255,0.30) 0%,
-        rgba(255,255,255,0.10) 48%,
-        color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.04)) 100%
+        rgba(255,255,255,0.070) 0%,
+        rgba(255,255,255,0.014) 50%,
+        color-mix(in srgb, var(--admin-primary) 8%, transparent) 100%
+      )
+    `,
+    color: 'var(--admin-primary)',
+    boxShadow: `
+      inset 0 1px 0 rgba(255,255,255,0.52),
+      inset 0 -1px 0 rgba(15,23,42,0.16),
+      0 9px 18px rgba(12,6,35,0.070),
+      0 0 16px color-mix(in srgb, var(--admin-primary) 18%, transparent)
+    `,
+    backdropFilter: 'blur(18px) saturate(185%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(185%)',
+  };
+
+  const buttonStyle = {
+    border:
+      '1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.40))',
+    background: `
+      linear-gradient(
+        145deg,
+        rgba(255,255,255,0.058) 0%,
+        rgba(255,255,255,0.012) 54%,
+        color-mix(in srgb, var(--admin-primary) 5%, transparent) 100%
+      )
+    `,
+    color: 'var(--admin-card-text)',
+    boxShadow: `
+      inset 0 1px 0 rgba(255,255,255,0.44),
+      inset 0 -1px 0 rgba(15,23,42,0.12),
+      0 8px 16px rgba(12,6,35,0.055),
+      0 0 12px color-mix(in srgb, var(--admin-primary) 12%, transparent)
+    `,
+    backdropFilter: 'blur(15px) saturate(170%)',
+    WebkitBackdropFilter: 'blur(15px) saturate(170%)',
+  };
+
+  const tableStyle = {
+    border:
+      '1px solid color-mix(in srgb, var(--admin-primary) 20%, rgba(255,255,255,0.32))',
+    background: `
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--admin-primary) 6%, rgba(255,255,255,0.028)) 0%,
+        rgba(255,255,255,0.008) 52%,
+        color-mix(in srgb, var(--admin-primary) 4%, transparent) 100%
       )
     `,
     boxShadow: `
-      inset 0 1px 0 rgba(255,255,255,0.86),
-      inset 0 -1px 0 rgba(15,23,42,0.05),
-      0 12px 24px rgba(12,6,35,0.055)
+      inset 0 1px 0 rgba(255,255,255,0.30),
+      inset 0 -1px 0 rgba(15,23,42,0.11),
+      0 9px 18px rgba(12,6,35,0.045),
+      0 0 12px color-mix(in srgb, var(--admin-primary) 7%, transparent)
     `,
-    backdropFilter: 'blur(18px) saturate(165%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(165%)',
+    backdropFilter: 'blur(13px) saturate(160%)',
+    WebkitBackdropFilter: 'blur(13px) saturate(160%)',
   };
 
   return (
@@ -238,14 +240,14 @@ export default function DashboardRecentOrders({ orders = [] }) {
 
           @keyframes recentOrdersShine {
             0% {
-              transform: translateX(-130%) rotate(28deg);
+              transform: translateX(-145%) rotate(28deg);
               opacity: 0;
             }
-            35% {
-              opacity: 0.34;
+            36% {
+              opacity: 0.42;
             }
             100% {
-              transform: translateX(170%) rotate(28deg);
+              transform: translateX(185%) rotate(28deg);
               opacity: 0;
             }
           }
@@ -261,8 +263,17 @@ export default function DashboardRecentOrders({ orders = [] }) {
             }
           }
 
+          @keyframes recentOrdersEdgePulse {
+            0%, 100% {
+              opacity: 0.48;
+            }
+            50% {
+              opacity: 0.9;
+            }
+          }
+
           .dashboard-recent-orders-panel {
-            animation: recentOrdersEnter 540ms ease-out both;
+            animation: recentOrdersEnter 520ms ease-out both;
           }
 
           .recent-orders-row {
@@ -270,18 +281,26 @@ export default function DashboardRecentOrders({ orders = [] }) {
             transition:
               background 180ms ease,
               transform 180ms ease,
-              filter 180ms ease;
+              filter 180ms ease,
+              border-color 180ms ease,
+              box-shadow 180ms ease;
           }
 
           .recent-orders-row:hover {
-            transform: translateY(-1px);
-            filter: brightness(1.025) saturate(1.035);
+            transform: translateY(-2px);
+            filter: brightness(1.03) saturate(1.06);
             background:
               linear-gradient(
-                135deg,
-                rgba(255,255,255,0.34),
-                color-mix(in srgb, var(--admin-primary) 6%, rgba(255,255,255,0.10))
+                145deg,
+                color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.044)) 0%,
+                rgba(255,255,255,0.014) 56%,
+                color-mix(in srgb, var(--admin-primary) 6%, transparent) 100%
               ) !important;
+            box-shadow:
+              inset 0 1px 0 rgba(255,255,255,0.34),
+              inset 0 -1px 0 rgba(15,23,42,0.12),
+              0 10px 18px rgba(12,6,35,0.055),
+              0 0 14px color-mix(in srgb, var(--admin-primary) 10%, transparent) !important;
           }
 
           .recent-orders-table-shine {
@@ -292,20 +311,27 @@ export default function DashboardRecentOrders({ orders = [] }) {
             animation: recentOrdersDotPulse 3.4s ease-in-out infinite;
           }
 
+          .recent-orders-panel-edge {
+            animation: recentOrdersEdgePulse 3.8s ease-in-out infinite;
+          }
+
           .recent-orders-button {
             transition:
               transform 180ms ease,
+              filter 180ms ease,
               box-shadow 180ms ease,
               border-color 180ms ease;
           }
 
           .recent-orders-button:hover {
             transform: translateY(-1px);
-            border-color: color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.84)) !important;
+            filter: brightness(1.025) saturate(1.05);
+            border-color: color-mix(in srgb, var(--admin-primary) 32%, rgba(255,255,255,0.46)) !important;
             box-shadow:
-              inset 0 1px 0 rgba(255,255,255,0.96),
-              inset 0 -1px 0 rgba(15,23,42,0.07),
-              0 10px 20px rgba(12,6,35,0.08) !important;
+              inset 0 1px 0 rgba(255,255,255,0.48),
+              inset 0 -1px 0 rgba(15,23,42,0.12),
+              0 10px 20px rgba(12,6,35,0.075),
+              0 0 16px color-mix(in srgb, var(--admin-primary) 15%, transparent) !important;
           }
 
           @media (max-width: 1280px) {
@@ -318,7 +344,8 @@ export default function DashboardRecentOrders({ orders = [] }) {
             .dashboard-recent-orders-panel,
             .recent-orders-row,
             .recent-orders-table-shine,
-            .recent-orders-diamond-dot {
+            .recent-orders-diamond-dot,
+            .recent-orders-panel-edge {
               animation: none !important;
               transition: none !important;
             }
@@ -336,34 +363,43 @@ export default function DashboardRecentOrders({ orders = [] }) {
         style={shellStyle}
       >
         <span
-          className="pointer-events-none absolute inset-x-10 top-0 h-px"
+          className="pointer-events-none absolute inset-x-8 top-0 h-px"
           style={{
             background:
-              'linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)',
-            opacity: 0.92,
+              'linear-gradient(90deg, transparent, rgba(255,255,255,0.78), color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,0.42)), transparent)',
           }}
         />
 
         <span
-          className="pointer-events-none absolute -right-10 -top-10 h-[220px] w-[58px] rotate-[34deg]"
+          className="recent-orders-panel-edge pointer-events-none absolute left-0 top-12 h-[calc(100%-96px)] w-px"
           style={{
             background:
-              'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), rgba(255,255,255,0.32), rgba(255,255,255,0.08), transparent)',
-            opacity: 0.36,
-            filter: 'blur(1px)',
+              'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 56%, rgba(255,255,255,0.44)), transparent)',
+            boxShadow:
+              '0 0 12px color-mix(in srgb, var(--admin-primary) 26%, transparent)',
           }}
         />
 
-        <div className="relative z-10 mb-3 flex shrink-0 items-start justify-between gap-4">
+        <span
+          className="pointer-events-none absolute -right-12 -top-16 h-[230px] w-[48px] rotate-[34deg]"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), rgba(255,255,255,0.23), rgba(255,255,255,0.06), transparent)',
+            opacity: 0.30,
+            filter: 'blur(0.8px)',
+          }}
+        />
+
+        <div className="relative z-10 mb-4 flex shrink-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <span
-              className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px]"
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[17px]"
               style={iconChipStyle}
             >
               <DiamondGlints />
               <ClipboardList
-                size={20}
-                strokeWidth={2.2}
+                size={18}
+                strokeWidth={2.5}
                 style={{
                   filter:
                     'drop-shadow(0 0 6px color-mix(in srgb, var(--admin-primary) 34%, transparent))',
@@ -372,16 +408,16 @@ export default function DashboardRecentOrders({ orders = [] }) {
             </span>
 
             <div className="min-w-0">
-              <h2 className="text-[17px] font-black leading-none" style={styles.title}>
+              <h2 className="text-[18px] font-black leading-[20px]" style={styles.title}>
                 Órdenes recientes
               </h2>
 
               <p
-                className="mt-1.5 text-[13px] font-semibold leading-5"
+                className="mt-1 text-[13px] font-semibold leading-[18px]"
                 style={{
                   ...styles.muted,
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: 1,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                 }}
@@ -393,11 +429,19 @@ export default function DashboardRecentOrders({ orders = [] }) {
 
           <button
             type="button"
-            className="recent-orders-button inline-flex shrink-0 items-center gap-1.5 rounded-[14px] px-4 py-2 text-[12px] font-black"
+            onClick={onViewOrders}
+            className="recent-orders-button relative inline-flex h-9 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[14px] px-3 text-[11.5px] font-black"
             style={buttonStyle}
           >
-            Ver todas
-            <ChevronRight size={14} />
+            <span
+              className="recent-orders-table-shine pointer-events-none absolute -left-8 top-[-16px] h-[58px] w-[13px]"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.34), transparent)',
+              }}
+            />
+            <span className="relative z-10">Ver todas</span>
+            <ChevronRight size={13} className="relative z-10" />
           </button>
         </div>
 
@@ -409,7 +453,8 @@ export default function DashboardRecentOrders({ orders = [] }) {
             className="recent-orders-table-shine pointer-events-none absolute -left-12 top-0 h-full w-[18px]"
             style={{
               background:
-                'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+                'linear-gradient(90deg, transparent, rgba(255,255,255,0.24), transparent)',
+              opacity: 0.72,
             }}
           />
 
@@ -423,9 +468,9 @@ export default function DashboardRecentOrders({ orders = [] }) {
             style={{
               color: 'var(--admin-card-muted-text)',
               borderBottom:
-                '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.42))',
+                '1px solid color-mix(in srgb, var(--admin-primary) 15%, rgba(255,255,255,0.24))',
               background:
-                'linear-gradient(135deg, rgba(255,255,255,0.26), rgba(255,255,255,0.09))',
+                'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary) 5%, rgba(255,255,255,0.026)), rgba(255,255,255,0.008))',
             }}
           >
             <span>Orden / cliente</span>
@@ -448,11 +493,11 @@ export default function DashboardRecentOrders({ orders = [] }) {
                     borderBottom:
                       index === MAX_VISIBLE_ORDERS - 1
                         ? 'none'
-                        : '1px solid color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.34))',
+                        : '1px solid color-mix(in srgb, var(--admin-primary) 11%, rgba(255,255,255,0.18))',
                     background:
                       index % 2 === 0
-                        ? 'linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.055))'
-                        : 'linear-gradient(135deg, rgba(255,255,255,0.11), rgba(255,255,255,0.035))',
+                        ? 'linear-gradient(145deg, rgba(255,255,255,0.032), rgba(255,255,255,0.008))'
+                        : 'linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 3%, rgba(255,255,255,0.018)), rgba(255,255,255,0.006))',
                     animationDelay: `${110 + index * 55}ms`,
                   }}
                 >
