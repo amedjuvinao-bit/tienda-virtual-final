@@ -7,7 +7,7 @@ import { dashboardStyles as styles } from '../dashboardStyles';
 const CHART_BOUNDS = {
   left: 58,
   right: 596,
-  top: 78,
+  top: 86,
   bottom: 150,
 };
 
@@ -164,13 +164,13 @@ function getComparisonText(currentValue, previousValue) {
   const current = toSafeNumber(currentValue, 0);
   const previous = toSafeNumber(previousValue, 0);
 
-  if (previous <= 0 && current > 0) return 'Nuevo frente al periodo anterior';
-  if (previous <= 0) return 'Sin ventas comparables';
+  if (previous <= 0 && current > 0) return 'Nuevo vs anterior';
+  if (previous <= 0) return 'Sin comparativo';
 
   const percent = ((current - previous) / previous) * 100;
   const sign = percent >= 0 ? '+' : '';
 
-  return `${sign}${percent.toFixed(1)}% vs periodo anterior`;
+  return `${sign}${percent.toFixed(1)}% vs anterior`;
 }
 
 function getTooltipPlacement(point) {
@@ -179,8 +179,8 @@ function getTooltipPlacement(point) {
   }
 
   return {
-    left: Math.min(Math.max((point.x / SVG_WIDTH) * 100, 16), 84),
-    top: Math.min(Math.max((point.y / SVG_HEIGHT) * 100, 43), 78),
+    left: Math.min(Math.max((point.x / SVG_WIDTH) * 100, 15), 85),
+    top: Math.min(Math.max((point.y / SVG_HEIGHT) * 100, 42), 78),
   };
 }
 
@@ -283,13 +283,12 @@ function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle,
             background: `
               linear-gradient(
                 145deg,
-                rgba(255,255,255,0.72) 0%,
-                rgba(255,255,255,0.36) 54%,
-                color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.10)) 100%
+                color-mix(in srgb, var(--admin-card-bg) 74%, rgba(255,255,255,0.22)) 0%,
+                color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 7%) 100%
               )
             `,
             boxShadow: `
-              inset 0 1px 0 rgba(255,255,255,0.78),
+              inset 0 1px 0 rgba(255,255,255,0.40),
               0 18px 34px rgba(12,6,35,0.15),
               0 0 18px color-mix(in srgb, var(--admin-primary) 13%, transparent)
             `,
@@ -304,8 +303,8 @@ function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle,
               background: `
                 linear-gradient(
                   145deg,
-                  rgba(255,255,255,0.52) 0%,
-                  rgba(255,255,255,0.22) 100%
+                  rgba(255,255,255,0.12) 0%,
+                  rgba(255,255,255,0.035) 100%
                 )
               `,
             }}
@@ -327,10 +326,10 @@ function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle,
                   style={{
                     color: selected ? 'var(--admin-primary)' : 'var(--admin-card-text)',
                     background: selected
-                      ? 'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.48))'
+                      ? 'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.26))'
                       : 'transparent',
                     boxShadow: selected
-                      ? 'inset 0 1px 0 rgba(255,255,255,0.58), 0 6px 14px rgba(12,6,35,0.055)'
+                      ? 'inset 0 1px 0 rgba(255,255,255,0.32), 0 6px 14px rgba(12,6,35,0.055)'
                       : 'none',
                   }}
                 >
@@ -403,7 +402,6 @@ export default function DashboardSalesPanel({
     0
   );
   const tooltipPosition = getTooltipPlacement(activePoint);
-
   const selectedRangeOptions = useMemo(
     () => (rangeOptions.length ? rangeOptions : FALLBACK_RANGE_OPTIONS),
     [rangeOptions]
@@ -524,8 +522,8 @@ export default function DashboardSalesPanel({
           }
 
           @keyframes dashboardTooltipIn {
-            from { opacity: 0; transform: translate(-50%, calc(-100% - 8px)) scale(0.96); filter: blur(4px); }
-            to { opacity: 1; transform: translate(-50%, calc(-100% - 14px)) scale(1); filter: blur(0); }
+            from { opacity: 0; transform: translate(-50%, calc(-100% - 5px)) scale(0.96); filter: blur(4px); }
+            to { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); filter: blur(0); }
           }
 
           @keyframes dashboardGlassPulse {
@@ -641,7 +639,7 @@ export default function DashboardSalesPanel({
           </div>
         </div>
 
-        <div className="relative z-10 mt-1 overflow-visible rounded-[20px]">
+        <div className="relative z-10 mt-3 overflow-visible rounded-[20px]">
           <svg
             viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
             className="h-[200px] w-full"
@@ -820,34 +818,42 @@ export default function DashboardSalesPanel({
 
           {activePoint ? (
             <div
-              className="dashboard-sales-tooltip pointer-events-none absolute z-[80] w-[190px] rounded-[18px] p-[1px]"
+              className="dashboard-sales-tooltip pointer-events-none absolute z-[80] w-[154px] rounded-[17px] p-[1px]"
               style={{
                 left: `${tooltipPosition.left}%`,
                 top: `${tooltipPosition.top}%`,
-                transform: 'translate(-50%, calc(-100% - 14px))',
+                transform: 'translate(-50%, calc(-100% - 8px))',
                 border:
-                  '1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.62))',
+                  '1px solid color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.44))',
                 background: `
                   linear-gradient(
                     145deg,
-                    rgba(255,255,255,0.88) 0%,
-                    rgba(255,255,255,0.58) 54%,
-                    color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,0.20)) 100%
+                    color-mix(in srgb, var(--admin-card-bg) 68%, rgba(255,255,255,0.18)) 0%,
+                    color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 9%) 100%
                   )
                 `,
                 boxShadow: `
-                  inset 0 1px 0 rgba(255,255,255,0.92),
-                  0 16px 34px rgba(12,6,35,0.15),
-                  0 0 18px color-mix(in srgb, var(--admin-primary) 14%, transparent)
+                  inset 0 1px 0 rgba(255,255,255,0.30),
+                  inset 0 -1px 0 rgba(15,23,42,0.14),
+                  0 14px 28px rgba(12,6,35,0.18),
+                  0 0 18px color-mix(in srgb, var(--admin-primary) 16%, transparent)
                 `,
                 backdropFilter: 'blur(18px) saturate(175%)',
                 WebkitBackdropFilter: 'blur(18px) saturate(175%)',
               }}
             >
-              <div className="relative rounded-[17px] px-3.5 py-2.5 text-left">
-                <div className="flex items-start justify-between gap-2">
+              <div className="relative rounded-[16px] px-3 py-2 text-left">
+                <span
+                  className="pointer-events-none absolute inset-x-4 top-0 h-px"
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.62), transparent)',
+                  }}
+                />
+
+                <div className="flex items-center justify-between gap-2">
                   <p
-                    className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.12em]"
+                    className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em]"
                     style={styles.muted}
                     title={activePoint.label}
                   >
@@ -856,24 +862,29 @@ export default function DashboardSalesPanel({
 
                   {activeOrders > 0 ? (
                     <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black"
+                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[8.5px] font-black"
                       style={{
                         color: 'var(--admin-primary)',
                         background:
-                          'color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.56))',
+                          'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.20))',
+                        border:
+                          '1px solid color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.24))',
                       }}
                     >
-                      {activeOrders} {activeOrders === 1 ? 'pedido' : 'pedidos'}
+                      {activeOrders}p
                     </span>
                   ) : null}
                 </div>
 
-                <p className="mt-1 text-[18px] font-black leading-none" style={styles.title}>
+                <p
+                  className="mt-1 text-[16px] font-black leading-none tracking-tight"
+                  style={styles.title}
+                >
                   ${formatMoney(activePoint.rawValue)}
                 </p>
 
                 <p
-                  className="mt-1.5 truncate text-[10.5px] font-black leading-[13px]"
+                  className="mt-1 text-[9.5px] font-black leading-[12px]"
                   style={{ color: 'var(--admin-primary)' }}
                   title={
                     compareEnabled && activeComparisonPoint
@@ -887,19 +898,20 @@ export default function DashboardSalesPanel({
                 </p>
 
                 {compareEnabled && activeComparisonPoint ? (
-                  <p className="mt-1 truncate text-[9.5px] font-bold leading-[12px]" style={styles.muted}>
-                    Anterior: ${formatMoney(activeComparisonPoint.rawValue)}
+                  <p className="mt-0.5 truncate text-[8.7px] font-bold leading-[11px]" style={styles.muted}>
+                    Ant: ${formatMoney(activeComparisonPoint.rawValue)}
                   </p>
                 ) : null}
 
                 <span
-                  className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1.5 rotate-45"
+                  className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45"
                   style={{
-                    background: 'rgba(255,255,255,0.72)',
+                    background:
+                      'color-mix(in srgb, var(--admin-card-bg) 78%, var(--admin-primary) 8%)',
                     borderRight:
-                      '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.48))',
+                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.34))',
                     borderBottom:
-                      '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.48))',
+                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.34))',
                   }}
                 />
               </div>
