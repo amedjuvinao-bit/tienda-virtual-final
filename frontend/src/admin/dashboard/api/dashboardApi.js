@@ -2,9 +2,7 @@
 
 import api from '../../../lib/api';
 
-export async function getDashboardSummary() {
-  const response = await api.get('/api/admin/dashboard');
-
+function unwrapDashboardResponse(response) {
   if (response?.data?.data) {
     return response.data.data;
   }
@@ -12,6 +10,17 @@ export async function getDashboardSummary() {
   return response.data;
 }
 
+export async function getDashboardSummary(params = {}) {
+  const response = await api.get('/api/admin/dashboard', { params });
+  return unwrapDashboardResponse(response);
+}
+
+export async function getDashboardSales(params = {}) {
+  const response = await api.get('/api/admin/dashboard-sales', { params });
+  return unwrapDashboardResponse(response);
+}
+
 export default {
   getDashboardSummary,
+  getDashboardSales,
 };
