@@ -28,6 +28,16 @@ const SALES_RANGE_OPTIONS = [
   { value: 'previous_month', label: 'Mes anterior' },
 ];
 
+function getSalesRangeOption(value) {
+  return (
+    SALES_RANGE_OPTIONS.find((item) => item.value === value) || SALES_RANGE_OPTIONS[0]
+  );
+}
+
+function normalizeSalesRange(value) {
+  return getSalesRangeOption(value).value;
+}
+
 const fallbackDashboardData = {
   quickActions: dashboardQuickActions,
   kpis: dashboardKpis,
@@ -90,13 +100,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let isMounted = true;
+    const activeRange = normalizeSalesRange(salesRange);
+    const activeRangeOption = getSalesRangeOption(activeRange);
 
     async function loadSalesData() {
       setSalesLoading(true);
 
+      setDashboardData((prev) => ({
+        ...prev,
+        salesPeriod: {
+          ...(prev.salesPeriod || {}),
+          range: activeRange,
+          rangeLabel: activeRangeOption.label,
+          compare: salesCompare,
+        },
+      }));
+
       try {
         const data = await getDashboardSales({
-          range: salesRange,
+          range: activeRange,
           compare: salesCompare ? 'true' : 'false',
         });
 
@@ -104,15 +126,14 @@ export default function DashboardPage() {
 
         setDashboardData((prev) => ({
           ...prev,
-          salesChartData: data.chartData || prev.salesChartData || [],
-          comparisonSalesChartData: data.comparisonChartData || [],
+          salesChartData: Array.isArray(data.chartData) ? data.chartData : [],
+          comparisonSalesChartData: Array.isArray(data.comparisonChartData)
+            ? data.comparisonChartData
+            : [],
           salesSummary: data.summary || null,
           salesPeriod: {
-            range: data.range || salesRange,
-            rangeLabel:
-              data.rangeLabel ||
-              SALES_RANGE_OPTIONS.find((item) => item.value === salesRange)?.label ||
-              'Esta semana',
+            range: data.range || activeRange,
+            rangeLabel: data.rangeLabel || activeRangeOption.label,
             compare: Boolean(data.compare),
           },
         }));
@@ -147,7 +168,7 @@ export default function DashboardPage() {
   }, []);
 
   const handleSalesRangeChange = useCallback((nextRange) => {
-    setSalesRange(nextRange || 'this_week');
+    setSalesRange(normalizeSalesRange(nextRange));
   }, []);
 
   const handleToggleSalesCompare = useCallback(() => {
