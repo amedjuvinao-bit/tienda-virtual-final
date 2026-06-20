@@ -114,6 +114,7 @@ const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
+const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 
@@ -199,6 +200,9 @@ if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 
 // ✅ CONEXIÓN DEL DASHBOARD ADMINISTRATIVO
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
+
+// ✅ CONEXIÓN DEL GRÁFICO DE VENTAS DEL DASHBOARD
+if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 
 // ✅ CONEXIÓN DE METAS DEL DASHBOARD ADMINISTRATIVO
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
