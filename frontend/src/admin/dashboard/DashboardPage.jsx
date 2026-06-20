@@ -48,6 +48,7 @@ const fallbackDashboardData = {
     range: 'this_week',
     rangeLabel: 'Esta semana',
     compare: false,
+    topProductsTitle: 'Top productos esta semana',
   },
   topProducts,
   alerts: dashboardAlerts,
@@ -113,6 +114,9 @@ export default function DashboardPage() {
           range: activeRange,
           rangeLabel: activeRangeOption.label,
           compare: salesCompare,
+          topProductsTitle:
+            prev.salesPeriod?.topProductsTitle ||
+            `Top productos ${activeRangeOption.label.toLowerCase()}`,
         },
       }));
 
@@ -130,11 +134,15 @@ export default function DashboardPage() {
           comparisonSalesChartData: Array.isArray(data.comparisonChartData)
             ? data.comparisonChartData
             : [],
+          topProducts: Array.isArray(data.topProducts) ? data.topProducts : prev.topProducts,
           salesSummary: data.summary || null,
           salesPeriod: {
             range: data.range || activeRange,
             rangeLabel: data.rangeLabel || activeRangeOption.label,
             compare: Boolean(data.compare),
+            topProductsTitle:
+              data.topProductsTitle ||
+              `Top productos ${String(data.rangeLabel || activeRangeOption.label).toLowerCase()}`,
           },
         }));
       } catch (error) {
