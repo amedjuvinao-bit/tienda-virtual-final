@@ -14,17 +14,31 @@ import {
   topProducts,
 } from './dashboardMockData';
 
-import { getDashboardSummary } from './api/dashboardApi';
+import { getDashboardSales, getDashboardSummary } from './api/dashboardApi';
 import DashboardModelOne from './layouts/DashboardModelOne';
 
 const DASHBOARD_MODELS = {
   modelOne: DashboardModelOne,
 };
 
+const SALES_RANGE_OPTIONS = [
+  { value: 'this_week', label: 'Esta semana' },
+  { value: 'last_7_days', label: 'Últimos 7 días' },
+  { value: 'this_month', label: 'Este mes' },
+  { value: 'previous_month', label: 'Mes anterior' },
+];
+
 const fallbackDashboardData = {
   quickActions: dashboardQuickActions,
   kpis: dashboardKpis,
   salesChartData,
+  comparisonSalesChartData: [],
+  salesSummary: null,
+  salesPeriod: {
+    range: 'this_week',
+    rangeLabel: 'Esta semana',
+    compare: false,
+  },
   topProducts,
   alerts: dashboardAlerts,
   monthlyGoal,
@@ -38,6 +52,9 @@ export default function DashboardPage() {
   const SelectedDashboardModel = DASHBOARD_MODELS[selectedModel] || DashboardModelOne;
 
   const [dashboardData, setDashboardData] = useState(fallbackDashboardData);
+  const [salesRange, setSalesRange] = useState('this_week');
+  const [salesCompare, setSalesCompare] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -48,7 +65,8 @@ export default function DashboardPage() {
 
         if (!isMounted || !data) return;
 
-        setDashboardData({
+        setDashboardData((prev) => ({
+          ...prev,
           quickActions: data.quickActions || fallbackDashboardData.quickActions,
           kpis: data.kpis || fallbackDashboardData.kpis,
           salesChartData: data.salesChartData || fallbackDashboardData.salesChartData,
@@ -57,7 +75,7 @@ export default function DashboardPage() {
           monthlyGoal: data.monthlyGoal || fallbackDashboardData.monthlyGoal,
           inventoryByBranch: data.inventoryByBranch || fallbackDashboardData.inventoryByBranch,
           recentOrders: data.recentOrders || fallbackDashboardData.recentOrders,
-        });
+        }));
       } catch (error) {
         console.error('No se pudo cargar el dashboard real:', error);
       }
@@ -69,6 +87,48 @@ export default function DashboardPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSalesData() {
+      setSalesLoading(true);
+
+      try {
+        const data = await getDashboardSales({
+          range: salesRange,
+          compare: salesCompare ? 'true' : 'false',
+        });
+
+        if (!isMounted || !data) return;
+
+        setDashboardData((prev) => ({
+          ...prev,
+          salesChartData: data.chartData || prev.salesChartData || [],
+          comparisonSalesChartData: data.comparisonChartData || [],
+          salesSummary: data.summary || null,
+          salesPeriod: {
+            range: data.range || salesRange,
+            rangeLabel:
+              data.rangeLabel ||
+              SALES_RANGE_OPTIONS.find((item) => item.value === salesRange)?.label ||
+              'Esta semana',
+            compare: Boolean(data.compare),
+          },
+        }));
+      } catch (error) {
+        console.error('No se pudo cargar el gráfico de ventas:', error);
+      } finally {
+        if (isMounted) setSalesLoading(false);
+      }
+    }
+
+    loadSalesData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [salesRange, salesCompare]);
 
   const dashboardNavigation = useMemo(
     () => ({
@@ -86,12 +146,29 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handleSalesRangeChange = useCallback((nextRange) => {
+    setSalesRange(nextRange || 'this_week');
+  }, []);
+
+  const handleToggleSalesCompare = useCallback(() => {
+    setSalesCompare((prev) => !prev);
+  }, []);
+
   return (
     <section className="space-y-4 text-slate-950">
       <SelectedDashboardModel
         quickActions={dashboardData.quickActions}
         kpis={dashboardData.kpis}
         salesChartData={dashboardData.salesChartData}
+        comparisonSalesChartData={dashboardData.comparisonSalesChartData}
+        salesSummary={dashboardData.salesSummary}
+        salesPeriod={dashboardData.salesPeriod}
+        salesRange={salesRange}
+        salesRangeOptions={SALES_RANGE_OPTIONS}
+        salesCompare={salesCompare}
+        salesLoading={salesLoading}
+        onSalesRangeChange={handleSalesRangeChange}
+        onSalesCompareToggle={handleToggleSalesCompare}
         topProducts={dashboardData.topProducts}
         alerts={dashboardData.alerts}
         monthlyGoal={dashboardData.monthlyGoal}
