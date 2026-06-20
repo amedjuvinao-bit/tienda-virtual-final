@@ -1,6 +1,6 @@
 // frontend/src/admin/dashboard/DashboardPage.jsx
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -80,14 +80,11 @@ export default function DashboardPage() {
     [navigate]
   );
 
-  const handleDashboardAction = useCallback(
-    (action) => {
-      if (typeof action === 'function') {
-        action();
-      }
-    },
-    []
-  );
+  const handleDashboardAction = useCallback((action) => {
+    if (typeof action === 'function') {
+      action();
+    }
+  }, []);
 
   return (
     <section className="space-y-4 text-slate-950">
