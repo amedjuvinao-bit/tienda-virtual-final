@@ -1,8 +1,12 @@
 // frontend/src/admin/dashboard/components/DashboardSalesPanel.jsx
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, LineChart, Loader2, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ImageIcon, LineChart, Loader2, Sparkles } from 'lucide-react';
 import { dashboardStyles as styles } from '../dashboardStyles';
+
+const SVG_WIDTH = 620;
+const SVG_HEIGHT = 200;
+const FALLBACK_RANGE_OPTIONS = [{ value: 'this_week', label: 'Esta semana' }];
 
 const CHART_BOUNDS = {
   left: 58,
@@ -10,10 +14,6 @@ const CHART_BOUNDS = {
   top: 86,
   bottom: 150,
 };
-
-const SVG_WIDTH = 620;
-const SVG_HEIGHT = 200;
-const FALLBACK_RANGE_OPTIONS = [{ value: 'this_week', label: 'Esta semana' }];
 
 function toSafeNumber(value, fallback = 0) {
   const number = Number(value);
@@ -50,14 +50,10 @@ function getNiceChartMax(value) {
   const magnitude = 10 ** Math.floor(Math.log10(rawValue));
   const normalized = rawValue / magnitude;
 
-  let niceNormalized = 1;
-
-  if (normalized <= 1) niceNormalized = 1;
-  else if (normalized <= 2) niceNormalized = 2;
-  else if (normalized <= 5) niceNormalized = 5;
-  else niceNormalized = 10;
-
-  return niceNormalized * magnitude;
+  if (normalized <= 1) return magnitude;
+  if (normalized <= 2) return 2 * magnitude;
+  if (normalized <= 5) return 5 * magnitude;
+  return 10 * magnitude;
 }
 
 function getChartMaxValue(...datasets) {
@@ -124,8 +120,8 @@ function getAreaPath(points = []) {
   return `${line} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`;
 }
 
-function getYAxisLabels(maxValue, hasRealSales) {
-  if (!hasRealSales) {
+function getYAxisLabels(maxValue, hasSales) {
+  if (!hasSales) {
     return [{ label: '0', y: CHART_BOUNDS.bottom }];
   }
 
@@ -174,13 +170,11 @@ function getComparisonText(currentValue, previousValue) {
 }
 
 function getTooltipPlacement(point) {
-  if (!point) {
-    return { left: 50, top: 50 };
-  }
+  if (!point) return { left: 50, top: 50 };
 
   return {
-    left: Math.min(Math.max((point.x / SVG_WIDTH) * 100, 15), 85),
-    top: Math.min(Math.max((point.y / SVG_HEIGHT) * 100, 42), 78),
+    left: Math.min(Math.max((point.x / SVG_WIDTH) * 100, 17), 83),
+    top: Math.min(Math.max((point.y / SVG_HEIGHT) * 100, 43), 78),
   };
 }
 
@@ -343,6 +337,25 @@ function SalesRangeDropdown({ value, options = [], loading = false, buttonStyle,
       ) : null}
     </div>
   );
+}
+
+function ProductImage({ image, name }) {
+  if (!image) {
+    return (
+      <span
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+        style={{
+          border: '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.24))',
+          background: 'color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,0.12))',
+          color: 'var(--admin-primary)',
+        }}
+      >
+        <ImageIcon size={13} />
+      </span>
+    );
+  }
+
+  return <img src={image} alt={name} className="h-7 w-7 shrink-0 rounded-lg object-cover" />;
 }
 
 export default function DashboardSalesPanel({
@@ -818,57 +831,101 @@ export default function DashboardSalesPanel({
 
           {activePoint ? (
             <div
-              className="dashboard-sales-tooltip pointer-events-none absolute z-[80] w-[154px] rounded-[17px] p-[1px]"
+              className="dashboard-sales-tooltip pointer-events-none absolute z-[80] w-[142px] rounded-[17px] p-[1px]"
               style={{
                 left: `${tooltipPosition.left}%`,
                 top: `${tooltipPosition.top}%`,
                 transform: 'translate(-50%, calc(-100% - 8px))',
                 border:
-                  '1px solid color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.44))',
+                  '1px solid color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.58))',
                 background: `
                   linear-gradient(
                     145deg,
-                    color-mix(in srgb, var(--admin-card-bg) 68%, rgba(255,255,255,0.18)) 0%,
-                    color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 9%) 100%
+                    rgba(255,255,255,0.26) 0%,
+                    color-mix(in srgb, var(--admin-card-bg) 45%, rgba(255,255,255,0.40)) 48%,
+                    color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 10%) 100%
                   )
                 `,
                 boxShadow: `
-                  inset 0 1px 0 rgba(255,255,255,0.30),
-                  inset 0 -1px 0 rgba(15,23,42,0.14),
-                  0 14px 28px rgba(12,6,35,0.18),
-                  0 0 18px color-mix(in srgb, var(--admin-primary) 16%, transparent)
+                  inset 0 1px 0 rgba(255,255,255,0.68),
+                  inset 0 -1px 0 rgba(15,23,42,0.10),
+                  inset 0 0 18px rgba(255,255,255,0.060),
+                  0 14px 28px rgba(12,6,35,0.15),
+                  0 0 18px color-mix(in srgb, var(--admin-primary) 17%, transparent)
                 `,
-                backdropFilter: 'blur(18px) saturate(175%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(175%)',
+                backdropFilter: 'blur(20px) saturate(190%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(190%)',
               }}
             >
-              <div className="relative rounded-[16px] px-3 py-2 text-left">
+              <div
+                className="relative overflow-hidden rounded-[16px] px-3 py-2 text-left"
+                style={{
+                  background: `
+                    linear-gradient(
+                      145deg,
+                      rgba(255,255,255,0.16) 0%,
+                      rgba(255,255,255,0.060) 62%,
+                      color-mix(in srgb, var(--admin-primary) 5%, transparent) 100%
+                    )
+                  `,
+                }}
+              >
                 <span
                   className="pointer-events-none absolute inset-x-4 top-0 h-px"
                   style={{
                     background:
-                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.62), transparent)',
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.86), transparent)',
                   }}
                 />
 
-                <div className="flex items-center justify-between gap-2">
+                <span
+                  className="pointer-events-none absolute right-[9px] top-[8px] h-[4px] w-[4px] rounded-full"
+                  style={{
+                    background: 'rgba(255,255,255,0.86)',
+                    boxShadow:
+                      '0 0 7px rgba(255,255,255,0.72), 0 0 12px color-mix(in srgb, var(--admin-primary) 24%, transparent)',
+                  }}
+                />
+
+                <p
+                  className="max-w-[108px] truncate text-[8.8px] font-black uppercase tracking-[0.13em]"
+                  style={styles.muted}
+                  title={activePoint.label}
+                >
+                  {activePoint.label}
+                </p>
+
+                <p
+                  className="mt-1 text-[15px] font-black leading-none tracking-tight"
+                  style={styles.title}
+                >
+                  ${formatMoney(activePoint.rawValue)}
+                </p>
+
+                <div className="mt-1 flex items-center justify-between gap-2">
                   <p
-                    className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.14em]"
-                    style={styles.muted}
-                    title={activePoint.label}
+                    className="min-w-0 truncate text-[9px] font-black leading-[11px]"
+                    style={{ color: 'var(--admin-primary)' }}
+                    title={
+                      compareEnabled && activeComparisonPoint
+                        ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
+                        : 'Ventas del periodo'
+                    }
                   >
-                    {activePoint.label}
+                    {compareEnabled && activeComparisonPoint
+                      ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
+                      : 'Ventas del periodo'}
                   </p>
 
                   {activeOrders > 0 ? (
                     <span
-                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[8.5px] font-black"
+                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-black"
                       style={{
                         color: 'var(--admin-primary)',
                         background:
-                          'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.20))',
+                          'color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.22))',
                         border:
-                          '1px solid color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.24))',
+                          '1px solid color-mix(in srgb, var(--admin-primary) 14%, rgba(255,255,255,0.28))',
                       }}
                     >
                       {activeOrders}p
@@ -876,29 +933,8 @@ export default function DashboardSalesPanel({
                   ) : null}
                 </div>
 
-                <p
-                  className="mt-1 text-[16px] font-black leading-none tracking-tight"
-                  style={styles.title}
-                >
-                  ${formatMoney(activePoint.rawValue)}
-                </p>
-
-                <p
-                  className="mt-1 text-[9.5px] font-black leading-[12px]"
-                  style={{ color: 'var(--admin-primary)' }}
-                  title={
-                    compareEnabled && activeComparisonPoint
-                      ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
-                      : 'Ventas del periodo'
-                  }
-                >
-                  {compareEnabled && activeComparisonPoint
-                    ? getComparisonText(activePoint.rawValue, activeComparisonPoint.rawValue)
-                    : 'Ventas del periodo'}
-                </p>
-
                 {compareEnabled && activeComparisonPoint ? (
-                  <p className="mt-0.5 truncate text-[8.7px] font-bold leading-[11px]" style={styles.muted}>
+                  <p className="mt-0.5 truncate text-[8.5px] font-bold leading-[10px]" style={styles.muted}>
                     Ant: ${formatMoney(activeComparisonPoint.rawValue)}
                   </p>
                 ) : null}
@@ -907,11 +943,13 @@ export default function DashboardSalesPanel({
                   className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45"
                   style={{
                     background:
-                      'color-mix(in srgb, var(--admin-card-bg) 78%, var(--admin-primary) 8%)',
+                      'color-mix(in srgb, var(--admin-card-bg) 48%, rgba(255,255,255,0.34))',
                     borderRight:
-                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.34))',
+                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.40))',
                     borderBottom:
-                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.34))',
+                      '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.40))',
+                    boxShadow:
+                      '2px 2px 8px color-mix(in srgb, var(--admin-primary) 8%, transparent)',
                   }}
                 />
               </div>
@@ -958,72 +996,83 @@ export default function DashboardSalesPanel({
             }}
           >
             <div
-              className="grid grid-cols-[minmax(0,1.7fr)_78px_120px_105px] border-b px-3 py-2 text-[10.5px] font-black"
+              className="grid grid-cols-[minmax(0,1fr)_70px_112px_92px] gap-2 px-3.5 py-1.5 text-[11px] font-black"
               style={{
-                borderColor: 'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.18))',
                 color: 'var(--admin-card-muted-text)',
+                borderBottom:
+                  '1px solid color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.10))',
+                background: 'rgba(255,255,255,0.018)',
               }}
             >
               <span>Producto</span>
               <span>Ventas</span>
               <span>Ingresos</span>
-              <span>Tendencia</span>
-            </div>
-
-            {(topProducts || []).slice(0, 3).map((product, index) => (
-              <div
-                key={product.id || product.name || index}
-                className="grid grid-cols-[minmax(0,1.7fr)_78px_120px_105px] items-center px-3 py-2 text-[12px] font-black"
+              <span
                 style={{
-                  borderTop:
-                    index > 0
-                      ? '1px solid color-mix(in srgb, var(--admin-primary) 8%, transparent)'
-                      : 'none',
-                  color: 'var(--admin-card-text)',
+                  color:
+                    'color-mix(in srgb, var(--admin-primary) 42%, var(--admin-card-text))',
+                  textShadow:
+                    '0 0 6px color-mix(in srgb, var(--admin-primary) 14%, transparent)',
                 }}
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="h-7 w-7 shrink-0 rounded-[9px] object-cover"
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = 'hidden';
-                    }}
-                  />
-                  <span className="truncate">{product.name}</span>
-                </div>
+                Tendencia
+              </span>
+            </div>
 
-                <span>{product.sales}</span>
-                <span>{product.income}</span>
-                <svg width="82" height="20" viewBox="0 0 82 20" aria-hidden="true">
-                  <path
-                    d={getSparklinePath(product.trend || [])}
-                    fill="none"
-                    stroke="var(--admin-primary)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-            ))}
+            <div>
+              {topProducts.slice(0, 3).map((product, index) => (
+                <article
+                  key={product.id || `${product.name}-${index}`}
+                  className="grid grid-cols-[minmax(0,1fr)_70px_112px_92px] items-center gap-2 px-3.5 py-1"
+                  style={{
+                    borderBottom:
+                      '1px solid color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.05))',
+                    background: 'transparent',
+                  }}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <ProductImage image={product.image} name={product.name} />
+
+                    <p className="truncate text-[12px] font-bold leading-none" style={styles.title}>
+                      {product.name || 'Producto sin nombre'}
+                    </p>
+                  </div>
+
+                  <p className="text-[12px] font-bold leading-none" style={styles.title}>
+                    {product.sales || 0}
+                  </p>
+
+                  <p className="text-[12px] font-bold leading-none" style={styles.title}>
+                    {product.income || '$0.00'}
+                  </p>
+
+                  <svg viewBox="0 0 76 18" className="h-4.5 w-full">
+                    <path
+                      d={getSparklinePath(product.trend || [])}
+                      fill="none"
+                      stroke="var(--admin-primary)"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.9"
+                    />
+                  </svg>
+                </article>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              className="dashboard-glass-main-button relative inline-flex items-center gap-2 overflow-hidden rounded-[14px] px-4 py-2 text-[12px] font-black transition duration-200"
-              style={glassMainButtonStyle}
-              onClick={(event) => {
-                event.stopPropagation();
-                onViewProducts?.();
-              }}
-            >
-              <span className="relative z-10">Ver todos los productos</span>
-              <span className="relative z-10">→</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onViewProducts?.()}
+            className="dashboard-glass-main-button relative mx-auto mt-1.5 flex items-center justify-center gap-2 overflow-hidden rounded-[13px] px-4 py-1.5 text-[12.5px] font-black transition duration-200"
+            style={glassMainButtonStyle}
+          >
+            <span className="relative z-10">Ver todos los productos</span>
+            <span className="relative z-10" aria-hidden="true">
+              →
+            </span>
+          </button>
         </div>
       </div>
     </section>
