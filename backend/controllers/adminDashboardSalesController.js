@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 
 const TIMEZONE = 'America/Bogota';
 const VALID_SALE_STATUSES = ['paid', 'confirmed', 'shipped', 'delivered', 'completed'];
+const CANCELLED_STATUSES = ['cancelled', 'canceled', 'refunded', 'failed'];
+const VALID_PAYMENT_STATUSES = ['paid'];
 
 const SALES_RANGE_OPTIONS = {
   this_week: 'Esta semana',
@@ -12,9 +14,64 @@ const SALES_RANGE_OPTIONS = {
   previous_month: 'Mes anterior',
 };
 
+const SALES_TOTAL_EXPRESSION = {
+  $ifNull: [
+    '$total',
+    {
+      $add: [
+        { $ifNull: ['$subtotal', 0] },
+        { $ifNull: ['$shipping', 0] },
+        { $ifNull: ['$taxes.iva.amount', 0] },
+      ],
+    },
+  ],
+};
+
+function parseAmountString(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return NaN;
+
+  const clean = raw.replace(/[^\d.,-]/g, '');
+  const lastDot = clean.lastIndexOf('.');
+  const lastComma = clean.lastIndexOf(',');
+
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalSeparator = lastDot > lastComma ? '.' : ',';
+    const thousandsSeparator = decimalSeparator === '.' ? ',' : '.';
+
+    return Number(
+      clean
+        .replaceAll(thousandsSeparator, '')
+        .replace(decimalSeparator, '.')
+    );
+  }
+
+  if (lastComma >= 0) {
+    const decimalDigits = clean.length - lastComma - 1;
+    return Number(
+      decimalDigits > 0 && decimalDigits <= 2
+        ? clean.replace(',', '.')
+        : clean.replaceAll(',', '')
+    );
+  }
+
+  if (lastDot >= 0) {
+    const decimalDigits = clean.length - lastDot - 1;
+    return Number(
+      decimalDigits > 0 && decimalDigits <= 2 ? clean : clean.replaceAll('.', '')
+    );
+  }
+
+  return Number(clean);
+}
+
 function toNumber(value, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  const parsed = parseAmountString(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function roundNumber(value) {
@@ -65,6 +122,7 @@ function getRangeDates(rangeKey) {
   if (rangeKey === 'last_7_days') {
     const currentStart = addDays(today, -6);
     const currentEnd = addDays(today, 1);
+
     return {
       currentStart,
       currentEnd,
@@ -77,6 +135,7 @@ function getRangeDates(rangeKey) {
     const currentStart = startOfMonth(today);
     const currentEnd = addMonths(currentStart, 1);
     const previousStart = addMonths(currentStart, -1);
+
     return {
       currentStart,
       currentEnd,
@@ -89,6 +148,7 @@ function getRangeDates(rangeKey) {
     const currentEnd = startOfMonth(today);
     const currentStart = addMonths(currentEnd, -1);
     const previousStart = addMonths(currentStart, -1);
+
     return {
       currentStart,
       currentEnd,
@@ -134,7 +194,8 @@ function formatBucketLabel(start, end) {
   );
 
   if (dayCount <= 1) {
-    return formatShortWeekday(start).charAt(0).toUpperCase() + formatShortWeekday(start).slice(1);
+    const label = formatShortWeekday(start);
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   const sameMonth = start.getMonth() === exclusiveEnd.getMonth();
@@ -155,6 +216,7 @@ function buildBuckets(start, end, maxBuckets = 7) {
     return Array.from({ length: totalDays }, (_, index) => {
       const bucketStart = addDays(start, index);
       const bucketEnd = addDays(bucketStart, 1);
+
       return {
         start: bucketStart,
         end: bucketEnd,
@@ -164,33 +226,49 @@ function buildBuckets(start, end, maxBuckets = 7) {
     });
   }
 
-  const bucketCount = maxBuckets;
-  return Array.from({ length: bucketCount }, (_, index) => {
-    const bucketStart = new Date(start.getTime() + (totalMs / bucketCount) * index);
+  return Array.from({ length: maxBuckets }, (_, index) => {
+    const bucketStart = new Date(start.getTime() + (totalMs / maxBuckets) * index);
     const bucketEnd =
-      index === bucketCount - 1
+      index === maxBuckets - 1
         ? new Date(end)
-        : new Date(start.getTime() + (totalMs / bucketCount) * (index + 1));
+        : new Date(start.getTime() + (totalMs / maxBuckets) * (index + 1));
 
     return {
-      start,
-      end,
+      start: bucketStart,
+      end: bucketEnd,
       label: formatBucketLabel(bucketStart, bucketEnd),
       value: 0,
-      bucketStart,
-      bucketEnd,
     };
-  }).map((bucket) => ({
-    start: bucket.bucketStart,
-    end: bucket.bucketEnd,
-    label: bucket.label,
-    value: 0,
-  }));
+  });
+}
+
+function getSalesMatch(start, end) {
+  return {
+    createdAt: {
+      $gte: start,
+      $lt: end,
+    },
+    status: {
+      $nin: CANCELLED_STATUSES,
+    },
+    $or: [
+      {
+        status: {
+          $in: VALID_SALE_STATUSES,
+        },
+      },
+      {
+        'payment.status': {
+          $in: VALID_PAYMENT_STATUSES,
+        },
+      },
+    ],
+  };
 }
 
 function putOrderIntoBucket(buckets, order) {
   const createdAt = new Date(order.createdAt);
-  const total = toNumber(order.total, 0);
+  const total = toNumber(order.totalAmount ?? order.total, 0);
 
   const bucket = buckets.find(
     (item) => createdAt >= item.start && createdAt < item.end
@@ -202,17 +280,17 @@ function putOrderIntoBucket(buckets, order) {
 }
 
 async function getSalesForRange(start, end) {
-  const orders = await Order.find({
-    status: { $in: VALID_SALE_STATUSES },
-    createdAt: {
-      $gte: start,
-      $lt: end,
+  return Order.aggregate([
+    {
+      $match: getSalesMatch(start, end),
     },
-  })
-    .select('createdAt total')
-    .lean();
-
-  return orders;
+    {
+      $project: {
+        createdAt: 1,
+        totalAmount: SALES_TOTAL_EXPRESSION,
+      },
+    },
+  ]);
 }
 
 async function buildChartData(start, end) {
