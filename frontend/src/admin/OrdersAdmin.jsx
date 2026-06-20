@@ -1,6 +1,7 @@
 // frontend/src/admin/OrdersAdmin.jsx
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import api, { setAdminToken } from '../lib/api';
 import ElectronicInvoiceBox from './orders/electronicInvoice/ElectronicInvoiceBox';
 import OrdersFilters from './orders/components/OrdersFilters';
@@ -111,6 +112,20 @@ const parseTagsInput = (str) =>
     .map((s) => normalizeTag(s))
     .filter(Boolean);
 
+
+const parseDashboardStatusParam = (rawStatus) => {
+  const allowedStatuses = new Set(STATUS_FILTERS.map((item) => item.key));
+
+  return Array.from(
+    new Set(
+      String(rawStatus || '')
+        .split(',')
+        .map((item) => item.trim().toLowerCase())
+        .filter((item) => allowedStatuses.has(item))
+    )
+  );
+};
+
 /* ---------- Fallbacks client-side ---------- */
 function applyStatusClientFilter(list, statusFilter) {
   if (!Array.isArray(list) || statusFilter.length === 0) return list;
@@ -204,7 +219,9 @@ function titleForEvent(ev) {
    Listado + FILTROS EN 2 LÍNEAS
    =========================== */
 export default function OrdersAdmin() {
+  const [searchParams] = useSearchParams();
   const [showQuickViewsFloating, setShowQuickViewsFloating] = useState(false);
+  
    // Cargar token admin desde localStorage
   useEffect(() => {
      const token = localStorage.getItem('admin_token');
@@ -307,7 +324,9 @@ export default function OrdersAdmin() {
   }, [typingQ]);
 
   // Filtros estado
-  const [statusFilter, setStatusFilter] = useState([]);
+  const [statusFilter, setStatusFilter] = useState(() =>
+    parseDashboardStatusParam(searchParams.get('status'))
+  );
   const toggleStatus = (k) => {
     setStatusFilter((prev) =>
       prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
@@ -315,6 +334,22 @@ export default function OrdersAdmin() {
     setPage(1);
   };
   const clearStatus = () => { setStatusFilter([]); setPage(1); };
+
+  useEffect(() => {
+    const statusFromDashboard = parseDashboardStatusParam(searchParams.get('status'));
+
+    if (!statusFromDashboard.length) return;
+
+    setStatusFilter((prev) => {
+      const sameLength = prev.length === statusFromDashboard.length;
+      const sameValues =
+        sameLength && statusFromDashboard.every((status) => prev.includes(status));
+
+      return sameValues ? prev : statusFromDashboard;
+    });
+
+  setPage(1);
+}, [searchParams]);
 
   const {
     quickView,
