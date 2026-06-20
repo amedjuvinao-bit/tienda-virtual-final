@@ -19,8 +19,19 @@ function isInsideSection(target, sectionTitle) {
   return String(section.textContent || '').includes(sectionTitle);
 }
 
+function sanitizeCssContent(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
 export default function DashboardModelOne(props) {
   const navigation = props.navigation || {};
+  const topProductsTitle =
+    props.salesPeriod?.topProductsTitle ||
+    `Top productos ${String(props.salesPeriod?.rangeLabel || 'esta semana').toLowerCase()}`;
 
   const handleDashboardClick = (event) => {
     const text = getButtonText(event.target);
@@ -55,6 +66,22 @@ export default function DashboardModelOne(props) {
 
   return (
     <div className="space-y-2 xl:space-y-2" onClick={handleDashboardClick}>
+      <style>
+        {`
+          .dashboard-sales-dynamic-title h3 {
+            font-size: 0 !important;
+            line-height: 1 !important;
+          }
+
+          .dashboard-sales-dynamic-title h3::after {
+            content: var(--dashboard-top-products-title);
+            font-size: 15px;
+            font-weight: 950;
+            line-height: 1;
+          }
+        `}
+      </style>
+
       <DashboardHero actions={props.quickActions || []} />
 
       <div className="-mt-1">
@@ -70,13 +97,17 @@ export default function DashboardModelOne(props) {
       >
         <div
           className="
-            min-w-0 self-start
+            dashboard-sales-dynamic-title min-w-0 self-start
             xl:h-[var(--dashboard-sales-zone-height)]
             xl:[&>section]:h-full
             xl:[&>section>div]:h-full
           "
+          style={{
+            '--dashboard-top-products-title': `"${sanitizeCssContent(topProductsTitle)}"`,
+          }}
         >
           <DashboardSalesPanel
+            key={`sales-${props.salesRange || 'this_week'}-${props.salesCompare ? 'compare' : 'single'}`}
             chartData={props.salesChartData || []}
             comparisonData={props.comparisonSalesChartData || []}
             salesSummary={props.salesSummary}
