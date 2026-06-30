@@ -32,6 +32,8 @@ export default function DashboardModelOne(props) {
     `Top productos ${String(props.salesPeriod?.rangeLabel || 'esta semana').toLowerCase()}`;
 
   const reviewOrders = navigation.reviewOrders || navigation.viewOrders;
+  const hasTopProducts = Array.isArray(props.topProducts) && props.topProducts.length > 0;
+  const showTopProductsEmptyState = !props.salesLoading && !hasTopProducts;
 
   return (
     <div className="space-y-2 xl:space-y-2">
@@ -66,7 +68,7 @@ export default function DashboardModelOne(props) {
       >
         <div
           className="
-            dashboard-sales-dynamic-title min-w-0 self-start
+            dashboard-sales-dynamic-title relative min-w-0 self-start
             xl:h-[var(--dashboard-sales-zone-height)]
             xl:[&>section]:h-full
             xl:[&>section>div]:h-full
@@ -90,6 +92,40 @@ export default function DashboardModelOne(props) {
             topProducts={props.topProducts || []}
             onViewProducts={navigation.viewProducts}
           />
+
+          {showTopProductsEmptyState ? (
+            <div className="pointer-events-none absolute inset-x-7 bottom-[48px] z-20 flex justify-center">
+              <div
+                className="max-w-[430px] rounded-[16px] px-4 py-2 text-center"
+                style={{
+                  border:
+                    '1px solid color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.28))',
+                  background: `
+                    linear-gradient(
+                      145deg,
+                      rgba(255,255,255,0.040) 0%,
+                      rgba(255,255,255,0.014) 55%,
+                      color-mix(in srgb, var(--admin-primary) 4%, transparent) 100%
+                    )
+                  `,
+                  boxShadow: `
+                    inset 0 1px 0 rgba(255,255,255,0.28),
+                    0 8px 18px rgba(12,6,35,0.040),
+                    0 0 10px color-mix(in srgb, var(--admin-primary) 8%, transparent)
+                  `,
+                  backdropFilter: 'blur(12px) saturate(155%)',
+                  WebkitBackdropFilter: 'blur(12px) saturate(155%)',
+                }}
+              >
+                <p className="text-[12px] font-black leading-[15px]" style={styles.title}>
+                  Sin productos vendidos en este periodo.
+                </p>
+                <p className="mt-1 text-[10.5px] font-bold leading-[13px]" style={styles.muted}>
+                  Cuando existan ventas pagadas o activas, aparecerán aquí los productos más vendidos.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <aside
