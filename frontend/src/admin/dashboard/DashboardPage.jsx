@@ -3,17 +3,6 @@
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import {
-  dashboardAlerts,
-  dashboardKpis,
-  dashboardQuickActions,
-  inventoryByBranch,
-  monthlyGoal,
-  recentOrders,
-  salesChartData,
-  topProducts,
-} from './dashboardMockData';
-
 import { getDashboardSales, getDashboardSummary } from './api/dashboardApi';
 import DashboardModelOne from './layouts/DashboardModelOne';
 
@@ -46,10 +35,10 @@ function wait(ms) {
   });
 }
 
-const fallbackDashboardData = {
-  quickActions: dashboardQuickActions,
-  kpis: dashboardKpis,
-  salesChartData,
+const emptyDashboardData = {
+  quickActions: [],
+  kpis: [],
+  salesChartData: [],
   comparisonSalesChartData: [],
   salesSummary: null,
   salesPeriod: {
@@ -58,11 +47,11 @@ const fallbackDashboardData = {
     compare: false,
     topProductsTitle: 'Top productos esta semana',
   },
-  topProducts,
-  alerts: dashboardAlerts,
-  monthlyGoal,
-  inventoryByBranch,
-  recentOrders,
+  topProducts: [],
+  alerts: [],
+  monthlyGoal: null,
+  inventoryByBranch: [],
+  recentOrders: [],
 };
 
 export default function DashboardPage() {
@@ -70,7 +59,7 @@ export default function DashboardPage() {
   const selectedModel = 'modelOne';
   const SelectedDashboardModel = DASHBOARD_MODELS[selectedModel] || DashboardModelOne;
 
-  const [dashboardData, setDashboardData] = useState(fallbackDashboardData);
+  const [dashboardData, setDashboardData] = useState(emptyDashboardData);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState(null);
   const [salesError, setSalesError] = useState(null);
@@ -88,24 +77,25 @@ export default function DashboardPage() {
       try {
         const data = await getDashboardSummary();
 
-        if (!isMounted || !data) return;
+        if (!isMounted) return;
+        if (!data) throw new Error('Respuesta vacía del backend');
 
         setDashboardData((prev) => ({
           ...prev,
-          quickActions: data.quickActions || fallbackDashboardData.quickActions,
-          kpis: data.kpis || fallbackDashboardData.kpis,
-          salesChartData: data.salesChartData || fallbackDashboardData.salesChartData,
-          topProducts: data.topProducts || fallbackDashboardData.topProducts,
-          alerts: data.alerts || fallbackDashboardData.alerts,
-          monthlyGoal: data.monthlyGoal || fallbackDashboardData.monthlyGoal,
-          inventoryByBranch: data.inventoryByBranch || fallbackDashboardData.inventoryByBranch,
-          recentOrders: data.recentOrders || fallbackDashboardData.recentOrders,
+          quickActions: Array.isArray(data.quickActions) ? data.quickActions : [],
+          kpis: Array.isArray(data.kpis) ? data.kpis : [],
+          salesChartData: Array.isArray(data.salesChartData) ? data.salesChartData : [],
+          topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+          alerts: Array.isArray(data.alerts) ? data.alerts : [],
+          monthlyGoal: data.monthlyGoal || null,
+          inventoryByBranch: Array.isArray(data.inventoryByBranch) ? data.inventoryByBranch : [],
+          recentOrders: Array.isArray(data.recentOrders) ? data.recentOrders : [],
         }));
       } catch (error) {
         console.error('No se pudo cargar el dashboard real:', error);
         if (isMounted) {
           setDashboardError(
-            'No se pudo cargar el resumen principal del dashboard. Se mantienen datos disponibles mientras vuelve la conexión.'
+            'No se pudo cargar el resumen principal del dashboard. No se mostrarán datos simulados.'
           );
         }
       } finally {
@@ -138,9 +128,7 @@ export default function DashboardPage() {
           range: activeRange,
           rangeLabel: activeRangeOption.label,
           compare: salesCompare,
-          topProductsTitle:
-            prev.salesPeriod?.topProductsTitle ||
-            `Top productos ${activeRangeOption.label.toLowerCase()}`,
+          topProductsTitle: `Top productos ${activeRangeOption.label.toLowerCase()}`,
         },
       }));
 
@@ -150,7 +138,8 @@ export default function DashboardPage() {
           compare: salesCompare ? 'true' : 'false',
         });
 
-        if (!isMounted || !data) return;
+        if (!isMounted) return;
+        if (!data) throw new Error('Respuesta vacía del backend');
 
         setDashboardData((prev) => ({
           ...prev,
@@ -158,7 +147,7 @@ export default function DashboardPage() {
           comparisonSalesChartData: Array.isArray(data.comparisonChartData)
             ? data.comparisonChartData
             : [],
-          topProducts: Array.isArray(data.topProducts) ? data.topProducts : prev.topProducts,
+          topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
           salesSummary: data.summary || null,
           salesPeriod: {
             range: data.range || activeRange,
