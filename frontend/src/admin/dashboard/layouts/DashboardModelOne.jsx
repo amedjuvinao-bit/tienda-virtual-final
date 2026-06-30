@@ -26,6 +26,83 @@ function runSectionButtonAction(event, action) {
   action();
 }
 
+function DashboardStatusNotice({ type = 'info', title, message }) {
+  if (!title && !message) return null;
+
+  const isError = type === 'error';
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-[18px] px-4 py-3"
+      style={{
+        border: isError
+          ? '1px solid color-mix(in srgb, #ef4444 38%, rgba(255,255,255,0.34))'
+          : '1px solid color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,0.30))',
+        background: isError
+          ? `
+            linear-gradient(
+              145deg,
+              color-mix(in srgb, #ef4444 10%, rgba(255,255,255,0.040)) 0%,
+              rgba(255,255,255,0.014) 54%,
+              color-mix(in srgb, var(--admin-primary) 4%, transparent) 100%
+            )
+          `
+          : `
+            linear-gradient(
+              145deg,
+              rgba(255,255,255,0.044) 0%,
+              rgba(255,255,255,0.012) 54%,
+              color-mix(in srgb, var(--admin-primary) 5%, transparent) 100%
+            )
+          `,
+        boxShadow: `
+          inset 0 1px 0 rgba(255,255,255,0.30),
+          inset 0 -1px 0 rgba(15,23,42,0.10),
+          0 8px 18px rgba(12,6,35,0.040)
+        `,
+        backdropFilter: 'blur(14px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+      }}
+    >
+      <span
+        className="pointer-events-none absolute inset-x-8 top-0 h-px"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent)',
+        }}
+      />
+
+      <div className="relative z-10 flex items-start gap-3">
+        <span
+          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-black"
+          style={{
+            border: isError
+              ? '1px solid color-mix(in srgb, #ef4444 44%, rgba(255,255,255,0.36))'
+              : '1px solid color-mix(in srgb, var(--admin-primary) 30%, rgba(255,255,255,0.36))',
+            color: isError ? '#ef4444' : 'var(--admin-primary)',
+            background: 'rgba(255,255,255,0.055)',
+          }}
+        >
+          {isError ? '!' : 'i'}
+        </span>
+
+        <div className="min-w-0">
+          {title ? (
+            <p className="text-[12.5px] font-black leading-[16px]" style={styles.title}>
+              {title}
+            </p>
+          ) : null}
+          {message ? (
+            <p className="mt-0.5 text-[11.5px] font-semibold leading-[15px]" style={styles.muted}>
+              {message}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardModelOne(props) {
   const navigation = props.navigation || {};
   const topProductsTitle =
@@ -55,6 +132,30 @@ export default function DashboardModelOne(props) {
       </style>
 
       <DashboardHero actions={props.quickActions || []} />
+
+      {props.dashboardLoading ? (
+        <DashboardStatusNotice
+          type="info"
+          title="Cargando datos actualizados del dashboard"
+          message="Estamos consultando el resumen principal, ventas, inventario y órdenes recientes."
+        />
+      ) : null}
+
+      {props.dashboardError ? (
+        <DashboardStatusNotice
+          type="error"
+          title="No se pudo cargar el resumen principal"
+          message={props.dashboardError}
+        />
+      ) : null}
+
+      {props.salesError ? (
+        <DashboardStatusNotice
+          type="error"
+          title="No se pudieron cargar las ventas"
+          message={props.salesError}
+        />
+      ) : null}
 
       <div className="-mt-1">
         <DashboardKpiGrid items={props.kpis || []} />
