@@ -8,17 +8,6 @@ import DashboardKpiGrid from '../components/DashboardKpiGrid';
 import DashboardRecentOrders from '../components/DashboardRecentOrders';
 import DashboardSalesPanel from '../components/DashboardSalesPanel';
 
-function getButtonText(target) {
-  const button = target?.closest?.('button');
-  return button ? String(button.textContent || '').replace(/\s+/g, ' ').trim() : '';
-}
-
-function isInsideSection(target, sectionTitle) {
-  const section = target?.closest?.('section');
-  if (!section) return false;
-  return String(section.textContent || '').includes(sectionTitle);
-}
-
 function sanitizeCssContent(value) {
   return String(value || '')
     .replace(/\\/g, '\\\\')
@@ -27,45 +16,25 @@ function sanitizeCssContent(value) {
     .trim();
 }
 
+function runSectionButtonAction(event, action) {
+  const button = event.target?.closest?.('button');
+
+  if (!button || typeof action !== 'function') return;
+
+  event.stopPropagation();
+  action();
+}
+
 export default function DashboardModelOne(props) {
   const navigation = props.navigation || {};
   const topProductsTitle =
     props.salesPeriod?.topProductsTitle ||
     `Top productos ${String(props.salesPeriod?.rangeLabel || 'esta semana').toLowerCase()}`;
 
-  const handleDashboardClick = (event) => {
-    const text = getButtonText(event.target);
-    if (!text) return;
-
-    if (text.includes('Revisar')) {
-      navigation.reviewOrders?.();
-      return;
-    }
-
-    if (text.includes('Ver todos los productos')) {
-      navigation.viewProducts?.();
-      return;
-    }
-
-    if (text.includes('Ver detalle')) {
-      navigation.viewInventory?.();
-      return;
-    }
-
-    if (text.includes('Ver todas')) {
-      if (isInsideSection(event.target, 'Alertas importantes')) {
-        navigation.reviewOrders?.();
-        return;
-      }
-
-      if (isInsideSection(event.target, 'Órdenes recientes')) {
-        navigation.viewOrders?.();
-      }
-    }
-  };
+  const reviewOrders = navigation.reviewOrders || navigation.viewOrders;
 
   return (
-    <div className="space-y-2 xl:space-y-2" onClick={handleDashboardClick}>
+    <div className="space-y-2 xl:space-y-2">
       <style>
         {`
           .dashboard-sales-dynamic-title h3 {
@@ -137,11 +106,12 @@ export default function DashboardModelOne(props) {
               xl:[&>section]:h-full
               xl:[&>section>div]:h-full
             "
+            onClickCapture={(event) => runSectionButtonAction(event, reviewOrders)}
           >
             <DashboardAlertsPanel
               alerts={props.alerts || []}
-              onViewAlerts={navigation.reviewOrders || navigation.viewOrders}
-              onReviewAlert={navigation.reviewOrders || navigation.viewOrders}
+              onViewAlerts={reviewOrders}
+              onReviewAlert={reviewOrders}
             />
           </div>
 
@@ -158,10 +128,16 @@ export default function DashboardModelOne(props) {
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
-        <DashboardInventoryByBranch
-          items={props.inventoryByBranch || []}
-          onViewInventory={navigation.viewInventory}
-        />
+        <div
+          className="min-w-0"
+          onClickCapture={(event) => runSectionButtonAction(event, navigation.viewInventory)}
+        >
+          <DashboardInventoryByBranch
+            items={props.inventoryByBranch || []}
+            onViewInventory={navigation.viewInventory}
+          />
+        </div>
+
         <DashboardRecentOrders
           orders={props.recentOrders || []}
           onViewOrders={navigation.viewOrders}
