@@ -64,6 +64,15 @@ function calcSummary(items) {
   return { totalItems, subtotal };
 }
 
+function readStoredCart() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('cart') || '[]');
+    return Array.isArray(stored) ? stored.filter((item) => item && item._id) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Comparación superficial de arrays de items (evita loops al sincronizar) */
 function itemsShallowEqual(a, b) {
   if (a === b) return true;
@@ -88,7 +97,7 @@ function itemsShallowEqual(a, b) {
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(readStoredCart);
   const [loading, setLoading] = useState(false);
   const syncingRef = useRef(false);
 
@@ -100,7 +109,7 @@ export function CartProvider({ children }) {
     } catch {}
   }, []);
 
-  // ---------- Cargar carrito desde la base de datos (mount) ----------
+  // ---------- Cargar carrito desde la base de datos cuando se fuerce manualmente ----------
   const syncCart = async () => {
     const sessionId = getSessionId();
     setLoading(true);
@@ -114,16 +123,13 @@ export function CartProvider({ children }) {
         setCart(local);
       }
     } catch (err) {
-      console.log('No hay carrito o error al conectar al backend:', err?.message);
+      if (err?.response?.status !== 404) {
+        console.log('No hay carrito o error al conectar al backend:', err?.message);
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    syncCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ---------- Sincronizar con backend ante cambios ----------
   useEffect(() => {
