@@ -183,6 +183,18 @@ export default function DashboardPage() {
     setSalesCompare((prev) => !prev);
   }, []);
 
+  const handleMonthlyGoalUpdated = useCallback((updatedGoal) => {
+    if (!updatedGoal) return;
+
+    setDashboardData((prev) => ({
+      ...prev,
+      monthlyGoal: {
+        ...(prev.monthlyGoal || {}),
+        ...updatedGoal,
+      },
+    }));
+  }, []);
+
   return (
     <section className="space-y-4 text-slate-950">
       <SelectedDashboardModel
@@ -201,6 +213,7 @@ export default function DashboardPage() {
         topProducts={dashboardData.topProducts}
         alerts={dashboardData.alerts}
         monthlyGoal={dashboardData.monthlyGoal}
+        onGoalUpdated={handleMonthlyGoalUpdated}
         inventoryByBranch={dashboardData.inventoryByBranch}
         recentOrders={dashboardData.recentOrders}
         navigation={dashboardNavigation}
