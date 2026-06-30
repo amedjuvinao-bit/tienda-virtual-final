@@ -21,6 +21,8 @@ const DASHBOARD_MODELS = {
   modelOne: DashboardModelOne,
 };
 
+const SALES_LOADING_MIN_MS = 750;
+
 const SALES_RANGE_OPTIONS = [
   { value: 'this_week', label: 'Esta semana' },
   { value: 'last_7_days', label: 'Últimos 7 días' },
@@ -36,6 +38,12 @@ function getSalesRangeOption(value) {
 
 function normalizeSalesRange(value) {
   return getSalesRangeOption(value).value;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 const fallbackDashboardData = {
@@ -118,6 +126,8 @@ export default function DashboardPage() {
     const activeRangeOption = getSalesRangeOption(activeRange);
 
     async function loadSalesData() {
+      const startedAt = Date.now();
+
       setSalesLoading(true);
       setSalesError(null);
 
@@ -167,6 +177,8 @@ export default function DashboardPage() {
           );
         }
       } finally {
+        const remainingMs = Math.max(0, SALES_LOADING_MIN_MS - (Date.now() - startedAt));
+        if (remainingMs > 0) await wait(remainingMs);
         if (isMounted) setSalesLoading(false);
       }
     }
