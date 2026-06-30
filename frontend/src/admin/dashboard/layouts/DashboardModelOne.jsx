@@ -7,6 +7,7 @@ import DashboardInventoryByBranch from '../components/DashboardInventoryByBranch
 import DashboardKpiGrid from '../components/DashboardKpiGrid';
 import DashboardRecentOrders from '../components/DashboardRecentOrders';
 import DashboardSalesPanel from '../components/DashboardSalesPanel';
+import { dashboardStyles as styles } from '../dashboardStyles';
 
 function sanitizeCssContent(value) {
   return String(value || '')
