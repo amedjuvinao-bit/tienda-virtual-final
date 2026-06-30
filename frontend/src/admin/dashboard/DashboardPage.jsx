@@ -63,6 +63,9 @@ export default function DashboardPage() {
   const SelectedDashboardModel = DASHBOARD_MODELS[selectedModel] || DashboardModelOne;
 
   const [dashboardData, setDashboardData] = useState(fallbackDashboardData);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState(null);
+  const [salesError, setSalesError] = useState(null);
   const [salesRange, setSalesRange] = useState('this_week');
   const [salesCompare, setSalesCompare] = useState(false);
   const [salesLoading, setSalesLoading] = useState(false);
@@ -71,6 +74,9 @@ export default function DashboardPage() {
     let isMounted = true;
 
     async function loadDashboardSummary() {
+      setDashboardLoading(true);
+      setDashboardError(null);
+
       try {
         const data = await getDashboardSummary();
 
@@ -89,6 +95,13 @@ export default function DashboardPage() {
         }));
       } catch (error) {
         console.error('No se pudo cargar el dashboard real:', error);
+        if (isMounted) {
+          setDashboardError(
+            'No se pudo cargar el resumen principal del dashboard. Se mantienen datos disponibles mientras vuelve la conexión.'
+          );
+        }
+      } finally {
+        if (isMounted) setDashboardLoading(false);
       }
     }
 
@@ -106,6 +119,7 @@ export default function DashboardPage() {
 
     async function loadSalesData() {
       setSalesLoading(true);
+      setSalesError(null);
 
       setDashboardData((prev) => ({
         ...prev,
@@ -147,6 +161,11 @@ export default function DashboardPage() {
         }));
       } catch (error) {
         console.error('No se pudo cargar el gráfico de ventas:', error);
+        if (isMounted) {
+          setSalesError(
+            `No se pudieron cargar las ventas de ${activeRangeOption.label.toLowerCase()}. Revisa la conexión con el backend.`
+          );
+        }
       } finally {
         if (isMounted) setSalesLoading(false);
       }
@@ -200,6 +219,9 @@ export default function DashboardPage() {
       <SelectedDashboardModel
         quickActions={dashboardData.quickActions}
         kpis={dashboardData.kpis}
+        dashboardLoading={dashboardLoading}
+        dashboardError={dashboardError}
+        salesError={salesError}
         salesChartData={dashboardData.salesChartData}
         comparisonSalesChartData={dashboardData.comparisonSalesChartData}
         salesSummary={dashboardData.salesSummary}
