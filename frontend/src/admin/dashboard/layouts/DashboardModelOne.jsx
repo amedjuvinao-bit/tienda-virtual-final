@@ -122,7 +122,10 @@ export default function DashboardModelOne(props) {
               xl:[&>section>div]:h-full
             "
           >
-            <DashboardGoalsPanel goal={props.monthlyGoal} />
+            <DashboardGoalsPanel
+              goal={props.monthlyGoal}
+              onGoalUpdated={props.onGoalUpdated}
+            />
           </div>
         </aside>
       </div>
