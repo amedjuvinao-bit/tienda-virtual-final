@@ -103,6 +103,57 @@ function DashboardStatusNotice({ type = 'info', title, message }) {
   );
 }
 
+function SalesUpdatingNotice({ label }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-6 top-[74px] z-30">
+      <div
+        className="relative mx-auto max-w-[410px] overflow-hidden rounded-[16px] px-4 py-2.5 text-center"
+        style={{
+          border:
+            '1px solid color-mix(in srgb, var(--admin-primary) 28%, rgba(255,255,255,0.34))',
+          background: `
+            linear-gradient(
+              145deg,
+              color-mix(in srgb, var(--admin-card-bg) 72%, rgba(255,255,255,0.18)) 0%,
+              color-mix(in srgb, var(--admin-card-bg) 84%, var(--admin-primary) 8%) 100%
+            )
+          `,
+          boxShadow: `
+            inset 0 1px 0 rgba(255,255,255,0.42),
+            0 14px 26px rgba(12,6,35,0.105),
+            0 0 14px color-mix(in srgb, var(--admin-primary) 12%, transparent)
+          `,
+          backdropFilter: 'blur(16px) saturate(175%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(175%)',
+        }}
+      >
+        <p className="text-[12.5px] font-black leading-[15px]" style={styles.title}>
+          Actualizando ventas...
+        </p>
+        <p className="mt-1 text-[10.5px] font-bold leading-[13px]" style={styles.muted}>
+          Consultando datos de {String(label || 'este rango').toLowerCase()}.
+        </p>
+
+        <div
+          className="relative mt-2 h-[3px] overflow-hidden rounded-full"
+          style={{
+            background: 'color-mix(in srgb, var(--admin-primary) 12%, rgba(255,255,255,0.10))',
+          }}
+        >
+          <span
+            className="dashboard-sales-loading-bar absolute inset-y-0 left-0 w-1/2 rounded-full"
+            style={{
+              background:
+                'linear-gradient(90deg, transparent, var(--admin-primary), color-mix(in srgb, var(--admin-primary) 52%, rgba(255,255,255,0.50)), transparent)',
+              boxShadow: '0 0 12px color-mix(in srgb, var(--admin-primary) 24%, transparent)',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardModelOne(props) {
   const navigation = props.navigation || {};
   const topProductsTitle =
@@ -117,6 +168,16 @@ export default function DashboardModelOne(props) {
     <div className="space-y-2 xl:space-y-2">
       <style>
         {`
+          @keyframes dashboardSalesLoadingSweep {
+            0% { transform: translateX(-120%); opacity: 0.35; }
+            35% { opacity: 1; }
+            100% { transform: translateX(240%); opacity: 0.35; }
+          }
+
+          .dashboard-sales-loading-bar {
+            animation: dashboardSalesLoadingSweep 900ms ease-in-out infinite;
+          }
+
           .dashboard-sales-dynamic-title h3 {
             font-size: 0 !important;
             line-height: 1 !important;
@@ -194,6 +255,10 @@ export default function DashboardModelOne(props) {
             topProducts={props.topProducts || []}
             onViewProducts={navigation.viewProducts}
           />
+
+          {props.salesLoading ? (
+            <SalesUpdatingNotice label={props.salesPeriod?.rangeLabel} />
+          ) : null}
 
           {showTopProductsEmptyState ? (
             <div className="pointer-events-none absolute inset-x-7 bottom-[48px] z-20 flex justify-center">
