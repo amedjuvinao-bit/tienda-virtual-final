@@ -38,7 +38,7 @@ export default function useDashboardGoalEditor({ goal, onGoalUpdated } = {}) {
 
   const syncGoalToForm = useCallback((nextGoal) => {
     setCurrentGoal(nextGoal || null);
-    setForm(normalizeGoalForForm(nextGoal));
+    setForm(normalizeGoalForForm(nextGoal || {}));
   }, []);
 
   useEffect(() => {
