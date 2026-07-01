@@ -66,6 +66,7 @@ const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const orderRoutes = tryRequire('./routes/orders');
+const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
@@ -140,6 +141,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
 }
 
 if (orderRoutes) app.use('/api/orders', orderRoutes);
+if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
 if (dianProviderTestRoutes) app.use('/api/dian-provider', dianProviderTestRoutes);
 if (geoRoutes) app.use('/api/geo', geoRoutes);
