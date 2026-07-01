@@ -325,54 +325,6 @@ inventoryReservationSchema.index({
   status: 1,
 });
 
-function getReservationReleaseDate(reservation) {
-  return (
-    reservation.releasedAt ||
-    reservation.expiredAt ||
-    reservation.cancelledAt ||
-    reservation.failedAt ||
-    null
-  );
-}
-
-function getOrderInventoryPatchFromReservation(reservation) {
-  const status = String(reservation?.status || '').trim().toLowerCase();
-  const isConfirmed = status === 'confirmed';
-  const isReleased = ['released', 'expired', 'cancelled', 'failed'].includes(status);
-
-  const patch = {
-    'inventoryControl.discountedAtCheckout': isConfirmed,
-    'inventoryControl.restockedOnFailure': isReleased,
-  };
-
-  if (isReleased) {
-    patch['inventoryControl.restockedAt'] = getReservationReleaseDate(reservation) || new Date();
-  } else {
-    patch['inventoryControl.restockedAt'] = null;
-  }
-
-  return patch;
-}
-
-async function syncOrderInventoryControlFromReservation(reservation) {
-  if (!reservation) return;
-
-  const orderId = reservation.order;
-  const orderNumber = String(reservation.orderNumber || '').trim();
-
-  if (!orderId && !orderNumber) return;
-
-  const Order = mongoose.models.Order;
-
-  if (!Order) return;
-
-  const filter = orderId ? { _id: orderId } : { orderNumber };
-
-  await Order.updateOne(filter, {
-    $set: getOrderInventoryPatchFromReservation(reservation),
-  });
-}
-
 inventoryReservationSchema.pre('validate', function calculateReservationTotals(next) {
   if (!Array.isArray(this.items)) {
     this.items = [];
@@ -414,20 +366,6 @@ inventoryReservationSchema.pre('validate', function generateReservationCode(next
   this.reservationCode = `RES-${datePart}-${randomPart}`;
 
   next();
-});
-
-inventoryReservationSchema.post('save', async function syncReservationOrderControl(doc) {
-  try {
-    await syncOrderInventoryControlFromReservation(doc);
-  } catch (error) {
-    console.error('❌ Error sincronizando reserva con control de inventario de orden:', {
-      reservationId: doc?._id || null,
-      reservationCode: doc?.reservationCode || '',
-      orderNumber: doc?.orderNumber || '',
-      status: doc?.status || '',
-      error: error.message,
-    });
-  }
 });
 
 inventoryReservationSchema.methods.isExpired = function isExpired() {
