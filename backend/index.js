@@ -78,6 +78,7 @@ const inventoryReservationService = tryRequire('./services/inventoryReservationS
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
+const adminBranchProtectionRoutes = tryRequire('./routes/adminBranchProtection');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
@@ -149,6 +150,7 @@ if (uploadRoutes) app.use('/api/uploads', uploadRoutes);
 if (adminAuthRoutes) app.use('/api/admin/auth', loginLimiter, adminAuthRoutes);
 if (adminUsersRoutes) app.use('/api/admin/users', adminUsersRoutes);
 if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
+if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProtectionRoutes);
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
