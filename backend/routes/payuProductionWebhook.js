@@ -11,6 +11,9 @@ const {
   confirmInventoryReservation,
   releaseInventoryReservation,
 } = require('../services/inventoryReservationService');
+const {
+  generateElectronicInvoiceAfterPayment,
+} = require('../services/electronicInvoiceAfterPaymentService');
 
 const router = express.Router();
 
@@ -219,13 +222,8 @@ function validatePayUSignature({ payload, payu }) {
   const currency = trimSafe(payload.currency, 12).toUpperCase();
   const statePol = trimSafe(payload.state_pol || payload.transactionState, 40);
 
-  if (!providedSign) {
-    return { ok: false, error: 'PAYU_SIGN_MISSING' };
-  }
-
-  if (!payu.apiKey) {
-    return { ok: false, error: 'PAYU_API_KEY_MISSING' };
-  }
+  if (!providedSign) return { ok: false, error: 'PAYU_SIGN_MISSING' };
+  if (!payu.apiKey) return { ok: false, error: 'PAYU_API_KEY_MISSING' };
 
   if (!merchantId || !referenceSale || !value || !currency || !statePol) {
     return { ok: false, error: 'PAYU_SIGNATURE_FIELDS_MISSING' };
@@ -534,6 +532,31 @@ function verifyPayUProductionConfig(payments) {
   return { ok: true };
 }
 
+function buildPayUInvoiceTransaction({ payload, transactionId, signatureAlgorithm }) {
+  return {
+    id: transactionId,
+    transaction_id: transactionId,
+    transactionId,
+    payment_method_type: trimSafe(payload.payment_method_type, 80),
+    payment_method_name: trimSafe(payload.payment_method_name, 120),
+    payment_method: trimSafe(payload.payment_method, 120),
+    paymentMethodType: trimSafe(payload.payment_method_type, 80),
+    paymentMethod: trimSafe(payload.payment_method_name || payload.payment_method, 120),
+    rawMethod: {
+      state_pol: trimSafe(payload.state_pol, 40),
+      response_code_pol: trimSafe(payload.response_code_pol, 120),
+      response_message_pol: trimSafe(payload.response_message_pol, 180),
+      reference_pol: trimSafe(payload.reference_pol, 120),
+      transaction_id: transactionId,
+      payment_method: trimSafe(payload.payment_method, 80),
+      payment_method_type: trimSafe(payload.payment_method_type, 80),
+      payment_method_name: trimSafe(payload.payment_method_name, 120),
+      test: trimSafe(payload.test, 20),
+      signatureAlgorithm,
+    },
+  };
+}
+
 router.post('/payu/checkout-data', async (req, res) => {
   try {
     const orderId = trimSafe(req.body?.orderId, 100);
@@ -625,6 +648,10 @@ router.post('/payu/checkout-data', async (req, res) => {
 
 router.post('/payu/webhook', express.urlencoded({ extended: true }), async (req, res) => {
   let session = null;
+  let shouldGenerateDian = false;
+  let dianOrderId = null;
+  let dianTransaction = null;
+  let dianPayments = null;
 
   try {
     const payload = req.body && typeof req.body === 'object' ? req.body : {};
@@ -864,6 +891,17 @@ router.post('/payu/webhook', express.urlencoded({ extended: true }), async (req,
 
       await freshOrder.save({ session });
 
+      if (mapped.paymentStatus === 'paid') {
+        shouldGenerateDian = true;
+        dianOrderId = freshOrder._id;
+        dianTransaction = buildPayUInvoiceTransaction({
+          payload,
+          transactionId,
+          signatureAlgorithm: signatureCheck.algorithm,
+        });
+        dianPayments = payments;
+      }
+
       responsePayload = {
         ok: true,
         received: true,
@@ -876,6 +914,15 @@ router.post('/payu/webhook', express.urlencoded({ extended: true }), async (req,
         signatureAlgorithm: signatureCheck.algorithm,
       };
     });
+
+    if (shouldGenerateDian && dianOrderId) {
+      generateElectronicInvoiceAfterPayment({
+        orderId: dianOrderId,
+        transaction: dianTransaction,
+        payments: dianPayments,
+        paymentProvider: 'payu',
+      });
+    }
 
     return res.status(200).json(responsePayload);
   } catch (error) {
