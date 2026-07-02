@@ -1,10 +1,13 @@
 // backend/routes/adminPos.js
 
 const express = require('express');
+const mongoose = require('mongoose');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Branch = require('../models/Branch');
+const Product = require('../models/Product');
+const InventoryStock = require('../models/InventoryStock');
 const SiteSettings = require('../models/SiteSettings');
 const {
   POS_PAYMENT_METHODS,
@@ -20,6 +23,16 @@ function cleanText(value) {
 
 function normalizePermission(value) {
   return cleanText(value).toLowerCase().replace(/\s+/g, ':');
+}
+
+function escapeRegex(value) {
+  return cleanText(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function toPositiveInt(value, fallback = 30, max = 60) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.min(Math.floor(number), max);
 }
 
 function getEffectivePermissions(req) {
@@ -134,6 +147,50 @@ function serializeBranch(branch = {}) {
   };
 }
 
+function getProductImage(product = {}, stock = {}) {
+  if (product.image) return product.image;
+
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    if (typeof product.images[0] === 'string') return product.images[0];
+    if (product.images[0]?.url) return product.images[0].url;
+  }
+
+  return stock.productSnapshot?.image || '';
+}
+
+function getAvailableStock(stock = {}) {
+  return Math.max(0, Number(stock.stock || 0) - Number(stock.reservedStock || 0));
+}
+
+function serializePosProduct(stock = {}, branch = {}) {
+  const product = stock.product && typeof stock.product === 'object' ? stock.product : {};
+  const productId = String(product._id || stock.product || '');
+  const variant = stock.variant || {};
+  const availableStock = getAvailableStock(stock);
+  const category = product.category || stock.productSnapshot?.category || '';
+
+  return {
+    id: `${productId}:${stock.variantKey || 'default__default'}`,
+    productId,
+    title: product.title || stock.productSnapshot?.title || '',
+    sku: product.sku || stock.productSnapshot?.sku || '',
+    barcode: product.barcode || variant.barcode || '',
+    category,
+    categories: Array.isArray(product.categories) ? product.categories : category ? [category] : [],
+    price: Number(product.price || 0),
+    image: getProductImage(product, stock),
+    variantKey: stock.variantKey || 'default__default',
+    size: variant.size || '',
+    color: variant.color || '',
+    variantSku: variant.sku || '',
+    variantBarcode: variant.barcode || '',
+    stock: Number(stock.stock || 0),
+    reservedStock: Number(stock.reservedStock || 0),
+    availableStock,
+    branch: serializeBranch(branch),
+  };
+}
+
 function serializePreview(preview = {}) {
   return {
     branch: serializeBranch(preview.branch || {}),
@@ -178,6 +235,14 @@ function sendError(res, error) {
   });
 }
 
+function createRouteError(message, code, statusCode = 400, details = {}) {
+  const error = new Error(message);
+  error.code = code;
+  error.statusCode = statusCode;
+  error.details = details;
+  return error;
+}
+
 async function loadBillingInfo() {
   const settings = await SiteSettings.findOne().select('billing').lean();
   const dian = settings?.billing?.dian || {};
@@ -197,6 +262,60 @@ function assertBranchAccess(req, branchId) {
   if (!shouldLimitBranches(req)) return true;
 
   return normalizeBranchIds(req).includes(String(branchId || ''));
+}
+
+async function loadPosBranch(req, branchId) {
+  const cleanBranchId = cleanText(branchId || req.adminDefaultBranch || '');
+
+  if (!cleanBranchId || !mongoose.Types.ObjectId.isValid(cleanBranchId)) {
+    throw createRouteError(
+      'Debes seleccionar una sede válida para buscar productos POS.',
+      'POS_BRANCH_REQUIRED',
+      400,
+      { branchId: cleanBranchId }
+    );
+  }
+
+  const branch = await Branch.findOne(
+    buildBranchFilter(req, {
+      _id: cleanBranchId,
+      'settings.allowPosSales': true,
+    })
+  ).lean();
+
+  if (!branch) {
+    throw createRouteError(
+      'La sede seleccionada no está habilitada para ventas POS o no tienes acceso.',
+      'POS_BRANCH_NOT_AVAILABLE',
+      404,
+      { branchId: cleanBranchId }
+    );
+  }
+
+  return branch;
+}
+
+async function buildProductSearchFilter(searchText) {
+  const filter = {
+    active: { $ne: false },
+    visible: { $ne: false },
+    price: { $gt: 0 },
+  };
+
+  if (!searchText) return filter;
+
+  const regex = new RegExp(escapeRegex(searchText), 'i');
+
+  return {
+    ...filter,
+    $or: [
+      { title: regex },
+      { sku: regex },
+      { barcode: regex },
+      { category: regex },
+      { categories: regex },
+    ],
+  };
 }
 
 router.use(requireAdmin);
@@ -246,6 +365,62 @@ router.get('/bootstrap', requirePermission('pos:view'), async (req, res) => {
         canReceipt: hasPermission(req, 'pos:receipt'),
       },
       billing,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get('/products', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const q = cleanText(req.query.q || '').slice(0, 120);
+    const limit = toPositiveInt(req.query.limit, 30, 60);
+    const branch = await loadPosBranch(req, req.query.branchId);
+    const productFilter = await buildProductSearchFilter(q);
+    const products = await Product.find(productFilter)
+      .select('title sku barcode price image images category categories active visible')
+      .sort(q ? { title: 1 } : { updatedAt: -1 })
+      .limit(q ? 80 : 120)
+      .lean();
+    const productIds = products.map((product) => product._id);
+
+    if (productIds.length === 0) {
+      return res.json({
+        ok: true,
+        query: q,
+        branch: serializeBranch(branch),
+        products: [],
+        total: 0,
+      });
+    }
+
+    const stockRows = await InventoryStock.find({
+      branch: branch._id,
+      product: { $in: productIds },
+      active: true,
+      deletedAt: null,
+    })
+      .populate({
+        path: 'product',
+        select: 'title sku barcode price image images category categories active visible',
+      })
+      .sort({ availableStock: -1, lastMovementAt: -1, updatedAt: -1 })
+      .limit(limit * 3)
+      .lean();
+
+    const rows = stockRows
+      .filter((row) => getAvailableStock(row) > 0)
+      .filter((row) => row.product && row.product.active !== false && row.product.visible !== false)
+      .map((row) => serializePosProduct(row, branch))
+      .filter((row) => Number(row.price || 0) > 0)
+      .slice(0, limit);
+
+    return res.json({
+      ok: true,
+      query: q,
+      branch: serializeBranch(branch),
+      products: rows,
+      total: rows.length,
     });
   } catch (error) {
     return sendError(res, error);
