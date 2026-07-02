@@ -93,6 +93,25 @@ function getProductImage(product = {}) {
   return '';
 }
 
+function getServerUnitPrice(product = {}) {
+  const price = toMoney(product.price);
+
+  if (price <= 0) {
+    throw createPosError(
+      `El producto ${product.title || ''} no tiene un precio válido para vender en POS.`,
+      'POS_INVALID_PRODUCT_PRICE',
+      {
+        productId: String(product._id || ''),
+        title: product.title || '',
+        price: product.price,
+      },
+      409
+    );
+  }
+
+  return price;
+}
+
 function buildProductSnapshot(product = {}, fallback = {}) {
   return {
     title: cleanText(product.title || fallback.title || fallback.name || '', 220),
@@ -152,15 +171,6 @@ function normalizePosItems(items = []) {
     const unitPrice = toMoney(item.unitPrice ?? item.price ?? item.precio);
     const size = cleanText(item.size || item.talla || item.variant?.size || '', 80);
     const color = cleanText(item.color || item.variant?.color || '', 120);
-
-    if (unitPrice <= 0) {
-      throw createPosError(
-        `El precio del producto en la posición ${index + 1} debe ser mayor a cero.`,
-        'POS_INVALID_UNIT_PRICE',
-        { index, productId, unitPrice },
-        400
-      );
-    }
 
     return {
       index,
@@ -265,73 +275,52 @@ function normalizeDiscountPayload(discount = {}, subtotal = 0) {
   };
 }
 
-function calculatePosTotals({ items = [], discount = {}, taxes = {} } = {}) {
-  const normalizedItems = normalizePosItems(items);
-  const subtotal = normalizedItems.reduce((sum, item) => sum + item.lineSubtotal, 0);
-  const normalizedDiscount = normalizeDiscountPayload(discount, subtotal);
-  const taxableBase = Math.max(0, subtotal - normalizedDiscount.amount);
-
+function calculateTax({ taxableBase = 0, taxes = {} } = {}) {
   const ivaEnabled = taxes?.iva?.enabled === true;
   const ivaPercent = Math.max(0, Math.min(100, toNumber(taxes?.iva?.percent, 0)));
-  const ivaAmount = ivaEnabled && ivaPercent > 0 ? Math.round((taxableBase * ivaPercent) / 100) : 0;
-  const total = Math.max(0, taxableBase + ivaAmount);
-  const totalItems = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const ivaAmount = ivaEnabled && ivaPercent > 0 ? Math.round((toMoney(taxableBase) * ivaPercent) / 100) : 0;
 
   return {
-    items: normalizedItems,
+    iva: {
+      enabled: ivaEnabled,
+      percent: ivaPercent,
+      code: cleanText(taxes?.iva?.code || '01', 20),
+      name: cleanText(taxes?.iva?.name || 'IVA', 80),
+      amount: ivaAmount,
+    },
+  };
+}
+
+function calculateTotalsFromNormalizedItems({ items = [], discount = {}, taxes = {} } = {}) {
+  const subtotal = items.reduce((sum, item) => sum + toMoney(item.lineSubtotal), 0);
+  const normalizedDiscount = normalizeDiscountPayload(discount, subtotal);
+  const taxableBase = Math.max(0, subtotal - normalizedDiscount.amount);
+  const normalizedTaxes = calculateTax({ taxableBase, taxes });
+  const total = Math.max(0, taxableBase + normalizedTaxes.iva.amount);
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  return {
+    items,
     summary: {
-      itemsCount: normalizedItems.length,
+      itemsCount: items.length,
       totalItems,
       subtotal,
     },
     subtotal,
     discount: normalizedDiscount,
-    taxes: {
-      iva: {
-        enabled: ivaEnabled,
-        percent: ivaPercent,
-        code: cleanText(taxes?.iva?.code || '01', 20),
-        name: cleanText(taxes?.iva?.name || 'IVA', 80),
-        amount: ivaAmount,
-      },
-    },
+    taxes: normalizedTaxes,
     shipping: 0,
     total,
   };
 }
 
-function normalizePosPayload(payload = {}) {
-  const branchId = getObjectIdValue(payload.branchId || payload.branch || payload.sede);
-  const rawItems = Array.isArray(payload.items)
-    ? payload.items
-    : Array.isArray(payload.cart)
-      ? payload.cart
-      : [];
-
-  const calculated = calculatePosTotals({
-    items: rawItems,
-    discount: payload.discount,
-    taxes: payload.taxes,
+function calculatePosTotals({ items = [], discount = {}, taxes = {} } = {}) {
+  const normalizedItems = normalizePosItems(items);
+  return calculateTotalsFromNormalizedItems({
+    items: normalizedItems,
+    discount,
+    taxes,
   });
-
-  const payment = normalizePaymentPayload(payload.payment || {}, calculated.total);
-
-  return {
-    branchId,
-    branchObjectId: branchId ? toObjectId(branchId, 'branchId') : null,
-    terminalId: cleanText(payload.terminalId || payload.pos?.terminalId || '', 80),
-    registerCode: cleanUpper(payload.registerCode || payload.pos?.registerCode || '', 80),
-    shiftCode: cleanUpper(payload.shiftCode || payload.pos?.shiftCode || '', 80),
-    customerMode:
-      cleanLower(payload.customerMode || payload.pos?.customerMode || '') === 'identified'
-        ? 'identified'
-        : 'guest',
-    notes: cleanText(payload.notes || payload.pos?.notes || '', 1200),
-    customer: normalizePosCustomer(payload.customer),
-    billing: normalizePosBilling(payload.billing || payload.customer),
-    payment,
-    ...calculated,
-  };
 }
 
 function normalizePosCustomer(customer = {}) {
@@ -366,6 +355,40 @@ function normalizePosBilling(billing = {}) {
     phone: cleanText(billing.phone || '', 60),
     email: cleanText(billing.email || '', 180),
     country: cleanText(billing.country || 'Colombia', 80),
+  };
+}
+
+function normalizePosPayload(payload = {}) {
+  const branchId = getObjectIdValue(payload.branchId || payload.branch || payload.sede);
+  const rawItems = Array.isArray(payload.items)
+    ? payload.items
+    : Array.isArray(payload.cart)
+      ? payload.cart
+      : [];
+
+  const calculated = calculatePosTotals({
+    items: rawItems,
+    discount: payload.discount,
+    taxes: payload.taxes,
+  });
+
+  const payment = normalizePaymentPayload(payload.payment || {}, calculated.total);
+
+  return {
+    branchId,
+    branchObjectId: branchId ? toObjectId(branchId, 'branchId') : null,
+    terminalId: cleanText(payload.terminalId || payload.pos?.terminalId || '', 80),
+    registerCode: cleanUpper(payload.registerCode || payload.pos?.registerCode || '', 80),
+    shiftCode: cleanUpper(payload.shiftCode || payload.pos?.shiftCode || '', 80),
+    customerMode:
+      cleanLower(payload.customerMode || payload.pos?.customerMode || '') === 'identified'
+        ? 'identified'
+        : 'guest',
+    notes: cleanText(payload.notes || payload.pos?.notes || '', 1200),
+    customer: normalizePosCustomer(payload.customer),
+    billing: normalizePosBilling(payload.billing || payload.customer),
+    payment,
+    ...calculated,
   };
 }
 
@@ -479,8 +502,12 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
       );
     }
 
+    const serverUnitPrice = getServerUnitPrice(product);
+
     validatedItems.push({
       ...item,
+      unitPrice: serverUnitPrice,
+      lineSubtotal: item.quantity * serverUnitPrice,
       product,
       stock,
       availableStock,
@@ -783,28 +810,33 @@ async function syncProductTotalStock(productId, { session = null } = {}) {
   return totalStock;
 }
 
+async function preparePosSalePreview(payload = {}, options = {}) {
+  const session = options.session || null;
+  const normalizedPayload = normalizePosPayload(payload);
+  const branch = await validatePosBranch(normalizedPayload.branchId, { session });
+  const validatedItems = await loadAndValidatePosItems(normalizedPayload.items, branch, { session });
+  const recalculated = calculateTotalsFromNormalizedItems({
+    items: validatedItems,
+    discount: payload.discount,
+    taxes: payload.taxes,
+  });
+
+  return {
+    ...normalizedPayload,
+    ...recalculated,
+    payment: normalizePaymentPayload(payload.payment || {}, recalculated.total),
+    branch,
+    branchSnapshot: buildBranchSnapshot(branch),
+  };
+}
+
 async function createPosSale(payload = {}, options = {}) {
   const externalSession = options.session || null;
   const admin = options.admin || {};
 
   const run = async (session) => {
-    const normalizedPayload = normalizePosPayload(payload);
-    const branch = await validatePosBranch(normalizedPayload.branchId, { session });
-    const validatedItems = await loadAndValidatePosItems(normalizedPayload.items, branch, { session });
-
-    normalizedPayload.items = validatedItems;
-    normalizedPayload.summary = {
-      itemsCount: validatedItems.length,
-      totalItems: validatedItems.reduce((sum, item) => sum + item.quantity, 0),
-      subtotal: validatedItems.reduce((sum, item) => sum + item.lineSubtotal, 0),
-    };
-    normalizedPayload.subtotal = normalizedPayload.summary.subtotal;
-    normalizedPayload.discount = normalizeDiscountPayload(payload.discount || {}, normalizedPayload.subtotal);
-    normalizedPayload.total = Math.max(
-      0,
-      normalizedPayload.subtotal - normalizedPayload.discount.amount + (normalizedPayload.taxes?.iva?.amount || 0)
-    );
-    normalizedPayload.payment = normalizePaymentPayload(payload.payment || {}, normalizedPayload.total);
+    const normalizedPayload = await preparePosSalePreview(payload, { session });
+    const branch = normalizedPayload.branch;
 
     validateDiscountAuthorization({ normalizedPayload, admin });
 
@@ -815,7 +847,7 @@ async function createPosSale(payload = {}, options = {}) {
 
     const movements = await applyPosInventoryOut({
       order,
-      validatedItems,
+      validatedItems: normalizedPayload.items,
       branch,
       admin,
       session,
@@ -871,9 +903,11 @@ module.exports = {
   normalizePaymentPayload,
   normalizeDiscountPayload,
   calculatePosTotals,
+  calculateTotalsFromNormalizedItems,
   validatePosBranch,
   loadAndValidatePosItems,
   buildPosOrderPayload,
   applyPosInventoryOut,
+  preparePosSalePreview,
   createPosSale,
 };
