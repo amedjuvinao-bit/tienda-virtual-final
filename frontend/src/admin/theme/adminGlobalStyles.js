@@ -34,16 +34,16 @@ export function applyAdminGlobalStyles() {
       background:
         var(--admin-glass-overlay),
         linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
-      opacity: 0.88;
-      backdrop-filter: blur(var(--admin-page-glass-blur)) saturate(1.18);
-      -webkit-backdrop-filter: blur(var(--admin-page-glass-blur)) saturate(1.18);
+      opacity: 0.94;
+      backdrop-filter: blur(calc(var(--admin-page-glass-blur) + 1px)) saturate(1.28);
+      -webkit-backdrop-filter: blur(calc(var(--admin-page-glass-blur) + 1px)) saturate(1.28);
     }
 
     html.admin-theme-dark .admin-area::before {
       background:
         var(--admin-glass-overlay),
         linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
-      opacity: 0.84;
+      opacity: 0.88;
     }
 
     /* Ambient radial glows */
@@ -57,8 +57,8 @@ export function applyAdminGlobalStyles() {
         radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--admin-primary) 16%, transparent), transparent 24%),
         radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--admin-card-bg) 22%, transparent), transparent 30%),
         radial-gradient(circle at 80% 88%, color-mix(in srgb, var(--admin-primary) 12%, transparent), transparent 32%);
-      opacity: 0.50;
-      filter: blur(12px);
+      opacity: 0.58;
+      filter: blur(18px);
     }
 
     html.admin-theme-dark .admin-area::after {
@@ -87,12 +87,15 @@ export function applyAdminGlobalStyles() {
       -webkit-backdrop-filter: blur(var(--admin-glass-blur)) saturate(var(--admin-glass-saturation)) !important;
       position: relative;
       overflow: hidden;
+      isolation: isolate;
+      transform: translateZ(0);
       transition:
-        transform 180ms ease,
-        box-shadow 220ms ease,
-        border-color 220ms ease,
-        background 220ms ease,
-        color 180ms ease !important;
+        transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 240ms ease,
+        background 240ms ease,
+        color 180ms ease,
+        filter 240ms ease !important;
     }
 
     /* Top-edge reflection line on every glass surface */
@@ -114,13 +117,46 @@ export function applyAdminGlobalStyles() {
         var(--admin-glass-highlight),
         transparent
       );
-      opacity: 0.78;
+      opacity: 0.88;
+    }
+
+
+
+    /* Premium inner glow: subtle depth without changing component structure */
+    .admin-sidebar-glass::after,
+    .admin-header-glass::after,
+    .admin-card-glass::after,
+    .admin-glass-card::after,
+    .admin-hero-glass::after,
+    .admin-section-bar::after,
+    .admin-form-glass::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--admin-primary) 10%, transparent), transparent 28%),
+        linear-gradient(145deg, rgba(255,255,255,0.08), transparent 42%);
+      opacity: 0.72;
+      z-index: 0;
+    }
+
+    .admin-sidebar-glass > *,
+    .admin-header-glass > *,
+    .admin-card-glass > *,
+    .admin-glass-card > *,
+    .admin-hero-glass > *,
+    .admin-section-bar > *,
+    .admin-form-glass > * {
+      position: relative;
+      z-index: 1;
     }
 
     /* Hover lift — only on interactive cards */
     .admin-card-glass:hover,
     .admin-glass-card:hover {
-      transform: translateY(-1px);
+      transform: translateY(-3px) scale(1.002);
       border-color: color-mix(in srgb, var(--admin-primary) 46%, var(--admin-card-border)) !important;
       box-shadow: var(--admin-glass-shadow-hover) !important;
     }
@@ -156,14 +192,15 @@ export function applyAdminGlobalStyles() {
        Usage: <div class="admin-hero-glass"> */
 
     .admin-hero-glass {
-      border-radius: 20px;
+      border-radius: 24px;
       display: flex;
       align-items: stretch;
       background: color-mix(in srgb, var(--admin-glass-bg) 90%, transparent) !important;
       backdrop-filter: blur(30px) saturate(var(--admin-glass-saturation)) !important;
       -webkit-backdrop-filter: blur(30px) saturate(var(--admin-glass-saturation)) !important;
       box-shadow:
-        0 8px 32px color-mix(in srgb, var(--admin-primary) 10%, transparent),
+        0 24px 70px color-mix(in srgb, var(--admin-primary) 13%, transparent),
+        0 12px 32px rgba(15,23,42,0.08),
         inset 0 1px 0 var(--admin-glass-highlight) !important;
     }
 
@@ -185,7 +222,7 @@ export function applyAdminGlobalStyles() {
     .admin-hero-glass .admin-hero-breadcrumb .admin-crumb-active {
       background: color-mix(in srgb, var(--admin-primary) 12%, transparent);
       border: 1px solid color-mix(in srgb, var(--admin-primary) 28%, transparent);
-      border-radius: 20px;
+      border-radius: 24px;
       padding: 2px 9px;
       font-weight: 600;
       color: var(--admin-primary);
@@ -255,7 +292,7 @@ export function applyAdminGlobalStyles() {
        Usage: <div class="admin-section-bar"> */
 
     .admin-section-bar {
-      border-radius: 14px;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       gap: 14px;
@@ -265,7 +302,7 @@ export function applyAdminGlobalStyles() {
       -webkit-backdrop-filter: blur(20px) saturate(var(--admin-glass-saturation)) !important;
       box-shadow:
         inset 0 1px 0 var(--admin-glass-highlight),
-        0 4px 14px color-mix(in srgb, var(--admin-primary) 6%, transparent) !important;
+        0 16px 34px color-mix(in srgb, var(--admin-primary) 9%, transparent) !important;
     }
 
     .admin-section-bar .admin-section-pill {
@@ -296,7 +333,7 @@ export function applyAdminGlobalStyles() {
     .admin-section-bar .admin-section-chip {
       margin-left: auto;
       padding: 4px 12px;
-      border-radius: 20px;
+      border-radius: 24px;
       font-size: 10px;
       font-weight: 600;
       white-space: nowrap;
@@ -312,7 +349,7 @@ export function applyAdminGlobalStyles() {
        Usage: <div class="admin-form-glass"> */
 
     .admin-form-glass {
-      border-radius: 20px;
+      border-radius: 24px;
       background: color-mix(in srgb, var(--admin-glass-bg) 75%, transparent) !important;
       backdrop-filter: blur(28px) saturate(var(--admin-glass-saturation)) !important;
       -webkit-backdrop-filter: blur(28px) saturate(var(--admin-glass-saturation)) !important;
@@ -448,12 +485,12 @@ export function applyAdminGlobalStyles() {
 
     .admin-area button {
       transition:
-        transform 160ms ease,
-        box-shadow 180ms ease,
-        border-color 180ms ease,
-        background 180ms ease,
+        transform 210ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 230ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 200ms ease,
+        background 200ms ease,
         color 160ms ease,
-        filter 160ms ease !important;
+        filter 180ms ease !important;
       will-change: transform;
     }
 
@@ -476,8 +513,9 @@ export function applyAdminGlobalStyles() {
       color: var(--admin-button-text) !important;
       border-color: color-mix(in srgb, var(--admin-primary) 72%, rgba(255,255,255,0.34)) !important;
       box-shadow:
-        0 10px 24px color-mix(in srgb, var(--admin-primary) 22%, transparent),
-        inset 0 1px 0 rgba(255,255,255,0.30) !important;
+        0 18px 38px color-mix(in srgb, var(--admin-primary) 28%, transparent),
+        0 6px 14px color-mix(in srgb, var(--admin-primary) 18%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.34) !important;
       backdrop-filter: blur(16px) saturate(1.35);
       -webkit-backdrop-filter: blur(16px) saturate(1.35);
     }
@@ -487,9 +525,12 @@ export function applyAdminGlobalStyles() {
     .admin-area button.bg-red-600,
     .admin-area button[class*="bg-red-5"],
     .admin-area button[class*="bg-red-6"] {
-      background: var(--admin-danger) !important;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--admin-danger) 92%, white 8%), var(--admin-danger-hover)) !important;
       color: var(--admin-danger-text-on-bg) !important;
-      border-color: var(--admin-danger) !important;
+      border-color: color-mix(in srgb, var(--admin-danger) 76%, rgba(255,255,255,0.22)) !important;
+      box-shadow:
+        0 16px 34px color-mix(in srgb, var(--admin-danger) 26%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.24) !important;
     }
 
     /* Soft gray/neutral buttons */
@@ -500,8 +541,8 @@ export function applyAdminGlobalStyles() {
       color: var(--admin-button-soft-text) !important;
       border: 1px solid var(--admin-button-soft-border) !important;
       box-shadow:
-        0 8px 20px color-mix(in srgb, var(--admin-primary) 8%, transparent),
-        inset 0 1px 0 rgba(255,255,255,0.28) !important;
+        0 14px 30px color-mix(in srgb, var(--admin-primary) 10%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.34) !important;
       backdrop-filter: blur(14px) saturate(1.22);
       -webkit-backdrop-filter: blur(14px) saturate(1.22);
     }
@@ -523,7 +564,7 @@ export function applyAdminGlobalStyles() {
       background: var(--admin-button-glass-bg) !important;
       box-shadow:
         inset 0 1px 0 var(--admin-glass-highlight),
-        0 10px 24px color-mix(in srgb, var(--admin-primary) 14%, transparent) !important;
+        0 16px 36px color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
       backdrop-filter: blur(18px) saturate(1.5);
       -webkit-backdrop-filter: blur(18px) saturate(1.5);
     }
@@ -552,12 +593,12 @@ export function applyAdminGlobalStyles() {
 
     /* Hover / active / focus — shared across all enabled buttons */
     .admin-area button:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
       filter: saturate(1.04) brightness(1.02);
     }
 
     .admin-area button:not(:disabled):not([disabled]):not([aria-disabled="true"]):active {
-      transform: translateY(0) scale(0.985);
+      transform: translateY(0) scale(0.975);
       filter: saturate(0.98) brightness(0.98);
     }
 
@@ -613,11 +654,11 @@ export function applyAdminGlobalStyles() {
       backdrop-filter: blur(12px) saturate(1.16);
       -webkit-backdrop-filter: blur(12px) saturate(1.16);
       transition:
-        border-color 180ms ease,
-        box-shadow 180ms ease,
-        background 180ms ease,
+        border-color 210ms ease,
+        box-shadow 230ms ease,
+        background 210ms ease,
         color 160ms ease,
-        transform 160ms ease !important;
+        transform 200ms cubic-bezier(0.22, 1, 0.36, 1) !important;
     }
 
     html.admin-theme-dark .admin-area input,
@@ -632,7 +673,7 @@ export function applyAdminGlobalStyles() {
     .admin-area input::placeholder,
     .admin-area textarea::placeholder {
       color: var(--admin-input-placeholder) !important;
-      opacity: 0.86;
+      opacity: 0.78;
     }
 
     .admin-area input:hover,
@@ -649,11 +690,11 @@ export function applyAdminGlobalStyles() {
     .admin-area textarea:focus {
       outline: none;
       border-color: var(--admin-input-focus) !important;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
       box-shadow:
-        0 0 0 3px color-mix(in srgb, var(--admin-primary) 20%, transparent),
-        0 12px 26px color-mix(in srgb, var(--admin-primary) 12%, transparent),
-        inset 0 1px 0 rgba(255,255,255,0.16);
+        0 0 0 4px color-mix(in srgb, var(--admin-primary) 20%, transparent),
+        0 18px 34px color-mix(in srgb, var(--admin-primary) 15%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.18);
     }
 
     /* Select option fallback (no styling inside browser native picker) */
@@ -695,8 +736,8 @@ export function applyAdminGlobalStyles() {
       border-color: var(--admin-table-border) !important;
       background: var(--admin-widget-glass-bg) !important;
       border-color: var(--admin-widget-glass-border) !important;
-      backdrop-filter: blur(20px) saturate(1.28);
-      -webkit-backdrop-filter: blur(20px) saturate(1.28);
+      backdrop-filter: blur(24px) saturate(1.34);
+      -webkit-backdrop-filter: blur(24px) saturate(1.34);
       border-collapse: separate;
       border-spacing: 0;
       overflow: hidden;
@@ -718,10 +759,11 @@ export function applyAdminGlobalStyles() {
       color: var(--admin-table-text) !important;
       border-color: var(--admin-table-border) !important;
       transition:
-        background 160ms ease,
+        background 210ms ease,
         color 160ms ease,
-        border-color 160ms ease,
-        box-shadow 160ms ease !important;
+        border-color 180ms ease,
+        box-shadow 220ms ease,
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1) !important;
     }
 
     .admin-area tbody tr:nth-child(even) {
@@ -730,9 +772,10 @@ export function applyAdminGlobalStyles() {
 
     .admin-area tbody tr:hover {
       background: var(--admin-table-row-hover) !important;
+      transform: translateY(-1px);
       box-shadow:
-        inset 3px 0 0 color-mix(in srgb, var(--admin-primary) 48%, transparent),
-        0 8px 18px color-mix(in srgb, var(--admin-primary) 7%, transparent);
+        inset 4px 0 0 color-mix(in srgb, var(--admin-primary) 55%, transparent),
+        0 14px 30px color-mix(in srgb, var(--admin-primary) 10%, transparent);
     }
 
     html.admin-theme-dark .admin-area table,
@@ -783,8 +826,8 @@ export function applyAdminGlobalStyles() {
       backdrop-filter: blur(14px) saturate(1.24);
       -webkit-backdrop-filter: blur(14px) saturate(1.24);
       box-shadow:
-        0 16px 42px rgba(15,23,42,0.08),
-        0 8px 20px color-mix(in srgb, var(--admin-primary) 6%, transparent),
+        0 20px 52px rgba(15,23,42,0.10),
+        0 10px 26px color-mix(in srgb, var(--admin-primary) 8%, transparent),
         inset 0 1px 0 var(--admin-glass-highlight);
     }
 
@@ -856,6 +899,11 @@ export function applyAdminGlobalStyles() {
     .admin-area .shadow-xl,
     .admin-area .shadow-2xl {
       box-shadow: var(--admin-widget-glass-shadow) !important;
+      transition:
+        box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 220ms ease,
+        background 220ms ease;
     }
 
     .admin-area .border {
@@ -865,8 +913,33 @@ export function applyAdminGlobalStyles() {
     .admin-area .rounded-lg,
     .admin-area .rounded-xl,
     .admin-area .rounded-2xl {
-      backdrop-filter: blur(18px) saturate(1.28);
-      -webkit-backdrop-filter: blur(18px) saturate(1.28);
+      backdrop-filter: blur(20px) saturate(1.34);
+      -webkit-backdrop-filter: blur(20px) saturate(1.34);
+    }
+
+
+
+    /* Premium global rhythm: consistent lift for cards commonly built with Tailwind utilities */
+    .admin-area .rounded-2xl.border,
+    .admin-area .rounded-xl.border,
+    .admin-area .rounded-lg.border {
+      transition:
+        transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 220ms ease,
+        background 220ms ease;
+    }
+
+    .admin-area .rounded-2xl.border:hover,
+    .admin-area .rounded-xl.border:hover,
+    .admin-area .rounded-lg.border:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--admin-primary) 40%, var(--admin-glass-border)) !important;
+      box-shadow: var(--admin-glass-shadow-hover) !important;
+    }
+
+    .admin-area [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {
+      border-color: color-mix(in srgb, var(--admin-card-border) 78%, var(--admin-primary) 12%) !important;
     }
 
     /* Preserve color swatches / color pickers */
@@ -884,10 +957,35 @@ export function applyAdminGlobalStyles() {
        LAYER 9 — SCROLLBAR
        ============================================================ */
 
-    .admin-area ::-webkit-scrollbar        { width: 10px; height: 10px; }
-    .admin-area ::-webkit-scrollbar-track  { background: color-mix(in srgb, var(--admin-card-bg) 55%, transparent); border-radius: 999px; }
-    .admin-area ::-webkit-scrollbar-thumb  { background: color-mix(in srgb, var(--admin-primary) 58%, var(--admin-card-bg)); border-radius: 999px; border: 2px solid color-mix(in srgb, var(--admin-card-bg) 70%, transparent); }
-    .admin-area ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--admin-primary) 78%, var(--admin-card-bg)); }
+    .admin-area ::-webkit-scrollbar        { width: 11px; height: 11px; }
+    .admin-area ::-webkit-scrollbar-track  { background: color-mix(in srgb, var(--admin-card-bg) 48%, transparent); border-radius: 999px; }
+    .admin-area ::-webkit-scrollbar-thumb  { background: linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 68%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary-hover) 66%, var(--admin-card-bg))); border-radius: 999px; border: 3px solid color-mix(in srgb, var(--admin-card-bg) 72%, transparent); }
+    .admin-area ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 82%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary-hover) 82%, var(--admin-card-bg))); }
+
+
+
+
+    /* Premium motion tokens used by modals/cards without changing JSX */
+    @keyframes adminPremiumFadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+        filter: blur(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+    }
+
+    .admin-area .admin-card-glass,
+    .admin-area .admin-glass-card,
+    .admin-area .admin-hero-glass,
+    .admin-area .admin-section-bar,
+    .admin-area .admin-form-glass {
+      animation: adminPremiumFadeUp 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
 
 
     /* ============================================================

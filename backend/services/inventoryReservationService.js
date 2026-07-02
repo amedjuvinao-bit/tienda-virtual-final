@@ -1,0 +1,1091 @@
+// backend/services/inventoryReservationService.js
+
+const mongoose = require('mongoose');
+
+const InventoryReservation = require('../models/InventoryReservation');
+const InventoryStock = require('../models/InventoryStock');
+const InventoryMovement = require('../models/InventoryMovement');
+const Product = require('../models/Product');
+const Branch = require('../models/Branch');
+
+const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
+
+const DEFAULT_RESERVATION_MINUTES =
+  Number.isFinite(RAW_DEFAULT_RESERVATION_MINUTES) && RAW_DEFAULT_RESERVATION_MINUTES > 0
+    ? RAW_DEFAULT_RESERVATION_MINUTES
+    : 30;
+
+function createServiceError(message, code, details = {}, statusCode = 400) {
+  const error = new Error(message);
+
+  error.code = code;
+  error.details = details;
+  error.statusCode = statusCode;
+
+  return error;
+}
+
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function cleanUpper(value) {
+  return cleanText(value).toUpperCase();
+}
+
+function normalizeVariantValue(value) {
+  return cleanText(value);
+}
+
+function getObjectIdValue(value) {
+  if (!value) return '';
+
+  if (typeof value === 'object') {
+    return String(value._id || value.id || value);
+  }
+
+  return String(value);
+}
+
+function isValidObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(String(value || ''));
+}
+
+function toObjectId(value, fieldName = 'id') {
+  const cleanValue = getObjectIdValue(value);
+
+  if (!isValidObjectId(cleanValue)) {
+    throw createServiceError(
+      `El campo ${fieldName} no tiene un ObjectId válido.`,
+      'INVALID_OBJECT_ID',
+      {
+        field: fieldName,
+        value: cleanValue,
+      },
+      400
+    );
+  }
+
+  return new mongoose.Types.ObjectId(cleanValue);
+}
+
+function toNumber(value, defaultValue = 0) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) return defaultValue;
+
+  return number;
+}
+
+function getProductImage(product = {}) {
+  if (product.image) return product.image;
+
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const coverImage = product.images.find((image) => image?.isCover);
+
+    if (coverImage?.url) return coverImage.url;
+    if (typeof product.images[0] === 'string') return product.images[0];
+    if (product.images[0]?.url) return product.images[0].url;
+  }
+
+  return '';
+}
+
+function getProductSnapshot(product = {}, fallbackItem = {}) {
+  return {
+    title: cleanText(product.title || fallbackItem.title || fallbackItem.name || ''),
+    sku: cleanUpper(product.sku || fallbackItem.sku || ''),
+    image: cleanText(getProductImage(product) || fallbackItem.image || ''),
+    category: cleanText(product.category || fallbackItem.category || ''),
+  };
+}
+
+function getBranchSnapshot(branch = {}) {
+  return {
+    name: cleanText(branch.name || branch.title || ''),
+    code: cleanUpper(branch.code || ''),
+    type: cleanText(branch.type || '').toLowerCase(),
+  };
+}
+
+function getAvailableFromStock(stock = {}) {
+  const physicalStock = toNumber(stock.stock, 0);
+  const reservedStock = toNumber(stock.reservedStock, 0);
+
+  return Math.max(0, physicalStock - reservedStock);
+}
+
+function normalizeCartItems(items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw createServiceError(
+      'La reserva necesita al menos un producto.',
+      'EMPTY_RESERVATION_ITEMS',
+      {},
+      400
+    );
+  }
+
+  return items.map((item, index) => {
+    const productId =
+      getObjectIdValue(item.productId) ||
+      getObjectIdValue(item.product) ||
+      getObjectIdValue(item._id);
+
+    const size = normalizeVariantValue(item.size || item.talla || item.variant?.size);
+    const color = normalizeVariantValue(item.color || item.variant?.color);
+    const quantity = toNumber(item.quantity || item.qty || item.cantidad, 0);
+    const unitPrice = toNumber(item.unitPrice || item.price || item.precio, 0);
+
+    if (!productId || !isValidObjectId(productId)) {
+      throw createServiceError(
+        `El producto de la posición ${index + 1} no tiene un ID válido.`,
+        'INVALID_PRODUCT_ID',
+        {
+          index,
+          productId,
+        },
+        400
+      );
+    }
+
+    if (!size) {
+      throw createServiceError(
+        `El producto de la posición ${index + 1} no tiene talla definida.`,
+        'MISSING_SIZE',
+        {
+          index,
+          productId,
+        },
+        400
+      );
+    }
+
+    if (!color) {
+      throw createServiceError(
+        `El producto de la posición ${index + 1} no tiene color definido.`,
+        'MISSING_COLOR',
+        {
+          index,
+          productId,
+        },
+        400
+      );
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw createServiceError(
+        `La cantidad del producto en la posición ${index + 1} debe ser mayor a cero.`,
+        'INVALID_QUANTITY',
+        {
+          index,
+          productId,
+          quantity,
+        },
+        400
+      );
+    }
+
+    return {
+      originalItem: item,
+      productId,
+      productObjectId: toObjectId(productId, `items[${index}].productId`),
+      size,
+      color,
+      quantity,
+      unitPrice,
+      lineTotal: quantity * unitPrice,
+      title: cleanText(item.title || item.name || ''),
+      sku: cleanUpper(item.sku || ''),
+      image: cleanText(item.image || ''),
+      category: cleanText(item.category || ''),
+    };
+  });
+}
+
+function buildStockVariantFilter(item) {
+  return {
+    product: item.productObjectId,
+    active: true,
+    deletedAt: null,
+    $or: [
+      {
+        size: item.size,
+        color: item.color,
+      },
+      {
+        'variant.size': item.size,
+        'variant.color': item.color,
+      },
+    ],
+  };
+}
+
+function sortStocksByPriority(stocks = [], branchPriorityIds = []) {
+  const priorityMap = new Map(
+    branchPriorityIds.map((branchId, index) => [String(branchId), index])
+  );
+
+  return [...stocks].sort((a, b) => {
+    const branchA = String(a.branch || a.branchId || '');
+    const branchB = String(b.branch || b.branchId || '');
+
+    const priorityA = priorityMap.has(branchA) ? priorityMap.get(branchA) : 9999;
+    const priorityB = priorityMap.has(branchB) ? priorityMap.get(branchB) : 9999;
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    const availableA = getAvailableFromStock(a);
+    const availableB = getAvailableFromStock(b);
+
+    return availableB - availableA;
+  });
+}
+
+async function withTransaction(work, externalSession = null) {
+  if (externalSession) {
+    return work(externalSession);
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    let result;
+
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+async function loadProductMap(items, session) {
+  const productIds = [...new Set(items.map((item) => item.productId))];
+
+  const products = await Product.find({
+    _id: {
+      $in: productIds.map((productId) => toObjectId(productId, 'productId')),
+    },
+  })
+    .select('title sku image images category')
+    .session(session)
+    .lean();
+
+  return new Map(products.map((product) => [String(product._id), product]));
+}
+
+async function loadBranchMap(branchIds, session) {
+  const cleanBranchIds = [...new Set(branchIds.map(String).filter(Boolean))];
+
+  if (cleanBranchIds.length === 0) return new Map();
+
+  const branches = await Branch.find({
+    _id: {
+      $in: cleanBranchIds.map((branchId) => toObjectId(branchId, 'branchId')),
+    },
+  })
+    .select('name code type')
+    .session(session)
+    .lean();
+
+  return new Map(branches.map((branch) => [String(branch._id), branch]));
+}
+
+function buildReservationStockUpdate(quantityToReserve) {
+  return [
+    {
+      $set: {
+        reservedStock: {
+          $add: [
+            {
+              $ifNull: ['$reservedStock', 0],
+            },
+            quantityToReserve,
+          ],
+        },
+        availableStock: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                '$stock',
+                {
+                  $add: [
+                    {
+                      $ifNull: ['$reservedStock', 0],
+                    },
+                    quantityToReserve,
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  ];
+}
+
+function buildReleaseStockUpdate(quantityToRelease) {
+  return [
+    {
+      $set: {
+        reservedStock: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                {
+                  $ifNull: ['$reservedStock', 0],
+                },
+                quantityToRelease,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $set: {
+        availableStock: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                '$stock',
+                {
+                  $ifNull: ['$reservedStock', 0],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  ];
+}
+
+function buildConfirmStockUpdate(quantityToConfirm) {
+  return [
+    {
+      $set: {
+        stock: {
+          $max: [
+            0,
+            {
+              $subtract: ['$stock', quantityToConfirm],
+            },
+          ],
+        },
+        reservedStock: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                {
+                  $ifNull: ['$reservedStock', 0],
+                },
+                quantityToConfirm,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $set: {
+        availableStock: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                '$stock',
+                {
+                  $ifNull: ['$reservedStock', 0],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  ];
+}
+
+async function reserveFromStockRow({
+  stock,
+  item,
+  product,
+  branch,
+  quantityToReserve,
+  session,
+}) {
+  const stockBeforeReservation = toNumber(stock.stock, 0);
+  const reservedBeforeReservation = toNumber(stock.reservedStock, 0);
+  const availableBeforeReservation = getAvailableFromStock(stock);
+
+  const updatedStock = await InventoryStock.findOneAndUpdate(
+    {
+      _id: stock._id,
+      active: true,
+      deletedAt: null,
+      $expr: {
+        $gte: [
+          {
+            $subtract: [
+              '$stock',
+              {
+                $ifNull: ['$reservedStock', 0],
+              },
+            ],
+          },
+          quantityToReserve,
+        ],
+      },
+    },
+    buildReservationStockUpdate(quantityToReserve),
+    {
+      new: true,
+      session,
+      runValidators: false,
+    }
+  );
+
+  if (!updatedStock) {
+    throw createServiceError(
+      'El inventario cambió mientras se intentaba reservar. Intenta nuevamente.',
+      'CONCURRENT_STOCK_CHANGE',
+      {
+        productId: item.productId,
+        size: item.size,
+        color: item.color,
+        stockId: String(stock._id),
+      },
+      409
+    );
+  }
+
+  return {
+    product: item.productObjectId,
+    inventoryStock: stock._id,
+    branch: stock.branch,
+    productSnapshot: getProductSnapshot(product, item),
+    branchSnapshot: getBranchSnapshot(branch),
+    size: item.size,
+    color: item.color,
+    quantity: quantityToReserve,
+    unitPrice: item.unitPrice,
+    lineTotal: quantityToReserve * item.unitPrice,
+    stockBeforeReservation,
+    reservedBeforeReservation,
+    availableBeforeReservation,
+  };
+}
+
+async function releaseReservedItems({ items = [], session }) {
+  for (const item of items) {
+    const quantity = toNumber(item.quantity, 0);
+
+    if (!item.inventoryStock || quantity <= 0) continue;
+
+    await InventoryStock.updateOne(
+      {
+        _id: item.inventoryStock,
+      },
+      buildReleaseStockUpdate(quantity),
+      {
+        session,
+      }
+    );
+  }
+}
+
+async function allocateReservationItems({
+  items,
+  branchPriorityIds = [],
+  session,
+}) {
+  const normalizedItems = normalizeCartItems(items);
+  const productMap = await loadProductMap(normalizedItems, session);
+
+  const reservationItems = [];
+  const insufficientItems = [];
+  const usedBranchIds = new Set();
+
+  for (const item of normalizedItems) {
+    let remainingQuantity = item.quantity;
+
+    const rawStocks = await InventoryStock.find(buildStockVariantFilter(item))
+      .select(
+        'product branch stock reservedStock availableStock size color variant productSnapshot branchSnapshot'
+      )
+      .session(session)
+      .lean();
+
+    const stocks = sortStocksByPriority(rawStocks, branchPriorityIds);
+
+    const branchIdsForItem = stocks.map((stock) => String(stock.branch || ''));
+    const branchMap = await loadBranchMap(branchIdsForItem, session);
+
+    for (const stock of stocks) {
+      if (remainingQuantity <= 0) break;
+
+      const availableStock = getAvailableFromStock(stock);
+
+      if (availableStock <= 0) continue;
+
+      const quantityToReserve = Math.min(remainingQuantity, availableStock);
+      const product = productMap.get(item.productId) || {};
+      const branchId = String(stock.branch || '');
+      const branch = branchMap.get(branchId) || {};
+
+      const reservedItem = await reserveFromStockRow({
+        stock,
+        item,
+        product,
+        branch,
+        quantityToReserve,
+        session,
+      });
+
+      reservationItems.push(reservedItem);
+      usedBranchIds.add(branchId);
+
+      remainingQuantity -= quantityToReserve;
+    }
+
+    if (remainingQuantity > 0) {
+      insufficientItems.push({
+        productId: item.productId,
+        title: item.title || productMap.get(item.productId)?.title || '',
+        sku: item.sku || productMap.get(item.productId)?.sku || '',
+        size: item.size,
+        color: item.color,
+        requestedQuantity: item.quantity,
+        missingQuantity: remainingQuantity,
+      });
+    }
+  }
+
+  if (insufficientItems.length > 0) {
+    await releaseReservedItems({
+      items: reservationItems,
+      session,
+    });
+
+    throw createServiceError(
+      'No hay inventario suficiente para completar la reserva.',
+      'INSUFFICIENT_STOCK',
+      {
+        insufficientItems,
+      },
+      409
+    );
+  }
+
+  return {
+    reservationItems,
+    usedBranchIds: Array.from(usedBranchIds),
+  };
+}
+
+async function syncProductTotalStock(productId, { session = null } = {}) {
+  const rows = await InventoryStock.find({
+    product: toObjectId(productId, 'productId'),
+    deletedAt: null,
+    active: true,
+  })
+    .select('stock')
+    .session(session)
+    .lean();
+
+  const totalStock = rows.reduce(
+    (sum, row) => sum + Math.max(0, Number(row.stock || 0)),
+    0
+  );
+
+  await Product.updateOne(
+    {
+      _id: toObjectId(productId, 'productId'),
+    },
+    {
+      $set: {
+        stock: totalStock,
+      },
+    },
+    {
+      session,
+    }
+  );
+
+  return totalStock;
+}
+
+async function createSaleOutMovementFromReservationItem({
+  reservation,
+  reservationItem,
+  stockBefore,
+  stockAfter,
+  order = null,
+  orderNumber = '',
+  paymentReference = '',
+  paymentTransactionId = '',
+  session,
+}) {
+  const quantity = toNumber(reservationItem.quantity, 0);
+
+  if (!quantity) return null;
+
+  const reference =
+    cleanUpper(paymentReference) ||
+    cleanUpper(paymentTransactionId) ||
+    cleanUpper(orderNumber) ||
+    cleanUpper(reservation.reservationCode);
+
+  const movement = new InventoryMovement({
+    type: 'sale_out',
+    direction: 'out',
+    status: 'posted',
+
+    product: reservationItem.product,
+    productSnapshot: reservationItem.productSnapshot || {},
+    variant: {
+      size: reservationItem.size,
+      color: reservationItem.color,
+      sku: reservationItem.productSnapshot?.sku || '',
+      barcode: '',
+    },
+
+    branchFrom: reservationItem.branch,
+    branchFromSnapshot: reservationItem.branchSnapshot || {},
+
+    branchTo: null,
+    branchToSnapshot: {},
+
+    quantity,
+
+    stockFrom: {
+      before: stockBefore,
+      quantity,
+      after: stockAfter,
+    },
+
+    stockTo: {
+      before: 0,
+      quantity: 0,
+      after: 0,
+    },
+
+    unitCost: 0,
+    totalCost: 0,
+
+    reason: 'Salida automática por venta confirmada',
+    notes: `Reserva ${reservation.reservationCode || reservation._id} confirmada.`,
+    reference,
+
+    order: order || reservation.order || null,
+    orderNumber: cleanUpper(orderNumber || reservation.orderNumber || ''),
+
+    sourceModel: 'InventoryReservation',
+    sourceId: reservation._id,
+
+    createdBy: null,
+    updatedBy: null,
+    postedBy: null,
+    postedAt: new Date(),
+  });
+
+  await movement.save({ session });
+
+  return movement;
+}
+
+async function createInventoryReservation({
+  sessionId = '',
+  order = null,
+  orderNumber = '',
+  paymentReference = '',
+  paymentTransactionId = '',
+  source = 'checkout',
+  items = [],
+  branchPriorityIds = [],
+  expiresInMinutes = DEFAULT_RESERVATION_MINUTES,
+  currency = 'COP',
+  metadata = {},
+  notes = '',
+} = {}, options = {}) {
+  return withTransaction(async (session) => {
+    const safeExpiresInMinutes =
+      Number.isFinite(Number(expiresInMinutes)) && Number(expiresInMinutes) > 0
+        ? Number(expiresInMinutes)
+        : DEFAULT_RESERVATION_MINUTES;
+
+    const expiresAt = new Date(Date.now() + safeExpiresInMinutes * 60 * 1000);
+
+    const { reservationItems, usedBranchIds } = await allocateReservationItems({
+      items,
+      branchPriorityIds,
+      session,
+    });
+
+    const subtotal = reservationItems.reduce((sum, item) => {
+      return sum + toNumber(item.lineTotal, 0);
+    }, 0);
+
+    const totalQuantity = reservationItems.reduce((sum, item) => {
+      return sum + toNumber(item.quantity, 0);
+    }, 0);
+
+    const [reservation] = await InventoryReservation.create(
+      [
+        {
+          sessionId: cleanText(sessionId),
+          order: order ? toObjectId(order, 'order') : null,
+          orderNumber: cleanText(orderNumber),
+          paymentReference: cleanText(paymentReference),
+          paymentTransactionId: cleanText(paymentTransactionId),
+          source,
+          status: 'pending',
+          items: reservationItems,
+          totalQuantity,
+          subtotal,
+          total: subtotal,
+          currency,
+          expiresAt,
+          notes: cleanText(notes),
+          metadata: {
+            ...metadata,
+            usedBranchIds,
+          },
+        },
+      ],
+      {
+        session,
+      }
+    );
+
+    return reservation;
+  }, options.session || null);
+}
+
+async function findReservation(identifier, session) {
+  if (!identifier) {
+    throw createServiceError(
+      'Debes enviar el identificador de la reserva.',
+      'MISSING_RESERVATION_IDENTIFIER',
+      {},
+      400
+    );
+  }
+
+  const cleanIdentifier = String(identifier);
+
+  const filter = isValidObjectId(cleanIdentifier)
+    ? { _id: cleanIdentifier }
+    : {
+        $or: [
+          { reservationCode: cleanIdentifier },
+          { orderNumber: cleanIdentifier },
+          { paymentReference: cleanIdentifier },
+          { paymentTransactionId: cleanIdentifier },
+        ],
+      };
+
+  const reservation = await InventoryReservation.findOne(filter).session(session);
+
+  if (!reservation) {
+    throw createServiceError(
+      'No se encontró la reserva de inventario.',
+      'RESERVATION_NOT_FOUND',
+      {
+        identifier: cleanIdentifier,
+      },
+      404
+    );
+  }
+
+  return reservation;
+}
+
+async function releaseInventoryReservation(
+  identifier,
+  {
+    status = 'released',
+    releaseReason = 'Reserva liberada',
+  } = {},
+  options = {}
+) {
+  return withTransaction(async (session) => {
+    const reservation = await findReservation(identifier, session);
+
+    if (reservation.status !== 'pending') {
+      return reservation;
+    }
+
+    await releaseReservedItems({
+      items: reservation.items,
+      session,
+    });
+
+    const now = new Date();
+
+    reservation.status = status;
+    reservation.releaseReason = cleanText(releaseReason);
+
+    if (status === 'expired') {
+      reservation.expiredAt = now;
+    } else if (status === 'cancelled') {
+      reservation.cancelledAt = now;
+    } else if (status === 'failed') {
+      reservation.failedAt = now;
+    } else {
+      reservation.releasedAt = now;
+    }
+
+    reservation.items.forEach((item) => {
+      item.releasedAt = now;
+    });
+
+    await reservation.save({ session });
+
+    return reservation;
+  }, options.session || null);
+}
+
+async function confirmInventoryReservation(
+  identifier,
+  {
+    order = null,
+    orderNumber = '',
+    paymentReference = '',
+    paymentTransactionId = '',
+  } = {},
+  options = {}
+) {
+  return withTransaction(async (session) => {
+    const reservation = await findReservation(identifier, session);
+
+    if (reservation.status === 'confirmed') {
+      return reservation;
+    }
+
+    if (reservation.status !== 'pending') {
+      throw createServiceError(
+        `La reserva no se puede confirmar porque está en estado ${reservation.status}.`,
+        'RESERVATION_NOT_CONFIRMABLE',
+        {
+          reservationId: reservation._id,
+          status: reservation.status,
+        },
+        409
+      );
+    }
+
+    if (reservation.isExpired()) {
+      await releaseInventoryReservation(
+        reservation._id,
+        {
+          status: 'expired',
+          releaseReason: 'Reserva vencida antes de confirmar el pago',
+        },
+        {
+          session,
+        }
+      );
+
+      throw createServiceError(
+        'La reserva está vencida y no puede confirmarse.',
+        'RESERVATION_EXPIRED',
+        {
+          reservationId: reservation._id,
+        },
+        409
+      );
+    }
+
+    const now = new Date();
+    const affectedProducts = new Set();
+
+    for (const item of reservation.items) {
+      const quantity = toNumber(item.quantity, 0);
+
+      if (!item.inventoryStock || quantity <= 0) continue;
+
+      const stockBeforeDoc = await InventoryStock.findOne({
+        _id: item.inventoryStock,
+        stock: {
+          $gte: quantity,
+        },
+        reservedStock: {
+          $gte: quantity,
+        },
+      })
+        .session(session)
+        .lean();
+
+      if (!stockBeforeDoc) {
+        throw createServiceError(
+          'No se pudo confirmar la reserva porque el stock reservado ya no está disponible.',
+          'RESERVED_STOCK_NOT_AVAILABLE',
+          {
+            reservationId: reservation._id,
+            inventoryStock: item.inventoryStock,
+            quantity,
+          },
+          409
+        );
+      }
+
+      const stockBefore = toNumber(stockBeforeDoc.stock, 0);
+      const stockAfter = Math.max(0, stockBefore - quantity);
+
+      const updatedStock = await InventoryStock.findOneAndUpdate(
+        {
+          _id: item.inventoryStock,
+          stock: {
+            $gte: quantity,
+          },
+          reservedStock: {
+            $gte: quantity,
+          },
+        },
+        buildConfirmStockUpdate(quantity),
+        {
+          new: true,
+          session,
+          runValidators: false,
+        }
+      );
+
+      if (!updatedStock) {
+        throw createServiceError(
+          'El inventario cambió mientras se confirmaba la reserva.',
+          'CONCURRENT_CONFIRMATION_CHANGE',
+          {
+            reservationId: reservation._id,
+            inventoryStock: item.inventoryStock,
+            quantity,
+          },
+          409
+        );
+      }
+
+      const movement = await createSaleOutMovementFromReservationItem({
+        reservation,
+        reservationItem: item,
+        stockBefore,
+        stockAfter,
+        order: order || reservation.order || null,
+        orderNumber: orderNumber || reservation.orderNumber || '',
+        paymentReference: paymentReference || reservation.paymentReference || '',
+        paymentTransactionId: paymentTransactionId || reservation.paymentTransactionId || '',
+        session,
+      });
+
+      await InventoryStock.updateOne(
+        {
+          _id: item.inventoryStock,
+        },
+        {
+          $set: {
+            lastMovement: movement?._id || null,
+            lastMovementAt: now,
+          },
+        },
+        {
+          session,
+        }
+      );
+
+      item.saleMovement = movement?._id || null;
+      item.confirmedAt = now;
+      affectedProducts.add(String(item.product || ''));
+    }
+
+    reservation.status = 'confirmed';
+    reservation.confirmedAt = now;
+
+    if (order) {
+      reservation.order = toObjectId(order, 'order');
+    }
+
+    if (orderNumber) {
+      reservation.orderNumber = cleanText(orderNumber);
+    }
+
+    if (paymentReference) {
+      reservation.paymentReference = cleanText(paymentReference);
+    }
+
+    if (paymentTransactionId) {
+      reservation.paymentTransactionId = cleanText(paymentTransactionId);
+    }
+
+    await reservation.save({ session });
+
+    for (const productId of affectedProducts) {
+      if (productId) {
+        await syncProductTotalStock(productId, { session });
+      }
+    }
+
+    return reservation;
+  }, options.session || null);
+}
+
+async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
+  return withTransaction(async (session) => {
+    const now = new Date();
+
+    const reservations = await InventoryReservation.find({
+      status: 'pending',
+      expiresAt: {
+        $lte: now,
+      },
+    })
+      .sort({ expiresAt: 1 })
+      .limit(Number(limit || 50))
+      .session(session);
+
+    const expiredReservations = [];
+
+    for (const reservation of reservations) {
+      await releaseReservedItems({
+        items: reservation.items,
+        session,
+      });
+
+      reservation.status = 'expired';
+      reservation.expiredAt = now;
+      reservation.releaseReason = 'Reserva vencida automáticamente';
+
+      reservation.items.forEach((item) => {
+        item.releasedAt = now;
+      });
+
+      await reservation.save({ session });
+
+      expiredReservations.push(reservation);
+    }
+
+    return {
+      count: expiredReservations.length,
+      reservations: expiredReservations,
+    };
+  }, options.session || null);
+}
+
+module.exports = {
+  DEFAULT_RESERVATION_MINUTES,
+  createInventoryReservation,
+  confirmInventoryReservation,
+  releaseInventoryReservation,
+  expireInventoryReservations,
+  allocateReservationItems,
+  releaseReservedItems,
+  createServiceError,
+};

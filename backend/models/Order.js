@@ -35,6 +35,18 @@ const toNum = (v, def = 0) => {
   return Number.isFinite(n) ? n : def;
 };
 
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function cleanUpper(value) {
+  return cleanText(value).toUpperCase();
+}
+
+function cleanLower(value) {
+  return cleanText(value).toLowerCase();
+}
+
 /* ========= Subesquemas ========= */
 const TimelineEntrySchema = new mongoose.Schema(
   {
@@ -56,6 +68,27 @@ const NoteSchema = new mongoose.Schema(
     at: { type: Date, default: Date.now },
   },
   { _id: true }
+);
+
+/* ========= Snapshot de sede operativa ========= */
+const BranchSnapshotSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, default: '' },
+    code: { type: String, trim: true, uppercase: true, default: '' },
+    type: { type: String, trim: true, lowercase: true, default: '' },
+  },
+  { _id: false }
+);
+
+/* ========= Snapshot de usuario administrativo ========= */
+const AdminSnapshotSchema = new mongoose.Schema(
+  {
+    username: { type: String, trim: true, lowercase: true, default: '' },
+    displayName: { type: String, trim: true, default: '' },
+    role: { type: String, trim: true, lowercase: true, default: '' },
+    adminRole: { type: String, trim: true, lowercase: true, default: '' },
+  },
+  { _id: false }
 );
 
 /* ========= Ítems (snapshot de producto) ========= */
@@ -132,6 +165,15 @@ const PaymentSchema = new mongoose.Schema(
       enum: ['pending_gateway', 'pending_manual', 'paid', 'failed', 'cancelled'],
       default: 'pending_gateway',
     },
+    methodType: { type: String, trim: true, default: '' },
+    method: { type: String, trim: true, default: '' },
+    methodLabel: { type: String, trim: true, default: '' },
+    transactionId: { type: String, trim: true, default: '' },
+    reference: { type: String, trim: true, default: '' },
+    amountInCents: { type: Number, default: 0, min: 0 },
+    amount: { type: Number, default: 0, min: 0 },
+    paidAt: { type: Date, default: null },
+    rawMethod: { type: Object, default: () => ({}) },
   },
   { _id: false }
 );
@@ -145,8 +187,59 @@ const OrderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'processing', 'paid', 'shipped', 'cancelled', 'canceled', 'refunded','failed'],
+      enum: [
+        'pending',
+        'processing',
+        'paid',
+        'shipped',
+        'cancelled',
+        'canceled',
+        'refunded',
+        'failed',
+      ],
       default: 'pending',
+      index: true,
+    },
+
+    /* ========= Sede operativa ========= */
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
+
+    branchSnapshot: {
+      type: BranchSnapshotSchema,
+      default: () => ({
+        name: '',
+        code: '',
+        type: '',
+      }),
+    },
+
+    /* ========= Usuario administrativo que originó o gestionó la orden ========= */
+    createdByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+      index: true,
+    },
+
+    createdByAdminSnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({
+        username: '',
+        displayName: '',
+        role: '',
+        adminRole: '',
+      }),
+    },
+
+    source: {
+      type: String,
+      enum: ['online', 'admin', 'pos', 'manual', 'import', 'system'],
+      default: 'online',
       index: true,
     },
 
@@ -277,6 +370,15 @@ const OrderSchema = new mongoose.Schema(
         checkoutLabel: '',
         enableWebhook: false,
         status: 'pending_gateway',
+        methodType: '',
+        method: '',
+        methodLabel: '',
+        transactionId: '',
+        reference: '',
+        amountInCents: 0,
+        amount: 0,
+        paidAt: null,
+        rawMethod: {},
       }),
     },
 
@@ -299,12 +401,63 @@ OrderSchema.index({ printed: 1, createdAt: -1 });
 OrderSchema.index({ archived: 1, createdAt: -1 });
 OrderSchema.index({ 'payment.provider': 1, createdAt: -1 });
 OrderSchema.index({ 'payment.status': 1, createdAt: -1 });
+OrderSchema.index({ 'payment.transactionId': 1 }, { sparse: true });
+OrderSchema.index({ 'payment.reference': 1 }, { sparse: true });
+OrderSchema.index({ branch: 1, createdAt: -1 });
+OrderSchema.index({ source: 1, createdAt: -1 });
+OrderSchema.index({ createdByAdmin: 1, createdAt: -1 });
+OrderSchema.index({ 'branchSnapshot.code': 1, createdAt: -1 });
 
 /* ========= Hooks ========= */
 OrderSchema.pre('validate', function (next) {
   try {
     if (!Array.isArray(this.items)) this.items = [];
     if (!Array.isArray(this.cart)) this.cart = [];
+
+    this.source = cleanLower(this.source || 'online');
+
+    if (
+      !['online', 'admin', 'pos', 'manual', 'import', 'system'].includes(this.source)
+    ) {
+      this.source = 'online';
+    }
+
+    if (!this.branchSnapshot || typeof this.branchSnapshot !== 'object') {
+      this.branchSnapshot = {
+        name: '',
+        code: '',
+        type: '',
+      };
+    } else {
+      this.branchSnapshot.name = cleanText(this.branchSnapshot.name);
+      this.branchSnapshot.code = cleanUpper(this.branchSnapshot.code);
+      this.branchSnapshot.type = cleanLower(this.branchSnapshot.type);
+    }
+
+    if (
+      !this.createdByAdminSnapshot ||
+      typeof this.createdByAdminSnapshot !== 'object'
+    ) {
+      this.createdByAdminSnapshot = {
+        username: '',
+        displayName: '',
+        role: '',
+        adminRole: '',
+      };
+    } else {
+      this.createdByAdminSnapshot.username = cleanLower(
+        this.createdByAdminSnapshot.username
+      );
+      this.createdByAdminSnapshot.displayName = cleanText(
+        this.createdByAdminSnapshot.displayName
+      );
+      this.createdByAdminSnapshot.role = cleanLower(
+        this.createdByAdminSnapshot.role
+      );
+      this.createdByAdminSnapshot.adminRole = cleanLower(
+        this.createdByAdminSnapshot.adminRole
+      );
+    }
 
     if (this.items.length === 0 && this.cart.length > 0) {
       this.items = this.cart
@@ -353,11 +506,21 @@ OrderSchema.pre('validate', function (next) {
     );
 
     if (!this.summary || typeof this.summary !== 'object') {
-      this.summary = { itemsCount: this.items.length, totalItems, subtotal: subtotalCalc };
+      this.summary = {
+        itemsCount: this.items.length,
+        totalItems,
+        subtotal: subtotalCalc,
+      };
     } else {
-      if (typeof this.summary.itemsCount !== 'number') this.summary.itemsCount = this.items.length;
-      if (typeof this.summary.totalItems !== 'number') this.summary.totalItems = totalItems;
-      if (typeof this.summary.subtotal !== 'number') this.summary.subtotal = subtotalCalc;
+      if (typeof this.summary.itemsCount !== 'number') {
+        this.summary.itemsCount = this.items.length;
+      }
+      if (typeof this.summary.totalItems !== 'number') {
+        this.summary.totalItems = totalItems;
+      }
+      if (typeof this.summary.subtotal !== 'number') {
+        this.summary.subtotal = subtotalCalc;
+      }
     }
 
     if (typeof this.subtotal !== 'number') this.subtotal = subtotalCalc;
@@ -378,21 +541,33 @@ OrderSchema.pre('validate', function (next) {
         status: 'pending_gateway',
       };
     } else {
-      this.payment.active = typeof this.payment.active === 'boolean' ? this.payment.active : true;
-      this.payment.provider = String(this.payment.provider || '').trim().toLowerCase();
+      this.payment.active =
+        typeof this.payment.active === 'boolean' ? this.payment.active : true;
+      this.payment.provider = String(this.payment.provider || '')
+        .trim()
+        .toLowerCase();
       this.payment.providerLabel = String(this.payment.providerLabel || '').trim();
       this.payment.mode =
         String(this.payment.mode || '').trim().toLowerCase() === 'production'
           ? 'production'
           : 'sandbox';
-      this.payment.currency = String(this.payment.currency || 'COP').trim().toUpperCase() || 'COP';
+      this.payment.currency =
+        String(this.payment.currency || 'COP').trim().toUpperCase() || 'COP';
       this.payment.checkoutLabel = String(this.payment.checkoutLabel || '').trim();
       this.payment.enableWebhook = this.payment.enableWebhook === true;
 
       const safeStatus = String(this.payment.status || '').trim().toLowerCase();
-      this.payment.status = ['pending_gateway', 'pending_manual', 'paid', 'failed', 'cancelled'].includes(safeStatus)
+      this.payment.status = [
+        'pending_gateway',
+        'pending_manual',
+        'paid',
+        'failed',
+        'cancelled',
+      ].includes(safeStatus)
         ? safeStatus
-        : (this.payment.provider === 'manual' ? 'pending_manual' : 'pending_gateway');
+        : this.payment.provider === 'manual'
+          ? 'pending_manual'
+          : 'pending_gateway';
     }
 
     if (!this.inventoryControl || typeof this.inventoryControl !== 'object') {
@@ -426,7 +601,11 @@ OrderSchema.pre('validate', function (next) {
 OrderSchema.pre('save', function (next) {
   if (this.isNew) {
     this.timeline = this.timeline || [];
-    if (!this.timeline.some((t) => t.type === 'status' && t.statusTo === this.status)) {
+    if (
+      !this.timeline.some(
+        (t) => t.type === 'status' && t.statusTo === this.status
+      )
+    ) {
       this.timeline.push({
         type: 'status',
         statusFrom: undefined,

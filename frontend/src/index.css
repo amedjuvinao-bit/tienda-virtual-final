@@ -259,59 +259,104 @@ video {
   color: var(--admin-input-text, #111827);
 }
 
-.admin-area input::placeholder,
-.admin-area textarea::placeholder {
-  color: var(--admin-input-placeholder, #9ca3af);
+/* ========= DASHBOARD GLASS FIXES =========
+   Ajustes visuales puntuales para que los widgets nuevos respeten
+   temas claros/oscuros sin texto negro sobre fondos oscuros.
+---------------------------------------------------- */
+.admin-area .dashboard-sales-enter [role="listbox"] button {
+  color: color-mix(in srgb, var(--admin-card-text) 18%, rgba(255,255,255,0.92)) !important;
+  text-shadow: 0 1px 2px rgba(15,23,42,0.24);
 }
 
-.admin-area input:focus,
-.admin-area select:focus,
-.admin-area textarea:focus {
-  outline: none;
-  border-color: var(--admin-input-focus, #ec4899);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-input-focus, #ec4899) 25%, transparent);
+.admin-area .dashboard-sales-enter [role="listbox"] button[aria-selected="true"] {
+  color: color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,0.96)) !important;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--admin-primary) 20%, rgba(255,255,255,0.20)),
+      rgba(255,255,255,0.075)
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.32),
+    0 8px 18px rgba(12,6,35,0.10),
+    0 0 12px color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
 }
 
-/* Botones comunes con colores fijos de Tailwind */
-.admin-area .bg-pink-500,
-.admin-area .bg-pink-600,
-.admin-area .bg-red-500,
-.admin-area .bg-red-600 {
-  background-color: var(--admin-button-bg, #ec4899);
-  color: var(--admin-button-text, #ffffff);
+.admin-area .dashboard-sales-enter [role="listbox"] button:hover {
+  color: rgba(255,255,255,0.98) !important;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--admin-primary) 16%, rgba(255,255,255,0.18)),
+      rgba(255,255,255,0.065)
+    ) !important;
 }
 
-.admin-area .hover\:bg-pink-600:hover,
-.admin-area .hover\:bg-red-600:hover {
-  background-color: var(--admin-button-hover, #db2777);
-  color: var(--admin-button-text, #ffffff);
+.admin-area .dashboard-recent-orders-panel {
+  border-color: color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,0.60)) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.155) 0%,
+      rgba(255,255,255,0.060) 48%,
+      color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.035)) 100%
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.58),
+    inset 0 -1px 0 rgba(15,23,42,0.08),
+    0 18px 38px rgba(12,6,35,0.085),
+    0 0 18px color-mix(in srgb, var(--admin-primary) 12%, transparent) !important;
 }
 
-.admin-area .hover\:bg-gray-50:hover,
-.admin-area .hover\:bg-pink-50:hover,
-.admin-area .hover\:bg-amber-50:hover,
-.admin-area .hover\:bg-red-50:hover {
-  background-color: var(--admin-button-soft-bg, #fdf2f8);
+.admin-area .dashboard-recent-orders-panel > div {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.120) 0%,
+      rgba(255,255,255,0.042) 52%,
+      color-mix(in srgb, var(--admin-primary) 7%, transparent) 100%
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.42),
+    inset 0 -1px 0 rgba(15,23,42,0.065) !important;
 }
 
-/* Botones outline / texto */
-.admin-area .text-red-600,
-.admin-area .text-amber-700 {
-  color: var(--admin-primary, #ec4899);
+.admin-area .dashboard-recent-orders-panel > div > div:last-child {
+  border-color: color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.45)) !important;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.110) 0%,
+      rgba(255,255,255,0.038) 48%,
+      color-mix(in srgb, var(--admin-primary) 7%, transparent) 100%
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.42),
+    inset 0 -1px 0 rgba(15,23,42,0.07),
+    0 12px 24px rgba(12,6,35,0.060) !important;
 }
 
-/* Compatibilidad con botones que tienen border */
-.admin-area button.border {
-  border-color: var(--admin-button-soft-border, var(--admin-card-border, #e5e7eb));
+.admin-area .dashboard-recent-orders-panel .recent-orders-grid:first-child {
+  color: color-mix(in srgb, var(--admin-card-muted-text) 36%, rgba(255,255,255,0.78)) !important;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.12),
+      color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.035))
+    ) !important;
 }
 
-.admin-area button.border:hover {
-  background-color: var(--admin-button-soft-bg, #fdf2f8);
+.admin-area .dashboard-recent-orders-panel .recent-orders-row {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.070),
+      color-mix(in srgb, var(--admin-primary) 4%, rgba(255,255,255,0.025))
+    ) !important;
 }
 
-/* ========= ADMIN TABLE BORDER FIX ========= */
-.admin-area table th,
-.admin-area table td,
-.admin-area table tr {
-  border-color: var(--admin-table-border, var(--admin-card-border, #e5e7eb));
+.admin-area .dashboard-recent-orders-panel .recent-orders-row p,
+.admin-area .dashboard-recent-orders-panel .recent-orders-row span:not([style*="background"]),
+.admin-area .dashboard-recent-orders-panel .recent-orders-row svg {
+  text-shadow: 0 1px 2px rgba(15,23,42,0.20);
 }

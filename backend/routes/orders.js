@@ -15,13 +15,19 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const SiteSettings = require('../models/SiteSettings');
 const Subscriber = require('../models/Subscriber');
 const Product = require('../models/Product');
+const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
 const { sendMail } = require('../lib/mailer');
 
 // nuevos
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
+const {
+  createInventoryReservation,
+  expireInventoryReservations,
+} = require('../services/inventoryReservationService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -505,6 +511,251 @@ function getBillingMode(settings = {}) {
   };
 }
 
+function getValidSource(value, hasAdminUser = false) {
+  const source = String(value || '').trim().toLowerCase();
+
+  if (hasAdminUser && ['admin', 'pos', 'manual', 'import', 'system'].includes(source)) {
+    return source;
+  }
+
+  return 'online';
+}
+
+function getBranchIdFromRequest(rawBody = {}, cleaned = {}) {
+  return (
+    rawBody.branch ||
+    rawBody.branchId ||
+    rawBody.defaultBranch ||
+    cleaned.branch ||
+    cleaned.branchId ||
+    cleaned.defaultBranch ||
+    ''
+  );
+}
+
+function buildBranchSnapshot(branch) {
+  if (!branch) {
+    return {
+      name: '',
+      code: '',
+      type: '',
+    };
+  }
+
+  return {
+    name: String(branch.name || '').trim(),
+    code: String(branch.code || '').trim().toUpperCase(),
+    type: String(branch.type || '').trim().toLowerCase(),
+  };
+}
+
+function buildAdminSnapshot(req) {
+  return {
+    username: String(req.adminUsername || req.user?.username || '').trim().toLowerCase(),
+    displayName: String(
+      req.adminDisplayName ||
+        req.user?.displayName ||
+        req.user?.fullName ||
+        req.adminUsername ||
+        ''
+    ).trim(),
+    role: String(req.adminRole || req.user?.role || '').trim().toLowerCase(),
+    adminRole: String(req.adminRole || req.user?.adminRole || '').trim().toLowerCase(),
+  };
+}
+
+async function getDefaultOnlineBranch({ session } = {}) {
+  return (
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+      isDefaultForOnlineOrders: true,
+    })
+      .session(session)
+      .lean()) ||
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+      isMain: true,
+    })
+      .session(session)
+      .lean()) ||
+    (await Branch.findOne({
+      deletedAt: null,
+      active: true,
+      status: 'active',
+    })
+      .session(session)
+      .lean())
+  );
+}
+
+async function resolveOrderBranchData(rawBody = {}, cleaned = {}, { session } = {}) {
+  const requestedBranchId = getBranchIdFromRequest(rawBody, cleaned);
+
+  let branch = null;
+
+  if (requestedBranchId && mongoose.Types.ObjectId.isValid(String(requestedBranchId))) {
+    branch = await Branch.findOne({
+      _id: requestedBranchId,
+      deletedAt: null,
+      active: true,
+      status: 'active',
+    })
+      .session(session)
+      .lean();
+  }
+
+  if (!branch) {
+    branch = await getDefaultOnlineBranch({ session });
+  }
+
+  return {
+    branchId: branch?._id || null,
+    branchSnapshot: buildBranchSnapshot(branch),
+  };
+}
+
+function normalizeBranchId(value) {
+  if (!value) return '';
+
+  if (typeof value === 'object') {
+    if (value._id) return normalizeBranchId(value._id);
+    if (value.id) return normalizeBranchId(value.id);
+    if (value.branch) return normalizeBranchId(value.branch);
+  }
+
+  const id = String(value || '').trim();
+
+  return mongoose.Types.ObjectId.isValid(id) ? id : '';
+}
+
+function getAdminRoleCode(req) {
+  return String(
+    req.adminRole ||
+      req.adminProfile?.adminRole ||
+      req.adminProfile?.actualRole ||
+      req.user?.role ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function canAdminSeeAllBranches(req) {
+  if (req.adminAuthType === 'legacy') return true;
+
+  const role = getAdminRoleCode(req);
+
+  return [
+    'owner',
+    'admin',
+    'administrator',
+    'superadmin',
+    'propietario',
+    'administrador',
+  ].includes(role);
+}
+
+function getAllowedBranchIdsFromRequest(req) {
+  const ids = new Set();
+
+  const defaultBranchId = normalizeBranchId(req.adminDefaultBranch);
+
+  if (defaultBranchId) {
+    ids.add(defaultBranchId);
+  }
+
+  const branches = Array.isArray(req.adminBranches) ? req.adminBranches : [];
+
+  for (const item of branches) {
+    const branchId = normalizeBranchId(item?.branch || item);
+
+    if (branchId) {
+      ids.add(branchId);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+function getRequestedBranchIdFromQuery(req) {
+  const raw =
+    req.query.branchId ||
+    req.query.branch ||
+    req.query.sedeId ||
+    req.query.sede ||
+    '';
+
+  const value = String(raw || '').trim();
+
+  if (!value || value.toLowerCase() === 'all' || value.toLowerCase() === 'todas') {
+    return '';
+  }
+
+  return value;
+}
+
+function applyOrderBranchAccessFilter(req, filter) {
+  const requestedBranchRaw = getRequestedBranchIdFromQuery(req);
+  const requestedBranchId = normalizeBranchId(requestedBranchRaw);
+
+  if (requestedBranchRaw && !requestedBranchId) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'INVALID_BRANCH_ID',
+      message: 'La sede enviada no es válida.',
+    };
+  }
+
+  if (canAdminSeeAllBranches(req)) {
+    if (requestedBranchId) {
+      filter.branch = new mongoose.Types.ObjectId(requestedBranchId);
+    }
+
+    return {
+      ok: true,
+      mode: requestedBranchId ? 'single' : 'all',
+      branchIds: requestedBranchId ? [requestedBranchId] : [],
+    };
+  }
+
+  const allowedBranchIds = getAllowedBranchIdsFromRequest(req);
+
+  if (allowedBranchIds.length === 0) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'NO_BRANCH_ASSIGNED',
+      message: 'Tu usuario no tiene sedes asignadas para consultar órdenes.',
+    };
+  }
+
+  if (requestedBranchId && !allowedBranchIds.includes(requestedBranchId)) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'BRANCH_FORBIDDEN',
+      message: 'No tienes permiso para consultar órdenes de esa sede.',
+    };
+  }
+
+  const branchIdsToUse = requestedBranchId ? [requestedBranchId] : allowedBranchIds;
+
+  filter.branch = {
+    $in: branchIdsToUse.map((id) => new mongoose.Types.ObjectId(id)),
+  };
+
+  return {
+    ok: true,
+    mode: requestedBranchId ? 'single' : 'assigned',
+    branchIds: branchIdsToUse,
+  };
+}
+
 function deriveIdempotencyKey(cleaned) {
   const payload = {
     sessionId: String(cleaned.sessionId || ''),
@@ -567,6 +818,15 @@ router.get('/admin', async (req, res) => {
 
     const filter = {};
 
+    const branchAccess = applyOrderBranchAccessFilter(req, filter);
+
+    if (!branchAccess.ok) {
+      return res.status(branchAccess.status || 403).json({
+        error: branchAccess.error || 'BRANCH_ACCESS_DENIED',
+        message: branchAccess.message || 'No tienes permiso para consultar órdenes de esa sede.',
+      });
+    }
+
     if (q) {
       const rx = new RegExp(escapeRegex(q), 'i');
 
@@ -581,6 +841,8 @@ router.get('/admin', async (req, res) => {
         { 'billing.name': rx },
         { 'billing.lastname': rx },
         { 'billing.id': rx },
+        { 'branchSnapshot.name': rx },
+        { 'branchSnapshot.code': rx },
       ];
 
       if (/^[0-9a-fA-F]{24}$/.test(q)) {
@@ -592,11 +854,35 @@ router.get('/admin', async (req, res) => {
 
     const { dateFrom, dateTo } = req.query;
 
+    function buildColombiaStartOfDay(dateValue) {
+      const date = String(dateValue || '').trim();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+      return new Date(`${date}T00:00:00.000-05:00`);
+    }
+
+    function buildColombiaEndOfDay(dateValue) {
+      const date = String(dateValue || '').trim();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+      return new Date(`${date}T23:59:59.999-05:00`);
+    }
+
     if (dateFrom || dateTo) {
       filter.createdAt = {};
 
-      if (dateFrom) filter.createdAt.$gte = new Date(`${dateFrom}T00:00:00.000Z`);
-      if (dateTo) filter.createdAt.$lte = new Date(`${dateTo}T23:59:59.999Z`);
+      const fromDate = buildColombiaStartOfDay(dateFrom);
+      const toDate = buildColombiaEndOfDay(dateTo);
+
+      if (fromDate && !Number.isNaN(fromDate.getTime())) {
+        filter.createdAt.$gte = fromDate;
+      }
+
+      if (toDate && !Number.isNaN(toDate.getTime())) {
+        filter.createdAt.$lte = toDate;
+      }
 
       if (Object.keys(filter.createdAt).length === 0) delete filter.createdAt;
     }
@@ -657,7 +943,322 @@ router.get('/admin', async (req, res) => {
       }
     }
 
+    /* ============================
+    * Filtros operativos admin
+    * printed / archived
+    * ============================ */
+    const printedQ = String(req.query.printed || '').trim().toLowerCase();
+
+    if (printedQ === '1' || printedQ === 'true') {
+      filter.printed = true;
+    }
+
+    if (printedQ === '0' || printedQ === 'false') {
+      filter.$and = [
+        ...(Array.isArray(filter.$and) ? filter.$and : []),
+        {
+          $or: [
+            { printed: false },
+            { printed: { $exists: false } },
+          ],
+        },
+      ];
+    }
+
+    const archivedQ = String(req.query.archived || '').trim().toLowerCase();
+
+    if (archivedQ === '1' || archivedQ === 'true') {
+      filter.archived = true;
+    }
+
+    if (archivedQ === '0' || archivedQ === 'false') {
+      filter.archived = { $ne: true };
+    }
+
+    /* ============================
+    * Filtro admin por factura electrónica
+    * invoiceFilter
+    * ============================ */
+    const invoiceFilterQ = String(req.query.invoiceFilter || '').trim().toLowerCase();
+
+    if (invoiceFilterQ && invoiceFilterQ !== 'all') {
+      const invoiceBaseFilter = {};
+
+      if (invoiceFilterQ === 'validated') {
+        invoiceBaseFilter.$or = [
+          { cufe: { $exists: true, $nin: ['', null] } },
+          { invoiceNumber: { $exists: true, $nin: ['', null] } },
+          { 'provider.cufe': { $exists: true, $nin: ['', null] } },
+          { 'provider.number': { $exists: true, $nin: ['', null] } },
+          { 'provider.isValidated': true },
+          { 'provider.raw.is_validated': true },
+          { 'dianResponse.raw.data.data.is_validated': true },
+          { 'dianResponse.raw.data.data.cufe': { $exists: true, $nin: ['', null] } },
+        ];
+      }
+
+      if (invoiceFilterQ === 'pending') {
+        invoiceBaseFilter.$or = [
+          { status: 'pending' },
+          { status: 'sent' },
+          { status: 'processing' },
+          { 'provider.status': 'pending' },
+          { 'provider.status': 'sent' },
+          { 'provider.status': 'processing' },
+        ];
+      }
+
+      if (invoiceFilterQ === 'rejected' || invoiceFilterQ === 'error') {
+        invoiceBaseFilter.$or = [
+          { status: 'rejected' },
+          { status: 'failed' },
+          { status: 'error' },
+          { 'provider.status': 'rejected' },
+          { 'provider.status': 'failed' },
+          { 'provider.status': 'error' },
+          { errors: { $exists: true, $ne: [] } },
+          { providerErrors: { $exists: true, $ne: [] } },
+        ];
+      }
+
+      if (invoiceFilterQ === 'credit_note') {
+        invoiceBaseFilter.$or = [
+          { creditNotes: { $exists: true, $ne: [] } },
+          { 'creditNotes.0': { $exists: true } },
+        ];
+      }
+
+      const invoiceRows = await ElectronicInvoice.find(invoiceBaseFilter)
+        .select('orderId')
+        .lean();
+
+      const invoiceOrderIds = invoiceRows
+        .map((invoice) => invoice.orderId)
+        .filter(Boolean);
+
+      if (invoiceFilterQ === 'without_invoice') {
+        const ordersWithInvoice = await ElectronicInvoice.find({})
+          .select('orderId')
+          .lean();
+
+        const idsWithInvoice = ordersWithInvoice
+          .map((invoice) => invoice.orderId)
+          .filter(Boolean);
+
+        filter._id = {
+          ...(filter._id && typeof filter._id === 'object' ? filter._id : {}),
+          $nin: idsWithInvoice,
+        };
+      } else {
+        filter._id = {
+          ...(filter._id && typeof filter._id === 'object' ? filter._id : {}),
+          $in: invoiceOrderIds,
+        };
+      }
+    }
+
     const total = await Order.countDocuments(filter);
+    const financialSummaryRows = await Order.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+
+          totalOrders: { $sum: 1 },
+
+          totalSales: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['paid', 'shipped']] },
+                { $ifNull: ['$total', 0] },
+                0,
+              ],
+            },
+          },
+
+          pendingAmount: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['pending', 'processing']] },
+                { $ifNull: ['$total', 0] },
+                0,
+              ],
+            },
+          },
+
+          paidOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['paid', 'shipped']] },
+                1,
+                0,
+              ],
+            },
+          },
+
+          pendingOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['pending', 'processing']] },
+                1,
+                0,
+              ],
+            },
+          },
+
+          cancelledOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['cancelled', 'canceled']] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalOrders: 1,
+          totalSales: 1,
+          pendingAmount: 1,
+          paidOrders: 1,
+          pendingOrders: 1,
+          cancelledOrders: 1,
+          averageTicket: {
+            $cond: [
+              { $gt: ['$paidOrders', 0] },
+              { $divide: ['$totalSales', '$paidOrders'] },
+              0,
+            ],
+          },
+        },
+      },
+    ]);
+
+    const baseFinancialSummary = financialSummaryRows[0] || {
+      totalOrders: 0,
+      totalSales: 0,
+      pendingAmount: 0,
+      paidOrders: 0,
+      pendingOrders: 0,
+      cancelledOrders: 0,
+      averageTicket: 0,
+    };
+
+    const summaryOrders = await Order.find(filter).select('_id').lean();
+
+    const summaryOrderIds = summaryOrders
+      .map((order) => order._id)
+      .filter(Boolean);
+
+    const summaryInvoices = summaryOrderIds.length
+      ? await ElectronicInvoice.find({
+          orderId: { $in: summaryOrderIds },
+        })
+          .select('orderId status provider.status')
+          .lean()
+      : [];
+
+    const ordersWithInvoiceSet = new Set(
+      summaryInvoices
+        .map((invoice) => String(invoice.orderId || ''))
+        .filter(Boolean)
+    );
+
+    const validatedInvoiceSet = new Set(
+    summaryInvoices
+      .filter((invoice) => {
+        const status = String(invoice.status || '').toLowerCase();
+        const providerStatus = String(invoice.provider?.status || '').toLowerCase();
+        const providerRawStatus = String(invoice.provider?.raw?.status || '').toLowerCase();
+        const providerRawDataStatus = String(invoice.provider?.raw?.data?.status || '').toLowerCase();
+
+        const hasValidatedStatus = [
+          status,
+          providerStatus,
+          providerRawStatus,
+          providerRawDataStatus,
+        ].some((value) =>
+          [
+            'validated',
+            'validada',
+            'validado',
+          ].includes(value)
+        );
+
+        const hasDianEvidence =
+          Boolean(invoice.validatedAt) ||
+          Boolean(invoice.cufe) ||
+          Boolean(invoice.provider?.cufe) ||
+          Boolean(invoice.provider?.raw?.cufe) ||
+          Boolean(invoice.provider?.raw?.data?.cufe);
+
+        return hasValidatedStatus || hasDianEvidence;
+      })
+      .map((invoice) => String(invoice.orderId || ''))
+      .filter(Boolean)
+  );
+    
+
+    const financialSummary = {
+      ...baseFinancialSummary,
+      withoutInvoiceOrders: Math.max(
+        0,
+        Number(baseFinancialSummary.totalOrders || 0) - ordersWithInvoiceSet.size
+      ),
+      validatedInvoiceOrders: validatedInvoiceSet.size,
+    };
+
+    const dianValidatedInvoiceCriteria = [
+      { cufe: { $exists: true, $nin: ['', null] } },
+      { invoiceNumber: { $exists: true, $nin: ['', null] } },
+      { validatedAt: { $exists: true, $nin: ['', null] } },
+
+      { 'provider.cufe': { $exists: true, $nin: ['', null] } },
+      { 'provider.number': { $exists: true, $nin: ['', null] } },
+      { 'provider.isValidated': true },
+      { 'provider.validatedAt': { $exists: true, $nin: ['', null] } },
+
+      { 'provider.raw.cufe': { $exists: true, $nin: ['', null] } },
+      { 'provider.raw.number': { $exists: true, $nin: ['', null] } },
+      { 'provider.raw.is_validated': true },
+      { 'provider.raw.validated_at': { $exists: true, $nin: ['', null] } },
+
+      { 'dianResponse.raw.data.data.cufe': { $exists: true, $nin: ['', null] } },
+      { 'dianResponse.raw.data.data.number': { $exists: true, $nin: ['', null] } },
+      { 'dianResponse.raw.data.data.is_validated': true },
+      { 'dianResponse.raw.data.data.validated_at': { $exists: true, $nin: ['', null] } },
+    ];
+
+    const summaryOrderIdsForInvoices = await Order.distinct('_id', filter);
+
+    const ordersWithInvoiceIdsForSummary = summaryOrderIdsForInvoices.length
+      ? await ElectronicInvoice.distinct('orderId', {
+          orderId: { $in: summaryOrderIdsForInvoices },
+        })
+      : [];
+
+    const validatedInvoiceIdsForSummary = summaryOrderIdsForInvoices.length
+      ? await ElectronicInvoice.distinct('orderId', {
+          orderId: { $in: summaryOrderIdsForInvoices },
+          $or: dianValidatedInvoiceCriteria,
+        })
+      : [];
+
+    financialSummary.withoutInvoiceOrders = Math.max(
+      0,
+      Number(financialSummary.totalOrders || 0) - ordersWithInvoiceIdsForSummary.length
+    );
+
+    financialSummary.ordersWithoutInvoice = financialSummary.withoutInvoiceOrders;
+
+    financialSummary.validatedInvoiceOrders = validatedInvoiceIdsForSummary.length;
+    financialSummary.validatedInvoices = validatedInvoiceIdsForSummary.length;
+    financialSummary.validatedDianOrders = validatedInvoiceIdsForSummary.length;
+
+
     const sort = parseSort(req.query.sort);
 
     const docs = await Order.find(filter).sort(sort).skip(skip).limit(limit).lean();
@@ -764,7 +1365,14 @@ router.get('/admin', async (req, res) => {
       return res.status(200).send(rows.join('\n'));
     }
 
-    res.json({ page, limit, total, totalPages, data: withDerived });
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages,
+      financialSummary,
+      data: withDerived,
+    });
   } catch (error) {
     console.error('Error en /api/orders/admin:', error);
     res.status(500).json({ message: 'Error al listar órdenes para admin' });
@@ -849,7 +1457,7 @@ router.get('/:id', async (req, res) => {
  * ============================ */
 router.options('/:id/status', (_req, res) => res.sendStatus(204));
 
-router.patch('/:id/status', requireAdmin, async (req, res) => {
+router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), async (req, res) => {
   try {
     const STATUS_MAP = new Map([
       ['pendiente', 'pending'],
@@ -1187,20 +1795,20 @@ router.post('/', rateLimit, async (req, res) => {
     console.error('Idempotency lookup error:', err);
   }
 
-  const check = await dryRunCheck(cleaned.cart);
-
-  if (!check.ok) {
-    return res.status(409).json({
-      error: 'No hay stock suficiente para uno o más artículos.',
-      code: 'NO_STOCK',
-      details: check.details,
-    });
+    try {
+    await expireInventoryReservations({ limit: 25 });
+  } catch (expirationError) {
+    console.warn(
+      '⚠️ No se pudieron liberar reservas vencidas antes de crear la orden:',
+      expirationError.message
+    );
   }
 
   const session = await mongoose.startSession();
 
   try {
     let created;
+    let inventoryReservation = null;
 
     await session.withTransaction(async () => {
       if (idempoKey) {
@@ -1232,11 +1840,19 @@ router.post('/', rateLimit, async (req, res) => {
 
       if (created) return;
 
-      await decrementStock(cleaned.cart, { session });
+      
 
       const orderNumber = await getNextOrderNumber({ session });
       const settings = await SiteSettings.findOne().session(session).lean();
       const billingMode = getBillingMode(settings);
+
+      const orderBranchData = await resolveOrderBranchData(req.body || {}, cleaned, {
+        session,
+      });
+
+      const hasAdminUser = Boolean(req.adminUserId);
+      const orderSource = getValidSource(req.body?.source || cleaned.source, hasAdminUser);
+      const createdByAdminSnapshot = buildAdminSnapshot(req);
 
       console.log('🧾 MODO FACTURACIÓN:', {
         dianEnabled: billingMode.dianEnabled,
@@ -1302,7 +1918,6 @@ router.post('/', rateLimit, async (req, res) => {
         },
       };
 
-      
       const base = {
         ...cleaned,
         orderNumber,
@@ -1310,6 +1925,20 @@ router.post('/', rateLimit, async (req, res) => {
         shipping: shippingAmount,
         total: totalAmount,
         taxes: taxesSnapshot,
+
+        branch: orderBranchData.branchId,
+        branchSnapshot: orderBranchData.branchSnapshot,
+
+        createdByAdmin: hasAdminUser && req.adminUserId ? req.adminUserId : null,
+        createdByAdminSnapshot,
+
+        source: orderSource,
+
+        inventoryControl: {
+          discountedAtCheckout: false,
+          restockedOnFailure: false,
+          restockedAt: null,
+        },
       };
 
       base.status = base.status || 'pending';
@@ -1317,8 +1946,39 @@ router.post('/', rateLimit, async (req, res) => {
       created = await Order.create([{ ...base }], { session });
       created = created[0];
 
-     
-     
+      inventoryReservation = await createInventoryReservation(
+        {
+          sessionId: cleaned.sessionId,
+          order: created._id,
+          orderNumber: created.orderNumber,
+          paymentReference:
+            req.body?.paymentReference ||
+            req.body?.payment?.reference ||
+            req.body?.payment?.transactionId ||
+            '',
+          paymentTransactionId:
+            req.body?.paymentTransactionId ||
+            req.body?.payment?.transactionId ||
+            '',
+          source: 'checkout',
+          items: cleaned.cart,
+          branchPriorityIds: orderBranchData.branchId
+            ? [String(orderBranchData.branchId)]
+            : [],
+          expiresInMinutes: 20,
+          currency: cleaned.payment?.currency || 'COP',
+          metadata: {
+            orderSource,
+            idempotencyKey: idempoKey || '',
+            orderBranch: orderBranchData.branchId
+              ? String(orderBranchData.branchId)
+              : '',
+            orderBranchSnapshot: orderBranchData.branchSnapshot,
+          },
+          notes: 'Reserva automática creada al generar la orden online.',
+        },
+        { session }
+      );
 
       await OrderEvent.create(
         [
@@ -1326,7 +1986,18 @@ router.post('/', rateLimit, async (req, res) => {
             orderId: created._id,
             type: 'status_changed',
             message: `Orden creada con estado ${created.status}`,
-            meta: { to: created.status, ip: req.ip },
+            meta: {
+              to: created.status,
+              ip: req.ip,
+              branch: orderBranchData.branchId,
+              branchSnapshot: orderBranchData.branchSnapshot,
+              source: orderSource,
+              reservationId: inventoryReservation?._id || null,
+              reservationCode: inventoryReservation?.reservationCode || '',
+              reservationStatus: inventoryReservation?.status || '',
+              reservationExpiresAt: inventoryReservation?.expiresAt || null,
+              by: createdByAdminSnapshot.username || 'system',
+            },
           },
         ],
         { session }
@@ -1355,6 +2026,9 @@ router.post('/', rateLimit, async (req, res) => {
               response: {
                 _id: created._id,
                 orderNumber: created.orderNumber,
+                reservationId: inventoryReservation?._id || null,
+                reservationCode: inventoryReservation?.reservationCode || '',
+                
               },
               completedAt: new Date(),
             },
@@ -1370,9 +2044,13 @@ router.post('/', rateLimit, async (req, res) => {
       return res.status(statusCode).json({
         _id: created._id,
         orderNumber: created.orderNumber,
+        reservationId: inventoryReservation?._id || null,
+        reservationCode: inventoryReservation?.reservationCode || '',
+        reservationStatus: inventoryReservation?.status || '',
+        reservationExpiresAt: inventoryReservation?.expiresAt || null,
         ...(created.idempotent || created.reused
           ? { idempotent: true, reused: true }
-          : {}),
+          : {}),     
       });
     }
 
@@ -1413,6 +2091,36 @@ router.post('/', rateLimit, async (req, res) => {
     }
 
     const code = String(error?.code || '');
+    if (code === 'INSUFFICIENT_STOCK') {
+      return res.status(error.statusCode || 409).json({
+        error: 'No hay inventario suficiente para completar la compra.',
+        code,
+        details: error.details || {},
+      });
+    }
+
+    if (code === 'CONCURRENT_STOCK_CHANGE') {
+      return res.status(error.statusCode || 409).json({
+        error: 'El inventario cambió mientras se intentaba reservar. Intenta nuevamente.',
+        code,
+        details: error.details || {},
+      });
+    }
+
+    if (
+      [
+        'INVALID_PRODUCT_ID',
+        'MISSING_SIZE',
+        'MISSING_COLOR',
+        'INVALID_QUANTITY',
+      ].includes(code)
+    ) {
+      return res.status(error.statusCode || 400).json({
+        error: error.message || 'Datos inválidos para reservar inventario.',
+        code,
+        details: error.details || {},
+      });
+    }
 
     if (isDuplicateOrderNumberError(error)) {
       return res.status(409).json({

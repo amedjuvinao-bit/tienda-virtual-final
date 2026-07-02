@@ -371,11 +371,19 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
     } catch (error) {
       console.error('Error creando nota crédito:', error);
 
-      setRetryError(
-        error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          'No fue posible crear la nota crédito.'
-      );
+      const backendError = error?.response?.data;
+
+      if (backendError?.code === 'FACTUS_PENDING_CREDIT_NOTE') {
+        setRetryError(
+          'Factus reporta una nota crédito pendiente para esta factura. Debes sincronizar el estado antes de crear otra nota crédito.'
+        );
+      } else {
+        setRetryError(
+          backendError?.message ||
+            backendError?.error ||
+            'No fue posible crear la nota crédito.'
+        );
+      }
     } finally {
       setCreatingCreditNote(false);
     }
