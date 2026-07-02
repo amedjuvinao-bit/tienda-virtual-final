@@ -275,18 +275,20 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
 
 router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
   try {
-    const result = await createPosSale(req.body || {}, {
-      admin: buildAdminContext(req),
-      generateElectronicInvoice: req.body?.generateElectronicInvoice === true,
-    });
+    const preview = await preparePosSalePreview(req.body || {});
 
-    if (!assertBranchAccess(req, result.branch?._id)) {
+    if (!assertBranchAccess(req, preview.branch?._id)) {
       return res.status(403).json({
         ok: false,
         error: 'POS_BRANCH_NOT_ALLOWED',
         message: 'No tienes acceso a la sede seleccionada.',
       });
     }
+
+    const result = await createPosSale(req.body || {}, {
+      admin: buildAdminContext(req),
+      generateElectronicInvoice: req.body?.generateElectronicInvoice === true,
+    });
 
     return res.status(201).json({
       ok: true,
