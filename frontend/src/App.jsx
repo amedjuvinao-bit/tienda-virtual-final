@@ -51,6 +51,7 @@ import AdminLayout from "./admin/AdminLayout";
 import Dashboard from "./admin/Dashboard";
 import ProductosAdmin from "./admin/ProductosAdmin";
 import InventoryAdmin from "./admin/InventoryAdmin";
+import PosSalesPage from "./admin/pos/PosSalesPage";
 import PagesAdmin from "./admin/pages/PagesAdmin";
 import PageEditor from "./admin/pages/PageEditor";
 import CatalogPageEditor from "./admin/pages/CatalogPageEditor";
@@ -492,10 +493,22 @@ export default function App() {
                   path="productos"
                   element={protectAdminContent(<ProductosAdmin />)}
                 />
+
+                <Route
+                  path="ordenes"
+                  element={protectAdminContent(<OrdersAdmin />)}
+                />
+
+                <Route
+                  path="pos"
+                  element={protectAdminContent(<PosSalesPage />)}
+                />
+
                 <Route
                   path="inventario"
                   element={protectAdminContent(<InventoryAdmin />)}
                 />
+
                 <Route
                   path="productos/nuevo"
                   element={protectAdminContent(<FormularioProducto />)}
@@ -512,11 +525,6 @@ export default function App() {
                 <Route
                   path="favoritos"
                   element={protectAdminContent(<FavoritosAdmin />)}
-                />
-
-                <Route
-                  path="ordenes"
-                  element={protectAdminContent(<OrdersAdmin />)}
                 />
 
                 <Route
@@ -618,9 +626,12 @@ export default function App() {
               position="top-right"
               autoClose={3000}
               hideProgressBar={false}
-              newestOnTop={false}
+              newestOnTop
               closeOnClick
+              pauseOnFocusLoss
+              draggable
               pauseOnHover
+              theme="colored"
             />
           </BrowserRouter>
         </CartProvider>
