@@ -247,8 +247,8 @@ const DiscountSchema = new mongoose.Schema(
 /* ========= Metadata POS ========= */
 const PosMetadataSchema = new mongoose.Schema(
   {
-    saleNumber: { type: String, trim: true, default: '', index: true },
-    receiptNumber: { type: String, trim: true, default: '', index: true },
+    saleNumber: { type: String, trim: true, default: '' },
+    receiptNumber: { type: String, trim: true, default: '' },
     terminalId: { type: String, trim: true, default: '' },
     registerCode: { type: String, trim: true, uppercase: true, default: '' },
     shiftCode: { type: String, trim: true, uppercase: true, default: '' },
@@ -890,9 +890,11 @@ OrderSchema.pre('validate', function (next) {
       };
     } else {
       this.inventoryControl.discountedAtCheckout =
-        typeof this.inventoryControl.discountedAtCheckout === 'boolean'
-          ? this.inventoryControl.discountedAtCheckout
-          : this.source !== 'pos';
+        this.source === 'pos'
+          ? false
+          : typeof this.inventoryControl.discountedAtCheckout === 'boolean'
+            ? this.inventoryControl.discountedAtCheckout
+            : true;
 
       this.inventoryControl.restockedOnFailure =
         this.inventoryControl.restockedOnFailure === true;
