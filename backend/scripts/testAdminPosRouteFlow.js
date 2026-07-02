@@ -57,7 +57,7 @@ async function callSaleRoute(body) {
   return { status: response.status, data };
 }
 
-async function pickCandidate() {
+async function getActivePosBranch() {
   const branch = await Branch.findOne({
     deletedAt: null,
     active: true,
@@ -67,23 +67,58 @@ async function pickCandidate() {
 
   if (!branch) fail('No hay sede POS activa.');
 
+  return branch;
+}
+
+async function getActiveProduct(stockRow) {
+  return Product.findOne({
+    _id: stockRow.product,
+    active: { $ne: false },
+    visible: { $ne: false },
+    price: { $gt: 0 },
+  }).lean();
+}
+
+async function prepareOneUnit(stockRow) {
+  const currentStock = Number(stockRow.stock || 0);
+  const reservedStock = Number(stockRow.reservedStock || 0);
+  const nextStock = Math.max(currentStock, reservedStock) + 1;
+  const nextAvailable = Math.max(0, nextStock - reservedStock);
+
+  return InventoryStock.findByIdAndUpdate(
+    stockRow._id,
+    {
+      $set: {
+        stock: nextStock,
+        availableStock: nextAvailable,
+        lastMovementAt: new Date(),
+      },
+    },
+    { new: true }
+  ).lean();
+}
+
+async function pickCandidate() {
+  const branch = await getActivePosBranch();
   const rows = await InventoryStock.find({
     branch: branch._id,
     active: true,
     deletedAt: null,
-  }).limit(80).lean();
+  }).limit(100).lean();
 
   for (const row of rows) {
     if (available(row) < 1) continue;
 
-    const product = await Product.findOne({
-      _id: row.product,
-      active: { $ne: false },
-      visible: { $ne: false },
-      price: { $gt: 0 },
-    }).lean();
+    const product = await getActiveProduct(row);
+    if (product) return { branch, row, product, preparedStock: false };
+  }
 
-    if (product) return { branch, row, product };
+  for (const row of rows) {
+    const product = await getActiveProduct(row);
+    if (!product) continue;
+
+    const preparedRow = await prepareOneUnit(row);
+    return { branch, row: preparedRow, product, preparedStock: true };
   }
 
   fail('No hay producto disponible para probar la ruta POS.');
@@ -99,6 +134,10 @@ async function main() {
   const selected = await pickCandidate();
   const stockBefore = Number(selected.row.stock || 0);
   const expectedTotal = Math.round(Number(selected.product.price || 0));
+
+  if (selected.preparedStock) {
+    console.log('Stock temporal preparado para ejecutar la prueba.');
+  }
 
   const payload = {
     branchId: String(selected.branch._id),
