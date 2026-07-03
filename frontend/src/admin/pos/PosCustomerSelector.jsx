@@ -1,6 +1,7 @@
 // frontend/src/admin/pos/PosCustomerSelector.jsx
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, Loader2, Search, UserRound, X } from 'lucide-react';
 import { searchAdminCustomers } from '../api/adminCustomersApi';
 
@@ -19,6 +20,30 @@ function cleanText(value) {
 function publishCustomerSelection(state) {
   if (typeof window === 'undefined') return;
   window.__rbPosCustomerSelection = state;
+}
+
+function findCustomerSlot() {
+  if (typeof document === 'undefined') return null;
+
+  const labels = Array.from(document.querySelectorAll('label'));
+  const saleBranchLabel = labels.find((label) =>
+    cleanText(label.textContent).toLowerCase() === 'sede de venta'
+  );
+
+  const configCard = saleBranchLabel?.closest('section');
+  const parent = configCard?.parentElement;
+
+  if (!configCard || !parent) return null;
+
+  let slot = parent.querySelector(':scope > [data-pos-customer-inline-slot="true"]');
+
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.setAttribute('data-pos-customer-inline-slot', 'true');
+    configCard.insertAdjacentElement('afterend', slot);
+  }
+
+  return slot;
 }
 
 function CustomerResult({ customer, onSelect }) {
@@ -47,7 +72,7 @@ function CustomerResult({ customer, onSelect }) {
   );
 }
 
-export default function PosCustomerSelector() {
+function PosCustomerSelectorContent() {
   const [mode, setMode] = useState('guest');
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
@@ -130,7 +155,7 @@ export default function PosCustomerSelector() {
 
   return (
     <section
-      className="mb-5 rounded-2xl border p-5"
+      className="rounded-2xl border p-5"
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -245,4 +270,32 @@ export default function PosCustomerSelector() {
       ) : null}
     </section>
   );
+}
+
+export default function PosCustomerSelector() {
+  const [slot, setSlot] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const refresh = () => {
+      if (!active) return;
+      const nextSlot = findCustomerSlot();
+      if (nextSlot) setSlot(nextSlot);
+    };
+
+    refresh();
+    const interval = window.setInterval(refresh, 200);
+    const timeout = window.setTimeout(() => window.clearInterval(interval), 3000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, []);
+
+  if (!slot) return null;
+
+  return createPortal(<PosCustomerSelectorContent />, slot);
 }
