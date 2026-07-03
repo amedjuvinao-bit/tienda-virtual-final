@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Store } from 'lucide-react';
+import { Store, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OriginalAdminLayout from './AdminLayout.jsx';
 import { canAccessAdminPath } from './security/adminPermissions';
@@ -12,10 +12,30 @@ const MAIN_MENU_ORDER = [
   '/admin/dashboard',
   '/admin/productos',
   '/admin/ordenes',
+  '/admin/clientes',
   '/admin/pos',
   '/admin/inventario',
   '/admin/carritos',
   '/admin/favoritos',
+];
+
+const EXTRA_MAIN_LINKS = [
+  {
+    key: 'clientes',
+    path: '/admin/clientes',
+    label: 'Clientes',
+    mobileLabel: 'Clientes',
+    icon: UserRound,
+    slotAfter: '/admin/ordenes',
+  },
+  {
+    key: 'pos',
+    path: '/admin/pos',
+    label: 'POS / Ventas físicas',
+    mobileLabel: 'POS',
+    icon: Store,
+    slotAfter: '/admin/clientes',
+  },
 ];
 
 function getHrefFromMenuNode(node) {
@@ -28,14 +48,14 @@ function isMobileMenu(parent) {
   return parent?.classList?.contains('admin-mobile-nav-panel');
 }
 
-function getPosSlot(parent) {
-  if (!parent) return null;
+function getMenuSlot(parent, key) {
+  if (!parent || !key) return null;
 
-  let slot = parent.querySelector(':scope > [data-admin-pos-menu-slot="true"]');
+  let slot = parent.querySelector(`:scope > [data-admin-extra-menu-slot="${key}"]`);
 
   if (!slot) {
     slot = document.createElement('span');
-    slot.setAttribute('data-admin-pos-menu-slot', 'true');
+    slot.setAttribute('data-admin-extra-menu-slot', key);
     slot.style.display = 'contents';
     parent.appendChild(slot);
   }
@@ -64,26 +84,33 @@ function orderMainMenu(parent) {
   restNodes.forEach((node) => parent.appendChild(node));
 }
 
-function findPosMenuSlots() {
-  const orderLinks = Array.from(document.querySelectorAll('a[href="/admin/ordenes"]'));
-  const parents = [];
+function findMenuTargets(visibleLinks) {
+  const anchorLinks = Array.from(document.querySelectorAll('a[href="/admin/ordenes"]'));
+  const targets = [];
   const seen = new Set();
 
-  orderLinks.forEach((link) => {
+  anchorLinks.forEach((link) => {
     const parent = link.parentElement;
     if (!parent || seen.has(parent)) return;
 
-    const slot = getPosSlot(parent);
-    orderMainMenu(parent);
+    visibleLinks.forEach((menuLink) => {
+      const existingLink = parent.querySelector(`a[href="${menuLink.path}"]`);
+      if (existingLink && !existingLink.closest('[data-admin-extra-menu-slot]')) return;
 
-    parents.push({ slot, mobile: isMobileMenu(parent) });
+      const slot = getMenuSlot(parent, menuLink.key);
+      if (slot) {
+        targets.push({ slot, mobile: isMobileMenu(parent), menuLink });
+      }
+    });
+
+    orderMainMenu(parent);
     seen.add(parent);
   });
 
-  return parents;
+  return targets;
 }
 
-function PosMenuLink({ mobile = false }) {
+function AdminExtraMenuLink({ menuLink, mobile = false }) {
   const activeNavStyle = {
     background: 'var(--admin-active-nav-bg)',
     color: 'var(--admin-active-nav-text)',
@@ -108,30 +135,35 @@ function PosMenuLink({ mobile = false }) {
       }
     : undefined;
 
+  const Icon = menuLink.icon;
+
   return React.createElement(
     NavLink,
     {
-      to: '/admin/pos',
+      to: menuLink.path,
       className,
       style: ({ isActive }) => (isActive ? activeNavStyle : normalNavStyle),
     },
     React.createElement(
       'span',
       { className: 'admin-icon-wrap', style: iconWrapStyle },
-      React.createElement(Store, { className: mobile ? 'h-3 w-3' : 'h-3.5 w-3.5' })
+      React.createElement(Icon, { className: mobile ? 'h-3 w-3' : 'h-3.5 w-3.5' })
     ),
-    React.createElement('span', null, mobile ? 'POS' : 'POS / Ventas físicas')
+    React.createElement('span', null, mobile ? menuLink.mobileLabel : menuLink.label)
   );
 }
 
-function PosMenuPortal() {
+function AdminExtraMenuPortal() {
   const { adminUser } = useAuth();
   const location = useLocation();
   const [targets, setTargets] = useState([]);
-  const canSeePos = canAccessAdminPath(adminUser, '/admin/pos');
+
+  const visibleLinks = EXTRA_MAIN_LINKS.filter((menuLink) =>
+    canAccessAdminPath(adminUser, menuLink.path)
+  );
 
   useEffect(() => {
-    if (!canSeePos) {
+    if (visibleLinks.length === 0) {
       setTargets([]);
       return undefined;
     }
@@ -140,7 +172,7 @@ function PosMenuPortal() {
 
     const refresh = () => {
       if (!active) return;
-      setTargets(findPosMenuSlots());
+      setTargets(findMenuTargets(visibleLinks));
     };
 
     refresh();
@@ -152,12 +184,16 @@ function PosMenuPortal() {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
-  }, [canSeePos, location.pathname]);
+  }, [adminUser, location.pathname]);
 
-  if (!canSeePos || targets.length === 0) return null;
+  if (visibleLinks.length === 0 || targets.length === 0) return null;
 
-  return targets.map(({ slot, mobile }, index) =>
-    createPortal(React.createElement(PosMenuLink, { mobile }), slot, `admin-pos-menu-${index}`)
+  return targets.map(({ slot, mobile, menuLink }, index) =>
+    createPortal(
+      React.createElement(AdminExtraMenuLink, { menuLink, mobile }),
+      slot,
+      `admin-extra-menu-${menuLink.key}-${index}`
+    )
   );
 }
 
@@ -166,6 +202,6 @@ export default function AdminLayout() {
     React.Fragment,
     null,
     React.createElement(OriginalAdminLayout),
-    React.createElement(PosMenuPortal)
+    React.createElement(AdminExtraMenuPortal)
   );
 }
