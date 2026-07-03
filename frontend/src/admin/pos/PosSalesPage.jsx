@@ -17,7 +17,7 @@ import {
   Store,
   Trash2,
 } from 'lucide-react';
-import { getPosBootstrap, getPosProducts } from '../api/adminPosApi';
+import { createPosSale, getPosBootstrap, getPosProducts } from '../api/adminPosApi';
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -48,6 +48,10 @@ function getVariantLabel(product = {}) {
 
 function getProductCartKey(product = {}) {
   return product.id || `${product.productId || ''}:${product.variantKey || 'default__default'}`;
+}
+
+function getOrderNumber(order = {}) {
+  return order.orderNumber || order.number || order.receiptNumber || order._id || order.id || '';
 }
 
 function toSafeQty(value, max = 1) {
@@ -115,9 +119,9 @@ function ProductImage({ product }) {
   );
 }
 
-function PosProductRow({ product, quantityInCart = 0, onAdd }) {
+function PosProductRow({ product, quantityInCart = 0, onAdd, disabled = false }) {
   const availableStock = Number(product.availableStock || 0);
-  const canAdd = availableStock > quantityInCart;
+  const canAdd = availableStock > quantityInCart && !disabled;
 
   return (
     <div
@@ -178,16 +182,16 @@ function PosProductRow({ product, quantityInCart = 0, onAdd }) {
           style={{ background: 'var(--admin-primary)' }}
         >
           <Plus className="h-4 w-4" />
-          {canAdd ? 'Agregar' : 'Sin stock'}
+          {availableStock > quantityInCart ? 'Agregar' : 'Sin stock'}
         </button>
       </div>
     </div>
   );
 }
 
-function CartItemRow({ item, onIncrease, onDecrease, onRemove }) {
+function CartItemRow({ item, onIncrease, onDecrease, onRemove, disabled = false }) {
   const maxQty = Number(item.availableStock || 1);
-  const canIncrease = Number(item.quantity || 1) < maxQty;
+  const canIncrease = Number(item.quantity || 1) < maxQty && !disabled;
 
   return (
     <div
@@ -210,7 +214,8 @@ function CartItemRow({ item, onIncrease, onDecrease, onRemove }) {
         <button
           type="button"
           onClick={() => onRemove(item.cartKey)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border"
+          disabled={disabled}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border disabled:cursor-not-allowed disabled:opacity-40"
           style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}
           aria-label="Quitar producto del carrito"
         >
@@ -223,7 +228,8 @@ function CartItemRow({ item, onIncrease, onDecrease, onRemove }) {
           <button
             type="button"
             onClick={() => onDecrease(item.cartKey)}
-            className="flex h-9 w-9 items-center justify-center"
+            disabled={disabled}
+            className="flex h-9 w-9 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Disminuir cantidad"
           >
             <Minus className="h-4 w-4" />
@@ -261,6 +267,9 @@ export default function PosSalesPage() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState('');
   const [cartItems, setCartItems] = useState([]);
+  const [saleLoading, setSaleLoading] = useState(false);
+  const [saleError, setSaleError] = useState('');
+  const [saleSuccess, setSaleSuccess] = useState('');
 
   const branches = useMemo(
     () => (Array.isArray(bootstrap?.branches) ? bootstrap.branches : []),
@@ -299,6 +308,7 @@ export default function PosSalesPage() {
   }, [cartItems]);
 
   const billingActive = bootstrap?.billing?.electronicBillingActive === true;
+  const canConfirmSale = cartItems.length > 0 && !saleLoading;
 
   const loadBootstrap = async () => {
     try {
@@ -318,11 +328,17 @@ export default function PosSalesPage() {
     }
   };
 
+  const clearSaleMessages = () => {
+    setSaleError('');
+    setSaleSuccess('');
+  };
+
   const handleAddProduct = (product) => {
     const cartKey = getProductCartKey(product);
     const availableStock = Number(product.availableStock || 0);
 
-    if (!cartKey || availableStock <= 0) return;
+    if (!cartKey || availableStock <= 0 || saleLoading) return;
+    clearSaleMessages();
 
     setCartItems((prev) => {
       const existing = prev.find((item) => item.cartKey === cartKey);
@@ -352,6 +368,9 @@ export default function PosSalesPage() {
   };
 
   const handleIncreaseQty = (cartKey) => {
+    if (saleLoading) return;
+    clearSaleMessages();
+
     setCartItems((prev) =>
       prev.map((item) =>
         item.cartKey === cartKey
@@ -362,6 +381,9 @@ export default function PosSalesPage() {
   };
 
   const handleDecreaseQty = (cartKey) => {
+    if (saleLoading) return;
+    clearSaleMessages();
+
     setCartItems((prev) =>
       prev
         .map((item) =>
@@ -374,7 +396,72 @@ export default function PosSalesPage() {
   };
 
   const handleRemoveItem = (cartKey) => {
+    if (saleLoading) return;
+    clearSaleMessages();
     setCartItems((prev) => prev.filter((item) => item.cartKey !== cartKey));
+  };
+
+  const handleConfirmSale = async () => {
+    if (!canConfirmSale || !selectedBranchId) return;
+
+    const soldItems = cartItems.map((item) => ({ ...item }));
+
+    try {
+      setSaleLoading(true);
+      setSaleError('');
+      setSaleSuccess('');
+
+      const data = await createPosSale({
+        branchId: selectedBranchId,
+        customerMode: 'guest',
+        registerCode: 'CAJA POS',
+        items: soldItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size || '',
+          color: item.color || '',
+        })),
+        payment: {
+          method: paymentMethod,
+          receivedAmount: cartSummary.total,
+          amount: cartSummary.total,
+        },
+        discount: {
+          type: 'none',
+          value: 0,
+        },
+      });
+
+      const orderNumber = getOrderNumber(data?.order || {});
+
+      setProducts((prev) =>
+        prev
+          .map((product) => {
+            const cartKey = getProductCartKey(product);
+            const sold = soldItems.find((item) => item.cartKey === cartKey);
+            if (!sold) return product;
+
+            const availableStock = Math.max(
+              0,
+              Number(product.availableStock || 0) - Number(sold.quantity || 0)
+            );
+
+            return {
+              ...product,
+              availableStock,
+              stock: availableStock,
+            };
+          })
+          .filter((product) => Number(product.availableStock || 0) > 0)
+      );
+
+      setCartItems([]);
+      setSaleSuccess(orderNumber ? `Venta POS creada correctamente. Orden ${orderNumber}.` : 'Venta POS creada correctamente.');
+    } catch (err) {
+      setSaleError(err?.message || 'No fue posible confirmar la venta POS.');
+    } finally {
+      setSaleLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -383,6 +470,8 @@ export default function PosSalesPage() {
 
   useEffect(() => {
     setCartItems([]);
+    setSaleError('');
+    setSaleSuccess('');
   }, [selectedBranchId]);
 
   useEffect(() => {
@@ -454,7 +543,7 @@ export default function PosSalesPage() {
         <button
           type="button"
           onClick={loadBootstrap}
-          disabled={loading}
+          disabled={loading || saleLoading}
           className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             borderColor: 'var(--admin-primary-soft-border)',
@@ -473,6 +562,16 @@ export default function PosSalesPage() {
           <div>
             <p className="font-black">No se pudo cargar la información del POS</p>
             <p className="mt-1">{error}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {saleSuccess ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-black">Venta confirmada</p>
+            <p className="mt-1">{saleSuccess}</p>
           </div>
         </div>
       ) : null}
@@ -520,7 +619,8 @@ export default function PosSalesPage() {
                     <select
                       value={selectedBranchId}
                       onChange={(event) => setSelectedBranchId(event.target.value)}
-                      className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none"
+                      disabled={saleLoading}
+                      className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
                         borderColor: 'var(--admin-card-border)',
                         color: 'var(--admin-card-text)',
@@ -549,7 +649,8 @@ export default function PosSalesPage() {
                     <select
                       value={paymentMethod}
                       onChange={(event) => setPaymentMethod(event.target.value)}
-                      className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none"
+                      disabled={saleLoading}
+                      className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
                         borderColor: 'var(--admin-card-border)',
                         color: 'var(--admin-card-text)',
@@ -591,8 +692,9 @@ export default function PosSalesPage() {
                       type="text"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
+                      disabled={saleLoading}
                       placeholder="Buscar por nombre, SKU o código de barras"
-                      className="w-full bg-transparent text-sm font-semibold outline-none"
+                      className="w-full bg-transparent text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       style={{ color: 'var(--admin-card-text)' }}
                     />
                     {productsLoading ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}
@@ -645,6 +747,7 @@ export default function PosSalesPage() {
                             product={product}
                             quantityInCart={Number(cartByKey[cartKey]?.quantity || 0)}
                             onAdd={handleAddProduct}
+                            disabled={saleLoading}
                           />
                         );
                       })}
@@ -671,8 +774,13 @@ export default function PosSalesPage() {
                   {cartItems.length > 0 ? (
                     <button
                       type="button"
-                      onClick={() => setCartItems([])}
-                      className="rounded-xl border px-3 py-2 text-xs font-black"
+                      onClick={() => {
+                        if (saleLoading) return;
+                        clearSaleMessages();
+                        setCartItems([]);
+                      }}
+                      disabled={saleLoading}
+                      className="rounded-xl border px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40"
                       style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}
                     >
                       Vaciar
@@ -704,10 +812,21 @@ export default function PosSalesPage() {
                         onIncrease={handleIncreaseQty}
                         onDecrease={handleDecreaseQty}
                         onRemove={handleRemoveItem}
+                        disabled={saleLoading}
                       />
                     ))}
                   </div>
                 )}
+
+                {saleError ? (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="font-black">No se pudo confirmar la venta</p>
+                      <p className="mt-1">{saleError}</p>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
                   <div className="flex items-center justify-between text-sm">
@@ -727,13 +846,14 @@ export default function PosSalesPage() {
 
                 <button
                   type="button"
-                  disabled
+                  disabled={!canConfirmSale}
+                  onClick={handleConfirmSale}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ background: 'var(--admin-primary)' }}
-                  title="La confirmación se conectará cuando agreguemos preview de venta"
+                  title={canConfirmSale ? 'Crear venta POS real' : 'Agrega productos al carrito para confirmar la venta'}
                 >
-                  <BadgeCheck className="h-5 w-5" />
-                  Confirmar venta
+                  {saleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BadgeCheck className="h-5 w-5" />}
+                  {saleLoading ? 'Confirmando venta...' : 'Confirmar venta'}
                 </button>
               </div>
             </PosCard>
