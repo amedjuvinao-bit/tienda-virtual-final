@@ -7,6 +7,7 @@ import {
   Building2,
   CreditCard,
   Loader2,
+  Minus,
   PackageSearch,
   Plus,
   ReceiptText,
@@ -14,6 +15,7 @@ import {
   Search,
   ShoppingBag,
   Store,
+  Trash2,
 } from 'lucide-react';
 import { getPosBootstrap, getPosProducts } from '../api/adminPosApi';
 
@@ -42,6 +44,16 @@ function getPaymentLabel(method) {
 function getVariantLabel(product = {}) {
   const parts = [product.size, product.color].filter(Boolean);
   return parts.length ? parts.join(' / ') : 'Variante general';
+}
+
+function getProductCartKey(product = {}) {
+  return product.id || `${product.productId || ''}:${product.variantKey || 'default__default'}`;
+}
+
+function toSafeQty(value, max = 1) {
+  const number = Number(value);
+  const qty = Number.isFinite(number) ? Math.floor(number) : 1;
+  return Math.max(1, Math.min(qty, Math.max(1, Number(max || 1))));
 }
 
 function InfoPill({ icon: Icon, label, value }) {
@@ -103,7 +115,10 @@ function ProductImage({ product }) {
   );
 }
 
-function PosProductRow({ product }) {
+function PosProductRow({ product, quantityInCart = 0, onAdd }) {
+  const availableStock = Number(product.availableStock || 0);
+  const canAdd = availableStock > quantityInCart;
+
   return (
     <div
       className="flex flex-col gap-4 rounded-2xl border p-4 lg:flex-row lg:items-center lg:justify-between"
@@ -128,8 +143,16 @@ function PosProductRow({ product }) {
               className="rounded-full px-2.5 py-1 text-[11px] font-black"
               style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}
             >
-              Stock: {Number(product.availableStock || 0)}
+              Stock: {availableStock}
             </span>
+            {quantityInCart > 0 ? (
+              <span
+                className="rounded-full px-2.5 py-1 text-[11px] font-black"
+                style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
+              >
+                En carrito: {quantityInCart}
+              </span>
+            ) : null}
             {product.category ? (
               <span
                 className="rounded-full px-2.5 py-1 text-[11px] font-bold"
@@ -149,14 +172,79 @@ function PosProductRow({ product }) {
 
         <button
           type="button"
-          disabled
+          onClick={() => onAdd(product)}
+          disabled={!canAdd}
           className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
           style={{ background: 'var(--admin-primary)' }}
-          title="El agregado al carrito se conectará en el siguiente paso"
         >
           <Plus className="h-4 w-4" />
-          Agregar
+          {canAdd ? 'Agregar' : 'Sin stock'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CartItemRow({ item, onIncrease, onDecrease, onRemove }) {
+  const maxQty = Number(item.availableStock || 1);
+  const canIncrease = Number(item.quantity || 1) < maxQty;
+
+  return (
+    <div
+      className="rounded-2xl border p-4"
+      style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+            {item.title || 'Producto sin nombre'}
+          </p>
+          <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            {getVariantLabel(item)} · Stock {item.availableStock}
+          </p>
+          <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            {formatMoney(item.price)} x {item.quantity}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onRemove(item.cartKey)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border"
+          style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}
+          aria-label="Quitar producto del carrito"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="inline-flex items-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <button
+            type="button"
+            onClick={() => onDecrease(item.cartKey)}
+            className="flex h-9 w-9 items-center justify-center"
+            aria-label="Disminuir cantidad"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="min-w-10 px-2 text-center text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+            {item.quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() => onIncrease(item.cartKey)}
+            disabled={!canIncrease}
+            className="flex h-9 w-9 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Aumentar cantidad"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        <strong className="text-sm" style={{ color: 'var(--admin-primary)' }}>
+          {formatMoney(Number(item.price || 0) * Number(item.quantity || 1))}
+        </strong>
       </div>
     </div>
   );
@@ -172,6 +260,7 @@ export default function PosSalesPage() {
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState('');
+  const [cartItems, setCartItems] = useState([]);
 
   const branches = useMemo(
     () => (Array.isArray(bootstrap?.branches) ? bootstrap.branches : []),
@@ -186,6 +275,28 @@ export default function PosSalesPage() {
   const selectedBranch = useMemo(() => {
     return branches.find((branch) => branch.id === selectedBranchId) || bootstrap?.defaultBranch || null;
   }, [branches, bootstrap?.defaultBranch, selectedBranchId]);
+
+  const cartByKey = useMemo(() => {
+    return cartItems.reduce((acc, item) => {
+      acc[item.cartKey] = item;
+      return acc;
+    }, {});
+  }, [cartItems]);
+
+  const cartSummary = useMemo(() => {
+    const subtotal = cartItems.reduce(
+      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+      0
+    );
+    const totalItems = cartItems.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+
+    return {
+      subtotal,
+      discount: 0,
+      total: subtotal,
+      totalItems,
+    };
+  }, [cartItems]);
 
   const billingActive = bootstrap?.billing?.electronicBillingActive === true;
 
@@ -207,9 +318,72 @@ export default function PosSalesPage() {
     }
   };
 
+  const handleAddProduct = (product) => {
+    const cartKey = getProductCartKey(product);
+    const availableStock = Number(product.availableStock || 0);
+
+    if (!cartKey || availableStock <= 0) return;
+
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.cartKey === cartKey);
+
+      if (existing) {
+        return prev.map((item) => {
+          if (item.cartKey !== cartKey) return item;
+
+          return {
+            ...item,
+            quantity: toSafeQty(Number(item.quantity || 1) + 1, item.availableStock),
+          };
+        });
+      }
+
+      return [
+        ...prev,
+        {
+          ...product,
+          cartKey,
+          quantity: 1,
+          availableStock,
+          price: Number(product.price || 0),
+        },
+      ];
+    });
+  };
+
+  const handleIncreaseQty = (cartKey) => {
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.cartKey === cartKey
+          ? { ...item, quantity: toSafeQty(Number(item.quantity || 1) + 1, item.availableStock) }
+          : item
+      )
+    );
+  };
+
+  const handleDecreaseQty = (cartKey) => {
+    setCartItems((prev) =>
+      prev
+        .map((item) =>
+          item.cartKey === cartKey
+            ? { ...item, quantity: Number(item.quantity || 1) - 1 }
+            : item
+        )
+        .filter((item) => Number(item.quantity || 0) > 0)
+    );
+  };
+
+  const handleRemoveItem = (cartKey) => {
+    setCartItems((prev) => prev.filter((item) => item.cartKey !== cartKey));
+  };
+
   useEffect(() => {
     loadBootstrap();
   }, []);
+
+  useEffect(() => {
+    setCartItems([]);
+  }, [selectedBranchId]);
 
   useEffect(() => {
     if (loading || !selectedBranchId) {
@@ -463,9 +637,17 @@ export default function PosSalesPage() {
 
                   {!productsError && !productsLoading && products.length > 0 ? (
                     <div className="mt-5 space-y-3">
-                      {products.map((product) => (
-                        <PosProductRow key={product.id || `${product.productId}-${product.variantKey}`} product={product} />
-                      ))}
+                      {products.map((product) => {
+                        const cartKey = getProductCartKey(product);
+                        return (
+                          <PosProductRow
+                            key={product.id || `${product.productId}-${product.variantKey}`}
+                            product={product}
+                            quantityInCart={Number(cartByKey[cartKey]?.quantity || 0)}
+                            onAdd={handleAddProduct}
+                          />
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -474,41 +656,72 @@ export default function PosSalesPage() {
 
             <PosCard className="overflow-hidden">
               <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
-                <h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
-                  Carrito de venta
-                </h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                  Resumen de productos, descuentos y pago.
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
+                      Carrito de venta
+                    </h2>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      {cartItems.length > 0
+                        ? `${cartSummary.totalItems} producto(s) agregados`
+                        : 'Resumen de productos, descuentos y pago.'}
+                    </p>
+                  </div>
+
+                  {cartItems.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setCartItems([])}
+                      className="rounded-xl border px-3 py-2 text-xs font-black"
+                      style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}
+                    >
+                      Vaciar
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-4 p-5">
-                <div
-                  className="rounded-2xl border p-5 text-center"
-                  style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}
-                >
-                  <ReceiptText className="mx-auto h-8 w-8" style={{ color: 'var(--admin-primary)' }} />
-                  <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                    Sin productos agregados
-                  </p>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
-                    Agrega productos desde el buscador para calcular la venta.
-                  </p>
-                </div>
+                {cartItems.length === 0 ? (
+                  <div
+                    className="rounded-2xl border p-5 text-center"
+                    style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}
+                  >
+                    <ReceiptText className="mx-auto h-8 w-8" style={{ color: 'var(--admin-primary)' }} />
+                    <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+                      Sin productos agregados
+                    </p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Agrega productos desde el buscador para calcular la venta.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {cartItems.map((item) => (
+                      <CartItemRow
+                        key={item.cartKey}
+                        item={item}
+                        onIncrease={handleIncreaseQty}
+                        onDecrease={handleDecreaseQty}
+                        onRemove={handleRemoveItem}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 <div className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
                   <div className="flex items-center justify-between text-sm">
                     <span style={{ color: 'var(--admin-card-muted-text)' }}>Subtotal</span>
-                    <strong style={{ color: 'var(--admin-card-text)' }}>{formatMoney(0)}</strong>
+                    <strong style={{ color: 'var(--admin-card-text)' }}>{formatMoney(cartSummary.subtotal)}</strong>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span style={{ color: 'var(--admin-card-muted-text)' }}>Descuento</span>
-                    <strong style={{ color: 'var(--admin-card-text)' }}>{formatMoney(0)}</strong>
+                    <strong style={{ color: 'var(--admin-card-text)' }}>{formatMoney(cartSummary.discount)}</strong>
                   </div>
                   <div className="h-px" style={{ background: 'var(--admin-card-border)' }} />
                   <div className="flex items-center justify-between text-base">
                     <span className="font-black" style={{ color: 'var(--admin-card-text)' }}>Total</span>
-                    <strong className="text-xl" style={{ color: 'var(--admin-primary)' }}>{formatMoney(0)}</strong>
+                    <strong className="text-xl" style={{ color: 'var(--admin-primary)' }}>{formatMoney(cartSummary.total)}</strong>
                   </div>
                 </div>
 
@@ -517,6 +730,7 @@ export default function PosSalesPage() {
                   disabled
                   className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ background: 'var(--admin-primary)' }}
+                  title="La confirmación se conectará cuando agreguemos preview de venta"
                 >
                   <BadgeCheck className="h-5 w-5" />
                   Confirmar venta
