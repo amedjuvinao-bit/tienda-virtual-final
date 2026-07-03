@@ -52,6 +52,74 @@ function emitPosSaleCreated(data) {
   }));
 }
 
+function getSelectedPosCustomerPayload(payload = {}) {
+  if (payload.customerId || payload.customerMode === 'identified') return payload;
+  if (typeof window === 'undefined') return payload;
+
+  const state = window.__rbPosCustomerSelection || {};
+  const mode = cleanText(state.mode || 'guest').toLowerCase();
+
+  if (mode === 'existing') {
+    const customer = state.selectedCustomer || {};
+
+    if (!customer.id) {
+      throw new Error('Selecciona un cliente existente o cambia a consumidor final.');
+    }
+
+    return {
+      ...payload,
+      customerMode: 'identified',
+      customerId: customer.id,
+      customer: {
+        fullName: customer.fullName || customer.displayName || '',
+        name: customer.fullName || customer.displayName || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        documentType: customer.documentType || '',
+        documentNumber: customer.documentNumber || '',
+        address: customer.address || '',
+        city: customer.city || '',
+        department: customer.department || '',
+        country: customer.country || 'CO',
+      },
+    };
+  }
+
+  if (mode === 'quick') {
+    const customer = state.quickCustomer || {};
+    const fullName = cleanText(customer.fullName);
+
+    if (fullName.length < 3) {
+      throw new Error('Ingresa el nombre del cliente rápido.');
+    }
+
+    return {
+      ...payload,
+      customerMode: 'identified',
+      customerAction: 'quick_create',
+      customer: {
+        fullName,
+        name: fullName,
+        phone: cleanText(customer.phone),
+        email: cleanText(customer.email).toLowerCase(),
+        documentType: cleanText(customer.documentType || 'CC').toUpperCase(),
+        documentNumber: cleanText(customer.documentNumber),
+        country: 'CO',
+      },
+    };
+  }
+
+  return {
+    ...payload,
+    customerMode: 'guest',
+    customer: {
+      fullName: 'Consumidor final',
+      name: 'Consumidor final',
+      country: 'CO',
+    },
+  };
+}
+
 function buildQueryParams(params = {}) {
   const query = new URLSearchParams();
 
@@ -111,7 +179,7 @@ export async function previewPosSale(payload) {
   assertPayload(payload, 'Los datos de la venta POS son obligatorios.');
 
   try {
-    const response = await api.post(`${BASE_URL}/sales/preview`, payload);
+    const response = await api.post(`${BASE_URL}/sales/preview`, getSelectedPosCustomerPayload(payload));
 
     return response.data;
   } catch (error) {
@@ -129,7 +197,7 @@ export async function createPosSale(payload, options = {}) {
   try {
     const response = await postIdempotent(
       `${BASE_URL}/sales`,
-      payload,
+      getSelectedPosCustomerPayload(payload),
       idempotencyKey
     );
 
