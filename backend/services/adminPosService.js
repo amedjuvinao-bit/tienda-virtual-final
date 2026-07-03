@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Order = require('../models/Order');
+const Customer = require('../models/Customer');
 const Counter = require('../models/Counter');
 const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 
@@ -323,38 +324,94 @@ function calculatePosTotals({ items = [], discount = {}, taxes = {} } = {}) {
   });
 }
 
-function normalizePosCustomer(customer = {}) {
+function normalizePosCustomer(customer = {}, fallbackName = DEFAULT_POS_CUSTOMER_NAME) {
+  const fullName = cleanText(
+    customer.fullName || customer.displayName || customer.name || fallbackName,
+    160
+  );
+
   return {
-    name: cleanText(customer.name || DEFAULT_POS_CUSTOMER_NAME, 120),
-    lastname: cleanText(customer.lastname || '', 120),
-    id: cleanText(customer.id || customer.document || '', 40),
-    documentType: cleanText(customer.documentType || '', 40),
+    name: fullName || fallbackName,
+    lastname: cleanText(customer.lastname || customer.lastName || '', 120),
+    id: cleanText(customer.id || customer.documentNumber || customer.document || customer.identification || '', 40),
+    documentType: cleanUpper(customer.documentType || '', 40),
     emailOrPhone: cleanText(customer.emailOrPhone || customer.email || customer.phone || '', 180),
-    email: cleanText(customer.email || '', 180),
-    phone: cleanText(customer.phone || '', 60),
+    email: cleanLower(customer.email || '', 180),
+    phone: cleanText(customer.phone || customer.cellphone || customer.mobile || '', 60),
     address: cleanText(customer.address || '', 250),
     city: cleanText(customer.city || '', 100),
     department: cleanText(customer.department || '', 100),
-    country: cleanText(customer.country || 'Colombia', 80),
+    postalCode: cleanText(customer.postalCode || '', 40),
+    country: cleanUpper(customer.country || 'CO', 80) || 'CO',
     deliveryType: 'store',
-    wantsNewsletter: customer.wantsNewsletter === true,
+    wantsNewsletter: customer.wantsNewsletter === true || customer.acceptsMarketing === true,
   };
+}
+
+function buildGuestCustomerSnapshot() {
+  return normalizePosCustomer({ fullName: DEFAULT_POS_CUSTOMER_NAME, country: 'CO' });
+}
+
+function buildCustomerOrderSnapshot(customer = {}) {
+  const raw = typeof customer.toObject === 'function' ? customer.toObject() : customer;
+
+  return normalizePosCustomer({
+    fullName: raw.fullName || raw.displayName || '',
+    phone: raw.phone || '',
+    email: raw.email || '',
+    documentType: raw.documentType || '',
+    documentNumber: raw.documentNumber || '',
+    address: raw.address || '',
+    city: raw.city || '',
+    department: raw.department || '',
+    postalCode: raw.postalCode || '',
+    country: raw.country || 'CO',
+    acceptsMarketing: raw.acceptsMarketing === true,
+  });
+}
+
+function normalizeCustomerIdFromPayload(payload = {}) {
+  return getObjectIdValue(
+    payload.customerId ||
+      payload.customer?._id ||
+      payload.customer?.customerId ||
+      payload.customer?.idRef ||
+      payload.pos?.customerId
+  );
+}
+
+function shouldCreateQuickCustomer(payload = {}, normalizedPayload = {}) {
+  const rawMode = cleanLower(payload.customerMode || payload.pos?.customerMode || '', 40);
+  const action = cleanLower(payload.customerAction || payload.pos?.customerAction || '', 40);
+  const customer = payload.customer || {};
+  const name = cleanText(customer.fullName || customer.displayName || customer.name || '', 160);
+
+  if (!name || name === DEFAULT_POS_CUSTOMER_NAME) return false;
+  if (normalizeCustomerIdFromPayload(payload)) return false;
+
+  return (
+    rawMode === 'identified' ||
+    rawMode === 'quick' ||
+    action === 'create' ||
+    action === 'quick_create' ||
+    normalizedPayload.customerMode === 'identified'
+  );
 }
 
 function normalizePosBilling(billing = {}) {
   return {
     useSameAddress: true,
-    name: cleanText(billing.name || DEFAULT_POS_CUSTOMER_NAME, 120),
-    lastname: cleanText(billing.lastname || '', 120),
-    id: cleanText(billing.id || billing.document || '', 40),
-    documentType: cleanText(billing.documentType || '', 40),
+    name: cleanText(billing.name || billing.fullName || DEFAULT_POS_CUSTOMER_NAME, 120),
+    lastname: cleanText(billing.lastname || billing.lastName || '', 120),
+    id: cleanText(billing.id || billing.documentNumber || billing.document || '', 40),
+    documentType: cleanUpper(billing.documentType || '', 40),
     address: cleanText(billing.address || '', 250),
     city: cleanText(billing.city || '', 100),
     department: cleanText(billing.department || '', 100),
     postalCode: cleanText(billing.postalCode || '', 40),
     phone: cleanText(billing.phone || '', 60),
-    email: cleanText(billing.email || '', 180),
-    country: cleanText(billing.country || 'Colombia', 80),
+    email: cleanLower(billing.email || '', 180),
+    country: cleanUpper(billing.country || 'CO', 80) || 'CO',
   };
 }
 
@@ -373,6 +430,15 @@ function normalizePosPayload(payload = {}) {
   });
 
   const payment = normalizePaymentPayload(payload.payment || {}, calculated.total);
+  const requestedCustomerMode = cleanLower(payload.customerMode || payload.pos?.customerMode || '', 40);
+  const customerId = normalizeCustomerIdFromPayload(payload);
+  const customerSnapshot = normalizePosCustomer(payload.customer || {});
+  const hasCustomerData =
+    customerId ||
+    cleanText(customerSnapshot.name || '') !== DEFAULT_POS_CUSTOMER_NAME ||
+    cleanText(customerSnapshot.phone || '') ||
+    cleanText(customerSnapshot.email || '') ||
+    cleanText(customerSnapshot.id || '');
 
   return {
     branchId,
@@ -380,16 +446,169 @@ function normalizePosPayload(payload = {}) {
     terminalId: cleanText(payload.terminalId || payload.pos?.terminalId || '', 80),
     registerCode: cleanUpper(payload.registerCode || payload.pos?.registerCode || '', 80),
     shiftCode: cleanUpper(payload.shiftCode || payload.pos?.shiftCode || '', 80),
+    customerId,
     customerMode:
-      cleanLower(payload.customerMode || payload.pos?.customerMode || '') === 'identified'
+      requestedCustomerMode === 'identified' || requestedCustomerMode === 'quick' || hasCustomerData
         ? 'identified'
         : 'guest',
     notes: cleanText(payload.notes || payload.pos?.notes || '', 1200),
-    customer: normalizePosCustomer(payload.customer),
+    customer: hasCustomerData ? customerSnapshot : buildGuestCustomerSnapshot(),
     billing: normalizePosBilling(payload.billing || payload.customer),
     payment,
     ...calculated,
   };
+}
+
+async function loadExistingCustomer(customerId, { session = null } = {}) {
+  if (!customerId) return null;
+
+  if (!isValidObjectId(customerId)) {
+    throw createPosError(
+      'El cliente seleccionado no tiene un ID válido.',
+      'POS_CUSTOMER_INVALID_ID',
+      { customerId },
+      400
+    );
+  }
+
+  const customer = await Customer.findOne({
+    _id: toObjectId(customerId, 'customerId'),
+    deletedAt: null,
+    active: true,
+    status: 'active',
+  }).session(session);
+
+  if (!customer) {
+    throw createPosError(
+      'El cliente seleccionado no existe o no está activo.',
+      'POS_CUSTOMER_NOT_FOUND',
+      { customerId },
+      404
+    );
+  }
+
+  return customer;
+}
+
+function buildQuickCustomerPayload(payload = {}, branch, admin = {}) {
+  const customer = payload.customer || {};
+  const fullName = cleanText(customer.fullName || customer.displayName || customer.name || '', 160);
+
+  if (!fullName) {
+    throw createPosError(
+      'Para crear un cliente rápido debes ingresar el nombre.',
+      'POS_QUICK_CUSTOMER_NAME_REQUIRED',
+      {},
+      400
+    );
+  }
+
+  return {
+    fullName,
+    displayName: fullName,
+    phone: cleanText(customer.phone || customer.cellphone || customer.mobile || '', 60),
+    email: cleanLower(customer.email || '', 180),
+    documentType: cleanUpper(customer.documentType || '', 40),
+    documentNumber: cleanText(customer.documentNumber || customer.document || customer.id || '', 40),
+    address: cleanText(customer.address || '', 250),
+    city: cleanText(customer.city || '', 100),
+    department: cleanText(customer.department || '', 100),
+    country: cleanUpper(customer.country || 'CO', 80) || 'CO',
+    postalCode: cleanText(customer.postalCode || '', 40),
+    source: 'pos',
+    status: 'active',
+    acceptsMarketing: customer.acceptsMarketing === true || customer.wantsNewsletter === true,
+    notes: cleanText(customer.notes || 'Cliente creado desde POS.', 1200),
+    defaultBranch: branch?._id || null,
+    createdByAdmin: getObjectIdValue(admin._id || admin.id || admin.adminUserId || admin.userId) || null,
+  };
+}
+
+async function resolvePosCustomerForPreview(payload = {}, normalizedPayload = {}, { session = null } = {}) {
+  if (normalizedPayload.customerId) {
+    const customer = await loadExistingCustomer(normalizedPayload.customerId, { session });
+    return {
+      customerMode: 'identified',
+      quickSale: false,
+      customer,
+      customerSnapshot: buildCustomerOrderSnapshot(customer),
+    };
+  }
+
+  if (shouldCreateQuickCustomer(payload, normalizedPayload)) {
+    return {
+      customerMode: 'identified',
+      quickSale: false,
+      customer: null,
+      customerSnapshot: normalizedPayload.customer,
+    };
+  }
+
+  return {
+    customerMode: 'guest',
+    quickSale: true,
+    customer: null,
+    customerSnapshot: buildGuestCustomerSnapshot(),
+  };
+}
+
+async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, branch, admin = {}, { session = null } = {}) {
+  if (normalizedPayload.customerId) {
+    const customer = await loadExistingCustomer(normalizedPayload.customerId, { session });
+    return {
+      customerMode: 'identified',
+      quickSale: false,
+      customer,
+      customerSnapshot: buildCustomerOrderSnapshot(customer),
+    };
+  }
+
+  if (shouldCreateQuickCustomer(payload, normalizedPayload)) {
+    const createdCustomers = await Customer.create(
+      [buildQuickCustomerPayload(payload, branch, admin)],
+      { session }
+    );
+    const customer = createdCustomers[0];
+
+    return {
+      customerMode: 'identified',
+      quickSale: false,
+      customer,
+      customerSnapshot: buildCustomerOrderSnapshot(customer),
+    };
+  }
+
+  return {
+    customerMode: 'guest',
+    quickSale: true,
+    customer: null,
+    customerSnapshot: buildGuestCustomerSnapshot(),
+  };
+}
+
+async function updateCustomerStatsAfterPosSale(customer, order, { session = null } = {}) {
+  if (!customer?._id || !order?._id) return;
+
+  const now = new Date();
+  const currentFirstPurchaseAt = customer.stats?.firstPurchaseAt || null;
+
+  await Customer.updateOne(
+    { _id: customer._id },
+    {
+      $inc: {
+        'stats.ordersCount': 1,
+        'stats.posOrdersCount': 1,
+        'stats.totalSpent': toMoney(order.total),
+      },
+      $set: {
+        'stats.lastOrder': order._id,
+        'stats.lastOrderNumber': order.orderNumber || '',
+        'stats.lastPurchaseAt': now,
+        'stats.firstPurchaseAt': currentFirstPurchaseAt || now,
+      },
+    },
+    { session }
+  );
 }
 
 async function validatePosBranch(branchId, { session = null } = {}) {
@@ -593,7 +812,7 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       registerCode: normalizedPayload.registerCode,
       shiftCode: normalizedPayload.shiftCode,
       customerMode: normalizedPayload.customerMode,
-      quickSale: normalizedPayload.customerMode !== 'identified',
+      quickSale: normalizedPayload.quickSale !== false ? normalizedPayload.customerMode !== 'identified' : false,
       notes: normalizedPayload.notes,
       confirmedAt: now,
     },
@@ -645,7 +864,9 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       restockedOnFailure: false,
       restockedAt: null,
     },
-    tags: ['pos', 'venta física'],
+    tags: normalizedPayload.customerMode === 'identified'
+      ? ['pos', 'venta física', 'cliente identificado']
+      : ['pos', 'venta física'],
     timeline: [
       {
         type: 'status',
@@ -820,11 +1041,23 @@ async function preparePosSalePreview(payload = {}, options = {}) {
     discount: payload.discount,
     taxes: payload.taxes,
   });
+  const customerResolution = await resolvePosCustomerForPreview(payload, normalizedPayload, { session });
 
   return {
     ...normalizedPayload,
     ...recalculated,
     payment: normalizePaymentPayload(payload.payment || {}, recalculated.total),
+    customerMode: customerResolution.customerMode,
+    quickSale: customerResolution.quickSale,
+    customer: customerResolution.customerSnapshot,
+    billing: normalizePosBilling(payload.billing || customerResolution.customerSnapshot),
+    customerRecord: customerResolution.customer
+      ? {
+          id: String(customerResolution.customer._id),
+          customerCode: customerResolution.customer.customerCode || '',
+          fullName: customerResolution.customer.fullName || '',
+        }
+      : null,
     branch,
     branchSnapshot: buildBranchSnapshot(branch),
   };
@@ -840,6 +1073,12 @@ async function createPosSale(payload = {}, options = {}) {
 
     validateDiscountAuthorization({ normalizedPayload, admin });
 
+    const customerResolution = await resolvePosCustomerForSale(payload, normalizedPayload, branch, admin, { session });
+    normalizedPayload.customerMode = customerResolution.customerMode;
+    normalizedPayload.quickSale = customerResolution.quickSale;
+    normalizedPayload.customer = customerResolution.customerSnapshot;
+    normalizedPayload.billing = normalizePosBilling(payload.billing || customerResolution.customerSnapshot);
+
     const orderNumber = await getNextOrderNumber({ session });
     const orderPayload = buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin });
     const createdOrders = await Order.create([orderPayload], { session });
@@ -853,10 +1092,13 @@ async function createPosSale(payload = {}, options = {}) {
       session,
     });
 
+    await updateCustomerStatsAfterPosSale(customerResolution.customer, order, { session });
+
     return {
       order,
       movements,
       branch,
+      customer: customerResolution.customer || null,
     };
   };
 
@@ -902,6 +1144,7 @@ module.exports = {
   normalizePosItems,
   normalizePaymentPayload,
   normalizeDiscountPayload,
+  normalizePosCustomer,
   calculatePosTotals,
   calculateTotalsFromNormalizedItems,
   validatePosBranch,
