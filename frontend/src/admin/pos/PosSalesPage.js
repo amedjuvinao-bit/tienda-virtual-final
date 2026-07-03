@@ -1,11 +1,5 @@
 // frontend/src/admin/pos/PosSalesPage.js
 
-import React, { useEffect } from 'react';
-import OriginalPosSalesPage from './PosSalesPage.jsx';
-import { attachPosConfirmController } from './posConfirmSaleDom';
+import Page from './PosSalesPage.jsx';
 
-export default function PosSalesPage() {
-  useEffect(() => attachPosConfirmController(), []);
-
-  return React.createElement(OriginalPosSalesPage);
-}
+export default Page;
