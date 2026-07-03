@@ -44,6 +44,24 @@ function assertPayload(payload, message) {
   }
 }
 
+function buildQueryParams(params = {}) {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+
+    const cleanValue = typeof value === 'string' ? cleanText(value) : value;
+
+    if (cleanValue === '') return;
+
+    query.set(key, String(cleanValue));
+  });
+
+  const queryString = query.toString();
+
+  return queryString ? `?${queryString}` : '';
+}
+
 export function buildPosIdempotencyKey(prefix = 'pos-sale') {
   const randomPart = Math.random().toString(36).slice(2, 10);
   return `${cleanText(prefix) || 'pos-sale'}-${Date.now()}-${randomPart}`;
@@ -56,6 +74,28 @@ export async function getPosBootstrap() {
     return response.data;
   } catch (error) {
     throwPosApiError(error, 'No fue posible cargar la información inicial del POS.');
+  }
+}
+
+export async function getPosProducts({ branchId, q = '', limit = 30 } = {}) {
+  const cleanBranchId = cleanText(branchId);
+
+  if (!cleanBranchId) {
+    throw new Error('Debes seleccionar una sede para buscar productos POS.');
+  }
+
+  const queryString = buildQueryParams({
+    branchId: cleanBranchId,
+    q,
+    limit,
+  });
+
+  try {
+    const response = await api.get(`${BASE_URL}/products${queryString}`);
+
+    return response.data;
+  } catch (error) {
+    throwPosApiError(error, 'No fue posible buscar productos POS.');
   }
 }
 
@@ -93,6 +133,7 @@ export async function createPosSale(payload, options = {}) {
 
 const adminPosApi = {
   getPosBootstrap,
+  getPosProducts,
   previewPosSale,
   createPosSale,
   buildPosIdempotencyKey,
