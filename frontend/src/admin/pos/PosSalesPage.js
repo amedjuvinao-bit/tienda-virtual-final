@@ -1,5 +1,10 @@
 // frontend/src/admin/pos/PosSalesPage.js
 
-import Page from './PosSalesPage.jsx';
+import React from 'react';
+import StablePosPage from './PosSalesPageSafe.jsx';
 
-export default Page;
+function PosSalesPage() {
+  return React.createElement(StablePosPage);
+}
+
+export default PosSalesPage;
