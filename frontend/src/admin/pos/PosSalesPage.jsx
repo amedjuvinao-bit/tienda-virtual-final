@@ -8,13 +8,14 @@ import {
   CreditCard,
   Loader2,
   PackageSearch,
+  Plus,
   ReceiptText,
   RefreshCw,
   Search,
   ShoppingBag,
   Store,
 } from 'lucide-react';
-import { getPosBootstrap } from '../api/adminPosApi';
+import { getPosBootstrap, getPosProducts } from '../api/adminPosApi';
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -36,6 +37,11 @@ function getPaymentLabel(method) {
   };
 
   return labels[method] || method || 'Pago';
+}
+
+function getVariantLabel(product = {}) {
+  const parts = [product.size, product.color].filter(Boolean);
+  return parts.length ? parts.join(' / ') : 'Variante general';
 }
 
 function InfoPill({ icon: Icon, label, value }) {
@@ -72,6 +78,90 @@ function PosCard({ children, className = '' }) {
   );
 }
 
+function ProductImage({ product }) {
+  if (product?.image) {
+    return (
+      <img
+        src={product.image}
+        alt={product.title || ''}
+        className="h-16 w-16 rounded-2xl object-cover"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-16 w-16 items-center justify-center rounded-2xl border"
+      style={{
+        borderColor: 'var(--admin-card-border)',
+        background: 'var(--admin-primary-soft-bg)',
+        color: 'var(--admin-primary)',
+      }}
+    >
+      <ShoppingBag className="h-6 w-6" />
+    </div>
+  );
+}
+
+function PosProductRow({ product }) {
+  return (
+    <div
+      className="flex flex-col gap-4 rounded-2xl border p-4 lg:flex-row lg:items-center lg:justify-between"
+      style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}
+    >
+      <div className="flex min-w-0 gap-3">
+        <ProductImage product={product} />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+            {product.title || 'Producto sin nombre'}
+          </p>
+
+          <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            {product.sku ? <span>SKU: {product.sku}</span> : null}
+            {product.barcode ? <span>Código: {product.barcode}</span> : null}
+            <span>{getVariantLabel(product)}</span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span
+              className="rounded-full px-2.5 py-1 text-[11px] font-black"
+              style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}
+            >
+              Stock: {Number(product.availableStock || 0)}
+            </span>
+            {product.category ? (
+              <span
+                className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-muted-text)' }}
+              >
+                {product.category}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between gap-3 lg:flex-col lg:items-end">
+        <strong className="text-base" style={{ color: 'var(--admin-primary)' }}>
+          {formatMoney(product.price)}
+        </strong>
+
+        <button
+          type="button"
+          disabled
+          className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ background: 'var(--admin-primary)' }}
+          title="El agregado al carrito se conectará en el siguiente paso"
+        >
+          <Plus className="h-4 w-4" />
+          Agregar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PosSalesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,6 +169,9 @@ export default function PosSalesPage() {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [searchTerm, setSearchTerm] = useState('');
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState('');
 
   const branches = useMemo(
     () => (Array.isArray(bootstrap?.branches) ? bootstrap.branches : []),
@@ -117,6 +210,42 @@ export default function PosSalesPage() {
   useEffect(() => {
     loadBootstrap();
   }, []);
+
+  useEffect(() => {
+    if (loading || !selectedBranchId) {
+      setProducts([]);
+      return undefined;
+    }
+
+    let active = true;
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        setProductsLoading(true);
+        setProductsError('');
+
+        const data = await getPosProducts({
+          branchId: selectedBranchId,
+          q: searchTerm,
+          limit: 30,
+        });
+
+        if (!active) return;
+        setProducts(Array.isArray(data?.products) ? data.products : []);
+      } catch (err) {
+        if (!active) return;
+        setProducts([]);
+        setProductsError(err?.message || 'No fue posible buscar productos POS.');
+      } finally {
+        if (active) setProductsLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [loading, selectedBranchId, searchTerm]);
 
   return (
     <div className="min-h-full space-y-5">
@@ -271,7 +400,7 @@ export default function PosSalesPage() {
                         Buscar productos
                       </h2>
                       <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        El buscador se conectará al inventario disponible de la sede seleccionada.
+                        Consulta el inventario disponible de la sede seleccionada.
                       </p>
                     </div>
                     <PackageSearch className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} />
@@ -292,20 +421,53 @@ export default function PosSalesPage() {
                       className="w-full bg-transparent text-sm font-semibold outline-none"
                       style={{ color: 'var(--admin-card-text)' }}
                     />
+                    {productsLoading ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}
                   </div>
 
-                  <div
-                    className="mt-5 rounded-2xl border p-8 text-center"
-                    style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}
-                  >
-                    <ShoppingBag className="mx-auto h-9 w-9" style={{ color: 'var(--admin-primary)' }} />
-                    <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      Buscador listo para conectar
-                    </p>
-                    <p className="mx-auto mt-2 max-w-md text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                      Ya tenemos bootstrap, preview y creación de venta. El siguiente paso será traer productos disponibles por sede y agregarlos al carrito.
-                    </p>
-                  </div>
+                  {productsError ? (
+                    <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <div>
+                        <p className="font-black">No se pudo buscar productos</p>
+                        <p className="mt-1">{productsError}</p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!productsError && productsLoading ? (
+                    <div
+                      className="mt-5 rounded-2xl border p-8 text-center"
+                      style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}
+                    >
+                      <Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} />
+                      <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+                        Buscando productos...
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {!productsError && !productsLoading && products.length === 0 ? (
+                    <div
+                      className="mt-5 rounded-2xl border p-8 text-center"
+                      style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}
+                    >
+                      <ShoppingBag className="mx-auto h-9 w-9" style={{ color: 'var(--admin-primary)' }} />
+                      <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+                        No hay productos con stock disponible
+                      </p>
+                      <p className="mx-auto mt-2 max-w-md text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        La búsqueda ya está conectada. Cuando exista stock en la sede, aquí aparecerán los productos para agregarlos al carrito.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {!productsError && !productsLoading && products.length > 0 ? (
+                    <div className="mt-5 space-y-3">
+                      {products.map((product) => (
+                        <PosProductRow key={product.id || `${product.productId}-${product.variantKey}`} product={product} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </PosCard>
             </div>
