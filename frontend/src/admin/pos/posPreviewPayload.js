@@ -16,3 +16,15 @@ export function buildPosPreviewPayload({ branchId, cartItems = [] }) {
     },
   };
 }
+
+export function buildPosSalePayload({ branchId, cartItems = [], paymentMethod = 'cash', total = 0 }) {
+  return {
+    ...buildPosPreviewPayload({ branchId, cartItems }),
+    registerCode: 'CAJA POS',
+    payment: {
+      method: paymentMethod,
+      receivedAmount: Number(total || 0),
+      amount: Number(total || 0),
+    },
+  };
+}
