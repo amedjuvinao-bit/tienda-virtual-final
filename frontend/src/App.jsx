@@ -52,6 +52,7 @@ import Dashboard from "./admin/Dashboard";
 import ProductosAdmin from "./admin/ProductosAdmin";
 import InventoryAdmin from "./admin/InventoryAdmin";
 import PosSalesPage from "./admin/pos/PosSalesPage";
+import AdminCustomersPage from "./admin/customers/AdminCustomersPage";
 import PagesAdmin from "./admin/pages/PagesAdmin";
 import PageEditor from "./admin/pages/PageEditor";
 import CatalogPageEditor from "./admin/pages/CatalogPageEditor";
@@ -497,6 +498,11 @@ export default function App() {
                 <Route
                   path="ordenes"
                   element={protectAdminContent(<OrdersAdmin />)}
+                />
+
+                <Route
+                  path="clientes"
+                  element={protectAdminContent(<AdminCustomersPage />)}
                 />
 
                 <Route
