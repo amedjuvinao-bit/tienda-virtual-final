@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import StablePosPage from './PosSalesPageSafe.jsx';
+import PosCustomerSelector from './PosCustomerSelector.jsx';
 
 function getOrderNumber(order = {}) {
   return order.orderNumber || order.number || order.receiptNumber || order._id || order.id || '';
@@ -85,6 +86,7 @@ function PosSalesPage() {
   return React.createElement(
     React.Fragment,
     null,
+    React.createElement(PosCustomerSelector),
     React.createElement(StablePosPage),
     React.createElement(PosSaleToast, {
       message,
