@@ -212,7 +212,7 @@ function startInventoryReservationExpirationJob() {
 
     try {
       const result = await expireInventoryReservations({
-        limit: INVENTORY_RESERVATION_LIMIT,
+        limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
       });
 
       const expiredCount = Number(result?.count || 0);
