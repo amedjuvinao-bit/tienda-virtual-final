@@ -82,6 +82,7 @@ const adminBranchProtectionRoutes = tryRequire('./routes/adminBranchProtection')
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
 const adminPosRoutes = tryRequire('./routes/adminPos');
+const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
@@ -155,6 +156,7 @@ if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProte
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
+if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
@@ -210,7 +212,7 @@ function startInventoryReservationExpirationJob() {
 
     try {
       const result = await expireInventoryReservations({
-        limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
+        limit: INVENTORY_RESERVATION_LIMIT,
       });
 
       const expiredCount = Number(result?.count || 0);
