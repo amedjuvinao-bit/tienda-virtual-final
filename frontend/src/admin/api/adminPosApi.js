@@ -44,6 +44,14 @@ function assertPayload(payload, message) {
   }
 }
 
+function emitPosSaleCreated(data) {
+  if (typeof window === 'undefined' || !data?.order) return;
+
+  window.dispatchEvent(new CustomEvent('pos:sale-created', {
+    detail: data,
+  }));
+}
+
 function buildQueryParams(params = {}) {
   const query = new URLSearchParams();
 
@@ -124,6 +132,8 @@ export async function createPosSale(payload, options = {}) {
       payload,
       idempotencyKey
     );
+
+    emitPosSaleCreated(response.data);
 
     return response.data;
   } catch (error) {
