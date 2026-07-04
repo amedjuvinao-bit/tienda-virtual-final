@@ -25,11 +25,11 @@ function PosSalesPage() {
     React.Fragment,
     null,
     React.createElement(PosCustomerSelector),
-    React.createElement(StablePosPage),
     React.createElement(PosReceiptActions, {
       sale: lastSale,
       onClose: () => setLastSale(null),
-    })
+    }),
+    React.createElement(StablePosPage)
   );
 }
 
