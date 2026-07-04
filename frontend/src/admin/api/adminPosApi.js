@@ -8,6 +8,36 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+function cleanDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function isValidEmail(value) {
+  const email = cleanText(value).toLowerCase();
+
+  if (!email) return true;
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function assertQuickCustomer(customer = {}) {
+  const fullName = cleanText(customer.fullName);
+  const phone = cleanText(customer.phone);
+  const email = cleanText(customer.email).toLowerCase();
+
+  if (fullName.length < 3) {
+    throw new Error('Ingresa el nombre del cliente rápido.');
+  }
+
+  if (phone && cleanDigits(phone).length < 7) {
+    throw new Error('El celular del cliente debe tener mínimo 7 números o dejarse vacío.');
+  }
+
+  if (email && !isValidEmail(email)) {
+    throw new Error('El correo del cliente no tiene un formato válido. Déjalo vacío o escribe un correo real.');
+  }
+}
+
 function buildPosApiErrorMessage(error, fallbackMessage) {
   const data = error?.response?.data || {};
 
@@ -88,10 +118,10 @@ function getSelectedPosCustomerPayload(payload = {}) {
   if (mode === 'quick') {
     const customer = state.quickCustomer || {};
     const fullName = cleanText(customer.fullName);
+    const phone = cleanText(customer.phone);
+    const email = cleanText(customer.email).toLowerCase();
 
-    if (fullName.length < 3) {
-      throw new Error('Ingresa el nombre del cliente rápido.');
-    }
+    assertQuickCustomer({ fullName, phone, email });
 
     return {
       ...payload,
@@ -100,8 +130,8 @@ function getSelectedPosCustomerPayload(payload = {}) {
       customer: {
         fullName,
         name: fullName,
-        phone: cleanText(customer.phone),
-        email: cleanText(customer.email).toLowerCase(),
+        phone,
+        email,
         documentType: cleanText(customer.documentType || 'CC').toUpperCase(),
         documentNumber: cleanText(customer.documentNumber),
         country: 'CO',
