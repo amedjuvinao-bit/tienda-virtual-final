@@ -35,6 +35,20 @@ function wait(ms) {
   });
 }
 
+function normalizeTopProducts(products) {
+  if (!Array.isArray(products)) return [];
+
+  return products.map((product, index) => {
+    const baseId = String(product?.id || product?._id || product?.productId || product?.sku || 'producto');
+
+    return {
+      ...product,
+      id: `${baseId}-${index}`,
+      originalId: product?.id || product?._id || product?.productId || '',
+    };
+  });
+}
+
 const emptyDashboardData = {
   quickActions: [],
   kpis: [],
@@ -85,7 +99,7 @@ export default function DashboardPage() {
           quickActions: Array.isArray(data.quickActions) ? data.quickActions : [],
           kpis: Array.isArray(data.kpis) ? data.kpis : [],
           salesChartData: Array.isArray(data.salesChartData) ? data.salesChartData : [],
-          topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+          topProducts: normalizeTopProducts(data.topProducts),
           alerts: Array.isArray(data.alerts) ? data.alerts : [],
           monthlyGoal: data.monthlyGoal || null,
           inventoryByBranch: Array.isArray(data.inventoryByBranch) ? data.inventoryByBranch : [],
@@ -147,7 +161,7 @@ export default function DashboardPage() {
           comparisonSalesChartData: Array.isArray(data.comparisonChartData)
             ? data.comparisonChartData
             : [],
-          topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+          topProducts: normalizeTopProducts(data.topProducts),
           salesSummary: data.summary || null,
           salesPeriod: {
             range: data.range || activeRange,
