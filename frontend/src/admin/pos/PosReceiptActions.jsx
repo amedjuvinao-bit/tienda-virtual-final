@@ -218,21 +218,21 @@ export default function PosReceiptActions({ sale, onClose }) {
 
   return (
     <>
-      <div
-        className="fixed right-8 top-24 z-[9999] w-[min(460px,calc(100vw-2rem))] rounded-3xl border p-5"
+      <section
+        className="mb-5 rounded-3xl border p-5"
         style={{
           borderColor: '#bbf7d0',
           background: '#ecfdf5',
           color: '#047857',
-          boxShadow: '0 18px 40px rgba(15, 23, 42, 0.18)',
+          boxShadow: '0 12px 28px rgba(15, 23, 42, 0.10)',
         }}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-black">Venta POS confirmada</p>
             <p className="mt-1 text-sm font-bold">Orden {number} creada correctamente.</p>
           </div>
-          <button type="button" onClick={onClose} className="font-black" style={{ color: '#047857' }}>×</button>
+          <button type="button" onClick={onClose} className="self-start font-black lg:self-auto" style={{ color: '#047857' }}>×</button>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -254,7 +254,7 @@ export default function PosReceiptActions({ sale, onClose }) {
             <span>{error}</span>
           </div>
         ) : null}
-      </div>
+      </section>
 
       <ReceiptModal
         receipt={receipt}
