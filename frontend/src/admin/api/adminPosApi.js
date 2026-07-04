@@ -52,9 +52,21 @@ function buildPosApiErrorMessage(error, fallbackMessage) {
   return data?.message || error?.userMessage || error?.message || fallbackMessage;
 }
 
+function emitPosSaleError(message) {
+  if (typeof window === 'undefined') return;
+
+  window.dispatchEvent(new CustomEvent('pos:sale-error', {
+    detail: {
+      message: cleanText(message) || 'No fue posible crear la venta POS.',
+    },
+  }));
+}
+
 function throwPosApiError(error, fallbackMessage) {
   const message = buildPosApiErrorMessage(error, fallbackMessage);
   const enhancedError = new Error(message);
+
+  emitPosSaleError(message);
 
   enhancedError.originalError = error;
   enhancedError.response = {
