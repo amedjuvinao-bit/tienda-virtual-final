@@ -1,11 +1,12 @@
 // backend/services/posReceiptService.js
 
-const PDFDocument = require('pdfkit');
+const { Writable } = require('stream');
 
 const Order = require('../models/Order');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const SiteSettings = require('../models/SiteSettings');
 const { sendMail } = require('../lib/mail/mailer');
+const { generateOrderPdf } = require('../lib/orderPdfGenerator');
 const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 
 function cleanText(value, max = 500) {
@@ -84,7 +85,7 @@ function mapOrderItems(order = {}) {
     const unitPrice = Number(item.unitPrice || item.price || item.priceNumber || 0);
 
     return {
-      title: cleanText(item.title || item.name || 'Producto', 220),
+      title: cleanText(item.title || item.name || item.product?.title || 'Producto', 220),
       size: cleanText(item.size || '', 80),
       color: cleanText(item.color || '', 120),
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
@@ -312,54 +313,105 @@ function buildReceiptHtml(receipt) {
   `;
 }
 
+function normalizeOrderForOrderPdf(order = {}, receipt = {}) {
+  const customer = order.customer || {};
+  const items = Array.isArray(order.items) && order.items.length > 0
+    ? order.items
+    : Array.isArray(order.cart)
+      ? order.cart
+      : [];
+
+  return {
+    ...order,
+    customer: {
+      ...customer,
+      name: customer.name || customer.fullName || receipt.customer?.name || 'Consumidor final',
+      lastname: customer.lastname || '',
+      id: customer.id || customer.documentNumber || receipt.customer?.documentNumber || '',
+      email: customer.email || receipt.customer?.email || '',
+      phone: customer.phone || receipt.customer?.phone || '',
+      emailOrPhone: customer.emailOrPhone || customer.email || customer.phone || receipt.customer?.email || receipt.customer?.phone || '',
+      address: customer.address || receipt.customer?.address || '',
+      city: customer.city || receipt.customer?.city || '',
+      department: customer.department || '',
+      country: customer.country || 'CO',
+    },
+    payment: {
+      ...(order.payment || {}),
+      method: order.payment?.method || receipt.payment?.method || 'cash',
+      status: order.payment?.status || order.status || 'paid',
+    },
+    items: items.map((item) => {
+      const unitPrice = Number(item.unitPrice || item.price || item.priceNumber || item.product?.price || 0);
+      return {
+        ...item,
+        title: item.title || item.name || item.product?.title || 'Producto',
+        price: unitPrice,
+        unitPrice,
+        product: {
+          ...(item.product || {}),
+          title: item.product?.title || item.title || item.name || 'Producto',
+          price: Number(item.product?.price || unitPrice || 0),
+          sku: item.product?.sku || item.sku || '',
+        },
+      };
+    }),
+    cart: items,
+    shipping: Number(order.shipping || 0),
+    subtotal: Number(order.subtotal || receipt.totals?.subtotal || 0),
+    total: Number(order.total || receipt.totals?.total || 0),
+  };
+}
+
+function normalizeInvoiceForOrderPdf(invoice = null, order = {}) {
+  if (!invoice) {
+    return {
+      orderNumber: order.orderNumber || '',
+    };
+  }
+
+  return {
+    ...invoice,
+    orderNumber: order.orderNumber || invoice.orderNumber || invoice.invoiceNumber || '',
+  };
+}
+
+async function renderOrderPdfToBuffer({ order, invoice, settings }) {
+  const chunks = [];
+  const sink = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk));
+      callback();
+    },
+  });
+
+  sink.setHeader = () => {};
+  sink.status = () => sink;
+
+  const finished = new Promise((resolve, reject) => {
+    sink.on('finish', () => resolve(Buffer.concat(chunks)));
+    sink.on('error', reject);
+  });
+
+  await generateOrderPdf({
+    order,
+    invoice,
+    settings,
+    res: sink,
+  });
+
+  return finished;
+}
+
 async function buildReceiptPdfBuffer(receipt) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 42 });
-    const chunks = [];
+  const order = await loadPosOrder(receipt?.order?.id || receipt?.order?.orderNumber);
+  const settings = await SiteSettings.findOne().lean().catch(() => null);
+  const invoice = await loadInvoiceForOrder(order);
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('error', reject);
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-
-    doc.fontSize(18).text(receipt.store.name || 'Rosa Boutique', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(11).text('Comprobante de venta POS', { align: 'center' });
-    doc.moveDown(1);
-
-    doc.fontSize(10);
-    doc.text(`Orden: ${receipt.order.orderNumber}`);
-    doc.text(`Comprobante: ${receipt.order.receiptNumber}`);
-    doc.text(`Fecha: ${formatDate(receipt.order.date)}`);
-    doc.text(`Sede: ${receipt.branch?.name || ''}`);
-    doc.text(`Vendedor: ${receipt.cashier?.displayName || receipt.cashier?.username || ''}`);
-    doc.text(`Cliente: ${receipt.customer.name}`);
-    if (receipt.customer.documentNumber) doc.text(`Documento: ${receipt.customer.documentType || ''} ${receipt.customer.documentNumber}`);
-    doc.moveDown(1);
-
-    doc.fontSize(12).text('Productos', { underline: true });
-    doc.moveDown(0.5);
-    receipt.items.forEach((item) => {
-      doc.fontSize(10).text(`${item.title}`);
-      doc.fontSize(9).text(`${[item.size, item.color].filter(Boolean).join(' / ')} | Cantidad: ${item.quantity} | Unitario: ${money(item.unitPrice)} | Subtotal: ${money(item.subtotal)}`);
-      doc.moveDown(0.35);
-    });
-
-    doc.moveDown(0.8);
-    doc.fontSize(11).text(`Subtotal: ${money(receipt.totals.subtotal)}`, { align: 'right' });
-    doc.text(`Descuento: ${money(receipt.totals.discount)}`, { align: 'right' });
-    doc.text(`Impuestos: ${money(receipt.totals.taxes)}`, { align: 'right' });
-    doc.fontSize(14).text(`Total: ${money(receipt.totals.total)}`, { align: 'right' });
-    doc.moveDown(0.8);
-    doc.fontSize(10).text(`Método de pago: ${receipt.payment.methodLabel || receipt.payment.method}`);
-    doc.text(`Recibido: ${money(receipt.payment.receivedAmount)}`);
-    doc.text(`Cambio: ${money(receipt.payment.changeAmount)}`);
-    doc.moveDown(1);
-
-    doc.fontSize(10).text(`Factura electrónica: ${receipt.invoice.message}`);
-    if (receipt.invoice.invoiceNumber) doc.text(`Número factura: ${receipt.invoice.invoiceNumber}`);
-    if (receipt.invoice.cufe) doc.text(`CUFE: ${receipt.invoice.cufe}`);
-
-    doc.end();
+  return renderOrderPdfToBuffer({
+    order: normalizeOrderForOrderPdf(order, receipt),
+    invoice: normalizeInvoiceForOrderPdf(invoice, order),
+    settings: settings || {},
   });
 }
 
