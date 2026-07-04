@@ -1,5 +1,5 @@
 // backend/index.js
-console.log('▶️ Iniciando backend/index.js');
+console.log('Iniciando backend/index.js');
 
 require('dotenv').config({
   path: require('path').join(__dirname, '.env'),
@@ -20,15 +20,15 @@ const PORT = process.env.PORT || 5000;
 function tryRequire(relPath) {
   try {
     const mod = require(relPath);
-    console.log(`➡️  Ruta cargada: ${relPath}`);
+    console.log(`Ruta cargada: ${relPath}`);
     return mod;
   } catch (e) {
     if (e.code === 'MODULE_NOT_FOUND') {
-      console.warn(`⚠️  Ruta NO encontrada, se omite: ${relPath}`);
+      console.warn(`Ruta NO encontrada, se omite: ${relPath}`);
       return null;
     }
 
-    console.error(`❌ Error al cargar ${relPath}:`, e.message);
+    console.error(`Error al cargar ${relPath}:`, e.message);
     return null;
   }
 }
@@ -82,6 +82,7 @@ const adminBranchProtectionRoutes = tryRequire('./routes/adminBranchProtection')
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
 const adminPosRoutes = tryRequire('./routes/adminPos');
+const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
@@ -124,7 +125,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
           await OrderEventModel.create({
             orderId: updatedOrder._id,
             type: 'status_changed',
-            message: `Estado: ${before.status || '—'} -> delivered`,
+            message: `Estado: ${before.status || '-'} -> delivered`,
             meta: {
               from: before.status || null,
               to: 'delivered',
@@ -156,6 +157,7 @@ if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProte
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
 if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
+if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
@@ -184,19 +186,19 @@ let inventoryReservationExpirationRunning = false;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
-    console.log('ℹ️ Job de expiración de reservas desactivado por configuración.');
+    console.log('Job de expiracion de reservas desactivado por configuracion.');
     return;
   }
 
   const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
 
   if (typeof expireInventoryReservations !== 'function') {
-    console.warn('⚠️ No se inició el job de expiración: expireInventoryReservations no está disponible.');
+    console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
     return;
   }
 
   if (inventoryReservationExpirationTimer) {
-    console.log('ℹ️ Job de expiración de reservas ya estaba iniciado.');
+    console.log('Job de expiracion de reservas ya estaba iniciado.');
     return;
   }
 
@@ -204,7 +206,7 @@ function startInventoryReservationExpirationJob() {
     if (inventoryReservationExpirationRunning) return;
 
     if (mongoose.connection.readyState !== 1) {
-      console.warn('⚠️ Job de reservas omitido: MongoDB no está conectado.');
+      console.warn('Job de reservas omitido: MongoDB no esta conectado.');
       return;
     }
 
@@ -218,10 +220,10 @@ function startInventoryReservationExpirationJob() {
       const expiredCount = Number(result?.count || 0);
 
       if (expiredCount > 0) {
-        console.log(`⏱️ Reservas vencidas liberadas automáticamente: ${expiredCount}`);
+        console.log(`Reservas vencidas liberadas automaticamente: ${expiredCount}`);
       }
     } catch (error) {
-      console.error('❌ Error expirando reservas de inventario:', error.message);
+      console.error('Error expirando reservas de inventario:', error.message);
     } finally {
       inventoryReservationExpirationRunning = false;
     }
@@ -239,28 +241,28 @@ function startInventoryReservationExpirationJob() {
   }
 
   console.log(
-    `✅ Job de expiración de reservas iniciado cada ${Math.round(
+    `Job de expiracion de reservas iniciado cada ${Math.round(
       INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
-    )} segundos. Límite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
+    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
   );
 }
 
 app.get('/', (_req, res) => {
-  res.send('🟢 Servidor backend funcionando correctamente.');
+  res.send('Servidor backend funcionando correctamente.');
 });
 
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log('✅ Conectado a MongoDB Atlas');
+    console.log('Conectado a MongoDB Atlas');
     startInventoryReservationExpirationJob();
   })
   .catch((error) => {
-    console.error('❌ Error al conectar MongoDB:', error.message);
-    console.warn('⚠️ Continuando sin conexión a MongoDB (solo para desarrollo).');
+    console.error('Error al conectar MongoDB:', error.message);
+    console.warn('Continuando sin conexion a MongoDB (solo para desarrollo).');
   })
   .finally(() => {
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
   });
