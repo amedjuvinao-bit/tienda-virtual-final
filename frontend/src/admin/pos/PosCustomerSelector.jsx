@@ -46,6 +46,17 @@ function findCustomerSlot() {
   return slot;
 }
 
+function isCustomerError(message) {
+  const text = cleanText(message).toLowerCase();
+
+  return (
+    text.includes('cliente') ||
+    text.includes('correo') ||
+    text.includes('celular') ||
+    text.includes('email')
+  );
+}
+
 function CustomerResult({ customer, onSelect }) {
   return (
     <button
@@ -78,6 +89,7 @@ function PosCustomerSelectorContent() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [quickCustomer, setQuickCustomer] = useState(EMPTY_QUICK_CUSTOMER);
 
@@ -88,6 +100,21 @@ function PosCustomerSelectorContent() {
       quickCustomer,
     });
   }, [mode, selectedCustomer, quickCustomer]);
+
+  useEffect(() => {
+    const onSaleError = (event) => {
+      const message = cleanText(event?.detail?.message || '');
+      if (message && isCustomerError(message)) {
+        setValidationError(message);
+      }
+    };
+
+    window.addEventListener('pos:sale-error', onSaleError);
+
+    return () => {
+      window.removeEventListener('pos:sale-error', onSaleError);
+    };
+  }, []);
 
   useEffect(() => {
     if (mode !== 'existing') return undefined;
@@ -130,6 +157,7 @@ function PosCustomerSelectorContent() {
   const changeMode = (nextMode) => {
     setMode(nextMode);
     setError('');
+    setValidationError('');
     setResults([]);
 
     if (nextMode !== 'existing') {
@@ -147,9 +175,11 @@ function PosCustomerSelectorContent() {
     setSearchTerm(customer?.fullName || customer?.displayName || '');
     setResults([]);
     setError('');
+    setValidationError('');
   };
 
   const updateQuickCustomer = (key, value) => {
+    setValidationError('');
     setQuickCustomer((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -201,6 +231,16 @@ function PosCustomerSelectorContent() {
         ))}
       </div>
 
+      {validationError ? (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-black">Revisa los datos del cliente</p>
+            <p className="mt-1">{validationError}</p>
+          </div>
+        </div>
+      ) : null}
+
       {mode === 'existing' ? (
         <div className="mt-4 space-y-3">
           {selectedCustomer ? (
@@ -209,7 +249,7 @@ function PosCustomerSelectorContent() {
                 <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{selectedCustomer.fullName || selectedCustomer.displayName}</p>
                 <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{[selectedCustomer.phone, selectedCustomer.email, selectedCustomer.documentNumber].filter(Boolean).join(' · ') || 'Cliente seleccionado'}</p>
               </div>
-              <button type="button" onClick={() => { setSelectedCustomer(null); setSearchTerm(''); }} className="flex h-9 w-9 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+              <button type="button" onClick={() => { setSelectedCustomer(null); setSearchTerm(''); setValidationError(''); }} className="flex h-9 w-9 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -220,7 +260,7 @@ function PosCustomerSelectorContent() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => { setSelectedCustomer(null); setSearchTerm(event.target.value); }}
+              onChange={(event) => { setSelectedCustomer(null); setValidationError(''); setSearchTerm(event.target.value); }}
               placeholder="Buscar cliente por nombre, celular, correo o documento"
               className="w-full bg-transparent text-sm font-semibold outline-none"
               style={{ color: 'var(--admin-card-text)' }}
@@ -265,7 +305,7 @@ function PosCustomerSelectorContent() {
             </select>
             <input value={quickCustomer.documentNumber} onChange={(event) => updateQuickCustomer('documentNumber', event.target.value)} placeholder="Documento" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
           </div>
-          <input value={quickCustomer.email} onChange={(event) => updateQuickCustomer('email', event.target.value)} placeholder="Correo opcional" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
+          <input value={quickCustomer.email} onChange={(event) => updateQuickCustomer('email', event.target.value)} placeholder="Correo opcional" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: validationError.toLowerCase().includes('correo') ? '#fecaca' : 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
         </div>
       ) : null}
     </section>
