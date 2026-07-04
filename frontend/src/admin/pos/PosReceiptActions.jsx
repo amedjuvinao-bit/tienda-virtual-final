@@ -29,10 +29,12 @@ function formatDate(value) {
 }
 
 function getOrderNumber(order = {}) {
+  if (!order || typeof order !== 'object') return '';
   return order.orderNumber || order.number || order.receiptNumber || order._id || order.id || '';
 }
 
 function getOrderId(order = {}) {
+  if (!order || typeof order !== 'object') return '';
   return order._id || order.id || order.orderId || order.orderNumber || '';
 }
 
@@ -162,7 +164,7 @@ export default function PosReceiptActions({ sale, onClose }) {
 
   const order = sale?.order || null;
   const orderId = useMemo(() => getOrderId(order), [order]);
-  const number = getOrderNumber(order || {});
+  const number = getOrderNumber(order);
 
   if (!order || !orderId) return null;
 
