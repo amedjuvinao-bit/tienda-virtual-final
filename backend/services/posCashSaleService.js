@@ -113,8 +113,7 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
         cashResolution.registerCode,
         { session }
       );
-      await recalculateCashSession(cashResolution.cashSession);
-      result.cashSession = cashResolution.cashSession;
+      result.cashSession = await recalculateCashSession(cashResolution.cashSession, { session });
     } else {
       result.cashSession = null;
     }
@@ -138,6 +137,10 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
     } finally {
       await session.endSession();
     }
+  }
+
+  if (!externalSession && result?.cashSession?._id) {
+    result.cashSession = await recalculateCashSession(result.cashSession._id);
   }
 
   if (generateElectronicInvoice) {
