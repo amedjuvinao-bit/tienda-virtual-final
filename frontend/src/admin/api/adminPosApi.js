@@ -3,6 +3,8 @@
 import api, { postIdempotent } from '../../lib/api';
 
 const BASE_URL = '/api/admin/pos';
+const CASH_SESSIONS_URL = '/api/admin/cash-sessions';
+const DEFAULT_REGISTER_CODE = 'CAJA POS';
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -180,6 +182,43 @@ function buildQueryParams(params = {}) {
   return queryString ? `?${queryString}` : '';
 }
 
+async function refreshCashSessionAfterSale(saleData = {}, payload = {}) {
+  const branchId = cleanText(
+    saleData?.branch?.id ||
+      saleData?.branch?._id ||
+      payload.branchId ||
+      payload.branch ||
+      ''
+  );
+
+  const cashRegisterCode = cleanText(
+    saleData?.cashRegisterCode ||
+      payload.cashRegisterCode ||
+      payload.registerCode ||
+      payload.pos?.cashRegisterCode ||
+      payload.pos?.registerCode ||
+      DEFAULT_REGISTER_CODE
+  );
+
+  if (!branchId) return saleData;
+
+  try {
+    const queryString = buildQueryParams({ branchId, cashRegisterCode });
+    const current = await api.get(`${CASH_SESSIONS_URL}/current${queryString}`);
+
+    if (current.data?.session) {
+      return {
+        ...saleData,
+        cashSession: current.data.session,
+      };
+    }
+  } catch (error) {
+    console.warn('[adminPosApi] No se pudo refrescar caja después de venta POS:', error?.message || error);
+  }
+
+  return saleData;
+}
+
 export function buildPosIdempotencyKey(prefix = 'pos-sale') {
   const randomPart = Math.random().toString(36).slice(2, 10);
   return `${cleanText(prefix) || 'pos-sale'}-${Date.now()}-${randomPart}`;
@@ -237,15 +276,18 @@ export async function createPosSale(payload, options = {}) {
     buildPosIdempotencyKey('pos-sale');
 
   try {
+    const preparedPayload = getSelectedPosCustomerPayload(payload);
     const response = await postIdempotent(
       `${BASE_URL}/sales`,
-      getSelectedPosCustomerPayload(payload),
+      preparedPayload,
       idempotencyKey
     );
 
-    emitPosSaleCreated(response.data);
+    const saleData = await refreshCashSessionAfterSale(response.data, preparedPayload);
 
-    return response.data;
+    emitPosSaleCreated(saleData);
+
+    return saleData;
   } catch (error) {
     throwPosApiError(error, 'No fue posible crear la venta POS.');
   }
