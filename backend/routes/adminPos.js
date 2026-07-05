@@ -9,11 +9,12 @@ const Branch = require('../models/Branch');
 const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const SiteSettings = require('../models/SiteSettings');
+const { serializeCashSession } = require('../services/cashSessionService');
 const {
   POS_PAYMENT_METHODS,
   preparePosSalePreview,
-  createPosSale,
 } = require('../services/adminPosService');
+const { createPosSaleWithCashSession } = require('../services/posCashSaleService');
 
 const router = express.Router();
 
@@ -460,7 +461,7 @@ router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
       });
     }
 
-    const result = await createPosSale(req.body || {}, {
+    const result = await createPosSaleWithCashSession(req.body || {}, {
       admin: buildAdminContext(req),
       generateElectronicInvoice: req.body?.generateElectronicInvoice === true,
     });
@@ -472,6 +473,9 @@ router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
         movement.toSafeObject ? movement.toSafeObject() : movement.toObject?.() || movement
       ),
       branch: serializeBranch(result.branch || {}),
+      cashSession: result.cashSession ? serializeCashSession(result.cashSession) : null,
+      cashRegisterCode: result.cashRegisterCode || '',
+      cashSessionRequired: result.cashSessionRequired === true,
     });
   } catch (error) {
     return sendError(res, error);
