@@ -151,20 +151,25 @@ async function resolveAdminContext(admin = {}) {
   };
 }
 
-async function recalculateCashSession(sessionOrId) {
+async function recalculateCashSession(sessionOrId, options = {}) {
+  const dbSession = options.session || null;
   const session = typeof sessionOrId === 'string' || sessionOrId instanceof mongoose.Types.ObjectId
-    ? await CashSession.findById(sessionOrId)
+    ? await CashSession.findById(sessionOrId).session(dbSession)
     : sessionOrId;
 
   if (!session) {
     throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
   }
 
-  const orders = await Order.find({
+  const ordersQuery = Order.find({
     source: 'pos',
     cashSession: session._id,
     status: { $in: ['paid', 'processing', 'shipped'] },
   }).lean();
+
+  if (dbSession) ordersQuery.session(dbSession);
+
+  const orders = await ordersQuery;
 
   const paymentTotals = {
     cash: 0,
@@ -226,7 +231,9 @@ async function recalculateCashSession(sessionOrId) {
     paymentTotals,
   };
 
-  await session.save();
+  if (dbSession) await session.save({ session: dbSession });
+  else await session.save();
+
   return session;
 }
 
