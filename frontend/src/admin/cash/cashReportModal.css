@@ -1,0 +1,31 @@
+/* frontend/src/admin/cash/cashReportModal.css */
+
+#cash-report-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 34px 18px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(7px);
+  overflow-y: auto;
+}
+
+#cash-report-panel > section {
+  width: min(100%, 1000px);
+  max-height: calc(100vh - 68px);
+  overflow-y: auto;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.28) !important;
+}
+
+@media (max-width: 768px) {
+  #cash-report-panel {
+    padding: 16px 10px;
+  }
+
+  #cash-report-panel > section {
+    max-height: calc(100vh - 32px);
+  }
+}
