@@ -1,0 +1,116 @@
+// backend/services/cashMovementService.js
+
+const mongoose = require('mongoose');
+
+const CashSession = require('../models/CashSession');
+const { createCashError, recalculateCashSession } = require('./cashSessionService');
+
+const MOVEMENT_CONFIG = {
+  cash_in: { direction: 'in', label: 'Ingreso manual' },
+  cash_out: { direction: 'out', label: 'Salida manual' },
+  expense: { direction: 'out', label: 'Gasto' },
+  withdrawal: { direction: 'out', label: 'Retiro de efectivo' },
+  adjustment: { direction: 'neutral', label: 'Ajuste' },
+};
+
+function cleanText(value, max = 500) {
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
+}
+
+function cleanLower(value, max = 500) {
+  return cleanText(value, max).toLowerCase();
+}
+
+function cleanMoney(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.round(number));
+}
+
+function toObjectId(value) {
+  const id = cleanText(value, 80);
+  return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
+}
+
+function buildAdminSnapshot(admin = {}) {
+  return {
+    username: cleanLower(admin.username || admin.adminUsername || 'admin', 80),
+    displayName: cleanText(admin.displayName || admin.fullName || admin.adminDisplayName || admin.username || 'Administrador', 160),
+    role: cleanLower(admin.role || admin.adminRole || 'admin', 40),
+    adminRole: cleanLower(admin.adminRole || admin.role || 'admin', 40),
+  };
+}
+
+function resolveMovementConfig(type, direction) {
+  const cleanType = cleanLower(type || 'adjustment', 40);
+  const config = MOVEMENT_CONFIG[cleanType];
+
+  if (!config) {
+    throw createCashError(
+      'Tipo de movimiento de caja no válido.',
+      'CASH_MOVEMENT_TYPE_INVALID',
+      400,
+      { type: cleanType }
+    );
+  }
+
+  if (cleanType !== 'adjustment') return { type: cleanType, direction: config.direction };
+
+  const cleanDirection = cleanLower(direction || 'neutral', 20);
+  const allowedDirections = ['in', 'out', 'neutral'];
+
+  return {
+    type: cleanType,
+    direction: allowedDirections.includes(cleanDirection) ? cleanDirection : 'neutral',
+  };
+}
+
+async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {}) {
+  const objectId = toObjectId(sessionId);
+
+  if (!objectId) {
+    throw createCashError('Debes indicar una caja válida.', 'CASH_SESSION_ID_REQUIRED', 400);
+  }
+
+  const session = await CashSession.findById(objectId);
+
+  if (!session) {
+    throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
+  }
+
+  if (session.status !== 'open') {
+    throw createCashError('Solo se pueden registrar movimientos en una caja abierta.', 'CASH_SESSION_NOT_OPEN', 409);
+  }
+
+  const amount = cleanMoney(payload.amount);
+  if (amount <= 0) {
+    throw createCashError('El monto del movimiento debe ser mayor que cero.', 'CASH_MOVEMENT_AMOUNT_REQUIRED', 400);
+  }
+
+  const { type, direction } = resolveMovementConfig(payload.type, payload.direction);
+  const reason = cleanText(payload.reason || payload.notes || '', 300);
+
+  if (!reason) {
+    throw createCashError('Debes escribir el motivo del movimiento.', 'CASH_MOVEMENT_REASON_REQUIRED', 400);
+  }
+
+  const adminObjectId = toObjectId(admin.id || admin._id || admin.adminUserId);
+
+  session.addCashMovement({
+    type,
+    amount,
+    direction,
+    reason,
+    reference: cleanText(payload.reference || '', 120),
+    createdBy: adminObjectId || null,
+    createdBySnapshot: buildAdminSnapshot(admin),
+  });
+
+  await session.save();
+  return recalculateCashSession(session);
+}
+
+module.exports = {
+  MOVEMENT_CONFIG,
+  addManualCashMovement,
+};
