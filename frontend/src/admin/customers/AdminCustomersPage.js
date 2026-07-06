@@ -1,5 +1,3 @@
-// frontend/src/admin/customers/AdminCustomersPage.js
-
-import Page from './AdminCustomersPageCRM.jsx';
+import Page from './AdminCustomersPageEditView.jsx';
 
 export default Page;
