@@ -12,6 +12,7 @@ const {
   listCashSessions,
   getCashSessionById,
 } = require('../services/cashSessionService');
+const { addManualCashMovement } = require('../services/cashMovementService');
 
 const router = express.Router();
 
@@ -89,6 +90,22 @@ router.post('/:id/close', requirePermission('pos:sell'), async (req, res) => {
       ok: true,
       session: serializeCashSession(session),
       message: 'Caja cerrada correctamente.',
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/:id/movements', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const session = await addManualCashMovement(req.params.id, req.body || {}, {
+      admin: buildAdminContext(req),
+    });
+
+    return res.status(201).json({
+      ok: true,
+      session: serializeCashSession(session),
+      message: 'Movimiento de caja registrado correctamente.',
     });
   } catch (error) {
     return sendError(res, error);
