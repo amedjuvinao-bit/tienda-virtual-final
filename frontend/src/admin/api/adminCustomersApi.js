@@ -90,6 +90,7 @@ export async function getAdminCustomers(params = {}) {
     q: params.q,
     status: params.status,
     source: params.source,
+    segment: params.segment,
     page: params.page || 1,
     limit: params.limit || 20,
   });
@@ -108,6 +109,7 @@ export async function searchAdminCustomers(q, options = {}) {
     q,
     status: options.status || 'active',
     source: options.source || 'all',
+    segment: options.segment || 'all',
     page: 1,
     limit: options.limit || 10,
   });
