@@ -62,6 +62,23 @@ export async function closeCashSession(sessionId, payload = {}) {
   }
 }
 
+export async function addCashMovement(sessionId, payload = {}) {
+  try {
+    const cleanId = cleanText(sessionId);
+    const response = await api.post(`${BASE_URL}/${cleanId}/movements`, {
+      type: cleanText(payload.type || 'cash_in'),
+      amount: Number(payload.amount || 0),
+      direction: cleanText(payload.direction || ''),
+      reason: cleanText(payload.reason || ''),
+      reference: cleanText(payload.reference || ''),
+    });
+
+    return response.data;
+  } catch (error) {
+    normalizeError(error, 'No fue posible registrar el movimiento de caja.');
+  }
+}
+
 export async function listCashSessions(params = {}) {
   try {
     const query = new URLSearchParams();
@@ -91,6 +108,7 @@ const adminCashSessionApi = {
   getCurrentCashSession,
   openCashSession,
   closeCashSession,
+  addCashMovement,
   listCashSessions,
   getCashSessionById,
 };
