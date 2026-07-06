@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Customer = require('../models/Customer');
+const Order = require('../models/Order');
 
 const router = express.Router();
 
@@ -19,6 +20,10 @@ function cleanLower(value) {
 
 function escapeRegex(value) {
   return cleanText(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function onlyDigits(value) {
+  return cleanText(value).replace(/\D/g, '');
 }
 
 function toPositiveInt(value, fallback = 20, max = 100) {
@@ -64,6 +69,39 @@ function serializeCustomer(customer = {}) {
     stats: raw.stats || {},
     createdAt: raw.createdAt || null,
     updatedAt: raw.updatedAt || null,
+  };
+}
+
+function serializeCustomerOrder(order = {}) {
+  const raw = typeof order.toObject === 'function' ? order.toObject({ virtuals: true }) : order;
+
+  return {
+    id: String(raw._id || raw.id || ''),
+    orderNumber: raw.orderNumber || '',
+    source: raw.source || '',
+    channel: raw.channel || '',
+    saleType: raw.saleType || '',
+    status: raw.status || '',
+    fulfillmentStatus: raw.fulfillmentStatus || '',
+    total: Number(raw.total || 0),
+    subtotal: Number(raw.subtotal || 0),
+    createdAt: raw.createdAt || null,
+    paidAt: raw.payment?.paidAt || null,
+    paymentMethod: raw.payment?.method || raw.payment?.methodType || '',
+    paymentLabel: raw.payment?.methodLabel || raw.payment?.method || '',
+    branch: raw.branchSnapshot || {},
+    receiptNumber: raw.pos?.receiptNumber || '',
+    invoiceNumber: raw.electronicInvoice?.number || raw.invoice?.number || raw.billing?.invoiceNumber || '',
+    itemsCount: Number(raw.summary?.totalItems || raw.summary?.itemsCount || (Array.isArray(raw.items) ? raw.items.length : 0)),
+    items: Array.isArray(raw.items)
+      ? raw.items.slice(0, 6).map((item) => ({
+          title: item.title || '',
+          quantity: Number(item.quantity || item.qty || 0),
+          size: item.size || '',
+          color: item.color || '',
+          unitPrice: Number(item.unitPrice || item.price || 0),
+        }))
+      : [],
   };
 }
 
@@ -180,6 +218,39 @@ function buildCustomerFilter(query = {}) {
   }
 
   return { filter, q, segment };
+}
+
+function buildCustomerOrdersFilter(customer = {}) {
+  const raw = typeof customer.toObject === 'function' ? customer.toObject() : customer;
+  const filters = [];
+  const id = String(raw._id || raw.id || '');
+  const email = cleanLower(raw.email || '');
+  const phone = cleanText(raw.phone || '');
+  const doc = cleanText(raw.documentNumber || '');
+  const normalizedPhone = onlyDigits(phone);
+  const normalizedDoc = onlyDigits(doc);
+
+  if (id) filters.push({ 'customer.customerId': id });
+  if (email) filters.push({ 'customer.email': email }, { 'billing.email': email });
+  if (phone) filters.push({ 'customer.phone': phone }, { 'billing.phone': phone });
+  if (normalizedPhone && normalizedPhone !== phone) filters.push({ 'customer.phone': normalizedPhone }, { 'billing.phone': normalizedPhone });
+  if (doc) filters.push({ 'customer.id': doc }, { 'billing.id': doc });
+  if (normalizedDoc && normalizedDoc !== doc) filters.push({ 'customer.id': normalizedDoc }, { 'billing.id': normalizedDoc });
+
+  if (raw.stats?.lastOrder && mongoose.Types.ObjectId.isValid(String(raw.stats.lastOrder))) {
+    filters.push({ _id: raw.stats.lastOrder });
+  }
+
+  return filters.length > 0 ? { $or: filters } : { _id: null };
+}
+
+async function loadCustomerOrders(customer, limit = 10) {
+  const orders = await Order.find(buildCustomerOrdersFilter(customer))
+    .sort({ createdAt: -1 })
+    .limit(toPositiveInt(limit, 10, 30))
+    .lean();
+
+  return orders.map(serializeCustomerOrder);
 }
 
 async function buildCustomersSummary() {
@@ -347,10 +418,12 @@ router.post('/', requirePermission('customers:create'), async (req, res) => {
 router.get('/:id', requirePermission('customers:view'), async (req, res) => {
   try {
     const customer = await loadCustomer(req.params.id);
+    const recentOrders = await loadCustomerOrders(customer, req.query.ordersLimit || 10);
 
     return res.json({
       ok: true,
       customer: serializeCustomer(customer),
+      recentOrders,
     });
   } catch (error) {
     return sendError(res, error);
