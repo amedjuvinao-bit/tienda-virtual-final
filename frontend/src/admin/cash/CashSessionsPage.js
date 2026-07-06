@@ -1,5 +1,3 @@
-// frontend/src/admin/cash/CashSessionsPage.js
-
-import Page from './CashSessionsPagePlus.jsx';
+import Page from './CashSessionsPageReport.jsx';
 
 export default Page;
