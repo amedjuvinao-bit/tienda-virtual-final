@@ -101,6 +101,50 @@ function buildCustomerPayload(body = {}, req, isCreate = false) {
   return payload;
 }
 
+function applyCustomerSegment(filter, segment) {
+  const cleanSegment = cleanLower(segment);
+
+  if (!cleanSegment || cleanSegment === 'all') return filter;
+
+  if (['with-purchases', 'with_purchases', 'buyers', 'compradores'].includes(cleanSegment)) {
+    filter['stats.ordersCount'] = { $gt: 0 };
+    return filter;
+  }
+
+  if (['without-purchases', 'without_purchases', 'no-purchases', 'sin-compras'].includes(cleanSegment)) {
+    filter.$and = [
+      ...(Array.isArray(filter.$and) ? filter.$and : []),
+      {
+        $or: [
+          { 'stats.ordersCount': { $exists: false } },
+          { 'stats.ordersCount': { $lte: 0 } },
+        ],
+      },
+    ];
+    return filter;
+  }
+
+  if (['with-email', 'with_email', 'con-correo'].includes(cleanSegment)) {
+    filter.email = { $exists: true, $ne: '' };
+    return filter;
+  }
+
+  if (['without-email', 'without_email', 'sin-correo'].includes(cleanSegment)) {
+    filter.$and = [
+      ...(Array.isArray(filter.$and) ? filter.$and : []),
+      {
+        $or: [
+          { email: { $exists: false } },
+          { email: '' },
+        ],
+      },
+    ];
+    return filter;
+  }
+
+  return filter;
+}
+
 function buildCustomerFilter(query = {}) {
   const filter = {
     deletedAt: null,
@@ -109,23 +153,104 @@ function buildCustomerFilter(query = {}) {
   const q = cleanText(query.q || '').slice(0, 120);
   const status = cleanLower(query.status || '');
   const source = cleanLower(query.source || '');
+  const segment = cleanLower(query.segment || '');
 
   if (status && status !== 'all') filter.status = status;
   if (source && source !== 'all') filter.source = source;
 
+  applyCustomerSegment(filter, segment);
+
   if (q) {
     const regex = new RegExp(escapeRegex(q), 'i');
-    filter.$or = [
-      { fullName: regex },
-      { displayName: regex },
-      { phone: regex },
-      { email: regex },
-      { documentNumber: regex },
-      { customerCode: regex },
+    const searchFilter = {
+      $or: [
+        { fullName: regex },
+        { displayName: regex },
+        { phone: regex },
+        { email: regex },
+        { documentNumber: regex },
+        { customerCode: regex },
+      ],
+    };
+
+    filter.$and = [
+      ...(Array.isArray(filter.$and) ? filter.$and : []),
+      searchFilter,
     ];
   }
 
-  return { filter, q };
+  return { filter, q, segment };
+}
+
+async function buildCustomersSummary() {
+  const base = { deletedAt: null, status: 'active' };
+  const withoutPurchasesFilter = {
+    ...base,
+    $or: [
+      { 'stats.ordersCount': { $exists: false } },
+      { 'stats.ordersCount': { $lte: 0 } },
+    ],
+  };
+  const withoutEmailFilter = {
+    ...base,
+    $or: [
+      { email: { $exists: false } },
+      { email: '' },
+    ],
+  };
+
+  const [
+    totalCustomers,
+    posCustomers,
+    webCustomers,
+    adminCustomers,
+    withPurchases,
+    withoutPurchases,
+    withEmail,
+    withoutEmail,
+    totalSpentAgg,
+    newestCustomer,
+  ] = await Promise.all([
+    Customer.countDocuments(base),
+    Customer.countDocuments({ ...base, source: 'pos' }),
+    Customer.countDocuments({ ...base, source: 'web' }),
+    Customer.countDocuments({ ...base, source: 'admin' }),
+    Customer.countDocuments({ ...base, 'stats.ordersCount': { $gt: 0 } }),
+    Customer.countDocuments(withoutPurchasesFilter),
+    Customer.countDocuments({ ...base, email: { $exists: true, $ne: '' } }),
+    Customer.countDocuments(withoutEmailFilter),
+    Customer.aggregate([
+      { $match: base },
+      {
+        $group: {
+          _id: null,
+          totalSpent: { $sum: { $ifNull: ['$stats.totalSpent', 0] } },
+          totalOrders: { $sum: { $ifNull: ['$stats.ordersCount', 0] } },
+          posOrders: { $sum: { $ifNull: ['$stats.posOrdersCount', 0] } },
+          webOrders: { $sum: { $ifNull: ['$stats.webOrdersCount', 0] } },
+        },
+      },
+    ]),
+    Customer.findOne(base).sort({ createdAt: -1 }),
+  ]);
+
+  const moneyStats = totalSpentAgg?.[0] || {};
+
+  return {
+    totalCustomers,
+    posCustomers,
+    webCustomers,
+    adminCustomers,
+    withPurchases,
+    withoutPurchases,
+    withEmail,
+    withoutEmail,
+    totalSpent: Number(moneyStats.totalSpent || 0),
+    totalOrders: Number(moneyStats.totalOrders || 0),
+    posOrders: Number(moneyStats.posOrders || 0),
+    webOrders: Number(moneyStats.webOrders || 0),
+    newestCustomer: newestCustomer ? serializeCustomer(newestCustomer) : null,
+  };
 }
 
 function sendError(res, error) {
@@ -175,23 +300,30 @@ router.get('/', requirePermission('customers:view'), async (req, res) => {
     const page = toPositiveInt(req.query.page, 1, 5000);
     const limit = toPositiveInt(req.query.limit, 20, 100);
     const skip = (page - 1) * limit;
-    const { filter, q } = buildCustomerFilter(req.query);
+    const { filter, q, segment } = buildCustomerFilter(req.query);
 
-    const [customers, total] = await Promise.all([
+    const [customers, total, summary] = await Promise.all([
       Customer.find(filter)
         .sort(q ? { fullName: 1 } : { updatedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit),
       Customer.countDocuments(filter),
+      buildCustomersSummary(),
     ]);
 
     return res.json({
       ok: true,
       customers: customers.map(serializeCustomer),
+      summary,
       total,
       page,
       limit,
       pages: Math.max(1, Math.ceil(total / limit)),
+      filters: {
+        segment: segment || 'all',
+        source: cleanLower(req.query.source || 'all') || 'all',
+        status: cleanLower(req.query.status || 'active') || 'active',
+      },
     });
   } catch (error) {
     return sendError(res, error);
