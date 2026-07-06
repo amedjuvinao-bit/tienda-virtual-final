@@ -65,6 +65,28 @@ function resolveMovementConfig(type, direction) {
   };
 }
 
+function assertMovementDoesNotOverdrawCash(session, { amount, type, direction }) {
+  const expectedCash = cleanMoney(session?.expectedCash || 0);
+  const isCashOut = direction === 'out';
+
+  if (!isCashOut) return;
+
+  if (amount > expectedCash) {
+    throw createCashError(
+      'No puedes registrar una salida mayor al efectivo esperado en caja.',
+      'CASH_MOVEMENT_EXCEEDS_EXPECTED_CASH',
+      409,
+      {
+        type,
+        direction,
+        amount,
+        expectedCash,
+        availableCash: expectedCash,
+      }
+    );
+  }
+}
+
 async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {}) {
   const objectId = toObjectId(sessionId);
 
@@ -94,9 +116,12 @@ async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {
     throw createCashError('Debes escribir el motivo del movimiento.', 'CASH_MOVEMENT_REASON_REQUIRED', 400);
   }
 
+  const recalculatedSession = await recalculateCashSession(session);
+  assertMovementDoesNotOverdrawCash(recalculatedSession, { amount, type, direction });
+
   const adminObjectId = toObjectId(admin.id || admin._id || admin.adminUserId);
 
-  session.addCashMovement({
+  recalculatedSession.addCashMovement({
     type,
     amount,
     direction,
@@ -106,8 +131,8 @@ async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {
     createdBySnapshot: buildAdminSnapshot(admin),
   });
 
-  await session.save();
-  return recalculateCashSession(session);
+  await recalculatedSession.save();
+  return recalculateCashSession(recalculatedSession);
 }
 
 module.exports = {
