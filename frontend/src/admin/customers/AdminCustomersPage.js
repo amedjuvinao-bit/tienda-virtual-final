@@ -1,5 +1,5 @@
 // frontend/src/admin/customers/AdminCustomersPage.js
 
-import Page from './AdminCustomersPageEnhanced.jsx';
+import Page from './AdminCustomersPagePro.jsx';
 
 export default Page;
