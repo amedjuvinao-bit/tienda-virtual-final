@@ -1,5 +1,6 @@
 import React from 'react';
+import AdminCustomersPageEditable from './AdminCustomersPageEditable.jsx';
 
 export default function AdminCustomersPageEditView() {
-  return React.createElement('div', null, 'Clientes');
+  return React.createElement(AdminCustomersPageEditable);
 }
