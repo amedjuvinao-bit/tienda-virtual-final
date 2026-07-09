@@ -3,6 +3,7 @@
 import api from '../../lib/api';
 
 const BASE_URL = '/api/admin/customers';
+const FOLLOW_UPS_URL = '/api/admin/customer-follow-ups';
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -85,6 +86,16 @@ export function normalizeCustomerPayload(payload = {}) {
   };
 }
 
+export function normalizeCustomerFollowUpPayload(payload = {}) {
+  return {
+    type: cleanText(payload.type || 'note').toLowerCase(),
+    status: cleanText(payload.status || 'pending').toLowerCase(),
+    note: cleanText(payload.note || payload.message || payload.comment),
+    nextAction: cleanText(payload.nextAction),
+    dueAt: payload.dueAt || null,
+  };
+}
+
 export async function getAdminCustomers(params = {}) {
   const queryString = buildQueryParams({
     q: params.q,
@@ -161,6 +172,81 @@ export async function updateAdminCustomer(customerId, payload) {
   }
 }
 
+export async function getAdminCustomerFollowUps(customerId, params = {}) {
+  const cleanId = cleanText(customerId);
+
+  if (!cleanId) {
+    throw new Error('Debes seleccionar un cliente válido.');
+  }
+
+  const queryString = buildQueryParams({
+    status: params.status || 'all',
+    limit: params.limit || 20,
+  });
+
+  try {
+    const response = await api.get(`${FOLLOW_UPS_URL}/${cleanId}${queryString}`);
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar el seguimiento del cliente.');
+  }
+}
+
+export async function createAdminCustomerFollowUp(customerId, payload) {
+  const cleanId = cleanText(customerId);
+
+  if (!cleanId) {
+    throw new Error('Debes seleccionar un cliente válido.');
+  }
+
+  assertPayload(payload, 'Los datos del seguimiento son obligatorios.');
+
+  try {
+    const response = await api.post(`${FOLLOW_UPS_URL}/${cleanId}`, normalizeCustomerFollowUpPayload(payload));
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible crear el seguimiento del cliente.');
+  }
+}
+
+export async function updateAdminCustomerFollowUp(customerId, followUpId, payload) {
+  const cleanCustomerId = cleanText(customerId);
+  const cleanFollowUpId = cleanText(followUpId);
+
+  if (!cleanCustomerId || !cleanFollowUpId) {
+    throw new Error('Debes seleccionar un seguimiento válido.');
+  }
+
+  assertPayload(payload, 'Los datos del seguimiento son obligatorios.');
+
+  try {
+    const response = await api.put(`${FOLLOW_UPS_URL}/${cleanCustomerId}/${cleanFollowUpId}`, normalizeCustomerFollowUpPayload(payload));
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible actualizar el seguimiento del cliente.');
+  }
+}
+
+export async function deleteAdminCustomerFollowUp(customerId, followUpId) {
+  const cleanCustomerId = cleanText(customerId);
+  const cleanFollowUpId = cleanText(followUpId);
+
+  if (!cleanCustomerId || !cleanFollowUpId) {
+    throw new Error('Debes seleccionar un seguimiento válido.');
+  }
+
+  try {
+    const response = await api.delete(`${FOLLOW_UPS_URL}/${cleanCustomerId}/${cleanFollowUpId}`);
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible eliminar el seguimiento del cliente.');
+  }
+}
+
 export async function createQuickPosCustomer(payload) {
   assertPayload(payload, 'Los datos del cliente son obligatorios.');
 
@@ -177,8 +263,13 @@ const adminCustomersApi = {
   getAdminCustomer,
   createAdminCustomer,
   updateAdminCustomer,
+  getAdminCustomerFollowUps,
+  createAdminCustomerFollowUp,
+  updateAdminCustomerFollowUp,
+  deleteAdminCustomerFollowUp,
   createQuickPosCustomer,
   normalizeCustomerPayload,
+  normalizeCustomerFollowUpPayload,
 };
 
 export default adminCustomersApi;
