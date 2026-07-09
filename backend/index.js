@@ -85,6 +85,7 @@ const adminPosRoutes = tryRequire('./routes/adminPos');
 const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
+const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
@@ -161,6 +162,7 @@ if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
 if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
+if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
@@ -245,7 +247,7 @@ function startInventoryReservationExpirationJob() {
   console.log(
     `Job de expiracion de reservas iniciado cada ${Math.round(
       INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
-    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
+    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_LIMIT}`
   );
 }
 
