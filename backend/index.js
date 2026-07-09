@@ -247,7 +247,7 @@ function startInventoryReservationExpirationJob() {
   console.log(
     `Job de expiracion de reservas iniciado cada ${Math.round(
       INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
-    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_LIMIT}`
+    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
   );
 }
 
