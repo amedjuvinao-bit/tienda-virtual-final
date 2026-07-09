@@ -1,12 +1,6 @@
 import React from 'react';
-import AdminCustomersPageEditable from './AdminCustomersPageEditable.jsx';
-import CustomerFollowUpsVisualPatch from './CustomerFollowUpsVisualPatch.jsx';
+import AdminCustomersPageTabbed from './AdminCustomersPageTabbed.jsx';
 
 export default function AdminCustomersPageEditView() {
-  return React.createElement(
-    React.Fragment,
-    null,
-    React.createElement(CustomerFollowUpsVisualPatch),
-    React.createElement(AdminCustomersPageEditable)
-  );
+  return React.createElement(AdminCustomersPageTabbed);
 }
