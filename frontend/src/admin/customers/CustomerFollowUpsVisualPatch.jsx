@@ -27,13 +27,6 @@ const STATUS_OPTIONS = [
   ['cancelled', 'Cancelado'],
 ];
 
-const QUICK_ACTIONS = [
-  ['whatsapp', 'WhatsApp', 'Seguimiento por chat'],
-  ['call', 'Llamada', 'Contacto telefónico'],
-  ['payment', 'Pago', 'Cobro o abono pendiente'],
-  ['size_request', 'Talla', 'Solicitud de producto'],
-];
-
 function clean(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
@@ -53,10 +46,10 @@ function formatDate(value) {
   return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
-function findCustomerCode(modal) {
-  const text = modal?.textContent || '';
-  const match = text.match(/CLI-[A-Z0-9]+-[A-Z0-9]+/i);
-  return match?.[0]?.toUpperCase() || '';
+function optionsHtml(options, selected) {
+  return options
+    .map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(label)}</option>`)
+    .join('');
 }
 
 function findHeading(text) {
@@ -71,180 +64,126 @@ function findFollowUpPanel() {
   return heading.closest('.rounded-3xl') || heading.parentElement;
 }
 
-function injectModalLayoutStyles() {
-  if (document.getElementById('customer-detail-modal-pro-layout')) return;
-
-  const style = document.createElement('style');
-  style.id = 'customer-detail-modal-pro-layout';
-  style.textContent = `
-    [data-customer-detail-pro="true"]::-webkit-scrollbar,
-    [data-customer-detail-pro="true"] *::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    [data-customer-detail-pro="true"]::-webkit-scrollbar-thumb,
-    [data-customer-detail-pro="true"] *::-webkit-scrollbar-thumb {
-      background: rgba(236,72,153,.28);
-      border-radius: 999px;
-    }
-    [data-customer-detail-pro="true"] input,
-    [data-customer-detail-pro="true"] textarea,
-    [data-customer-detail-pro="true"] select {
-      min-height: 42px;
-    }
-    @media (max-width: 1024px) {
-      [data-customer-detail-pro="true"] [data-pro-info-grid="true"] {
-        grid-template-columns: 1fr !important;
-      }
-      [data-customer-detail-pro="true"] [data-pro-metrics="true"] {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      }
-    }
-    @media (max-width: 640px) {
-      [data-customer-detail-pro="true"] [data-pro-metrics="true"] {
-        grid-template-columns: 1fr !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
+function findCustomerCode(modal) {
+  const text = modal?.textContent || '';
+  const match = text.match(/CLI-[A-Z0-9]+-[A-Z0-9]+/i);
+  return match?.[0]?.toUpperCase() || '';
 }
 
-function getClosestCardFromHeading(text) {
+function isModalOverlay(node) {
+  const classes = String(node?.className || '');
+  return classes.includes('fixed') && classes.includes('inset-0');
+}
+
+function findModalShell(fromNode) {
+  let node = fromNode;
+
+  while (node && node !== document.body) {
+    if (node.tagName === 'SECTION' && isModalOverlay(node.parentElement)) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
+function getCardFromHeading(text) {
   const heading = findHeading(text);
   if (!heading) return null;
   return heading.closest('.rounded-3xl, .overflow-hidden') || heading.parentElement;
 }
 
-function shrinkMetricCards(metricsGrid) {
-  if (!metricsGrid) return;
-
-  metricsGrid.dataset.proMetrics = 'true';
-  metricsGrid.style.display = 'grid';
-  metricsGrid.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
-  metricsGrid.style.gap = '12px';
-  metricsGrid.style.marginBottom = '2px';
-
-  Array.from(metricsGrid.children || []).forEach((card) => {
-    card.style.padding = '14px 16px';
-    card.style.borderRadius = '22px';
-    card.style.minHeight = '104px';
-    card.style.boxShadow = '0 10px 26px rgba(190,24,93,.07)';
-  });
-}
-
-function normalizeModal(panel) {
-  injectModalLayoutStyles();
-
-  const shell = panel?.closest('section');
+function applyStableModalLayout(panel) {
+  const shell = findModalShell(panel);
   if (!shell) return;
-  const overlay = shell.parentElement;
 
+  const overlay = shell.parentElement;
   if (overlay) {
-    overlay.style.alignItems = 'center';
+    overlay.style.alignItems = 'flex-start';
     overlay.style.justifyContent = 'center';
-    overlay.style.overflow = 'hidden';
-    overlay.style.padding = '18px';
-    overlay.style.background = 'rgba(15,23,42,.62)';
+    overlay.style.overflowY = 'auto';
+    overlay.style.padding = '24px 16px';
+    overlay.style.background = 'rgba(15,23,42,.55)';
   }
 
-  shell.dataset.customerDetailPro = 'true';
-  shell.style.width = 'min(1220px, calc(100vw - 44px))';
-  shell.style.maxWidth = '1220px';
-  shell.style.height = 'calc(100vh - 44px)';
-  shell.style.maxHeight = 'calc(100vh - 44px)';
+  shell.style.width = 'min(1180px, calc(100vw - 36px))';
+  shell.style.maxWidth = '1180px';
+  shell.style.maxHeight = 'calc(100vh - 48px)';
+  shell.style.height = 'auto';
   shell.style.display = 'flex';
   shell.style.flexDirection = 'column';
   shell.style.overflow = 'hidden';
-  shell.style.borderRadius = '32px';
-  shell.style.background = 'linear-gradient(145deg,#fff,#fff7fb)';
-  shell.style.boxShadow = '0 28px 90px rgba(15,23,42,.30)';
+  shell.style.borderRadius = '30px';
+  shell.style.background = 'linear-gradient(145deg, #fff, #fff7fb)';
+  shell.style.boxShadow = '0 28px 90px rgba(15,23,42,.26)';
 
   const header = shell.children?.[0];
+  const body = shell.children?.[1];
+
   if (header) {
     header.style.flex = '0 0 auto';
-    header.style.padding = '16px 22px';
-    header.style.background = 'linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,241,247,.86))';
+    header.style.padding = '18px 24px';
+    header.style.background = 'linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,241,247,.88))';
   }
 
-  const content = shell.children?.[1];
-  if (content) {
-    content.style.flex = '1 1 auto';
-    content.style.overflowY = 'auto';
-    content.style.maxHeight = 'none';
-    content.style.padding = '16px 22px 20px';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.gap = '14px';
+  if (body) {
+    body.style.flex = '1 1 auto';
+    body.style.overflowY = 'auto';
+    body.style.maxHeight = 'calc(100vh - 178px)';
+    body.style.padding = '18px 24px 22px';
   }
 
   const metricHeading = Array.from(shell.querySelectorAll('p'))
     .find((item) => clean(item.textContent).toLowerCase() === 'compras');
   const metricsGrid = metricHeading?.closest('.grid');
-  shrinkMetricCards(metricsGrid);
+  if (metricsGrid) {
+    metricsGrid.style.gap = '12px';
+  }
 
-  const dataCard = getClosestCardFromHeading('Datos del cliente');
-  const followCard = getClosestCardFromHeading('Seguimiento interno');
-  const infoGrid = dataCard?.parentElement;
+  Array.from(metricsGrid?.children || []).forEach((card) => {
+    card.style.padding = '14px 16px';
+    card.style.borderRadius = '22px';
+    card.style.minHeight = '108px';
+  });
 
-  if (infoGrid && followCard && infoGrid.contains(followCard)) {
-    infoGrid.dataset.proInfoGrid = 'true';
-    infoGrid.style.display = 'grid';
-    infoGrid.style.gridTemplateColumns = 'minmax(280px, .78fr) minmax(0, 1.22fr)';
-    infoGrid.style.gap = '14px';
-    infoGrid.style.alignItems = 'start';
+  const dataCard = getCardFromHeading('Datos del cliente');
+  const followCard = getCardFromHeading('Seguimiento interno');
+  const grid = dataCard?.parentElement;
+
+  if (grid && followCard && grid.contains(followCard)) {
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'minmax(300px,.85fr) minmax(0,1.15fr)';
+    grid.style.alignItems = 'start';
+    grid.style.gap = '16px';
   }
 
   [dataCard, followCard].forEach((card) => {
     if (!card) return;
-    card.style.alignSelf = 'start';
     card.style.padding = '18px';
     card.style.borderRadius = '24px';
-    card.style.boxShadow = '0 12px 30px rgba(190,24,93,.06)';
+    card.style.alignSelf = 'start';
+    card.style.minHeight = 'auto';
   });
 
-  const oldNote = followCard?.querySelector('p.mt-4.rounded-2xl');
-  if (oldNote) {
-    oldNote.style.marginTop = '12px';
-    oldNote.style.padding = '12px';
-    oldNote.style.fontSize = '12px';
-    oldNote.style.lineHeight = '1.45';
-  }
-
-  const ordersCard = getClosestCardFromHeading('Historial reciente de compras');
+  const ordersCard = getCardFromHeading('Historial reciente de compras');
   if (ordersCard) {
     ordersCard.style.borderRadius = '24px';
-    ordersCard.style.display = 'flex';
-    ordersCard.style.flexDirection = 'column';
-    ordersCard.style.maxHeight = '250px';
-    ordersCard.style.minHeight = '150px';
-    ordersCard.style.boxShadow = '0 12px 30px rgba(190,24,93,.06)';
-
-    const ordersList = ordersCard.querySelector('.divide-y');
-    if (ordersList) {
-      ordersList.style.overflowY = 'auto';
-      ordersList.style.maxHeight = '196px';
-    }
+    ordersCard.style.maxHeight = '260px';
+    ordersCard.style.overflow = 'hidden';
   }
 
-  const editForm = shell.querySelector('form.rounded-3xl');
-  if (editForm) {
-    editForm.style.maxHeight = '430px';
-    editForm.style.overflowY = 'auto';
-    editForm.style.borderRadius = '24px';
-    editForm.style.padding = '18px';
+  const ordersList = ordersCard?.querySelector('.divide-y');
+  if (ordersList) {
+    ordersList.style.maxHeight = '200px';
+    ordersList.style.overflowY = 'auto';
   }
 }
 
-function getStatusTone(status) {
+function statusTone(status) {
   if (status === 'done') return { bg: '#ecfdf5', text: '#047857', border: '#bbf7d0' };
   if (status === 'cancelled') return { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0' };
   return { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' };
-}
-
-function optionsHtml(options, selected) {
-  return options
-    .map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(label)}</option>`)
-    .join('');
 }
 
 async function resolveCustomerByCode(customerCode) {
@@ -255,34 +194,34 @@ async function resolveCustomerByCode(customerCode) {
 
 function renderLoading(container) {
   container.innerHTML = `
-    <div class="mt-4 rounded-2xl border p-4 text-sm font-bold" style="border-color: rgba(236,72,153,0.18); background: #fff; color: var(--admin-card-muted-text);">
-      Cargando gestión comercial...
+    <div class="mt-3 rounded-2xl border p-4 text-xs font-bold" style="border-color: rgba(236,72,153,.16); background: #fff; color: var(--admin-card-muted-text);">
+      Cargando seguimiento comercial...
     </div>
   `;
 }
 
 function renderError(container, message) {
   container.innerHTML = `
-    <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+    <div class="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-700">
       ${escapeHtml(message || 'No fue posible cargar el seguimiento del cliente.')}
     </div>
   `;
 }
 
-function renderHistory(rows = []) {
-  if (rows.length === 0) {
+function renderHistory(rows) {
+  if (!rows.length) {
     return `
-      <div class="rounded-2xl border p-4 text-xs font-bold" style="border-color: rgba(236,72,153,0.16); background: #fff; color: var(--admin-card-muted-text);">
-        Sin gestiones registradas. Usa el botón “Nueva gestión” para guardar una nota, llamada o WhatsApp.
+      <div class="rounded-2xl border p-4 text-xs font-bold" style="border-color: rgba(236,72,153,.14); background: #fff; color: var(--admin-card-muted-text);">
+        Sin gestiones registradas.
       </div>
     `;
   }
 
   return rows.map((item) => {
-    const tone = getStatusTone(item.status);
+    const tone = statusTone(item.status);
     return `
-      <article class="rounded-2xl border px-4 py-3" style="border-color: rgba(236,72,153,0.16); background: #fff;">
-        <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+      <article class="rounded-2xl border px-4 py-3" style="border-color: rgba(236,72,153,.14); background: #fff;">
+        <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
             <div class="flex flex-wrap gap-2">
               <span class="rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style="border-color: #f9a8d4; background: #fdf2f8; color: #be185d;">${escapeHtml(item.typeLabel || item.type || 'Nota')}</span>
@@ -308,47 +247,36 @@ function renderFollowUps(container, customer, followUps, feedback = '') {
   const last = rows[0] || null;
 
   container.innerHTML = `
-    <div class="mt-4 border-t pt-4" style="border-color: rgba(236,72,153,0.14);">
-      <section class="rounded-[22px] border p-4" style="border-color: rgba(236,72,153,0.16); background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,247,251,0.88)); box-shadow: 0 10px 24px rgba(190,24,93,.05);">
+    <div class="mt-4 border-t pt-4" style="border-color: rgba(236,72,153,.14);">
+      <section class="rounded-[22px] border p-4" style="border-color: rgba(236,72,153,.16); background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(255,247,251,.88));">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p class="text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Gestión CRM</p>
-            <h4 class="mt-1 text-sm font-black" style="color: var(--admin-card-text);">Seguimiento comercial</h4>
-            <p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Notas, tareas y contactos del cliente.</p>
+            <p class="text-[11px] font-black uppercase tracking-[.16em]" style="color: var(--admin-card-muted-text);">Gestión comercial</p>
+            <h4 class="mt-1 text-sm font-black" style="color: var(--admin-card-text);">Seguimiento del cliente</h4>
+            <p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Notas, tareas, cobros y contactos.</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <span class="rounded-2xl border px-3 py-2 text-[10px] font-black uppercase" style="border-color: #fed7aa; background: #fff7ed; color: #c2410c;">${pending} pendiente(s)</span>
             <span class="rounded-2xl border px-3 py-2 text-[10px] font-black uppercase" style="border-color: #fbcfe8; background: #fdf2f8; color: #be185d;">${rows.length} gestión(es)</span>
-            <button type="button" data-followup-open-dialog="note" class="rounded-2xl px-4 py-2 text-xs font-black text-white" style="background: var(--admin-primary); box-shadow: 0 12px 24px rgba(236,72,153,0.18);">+ Nueva gestión</button>
+            <button type="button" data-followup-open-dialog="note" class="rounded-2xl px-4 py-2 text-xs font-black text-white" style="background: var(--admin-primary);">+ Nueva gestión</button>
           </div>
         </div>
 
         ${feedback ? `<div class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-black text-emerald-700">${escapeHtml(feedback)}</div>` : ''}
 
-        <div class="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_170px]">
-          <div class="rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.14); background: #fff;">
-            <p class="text-[10px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Última gestión</p>
-            ${last ? `
-              <p class="mt-2 text-xs font-black leading-relaxed" style="color: var(--admin-card-text);">${escapeHtml(last.note)}</p>
-              <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(last.typeLabel || last.type)} · ${escapeHtml(last.statusLabel || last.status)} · ${escapeHtml(formatDate(last.createdAt))}</p>
-            ` : `
-              <p class="mt-2 text-xs font-black" style="color: var(--admin-card-text);">Sin gestión registrada</p>
-              <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">Crea una nota cuando exista una acción comercial real.</p>
-            `}
-          </div>
-          <div class="grid grid-cols-2 gap-2 xl:grid-cols-1">
-            ${QUICK_ACTIONS.map(([type, label, helper]) => `
-              <button type="button" data-followup-open-dialog="${escapeHtml(type)}" class="rounded-2xl border p-2.5 text-left transition" style="border-color: rgba(236,72,153,0.16); background: #fff; color: var(--admin-card-text);">
-                <span class="block text-[11px] font-black">${escapeHtml(label)}</span>
-                <span class="mt-0.5 block text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(helper)}</span>
-              </button>
-            `).join('')}
-          </div>
+        <div class="mt-4 rounded-2xl border p-3" style="border-color: rgba(236,72,153,.14); background: #fff;">
+          <p class="text-[10px] font-black uppercase tracking-[.16em]" style="color: var(--admin-card-muted-text);">Última gestión</p>
+          ${last ? `
+            <p class="mt-2 text-xs font-black leading-relaxed" style="color: var(--admin-card-text);">${escapeHtml(last.note)}</p>
+            <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(last.typeLabel || last.type)} · ${escapeHtml(last.statusLabel || last.status)} · ${escapeHtml(formatDate(last.createdAt))}</p>
+          ` : `
+            <p class="mt-2 text-xs font-black" style="color: var(--admin-card-text);">Sin gestión registrada</p>
+          `}
         </div>
 
-        <details class="mt-3 rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.14); background: rgba(255,255,255,0.72);">
-          <summary class="cursor-pointer text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-primary);">Ver historial de seguimiento</summary>
-          <div class="mt-3 max-h-[210px] space-y-2 overflow-y-auto pr-1" data-customer-followup-list="true">
+        <details class="mt-3 rounded-2xl border p-3" style="border-color: rgba(236,72,153,.14); background: rgba(255,255,255,.72);">
+          <summary class="cursor-pointer text-[11px] font-black uppercase tracking-[.16em]" style="color: var(--admin-primary);">Ver historial</summary>
+          <div class="mt-3 max-h-[210px] space-y-2 overflow-y-auto pr-1">
             ${renderHistory(rows)}
           </div>
         </details>
@@ -359,13 +287,11 @@ function renderFollowUps(container, customer, followUps, feedback = '') {
   container.dataset.customerId = customer.id;
   container.dataset.customerCode = customer.customerCode || '';
   container._followUps = rows;
-
-  window.requestAnimationFrame(() => normalizeModal(container.closest('.rounded-3xl') || container));
+  window.requestAnimationFrame(() => applyStableModalLayout(container));
 }
 
 function openFollowUpDialog(root, type = 'note') {
-  const previous = document.querySelector('[data-followup-dialog="true"]');
-  if (previous) previous.remove();
+  document.querySelector('[data-followup-dialog="true"]')?.remove();
 
   const overlay = document.createElement('div');
   overlay.dataset.followupDialog = 'true';
@@ -373,45 +299,26 @@ function openFollowUpDialog(root, type = 'note') {
   overlay.dataset.customerCode = root.dataset.customerCode || '';
   overlay.className = 'fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm';
   overlay.innerHTML = `
-    <section class="w-full max-w-2xl overflow-hidden rounded-[30px] border" style="border-color: rgba(236,72,153,0.28); background: linear-gradient(145deg, #fff, #fff7fb); box-shadow: 0 30px 90px rgba(15,23,42,0.24);">
-      <div class="flex items-start justify-between gap-4 border-b p-5" style="border-color: rgba(236,72,153,0.18);">
+    <section class="w-full max-w-2xl overflow-hidden rounded-[30px] border" style="border-color: rgba(236,72,153,.28); background: linear-gradient(145deg,#fff,#fff7fb); box-shadow: 0 30px 90px rgba(15,23,42,.24);">
+      <div class="flex items-start justify-between gap-4 border-b p-5" style="border-color: rgba(236,72,153,.18);">
         <div>
-          <p class="text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-primary);">Nueva gestión comercial</p>
+          <p class="text-xs font-black uppercase tracking-[.18em]" style="color: var(--admin-primary);">Nueva gestión comercial</p>
           <h3 class="mt-1 text-xl font-black" style="color: var(--admin-card-text);">Registrar seguimiento</h3>
-          <p class="mt-1 text-sm font-bold" style="color: var(--admin-card-muted-text);">Guarda solo información útil para vender, cobrar o contactar al cliente.</p>
+          <p class="mt-1 text-sm font-bold" style="color: var(--admin-card-muted-text);">Guarda información útil para vender, cobrar o contactar.</p>
         </div>
-        <button type="button" data-followup-close-dialog="true" class="rounded-2xl border px-4 py-3 text-xs font-black" style="border-color: rgba(236,72,153,0.22); background: #fff; color: var(--admin-card-text);">Cerrar</button>
+        <button type="button" data-followup-close-dialog="true" class="rounded-2xl border px-4 py-3 text-xs font-black" style="border-color: rgba(236,72,153,.22); background:#fff; color: var(--admin-card-text);">Cerrar</button>
       </div>
       <form data-customer-followup-modal-form="true" class="space-y-4 p-5">
         <div class="grid gap-4 md:grid-cols-3">
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Tipo</span>
-            <select name="type" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);">
-              ${optionsHtml(TYPE_OPTIONS, type)}
-            </select>
-          </label>
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Estado</span>
-            <select name="status" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);">
-              ${optionsHtml(STATUS_OPTIONS, 'pending')}
-            </select>
-          </label>
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Fecha</span>
-            <input type="datetime-local" name="dueAt" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" />
-          </label>
+          <label class="block"><span class="mb-2 block text-[11px] font-black uppercase tracking-[.14em]" style="color: var(--admin-card-muted-text);">Tipo</span><select name="type" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,.28); background:#fff; color: var(--admin-card-text);">${optionsHtml(TYPE_OPTIONS, type)}</select></label>
+          <label class="block"><span class="mb-2 block text-[11px] font-black uppercase tracking-[.14em]" style="color: var(--admin-card-muted-text);">Estado</span><select name="status" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,.28); background:#fff; color: var(--admin-card-text);">${optionsHtml(STATUS_OPTIONS, 'pending')}</select></label>
+          <label class="block"><span class="mb-2 block text-[11px] font-black uppercase tracking-[.14em]" style="color: var(--admin-card-muted-text);">Fecha</span><input type="datetime-local" name="dueAt" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,.28); background:#fff; color: var(--admin-card-text);" /></label>
         </div>
-        <label class="block">
-          <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Nota clara</span>
-          <textarea name="note" class="min-h-[110px] w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" placeholder="Ej: Cliente pidió talla 6. Confirmar disponibilidad mañana por WhatsApp."></textarea>
-        </label>
-        <label class="block">
-          <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Próxima acción</span>
-          <input name="nextAction" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" placeholder="Ej: escribir por WhatsApp mañana" />
-        </label>
+        <label class="block"><span class="mb-2 block text-[11px] font-black uppercase tracking-[.14em]" style="color: var(--admin-card-muted-text);">Nota clara</span><textarea name="note" class="min-h-[110px] w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,.28); background:#fff; color: var(--admin-card-text);" placeholder="Ej: Cliente pidió talla 6. Confirmar disponibilidad mañana por WhatsApp."></textarea></label>
+        <label class="block"><span class="mb-2 block text-[11px] font-black uppercase tracking-[.14em]" style="color: var(--admin-card-muted-text);">Próxima acción</span><input name="nextAction" class="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style="border-color: rgba(236,72,153,.28); background:#fff; color: var(--admin-card-text);" placeholder="Ej: escribir por WhatsApp mañana" /></label>
         <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-          <button type="button" data-followup-close-dialog="true" class="rounded-2xl border px-5 py-3 text-sm font-black" style="border-color: rgba(236,72,153,0.22); background: #fff; color: var(--admin-card-text);">Cancelar</button>
-          <button type="submit" class="rounded-2xl px-5 py-3 text-sm font-black text-white" style="background: var(--admin-primary); box-shadow: 0 16px 30px rgba(236,72,153,0.24);">Guardar gestión</button>
+          <button type="button" data-followup-close-dialog="true" class="rounded-2xl border px-5 py-3 text-sm font-black" style="border-color: rgba(236,72,153,.22); background:#fff; color: var(--admin-card-text);">Cancelar</button>
+          <button type="submit" class="rounded-2xl px-5 py-3 text-sm font-black text-white" style="background: var(--admin-primary);">Guardar gestión</button>
         </div>
       </form>
     </section>
@@ -443,15 +350,15 @@ export default function CustomerFollowUpsVisualPatch() {
 
       const panel = findFollowUpPanel();
       if (!panel) return;
-      normalizeModal(panel);
+      applyStableModalLayout(panel);
 
-      const modal = panel.closest('section') || panel.parentElement;
-      const customerCode = findCustomerCode(modal);
+      const modalShell = findModalShell(panel);
+      const customerCode = findCustomerCode(modalShell || panel);
       if (!customerCode) return;
 
       const current = panel.querySelector('[data-customer-followups-root="true"]');
       if (current?.dataset?.customerCode === customerCode) {
-        normalizeModal(panel);
+        applyStableModalLayout(panel);
         return;
       }
       if (current) current.remove();
@@ -466,7 +373,7 @@ export default function CustomerFollowUpsVisualPatch() {
       } catch (error) {
         renderError(container, error?.message || 'No fue posible cargar el seguimiento del cliente.');
       } finally {
-        normalizeModal(panel);
+        applyStableModalLayout(panel);
       }
     };
 
