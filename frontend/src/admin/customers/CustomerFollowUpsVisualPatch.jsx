@@ -43,7 +43,7 @@ function escapeHtml(value) {
 function formatDate(value) {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return 'Sin fecha';
-  return date.toLocaleString('es-CO', { hour12: false });
+  return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
 function findCustomerCode(modal) {
@@ -56,8 +56,24 @@ function findFollowUpPanel() {
   const headings = Array.from(document.querySelectorAll('h3'));
   const heading = headings.find((item) => clean(item.textContent).toLowerCase() === 'seguimiento interno');
   if (!heading) return null;
-
   return heading.closest('.rounded-3xl') || heading.parentElement;
+}
+
+function normalizeModal(panel) {
+  const shell = panel?.closest('section');
+  if (!shell) return;
+
+  shell.style.maxHeight = 'calc(100vh - 56px)';
+  shell.style.display = 'flex';
+  shell.style.flexDirection = 'column';
+  shell.style.overflow = 'hidden';
+
+  const content = shell.children?.[1];
+  if (content) {
+    content.style.overflowY = 'auto';
+    content.style.maxHeight = 'calc(100vh - 178px)';
+    content.style.paddingBottom = '22px';
+  }
 }
 
 function getStatusTone(status) {
@@ -81,7 +97,7 @@ async function resolveCustomerByCode(customerCode) {
 function renderLoading(container) {
   container.innerHTML = `
     <div class="mt-4 rounded-2xl border p-4 text-sm font-bold" style="border-color: rgba(236,72,153,0.18); background: #fff; color: var(--admin-card-muted-text);">
-      Cargando seguimiento del cliente...
+      Cargando gestión comercial...
     </div>
   `;
 }
@@ -94,81 +110,112 @@ function renderError(container, message) {
   `;
 }
 
+function renderCompactForm(formOpen) {
+  if (!formOpen) return '';
+
+  return `
+    <form data-customer-followup-form="true" class="mt-4 rounded-[24px] border p-4" style="border-color: rgba(236,72,153,0.18); background: linear-gradient(135deg, #fff, #fff7fb);">
+      <div class="grid gap-3 md:grid-cols-[150px_150px_1fr]">
+        <label class="block">
+          <span class="mb-2 block text-[10px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Tipo</span>
+          <select name="type" class="w-full rounded-2xl border px-3 py-2.5 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);">
+            ${optionsHtml(TYPE_OPTIONS, 'whatsapp')}
+          </select>
+        </label>
+        <label class="block">
+          <span class="mb-2 block text-[10px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Estado</span>
+          <select name="status" class="w-full rounded-2xl border px-3 py-2.5 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);">
+            ${optionsHtml(STATUS_OPTIONS, 'pending')}
+          </select>
+        </label>
+        <label class="block">
+          <span class="mb-2 block text-[10px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Próxima acción</span>
+          <input name="nextAction" class="w-full rounded-2xl border px-3 py-2.5 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" placeholder="Ej: escribir por WhatsApp mañana" />
+        </label>
+      </div>
+      <div class="mt-3 grid gap-3 md:grid-cols-[1fr_190px_auto] md:items-end">
+        <label class="block">
+          <span class="mb-2 block text-[10px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Nota de seguimiento</span>
+          <textarea name="note" class="min-h-[58px] w-full resize-none rounded-2xl border px-3 py-2.5 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" placeholder="Ej: Cliente pidió confirmar disponibilidad de talla 6"></textarea>
+        </label>
+        <label class="block">
+          <span class="mb-2 block text-[10px] font-black uppercase tracking-[0.14em]" style="color: var(--admin-card-muted-text);">Fecha</span>
+          <input type="datetime-local" name="dueAt" class="w-full rounded-2xl border px-3 py-2.5 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: #fff; color: var(--admin-card-text);" />
+        </label>
+        <button type="submit" class="inline-flex min-h-[42px] justify-center rounded-2xl px-4 py-3 text-xs font-black text-white" style="background: var(--admin-primary);">Guardar</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderHistory(rows = []) {
+  if (rows.length === 0) {
+    return `
+      <div class="rounded-2xl border p-4 text-xs font-bold" style="border-color: rgba(236,72,153,0.16); background: #fff; color: var(--admin-card-muted-text);">
+        Sin gestiones registradas. Usa “Nueva gestión” para guardar la primera nota.
+      </div>
+    `;
+  }
+
+  return rows.map((item) => {
+    const tone = getStatusTone(item.status);
+    return `
+      <article class="rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.16); background: #fff;">
+        <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap gap-2">
+              <span class="rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style="border-color: #f9a8d4; background: #fdf2f8; color: #be185d;">${escapeHtml(item.typeLabel || item.type || 'Nota')}</span>
+              <span class="rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style="border-color: ${tone.border}; background: ${tone.bg}; color: ${tone.text};">${escapeHtml(item.statusLabel || item.status || 'Pendiente')}</span>
+            </div>
+            <p class="mt-2 text-xs font-black leading-relaxed" style="color: var(--admin-card-text);">${escapeHtml(item.note)}</p>
+            ${item.nextAction ? `<p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Próxima acción: ${escapeHtml(item.nextAction)}</p>` : ''}
+            <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(formatDate(item.createdAt))}${item.dueAt ? ` · Programado: ${escapeHtml(formatDate(item.dueAt))}` : ''}</p>
+          </div>
+          <div class="flex shrink-0 flex-wrap gap-2">
+            ${item.status !== 'done' ? `<button type="button" data-followup-done="${escapeHtml(item.id)}" class="rounded-xl border px-3 py-2 text-[10px] font-black" style="border-color: #bbf7d0; background: #ecfdf5; color: #047857;">Realizado</button>` : ''}
+            <button type="button" data-followup-delete="${escapeHtml(item.id)}" class="rounded-xl border px-3 py-2 text-[10px] font-black" style="border-color: #fecaca; background: #fef2f2; color: #b91c1c;">Eliminar</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
 function renderFollowUps(container, customer, followUps, feedback = '') {
   const rows = Array.isArray(followUps) ? followUps : [];
+  const pending = rows.filter((item) => item.status !== 'done' && item.status !== 'cancelled').length;
+  const formOpen = container.dataset.formOpen === 'true';
 
   container.innerHTML = `
     <div class="mt-5 border-t pt-4" style="border-color: rgba(236,72,153,0.16);">
-      <div class="mb-3">
-        <p class="text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-card-muted-text);">Nuevo seguimiento</p>
-        <p class="mt-1 text-xs font-bold" style="color: var(--admin-card-muted-text);">Registra llamadas, WhatsApp, pagos pendientes, tallas o recordatorios.</p>
-      </div>
-
-      ${feedback ? `<div class="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-black text-emerald-700">${escapeHtml(feedback)}</div>` : ''}
-
-      <form data-customer-followup-form="true" class="space-y-3">
-        <div class="grid gap-3 md:grid-cols-2">
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Tipo</span>
-            <select name="type" class="w-full rounded-2xl border px-4 py-3 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: rgba(255,255,255,0.9); color: var(--admin-card-text);">
-              ${optionsHtml(TYPE_OPTIONS, 'whatsapp')}
-            </select>
-          </label>
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Estado</span>
-            <select name="status" class="w-full rounded-2xl border px-4 py-3 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: rgba(255,255,255,0.9); color: var(--admin-card-text);">
-              ${optionsHtml(STATUS_OPTIONS, 'pending')}
-            </select>
-          </label>
+      <section class="rounded-[26px] border p-4" style="border-color: rgba(236,72,153,0.18); background: rgba(255,255,255,0.72);">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-card-muted-text);">Gestión comercial</p>
+            <h4 class="mt-1 text-base font-black" style="color: var(--admin-card-text);">Notas y tareas del cliente</h4>
+            <p class="mt-1 text-xs font-bold" style="color: var(--admin-card-muted-text);">Registra solo acciones útiles: WhatsApp, llamada, talla, pago o recordatorio.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="rounded-2xl border px-3 py-2 text-[11px] font-black uppercase" style="border-color: #fed7aa; background: #fff7ed; color: #c2410c;">${pending} pendiente(s)</span>
+            <span class="rounded-2xl border px-3 py-2 text-[11px] font-black uppercase" style="border-color: #fbcfe8; background: #fdf2f8; color: #be185d;">${rows.length} gestión(es)</span>
+            <button type="button" data-followup-toggle-form="true" class="rounded-2xl px-4 py-2 text-xs font-black text-white" style="background: var(--admin-primary);">${formOpen ? 'Ocultar formulario' : '+ Nueva gestión'}</button>
+          </div>
         </div>
-        <label class="block">
-          <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Nota</span>
-          <textarea name="note" class="min-h-[80px] w-full resize-none rounded-2xl border px-4 py-3 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: rgba(255,255,255,0.9); color: var(--admin-card-text);" placeholder="Ej: Cliente pidió confirmar disponibilidad de talla 6"></textarea>
-        </label>
-        <div class="grid gap-3 md:grid-cols-[1fr_190px_auto] md:items-end">
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Próxima acción</span>
-            <input name="nextAction" class="w-full rounded-2xl border px-4 py-3 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: rgba(255,255,255,0.9); color: var(--admin-card-text);" placeholder="Ej: escribir por WhatsApp mañana" />
-          </label>
-          <label class="block">
-            <span class="mb-2 block text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Fecha</span>
-            <input type="datetime-local" name="dueAt" class="w-full rounded-2xl border px-4 py-3 text-xs font-bold outline-none" style="border-color: rgba(236,72,153,0.28); background: rgba(255,255,255,0.9); color: var(--admin-card-text);" />
-          </label>
-          <button type="submit" class="inline-flex justify-center rounded-2xl px-4 py-3 text-xs font-black text-white" style="background: var(--admin-primary);">Guardar seguimiento</button>
-        </div>
-      </form>
 
-      <div class="mt-5">
-        <p class="mb-3 text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-card-muted-text);">Historial de seguimiento</p>
-        <div class="space-y-3" data-customer-followup-list="true">
-          ${rows.length === 0 ? `
-            <div class="rounded-2xl border p-4 text-xs font-bold" style="border-color: rgba(236,72,153,0.16); background: #fff; color: var(--admin-card-muted-text);">
-              Este cliente todavía no tiene seguimientos registrados.
-            </div>
-          ` : rows.map((item) => {
-            const tone = getStatusTone(item.status);
-            return `
-              <article class="rounded-2xl border p-4" style="border-color: rgba(236,72,153,0.16); background: #fff;">
-                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap gap-2">
-                      <span class="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style="border-color: #f9a8d4; background: #fdf2f8; color: #be185d;">${escapeHtml(item.typeLabel || item.type || 'Nota')}</span>
-                      <span class="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style="border-color: ${tone.border}; background: ${tone.bg}; color: ${tone.text};">${escapeHtml(item.statusLabel || item.status || 'Pendiente')}</span>
-                    </div>
-                    <p class="mt-3 text-sm font-black" style="color: var(--admin-card-text);">${escapeHtml(item.note)}</p>
-                    ${item.nextAction ? `<p class="mt-2 text-xs font-bold" style="color: var(--admin-card-muted-text);">Próxima acción: ${escapeHtml(item.nextAction)}</p>` : ''}
-                    <p class="mt-2 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Creado: ${escapeHtml(formatDate(item.createdAt))}${item.dueAt ? ` · Fecha: ${escapeHtml(formatDate(item.dueAt))}` : ''}</p>
-                  </div>
-                  <div class="flex shrink-0 flex-wrap gap-2">
-                    ${item.status !== 'done' ? `<button type="button" data-followup-done="${escapeHtml(item.id)}" class="rounded-xl border px-3 py-2 text-[11px] font-black" style="border-color: #bbf7d0; background: #ecfdf5; color: #047857;">Realizado</button>` : ''}
-                    <button type="button" data-followup-delete="${escapeHtml(item.id)}" class="rounded-xl border px-3 py-2 text-[11px] font-black" style="border-color: #fecaca; background: #fef2f2; color: #b91c1c;">Eliminar</button>
-                  </div>
-                </div>
-              </article>
-            `;
-          }).join('')}
+        ${feedback ? `<div class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-black text-emerald-700">${escapeHtml(feedback)}</div>` : ''}
+
+        ${renderCompactForm(formOpen)}
+
+        <div class="mt-4">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <p class="text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-card-muted-text);">Historial</p>
+            <p class="text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Últimas gestiones</p>
+          </div>
+          <div class="max-h-[260px] space-y-2 overflow-y-auto pr-1" data-customer-followup-list="true">
+            ${renderHistory(rows)}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   `;
 
@@ -199,6 +246,7 @@ export default function CustomerFollowUpsVisualPatch() {
 
       const panel = findFollowUpPanel();
       if (!panel) return;
+      normalizeModal(panel);
 
       const modal = panel.closest('section') || panel.parentElement;
       const customerCode = findCustomerCode(modal);
@@ -246,6 +294,7 @@ export default function CustomerFollowUpsVisualPatch() {
       try {
         renderLoading(root);
         await createAdminCustomerFollowUp(customerId, payload);
+        root.dataset.formOpen = 'false';
         const response = await getAdminCustomerFollowUps(customerId, { status: 'all', limit: 20 });
         renderFollowUps(root, { id: customerId, customerCode }, response?.followUps || [], 'Seguimiento guardado correctamente.');
       } catch (error) {
@@ -254,6 +303,15 @@ export default function CustomerFollowUpsVisualPatch() {
     };
 
     const onClick = async (event) => {
+      const toggleButton = event.target?.closest?.('[data-followup-toggle-form]');
+      if (toggleButton) {
+        const root = toggleButton.closest('[data-customer-followups-root="true"]');
+        if (!root) return;
+        root.dataset.formOpen = root.dataset.formOpen === 'true' ? 'false' : 'true';
+        renderFollowUps(root, { id: root.dataset.customerId, customerCode: root.dataset.customerCode }, root._followUps || []);
+        return;
+      }
+
       const doneButton = event.target?.closest?.('[data-followup-done]');
       const deleteButton = event.target?.closest?.('[data-followup-delete]');
       if (!doneButton && !deleteButton) return;
