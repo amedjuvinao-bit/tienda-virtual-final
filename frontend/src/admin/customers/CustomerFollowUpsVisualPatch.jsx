@@ -59,27 +59,179 @@ function findCustomerCode(modal) {
   return match?.[0]?.toUpperCase() || '';
 }
 
+function findHeading(text) {
+  const target = clean(text).toLowerCase();
+  return Array.from(document.querySelectorAll('h3'))
+    .find((item) => clean(item.textContent).toLowerCase() === target);
+}
+
 function findFollowUpPanel() {
-  const headings = Array.from(document.querySelectorAll('h3'));
-  const heading = headings.find((item) => clean(item.textContent).toLowerCase() === 'seguimiento interno');
+  const heading = findHeading('seguimiento interno');
   if (!heading) return null;
   return heading.closest('.rounded-3xl') || heading.parentElement;
 }
 
+function injectModalLayoutStyles() {
+  if (document.getElementById('customer-detail-modal-pro-layout')) return;
+
+  const style = document.createElement('style');
+  style.id = 'customer-detail-modal-pro-layout';
+  style.textContent = `
+    [data-customer-detail-pro="true"]::-webkit-scrollbar,
+    [data-customer-detail-pro="true"] *::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    [data-customer-detail-pro="true"]::-webkit-scrollbar-thumb,
+    [data-customer-detail-pro="true"] *::-webkit-scrollbar-thumb {
+      background: rgba(236,72,153,.28);
+      border-radius: 999px;
+    }
+    [data-customer-detail-pro="true"] input,
+    [data-customer-detail-pro="true"] textarea,
+    [data-customer-detail-pro="true"] select {
+      min-height: 42px;
+    }
+    @media (max-width: 1024px) {
+      [data-customer-detail-pro="true"] [data-pro-info-grid="true"] {
+        grid-template-columns: 1fr !important;
+      }
+      [data-customer-detail-pro="true"] [data-pro-metrics="true"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+    }
+    @media (max-width: 640px) {
+      [data-customer-detail-pro="true"] [data-pro-metrics="true"] {
+        grid-template-columns: 1fr !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function getClosestCardFromHeading(text) {
+  const heading = findHeading(text);
+  if (!heading) return null;
+  return heading.closest('.rounded-3xl, .overflow-hidden') || heading.parentElement;
+}
+
+function shrinkMetricCards(metricsGrid) {
+  if (!metricsGrid) return;
+
+  metricsGrid.dataset.proMetrics = 'true';
+  metricsGrid.style.display = 'grid';
+  metricsGrid.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+  metricsGrid.style.gap = '12px';
+  metricsGrid.style.marginBottom = '2px';
+
+  Array.from(metricsGrid.children || []).forEach((card) => {
+    card.style.padding = '14px 16px';
+    card.style.borderRadius = '22px';
+    card.style.minHeight = '104px';
+    card.style.boxShadow = '0 10px 26px rgba(190,24,93,.07)';
+  });
+}
+
 function normalizeModal(panel) {
+  injectModalLayoutStyles();
+
   const shell = panel?.closest('section');
   if (!shell) return;
+  const overlay = shell.parentElement;
 
-  shell.style.maxHeight = 'calc(100vh - 56px)';
+  if (overlay) {
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.overflow = 'hidden';
+    overlay.style.padding = '18px';
+    overlay.style.background = 'rgba(15,23,42,.62)';
+  }
+
+  shell.dataset.customerDetailPro = 'true';
+  shell.style.width = 'min(1220px, calc(100vw - 44px))';
+  shell.style.maxWidth = '1220px';
+  shell.style.height = 'calc(100vh - 44px)';
+  shell.style.maxHeight = 'calc(100vh - 44px)';
   shell.style.display = 'flex';
   shell.style.flexDirection = 'column';
   shell.style.overflow = 'hidden';
+  shell.style.borderRadius = '32px';
+  shell.style.background = 'linear-gradient(145deg,#fff,#fff7fb)';
+  shell.style.boxShadow = '0 28px 90px rgba(15,23,42,.30)';
+
+  const header = shell.children?.[0];
+  if (header) {
+    header.style.flex = '0 0 auto';
+    header.style.padding = '16px 22px';
+    header.style.background = 'linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,241,247,.86))';
+  }
 
   const content = shell.children?.[1];
   if (content) {
+    content.style.flex = '1 1 auto';
     content.style.overflowY = 'auto';
-    content.style.maxHeight = 'calc(100vh - 178px)';
-    content.style.paddingBottom = '22px';
+    content.style.maxHeight = 'none';
+    content.style.padding = '16px 22px 20px';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.style.gap = '14px';
+  }
+
+  const metricHeading = Array.from(shell.querySelectorAll('p'))
+    .find((item) => clean(item.textContent).toLowerCase() === 'compras');
+  const metricsGrid = metricHeading?.closest('.grid');
+  shrinkMetricCards(metricsGrid);
+
+  const dataCard = getClosestCardFromHeading('Datos del cliente');
+  const followCard = getClosestCardFromHeading('Seguimiento interno');
+  const infoGrid = dataCard?.parentElement;
+
+  if (infoGrid && followCard && infoGrid.contains(followCard)) {
+    infoGrid.dataset.proInfoGrid = 'true';
+    infoGrid.style.display = 'grid';
+    infoGrid.style.gridTemplateColumns = 'minmax(280px, .78fr) minmax(0, 1.22fr)';
+    infoGrid.style.gap = '14px';
+    infoGrid.style.alignItems = 'start';
+  }
+
+  [dataCard, followCard].forEach((card) => {
+    if (!card) return;
+    card.style.alignSelf = 'start';
+    card.style.padding = '18px';
+    card.style.borderRadius = '24px';
+    card.style.boxShadow = '0 12px 30px rgba(190,24,93,.06)';
+  });
+
+  const oldNote = followCard?.querySelector('p.mt-4.rounded-2xl');
+  if (oldNote) {
+    oldNote.style.marginTop = '12px';
+    oldNote.style.padding = '12px';
+    oldNote.style.fontSize = '12px';
+    oldNote.style.lineHeight = '1.45';
+  }
+
+  const ordersCard = getClosestCardFromHeading('Historial reciente de compras');
+  if (ordersCard) {
+    ordersCard.style.borderRadius = '24px';
+    ordersCard.style.display = 'flex';
+    ordersCard.style.flexDirection = 'column';
+    ordersCard.style.maxHeight = '250px';
+    ordersCard.style.minHeight = '150px';
+    ordersCard.style.boxShadow = '0 12px 30px rgba(190,24,93,.06)';
+
+    const ordersList = ordersCard.querySelector('.divide-y');
+    if (ordersList) {
+      ordersList.style.overflowY = 'auto';
+      ordersList.style.maxHeight = '196px';
+    }
+  }
+
+  const editForm = shell.querySelector('form.rounded-3xl');
+  if (editForm) {
+    editForm.style.maxHeight = '430px';
+    editForm.style.overflowY = 'auto';
+    editForm.style.borderRadius = '24px';
+    editForm.style.padding = '18px';
   }
 }
 
@@ -156,47 +308,47 @@ function renderFollowUps(container, customer, followUps, feedback = '') {
   const last = rows[0] || null;
 
   container.innerHTML = `
-    <div class="mt-5 border-t pt-4" style="border-color: rgba(236,72,153,0.16);">
-      <section class="rounded-[26px] border p-4" style="border-color: rgba(236,72,153,0.18); background: linear-gradient(145deg, rgba(255,255,255,0.94), rgba(255,247,251,0.90));">
+    <div class="mt-4 border-t pt-4" style="border-color: rgba(236,72,153,0.14);">
+      <section class="rounded-[22px] border p-4" style="border-color: rgba(236,72,153,0.16); background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,247,251,0.88)); box-shadow: 0 10px 24px rgba(190,24,93,.05);">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p class="text-xs font-black uppercase tracking-[0.18em]" style="color: var(--admin-card-muted-text);">Gestión CRM</p>
-            <h4 class="mt-1 text-base font-black" style="color: var(--admin-card-text);">Seguimiento del cliente</h4>
-            <p class="mt-1 text-xs font-bold" style="color: var(--admin-card-muted-text);">Notas, tareas y contactos sin llenar la ventana principal.</p>
+            <p class="text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Gestión CRM</p>
+            <h4 class="mt-1 text-sm font-black" style="color: var(--admin-card-text);">Seguimiento comercial</h4>
+            <p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Notas, tareas y contactos del cliente.</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <span class="rounded-2xl border px-3 py-2 text-[11px] font-black uppercase" style="border-color: #fed7aa; background: #fff7ed; color: #c2410c;">${pending} pendiente(s)</span>
-            <span class="rounded-2xl border px-3 py-2 text-[11px] font-black uppercase" style="border-color: #fbcfe8; background: #fdf2f8; color: #be185d;">${rows.length} gestión(es)</span>
-            <button type="button" data-followup-open-dialog="note" class="rounded-2xl px-4 py-2 text-xs font-black text-white" style="background: var(--admin-primary); box-shadow: 0 12px 24px rgba(236,72,153,0.22);">+ Nueva gestión</button>
+            <span class="rounded-2xl border px-3 py-2 text-[10px] font-black uppercase" style="border-color: #fed7aa; background: #fff7ed; color: #c2410c;">${pending} pendiente(s)</span>
+            <span class="rounded-2xl border px-3 py-2 text-[10px] font-black uppercase" style="border-color: #fbcfe8; background: #fdf2f8; color: #be185d;">${rows.length} gestión(es)</span>
+            <button type="button" data-followup-open-dialog="note" class="rounded-2xl px-4 py-2 text-xs font-black text-white" style="background: var(--admin-primary); box-shadow: 0 12px 24px rgba(236,72,153,0.18);">+ Nueva gestión</button>
           </div>
         </div>
 
         ${feedback ? `<div class="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-black text-emerald-700">${escapeHtml(feedback)}</div>` : ''}
 
-        <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_190px]">
-          <div class="rounded-2xl border p-4" style="border-color: rgba(236,72,153,0.14); background: #fff;">
-            <p class="text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Última gestión</p>
+        <div class="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_170px]">
+          <div class="rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.14); background: #fff;">
+            <p class="text-[10px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-card-muted-text);">Última gestión</p>
             ${last ? `
-              <p class="mt-2 text-sm font-black leading-relaxed" style="color: var(--admin-card-text);">${escapeHtml(last.note)}</p>
-              <p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(last.typeLabel || last.type)} · ${escapeHtml(last.statusLabel || last.status)} · ${escapeHtml(formatDate(last.createdAt))}</p>
+              <p class="mt-2 text-xs font-black leading-relaxed" style="color: var(--admin-card-text);">${escapeHtml(last.note)}</p>
+              <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(last.typeLabel || last.type)} · ${escapeHtml(last.statusLabel || last.status)} · ${escapeHtml(formatDate(last.createdAt))}</p>
             ` : `
-              <p class="mt-2 text-sm font-black" style="color: var(--admin-card-text);">Sin gestión registrada</p>
-              <p class="mt-1 text-[11px] font-bold" style="color: var(--admin-card-muted-text);">Guarda una nota solo cuando exista una acción comercial real.</p>
+              <p class="mt-2 text-xs font-black" style="color: var(--admin-card-text);">Sin gestión registrada</p>
+              <p class="mt-1 text-[10px] font-bold" style="color: var(--admin-card-muted-text);">Crea una nota cuando exista una acción comercial real.</p>
             `}
           </div>
-          <div class="grid grid-cols-2 gap-2 lg:grid-cols-1">
+          <div class="grid grid-cols-2 gap-2 xl:grid-cols-1">
             ${QUICK_ACTIONS.map(([type, label, helper]) => `
-              <button type="button" data-followup-open-dialog="${escapeHtml(type)}" class="rounded-2xl border p-3 text-left transition" style="border-color: rgba(236,72,153,0.18); background: #fff; color: var(--admin-card-text);">
-                <span class="block text-xs font-black">${escapeHtml(label)}</span>
+              <button type="button" data-followup-open-dialog="${escapeHtml(type)}" class="rounded-2xl border p-2.5 text-left transition" style="border-color: rgba(236,72,153,0.16); background: #fff; color: var(--admin-card-text);">
+                <span class="block text-[11px] font-black">${escapeHtml(label)}</span>
                 <span class="mt-0.5 block text-[10px] font-bold" style="color: var(--admin-card-muted-text);">${escapeHtml(helper)}</span>
               </button>
             `).join('')}
           </div>
         </div>
 
-        <details class="mt-4 rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.14); background: rgba(255,255,255,0.72);">
-          <summary class="cursor-pointer text-xs font-black uppercase tracking-[0.16em]" style="color: var(--admin-primary);">Ver historial de seguimiento</summary>
-          <div class="mt-3 max-h-[230px] space-y-2 overflow-y-auto pr-1" data-customer-followup-list="true">
+        <details class="mt-3 rounded-2xl border p-3" style="border-color: rgba(236,72,153,0.14); background: rgba(255,255,255,0.72);">
+          <summary class="cursor-pointer text-[11px] font-black uppercase tracking-[0.16em]" style="color: var(--admin-primary);">Ver historial de seguimiento</summary>
+          <div class="mt-3 max-h-[210px] space-y-2 overflow-y-auto pr-1" data-customer-followup-list="true">
             ${renderHistory(rows)}
           </div>
         </details>
@@ -207,6 +359,8 @@ function renderFollowUps(container, customer, followUps, feedback = '') {
   container.dataset.customerId = customer.id;
   container.dataset.customerCode = customer.customerCode || '';
   container._followUps = rows;
+
+  window.requestAnimationFrame(() => normalizeModal(container.closest('.rounded-3xl') || container));
 }
 
 function openFollowUpDialog(root, type = 'note') {
@@ -296,7 +450,10 @@ export default function CustomerFollowUpsVisualPatch() {
       if (!customerCode) return;
 
       const current = panel.querySelector('[data-customer-followups-root="true"]');
-      if (current?.dataset?.customerCode === customerCode) return;
+      if (current?.dataset?.customerCode === customerCode) {
+        normalizeModal(panel);
+        return;
+      }
       if (current) current.remove();
 
       const container = document.createElement('div');
@@ -308,6 +465,8 @@ export default function CustomerFollowUpsVisualPatch() {
         await mountFollowUps(container, customerCode);
       } catch (error) {
         renderError(container, error?.message || 'No fue posible cargar el seguimiento del cliente.');
+      } finally {
+        normalizeModal(panel);
       }
     };
 
