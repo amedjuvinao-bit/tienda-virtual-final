@@ -18,10 +18,10 @@ function isCustomerModalOverlay(node) {
 function normalizeCustomerModal(overlay) {
   if (!overlay || !isCustomerModalOverlay(overlay)) return;
 
-  if (overlay.parentElement !== document.body) {
-    document.body.appendChild(overlay);
-  }
-
+  // IMPORTANTE:
+  // No mover el overlay al document.body con appendChild.
+  // Al mover un nodo renderizado por React fuera de su root, los onClick de las pestañas
+  // dejan de funcionar porque los eventos ya no llegan al árbol React.
   overlay.style.position = 'fixed';
   overlay.style.inset = '0';
   overlay.style.top = '0';
@@ -37,6 +37,7 @@ function normalizeCustomerModal(overlay) {
   overlay.style.padding = '18px';
   overlay.style.overflow = 'hidden';
   overlay.style.transform = 'none';
+  overlay.style.pointerEvents = 'auto';
 
   const modal = overlay.querySelector('section');
   if (!modal) return;
