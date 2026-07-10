@@ -15,13 +15,47 @@ function isCustomerModalOverlay(node) {
   );
 }
 
+function scrollModalAncestorsToTop(overlay) {
+  if (!overlay || overlay.dataset.customerModalScrolled === 'true') return;
+
+  overlay.dataset.customerModalScrolled = 'true';
+
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  } catch (_) {
+    window.scrollTo(0, 0);
+  }
+
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+
+  let node = overlay.parentElement;
+
+  while (node && node !== document.body) {
+    if (typeof node.scrollTop === 'number') node.scrollTop = 0;
+    if (typeof node.scrollLeft === 'number') node.scrollLeft = 0;
+    node = node.parentElement;
+  }
+
+  const scrollContainers = document.querySelectorAll(
+    'main, [class*="overflow-y-auto"], [class*="overflow-auto"], [class*="overflow-y-scroll"], [class*="overflow-scroll"]'
+  );
+
+  scrollContainers.forEach((item) => {
+    if (item === overlay || overlay.contains(item)) return;
+    if (typeof item.scrollTop === 'number') item.scrollTop = 0;
+    if (typeof item.scrollLeft === 'number') item.scrollLeft = 0;
+  });
+}
+
 function normalizeCustomerModal(overlay) {
   if (!overlay || !isCustomerModalOverlay(overlay)) return;
 
   // No mover este nodo al document.body: si se mueve, se rompen los eventos React.
-  // El problema real era centrar verticalmente dentro de un contenedor largo/scrolleado.
-  // Por eso el modal aparecía abajo. Se alinea arriba del área visible y se le da
-  // altura controlada para que no dependa del scroll de la página de clientes.
+  // Cuando se abre desde el final de la tabla, el contenedor admin conserva su scroll
+  // y deja el modal fuera de vista. Se corrige subiendo el scroll una sola vez al abrir.
+  scrollModalAncestorsToTop(overlay);
+
   overlay.style.position = 'fixed';
   overlay.style.inset = '0';
   overlay.style.zIndex = '9999';
