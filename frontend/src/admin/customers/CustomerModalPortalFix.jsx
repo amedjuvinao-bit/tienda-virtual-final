@@ -18,23 +18,18 @@ function isCustomerModalOverlay(node) {
 function normalizeCustomerModal(overlay) {
   if (!overlay || !isCustomerModalOverlay(overlay)) return;
 
-  // IMPORTANTE:
-  // No mover el overlay al document.body con appendChild.
-  // Al mover un nodo renderizado por React fuera de su root, los onClick de las pestañas
-  // dejan de funcionar porque los eventos ya no llegan al árbol React.
+  // No mover este nodo al document.body: si se mueve, se rompen los eventos React.
+  // Tampoco usar 100vw aquí: dentro del layout admin eso empuja el modal hacia la derecha
+  // y lo recorta cuando el navegador está reducido o DevTools está abierto.
   overlay.style.position = 'fixed';
   overlay.style.inset = '0';
-  overlay.style.top = '0';
-  overlay.style.left = '0';
-  overlay.style.right = '0';
-  overlay.style.bottom = '0';
-  overlay.style.width = '100vw';
-  overlay.style.height = '100vh';
   overlay.style.zIndex = '9999';
   overlay.style.display = 'flex';
   overlay.style.alignItems = 'center';
   overlay.style.justifyContent = 'center';
-  overlay.style.padding = '18px';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.padding = '16px';
   overlay.style.overflow = 'hidden';
   overlay.style.transform = 'none';
   overlay.style.pointerEvents = 'auto';
@@ -42,14 +37,17 @@ function normalizeCustomerModal(overlay) {
   const modal = overlay.querySelector('section');
   if (!modal) return;
 
-  modal.style.margin = '0';
+  modal.style.margin = '0 auto';
   modal.style.position = 'relative';
   modal.style.top = 'auto';
   modal.style.left = 'auto';
+  modal.style.right = 'auto';
   modal.style.transform = 'none';
-  modal.style.width = 'min(1160px, calc(100vw - 36px))';
-  modal.style.height = 'min(760px, calc(100vh - 36px))';
-  modal.style.maxHeight = 'calc(100vh - 36px)';
+  modal.style.width = 'min(900px, calc(100% - 12px))';
+  modal.style.height = 'min(720px, calc(100% - 12px))';
+  modal.style.maxWidth = '900px';
+  modal.style.maxHeight = 'calc(100% - 12px)';
+  modal.style.overflow = 'hidden';
 }
 
 export default function CustomerModalPortalFix() {
