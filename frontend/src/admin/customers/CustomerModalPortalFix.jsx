@@ -19,17 +19,18 @@ function normalizeCustomerModal(overlay) {
   if (!overlay || !isCustomerModalOverlay(overlay)) return;
 
   // No mover este nodo al document.body: si se mueve, se rompen los eventos React.
-  // Tampoco usar 100vw aquí: dentro del layout admin eso empuja el modal hacia la derecha
-  // y lo recorta cuando el navegador está reducido o DevTools está abierto.
+  // El problema real era centrar verticalmente dentro de un contenedor largo/scrolleado.
+  // Por eso el modal aparecía abajo. Se alinea arriba del área visible y se le da
+  // altura controlada para que no dependa del scroll de la página de clientes.
   overlay.style.position = 'fixed';
   overlay.style.inset = '0';
   overlay.style.zIndex = '9999';
   overlay.style.display = 'flex';
-  overlay.style.alignItems = 'center';
+  overlay.style.alignItems = 'flex-start';
   overlay.style.justifyContent = 'center';
   overlay.style.width = '100%';
   overlay.style.height = '100%';
-  overlay.style.padding = '16px';
+  overlay.style.padding = '24px 16px 16px';
   overlay.style.overflow = 'hidden';
   overlay.style.transform = 'none';
   overlay.style.pointerEvents = 'auto';
@@ -39,14 +40,14 @@ function normalizeCustomerModal(overlay) {
 
   modal.style.margin = '0 auto';
   modal.style.position = 'relative';
-  modal.style.top = 'auto';
+  modal.style.top = '0';
   modal.style.left = 'auto';
   modal.style.right = 'auto';
   modal.style.transform = 'none';
-  modal.style.width = 'min(900px, calc(100% - 12px))';
-  modal.style.height = 'min(720px, calc(100% - 12px))';
-  modal.style.maxWidth = '900px';
-  modal.style.maxHeight = 'calc(100% - 12px)';
+  modal.style.width = 'min(940px, calc(100% - 12px))';
+  modal.style.height = 'min(720px, calc(100vh - 64px))';
+  modal.style.maxWidth = '940px';
+  modal.style.maxHeight = 'calc(100vh - 64px)';
   modal.style.overflow = 'hidden';
 }
 
