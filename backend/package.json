@@ -7,6 +7,8 @@
     "seed:geo:all": "node scripts/seedGeoAll.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:customers": "node scripts/testCustomersModule.js",
+    "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
+    "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
     "migrate:categories": "node scripts/migrate-categories.js"
   },
   "keywords": [],
