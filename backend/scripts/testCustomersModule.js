@@ -35,13 +35,10 @@ const state = {
   passed: 0,
   failed: 0,
   warnings: 0,
-  createdCustomerIds: [],
-  createdFollowUpIds: [],
-  duplicateReport: null,
 };
 
-function printTitle(title) {
-  console.log(`\n=== ${title} ===`);
+function title(text) {
+  console.log(`\n=== ${text} ===`);
 }
 
 function pass(message) {
@@ -64,10 +61,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function getAdminToken() {
-  const secret = process.env.JWT_SECRET;
-
-  if (!secret) {
+function adminToken() {
+  if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET no esta configurado en backend/.env');
   }
 
@@ -78,16 +73,15 @@ function getAdminToken() {
       authType: 'legacy',
       adminRole: 'owner',
     },
-    secret,
+    process.env.JWT_SECRET,
     { expiresIn: '30m' }
   );
 }
 
-const TOKEN = getAdminToken();
+const TOKEN = adminToken();
 
 async function api(path, options = {}) {
-  const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
+  const response = await fetch(`${BASE_URL}${path}`, {
     method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -97,8 +91,8 @@ async function api(path, options = {}) {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 
-  let data = null;
   const text = await response.text();
+  let data = null;
 
   try {
     data = text ? JSON.parse(text) : null;
@@ -118,7 +112,7 @@ async function api(path, options = {}) {
 
 async function connectDb() {
   if (!process.env.MONGODB_URI) {
-    warn('MONGODB_URI no esta configurado. Se omite auditoria directa de duplicados y limpieza por base de datos.');
+    warn('MONGODB_URI no esta configurado. No se puede auditar duplicados ni limpiar datos de prueba.');
     return false;
   }
 
@@ -143,71 +137,68 @@ async function cleanupTestData() {
   if (ids.length > 0) {
     await CustomerFollowUp.deleteMany({ customer: { $in: ids } });
     await Customer.deleteMany({ _id: { $in: ids } });
+    console.log(`Limpieza: ${ids.length} cliente(s) de prueba eliminado(s).`);
   }
+}
+
+async function duplicateGroups(field, label, extraGroup = {}) {
+  const rows = await Customer.aggregate([
+    {
+      $match: {
+        deletedAt: null,
+        status: 'active',
+        tags: { $ne: TEST_TAG },
+        [field]: { $exists: true, $type: 'string', $ne: '' },
+      },
+    },
+    {
+      $group: {
+        _id: { value: `$${field}`, ...extraGroup },
+        count: { $sum: 1 },
+        examples: {
+          $push: {
+            id: '$_id',
+            name: '$fullName',
+            code: '$customerCode',
+            phone: '$phone',
+            email: '$email',
+            documentType: '$documentType',
+            documentNumber: '$documentNumber',
+          },
+        },
+      },
+    },
+    { $match: { count: { $gt: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 20 },
+  ]);
+
+  return { label, field, rows };
 }
 
 async function auditDuplicates() {
   const connected = await connectDb();
   if (!connected) return null;
 
-  const baseMatch = { deletedAt: null, status: 'active' };
-
-  const duplicateBy = async (field, label, extraGroup = {}) => {
-    const pipeline = [
-      {
-        $match: {
-          ...baseMatch,
-          [field]: { $exists: true, $type: 'string', $ne: '' },
-        },
-      },
-      {
-        $group: {
-          _id: { value: `$${field}`, ...extraGroup },
-          count: { $sum: 1 },
-          examples: {
-            $push: {
-              id: '$_id',
-              name: '$fullName',
-              code: '$customerCode',
-              phone: '$phone',
-              email: '$email',
-              documentType: '$documentType',
-              documentNumber: '$documentNumber',
-            },
-          },
-        },
-      },
-      { $match: { count: { $gt: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 20 },
-    ];
-
-    const rows = await Customer.aggregate(pipeline);
-    return { label, field, totalGroups: rows.length, rows };
+  return {
+    document: await duplicateGroups('normalizedDocument', 'Documento', { documentType: '$documentType' }),
+    phone: await duplicateGroups('normalizedPhone', 'Celular'),
+    email: await duplicateGroups('normalizedEmail', 'Correo'),
   };
-
-  const report = {
-    document: await duplicateBy('normalizedDocument', 'Documento', { documentType: '$documentType' }),
-    phone: await duplicateBy('normalizedPhone', 'Celular'),
-    email: await duplicateBy('normalizedEmail', 'Correo'),
-  };
-
-  state.duplicateReport = report;
-  return report;
 }
 
-function printDuplicateReport(report) {
+function printDuplicates(report) {
   if (!report) return;
 
-  printTitle('Auditoria de duplicados existentes');
+  title('Auditoria de duplicados reales');
 
   Object.values(report).forEach((section) => {
-    if (!section.totalGroups) {
+    if (section.rows.length === 0) {
       pass(`Sin duplicados por ${section.label}.`);
       return;
     }
 
-    warn(`Se encontraron ${section.totalGroups} grupo(s) duplicados por ${section.label}.`);
+    warn(`Duplicados por ${section.label}: ${section.rows.length} grupo(s).`);
 
     section.rows.slice(0, 5).forEach((group, index) => {
       const value = typeof group._id === 'object' ? JSON.stringify(group._id) : String(group._id || '');
@@ -219,7 +210,7 @@ function printDuplicateReport(report) {
   });
 }
 
-async function runStep(name, fn) {
+async function step(name, fn) {
   try {
     await fn();
     pass(name);
@@ -229,17 +220,16 @@ async function runStep(name, fn) {
 }
 
 async function main() {
-  printTitle('Prueba general modulo Clientes');
+  title('Prueba general modulo Clientes');
   console.log(`Backend: ${BASE_URL}`);
   console.log(`Run ID: ${RUN_ID}`);
 
   await cleanupTestData();
 
   let createdCustomer = null;
-  let updatedCustomer = null;
   let followUp = null;
 
-  const baseCustomerPayload = {
+  const payload = {
     fullName: `Cliente Prueba Modulo ${RUN_ID}`,
     displayName: `Cliente Prueba Modulo ${RUN_ID}`,
     phone: `300${String(Date.now()).slice(-7)}`,
@@ -257,71 +247,62 @@ async function main() {
     tags: [TEST_TAG],
   };
 
-  await runStep('GET /api/admin/customers lista clientes', async () => {
+  await step('Listar clientes', async () => {
     const data = await api('/api/admin/customers?status=active&page=1&limit=5');
-    assert(data?.ok === true, 'La respuesta no trae ok=true');
-    assert(Array.isArray(data.customers), 'customers no es un arreglo');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(Array.isArray(data.customers), 'customers no es arreglo');
     assert(typeof data.total === 'number', 'total no es numerico');
   });
 
-  await runStep('POST /api/admin/customers crea cliente admin', async () => {
-    const data = await api('/api/admin/customers', {
-      method: 'POST',
-      body: baseCustomerPayload,
-    });
-
+  await step('Crear cliente desde admin', async () => {
+    const data = await api('/api/admin/customers', { method: 'POST', body: payload });
     createdCustomer = data.customer;
-    state.createdCustomerIds.push(createdCustomer.id);
-
-    assert(data?.ok === true, 'La respuesta no trae ok=true');
-    assert(createdCustomer?.id, 'No devolvio id del cliente');
-    assert(createdCustomer.fullName === baseCustomerPayload.fullName, 'El nombre guardado no coincide');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(createdCustomer?.id, 'No devolvio id');
     assert(createdCustomer.customerCode, 'No genero customerCode');
+    assert(createdCustomer.fullName === payload.fullName, 'Nombre no coincide');
   });
 
-  await runStep('GET /api/admin/customers busca cliente por codigo/nombre', async () => {
-    const q = encodeURIComponent(createdCustomer.customerCode || createdCustomer.fullName);
+  await step('Buscar cliente por codigo', async () => {
+    const q = encodeURIComponent(createdCustomer.customerCode);
     const data = await api(`/api/admin/customers?q=${q}&status=active&page=1&limit=10`);
-    assert(data?.ok === true, 'La busqueda no trae ok=true');
-    assert(data.customers.some((item) => item.id === createdCustomer.id), 'El cliente creado no aparece en busqueda');
+    assert(data.customers.some((item) => item.id === createdCustomer.id), 'No aparece en busqueda');
   });
 
-  await runStep('GET /api/admin/customers/:id carga ficha comercial', async () => {
+  await step('Cargar ficha comercial', async () => {
     const data = await api(`/api/admin/customers/${createdCustomer.id}`);
-    assert(data?.ok === true, 'El detalle no trae ok=true');
-    assert(data.customer?.id === createdCustomer.id, 'El detalle no corresponde al cliente creado');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(data.customer?.id === createdCustomer.id, 'Detalle no corresponde');
     assert(Array.isArray(data.recentOrders), 'recentOrders no es arreglo');
   });
 
-  await runStep('PUT /api/admin/customers/:id edita cliente', async () => {
+  await step('Editar datos del cliente', async () => {
     const data = await api(`/api/admin/customers/${createdCustomer.id}`, {
       method: 'PUT',
       body: {
-        ...baseCustomerPayload,
-        fullName: `${baseCustomerPayload.fullName} Editado`,
-        displayName: `${baseCustomerPayload.fullName} Editado`,
+        ...payload,
+        fullName: `${payload.fullName} Editado`,
+        displayName: `${payload.fullName} Editado`,
         notes: 'Cliente actualizado por prueba automatica.',
         tags: [TEST_TAG],
       },
     });
-
-    updatedCustomer = data.customer;
-    assert(data?.ok === true, 'La actualizacion no trae ok=true');
-    assert(updatedCustomer.fullName.includes('Editado'), 'No actualizo el nombre');
-    assert(updatedCustomer.notes.includes('actualizado'), 'No actualizo notas');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(data.customer?.fullName?.includes('Editado'), 'No actualizo nombre');
+    assert(data.customer?.notes?.includes('actualizado'), 'No actualizo notas');
   });
 
-  await runStep('Filtros de clientes por origen y segmento', async () => {
+  await step('Filtros por origen y segmento', async () => {
     const bySource = await api('/api/admin/customers?source=admin&status=active&page=1&limit=20');
-    assert(bySource?.ok === true, 'Filtro por source no trae ok=true');
-    assert(Array.isArray(bySource.customers), 'Filtro por source no devuelve arreglo');
+    assert(bySource?.ok === true, 'Filtro source fallo');
+    assert(Array.isArray(bySource.customers), 'source no devuelve arreglo');
 
     const withEmail = await api('/api/admin/customers?segment=with-email&status=active&page=1&limit=20');
-    assert(withEmail?.ok === true, 'Filtro with-email no trae ok=true');
-    assert(Array.isArray(withEmail.customers), 'Filtro with-email no devuelve arreglo');
+    assert(withEmail?.ok === true, 'Filtro with-email fallo');
+    assert(Array.isArray(withEmail.customers), 'with-email no devuelve arreglo');
   });
 
-  await runStep('POST /api/admin/customer-follow-ups crea seguimiento', async () => {
+  await step('Crear seguimiento interno', async () => {
     const data = await api(`/api/admin/customer-follow-ups/${createdCustomer.id}`, {
       method: 'POST',
       body: {
@@ -332,49 +313,39 @@ async function main() {
         dueAt: new Date(Date.now() + 86400000).toISOString(),
       },
     });
-
     followUp = data.followUp;
-    state.createdFollowUpIds.push(followUp.id);
-
-    assert(data?.ok === true, 'Crear seguimiento no trae ok=true');
-    assert(followUp?.id, 'No devolvio id de seguimiento');
-    assert(followUp.status === 'pending', 'El seguimiento no quedo pendiente');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(followUp?.id, 'No devolvio seguimiento');
+    assert(followUp.status === 'pending', 'No quedo pendiente');
   });
 
-  await runStep('GET /api/admin/customer-follow-ups lista seguimiento', async () => {
+  await step('Listar seguimiento interno', async () => {
     const data = await api(`/api/admin/customer-follow-ups/${createdCustomer.id}?status=all&limit=20`);
-    assert(data?.ok === true, 'Listar seguimiento no trae ok=true');
+    assert(data?.ok === true, 'No trae ok=true');
     assert(Array.isArray(data.followUps), 'followUps no es arreglo');
-    assert(data.followUps.some((item) => item.id === followUp.id), 'El seguimiento creado no aparece listado');
+    assert(data.followUps.some((item) => item.id === followUp.id), 'Seguimiento no aparece');
   });
 
-  await runStep('PUT /api/admin/customer-follow-ups marca realizado', async () => {
+  await step('Marcar seguimiento como realizado', async () => {
     const data = await api(`/api/admin/customer-follow-ups/${createdCustomer.id}/${followUp.id}`, {
       method: 'PUT',
-      body: {
-        ...followUp,
-        status: 'done',
-      },
+      body: { ...followUp, status: 'done' },
     });
-
-    assert(data?.ok === true, 'Actualizar seguimiento no trae ok=true');
-    assert(data.followUp?.status === 'done', 'El seguimiento no quedo realizado');
+    assert(data?.ok === true, 'No trae ok=true');
+    assert(data.followUp?.status === 'done', 'No quedo realizado');
   });
 
-  await runStep('DELETE /api/admin/customer-follow-ups elimina seguimiento', async () => {
-    const data = await api(`/api/admin/customer-follow-ups/${createdCustomer.id}/${followUp.id}`, {
-      method: 'DELETE',
-    });
-
-    assert(data?.ok === true, 'Eliminar seguimiento no trae ok=true');
+  await step('Eliminar seguimiento interno', async () => {
+    const data = await api(`/api/admin/customer-follow-ups/${createdCustomer.id}/${followUp.id}`, { method: 'DELETE' });
+    assert(data?.ok === true, 'No trae ok=true');
   });
 
-  await runStep('Validacion de nombre obligatorio', async () => {
+  await step('Validar nombre obligatorio', async () => {
     try {
       await api('/api/admin/customers', {
         method: 'POST',
         body: {
-          ...baseCustomerPayload,
+          ...payload,
           fullName: '',
           displayName: '',
           phone: `301${String(Date.now()).slice(-7)}`,
@@ -383,62 +354,48 @@ async function main() {
           tags: [TEST_TAG],
         },
       });
-
-      throw new Error('El backend permitio crear cliente sin nombre');
+      throw new Error('Permitio crear cliente sin nombre');
     } catch (error) {
-      if (error.message === 'El backend permitio crear cliente sin nombre') throw error;
+      if (error.message === 'Permitio crear cliente sin nombre') throw error;
       assert([400, 422, 500].includes(Number(error.status)), `Estado inesperado: ${error.status}`);
     }
   });
 
-  await runStep('Prueba de politica de duplicados', async () => {
-    let duplicateCreated = null;
-
+  await step('Revisar politica de duplicados', async () => {
     try {
       const data = await api('/api/admin/customers', {
         method: 'POST',
         body: {
-          ...baseCustomerPayload,
-          fullName: `${baseCustomerPayload.fullName} Duplicado`,
-          displayName: `${baseCustomerPayload.fullName} Duplicado`,
+          ...payload,
+          fullName: `${payload.fullName} Duplicado`,
+          displayName: `${payload.fullName} Duplicado`,
           tags: [TEST_TAG],
         },
       });
 
-      duplicateCreated = data.customer;
-      if (duplicateCreated?.id) state.createdCustomerIds.push(duplicateCreated.id);
-    } catch (error) {
-      if ([400, 409, 422].includes(Number(error.status))) {
-        pass('El backend bloqueo duplicado de documento/celular/correo.');
-        return;
+      if (data?.customer?.id) {
+        const message = 'El backend permitio duplicar documento/celular/correo.';
+        if (STRICT_DUPLICATES) throw new Error(message);
+        warn(`${message} Falta decidir si se bloquea o se muestra advertencia.`);
       }
+    } catch (error) {
+      if ([400, 409, 422].includes(Number(error.status))) return;
       throw error;
-    }
-
-    if (duplicateCreated?.id) {
-      const message = 'El backend permitio crear un cliente duplicado con mismo documento/celular/correo.';
-      if (STRICT_DUPLICATES) throw new Error(message);
-      warn(`${message} Pendiente definir si se bloquea o se muestra advertencia.`);
     }
   });
 
-  const duplicates = await auditDuplicates();
-  printDuplicateReport(duplicates);
-
   await cleanupTestData();
 
-  printTitle('Resultado final');
+  const duplicateReport = await auditDuplicates();
+  printDuplicates(duplicateReport);
+
+  title('Resultado final');
   console.log(`OK: ${state.passed}`);
   console.log(`WARN: ${state.warnings}`);
   console.log(`FAIL: ${state.failed}`);
 
-  if (state.failed > 0) {
-    process.exitCode = 1;
-  }
-
-  if (STRICT_DUPLICATES && state.warnings > 0) {
-    process.exitCode = 1;
-  }
+  if (state.failed > 0) process.exitCode = 1;
+  if (STRICT_DUPLICATES && state.warnings > 0) process.exitCode = 1;
 }
 
 main()
