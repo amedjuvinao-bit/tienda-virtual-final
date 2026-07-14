@@ -18,6 +18,14 @@ function cleanLower(value) {
   return cleanText(value).toLowerCase();
 }
 
+function cleanUpper(value) {
+  return cleanText(value).toUpperCase();
+}
+
+function cleanPhone(value) {
+  return cleanText(value).replace(/[^0-9+]/g, '');
+}
+
 function escapeRegex(value) {
   return cleanText(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -137,6 +145,123 @@ function buildCustomerPayload(body = {}, req, isCreate = false) {
   }
 
   return payload;
+}
+
+function buildCustomerIdentity(payload = {}) {
+  return {
+    normalizedPhone: cleanPhone(payload.phone),
+    normalizedEmail: cleanLower(payload.email),
+    documentType: cleanUpper(payload.documentType),
+    normalizedDocument: onlyDigits(payload.documentNumber),
+  };
+}
+
+function buildDuplicateFilters(payload = {}) {
+  const identity = buildCustomerIdentity(payload);
+  const filters = [];
+
+  if (identity.normalizedDocument) {
+    filters.push({
+      key: 'document',
+      label: 'documento',
+      value: identity.normalizedDocument,
+      query: {
+        normalizedDocument: identity.normalizedDocument,
+        ...(identity.documentType ? { documentType: identity.documentType } : {}),
+      },
+    });
+  }
+
+  if (identity.normalizedPhone) {
+    filters.push({
+      key: 'phone',
+      label: 'celular',
+      value: identity.normalizedPhone,
+      query: { normalizedPhone: identity.normalizedPhone },
+    });
+  }
+
+  if (identity.normalizedEmail) {
+    filters.push({
+      key: 'email',
+      label: 'correo',
+      value: identity.normalizedEmail,
+      query: { normalizedEmail: identity.normalizedEmail },
+    });
+  }
+
+  return filters;
+}
+
+async function findCustomerDuplicate(payload = {}, excludeId = null) {
+  const filters = buildDuplicateFilters(payload);
+  if (!filters.length) return null;
+
+  const base = {
+    deletedAt: null,
+    ...(excludeId && mongoose.Types.ObjectId.isValid(String(excludeId))
+      ? { _id: { $ne: excludeId } }
+      : {}),
+  };
+
+  const existingCustomers = await Customer.find({
+    ...base,
+    $or: filters.map((filter) => filter.query),
+  })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .limit(10);
+
+  if (!existingCustomers.length) return null;
+
+  const conflicts = [];
+
+  existingCustomers.forEach((customer) => {
+    const raw = typeof customer.toObject === 'function' ? customer.toObject() : customer;
+
+    filters.forEach((filter) => {
+      if (filter.key === 'document') {
+        const sameDocument = cleanUpper(raw.documentType) === cleanUpper(payload.documentType) && raw.normalizedDocument === filter.value;
+        if (sameDocument) conflicts.push({ field: 'documentNumber', label: 'documento', value: raw.documentNumber || filter.value });
+      }
+
+      if (filter.key === 'phone' && raw.normalizedPhone === filter.value) {
+        conflicts.push({ field: 'phone', label: 'celular', value: raw.phone || filter.value });
+      }
+
+      if (filter.key === 'email' && raw.normalizedEmail === filter.value) {
+        conflicts.push({ field: 'email', label: 'correo', value: raw.email || filter.value });
+      }
+    });
+  });
+
+  const uniqueConflicts = Array.from(
+    new Map(conflicts.map((item) => [`${item.field}:${item.value}`, item])).values()
+  );
+
+  if (!uniqueConflicts.length) return null;
+
+  return {
+    customer: existingCustomers[0],
+    conflicts: uniqueConflicts,
+  };
+}
+
+async function assertCustomerIsUnique(payload = {}, excludeId = null) {
+  const duplicate = await findCustomerDuplicate(payload, excludeId);
+  if (!duplicate) return;
+
+  const fields = duplicate.conflicts.map((item) => item.label).join(', ');
+  const customer = serializeCustomer(duplicate.customer);
+
+  throw createRouteError(
+    `Ya existe un cliente registrado con el mismo ${fields}. Revisa el cliente ${customer.customerCode || customer.fullName}.`,
+    'CUSTOMER_DUPLICATE',
+    409,
+    {
+      conflicts: duplicate.conflicts,
+      existingCustomer: customer,
+    }
+  );
 }
 
 function applyCustomerSegment(filter, segment) {
@@ -404,6 +529,7 @@ router.get('/', requirePermission('customers:view'), async (req, res) => {
 router.post('/', requirePermission('customers:create'), async (req, res) => {
   try {
     const payload = buildCustomerPayload(req.body || {}, req, true);
+    await assertCustomerIsUnique(payload);
     const customer = await Customer.create(payload);
 
     return res.status(201).json({
@@ -434,6 +560,7 @@ router.put('/:id', requirePermission('customers:update'), async (req, res) => {
   try {
     const customer = await loadCustomer(req.params.id);
     const payload = buildCustomerPayload(req.body || {}, req, false);
+    await assertCustomerIsUnique(payload, customer._id);
 
     Object.entries(payload).forEach(([key, value]) => {
       if (value !== undefined) customer[key] = value;
