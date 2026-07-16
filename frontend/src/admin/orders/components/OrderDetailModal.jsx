@@ -169,13 +169,19 @@ export default function OrderDetailModal({
           window.open(preview, '_blank', 'noopener,noreferrer');
         }
       } else {
-        alert('Email enviado.');
+        alert(data?.message || 'Email enviado.');
       }
 
       await fetchTimeline();
     } catch (error) {
       console.error('email error', error);
-      alert('No se pudo enviar el email.');
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'No se pudo enviar el email.';
+
+      alert(message);
     } finally {
       setLoadingAux(false);
     }
