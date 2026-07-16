@@ -1,5 +1,7 @@
 // backend/controllers/adminDashboardGoalController.js
 
+const mongoose = require('mongoose');
+
 const Order = require('../models/Order');
 const {
   getMonthPeriodKey,
@@ -48,8 +50,30 @@ function getBogotaMonthRange(periodKey) {
   };
 }
 
+function normalizeObjectId(value) {
+  if (!value) return null;
+
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value;
+  }
+
+  if (typeof value === 'object') {
+    return normalizeObjectId(value._id || value.id || value.adminUserId || value.userId);
+  }
+
+  const id = String(value || '').trim();
+
+  return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
+}
+
 function getAdminReference(req) {
-  return req.adminUserId || req.adminUsername || req.adminUser || null;
+  return (
+    normalizeObjectId(req.adminUserId) ||
+    normalizeObjectId(req.adminProfile) ||
+    normalizeObjectId(req.user) ||
+    normalizeObjectId(req.adminUser) ||
+    null
+  );
 }
 
 function getGoalAmountFromBody(body = {}) {
