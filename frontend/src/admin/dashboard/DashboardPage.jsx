@@ -66,6 +66,8 @@ const emptyDashboardData = {
   monthlyGoal: null,
   inventoryByBranch: [],
   recentOrders: [],
+  salesByChannel: null,
+  cashSummary: null,
 };
 
 export default function DashboardPage() {
@@ -104,6 +106,8 @@ export default function DashboardPage() {
           monthlyGoal: data.monthlyGoal || null,
           inventoryByBranch: Array.isArray(data.inventoryByBranch) ? data.inventoryByBranch : [],
           recentOrders: Array.isArray(data.recentOrders) ? data.recentOrders : [],
+          salesByChannel: data.salesByChannel || data.totals?.salesByChannel || null,
+          cashSummary: data.cashSummary || data.totals?.cashSummary || null,
         }));
       } catch (error) {
         console.error('No se pudo cargar el dashboard real:', error);
@@ -198,6 +202,7 @@ export default function DashboardPage() {
       viewProducts: () => navigate('/admin/productos'),
       viewInventory: () => navigate('/admin/inventario'),
       viewOrders: () => navigate('/admin/ordenes'),
+      viewCash: () => navigate('/admin/caja'),
       reviewOrders: () => navigate('/admin/ordenes?status=pending,processing&source=dashboard-alerts'),
     }),
     [navigate]
@@ -253,6 +258,8 @@ export default function DashboardPage() {
         onGoalUpdated={handleMonthlyGoalUpdated}
         inventoryByBranch={dashboardData.inventoryByBranch}
         recentOrders={dashboardData.recentOrders}
+        salesByChannel={dashboardData.salesByChannel}
+        cashSummary={dashboardData.cashSummary}
         navigation={dashboardNavigation}
         onDashboardAction={handleDashboardAction}
       />
