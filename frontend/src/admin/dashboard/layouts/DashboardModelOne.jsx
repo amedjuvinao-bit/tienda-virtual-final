@@ -5,6 +5,7 @@ import DashboardGoalsPanel from '../components/DashboardGoalsPanel';
 import DashboardHero from '../components/DashboardHero';
 import DashboardInventoryByBranch from '../components/DashboardInventoryByBranch';
 import DashboardKpiGrid from '../components/DashboardKpiGrid';
+import DashboardPosCashPanel from '../components/DashboardPosCashPanel';
 import DashboardRecentOrders from '../components/DashboardRecentOrders';
 import DashboardSalesPanel from '../components/DashboardSalesPanel';
 import { dashboardStyles as styles } from '../dashboardStyles';
@@ -165,7 +166,7 @@ export default function DashboardModelOne(props) {
   const showTopProductsEmptyState = !props.salesLoading && !hasTopProducts;
 
   return (
-    <div className="space-y-2 xl:space-y-2">
+    <div className="space-y-3 xl:space-y-3">
       <style>
         {`
           @keyframes dashboardSalesLoadingSweep {
@@ -332,6 +333,13 @@ export default function DashboardModelOne(props) {
           </div>
         </aside>
       </div>
+
+      <DashboardPosCashPanel
+        salesByChannel={props.salesByChannel}
+        cashSummary={props.cashSummary}
+        onViewOrders={navigation.viewOrders}
+        onViewCash={navigation.viewCash}
+      />
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
         <div
