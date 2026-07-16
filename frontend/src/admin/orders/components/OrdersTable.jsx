@@ -31,18 +31,18 @@ export default function OrdersTable({
     cardBorder: 'var(--admin-card-border)',
   };
 
-    const getStatusAccent = (status) => {
-      const normalized = String(status || '').toLowerCase();
+  const getStatusAccent = (status) => {
+    const normalized = String(status || '').toLowerCase();
 
-      if (normalized.includes('paid') || normalized.includes('pag')) return 'from-emerald-400 to-green-500';
-      if (normalized.includes('pending') || normalized.includes('pend')) return 'from-amber-300 to-yellow-500';
-      if (normalized.includes('fail') || normalized.includes('fall')) return 'from-rose-400 to-red-500';
-      if (normalized.includes('cancel')) return 'from-gray-300 to-gray-500';
-      if (normalized.includes('refund') || normalized.includes('reemb')) return 'from-violet-400 to-purple-500';
-      if (normalized.includes('sent') || normalized.includes('env')) return 'from-sky-400 to-blue-500';
+    if (normalized.includes('paid') || normalized.includes('pag')) return 'from-emerald-400 to-green-500';
+    if (normalized.includes('pending') || normalized.includes('pend')) return 'from-amber-300 to-yellow-500';
+    if (normalized.includes('fail') || normalized.includes('fall')) return 'from-rose-400 to-red-500';
+    if (normalized.includes('cancel')) return 'from-gray-300 to-gray-500';
+    if (normalized.includes('refund') || normalized.includes('reemb')) return 'from-violet-400 to-purple-500';
+    if (normalized.includes('sent') || normalized.includes('env')) return 'from-sky-400 to-blue-500';
 
-      return 'from-pink-300 to-pink-500';
-    };
+    return 'from-pink-300 to-pink-500';
+  };
 
   const getOrderLevel = (total) => {
     const value = Number(total || 0);
@@ -79,6 +79,77 @@ export default function OrdersTable({
       code: String(code || '').trim().toUpperCase(),
       type: String(type || '').trim().toLowerCase(),
       hasBranch: Boolean(name || code),
+    };
+  };
+
+  const getOrderOriginInfo = (order) => {
+    const source = String(order?.source || '').trim().toLowerCase();
+    const channel = String(order?.channel || '').trim().toLowerCase();
+    const saleType = String(order?.saleType || '').trim().toLowerCase();
+    const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
+    const pos = order?.pos || {};
+
+    const isPos =
+      source === 'pos' ||
+      channel === 'physical_store' ||
+      saleType === 'pos_sale' ||
+      paymentProvider === 'pos' ||
+      Boolean(pos.receiptNumber || pos.saleNumber || pos.registerCode);
+
+    if (isPos) {
+      const reference = pos.receiptNumber || pos.saleNumber || order?.payment?.reference || '';
+      const terminal = pos.registerCode || pos.terminalId || '';
+
+      return {
+        label: 'POS',
+        description: 'Venta física',
+        detail: [reference, terminal ? `Caja ${terminal}` : 'Caja'].filter(Boolean).join(' · '),
+        badgeBg: 'linear-gradient(135deg, color-mix(in srgb, #22c55e 18%, #ffffff), color-mix(in srgb, var(--admin-primary-soft-bg) 65%, #ffffff))',
+        badgeText: '#047857',
+        border: 'color-mix(in srgb, #22c55e 42%, var(--admin-card-border))',
+      };
+    }
+
+    if (source === 'manual' || saleType === 'manual_order') {
+      return {
+        label: 'MANUAL',
+        description: 'Orden manual',
+        detail: 'Creada desde administración',
+        badgeBg: 'color-mix(in srgb, #f59e0b 14%, var(--admin-input-bg))',
+        badgeText: '#92400e',
+        border: 'color-mix(in srgb, #f59e0b 38%, var(--admin-card-border))',
+      };
+    }
+
+    if (source === 'admin') {
+      return {
+        label: 'ADMIN',
+        description: 'Panel administrativo',
+        detail: 'Gestión interna',
+        badgeBg: 'color-mix(in srgb, var(--admin-primary) 12%, var(--admin-input-bg))',
+        badgeText: 'var(--admin-primary)',
+        border: 'color-mix(in srgb, var(--admin-primary) 34%, var(--admin-card-border))',
+      };
+    }
+
+    if (source === 'import') {
+      return {
+        label: 'IMPORTADA',
+        description: 'Carga externa',
+        detail: 'Orden importada',
+        badgeBg: 'color-mix(in srgb, #64748b 14%, var(--admin-input-bg))',
+        badgeText: '#475569',
+        border: 'color-mix(in srgb, #64748b 34%, var(--admin-card-border))',
+      };
+    }
+
+    return {
+      label: 'WEB',
+      description: 'Tienda virtual',
+      detail: 'Pedido online',
+      badgeBg: 'color-mix(in srgb, #38bdf8 14%, var(--admin-input-bg))',
+      badgeText: '#0369a1',
+      border: 'color-mix(in srgb, #38bdf8 36%, var(--admin-card-border))',
     };
   };
 
@@ -143,7 +214,7 @@ export default function OrdersTable({
             </div>
 
             <div className="text-xs" style={{ color: THEME.mutedText }}>
-              Monitorea ventas, estados, sedes y acciones rápidas.
+              Monitorea ventas, estados, sedes, canal de origen y acciones rápidas.
             </div>
           </div>
 
@@ -209,6 +280,7 @@ export default function OrdersTable({
               const name = [cust.name, cust.lastname].filter(Boolean).join(' ') || 'Cliente';
               const tags = Array.isArray(o.tags) ? o.tags : [];
               const branchInfo = getBranchInfo(o);
+              const originInfo = getOrderOriginInfo(o);
 
               const initials = name
                 .split(' ')
@@ -275,6 +347,18 @@ export default function OrdersTable({
                         </div>
 
                         <div className="mt-2 flex flex-wrap items-center gap-1">
+                          <span
+                            className="inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black"
+                            style={{
+                              borderColor: originInfo.border,
+                              background: originInfo.badgeBg,
+                              color: originInfo.badgeText,
+                            }}
+                            title={originInfo.detail}
+                          >
+                            {originInfo.label} · {originInfo.description}
+                          </span>
+
                           <span
                             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                             style={{
@@ -347,6 +431,33 @@ export default function OrdersTable({
 
                       <div
                         className="mt-3 rounded-2xl border px-3 py-2"
+                        style={{
+                          borderColor: originInfo.border,
+                          background: originInfo.badgeBg,
+                        }}
+                      >
+                        <div
+                          className="text-[9px] font-black uppercase tracking-[0.16em]"
+                          style={{ color: originInfo.badgeText }}
+                        >
+                          Origen
+                        </div>
+
+                        <div
+                          className="mt-0.5 truncate text-[12px] font-black"
+                          style={{ color: THEME.cardText }}
+                          title={`${originInfo.label} · ${originInfo.description}`}
+                        >
+                          {originInfo.label} · {originInfo.description}
+                        </div>
+
+                        <div className="mt-0.5 truncate text-[10px] font-bold" style={{ color: THEME.mutedText }}>
+                          {originInfo.detail}
+                        </div>
+                      </div>
+
+                      <div
+                        className="mt-2 rounded-2xl border px-3 py-2"
                         style={{
                           borderColor: ADMIN_BORDER,
                           background: THEME.inputBg,
