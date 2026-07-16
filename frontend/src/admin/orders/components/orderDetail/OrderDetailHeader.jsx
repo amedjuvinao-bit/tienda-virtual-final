@@ -11,6 +11,67 @@ import {
 import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
 import { GhostButton, PrimaryButton, SoftBadge } from './OrderDetailPrimitives';
 
+function getOrderOriginInfo(order) {
+  const source = String(order?.source || '').trim().toLowerCase();
+  const channel = String(order?.channel || '').trim().toLowerCase();
+  const saleType = String(order?.saleType || '').trim().toLowerCase();
+  const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
+  const pos = order?.pos || {};
+
+  const isPos =
+    source === 'pos' ||
+    channel === 'physical_store' ||
+    saleType === 'pos_sale' ||
+    paymentProvider === 'pos' ||
+    Boolean(pos.receiptNumber || pos.saleNumber || pos.registerCode);
+
+  if (isPos) {
+    const reference = pos.receiptNumber || pos.saleNumber || order?.payment?.reference || '';
+    const terminal = pos.registerCode || pos.terminalId || '';
+
+    return {
+      label: 'POS',
+      description: 'Venta física',
+      detail: [reference, terminal ? `Caja ${terminal}` : 'Pagada en caja'].filter(Boolean).join(' · '),
+      variant: 'primary',
+    };
+  }
+
+  if (source === 'manual' || saleType === 'manual_order') {
+    return {
+      label: 'MANUAL',
+      description: 'Orden manual',
+      detail: 'Creada desde administración',
+      variant: 'warning',
+    };
+  }
+
+  if (source === 'admin') {
+    return {
+      label: 'ADMIN',
+      description: 'Panel administrativo',
+      detail: 'Gestión interna',
+      variant: 'primary',
+    };
+  }
+
+  if (source === 'import') {
+    return {
+      label: 'IMPORTADA',
+      description: 'Carga externa',
+      detail: 'Orden importada',
+      variant: 'neutral',
+    };
+  }
+
+  return {
+    label: 'WEB',
+    description: 'Tienda virtual',
+    detail: 'Pedido online',
+    variant: 'neutral',
+  };
+}
+
 export default function OrderDetailHeader({
   order,
   onClose,
@@ -23,6 +84,7 @@ export default function OrderDetailHeader({
   const branchInfo = getOrderBranchInfo(order);
   const sourceLabel = getOrderSourceLabel(order?.source);
   const summary = getOrderSummary(order);
+  const originInfo = getOrderOriginInfo(order);
 
   return (
     <header
@@ -139,6 +201,8 @@ export default function OrderDetailHeader({
               <span>•</span>
               <span>Canal: {sourceLabel}</span>
               <span>•</span>
+              <span>Origen: {originInfo.label} · {originInfo.description}</span>
+              <span>•</span>
               <span>Sede: {branchInfo.name}</span>
             </div>
 
@@ -150,6 +214,14 @@ export default function OrderDetailHeader({
                 gap: 8,
               }}
             >
+              <SoftBadge variant={originInfo.variant}>
+                {originInfo.label} · {originInfo.description}
+              </SoftBadge>
+
+              <SoftBadge variant="neutral">
+                {originInfo.detail}
+              </SoftBadge>
+
               <SoftBadge>
                 Total {toCOP(summary.total)}
               </SoftBadge>
