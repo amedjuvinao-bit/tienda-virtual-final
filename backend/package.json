@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:customers": "node scripts/testCustomersModule.js",
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
+    "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
     "migrate:categories": "node scripts/migrate-categories.js"
