@@ -1,10 +1,21 @@
 // backend/routes/productRoutes.js
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Product = require('../models/Product');
+const InventoryStock = require('../models/InventoryStock');
 const cloudinary = require('cloudinary').v2;
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
+const {
+  PRODUCT_TYPE_VALUES,
+  UNIT_OF_MEASURE_VALUES,
+  normalizeProductType,
+  normalizeUnitOfMeasure,
+  normalizeVariantPreset,
+  normalizeVariantAxes,
+  shouldTrackInventory,
+} = require('../lib/products/productUniversalConfig');
 
 // ✅ Cloudinary (usa tus variables del .env)
 cloudinary.config({
@@ -73,6 +84,136 @@ function totalStockFromInventory(inv) {
   let total = 0;
   for (const r of inv) total += Math.max(0, Number(r.stock || 0));
   return total;
+}
+
+function parseBoolean(value, fallback = undefined) {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return fallback;
+}
+
+function buildProductConfigPayload(body = {}, fallbackProductType = 'physical') {
+  const productType = normalizeProductType(body.productType || fallbackProductType);
+  const trackInventory = shouldTrackInventory(
+    productType,
+    parseBoolean(body.trackInventory, undefined)
+  );
+  const variantPreset = normalizeVariantPreset(body.variantPreset);
+
+  return {
+    productType,
+    unitOfMeasure: normalizeUnitOfMeasure(body.unitOfMeasure),
+    trackInventory,
+    allowBackorder: parseBoolean(body.allowBackorder, false) === true,
+    variantPreset,
+    variantAxes: normalizeVariantAxes(body.variantAxes, variantPreset),
+  };
+}
+
+function getObjectId(value) {
+  try {
+    const id = typeof value === 'object' ? value?._id || value?.id : value;
+    const text = String(id || '').trim();
+    return mongoose.Types.ObjectId.isValid(text) ? new mongoose.Types.ObjectId(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function buildInventorySummaryMap(products = []) {
+  const ids = products
+    .map((product) => getObjectId(product?._id))
+    .filter(Boolean);
+
+  if (!ids.length) return new Map();
+
+  const rows = await InventoryStock.aggregate([
+    {
+      $match: {
+        product: { $in: ids },
+        deletedAt: null,
+        active: { $ne: false },
+      },
+    },
+    {
+      $group: {
+        _id: '$product',
+        stock: { $sum: { $ifNull: ['$stock', 0] } },
+        reservedStock: { $sum: { $ifNull: ['$reservedStock', 0] } },
+        availableStock: { $sum: { $ifNull: ['$availableStock', 0] } },
+        variantsCount: { $sum: 1 },
+        branches: { $addToSet: '$branch' },
+        lowStockCount: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $gt: [{ $ifNull: ['$reorderPoint', 0] }, 0] },
+                  { $lte: [{ $ifNull: ['$availableStock', 0] }, { $ifNull: ['$reorderPoint', 0] }] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const map = new Map();
+
+  for (const row of rows) {
+    map.set(String(row._id), {
+      stock: Number(row.stock || 0),
+      reservedStock: Number(row.reservedStock || 0),
+      availableStock: Number(row.availableStock || 0),
+      variantsCount: Number(row.variantsCount || 0),
+      branchesCount: Array.isArray(row.branches) ? row.branches.length : 0,
+      lowStockCount: Number(row.lowStockCount || 0),
+      source: 'InventoryStock',
+    });
+  }
+
+  return map;
+}
+
+function serializeAdminProduct(product, inventorySummaryMap = new Map()) {
+  const plain = product?.toObject ? product.toObject({ virtuals: true }) : { ...product };
+  const productId = String(plain?._id || '');
+  const inventorySummary =
+    inventorySummaryMap.get(productId) ||
+    {
+      stock: Number(plain.stock || 0),
+      reservedStock: 0,
+      availableStock: Number(plain.stock || 0),
+      variantsCount: Array.isArray(plain.inventory) ? plain.inventory.length : 0,
+      branchesCount: 0,
+      lowStockCount: 0,
+      source: 'Product.stock',
+    };
+
+  const price = Number(plain.price || 0);
+  const cost = Number(plain.cost || 0);
+  const marginValue = Math.max(0, price - cost);
+  const marginPercent = price > 0 ? Math.round((marginValue / price) * 10000) / 100 : 0;
+
+  return {
+    ...plain,
+    productType: normalizeProductType(plain.productType),
+    unitOfMeasure: normalizeUnitOfMeasure(plain.unitOfMeasure),
+    trackInventory: shouldTrackInventory(plain.productType, plain.trackInventory),
+    inventorySummary,
+    stock: inventorySummary.stock,
+    reservedStock: inventorySummary.reservedStock,
+    availableStock: inventorySummary.availableStock,
+    financialSummary: {
+      price,
+      cost,
+      marginValue,
+      marginPercent,
+    },
+  };
 }
 
 // GET /api/products (activos por defecto)
@@ -159,6 +300,45 @@ router.get('/admin/reviews', requireAdmin, async (req, res) => {
   }
 });
 
+// ✅ GET /api/products/admin/list
+//    Vista administrativa enriquecida con inventario real y resumen financiero.
+router.get('/admin/list', requireAdmin, async (req, res) => {
+  try {
+    const { all = '1', q = '', productType = 'all' } = req.query;
+    const filter = all === '1' ? {} : { active: true };
+
+    const cleanQ = String(q || '').trim();
+    if (cleanQ) {
+      const regex = new RegExp(cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { title: regex },
+        { description: regex },
+        { sku: regex },
+        { category: regex },
+        { categories: regex },
+        { barcode: regex },
+      ];
+    }
+
+    const normalizedType = normalizeProductType(productType);
+    if (productType !== 'all' && PRODUCT_TYPE_VALUES.includes(normalizedType)) {
+      filter.productType = normalizedType;
+    }
+
+    const products = await Product.find(filter).sort({ createdAt: -1, title: 1 });
+    const inventorySummaryMap = await buildInventorySummaryMap(products);
+
+    res.json({
+      ok: true,
+      total: products.length,
+      data: products.map((product) => serializeAdminProduct(product, inventorySummaryMap)),
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener productos admin:', error.message);
+    res.status(500).json({ ok: false, message: 'Error al obtener productos administrativos' });
+  }
+});
+
 // ✅ POST /api/products (crear)
 //    PROTEGIDO: solo admin con permiso products:create
 router.post(
@@ -182,7 +362,7 @@ router.post(
         category,
         categories,
 
-        // nuevos campos
+        // inventario heredado
         sizes,
         inventory,
 
@@ -208,7 +388,8 @@ router.post(
         return res.status(400).json({ message: 'price inválido' });
       }
 
-      const preInv = sanitizeInventory(inventory);
+      const productConfig = buildProductConfigPayload(req.body);
+      const preInv = productConfig.trackInventory ? sanitizeInventory(inventory) : [];
 
       if (hasInventoryDuplicates(preInv)) {
         return res.status(400).json({
@@ -224,9 +405,9 @@ router.post(
         image: image ?? '',
         images: Array.isArray(images) ? images.slice(0, 5) : [],
         stock:
-          stock != null
+          productConfig.trackInventory && stock != null
             ? Math.max(0, Number(stock))
-            : preInv.length
+            : productConfig.trackInventory && preInv.length
               ? totalStockFromInventory(preInv)
               : 0,
         active: typeof active === 'boolean' ? active : true,
@@ -237,8 +418,15 @@ router.post(
         category: category ?? undefined,
         categories: sanitizeStrArray(categories),
 
-        sizes: Array.isArray(sizes) ? sizes : [],
+        sizes: productConfig.trackInventory && Array.isArray(sizes) ? sizes : [],
         inventory: preInv,
+
+        productType: productConfig.productType,
+        unitOfMeasure: productConfig.unitOfMeasure,
+        trackInventory: productConfig.trackInventory,
+        allowBackorder: productConfig.allowBackorder,
+        variantPreset: productConfig.variantPreset,
+        variantAxes: productConfig.variantAxes,
 
         reorderPoint:
           reorderPoint != null ? Math.max(0, Number(reorderPoint)) : undefined,
@@ -536,6 +724,8 @@ router.put(
         v !== null &&
         !(typeof v === 'string' && v.trim() === '');
 
+      const productConfig = buildProductConfigPayload(req.body, prod.productType || 'physical');
+
       // Detectar cambio de categoría
       const incomingCategory = provided(category) ? String(category) : undefined;
 
@@ -579,9 +769,16 @@ router.put(
 
       if (Array.isArray(features)) prod.features = features;
       if (Array.isArray(colors)) prod.colors = colors.slice(0, 10);
-      if (Array.isArray(sizes)) prod.sizes = sizes;
+      if (Array.isArray(sizes)) prod.sizes = productConfig.trackInventory ? sizes : [];
 
-      if (provided(stock)) {
+      prod.productType = productConfig.productType;
+      prod.unitOfMeasure = productConfig.unitOfMeasure;
+      prod.trackInventory = productConfig.trackInventory;
+      prod.allowBackorder = productConfig.allowBackorder;
+      prod.variantPreset = productConfig.variantPreset;
+      prod.variantAxes = productConfig.variantAxes;
+
+      if (productConfig.trackInventory && provided(stock)) {
         const n = Number(stock);
 
         if (Number.isNaN(n)) {
@@ -591,6 +788,12 @@ router.put(
         }
 
         prod.stock = Math.max(0, n);
+      }
+
+      if (!productConfig.trackInventory) {
+        prod.stock = 0;
+        prod.inventory = [];
+        prod.sizes = [];
       }
 
       if (typeof active === 'boolean') prod.active = active;
@@ -648,7 +851,7 @@ router.put(
       if (provided(notes)) prod.notes = notes;
 
       // ✅ INVENTARIO: replace (por defecto) o merge
-      if (Array.isArray(inventory)) {
+      if (productConfig.trackInventory && Array.isArray(inventory)) {
         const sanitized = sanitizeInventory(inventory);
 
         if (hasInventoryDuplicates(sanitized)) {
