@@ -2,20 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  PackageSearch,
-  BellRing,
-  RefreshCw,
-  Plus,
-  ArrowRightLeft,
-  BookOpen,
   AlertCircle,
-  MapPin,
+  ArrowRightLeft,
+  BellRing,
+  BookOpen,
   Boxes,
   Clock,
-  Warehouse,
-  Ruler,
-  Palette,
   Download,
+  PackageSearch,
+  Palette,
+  Plus,
+  RefreshCw,
+  Ruler,
+  Warehouse,
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
@@ -26,130 +25,48 @@ import InventoryReservationsPanel from './inventory/components/InventoryReservat
 import InventoryTransferModal from './inventory/components/InventoryTransferModal';
 
 const LOW_STOCK_LIMIT = 5;
+const PAGE_LIMIT = 100;
+const MAX_PAGES = 100;
 
 const STOCK_FILTERS = [
-  {
-    value: 'all',
-    label: 'Todos',
-  },
-  {
-    value: 'withStock',
-    label: 'Con stock',
-  },
-  {
-    value: 'withoutStock',
-    label: 'Sin stock',
-  },
-  {
-    value: 'lowStock',
-    label: 'Bajo stock',
-  },
+  { value: 'all', label: 'Todos' },
+  { value: 'withStock', label: 'Con stock' },
+  { value: 'withoutStock', label: 'Sin stock' },
+  { value: 'lowStock', label: 'Bajo stock' },
 ];
 
 const styles = {
-  pageText: {
-    color: 'var(--admin-page-text)',
-  },
-
+  pageText: { color: 'var(--admin-page-text)' },
   headerCard: {
-    borderRadius: 'calc(var(--admin-radius) + 6px)',
+    borderRadius: 'calc(var(--admin-radius) + 8px)',
     border: '1px solid var(--admin-card-border)',
     background: 'var(--admin-glass-strong-bg)',
     color: 'var(--admin-card-text)',
     boxShadow: 'var(--admin-glass-shadow)',
   },
-
   card: {
+    borderRadius: 'calc(var(--admin-radius) + 8px)',
+    border: '1px solid var(--admin-card-border)',
+    background: 'var(--admin-glass-bg)',
+    color: 'var(--admin-card-text)',
+    boxShadow: 'var(--admin-glass-shadow)',
+  },
+  statCard: {
     borderRadius: 'calc(var(--admin-radius) + 6px)',
     border: '1px solid var(--admin-card-border)',
-    background: 'var(--admin-glass-bg)',
+    background: 'var(--admin-card-bg)',
     color: 'var(--admin-card-text)',
     boxShadow: 'var(--admin-glass-shadow)',
   },
-
-  statCard: {
-    borderRadius: 'calc(var(--admin-radius) + 4px)',
-    border: '1px solid var(--admin-card-border)',
-    background: 'var(--admin-glass-bg)',
-    color: 'var(--admin-card-text)',
-    boxShadow: 'var(--admin-glass-shadow)',
-  },
-
   filterCard: {
-    borderRadius: 'calc(var(--admin-radius) + 2px)',
+    borderRadius: 'calc(var(--admin-radius) + 4px)',
     border: '1px solid var(--admin-card-border)',
     background: 'var(--admin-card-bg)',
     color: 'var(--admin-card-text)',
   },
-
-  eyebrow: {
-    color: 'var(--admin-primary)',
-  },
-
-  title: {
-    color: 'var(--admin-card-text)',
-  },
-
-  muted: {
-    color: 'var(--admin-card-muted-text)',
-  },
-
-  icon: {
-    color: 'var(--admin-primary)',
-  },
-
-  secondaryButton: {
-    borderRadius: '999px',
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.45) 30%)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 74%, #0f172a 26%), color-mix(in srgb, var(--admin-button-bg) 56%, #0f172a 44%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.30)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.52)',
-  },
-
-  primaryButton: {
-    borderRadius: '999px',
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.45) 30%)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 80%, #0f172a 20%), color-mix(in srgb, var(--admin-button-bg) 62%, #0f172a 38%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 26%, transparent), inset 0 1px 0 rgba(255,255,255,0.32)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.52)',
-  },
-
-  exportButtonSmall: {
-    position: 'absolute',
-    top: '18px',
-    right: '18px',
-    width: '42px',
-    height: '42px',
-    borderRadius: '14px',
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 55%, rgba(255,255,255,0.55) 45%)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 72%, #0f172a 28%), color-mix(in srgb, var(--admin-button-bg) 52%, #0f172a 48%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.28)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.50)',
-  },
-
-  softButton: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-button-soft-border)',
-    background: 'var(--admin-button-soft-bg)',
-    color: 'var(--admin-button-soft-text)',
-  },
-
-  errorBox: {
-    borderRadius: 'var(--admin-radius)',
-    border: '1px solid var(--admin-danger)',
-    background: 'var(--admin-danger-soft-bg)',
-    color: 'var(--admin-danger-text)',
-  },
-
+  title: { color: 'var(--admin-card-text)' },
+  muted: { color: 'var(--admin-card-muted-text)' },
+  eyebrow: { color: 'var(--admin-primary)' },
   input: {
     borderRadius: 'var(--admin-radius)',
     border: '1px solid var(--admin-input-border)',
@@ -157,21 +74,28 @@ const styles = {
     color: 'var(--admin-input-text)',
     outline: 'none',
   },
-
-  inventoryList: {
-    borderRadius: 'calc(var(--admin-radius) + 6px)',
-    border: '1px solid var(--admin-card-border)',
+  primaryButton: {
+    borderRadius: '999px',
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.45) 30%)',
     background:
-      'linear-gradient(180deg, color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%), var(--admin-card-bg))',
-    overflow: 'hidden',
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 82%, #0f172a 18%), color-mix(in srgb, var(--admin-button-bg) 58%, #0f172a 42%))',
+    color: '#ffffff',
+    boxShadow:
+      '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.30)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.52)',
   },
-
-  listHeader: {
-    borderBottom: '1px solid var(--admin-card-border)',
-    background: 'var(--admin-table-head-bg)',
-    color: 'var(--admin-table-head-text)',
+  softButton: {
+    borderRadius: '999px',
+    border: '1px solid var(--admin-button-soft-border)',
+    background: 'var(--admin-button-soft-bg)',
+    color: 'var(--admin-button-soft-text)',
   },
-
+  errorBox: {
+    borderRadius: 'var(--admin-radius)',
+    border: '1px solid var(--admin-danger)',
+    background: 'var(--admin-danger-soft-bg)',
+    color: 'var(--admin-danger-text)',
+  },
   inventoryCard: {
     borderRadius: 'calc(var(--admin-radius) + 8px)',
     border: '1px solid var(--admin-card-border)',
@@ -180,72 +104,37 @@ const styles = {
     color: 'var(--admin-card-text)',
     boxShadow: '0 16px 38px color-mix(in srgb, var(--admin-primary) 10%, transparent)',
   },
-
   productIconBox: {
     borderRadius: 'var(--admin-radius)',
     border: '1px solid var(--admin-primary-soft-border)',
     background: 'var(--admin-primary-soft-bg)',
     color: 'var(--admin-primary)',
   },
-
-  skuBadge: {
+  badge: {
     borderRadius: '999px',
     border: '1px solid var(--admin-primary-soft-border)',
     background: 'var(--admin-primary-soft-bg)',
     color: 'var(--admin-primary-soft-text)',
     whiteSpace: 'nowrap',
   },
-
-  branchBadge: {
-    borderRadius: '999px',
-    border: '1px solid var(--admin-button-soft-border)',
-    background: 'var(--admin-button-soft-bg)',
-    color: 'var(--admin-button-soft-text)',
-    whiteSpace: 'nowrap',
-  },
-
-  sectionBlock: {
-    borderRadius: 'calc(var(--admin-radius) + 2px)',
-    border: '1px solid var(--admin-card-border)',
-    background: 'color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 12%)',
-  },
-
-  sectionIconBox: {
-    borderRadius: 'calc(var(--admin-radius) - 4px)',
-    border: '1px solid var(--admin-primary-soft-border)',
-    background: 'var(--admin-primary-soft-bg)',
-    color: 'var(--admin-primary)',
-  },
-
-  valuePill: {
-    borderRadius: '999px',
-    border: '1px solid var(--admin-card-border)',
-    background: 'var(--admin-card-bg)',
-    color: 'var(--admin-card-text)',
-    whiteSpace: 'nowrap',
-  },
-
   stockBox: {
     borderRadius: 'calc(var(--admin-radius) + 2px)',
     border: '1px solid var(--admin-primary-soft-border)',
     background: 'var(--admin-primary-soft-bg)',
     color: 'var(--admin-primary-soft-text)',
   },
-
   reservedBox: {
     borderRadius: 'calc(var(--admin-radius) + 2px)',
     border: '1px solid color-mix(in srgb, var(--admin-warning) 55%, var(--admin-card-border))',
     background: 'color-mix(in srgb, var(--admin-warning-soft-bg) 70%, var(--admin-card-bg) 30%)',
     color: 'var(--admin-card-text)',
   },
-
   availableBox: {
     borderRadius: 'calc(var(--admin-radius) + 2px)',
     border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
     background: 'color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))',
     color: 'var(--admin-card-text)',
   },
-
   lowStockBadge: {
     borderRadius: '999px',
     border: '1px solid var(--admin-warning)',
@@ -253,7 +142,6 @@ const styles = {
     color: 'var(--admin-warning-text)',
     whiteSpace: 'nowrap',
   },
-
   outStockBadge: {
     borderRadius: '999px',
     border: '1px solid var(--admin-danger)',
@@ -261,7 +149,6 @@ const styles = {
     color: 'var(--admin-danger-text)',
     whiteSpace: 'nowrap',
   },
-
   goodStockBadge: {
     borderRadius: '999px',
     border: '1px solid color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
@@ -269,91 +156,56 @@ const styles = {
     color: 'var(--admin-card-text)',
     whiteSpace: 'nowrap',
   },
-
-  actionButton: {
-    borderRadius: '999px',
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 70%, rgba(255,255,255,0.42) 30%)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 78%, #0f172a 22%), color-mix(in srgb, var(--admin-button-bg) 58%, #0f172a 42%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 10px 24px color-mix(in srgb, var(--admin-button-bg) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.30)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.55)',
-  },
-
-  cardSoftActionButton: {
-    borderRadius: '999px',
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 65%, rgba(255,255,255,0.38) 35%)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 74%, #0f172a 26%), color-mix(in srgb, var(--admin-button-bg) 52%, #0f172a 48%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 10px 24px color-mix(in srgb, var(--admin-button-bg) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.26)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.55)',
-  },
 };
 
 function formatNumber(value) {
   const number = Number(value || 0);
-
   return new Intl.NumberFormat('es-CO').format(number);
 }
 
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalize(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function getObjectId(value) {
+  if (!value) return '';
+  if (typeof value === 'object') return String(value._id || value.id || '');
+  return String(value || '');
+}
+
+function getProductId(row) {
+  return getObjectId(row?.product || row?.productId || row?.productSnapshot?._id || row?.productSnapshot?.id);
+}
+
+function getBranchId(row) {
+  return getObjectId(row?.branch || row?.branchId || row?.branchSnapshot?._id || row?.branchSnapshot?.id);
+}
+
 function getProductTitle(row) {
-  return (
-    row?.product?.title ||
-    row?.productSnapshot?.title ||
-    row?.title ||
-    'Producto sin nombre'
-  );
+  return row?.product?.title || row?.productSnapshot?.title || row?.title || 'Producto sin nombre';
 }
 
 function getProductSku(row) {
-  return (
-    row?.product?.sku ||
-    row?.productSnapshot?.sku ||
-    row?.variant?.sku ||
-    row?.sku ||
-    '—'
-  );
+  return row?.product?.sku || row?.productSnapshot?.sku || row?.variant?.sku || row?.sku || '—';
 }
 
 function getBranchName(row) {
-  return (
-    row?.branch?.name ||
-    row?.branchSnapshot?.name ||
-    row?.branchName ||
-    'Sede no definida'
-  );
+  return row?.branch?.name || row?.branchSnapshot?.name || row?.branchName || row?.name || 'Sede no definida';
 }
 
-function getBranchOptionName(branch) {
-  if (typeof branch === 'string') return branch;
-
-  return (
-    branch?.name ||
-    branch?.title ||
-    branch?.label ||
-    branch?.branchName ||
-    'Sede sin nombre'
-  );
+function getBranchCode(row) {
+  return row?.branch?.code || row?.branchSnapshot?.code || row?.code || '';
 }
 
 function getBranchType(row) {
-  const type = String(
-    row?.branch?.type ||
-      row?.branchSnapshot?.type ||
-      row?.type ||
-      ''
-  )
-    .trim()
-    .toLowerCase();
-
-  const branchName = getBranchName(row).toLowerCase();
-
+  const type = normalize(row?.branch?.type || row?.branchSnapshot?.type || row?.type || '');
+  const branchName = normalize(getBranchName(row));
   if (type.includes('warehouse') || type.includes('bodega')) return 'Bodega';
   if (branchName.includes('bodega')) return 'Bodega';
-
   return 'Sede';
 }
 
@@ -365,90 +217,173 @@ function getVariantColor(row) {
   return row?.variant?.color || row?.color || '—';
 }
 
-function isHexColor(value) {
-  return /^#([0-9A-F]{3}){1,2}$/i.test(String(value || '').trim());
-}
-
 function getReservedStock(row) {
   const reservedStock = Number(row?.reservedStock || 0);
-
   return Number.isFinite(reservedStock) && reservedStock > 0 ? reservedStock : 0;
 }
 
 function getAvailableStock(row) {
-  if (typeof row?.availableStock === 'number') return row.availableStock;
-
+  if (typeof row?.availableStock === 'number') return Math.max(0, row.availableStock);
   const stock = Number(row?.stock || 0);
-  const reservedStock = getReservedStock(row);
-
-  return Math.max(0, stock - reservedStock);
+  return Math.max(0, stock - getReservedStock(row));
 }
 
 function getLowStockLimit(row) {
-  const reorderPoint = Number(
+  const value = Number(
     row?.reorderPoint ||
       row?.product?.reorderPoint ||
       row?.productSnapshot?.reorderPoint ||
+      row?.product?.stockMin ||
+      row?.productSnapshot?.stockMin ||
       LOW_STOCK_LIMIT
   );
 
-  return Number.isFinite(reorderPoint) && reorderPoint > 0
-    ? reorderPoint
-    : LOW_STOCK_LIMIT;
+  return Number.isFinite(value) && value > 0 ? value : LOW_STOCK_LIMIT;
 }
 
 function getStockStatus(row) {
-  const availableStock = Number(getAvailableStock(row) || 0);
-  const lowStockLimit = getLowStockLimit(row);
+  const available = getAvailableStock(row);
+  const lowLimit = getLowStockLimit(row);
 
-  if (availableStock <= 0) {
-    return {
-      label: 'Sin stock',
-      style: styles.outStockBadge,
-    };
-  }
-
-  if (availableStock <= lowStockLimit) {
-    return {
-      label: 'Bajo stock',
-      style: styles.lowStockBadge,
-    };
-  }
-
-  return {
-    label: 'Disponible',
-    style: styles.goodStockBadge,
-  };
+  if (available <= 0) return { label: 'Sin stock', style: styles.outStockBadge };
+  if (available <= lowLimit) return { label: 'Bajo stock', style: styles.lowStockBadge };
+  return { label: 'Disponible', style: styles.goodStockBadge };
 }
 
 function matchesStockFilter(row, stockFilter) {
-  const availableStock = Number(getAvailableStock(row) || 0);
-  const lowStockLimit = getLowStockLimit(row);
+  const available = getAvailableStock(row);
+  const lowLimit = getLowStockLimit(row);
 
-  if (stockFilter === 'withStock') {
-    return availableStock > 0;
-  }
-
-  if (stockFilter === 'withoutStock') {
-    return availableStock <= 0;
-  }
-
-  if (stockFilter === 'lowStock') {
-    return availableStock > 0 && availableStock <= lowStockLimit;
-  }
-
+  if (stockFilter === 'withStock') return available > 0;
+  if (stockFilter === 'withoutStock') return available <= 0;
+  if (stockFilter === 'lowStock') return available > 0 && available <= lowLimit;
   return true;
 }
 
-function getBranchesFromResponse(response) {
+function isHexColor(value) {
+  return /^#([0-9A-F]{3}){1,2}$/i.test(String(value || '').trim());
+}
+
+function getRowsFromResponse(response) {
   const data = response?.data;
-
+  if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.branches)) return data.branches;
-  if (Array.isArray(data?.data?.branches)) return data.data.branches;
   if (Array.isArray(data?.data?.data)) return data.data.data;
-
   return [];
+}
+
+async function fetchAllPages(endpoint, params = {}) {
+  const rows = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await api.get(endpoint, {
+      params: {
+        ...params,
+        page,
+        limit: PAGE_LIMIT,
+      },
+    });
+
+    rows.push(...getRowsFromResponse(response));
+
+    const responseTotalPages = Number(response?.data?.totalPages || 1);
+    totalPages = Number.isFinite(responseTotalPages) && responseTotalPages > 0 ? responseTotalPages : 1;
+    page += 1;
+  } while (page <= totalPages && page <= MAX_PAGES);
+
+  return rows;
+}
+
+function buildBranchOptions(branches = [], stockRows = []) {
+  const map = new Map();
+
+  branches.forEach((branch) => {
+    const id = getBranchId(branch);
+    if (!id) return;
+    map.set(id, {
+      id,
+      name: getBranchName(branch),
+      code: getBranchCode(branch),
+      type: getBranchType(branch),
+    });
+  });
+
+  stockRows.forEach((row) => {
+    const id = getBranchId(row);
+    if (!id || map.has(id)) return;
+    map.set(id, {
+      id,
+      name: getBranchName(row),
+      code: getBranchCode(row),
+      type: getBranchType(row),
+    });
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+function escapeCsv(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value).replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
+  if (text.includes(',') || text.includes(';') || text.includes('"')) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function downloadVisibleInventoryCsv(rows = []) {
+  const headers = [
+    'Producto',
+    'SKU',
+    'Sede',
+    'Codigo sede',
+    'Tipo sede',
+    'Talla',
+    'Color',
+    'Stock fisico',
+    'Reservado',
+    'Disponible',
+    'Punto minimo',
+    'Estado',
+  ];
+
+  const lines = [headers.map(escapeCsv).join(',')];
+
+  rows.forEach((row) => {
+    const status = getStockStatus(row).label;
+    lines.push(
+      [
+        getProductTitle(row),
+        getProductSku(row),
+        getBranchName(row),
+        getBranchCode(row),
+        getBranchType(row),
+        getVariantSize(row),
+        getVariantColor(row),
+        Number(row?.stock || 0),
+        getReservedStock(row),
+        getAvailableStock(row),
+        getLowStockLimit(row),
+        status,
+      ]
+        .map(escapeCsv)
+        .join(',')
+    );
+  });
+
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = `inventario_filtrado_${stamp}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 export default function InventoryAdmin() {
@@ -456,7 +391,6 @@ export default function InventoryAdmin() {
   const [movements, setMovements] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [branchesWarning, setBranchesWarning] = useState('');
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
@@ -472,47 +406,22 @@ export default function InventoryAdmin() {
     try {
       setLoading(true);
       setError('');
-      setBranchesWarning('');
 
-      const [stockRes, movementsRes] = await Promise.all([
-        api.get('/api/admin/inventory/stock'),
-        api.get('/api/admin/inventory/movements'),
+      const [stockData, movementsData, branchesResponse] = await Promise.all([
+        fetchAllPages('/api/admin/inventory/stock'),
+        fetchAllPages('/api/admin/inventory/movements'),
+        api.get('/api/admin/branches', { params: { page: 1, limit: 100, sort: 'name' } }),
       ]);
-
-      const stockData = Array.isArray(stockRes?.data?.data)
-        ? stockRes.data.data
-        : [];
-
-      const movementsData = Array.isArray(movementsRes?.data?.data)
-        ? movementsRes.data.data
-        : [];
 
       setStockRows(stockData);
       setMovements(movementsData);
-
-      try {
-        const branchesRes = await api.get('/api/admin/branches', {
-          params: {
-            limit: 100,
-            sort: 'name',
-          },
-        });
-
-        setBranches(getBranchesFromResponse(branchesRes));
-      } catch (branchesError) {
-        console.warn('⚠️ No se pudieron cargar todas las sedes:', branchesError);
-
-        setBranches([]);
-        setBranchesWarning(
-          'No se pudieron cargar todas las sedes. El filtro mostrará solo sedes con inventario.'
-        );
-      }
+      setBranches(getRowsFromResponse(branchesResponse));
     } catch (err) {
       console.error('❌ Error cargando inventario:', err);
       setError(
         err?.response?.data?.message ||
           err?.userMessage ||
-          'No se pudo cargar el inventario.'
+          'No se pudo cargar el inventario completo.'
       );
     } finally {
       setLoading(false);
@@ -523,52 +432,26 @@ export default function InventoryAdmin() {
     loadInventory();
   }, [loadInventory]);
 
-  const branchOptions = useMemo(() => {
-    const branchMap = new Map();
-
-    branches.forEach((branch) => {
-      const branchName = getBranchOptionName(branch);
-
-      if (!branchName || branchName === 'Sede sin nombre') return;
-
-      branchMap.set(branchName, branchName);
-    });
-
-    stockRows.forEach((row) => {
-      const branchName = getBranchName(row);
-
-      if (!branchName || branchName === 'Sede no definida') return;
-
-      branchMap.set(branchName, branchName);
-    });
-
-    return Array.from(branchMap.values()).sort((a, b) =>
-      a.localeCompare(b, 'es')
-    );
-  }, [branches, stockRows]);
+  const branchOptions = useMemo(() => buildBranchOptions(branches, stockRows), [branches, stockRows]);
 
   const filteredStockRows = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = normalize(searchTerm);
 
     return stockRows.filter((row) => {
-      const productTitle = getProductTitle(row).toLowerCase();
-      const productSku = getProductSku(row).toLowerCase();
-      const branchName = getBranchName(row);
-      const branchNameLower = branchName.toLowerCase();
-      const size = String(getVariantSize(row)).toLowerCase();
-      const color = String(getVariantColor(row)).toLowerCase();
+      const searchText = [
+        getProductTitle(row),
+        getProductSku(row),
+        getBranchName(row),
+        getBranchCode(row),
+        getBranchType(row),
+        getVariantSize(row),
+        getVariantColor(row),
+      ]
+        .join(' ')
+        .toLowerCase();
 
-      const matchesSearch =
-        !term ||
-        productTitle.includes(term) ||
-        productSku.includes(term) ||
-        branchNameLower.includes(term) ||
-        size.includes(term) ||
-        color.includes(term);
-
-      const matchesBranch =
-        branchFilter === 'all' || branchName === branchFilter;
-
+      const matchesSearch = !term || searchText.includes(term);
+      const matchesBranch = branchFilter === 'all' || getBranchId(row) === branchFilter;
       const matchesStock = matchesStockFilter(row, stockFilter);
 
       return matchesSearch && matchesBranch && matchesStock;
@@ -577,30 +460,24 @@ export default function InventoryAdmin() {
 
   const summary = useMemo(() => {
     const productsWithStock = new Set();
-
     let totalStock = 0;
     let totalReserved = 0;
     let totalAvailable = 0;
+    let lowStock = 0;
+    let outOfStock = 0;
 
     stockRows.forEach((row) => {
       const stock = Number(row?.stock || 0);
-      const reservedStock = Number(getReservedStock(row) || 0);
-      const availableStock = Number(getAvailableStock(row) || 0);
+      const reserved = getReservedStock(row);
+      const available = getAvailableStock(row);
 
       totalStock += stock;
-      totalReserved += reservedStock;
-      totalAvailable += availableStock;
+      totalReserved += reserved;
+      totalAvailable += available;
 
-      if (stock > 0) {
-        productsWithStock.add(
-          String(
-            row?.product?._id ||
-              row?.product ||
-              row?.productSnapshot?.id ||
-              row?._id
-          )
-        );
-      }
+      if (stock > 0) productsWithStock.add(getProductId(row) || row?._id);
+      if (available <= 0) outOfStock += 1;
+      if (available > 0 && available <= getLowStockLimit(row)) lowStock += 1;
     });
 
     return {
@@ -609,56 +486,12 @@ export default function InventoryAdmin() {
       totalReserved,
       totalAvailable,
       totalMovements: movements.length,
+      lowStock,
+      outOfStock,
     };
   }, [stockRows, movements]);
 
-  const hasActiveFilters =
-    searchTerm.trim() !== '' ||
-    branchFilter !== 'all' ||
-    stockFilter !== 'all';
-
-    const exportInventoryCsv = useCallback(async () => {
-    try {
-      setError('');
-
-      const response = await api.get('/api/admin/inventory/export', {
-        responseType: 'blob',
-        params: {
-          q: searchTerm.trim() || undefined,
-          branchId: undefined,
-        },
-      });
-
-      const blob = new Blob([response.data], {
-        type: response.headers?.['content-type'] || 'text/csv;charset=utf-8',
-      });
-
-      const disposition = response.headers?.['content-disposition'] || '';
-      const fileNameMatch = disposition.match(/filename="(.+)"/i);
-
-      const fileName =
-        fileNameMatch?.[1] || `inventario_por_sedes_${Date.now()}.csv`;
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('❌ Error exportando inventario CSV:', err);
-
-      setError(
-        err?.response?.data?.message ||
-          err?.userMessage ||
-          'No se pudo exportar el inventario.'
-      );
-    }
-  }, [searchTerm]);
+  const hasActiveFilters = searchTerm.trim() !== '' || branchFilter !== 'all' || stockFilter !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -683,46 +516,36 @@ export default function InventoryAdmin() {
 
   return (
     <section className="space-y-6" style={styles.pageText}>
-       
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"></div>
-      <div className="relative p-6 backdrop-blur" style={styles.headerCard}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p
-              className="text-xs font-bold uppercase tracking-[0.22em]"
-              style={styles.eyebrow}
-            >
+      <div className="p-6 backdrop-blur" style={styles.headerCard}>
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.22em]" style={styles.eyebrow}>
               Inventario por sedes
             </p>
-
-            <h1 className="mt-2 text-2xl font-bold" style={styles.title}>
+            <h1 className="mt-2 text-2xl font-black md:text-3xl" style={styles.title}>
               Inventario
             </h1>
-
-            <p className="mt-2 max-w-2xl text-sm" style={styles.muted}>
-              Controla el stock físico, reservado y disponible por sede, producto, talla, color y movimientos de inventario.
+            <p className="mt-2 max-w-3xl text-sm leading-6" style={styles.muted}>
+              Controla el stock físico, reservado y disponible por sede, producto, talla, color y movimientos. Esta vista carga todas las páginas del backend para no trabajar con solo 20 registros.
             </p>
           </div>
 
-          <div className="flex w-full shrink-0 flex-nowrap items-center justify-start gap-3 overflow-visible whitespace-nowrap lg:w-auto lg:justify-end">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={loadInventory}
               disabled={loading}
-              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
-              style={styles.secondaryButton}
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-70"
+              style={styles.softButton}
             >
-              <RefreshCw
-                size={16}
-                className={loading ? 'animate-spin' : ''}
-              />
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               {loading ? 'Actualizando...' : 'Actualizar'}
             </button>
 
             <button
               type="button"
               onClick={() => setAdjustmentModalOpen(true)}
-              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
               style={styles.primaryButton}
             >
               <Plus size={16} />
@@ -732,8 +555,8 @@ export default function InventoryAdmin() {
             <button
               type="button"
               onClick={openGeneralTransferModal}
-              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
-              style={styles.secondaryButton}
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
+              style={styles.softButton}
             >
               <ArrowRightLeft size={16} />
               Trasladar
@@ -742,8 +565,8 @@ export default function InventoryAdmin() {
             <button
               type="button"
               onClick={() => setAlertsPanelOpen(true)}
-              className="admin-inventory-theme-button inline-flex shrink-0 items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed"
-              style={styles.secondaryButton}
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
+              style={styles.softButton}
             >
               <BellRing size={16} />
               Alertas
@@ -754,119 +577,59 @@ export default function InventoryAdmin() {
         </div>
 
         {error && (
-          <div
-            className="mt-5 flex items-start gap-3 px-4 py-3 text-sm"
-            style={styles.errorBox}
-          >
+          <div className="mt-5 flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <p>{error}</p>
           </div>
         )}
-
-        {branchesWarning && !error && (
-          <div
-            className="mt-5 flex items-start gap-3 px-4 py-3 text-sm"
-            style={styles.errorBox}
-          >
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <p>{branchesWarning}</p>
-          </div>
-        )}
       </div>
-      <button
-        type="button"
-        onClick={exportInventoryCsv}
-        className="inline-flex items-center justify-center transition hover:-translate-y-0.5"
-        style={styles.exportButtonSmall}
-        title="Exportar inventario CSV"
-        aria-label="Exportar inventario CSV"
-      >
-        <Download size={18} />
-      </button>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard
-          label="Productos con stock"
-          value={summary.productsWithStock}
-          description="Productos con existencia registrada"
-          icon={<PackageSearch size={20} />}
-        />
-
-        <SummaryCard
-          label="Stock total"
-          value={summary.totalStock}
-          description="Todas las sedes"
-          icon={<PackageSearch size={20} />}
-        />
-
-        <SummaryCard
-          label="Reservado"
-          value={summary.totalReserved}
-          description="Apartado por órdenes pendientes"
-          icon={<Clock size={20} />}
-        />
-
-        <SummaryCard
-          label="Disponible"
-          value={summary.totalAvailable}
-          description="Listo para venta"
-          icon={<PackageSearch size={20} />}
-        />
-
-        <SummaryCard
-          label="Movimientos"
-          value={summary.totalMovements}
-          description="Entradas, salidas y ajustes"
-          icon={<ArrowRightLeft size={20} />}
-        />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <SummaryCard label="Productos con stock" value={summary.productsWithStock} description="Productos con existencia" icon={<PackageSearch size={20} />} />
+        <SummaryCard label="Stock físico" value={summary.totalStock} description="Todas las sedes" icon={<Boxes size={20} />} />
+        <SummaryCard label="Reservado" value={summary.totalReserved} description="Apartado por órdenes" icon={<Clock size={20} />} />
+        <SummaryCard label="Disponible" value={summary.totalAvailable} description="Listo para venta" icon={<PackageSearch size={20} />} />
+        <SummaryCard label="Bajo stock" value={summary.lowStock} description="Según punto mínimo" icon={<AlertCircle size={20} />} />
+        <SummaryCard label="Movimientos" value={summary.totalMovements} description="Entradas, salidas y traslados" icon={<ArrowRightLeft size={20} />} />
       </div>
 
       <div className="p-6 backdrop-blur" style={styles.card}>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-bold" style={styles.title}>
-              Stock por sede
-            </h2>
-
-            <p className="text-sm" style={styles.muted}>
-              Aquí se muestra el inventario detallado por producto, sede, talla y color, separando stock físico, reservado y disponible.
+            <h2 className="text-lg font-black" style={styles.title}>Stock por sede</h2>
+            <p className="mt-1 text-sm leading-6" style={styles.muted}>
+              Mostrando {formatNumber(filteredStockRows.length)} de {formatNumber(stockRows.length)} registros cargados.
             </p>
           </div>
 
-          <p className="text-sm font-semibold" style={styles.muted}>
-            Mostrando {formatNumber(filteredStockRows.length)} de{' '}
-            {formatNumber(stockRows.length)} registros
-          </p>
+          <button
+            type="button"
+            onClick={() => downloadVisibleInventoryCsv(filteredStockRows)}
+            disabled={loading || filteredStockRows.length === 0}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+            style={styles.primaryButton}
+          >
+            <Download size={16} />
+            Exportar vista actual
+          </button>
         </div>
 
         <div className="mt-5 p-4" style={styles.filterCard}>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto] lg:items-end">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_220px_auto] lg:items-end">
             <div>
-              <label
-                className="text-xs font-black uppercase tracking-wide"
-                style={styles.muted}
-              >
-                Buscar
-              </label>
-
+              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Buscar</label>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar producto, SKU, sede, talla o color..."
-                className="admin-inventory-search mt-2 w-full px-4 py-3 text-sm transition"
+                placeholder="Producto, SKU, sede, talla o color..."
+                className="mt-2 w-full px-4 py-3 text-sm transition"
                 style={styles.input}
               />
             </div>
 
             <div>
-              <label
-                className="text-xs font-black uppercase tracking-wide"
-                style={styles.muted}
-              >
-                Sede
-              </label>
-
+              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Sede</label>
               <select
                 value={branchFilter}
                 onChange={(event) => setBranchFilter(event.target.value)}
@@ -874,23 +637,16 @@ export default function InventoryAdmin() {
                 style={styles.input}
               >
                 <option value="all">Todas las sedes</option>
-
-                {branchOptions.map((branchName) => (
-                  <option key={branchName} value={branchName}>
-                    {branchName}
+                {branchOptions.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label
-                className="text-xs font-black uppercase tracking-wide"
-                style={styles.muted}
-              >
-                Estado de stock
-              </label>
-
+              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Estado</label>
               <select
                 value={stockFilter}
                 onChange={(event) => setStockFilter(event.target.value)}
@@ -898,9 +654,7 @@ export default function InventoryAdmin() {
                 style={styles.input}
               >
                 {STOCK_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
+                  <option key={filter.value} value={filter.value}>{filter.label}</option>
                 ))}
               </select>
             </div>
@@ -909,341 +663,122 @@ export default function InventoryAdmin() {
               type="button"
               onClick={clearFilters}
               disabled={!hasActiveFilters}
-              className="admin-inventory-soft-button inline-flex items-center justify-center px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center justify-center px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
               style={styles.softButton}
             >
               Limpiar filtros
             </button>
           </div>
-
-          <p className="mt-3 text-xs leading-5" style={styles.muted}>
-            Bajo stock se calcula con el punto de reorden del producto si existe.
-            Si no existe, se toma como referencia {LOW_STOCK_LIMIT} unidades disponibles.
-            El disponible se calcula como stock físico menos unidades reservadas.
-          </p>
         </div>
 
-        <div className="mt-6" style={styles.inventoryList}>
-          <div className="px-5 py-4" style={styles.listHeader}>
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <p className="text-xs font-black uppercase tracking-[0.18em]">
-                Fichas de inventario
-              </p>
-
-              <p className="text-xs font-semibold opacity-80">
-                Producto → ubicación → variante → cantidades → historial
-              </p>
+        <div className="mt-6 space-y-4">
+          {loading && (
+            <div className="px-4 py-12 text-center text-sm font-semibold" style={styles.muted}>
+              Cargando inventario completo...
             </div>
-          </div>
+          )}
 
-          <div className="space-y-4 p-4">
-            {loading && (
-              <div className="px-4 py-12 text-center text-sm" style={styles.muted}>
-                Cargando inventario...
-              </div>
-            )}
+          {!loading && filteredStockRows.length === 0 && (
+            <div className="px-4 py-12 text-center text-sm font-semibold" style={styles.muted}>
+              No hay registros de inventario para mostrar.
+            </div>
+          )}
 
-            {!loading && filteredStockRows.length === 0 && (
-              <div className="px-4 py-12 text-center text-sm" style={styles.muted}>
-                No hay registros de inventario para mostrar.
-              </div>
-            )}
+          {!loading && filteredStockRows.map((row) => {
+            const color = getVariantColor(row);
+            const stockStatus = getStockStatus(row);
+            const available = getAvailableStock(row);
+            const reserved = getReservedStock(row);
+            const canTransfer = available > 0;
 
-            {!loading &&
-              filteredStockRows.map((row) => {
-                const color = getVariantColor(row);
-                const stockStatus = getStockStatus(row);
-                const reservedStock = Number(getReservedStock(row) || 0);
-                const availableStock = Number(getAvailableStock(row) || 0);
-                const canTransferFromCard = availableStock > 0;
-
-                return (
-                  <article
-                    key={row?._id}
-                    className="admin-inventory-readable-card p-4 transition md:p-5"
-                    style={styles.inventoryCard}
-                  >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div
-                          className="flex h-12 w-12 shrink-0 items-center justify-center"
-                          style={styles.productIconBox}
-                        >
-                          <Boxes size={21} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p
-                            className="text-lg font-black leading-6"
-                            style={styles.title}
-                          >
-                            {getProductTitle(row)}
-                          </p>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span
-                              className="inline-flex items-center px-3 py-1 text-xs font-black"
-                              style={styles.skuBadge}
-                            >
-                              SKU: {getProductSku(row)}
-                            </span>
-
-                            <span
-                              className="inline-flex items-center px-3 py-1 text-xs font-black"
-                              style={stockStatus.style}
-                            >
-                              {stockStatus.label}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => openTransferFromCard(row)}
-                          disabled={!canTransferFromCard}
-                          className="admin-inventory-card-soft-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed sm:w-auto"
-                          style={styles.cardSoftActionButton}
-                          title={
-                            canTransferFromCard
-                              ? 'Trasladar este inventario'
-                              : 'No hay stock disponible para trasladar'
-                          }
-                        >
-                          <ArrowRightLeft size={15} />
-                          Trasladar desde aquí
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setMovementsModalRow(row)}
-                          className="admin-inventory-action-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition sm:w-auto"
-                          style={styles.actionButton}
-                        >
-                          <ArrowRightLeft size={15} />
-                          Ver movimientos
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setKardexModalRow(row)}
-                          className="admin-inventory-action-button inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-black transition sm:w-auto"
-                          style={styles.actionButton}
-                        >
-                          <BookOpen size={15} />
-                          Ver Kardex
-                        </button>
+            return (
+              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${getVariantSize(row)}-${getVariantColor(row)}`} className="p-4 md:p-5" style={styles.inventoryCard}>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center" style={styles.productIconBox}>
+                      <Boxes size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-black leading-6" style={styles.title}>{getProductTitle(row)}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center px-3 py-1 text-xs font-black" style={styles.badge}>SKU: {getProductSku(row)}</span>
+                        <span className="inline-flex items-center px-3 py-1 text-xs font-black" style={stockStatus.style}>{stockStatus.label}</span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]">
-                      <InfoBlock
-                        icon={<Warehouse size={17} />}
-                        label="Ubicación"
-                        title={getBranchName(row)}
-                      >
-                        <span
-                          className="inline-flex w-fit items-center px-3 py-1 text-xs font-black"
-                          style={styles.branchBadge}
-                        >
-                          {getBranchType(row)}
-                        </span>
-                      </InfoBlock>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openTransferFromCard(row)}
+                      disabled={!canTransfer}
+                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+                      style={styles.softButton}
+                    >
+                      <ArrowRightLeft size={15} />
+                      Trasladar
+                    </button>
 
-                      <InfoBlock
-                        icon={<Ruler size={17} />}
-                        label="Variante"
-                        title="Talla y color"
-                      >
-                        <div className="flex flex-wrap gap-2">
-                          <span
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black"
-                            style={styles.valuePill}
-                          >
-                            <Ruler size={13} style={styles.icon} />
-                            Talla {getVariantSize(row)}
-                          </span>
+                    <button
+                      type="button"
+                      onClick={() => setMovementsModalRow(row)}
+                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition"
+                      style={styles.primaryButton}
+                    >
+                      <ArrowRightLeft size={15} />
+                      Movimientos
+                    </button>
 
-                          <span
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black"
-                            style={styles.valuePill}
-                          >
-                            {isHexColor(color) ? (
-                              <span
-                                className="h-4 w-4 rounded-full"
-                                style={{
-                                  backgroundColor: color,
-                                  border: '1px solid var(--admin-table-border)',
-                                }}
-                              />
-                            ) : (
-                              <Palette size={13} style={styles.icon} />
-                            )}
-                            {color}
-                          </span>
-                        </div>
-                      </InfoBlock>
+                    <button
+                      type="button"
+                      onClick={() => setKardexModalRow(row)}
+                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition"
+                      style={styles.primaryButton}
+                    >
+                      <BookOpen size={15} />
+                      Kardex
+                    </button>
+                  </div>
+                </div>
 
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="px-4 py-4" style={styles.stockBox}>
-                          <p
-                            className="text-[10px] font-black uppercase tracking-wide"
-                            style={styles.muted}
-                          >
-                            Stock físico
-                          </p>
+                <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_1.25fr]">
+                  <InfoBlock icon={<Warehouse size={17} />} label="Ubicación" title={getBranchName(row)}>
+                    <span className="inline-flex w-fit items-center px-3 py-1 text-xs font-black" style={styles.badge}>{getBranchType(row)}</span>
+                  </InfoBlock>
 
-                          <p className="mt-1 text-2xl font-black" style={styles.title}>
-                            {formatNumber(row?.stock)}
-                          </p>
-                        </div>
-
-                        <div className="px-4 py-4" style={styles.reservedBox}>
-                          <p
-                            className="text-[10px] font-black uppercase tracking-wide"
-                            style={styles.muted}
-                          >
-                            Reservado
-                          </p>
-
-                          <p className="mt-1 text-2xl font-black" style={styles.title}>
-                            {formatNumber(reservedStock)}
-                          </p>
-                        </div>
-
-                        <div className="px-4 py-4" style={styles.availableBox}>
-                          <p
-                            className="text-[10px] font-black uppercase tracking-wide"
-                            style={styles.muted}
-                          >
-                            Disponible
-                          </p>
-
-                          <p className="mt-1 text-2xl font-black" style={styles.title}>
-                            {formatNumber(availableStock)}
-                          </p>
-                        </div>
-                      </div>
+                  <InfoBlock icon={<Ruler size={17} />} label="Variante" title="Talla y color">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
+                        <Ruler size={13} /> Talla {getVariantSize(row)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
+                        {isHexColor(color) ? (
+                          <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color, border: '1px solid var(--admin-table-border)' }} />
+                        ) : (
+                          <Palette size={13} />
+                        )}
+                        {color}
+                      </span>
                     </div>
-                  </article>
-                );
-              })}
-          </div>
+                  </InfoBlock>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <StockValueBox label="Stock físico" value={row?.stock} style={styles.stockBox} />
+                    <StockValueBox label="Reservado" value={reserved} style={styles.reservedBox} />
+                    <StockValueBox label="Disponible" value={available} style={styles.availableBox} />
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
 
-      <InventoryAdjustmentModal
-        open={adjustmentModalOpen}
-        onClose={() => setAdjustmentModalOpen(false)}
-        stockRows={stockRows}
-        onSaved={loadInventory}
-      />
-
-      <InventoryTransferModal
-        open={transferModalOpen}
-        onClose={closeTransferModal}
-        stockRows={stockRows}
-        initialStockRow={initialTransferStockRow}
-        onSaved={loadInventory}
-      />
-
-      <InventoryMovementsModal
-        open={Boolean(movementsModalRow)}
-        onClose={() => setMovementsModalRow(null)}
-        stockRow={movementsModalRow}
-        onChanged={loadInventory}
-      />
-
-      <InventoryKardexModal
-        open={Boolean(kardexModalRow)}
-        onClose={() => setKardexModalRow(null)}
-        stockRow={kardexModalRow}
-      />
-
-      <InventoryAlertsPanel
-        open={alertsPanelOpen}
-        onClose={() => setAlertsPanelOpen(false)}
-      />
-
-      <style>
-        {`
-          .admin-inventory-theme-button,
-          .admin-inventory-action-button,
-          .admin-inventory-card-soft-button {
-            position: relative;
-            overflow: hidden;
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
-          }
-
-          .admin-inventory-theme-button *,
-          .admin-inventory-action-button *,
-          .admin-inventory-card-soft-button * {
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
-            stroke: currentColor !important;
-          }
-
-          .admin-inventory-theme-button::before,
-          .admin-inventory-action-button::before,
-          .admin-inventory-card-soft-button::before {
-            content: '';
-            position: absolute;
-            inset: 1px auto 1px -55%;
-            width: 46%;
-            border-radius: inherit;
-            background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.50) 48%, transparent 100%);
-            transform: skewX(-18deg);
-            opacity: 0.55;
-            pointer-events: none;
-            transition: left 0.48s ease, opacity 0.25s ease;
-          }
-
-          .admin-inventory-theme-button:hover,
-          .admin-inventory-action-button:hover,
-          .admin-inventory-card-soft-button:hover:not(:disabled) {
-            filter: saturate(1.12) brightness(1.05);
-          }
-
-          .admin-inventory-theme-button:hover::before,
-          .admin-inventory-action-button:hover::before,
-          .admin-inventory-card-soft-button:hover:not(:disabled)::before {
-            left: 108%;
-            opacity: 0.92;
-          }
-
-          .admin-inventory-theme-button:disabled,
-          .admin-inventory-action-button:disabled,
-          .admin-inventory-card-soft-button:disabled {
-            opacity: 0.88 !important;
-            cursor: not-allowed;
-            color: rgba(255,255,255,0.92) !important;
-            -webkit-text-fill-color: rgba(255,255,255,0.92) !important;
-            background: linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 28%, #0f172a 72%), color-mix(in srgb, var(--admin-button-bg) 16%, #0f172a 84%)) !important;
-            border-color: color-mix(in srgb, var(--admin-button-bg) 40%, rgba(255,255,255,0.36) 60%) !important;
-          }
-
-          .admin-inventory-theme-button:disabled::before,
-          .admin-inventory-action-button:disabled::before,
-          .admin-inventory-card-soft-button:disabled::before {
-            display: none;
-          }
-
-          .admin-inventory-soft-button:hover {
-            background: var(--admin-primary-soft-hover) !important;
-          }
-
-          .admin-inventory-search::placeholder {
-            color: var(--admin-input-placeholder);
-          }
-
-          .admin-inventory-readable-card:hover {
-            background: linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 82%, var(--admin-primary) 18%), var(--admin-card-bg)) !important;
-            transform: translateY(-1px);
-          }
-        `}
-      </style>
+      <InventoryAdjustmentModal open={adjustmentModalOpen} onClose={() => setAdjustmentModalOpen(false)} stockRows={stockRows} onSaved={loadInventory} />
+      <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} onSaved={loadInventory} />
+      <InventoryMovementsModal open={Boolean(movementsModalRow)} onClose={() => setMovementsModalRow(null)} stockRow={movementsModalRow} onChanged={loadInventory} />
+      <InventoryKardexModal open={Boolean(kardexModalRow)} onClose={() => setKardexModalRow(null)} stockRow={kardexModalRow} />
+      <InventoryAlertsPanel open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} />
     </section>
   );
 }
@@ -1251,53 +786,36 @@ export default function InventoryAdmin() {
 function SummaryCard({ label, value, description, icon }) {
   return (
     <article className="p-5" style={styles.statCard}>
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold" style={styles.muted}>
-          {label}
-        </span>
-
-        <span style={styles.icon}>
-          {icon}
-        </span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-bold" style={styles.muted}>{label}</span>
+        <span style={styles.eyebrow}>{icon}</span>
       </div>
-
-      <p className="mt-4 text-3xl font-bold" style={styles.title}>
-        {formatNumber(value)}
-      </p>
-
-      <p className="mt-1 text-xs" style={styles.muted}>
-        {description}
-      </p>
+      <p className="mt-4 text-3xl font-black" style={styles.title}>{formatNumber(value)}</p>
+      <p className="mt-1 text-xs font-semibold" style={styles.muted}>{description}</p>
     </article>
   );
 }
 
 function InfoBlock({ icon, label, title, children }) {
   return (
-    <div className="p-4" style={styles.sectionBlock}>
+    <div className="p-4" style={styles.filterCard}>
       <div className="flex items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center"
-          style={styles.sectionIconBox}
-        >
-          {icon}
-        </div>
-
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center" style={styles.productIconBox}>{icon}</div>
         <div className="min-w-0">
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.14em]"
-            style={styles.muted}
-          >
-            {label}
-          </p>
-
-          <p className="mt-1 text-sm font-black leading-5" style={styles.title}>
-            {title}
-          </p>
-
+          <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>{label}</p>
+          <p className="mt-1 text-sm font-black leading-5" style={styles.title}>{title}</p>
           {children && <div className="mt-3">{children}</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function StockValueBox({ label, value, style }) {
+  return (
+    <div className="px-4 py-4" style={style}>
+      <p className="text-[10px] font-black uppercase tracking-wide" style={styles.muted}>{label}</p>
+      <p className="mt-1 text-2xl font-black" style={styles.title}>{formatNumber(value)}</p>
     </div>
   );
 }
