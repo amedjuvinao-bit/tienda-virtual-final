@@ -65,6 +65,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
+const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
@@ -146,6 +147,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   );
 }
 
+if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
