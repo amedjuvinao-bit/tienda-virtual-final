@@ -10,6 +10,7 @@
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
+    "test:dashboard-admin": "node scripts/testDashboardAdminModule.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
     "migrate:categories": "node scripts/migrate-categories.js"
