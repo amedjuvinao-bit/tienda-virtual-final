@@ -18,6 +18,29 @@ function cleanMoney(value, fallback = 0) {
   return Math.max(0, Math.round(number));
 }
 
+function toPlainObject(value) {
+  if (!value || typeof value !== 'object') return value;
+  if (typeof value.toObject === 'function') {
+    return value.toObject({ depopulate: true, virtuals: false });
+  }
+  return value;
+}
+
+function toPlainArray(value) {
+  if (Array.isArray(value)) return value.map(toPlainObject);
+
+  if (value && typeof value.toObject === 'function') {
+    const plain = value.toObject({ depopulate: true, virtuals: false });
+    if (Array.isArray(plain)) return plain.map(toPlainObject);
+  }
+
+  if (value && typeof value[Symbol.iterator] === 'function') {
+    return Array.from(value).map(toPlainObject);
+  }
+
+  return [];
+}
+
 function buildVariantKey(size = '', color = '') {
   const cleanSize = cleanLower(size, 80);
   const cleanColor = cleanLower(color, 120);
@@ -26,12 +49,13 @@ function buildVariantKey(size = '', color = '') {
 }
 
 function normalizeStringArray(items, max = Infinity) {
-  if (!Array.isArray(items)) return [];
+  const list = toPlainArray(items);
+  if (!list.length) return [];
 
   const out = [];
   const seen = new Set();
 
-  for (const item of items) {
+  for (const item of list) {
     const value = cleanText(
       typeof item === 'string' ? item : item?.url || item?.src || item?.value || '',
       1000
@@ -50,13 +74,12 @@ function normalizeStringArray(items, max = Infinity) {
 }
 
 function normalizeAttributes(attributes = []) {
-  if (!Array.isArray(attributes)) return [];
-
-  return attributes
+  return toPlainArray(attributes)
     .map((attribute) => {
-      const key = cleanLower(attribute?.key || attribute?.name || '', 80);
-      const label = cleanText(attribute?.label || attribute?.name || attribute?.key || '', 120);
-      const value = cleanText(attribute?.value || '', 160);
+      const attr = toPlainObject(attribute) || {};
+      const key = cleanLower(attr?.key || attr?.name || '', 80);
+      const label = cleanText(attr?.label || attr?.name || attr?.key || '', 120);
+      const value = cleanText(attr?.value || '', 160);
 
       if (!key && !label && !value) return null;
 
@@ -70,15 +93,16 @@ function normalizeAttributes(attributes = []) {
 }
 
 function buildVariantLabel(variant = {}) {
+  const plainVariant = toPlainObject(variant) || {};
   const parts = [
-    cleanText(variant.label, 160),
-    cleanText(variant.size, 80),
-    cleanText(variant.color, 120),
+    cleanText(plainVariant.label, 160),
+    cleanText(plainVariant.size, 80),
+    cleanText(plainVariant.color, 120),
   ].filter(Boolean);
 
   if (parts.length) return parts[0] || parts.slice(1).join(' / ');
 
-  const attrParts = normalizeAttributes(variant.attributes)
+  const attrParts = normalizeAttributes(plainVariant.attributes)
     .map((attribute) => attribute.value || attribute.label)
     .filter(Boolean);
 
@@ -86,61 +110,65 @@ function buildVariantLabel(variant = {}) {
 }
 
 function normalizeVariantInput(variant = {}, product = {}) {
-  const size = cleanText(variant.size || variant.talla || variant.attribute || '', 80);
-  const color = cleanText(variant.color || variant.colour || variant.visualAttribute || '', 120);
-  const variantKey = cleanLower(variant.variantKey || buildVariantKey(size, color), 180);
-  const images = normalizeStringArray(variant.images || variant.gallery || [], 8);
-  const image = cleanText(variant.image || images[0] || '', 1000);
-  const price = variant.price === '' || variant.price === null || variant.price === undefined
+  const plainVariant = toPlainObject(variant) || {};
+  const plainProduct = toPlainObject(product) || {};
+  const size = cleanText(plainVariant.size || plainVariant.talla || plainVariant.attribute || '', 80);
+  const color = cleanText(plainVariant.color || plainVariant.colour || plainVariant.visualAttribute || '', 120);
+  const variantKey = cleanLower(plainVariant.variantKey || buildVariantKey(size, color), 180);
+  const images = normalizeStringArray(plainVariant.images || plainVariant.gallery || [], 8);
+  const image = cleanText(plainVariant.image || images[0] || '', 1000);
+  const price = plainVariant.price === '' || plainVariant.price === null || plainVariant.price === undefined
     ? null
-    : cleanMoney(variant.price, product.price || 0);
-  const cost = variant.cost === '' || variant.cost === null || variant.cost === undefined
+    : cleanMoney(plainVariant.price, plainProduct.price || 0);
+  const cost = plainVariant.cost === '' || plainVariant.cost === null || plainVariant.cost === undefined
     ? null
-    : cleanMoney(variant.cost, product.cost || product.averageCost || 0);
-  const originalPrice = variant.originalPrice === '' || variant.originalPrice === null || variant.originalPrice === undefined
+    : cleanMoney(plainVariant.cost, plainProduct.cost || plainProduct.averageCost || 0);
+  const originalPrice = plainVariant.originalPrice === '' || plainVariant.originalPrice === null || plainVariant.originalPrice === undefined
     ? null
-    : cleanMoney(variant.originalPrice, 0);
-  const initialStock = cleanMoney(variant.initialStock ?? variant.stock ?? 0, 0);
+    : cleanMoney(plainVariant.originalPrice, 0);
+  const initialStock = cleanMoney(plainVariant.initialStock ?? plainVariant.stock ?? 0, 0);
 
   return {
     variantKey,
-    label: cleanText(variant.label || buildVariantLabel({ ...variant, size, color }), 160),
+    label: cleanText(plainVariant.label || buildVariantLabel({ ...plainVariant, size, color }), 160),
     size,
     color,
-    attributes: normalizeAttributes(variant.attributes),
-    sku: cleanUpper(variant.sku || variant.variantSku || '', 100),
-    barcode: cleanText(variant.barcode || variant.variantBarcode || '', 120),
+    attributes: normalizeAttributes(plainVariant.attributes),
+    sku: cleanUpper(plainVariant.sku || plainVariant.variantSku || '', 100),
+    barcode: cleanText(plainVariant.barcode || plainVariant.variantBarcode || '', 120),
     price,
     cost,
     originalPrice,
     image,
     images,
-    active: variant.active !== false,
-    sortOrder: Math.max(0, Math.floor(Number(variant.sortOrder || 0))),
+    active: plainVariant.active !== false,
+    sortOrder: Math.max(0, Math.floor(Number(plainVariant.sortOrder || 0))),
     initialStock,
   };
 }
 
 function buildVariantsFromLegacy(product = {}) {
+  const plainProduct = toPlainObject(product) || {};
   const rows = [];
 
-  const inventory = Array.isArray(product.inventory) ? product.inventory : [];
+  const inventory = toPlainArray(plainProduct.inventory);
   inventory.forEach((row) => {
-    const size = cleanText(row?.size, 80);
-    const color = cleanText(row?.color, 120);
+    const plainRow = toPlainObject(row) || {};
+    const size = cleanText(plainRow?.size, 80);
+    const color = cleanText(plainRow?.color, 120);
     if (!size && !color) return;
 
     rows.push({
       size,
       color,
-      initialStock: cleanMoney(row?.stock, 0),
+      initialStock: cleanMoney(plainRow?.stock, 0),
       active: true,
     });
   });
 
   if (!rows.length) {
-    const sizes = Array.isArray(product.sizes) ? product.sizes.map((size) => cleanText(size, 80)).filter(Boolean) : [];
-    const colors = Array.isArray(product.colors) ? product.colors.map((color) => cleanText(color, 120)).filter(Boolean) : [];
+    const sizes = toPlainArray(plainProduct.sizes).map((size) => cleanText(size, 80)).filter(Boolean);
+    const colors = toPlainArray(plainProduct.colors).map((color) => cleanText(color, 120)).filter(Boolean);
 
     if (sizes.length && colors.length) {
       sizes.forEach((size) => colors.forEach((color) => rows.push({ size, color, initialStock: 0, active: true })));
@@ -151,20 +179,22 @@ function buildVariantsFromLegacy(product = {}) {
     }
   }
 
-  if (!rows.length && cleanMoney(product.stock, 0) > 0) {
-    rows.push({ size: '', color: '', initialStock: cleanMoney(product.stock, 0), active: true });
+  if (!rows.length && cleanMoney(plainProduct.stock, 0) > 0) {
+    rows.push({ size: '', color: '', initialStock: cleanMoney(plainProduct.stock, 0), active: true });
   }
 
   return rows;
 }
 
 function normalizeProductVariants(variants = [], product = {}) {
-  const source = Array.isArray(variants) && variants.length ? variants : buildVariantsFromLegacy(product);
+  const variantList = toPlainArray(variants);
+  const source = variantList.length ? variantList : buildVariantsFromLegacy(product);
   const out = [];
   const seen = new Set();
 
   source.forEach((variant, index) => {
-    const normalized = normalizeVariantInput({ ...variant, sortOrder: variant?.sortOrder ?? index }, product);
+    const plainVariant = toPlainObject(variant) || {};
+    const normalized = normalizeVariantInput({ ...plainVariant, sortOrder: plainVariant?.sortOrder ?? index }, product);
     const key = normalized.variantKey || buildVariantKey(normalized.size, normalized.color);
     if (seen.has(key)) return;
 
@@ -180,7 +210,8 @@ function normalizeProductVariants(variants = [], product = {}) {
 }
 
 function findProductVariant(product = {}, selector = {}) {
-  const variants = normalizeProductVariants(product.variants || [], product);
+  const plainProduct = toPlainObject(product) || {};
+  const variants = normalizeProductVariants(plainProduct.variants || [], plainProduct);
   if (!variants.length) return null;
 
   const desiredKey = cleanLower(selector.variantKey || '', 180);
@@ -194,9 +225,10 @@ function findProductVariant(product = {}, selector = {}) {
 }
 
 function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
-  const variant = findProductVariant(product, selector);
-  const basePrice = cleanMoney(product.price, 0);
-  const baseCost = cleanMoney(product.averageCost || product.cost || 0, 0);
+  const plainProduct = toPlainObject(product) || {};
+  const variant = findProductVariant(plainProduct, selector);
+  const basePrice = cleanMoney(plainProduct.price, 0);
+  const baseCost = cleanMoney(plainProduct.averageCost || plainProduct.cost || 0, 0);
 
   if (!variant) {
     return {
@@ -204,10 +236,10 @@ function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
       variantKey: buildVariantKey(selector.size || '', selector.color || ''),
       price: basePrice,
       cost: baseCost,
-      sku: cleanUpper(product.sku || '', 100),
-      barcode: cleanText(product.barcode || '', 120),
-      image: cleanText(product.image || '', 1000),
-      images: normalizeStringArray(product.images || [], 8),
+      sku: cleanUpper(plainProduct.sku || '', 100),
+      barcode: cleanText(plainProduct.barcode || '', 120),
+      image: cleanText(plainProduct.image || '', 1000),
+      images: normalizeStringArray(plainProduct.images || [], 8),
     };
   }
 
@@ -216,11 +248,11 @@ function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
     variantKey: variant.variantKey,
     price: variant.price != null ? cleanMoney(variant.price, basePrice) : basePrice,
     cost: variant.cost != null ? cleanMoney(variant.cost, baseCost) : baseCost,
-    sku: cleanUpper(variant.sku || product.sku || '', 100),
-    barcode: cleanText(variant.barcode || product.barcode || '', 120),
-    image: cleanText(variant.image || product.image || '', 1000),
+    sku: cleanUpper(variant.sku || plainProduct.sku || '', 100),
+    barcode: cleanText(variant.barcode || plainProduct.barcode || '', 120),
+    image: cleanText(variant.image || plainProduct.image || '', 1000),
     images: normalizeStringArray(
-      Array.isArray(variant.images) && variant.images.length ? variant.images : product.images || [],
+      Array.isArray(variant.images) && variant.images.length ? variant.images : plainProduct.images || [],
       8
     ),
   };
