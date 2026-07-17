@@ -1,10 +1,21 @@
 // backend/index.js
 console.log('Iniciando backend/index.js');
 
-require('dotenv').config({
-  path: require('path').join(__dirname, '.env'),
-  quiet: true,
-});
+const { env, assertEnv, getSafeEnvSummary, EnvConfigError } = require('./config/env');
+
+try {
+  assertEnv();
+  const summary = getSafeEnvSummary();
+  console.log(`Entorno validado: ${summary.nodeEnv} | MongoDB via ${summary.mongo.source} | puerto ${summary.port}`);
+} catch (error) {
+  if (error instanceof EnvConfigError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  console.error('Error validando configuración de entorno:', error.message);
+  process.exit(1);
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -15,12 +26,7 @@ const rateLimit = require('express-rate-limit');
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const MONGO_URI =
-  process.env.MONGO_URI ||
-  process.env.MONGODB_URI ||
-  process.env.MONGO_URL ||
-  process.env.DATABASE_URL;
+const PORT = env.port;
 
 function tryRequire(relPath) {
   try {
@@ -179,20 +185,9 @@ if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettin
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);
 
-const INVENTORY_RESERVATION_EXPIRATION_ENABLED =
-  String(process.env.INVENTORY_RESERVATION_EXPIRATION_ENABLED || 'true')
-    .trim()
-    .toLowerCase() !== 'false';
-
-const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = Math.max(
-  30_000,
-  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS || 60_000)
-);
-
-const INVENTORY_RESERVATION_EXPIRATION_LIMIT = Math.max(
-  1,
-  Number(process.env.INVENTORY_RESERVATION_LIMIT || process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT || 50)
-);
+const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enabled;
+const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
+const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
@@ -241,13 +236,8 @@ function startInventoryReservationExpirationJob() {
   console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
-if (!MONGO_URI) {
-  console.error('Error MongoDB: falta variable de conexion. Define MONGO_URI, MONGODB_URI, MONGO_URL o DATABASE_URL en backend/.env');
-  process.exit(1);
-}
-
 mongoose
-  .connect(MONGO_URI)
+  .connect(env.mongoUri)
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
