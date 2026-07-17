@@ -11,6 +11,14 @@ const {
   shouldTrackInventory,
   buildSkuPrefix,
 } = require('../lib/products/productUniversalConfig');
+const {
+  cleanText,
+  cleanUpper,
+  cleanMoney,
+  normalizeAttributes,
+  normalizeProductVariants,
+  normalizeStringArray,
+} = require('../lib/products/productVariantConfig');
 
 // ==== Subesquemas opcionales ====
 const InventoryItemSchema = new mongoose.Schema(
@@ -27,6 +35,56 @@ const VariantAxisSchema = new mongoose.Schema(
     key: { type: String, trim: true, lowercase: true, default: '' },
     label: { type: String, trim: true, default: '' },
     values: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const VariantAttributeSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const ProductVariantSchema = new mongoose.Schema(
+  {
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      required: true,
+      index: true,
+    },
+    label: { type: String, trim: true, default: '' },
+    size: { type: String, trim: true, default: '' },
+    color: { type: String, trim: true, default: '' },
+    attributes: {
+      type: [VariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
+    sku: { type: String, trim: true, uppercase: true, default: '' },
+    barcode: { type: String, trim: true, default: '' },
+    price: { type: Number, default: null, min: 0 },
+    cost: { type: Number, default: null, min: 0 },
+    originalPrice: { type: Number, default: null, min: 0 },
+    image: { type: String, trim: true, default: '' },
+    images: {
+      type: [String],
+      default: [],
+      set: (arr) => normalizeStringArray(arr, 8),
+      validate: [
+        (arr) => Array.isArray(arr) && arr.length <= 8,
+        'La galería de la variante admite máximo 8 imágenes.',
+      ],
+    },
+    active: { type: Boolean, default: true },
+    sortOrder: { type: Number, default: 0, min: 0 },
+
+    // Solo se usa para carga inicial/sincronización; la existencia real vive en InventoryStock.
+    initialStock: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
@@ -113,6 +171,14 @@ const productSchema = new mongoose.Schema(
 
     // Matriz de inventario heredada (talla x color)
     inventory: { type: [InventoryItemSchema], default: [] },
+
+    // Variantes comerciales avanzadas.
+    // Aquí viven precio/costo/SKU/barcode/imágenes por variante.
+    // InventoryStock sigue siendo la fuente real de existencias por sede.
+    variants: {
+      type: [ProductVariantSchema],
+      default: [],
+    },
 
     // Tipo universal de producto
     productType: {
@@ -216,6 +282,9 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ categories: 1 });
 productSchema.index({ productType: 1, active: 1 });
 productSchema.index({ trackInventory: 1, active: 1 });
+productSchema.index({ 'variants.variantKey': 1 });
+productSchema.index({ 'variants.sku': 1 });
+productSchema.index({ 'variants.barcode': 1 });
 productSchema.index(
   { sku: 1 },
   { unique: true, partialFilterExpression: { sku: { $type: 'string' } } }
@@ -337,6 +406,27 @@ productSchema.pre('validate', async function (next) {
       this.variantAxes = normalizeVariantAxes(this.variantAxes, this.variantPreset);
     }
 
+    this.variants = normalizeProductVariants(this.variants || [], {
+      _id: this._id,
+      title: this.title,
+      sku: this.sku,
+      price: this.price,
+      cost: this.cost,
+      averageCost: this.averageCost,
+      image: this.image,
+      images: this.images,
+      stock: this.stock,
+      sizes: this.sizes,
+      colors: this.colors,
+      inventory: this.inventory,
+      trackInventory: this.trackInventory,
+    }).map((variant) => ({
+      ...variant,
+      price: variant.price == null ? null : cleanMoney(variant.price, this.price || 0),
+      cost: variant.cost == null ? null : cleanMoney(variant.cost, this.cost || this.averageCost || 0),
+      originalPrice: variant.originalPrice == null ? null : cleanMoney(variant.originalPrice, 0),
+    }));
+
     if (!this.sku) {
       const prefix = pickPrefix(this);
       const now = new Date();
@@ -377,6 +467,7 @@ productSchema.pre('save', function markProductInventorySync(next) {
       this.isModified('sizes') ||
       this.isModified('colors') ||
       this.isModified('inventory') ||
+      this.isModified('variants') ||
       this.isModified('stock') ||
       this.isModified('reorderPoint') ||
       this.isModified('reorderQty') ||
