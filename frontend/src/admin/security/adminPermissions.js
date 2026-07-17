@@ -16,6 +16,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   clientes: ['customers:view'],
   pos: ['pos:view'],
   caja: ['pos:view'],
+  finanzas: ['finance:view'],
   'pos/ventas': ['pos:view'],
   'pos/nueva-venta': ['pos:sell'],
 
