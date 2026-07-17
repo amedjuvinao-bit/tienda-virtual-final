@@ -8,7 +8,6 @@ const FinanceExpense = require('../models/FinanceExpense');
 const { resolveVariantCommercialSnapshot } = require('../lib/products/productVariantConfig');
 
 const CANCELLED_ORDER_STATUSES = ['cancelled', 'canceled', 'failed', 'refunded'];
-const CASH_OUT_TYPES = ['expense', 'withdrawal', 'cash_out'];
 
 function clean(value) {
   return String(value || '').trim();
@@ -78,8 +77,21 @@ function endOfMonth(date) {
   return d;
 }
 
+function parseDateOnly(value) {
+  const text = clean(value);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0);
+}
+
 function safeDate(value) {
   if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const dateOnly = parseDateOnly(value);
+  if (dateOnly) return dateOnly;
+
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -191,30 +203,6 @@ function bucketKey(date) {
   return d.toISOString().slice(0, 10);
 }
 
-function makeEmptyBucket(dateText) {
-  return {
-    date: dateText,
-    orders: 0,
-    revenue: 0,
-    subtotal: 0,
-    shipping: 0,
-    discounts: 0,
-    taxes: 0,
-  };
-}
-
-function addToMapBucket(map, key, patch = {}) {
-  if (!key) return;
-  const current = map.get(key) || makeEmptyBucket(key);
-  current.orders += Number(patch.orders || 0);
-  current.revenue += money(patch.revenue);
-  current.subtotal += money(patch.subtotal);
-  current.shipping += money(patch.shipping);
-  current.discounts += money(patch.discounts);
-  current.taxes += money(patch.taxes);
-  map.set(key, current);
-}
-
 function addGroupedAmount(map, key, amount, extra = {}) {
   const safeKey = clean(key || 'sin_definir') || 'sin_definir';
   const current = map.get(safeKey) || {
@@ -298,8 +286,8 @@ function summarizeSalesFromOrders(orders = []) {
     const orderShipping = money(order.shipping);
     const orderDiscount = money(order.discount?.amount);
     const orderTaxes = money(order.taxes?.iva?.amount);
-    const items = getOrderItems(order);
-    const orderItemsCount = items.reduce((acc, item) => acc + getItemQty(item), 0);
+    const orderItems = getOrderItems(order);
+    const orderItemsCount = orderItems.reduce((acc, item) => acc + getItemQty(item), 0);
     const paymentMethod = cleanLower(order.payment?.method || order.payment?.methodType || order.payment?.provider || 'sin_metodo');
     const dayKey = bucketKey(order.createdAt);
 
@@ -314,14 +302,23 @@ function summarizeSalesFromOrders(orders = []) {
     addGroupedAmount(byChannel, order.channel || 'web', amount, { orders: 1, items: orderItemsCount });
     addGroupedAmount(bySaleType, order.saleType || 'online_order', amount, { orders: 1, items: orderItemsCount });
     addGroupedAmount(byPaymentMethod, paymentMethod, amount, { orders: 1, items: orderItemsCount });
-    addToMapBucket(byDay, dayKey, {
-      orders: 1,
-      revenue: amount,
-      subtotal: orderSubtotal,
-      shipping: orderShipping,
-      discounts: orderDiscount,
-      taxes: orderTaxes,
-    });
+
+    const current = byDay.get(dayKey) || {
+      date: dayKey,
+      orders: 0,
+      revenue: 0,
+      subtotal: 0,
+      shipping: 0,
+      discounts: 0,
+      taxes: 0,
+    };
+    current.orders += 1;
+    current.revenue += amount;
+    current.subtotal += orderSubtotal;
+    current.shipping += orderShipping;
+    current.discounts += orderDiscount;
+    current.taxes += orderTaxes;
+    byDay.set(dayKey, current);
   }
 
   return {
@@ -430,7 +427,7 @@ function getCashMovementTotals(sessions = []) {
       if (type === 'expense') operatingExpenses += amount;
       if (type === 'withdrawal') withdrawals += amount;
 
-      addGroupedAmount(byType, type, amount, { orders: 0, items: 0 });
+      addGroupedAmount(byType, type, amount);
     }
   }
 
@@ -446,6 +443,7 @@ function getCashMovementTotals(sessions = []) {
 async function getCashSessions(query = {}) {
   const dateRange = resolveDateRange(query);
   const branchFilter = buildBranchFilter(query);
+
   return CashSession.find({
     ...branchFilter,
     openedAt: { $lte: dateRange.to },
@@ -524,6 +522,10 @@ function summarizeCashSessions(sessions = []) {
   };
 }
 
+function escapeRegex(value) {
+  return clean(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function buildExpenseFilter(query = {}) {
   const dateRange = resolveDateRange(query);
   const branchFilter = buildBranchFilter(query);
@@ -541,11 +543,11 @@ function buildExpenseFilter(query = {}) {
   if (type && type !== 'all') filter.type = type;
 
   const category = clean(query.category || '');
-  if (category && category !== 'all') filter.category = new RegExp(category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  if (category && category !== 'all') filter.category = new RegExp(escapeRegex(category), 'i');
 
   const q = clean(query.q || query.search || '');
   if (q) {
-    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const regex = new RegExp(escapeRegex(q), 'i');
     filter.$or = [
       { category: regex },
       { subcategory: regex },
