@@ -360,6 +360,36 @@ productSchema.pre('validate', async function (next) {
   }
 });
 
+// Marca si al guardar debe sincronizar la ficha comercial con InventoryStock.
+productSchema.pre('save', function markProductInventorySync(next) {
+  try {
+    this.$locals = this.$locals || {};
+    this.$locals.syncInventoryAfterSave =
+      this.isNew ||
+      this.isModified('title') ||
+      this.isModified('sku') ||
+      this.isModified('image') ||
+      this.isModified('category') ||
+      this.isModified('productType') ||
+      this.isModified('trackInventory') ||
+      this.isModified('variantPreset') ||
+      this.isModified('variantAxes') ||
+      this.isModified('sizes') ||
+      this.isModified('colors') ||
+      this.isModified('inventory') ||
+      this.isModified('stock') ||
+      this.isModified('reorderPoint') ||
+      this.isModified('reorderQty') ||
+      this.isModified('warehouseLocation') ||
+      this.isModified('cost') ||
+      this.isModified('averageCost');
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Autogenera/actualiza SLUG desde el título y garantiza unicidad
 productSchema.pre('save', async function (next) {
   try {
@@ -409,4 +439,16 @@ productSchema.pre('save', function (next) {
   }
 });
 
-module.exports = mongoose.model('Product', productSchema);
+// Sincroniza catálogo comercial con inventario real sin sobrescribir movimientos existentes.
+productSchema.post('save', async function syncProductInventoryAfterSave(doc) {
+  if (!doc?.$locals?.syncInventoryAfterSave) return;
+
+  try {
+    const { syncProductInventoryFromProduct } = require('../services/productInventorySyncService');
+    await syncProductInventoryFromProduct(doc);
+  } catch (error) {
+    console.error('[Product] No se pudo sincronizar InventoryStock:', error.message);
+  }
+});
+
+module.exports = mongoose.models.Product || mongoose.model('Product', productSchema);
