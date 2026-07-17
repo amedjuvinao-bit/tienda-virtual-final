@@ -1,42 +1,37 @@
-/* Ajuste dinámico de variantes del formulario de producto.
-   No fuerza colores fijos: respeta las variables del tema activo. */
+/* Ajustes visuales del formulario de producto.
+   Regla: no usar colores fijos. Todo depende de las variables del tema activo. */
 
 .admin-area form > section:nth-of-type(3) > div > div:first-child > div.flex.flex-wrap.gap-2 > button {
-  color: var(--admin-button-soft-text, var(--admin-card-text)) !important;
-  -webkit-text-fill-color: var(--admin-button-soft-text, var(--admin-card-text)) !important;
+  color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
+  -webkit-text-fill-color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
   border-color: var(--admin-primary-soft-border, var(--admin-card-border)) !important;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--admin-button-soft-bg, var(--admin-card-bg)) 88%, var(--admin-primary) 12%),
-      color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)
-    ) !important;
+  background: var(--admin-primary-soft-bg, var(--admin-card-bg)) !important;
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--admin-card-bg) 72%, transparent),
-    0 4px 12px color-mix(in srgb, var(--admin-primary) 12%, transparent) !important;
+    0 4px 12px color-mix(in srgb, var(--admin-primary) 10%, transparent) !important;
   text-shadow: none !important;
 }
 
-.admin-area form > section:nth-of-type(3) > div > div:first-child > div.flex.flex-wrap.gap-2 > button:hover {
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.flex.flex-wrap.gap-2 > button:hover,
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.flex.flex-wrap.gap-2 > button:focus-visible {
   color: var(--admin-button-text, var(--admin-card-text)) !important;
   -webkit-text-fill-color: var(--admin-button-text, var(--admin-card-text)) !important;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--admin-button-bg, var(--admin-primary)) 72%, var(--admin-card-bg) 28%),
-      color-mix(in srgb, var(--admin-button-bg, var(--admin-primary)) 52%, var(--admin-card-bg) 48%)
-    ) !important;
+  border-color: var(--admin-button-border, var(--admin-primary-soft-border, var(--admin-card-border))) !important;
+  background: var(--admin-button-bg, var(--admin-primary-soft-bg, var(--admin-card-bg))) !important;
 }
 
-.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.gap-2 > button {
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.gap-2 > button,
+.admin-area form > section:nth-of-type(3) button.ml-3,
+.admin-area form > section:nth-of-type(6) label.inline-flex.cursor-pointer {
   color: var(--admin-button-text, var(--admin-card-text)) !important;
   -webkit-text-fill-color: var(--admin-button-text, var(--admin-card-text)) !important;
-  border-color: color-mix(in srgb, var(--admin-button-bg, var(--admin-primary)) 70%, var(--admin-card-border) 30%) !important;
-  background: var(--admin-button-bg, var(--admin-primary)) !important;
+  border-color: var(--admin-button-border, var(--admin-primary-soft-border, var(--admin-card-border))) !important;
+  background: var(--admin-button-bg, var(--admin-primary-soft-bg, var(--admin-card-bg))) !important;
   text-shadow: none !important;
 }
 
-.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.flex-wrap.gap-2 > span {
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.flex-wrap.gap-2 > span,
+.admin-area form > section:nth-of-type(5) div.mt-2.flex.flex-wrap.gap-2 > span {
   color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
   -webkit-text-fill-color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
   border-color: var(--admin-primary-soft-border, var(--admin-card-border)) !important;
@@ -44,8 +39,26 @@
   text-shadow: none !important;
 }
 
-.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.flex-wrap.gap-2 > span button {
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.flex-wrap.gap-2 > span button,
+.admin-area form > section:nth-of-type(5) div.mt-2.flex.flex-wrap.gap-2 > span button {
   color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
   -webkit-text-fill-color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
+  text-shadow: none !important;
+}
+
+.admin-area form > section:nth-of-type(8) button[type="button"] {
+  color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
+  -webkit-text-fill-color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
+  border-color: var(--admin-primary-soft-border, var(--admin-card-border)) !important;
+  background: var(--admin-primary-soft-bg, var(--admin-card-bg)) !important;
+  text-shadow: none !important;
+}
+
+.admin-area form > section:nth-of-type(8) button[type="submit"],
+.admin-area form > section:nth-of-type(8) button:not([type]) {
+  color: var(--admin-button-text, var(--admin-card-text)) !important;
+  -webkit-text-fill-color: var(--admin-button-text, var(--admin-card-text)) !important;
+  border-color: var(--admin-button-border, var(--admin-primary-soft-border, var(--admin-card-border))) !important;
+  background: var(--admin-button-bg, var(--admin-primary-soft-bg, var(--admin-card-bg))) !important;
   text-shadow: none !important;
 }
