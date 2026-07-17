@@ -58,7 +58,7 @@ function fromBackendItem(it) {
     quantity: qty,
     price,
     slug: p?.slug,
-    sku: it.variantSku || p?.sku ?? p?.skun,
+    sku: it.variantSku || p?.sku || p?.skun || '',
     barcode: it.variantBarcode || p?.barcode || '',
   };
 }
