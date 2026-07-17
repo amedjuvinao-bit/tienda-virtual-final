@@ -20,10 +20,6 @@ const {
 const RUN_ID = Math.random().toString(36).slice(2, 9).toUpperCase();
 const TEST_PREFIX = `FIN-${RUN_ID}`;
 const TEST_DATE = new Date('2099-01-15T12:00:00.000Z');
-const TEST_QUERY = {
-  dateFrom: '2099-01-15',
-  dateTo: '2099-01-15',
-};
 
 const results = {
   ok: 0,
@@ -51,6 +47,14 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function buildTestQuery(branch) {
+  return {
+    dateFrom: '2099-01-15',
+    dateTo: '2099-01-15',
+    branchId: String(branch._id),
+  };
+}
+
 async function connectDb() {
   if (mongoose.connection.readyState !== 1) {
     await mongoose.connect(env.mongoUri);
@@ -59,31 +63,18 @@ async function connectDb() {
 }
 
 async function ensureBranch() {
-  let branch = await Branch.findOne({
-    deletedAt: null,
-    active: true,
-    status: 'active',
-  })
-    .sort({ isMain: -1, isDefaultForOnlineOrders: -1, createdAt: 1 })
-    .exec();
-
-  if (branch) {
-    ok(`Sede activa encontrada: ${branch.name}`);
-    return { branch, temporary: false };
-  }
-
-  branch = new Branch({
-    name: 'Sede Principal Finanzas',
+  const branch = new Branch({
+    name: `Sede Finanzas ${RUN_ID}`,
     code: TEST_PREFIX,
     type: 'store',
     status: 'active',
     active: true,
-    isMain: true,
-    isDefaultForOnlineOrders: true,
-    notes: `Creada por prueba finanzas ${RUN_ID}`,
+    isMain: false,
+    isDefaultForOnlineOrders: false,
+    notes: `Sede temporal aislada por prueba finanzas ${RUN_ID}`,
   });
   await branch.save();
-  warn('No habia sede activa. Se creo una sede temporal para la prueba.');
+  ok(`Sede temporal aislada creada: ${branch.name}`);
   return { branch, temporary: true };
 }
 
@@ -92,6 +83,7 @@ async function cleanup(extra = {}) {
   await CashSession.deleteMany({ sessionCode: { $regex: `^${TEST_PREFIX}` } });
   await FinanceExpense.deleteMany({ reference: { $regex: `^${TEST_PREFIX}` } });
   await Product.deleteMany({ sku: { $regex: `^${TEST_PREFIX}` } });
+  await Branch.deleteMany({ code: TEST_PREFIX });
 
   if (extra.temporaryBranchId) {
     await Branch.deleteOne({ _id: extra.temporaryBranchId });
@@ -323,41 +315,41 @@ async function validateStaticWiring() {
   ok('Permisos financieros registrados en catalogo admin');
 }
 
-async function validateReports() {
-  const sales = await financeService.getSalesReport(TEST_QUERY);
+async function validateReports(query) {
+  const sales = await financeService.getSalesReport(query);
   assert(Number(sales.revenue || 0) === 335000, 'Ventas no suman POS + Web correctamente.');
   assert(Number(sales.ordersCount || 0) === 2, 'Cantidad de ordenes financieras no coincide.');
   assert(sales.bySource.some((row) => row.key === 'pos' && Number(row.amount) === 200000), 'Ventas POS no aparecen en bySource.');
   assert(sales.bySource.some((row) => row.key === 'online' && Number(row.amount) === 135000), 'Ventas Web no aparecen en bySource.');
   ok('Reporte de ventas separa POS y Web correctamente');
 
-  const profit = await financeService.getProfitReport(TEST_QUERY);
+  const profit = await financeService.getProfitReport(query);
   assert(Number(profit.revenue || 0) === 335000, 'Utilidad no toma ingresos correctos.');
   assert(Number(profit.cogs || 0) === 200000, 'Costo de venta no coincide con costos de producto/variante.');
   assert(Number(profit.grossProfit || 0) === 135000, 'Utilidad bruta incorrecta.');
   ok('Reporte de utilidad calcula ingresos, costos y margen bruto');
 
-  const cash = await financeService.getCashReport(TEST_QUERY);
+  const cash = await financeService.getCashReport(query);
   assert(Number(cash.sessionsCount || 0) === 1, 'Caja financiera no detecta la sesion temporal.');
   assert(Number(cash.movements?.operatingExpenses || 0) === 10000, 'Caja no suma gastos operativos de movimientos.');
   assert(Number(cash.paymentTotals?.cash || 0) === 200000, 'Caja no suma pagos en efectivo.');
   ok('Reporte de caja calcula ventas, efectivo y movimientos');
 
-  const expenses = await financeService.getExpensesReport(TEST_QUERY);
+  const expenses = await financeService.getExpensesReport(query);
   assert(Number(expenses.manualTotal || 0) === 6000, 'Gastos manuales no suman correctamente.');
   assert(Number(expenses.manualCount || 0) === 1, 'Cantidad de gastos manuales incorrecta.');
   ok('Reporte de gastos manuales funciona');
 
-  const summary = await financeService.getFinanceSummary(TEST_QUERY);
+  const summary = await financeService.getFinanceSummary(query);
   assert(Number(summary.kpis.revenue || 0) === 335000, 'Resumen financiero no trae ingresos correctos.');
   assert(Number(summary.kpis.cogs || 0) === 200000, 'Resumen financiero no trae costos correctos.');
   assert(Number(summary.kpis.operatingExpenses || 0) === 16000, 'Resumen financiero no suma gastos manuales + caja.');
   assert(Number(summary.kpis.netProfit || 0) === 119000, 'Resumen financiero no calcula utilidad neta correcta.');
   ok('Resumen financiero calcula KPIs principales');
 
-  const csvSales = await financeService.buildFinanceCsv('sales', TEST_QUERY);
+  const csvSales = await financeService.buildFinanceCsv('sales', query);
   assert(csvSales.includes('Orden') && csvSales.includes(`${TEST_PREFIX}-WEB`), 'CSV de ventas no incluye orden temporal.');
-  const csvExpenses = await financeService.buildFinanceCsv('expenses', TEST_QUERY);
+  const csvExpenses = await financeService.buildFinanceCsv('expenses', query);
   assert(csvExpenses.includes('Categoria') && csvExpenses.includes('Pruebas actualizadas'), 'CSV de gastos no incluye gasto temporal.');
   ok('Exportacion CSV financiera funciona');
 }
@@ -379,12 +371,12 @@ async function main() {
   try {
     await validateStaticWiring();
     await connectDb();
+    await cleanup();
     branchInfo = await ensureBranch();
-    await cleanup({ temporaryBranchId: branchInfo.temporary ? branchInfo.branch._id : null });
-    if (branchInfo.temporary) branchInfo = await ensureBranch();
 
+    const query = buildTestQuery(branchInfo.branch);
     fixtures = await createFixtures(branchInfo.branch);
-    await validateReports();
+    await validateReports(query);
     await validateExpenseLifecycle(fixtures.expense._id);
   } catch (error) {
     fail('Error inesperado en prueba Backend Finanzas', error);
