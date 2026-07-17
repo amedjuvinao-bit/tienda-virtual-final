@@ -130,7 +130,6 @@ const sectionStyle = {
 
 const variantButtonBase = {
   borderRadius: 999,
-  border: '1px solid var(--admin-primary-soft-border)',
   minWidth: 42,
   minHeight: 34,
   padding: '8px 14px',
@@ -144,7 +143,7 @@ function variantButtonStyle(active) {
   if (active) {
     return {
       ...variantButtonBase,
-      borderColor: 'color-mix(in srgb, var(--admin-primary) 90%, white 10%)',
+      border: '1px solid color-mix(in srgb, var(--admin-primary) 90%, white 10%)',
       background: 'linear-gradient(135deg, var(--admin-button-bg), color-mix(in srgb, var(--admin-button-bg) 72%, #0f172a 28%))',
       color: '#ffffff',
       boxShadow: '0 8px 18px color-mix(in srgb, var(--admin-primary) 24%, transparent)',
@@ -154,10 +153,20 @@ function variantButtonStyle(active) {
 
   return {
     ...variantButtonBase,
-    borderColor: 'color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border))',
-    background: 'color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 14%)',
-    color: 'var(--admin-card-text)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    border: '1px solid color-mix(in srgb, var(--admin-primary) 76%, rgba(255,255,255,0.45) 24%)',
+    background: 'linear-gradient(135deg, rgba(168,85,247,0.28), rgba(124,58,237,0.18))',
+    color: '#ffffff',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
+    textShadow: '0 1px 7px rgba(0,0,0,0.55)',
+  };
+}
+
+function chipStyle() {
+  return {
+    borderColor: 'color-mix(in srgb, var(--admin-primary) 75%, rgba(255,255,255,0.35) 25%)',
+    background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(124,58,237,0.18))',
+    color: '#ffffff',
+    textShadow: '0 1px 7px rgba(0,0,0,0.48)',
   };
 }
 
@@ -173,9 +182,10 @@ function actionButtonStyle(kind = 'primary') {
 
   if (kind === 'soft') {
     return {
-      border: '1px solid color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border))',
-      background: 'color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 16%)',
-      color: 'var(--admin-card-text)',
+      border: '1px solid color-mix(in srgb, var(--admin-primary) 72%, rgba(255,255,255,0.32) 28%)',
+      background: 'linear-gradient(135deg, rgba(168,85,247,0.24), rgba(124,58,237,0.18))',
+      color: '#ffffff',
+      textShadow: '0 1px 7px rgba(0,0,0,0.45)',
     };
   }
 
@@ -263,13 +273,11 @@ export default function FormularioProducto() {
         setImagen(p.image || '');
         setImagenes(Array.isArray(p.images) ? p.images : []);
         setActivo(p.active !== false);
-
         setProductType(loadedProductType);
         setTrackInventory(loadedTrackInventory);
         setUnitOfMeasure(p.unitOfMeasure || 'unit');
         setAllowBackorder(p.allowBackorder === true);
         setVariantPreset(p.variantPreset || (Array.isArray(p.sizes) && p.sizes.length ? 'fashion' : 'none'));
-
         setCategoria(p.category || '');
         setOriginalCategoria(p.category || '');
         setCategoriesExtra(normalizeStringArray(p.categories || []));
@@ -319,12 +327,10 @@ export default function FormularioProducto() {
         setDimL(Number(p.dimensionsCm?.l ?? 0));
         setDimW(Number(p.dimensionsCm?.w ?? 0));
         setDimH(Number(p.dimensionsCm?.h ?? 0));
-
         setCost(Number(p.cost ?? 0));
         setAverageCost(Number(p.averageCost ?? 0));
         setTaxRate(Number(p.taxRate ?? 0));
         setTaxIncluded(p.taxIncluded !== false);
-
         setBrand(p.brand || '');
         setSeason(p.season || '');
         setSupplierName(p.supplier?.name || '');
@@ -760,9 +766,9 @@ export default function FormularioProducto() {
                   {sizes.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {sizes.map((size) => (
-                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={chipStyle()}>
                           {size}
-                          <button type="button" className="font-black" onClick={() => toggleSize(size)}>×</button>
+                          <button type="button" className="font-black text-white" onClick={() => toggleSize(size)}>×</button>
                         </span>
                       ))}
                     </div>
@@ -922,9 +928,9 @@ export default function FormularioProducto() {
               {categoriesExtra.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {categoriesExtra.map((cat) => (
-                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={chipStyle()}>
                       {cat}
-                      <button type="button" onClick={() => removeCatChip(cat)}>×</button>
+                      <button type="button" className="font-black text-white" onClick={() => removeCatChip(cat)}>×</button>
                     </span>
                   ))}
                 </div>
@@ -939,7 +945,7 @@ export default function FormularioProducto() {
                 <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Se mostrará primero en la tienda.</p>
               </div>
               <div className="p-5">
-                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={chipStyle()}>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0], false)} />
                   Elegir portada
                 </label>
@@ -962,7 +968,7 @@ export default function FormularioProducto() {
                 <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Máximo 5 imágenes adicionales.</p>
               </div>
               <div className="p-5">
-                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={chipStyle()}>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0], true)} />
                   Añadir imagen
                 </label>
@@ -991,7 +997,7 @@ export default function FormularioProducto() {
             </label>
 
             <div className="flex gap-3">
-              <button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+              <button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={actionButtonStyle('soft')}>
                 Cancelar
               </button>
               <button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>
