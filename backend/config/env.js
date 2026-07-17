@@ -55,6 +55,15 @@ function maskValue(value = '') {
 }
 
 const mongo = firstEnv(['MONGO_URI', 'MONGODB_URI', 'MONGO_URL', 'DATABASE_URL']);
+const cloudName = firstEnv([
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_CLOUD',
+  'CLOUDINARY_NAME',
+  'VITE_CLOUDINARY_CLOUD_NAME',
+  'VITE_CLOUDINARY_CLOUD',
+]);
+const cloudinaryFolder = firstEnv(['CLOUDINARY_FOLDER', 'VITE_CLOUDINARY_FOLDER']);
+const cloudinaryUploadPreset = firstEnv(['CLOUDINARY_UPLOAD_PRESET', 'VITE_CLOUDINARY_PRESET']);
 
 const env = {
   nodeEnv: clean(process.env.NODE_ENV) || 'development',
@@ -62,12 +71,17 @@ const env = {
   mongoUri: mongo.value,
   mongoUriSource: mongo.name,
   frontendUrl: clean(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.VITE_FRONTEND_URL),
+  backendUrl: clean(process.env.BACKEND_URL || process.env.API_URL || process.env.VITE_BACKEND_URL),
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
   cloudinary: {
-    cloudName: clean(process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD || process.env.VITE_CLOUDINARY_CLOUD),
+    cloudName: cloudName.value,
+    cloudNameSource: cloudName.name,
     apiKey: clean(process.env.CLOUDINARY_API_KEY),
     apiSecret: clean(process.env.CLOUDINARY_API_SECRET),
-    uploadPreset: clean(process.env.CLOUDINARY_UPLOAD_PRESET || process.env.VITE_CLOUDINARY_PRESET),
+    uploadPreset: cloudinaryUploadPreset.value,
+    uploadPresetSource: cloudinaryUploadPreset.name,
+    folder: cloudinaryFolder.value || 'tienda_virtual',
+    folderSource: cloudinaryFolder.value ? cloudinaryFolder.name : 'default',
   },
   mail: {
     host: clean(process.env.SMTP_HOST || process.env.MAIL_HOST),
@@ -100,6 +114,12 @@ function assertEnv() {
 }
 
 function getSafeEnvSummary() {
+  const cloudinaryBackendConfigured = Boolean(
+    env.cloudinary.cloudName &&
+    env.cloudinary.apiKey &&
+    env.cloudinary.apiSecret
+  );
+
   return {
     nodeEnv: env.nodeEnv,
     port: env.port,
@@ -109,8 +129,20 @@ function getSafeEnvSummary() {
       preview: maskValue(env.mongoUri),
     },
     frontendUrlConfigured: Boolean(env.frontendUrl),
+    backendUrlConfigured: Boolean(env.backendUrl),
     jwtConfigured: Boolean(env.jwtSecret),
-    cloudinaryConfigured: Boolean(env.cloudinary.cloudName && env.cloudinary.uploadPreset),
+    cloudinary: {
+      backendConfigured: cloudinaryBackendConfigured,
+      cloudNameConfigured: Boolean(env.cloudinary.cloudName),
+      cloudNameSource: env.cloudinary.cloudNameSource,
+      apiKeyConfigured: Boolean(env.cloudinary.apiKey),
+      apiSecretConfigured: Boolean(env.cloudinary.apiSecret),
+      uploadPresetConfigured: Boolean(env.cloudinary.uploadPreset),
+      uploadPresetSource: env.cloudinary.uploadPresetSource,
+      folder: env.cloudinary.folder,
+      folderSource: env.cloudinary.folderSource,
+    },
+    cloudinaryConfigured: cloudinaryBackendConfigured,
     smtpConfigured: Boolean(env.mail.host && env.mail.user && env.mail.pass),
     inventoryReservation: env.inventoryReservation,
   };
