@@ -97,6 +97,7 @@ const adminProductVariantsRoutes = tryRequire('./routes/adminProductVariants');
 const adminPosRoutes = tryRequire('./routes/adminPos');
 const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
+const adminFinanceRoutes = tryRequire('./routes/adminFinance');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
@@ -176,6 +177,7 @@ if (adminProductVariantsRoutes) app.use('/api/admin/product-variants', adminProd
 if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
 if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
+if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
