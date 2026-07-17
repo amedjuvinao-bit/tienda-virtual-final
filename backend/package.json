@@ -6,6 +6,7 @@
     "start": "node index.js",
     "seed:geo:all": "node scripts/seedGeoAll.js",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:env": "node scripts/testEnvConfig.js",
     "test:customers": "node scripts/testCustomersModule.js",
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
