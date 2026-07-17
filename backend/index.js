@@ -16,6 +16,11 @@ const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  process.env.MONGODB_URI ||
+  process.env.MONGO_URL ||
+  process.env.DATABASE_URL;
 
 function tryRequire(relPath) {
   try {
@@ -236,8 +241,13 @@ function startInventoryReservationExpirationJob() {
   console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
+if (!MONGO_URI) {
+  console.error('Error MongoDB: falta variable de conexion. Define MONGO_URI, MONGODB_URI, MONGO_URL o DATABASE_URL en backend/.env');
+  process.exit(1);
+}
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(MONGO_URI)
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
