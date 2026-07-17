@@ -144,6 +144,17 @@ function makeOrderPayload({ product, branch, orderNumber, source, channel, saleT
   };
 }
 
+async function forceOrderReportDate(orderIds = []) {
+  const ids = orderIds.filter(Boolean);
+  if (!ids.length) return;
+
+  await Order.updateMany(
+    { _id: { $in: ids } },
+    { $set: { createdAt: TEST_DATE, updatedAt: TEST_DATE } },
+    { timestamps: false }
+  );
+}
+
 async function createFixtures(branch) {
   const product = new Product({
     sku: `${TEST_PREFIX}-PROD`,
@@ -206,7 +217,10 @@ async function createFixtures(branch) {
     })
   );
 
+  await forceOrderReportDate([onlineOrder._id, posOrder._id]);
+
   ok('Ordenes temporales POS y Web creadas');
+  ok('Fechas de ordenes temporales fijadas para reporte financiero aislado');
 
   const cashier = new mongoose.Types.ObjectId();
   const cashSession = await CashSession.create({
