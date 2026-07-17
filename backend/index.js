@@ -82,6 +82,7 @@ const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchProtectionRoutes = tryRequire('./routes/adminBranchProtection');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
+const adminProductVariantsRoutes = tryRequire('./routes/adminProductVariants');
 const adminPosRoutes = tryRequire('./routes/adminPos');
 const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
@@ -160,6 +161,7 @@ if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
 if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProtectionRoutes);
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
+if (adminProductVariantsRoutes) app.use('/api/admin/product-variants', adminProductVariantsRoutes);
 if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
 if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
@@ -184,7 +186,7 @@ const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = Math.max(
 
 const INVENTORY_RESERVATION_EXPIRATION_LIMIT = Math.max(
   1,
-  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT || 50)
+  Number(process.env.INVENTORY_RESERVATION_LIMIT || process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT || 50)
 );
 
 let inventoryReservationExpirationTimer = null;
@@ -217,58 +219,30 @@ function startInventoryReservationExpirationJob() {
     }
 
     inventoryReservationExpirationRunning = true;
-
     try {
-      const result = await expireInventoryReservations({
-        limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
-      });
-
-      const expiredCount = Number(result?.count || 0);
-
-      if (expiredCount > 0) {
-        console.log(`Reservas vencidas liberadas automaticamente: ${expiredCount}`);
+      const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
+      if (result?.expired > 0) {
+        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
       }
     } catch (error) {
-      console.error('Error expirando reservas de inventario:', error.message);
+      console.error('Error en job de expiracion de reservas:', error.message);
     } finally {
       inventoryReservationExpirationRunning = false;
     }
   };
 
-  setTimeout(runExpiration, 5_000);
-
-  inventoryReservationExpirationTimer = setInterval(
-    runExpiration,
-    INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS
-  );
-
-  if (typeof inventoryReservationExpirationTimer.unref === 'function') {
-    inventoryReservationExpirationTimer.unref();
-  }
-
-  console.log(
-    `Job de expiracion de reservas iniciado cada ${Math.round(
-      INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
-    )} segundos. Limite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
-  );
+  inventoryReservationExpirationTimer = setInterval(runExpiration, INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS);
+  runExpiration().catch(() => null);
+  console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
-app.get('/', (_req, res) => {
-  res.send('Servidor backend funcionando correctamente.');
-});
-
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('Conectado a MongoDB Atlas');
+    console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
-  })
-  .catch((error) => {
-    console.error('Error al conectar MongoDB:', error.message);
-    console.warn('Continuando sin conexion a MongoDB (solo para desarrollo).');
-  })
-  .finally(() => {
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
-  });
+  })
+  .catch((err) => console.error('Error MongoDB:', err));
