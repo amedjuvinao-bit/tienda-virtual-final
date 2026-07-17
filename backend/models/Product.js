@@ -15,6 +15,7 @@ const {
   cleanText,
   cleanUpper,
   cleanMoney,
+  buildVariantKey,
   normalizeAttributes,
   normalizeProductVariants,
   normalizeStringArray,
@@ -54,8 +55,7 @@ const ProductVariantSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
-      required: true,
-      index: true,
+      default: '',
     },
     label: { type: String, trim: true, default: '' },
     size: { type: String, trim: true, default: '' },
@@ -88,6 +88,39 @@ const ProductVariantSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+ProductVariantSchema.pre('validate', function normalizeVariantBeforeValidate(next) {
+  try {
+    this.size = cleanText(this.size, 80);
+    this.color = cleanText(this.color, 120);
+    this.variantKey = cleanText(this.variantKey || buildVariantKey(this.size, this.color), 180).toLowerCase();
+
+    if (!this.variantKey || this.variantKey === '__') {
+      this.variantKey = 'default__default';
+    }
+
+    if (!this.label) {
+      this.label = [this.size, this.color].filter(Boolean).join(' / ') || 'Variante general';
+    }
+
+    this.label = cleanText(this.label, 160);
+    this.attributes = normalizeAttributes(this.attributes);
+    this.sku = cleanUpper(this.sku, 100);
+    this.barcode = cleanText(this.barcode, 120);
+    this.image = cleanText(this.image, 1000);
+    this.images = normalizeStringArray(this.images, 8);
+    this.price = this.price == null ? null : cleanMoney(this.price, 0);
+    this.cost = this.cost == null ? null : cleanMoney(this.cost, 0);
+    this.originalPrice = this.originalPrice == null ? null : cleanMoney(this.originalPrice, 0);
+    this.initialStock = cleanMoney(this.initialStock, 0);
+    this.sortOrder = Math.max(0, Math.floor(Number(this.sortOrder || 0)));
+    this.active = this.active !== false;
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const DimensionsSchema = new mongoose.Schema(
   { l: { type: Number, default: 0, min: 0 }, w: { type: Number, default: 0, min: 0 }, h: { type: Number, default: 0, min: 0 } },
