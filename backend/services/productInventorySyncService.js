@@ -3,6 +3,10 @@
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Branch = require('../models/Branch');
+const {
+  buildVariantKey,
+  normalizeProductVariants,
+} = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -46,26 +50,51 @@ async function findDefaultInventoryBranch() {
   );
 }
 
+function getLegacyInventoryStock(product = {}, size = '', color = '') {
+  const rows = Array.isArray(product.inventory) ? product.inventory : [];
+  const targetKey = buildVariantKey(size, color);
+
+  const match = rows.find((row) => buildVariantKey(row?.size || '', row?.color || '') === targetKey);
+  return positiveInt(match?.stock, 0);
+}
+
 function normalizeVariantRows(product = {}) {
   if (product.trackInventory === false) return [];
 
   const rows = [];
   const seen = new Set();
 
-  function addVariant({ size = '', color = '', stock = 0 } = {}) {
+  function addVariant({ size = '', color = '', sku = '', barcode = '', stock = 0 } = {}) {
     const cleanSize = cleanText(size);
     const cleanColor = cleanText(color);
-    const key = `${cleanLower(cleanSize)}|${cleanLower(cleanColor)}`;
+    const variantKey = buildVariantKey(cleanSize, cleanColor);
 
-    if (seen.has(key)) return;
-    seen.add(key);
+    if (seen.has(variantKey)) return;
+    seen.add(variantKey);
 
     rows.push({
       size: cleanSize,
       color: cleanColor,
+      sku: cleanText(sku).toUpperCase(),
+      barcode: cleanText(barcode),
       stock: positiveInt(stock),
+      variantKey,
     });
   }
+
+  const advancedVariants = normalizeProductVariants(product.variants || [], product)
+    .filter((variant) => variant.active !== false);
+
+  advancedVariants.forEach((variant) => {
+    const legacyStock = getLegacyInventoryStock(product, variant.size, variant.color);
+    addVariant({
+      size: variant.size,
+      color: variant.color,
+      sku: variant.sku,
+      barcode: variant.barcode,
+      stock: positiveInt(variant.initialStock, legacyStock),
+    });
+  });
 
   const inventory = Array.isArray(product.inventory) ? product.inventory : [];
   inventory.forEach((row) => addVariant(row));
