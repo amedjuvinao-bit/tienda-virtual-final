@@ -42,23 +42,45 @@ function makeSku(category) {
 
 function normalizeStringArray(arr, max = Infinity) {
   if (!Array.isArray(arr)) return [];
-
   const seen = new Set();
   const out = [];
 
   for (const item of arr) {
     const value = String(item || '').trim();
     if (!value) continue;
-
     const key = value.toLowerCase();
     if (seen.has(key)) continue;
-
     seen.add(key);
     out.push(value);
     if (out.length >= max) break;
   }
 
   return out;
+}
+
+function toMoney(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.round(number)) : Math.max(0, Math.round(Number(fallback || 0)));
+}
+
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function buildVariantKey(size = '', color = '') {
+  const sizeKey = cleanText(size).toLowerCase();
+  const colorKey = cleanText(color).toLowerCase();
+  const key = `${sizeKey}__${colorKey}`;
+  return !key || key === '__' ? 'default__default' : key;
+}
+
+function buildVariantLabel(size = '', color = '') {
+  const parts = [cleanText(size), cleanText(color)].filter(Boolean);
+  return parts.join(' / ') || 'Variante general';
+}
+
+function getColorValue(color) {
+  return typeof color === 'string' ? color : color?.hex || color?.value || color?.name || '';
 }
 
 function hasInventoryDuplicatesFront(inv) {
@@ -76,17 +98,110 @@ function getInitialTrackInventory(productType, explicitValue) {
   return shouldTrackInventoryByType(productType);
 }
 
+function normalizeLoadedVariants(product = {}) {
+  if (Array.isArray(product.variants) && product.variants.length) {
+    return product.variants.map((variant, index) => {
+      const size = cleanText(variant.size || '');
+      const color = cleanText(variant.color || '');
+      const key = cleanText(variant.variantKey || buildVariantKey(size, color)).toLowerCase();
+      return {
+        variantKey: key,
+        label: cleanText(variant.label || buildVariantLabel(size, color)),
+        size,
+        color,
+        sku: cleanText(variant.sku || '').toUpperCase(),
+        barcode: cleanText(variant.barcode || ''),
+        price: variant.price ?? '',
+        cost: variant.cost ?? '',
+        originalPrice: variant.originalPrice ?? '',
+        image: cleanText(variant.image || ''),
+        images: normalizeStringArray(variant.images || [], 8),
+        initialStock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        active: variant.active !== false,
+        sortOrder: Number(variant.sortOrder ?? index),
+      };
+    });
+  }
+
+  const inventory = Array.isArray(product.inventory) ? product.inventory : [];
+  return inventory
+    .filter((row) => cleanText(row?.size || '') || cleanText(row?.color || ''))
+    .map((row, index) => {
+      const size = cleanText(row.size || '');
+      const color = cleanText(row.color || '');
+      return {
+        variantKey: buildVariantKey(size, color),
+        label: buildVariantLabel(size, color),
+        size,
+        color,
+        sku: '',
+        barcode: '',
+        price: '',
+        cost: '',
+        originalPrice: '',
+        image: '',
+        images: [],
+        initialStock: Math.max(0, Math.floor(Number(row.stock || 0))),
+        active: true,
+        sortOrder: index,
+      };
+    });
+}
+
+function mergeAdvancedVariants({ previous = [], sizes = [], colors = [], stockMap = {}, basePrice = 0, baseCost = 0 }) {
+  const cleanSizes = normalizeStringArray(sizes);
+  const cleanColors = normalizeStringArray(colors.map(getColorValue).filter(Boolean), 10);
+  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
+
+  const axisValues = cleanSizes.length ? cleanSizes : [''];
+  const colorValues = cleanColors.length ? cleanColors : [''];
+  const combos = [];
+
+  if (!cleanSizes.length && !cleanColors.length) return previous;
+
+  axisValues.forEach((size) => {
+    colorValues.forEach((color) => {
+      const key = buildVariantKey(size, color);
+      const existing = existingByKey.get(key);
+      const stockKey = `${size}|||${color}`;
+      const initialStock = Math.max(0, Math.floor(Number(stockMap[stockKey] ?? existing?.initialStock ?? 0)));
+
+      combos.push({
+        variantKey: key,
+        label: existing?.label || buildVariantLabel(size, color),
+        size,
+        color,
+        sku: existing?.sku || '',
+        barcode: existing?.barcode || '',
+        price: existing?.price ?? '',
+        cost: existing?.cost ?? '',
+        originalPrice: existing?.originalPrice ?? '',
+        image: existing?.image || '',
+        images: normalizeStringArray(existing?.images || [], 8),
+        initialStock,
+        active: existing?.active !== false,
+        sortOrder: existing?.sortOrder ?? combos.length,
+        _basePrice: basePrice,
+        _baseCost: baseCost,
+      });
+    });
+  });
+
+  return combos;
+}
+
 function Thumb({ src, alt, onRemove, index }) {
   return (
     <div className="group relative overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
       <img src={src} alt={alt} className="h-20 w-full object-cover" />
-      <div className="absolute left-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] text-slate-700">
+      <div className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}>
         {index + 1}
       </div>
       <button
         type="button"
         onClick={onRemove}
-        className="absolute right-1 top-1 rounded border bg-white/90 px-1.5 py-0.5 text-[10px] text-slate-700 opacity-0 shadow transition group-hover:opacity-100"
+        className="absolute right-1 top-1 rounded border px-1.5 py-0.5 text-[10px] opacity-0 shadow transition group-hover:opacity-100"
+        style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
       >
         Quitar
       </button>
@@ -128,72 +243,34 @@ const sectionStyle = {
   background: 'color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%)',
 };
 
-const variantButtonBase = {
+const pillStyle = {
   borderRadius: 999,
-  minWidth: 42,
-  minHeight: 34,
-  padding: '8px 14px',
-  fontSize: 12,
-  fontWeight: 900,
-  letterSpacing: '0.04em',
-  lineHeight: 1,
+  border: '1px solid color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border) 36%)',
+  background: 'var(--admin-button-soft-bg)',
+  color: 'var(--admin-button-soft-text)',
 };
-
-function variantButtonStyle(active) {
-  if (active) {
-    return {
-      ...variantButtonBase,
-      border: '1px solid color-mix(in srgb, var(--admin-primary) 90%, white 10%)',
-      background: 'linear-gradient(135deg, var(--admin-button-bg), color-mix(in srgb, var(--admin-button-bg) 72%, #0f172a 28%))',
-      color: '#ffffff',
-      boxShadow: '0 8px 18px color-mix(in srgb, var(--admin-primary) 24%, transparent)',
-      textShadow: '0 1px 6px rgba(0,0,0,0.35)',
-    };
-  }
-
-  return {
-    ...variantButtonBase,
-    border: '1px solid color-mix(in srgb, var(--admin-primary) 76%, rgba(255,255,255,0.45) 24%)',
-    background: 'linear-gradient(135deg, rgba(168,85,247,0.28), rgba(124,58,237,0.18))',
-    color: '#ffffff',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
-    textShadow: '0 1px 7px rgba(0,0,0,0.55)',
-  };
-}
-
-function chipStyle() {
-  return {
-    borderColor: 'color-mix(in srgb, var(--admin-primary) 75%, rgba(255,255,255,0.35) 25%)',
-    background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(124,58,237,0.18))',
-    color: '#ffffff',
-    textShadow: '0 1px 7px rgba(0,0,0,0.48)',
-  };
-}
 
 function actionButtonStyle(kind = 'primary') {
   if (kind === 'danger') {
     return {
-      border: '1px solid color-mix(in srgb, var(--admin-danger) 80%, white 20%)',
-      background: 'linear-gradient(135deg, var(--admin-danger), color-mix(in srgb, var(--admin-danger) 75%, #0f172a 25%))',
-      color: '#ffffff',
-      textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+      border: '1px solid var(--admin-danger)',
+      background: 'var(--admin-danger)',
+      color: 'var(--admin-danger-text, var(--admin-button-text))',
     };
   }
 
   if (kind === 'soft') {
     return {
-      border: '1px solid color-mix(in srgb, var(--admin-primary) 72%, rgba(255,255,255,0.32) 28%)',
-      background: 'linear-gradient(135deg, rgba(168,85,247,0.24), rgba(124,58,237,0.18))',
-      color: '#ffffff',
-      textShadow: '0 1px 7px rgba(0,0,0,0.45)',
+      border: '1px solid var(--admin-button-soft-border)',
+      background: 'var(--admin-button-soft-bg)',
+      color: 'var(--admin-button-soft-text)',
     };
   }
 
   return {
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 76%, white 24%)',
-    background: 'linear-gradient(135deg, var(--admin-button-bg), color-mix(in srgb, var(--admin-button-bg) 70%, #0f172a 30%))',
-    color: '#ffffff',
-    textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+    border: '1px solid var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-text)',
   };
 }
 
@@ -228,6 +305,8 @@ export default function FormularioProducto() {
   const [sizes, setSizes] = useState([]);
   const [sizeInput, setSizeInput] = useState('');
   const [variantStock, setVariantStock] = useState({});
+  const [advancedVariants, setAdvancedVariants] = useState([]);
+  const [expandedVariant, setExpandedVariant] = useState('');
 
   const [reorderPoint, setReorderPoint] = useState(0);
   const [reorderQty, setReorderQty] = useState(0);
@@ -253,7 +332,7 @@ export default function FormularioProducto() {
 
   const colorKeys = useMemo(() => {
     return (Array.isArray(colorsArr) ? colorsArr : [])
-      .map((color) => (typeof color === 'string' ? color : color?.hex || color?.value || color?.name || ''))
+      .map(getColorValue)
       .filter(Boolean);
   }, [colorsArr]);
 
@@ -284,17 +363,11 @@ export default function FormularioProducto() {
 
         let normalizedColors = [];
         if (Array.isArray(p.colors) && p.colors.length) {
-          normalizedColors = normalizeStringArray(
-            p.colors.map((color) => (typeof color === 'string' ? color : color?.hex || color?.value || color?.name || '')),
-            10
-          );
+          normalizedColors = normalizeStringArray(p.colors.map(getColorValue), 10);
         }
 
         if ((!normalizedColors || normalizedColors.length === 0) && Array.isArray(p.inventory)) {
-          normalizedColors = normalizeStringArray(
-            p.inventory.map((row) => String(row.color || '').trim()),
-            10
-          );
+          normalizedColors = normalizeStringArray(p.inventory.map((row) => String(row.color || '').trim()), 10);
         }
 
         setColorsArr(normalizedColors);
@@ -318,6 +391,10 @@ export default function FormularioProducto() {
         } else {
           setVariantStock({});
         }
+
+        const loadedVariants = normalizeLoadedVariants(p);
+        setAdvancedVariants(loadedVariants);
+        if (loadedVariants[0]?.variantKey) setExpandedVariant(loadedVariants[0].variantKey);
 
         setStock(Number(p.stock ?? 0));
         setReorderPoint(Number(p.reorderPoint ?? 0));
@@ -388,7 +465,28 @@ export default function FormularioProducto() {
     }
   }, [productType, id]);
 
-  const subirImagen = async (file, isGallery = false) => {
+  useEffect(() => {
+    if (!trackInventory) return;
+
+    setAdvancedVariants((prev) => {
+      const merged = mergeAdvancedVariants({
+        previous: prev,
+        sizes,
+        colors: colorKeys,
+        stockMap: variantStock,
+        basePrice: toMoney(precio, 0),
+        baseCost: toMoney(cost || averageCost, 0),
+      });
+
+      if (!expandedVariant && merged[0]?.variantKey) {
+        setExpandedVariant(merged[0].variantKey);
+      }
+
+      return merged;
+    });
+  }, [trackInventory, sizes, colorKeys, variantStock, precio, cost, averageCost, expandedVariant]);
+
+  const subirImagen = async ({ file, gallery = false, variantKey = '' }) => {
     if (!file) return;
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       toast.error('Cloudinary no está configurado.');
@@ -404,13 +502,19 @@ export default function FormularioProducto() {
       const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, formData);
       const url = res.data.secure_url;
 
-      if (isGallery) {
-        setImagenes((prev) => {
-          const next = [...prev];
-          if (!next.includes(url)) next.push(url);
-          if (next.length > 5) next.length = 5;
-          return next;
-        });
+      if (variantKey) {
+        setAdvancedVariants((prev) => prev.map((variant) => {
+          if (variant.variantKey !== variantKey) return variant;
+          if (gallery) {
+            return { ...variant, images: normalizeStringArray([...(variant.images || []), url], 8) };
+          }
+          return { ...variant, image: url };
+        }));
+        return;
+      }
+
+      if (gallery) {
+        setImagenes((prev) => normalizeStringArray([...prev, url], 5));
       } else {
         setImagen(url);
       }
@@ -470,6 +574,23 @@ export default function FormularioProducto() {
     const key = `${size}|||${color}`;
     const qty = Math.max(0, Math.floor(Number(value) || 0));
     setVariantStock((prev) => ({ ...prev, [key]: qty }));
+    const variantKey = buildVariantKey(size, color);
+    setAdvancedVariants((prev) => prev.map((variant) => (
+      variant.variantKey === variantKey ? { ...variant, initialStock: qty } : variant
+    )));
+  };
+
+  const updateVariant = (variantKey, patch) => {
+    setAdvancedVariants((prev) => prev.map((variant) => (
+      variant.variantKey === variantKey ? { ...variant, ...patch } : variant
+    )));
+  };
+
+  const removeVariantImage = (variantKey, imageIndex) => {
+    setAdvancedVariants((prev) => prev.map((variant) => {
+      if (variant.variantKey !== variantKey) return variant;
+      return { ...variant, images: (variant.images || []).filter((_, index) => index !== imageIndex) };
+    }));
   };
 
   const totalFromMatrix = useMemo(() => {
@@ -478,6 +599,16 @@ export default function FormularioProducto() {
 
   const inventoryArray = useMemo(() => {
     if (!trackInventory) return [];
+
+    const rows = advancedVariants.length
+      ? advancedVariants.map((variant) => ({
+          size: variant.size || '',
+          color: variant.color || '',
+          stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        }))
+      : [];
+
+    if (rows.length) return rows;
 
     const out = [];
     sizes.forEach((size) => {
@@ -489,18 +620,38 @@ export default function FormularioProducto() {
       });
     });
 
-    return out.filter((row) => row.stock > 0);
-  }, [trackInventory, sizes, colorKeys, variantStock]);
+    return out;
+  }, [trackInventory, advancedVariants, sizes, colorKeys, variantStock]);
+
+  const variantPayload = useMemo(() => {
+    if (!trackInventory) return [];
+    return advancedVariants
+      .filter((variant) => variant.active !== false && (variant.size || variant.color || variant.label))
+      .map((variant, index) => ({
+        variantKey: variant.variantKey || buildVariantKey(variant.size, variant.color),
+        label: variant.label || buildVariantLabel(variant.size, variant.color),
+        size: variant.size || '',
+        color: variant.color || '',
+        sku: variant.sku || '',
+        barcode: variant.barcode || '',
+        price: variant.price === '' || variant.price == null ? null : toMoney(variant.price, precio),
+        cost: variant.cost === '' || variant.cost == null ? null : toMoney(variant.cost, cost || averageCost),
+        originalPrice: variant.originalPrice === '' || variant.originalPrice == null ? null : toMoney(variant.originalPrice, 0),
+        image: variant.image || '',
+        images: normalizeStringArray(variant.images || [], 8),
+        initialStock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        active: variant.active !== false,
+        sortOrder: index,
+      }));
+  }, [trackInventory, advancedVariants, precio, cost, averageCost]);
 
   const formInvalid = useMemo(() => {
     const price = Number(precio);
-    const currentStock = Number(stock);
     if (!titulo.trim()) return true;
     if (!categoria.trim()) return true;
     if (!price || price <= 0 || Number.isNaN(price)) return true;
-    if (trackInventory && inventoryArray.length === 0 && (Number.isNaN(currentStock) || currentStock < 0)) return true;
     return false;
-  }, [titulo, categoria, precio, stock, trackInventory, inventoryArray.length]);
+  }, [titulo, categoria, precio]);
 
   const guardarProducto = async (event) => {
     event.preventDefault();
@@ -526,10 +677,9 @@ export default function FormularioProducto() {
       return;
     }
 
-    const dimensions =
-      Number(dimL) || Number(dimW) || Number(dimH)
-        ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
-        : undefined;
+    const dimensions = Number(dimL) || Number(dimW) || Number(dimH)
+      ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
+      : undefined;
 
     const supplier = supplierName && supplierName.trim() ? { name: supplierName.trim() } : undefined;
     const categoriesNormalized = normalizeStringArray(categoriesExtra);
@@ -575,10 +725,7 @@ export default function FormularioProducto() {
     };
 
     const numericStock = Math.max(0, Math.floor(Number(stock) || 0));
-    const shouldOmitStock = trackInventory && (inventoryArray?.length || 0) > 0 && (!numericStock || numericStock <= 0);
-    if (trackInventory && !shouldOmitStock) {
-      data.stock = numericStock;
-    }
+    if (trackInventory && numericStock > 0) data.stock = numericStock;
 
     if (trackInventory && hasInventoryDuplicatesFront(inventoryArray)) {
       toast.error('Hay combinaciones duplicadas en la matriz de variantes.');
@@ -587,14 +734,25 @@ export default function FormularioProducto() {
 
     setCargando(true);
     try {
+      let savedProduct = null;
       if (id) {
         const regen = originalCategoria && categoria && categoria !== originalCategoria ? '&regenSku=1' : '';
-        await api.put(`/api/products/${id}?mode=replace${regen}`, data);
-        toast.success('Producto actualizado');
+        const { data: updated } = await api.put(`/api/products/${id}?mode=replace${regen}`, data);
+        savedProduct = updated;
       } else {
-        await api.post('/api/products', data);
-        toast.success('Producto creado');
+        const { data: created } = await api.post('/api/products', data);
+        savedProduct = created;
       }
+
+      const productId = savedProduct?._id || savedProduct?.id || id;
+      if (trackInventory && productId && variantPayload.length) {
+        await api.put(`/api/admin/product-variants/${productId}`, {
+          variants: variantPayload,
+          syncLegacy: true,
+        });
+      }
+
+      toast.success(id ? 'Producto actualizado' : 'Producto creado');
       navigate('/admin/productos');
     } catch (err) {
       if (err?.message === 'NO_ADMIN_TOKEN') {
@@ -602,8 +760,7 @@ export default function FormularioProducto() {
         return;
       }
       const status = err?.response?.status;
-      const msg =
-        err?.response?.data?.message ||
+      const msg = err?.response?.data?.message ||
         (status === 401 ? 'No autorizado.' : status === 409 ? 'Dato único duplicado.' : 'Error al guardar');
       toast.error(msg);
       console.error(err);
@@ -621,7 +778,7 @@ export default function FormularioProducto() {
           </p>
           <h2 className="mt-1 text-2xl font-bold">{id ? 'Editar producto' : 'Nuevo producto'}</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Configura productos físicos, digitales, servicios o combos sin limitar la tienda a ropa.
+            Configura productos universales, inventario real y variantes con precio e imágenes propias.
           </p>
         </div>
 
@@ -672,17 +829,17 @@ export default function FormularioProducto() {
             </div>
 
             <div className="space-y-2">
-              <FieldLabel required>Precio de venta</FieldLabel>
+              <FieldLabel required>Precio base</FieldLabel>
               <input type="number" min="0" step="1" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="89000" required />
             </div>
 
             <div className="space-y-2">
-              <FieldLabel>Costo unitario</FieldLabel>
+              <FieldLabel>Costo base</FieldLabel>
               <input type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="0" />
             </div>
 
             <div className="space-y-2">
-              <FieldLabel>Código de barras</FieldLabel>
+              <FieldLabel>Código de barras base</FieldLabel>
               <input value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="EAN / UPC / interno" />
             </div>
 
@@ -696,17 +853,17 @@ export default function FormularioProducto() {
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
               <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                El catálogo guarda la configuración; los movimientos reales se harán desde Inventario por sede.
+                El producto guarda la ficha comercial. Inventario conserva las existencias reales por sede y variante.
               </p>
             </div>
 
             <div className="grid gap-3">
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5 accent-pink-500" />
+                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
                 <span className="text-sm font-semibold">Controlar inventario para este producto</span>
               </label>
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                <input type="checkbox" checked={allowBackorder} onChange={(e) => setAllowBackorder(e.target.checked)} className="h-5 w-5 accent-pink-500" disabled={!trackInventory} />
+                <input type="checkbox" checked={allowBackorder} onChange={(e) => setAllowBackorder(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} disabled={!trackInventory} />
                 <span className="text-sm font-semibold">Permitir venta sin stock disponible</span>
               </label>
             </div>
@@ -727,7 +884,7 @@ export default function FormularioProducto() {
                   <FieldLabel>Stock inicial heredado</FieldLabel>
                   <input type="number" min="0" step="1" value={stock} onChange={(e) => setStock(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="0" />
                   <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
-                    Luego los movimientos se harán desde Inventario. Este dato queda como respaldo inicial.
+                    La existencia real queda en InventoryStock. Este valor solo sirve como respaldo inicial.
                   </p>
                 </div>
               </>
@@ -739,18 +896,12 @@ export default function FormularioProducto() {
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
                   <FieldLabel>{selectedPreset.axisLabel || 'Variante'}</FieldLabel>
-                  {selectedPreset.suggestions.length > 0 && (
+                  {(selectedPreset.suggestions || []).length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {selectedPreset.suggestions.map((item) => {
                         const active = sizes.some((size) => size.toLowerCase() === item.toLowerCase());
                         return (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => toggleSize(item)}
-                            className="transition hover:-translate-y-0.5 active:translate-y-0"
-                            style={variantButtonStyle(active)}
-                          >
+                          <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-4 py-2 text-xs font-black transition hover:-translate-y-0.5" style={active ? actionButtonStyle() : pillStyle}>
                             {item}
                           </button>
                         );
@@ -766,9 +917,9 @@ export default function FormularioProducto() {
                   {sizes.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {sizes.map((size) => (
-                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={chipStyle()}>
+                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
                           {size}
-                          <button type="button" className="font-black text-white" onClick={() => toggleSize(size)}>×</button>
+                          <button type="button" className="font-black" onClick={() => toggleSize(size)} style={{ color: 'var(--admin-button-soft-text)' }}>×</button>
                         </span>
                       ))}
                     </div>
@@ -821,7 +972,7 @@ export default function FormularioProducto() {
                             colorKeys.map((color) => (
                               <th key={color} className="border-l p-2" style={{ borderColor: 'var(--admin-card-border)' }}>
                                 <div className="flex items-center gap-2">
-                                  <span className="inline-block h-4 w-4 rounded-full border" style={{ backgroundColor: color }} />
+                                  <span className="inline-block h-4 w-4 rounded-full border" style={{ backgroundColor: color, borderColor: 'var(--admin-card-border)' }} />
                                   <span className="font-normal">{color}</span>
                                 </div>
                               </th>
@@ -854,6 +1005,141 @@ export default function FormularioProducto() {
                   </div>
                 </div>
               )}
+
+              {advancedVariants.length > 0 && (
+                <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                  <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+                      Variantes avanzadas
+                    </p>
+                    <h3 className="text-lg font-bold">Precio, SKU e imágenes por variante</h3>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Si una variante no tiene precio o costo propio, usará el precio y costo base del producto.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 p-4">
+                    {advancedVariants.map((variant) => {
+                      const open = expandedVariant === variant.variantKey;
+                      const effectivePrice = variant.price !== '' && variant.price != null ? variant.price : precio || 0;
+                      const effectiveCost = variant.cost !== '' && variant.cost != null ? variant.cost : cost || averageCost || 0;
+                      const margin = Math.max(0, toMoney(effectivePrice) - toMoney(effectiveCost));
+                      return (
+                        <article key={variant.variantKey} className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)' }}>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="h-20 w-20 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                              {variant.image || imagen ? (
+                                <img src={variant.image || imagen} alt={variant.label} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Sin imagen</div>
+                              )}
+                            </div>
+                            <div className="min-w-[220px] flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border px-3 py-1 text-xs font-black" style={pillStyle}>{variant.label}</span>
+                                <span className="rounded-full border px-3 py-1 text-xs font-black" style={variant.active ? pillStyle : { ...pillStyle, opacity: 0.65 }}> {variant.active ? 'ACTIVA' : 'INACTIVA'} </span>
+                              </div>
+                              <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                                {variant.variantKey} · Stock inicial {variant.initialStock || 0}
+                              </p>
+                              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                                <span>Precio: <b style={{ color: 'var(--admin-card-text)' }}>${Number(effectivePrice || 0).toLocaleString('es-CO')}</b></span>
+                                <span>Costo: <b style={{ color: 'var(--admin-card-text)' }}>${Number(effectiveCost || 0).toLocaleString('es-CO')}</b></span>
+                                <span>Margen: <b style={{ color: 'var(--admin-primary)' }}>${margin.toLocaleString('es-CO')}</b></span>
+                              </div>
+                            </div>
+                            <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle(open ? 'soft' : 'primary')} onClick={() => setExpandedVariant(open ? '' : variant.variantKey)}>
+                              {open ? 'Cerrar' : 'Configurar'}
+                            </button>
+                          </div>
+
+                          {open && (
+                            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                              <div className="space-y-3 lg:col-span-2">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  <div>
+                                    <FieldLabel>Nombre visible</FieldLabel>
+                                    <input value={variant.label} onChange={(e) => updateVariant(variant.variantKey, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>SKU variante</FieldLabel>
+                                    <input value={variant.sku} onChange={(e) => updateVariant(variant.variantKey, { sku: e.target.value.toUpperCase() })} className="w-full px-3 py-2" style={inputStyle} placeholder="SKU propio" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Barcode variante</FieldLabel>
+                                    <input value={variant.barcode} onChange={(e) => updateVariant(variant.variantKey, { barcode: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="EAN / UPC" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Precio propio</FieldLabel>
+                                    <input type="number" min="0" value={variant.price ?? ''} onChange={(e) => updateVariant(variant.variantKey, { price: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder={`Base ${precio || 0}`} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Costo propio</FieldLabel>
+                                    <input type="number" min="0" value={variant.cost ?? ''} onChange={(e) => updateVariant(variant.variantKey, { cost: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder={`Base ${cost || averageCost || 0}`} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Precio anterior</FieldLabel>
+                                    <input type="number" min="0" value={variant.originalPrice ?? ''} onChange={(e) => updateVariant(variant.variantKey, { originalPrice: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Opcional" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Stock inicial</FieldLabel>
+                                    <input type="number" min="0" value={variant.initialStock ?? 0} onChange={(e) => {
+                                      const qty = Math.max(0, Math.floor(Number(e.target.value || 0)));
+                                      updateVariant(variant.variantKey, { initialStock: qty });
+                                      setCell(variant.size, variant.color, qty);
+                                    }} className="w-full px-3 py-2" style={inputStyle} />
+                                  </div>
+                                  <label className="flex items-center gap-3 pt-6">
+                                    <input type="checkbox" checked={variant.active !== false} onChange={(e) => updateVariant(variant.variantKey, { active: e.target.checked })} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
+                                    <span className="text-sm font-semibold">Variante activa</span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <FieldLabel>Imagen principal variante</FieldLabel>
+                                <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                                  {variant.image ? (
+                                    <img src={variant.image} alt={variant.label} className="h-36 w-full object-cover" />
+                                  ) : (
+                                    <div className="flex h-36 items-center justify-center text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Sin imagen propia</div>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], variantKey: variant.variantKey })} />
+                                    Subir portada
+                                  </label>
+                                  {variant.image && (
+                                    <button type="button" className="rounded-full px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')} onClick={() => updateVariant(variant.variantKey, { image: '' })}>Quitar</button>
+                                  )}
+                                </div>
+
+                                <FieldLabel>Galería variante</FieldLabel>
+                                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], variantKey: variant.variantKey, gallery: true })} />
+                                  Añadir imagen
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(variant.images || []).length === 0 ? (
+                                    <div className="col-span-full rounded-xl border border-dashed p-4 text-center text-xs" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                                      Sin galería propia
+                                    </div>
+                                  ) : (
+                                    variant.images.map((src, index) => (
+                                      <Thumb key={`${variant.variantKey}-${src}-${index}`} src={src} alt={`Imagen ${index + 1}`} index={index} onRemove={() => removeVariantImage(variant.variantKey, index)} />
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </section>
           )}
 
@@ -866,144 +1152,51 @@ export default function FormularioProducto() {
             </div>
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
-              <div>
-                <FieldLabel>Costo promedio</FieldLabel>
-                <input type="number" min="0" value={averageCost} onChange={(e) => setAverageCost(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-              </div>
-              <div>
-                <FieldLabel>IVA %</FieldLabel>
-                <input type="number" min="0" max="100" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-              </div>
-              <div className="flex items-center gap-2 pt-6">
-                <input id="taxIncluded" type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="h-5 w-5 accent-pink-500" />
-                <label htmlFor="taxIncluded" className="text-sm font-semibold">Precio incluye IVA</label>
-              </div>
-              <div>
-                <FieldLabel>Punto de pedido</FieldLabel>
-                <input type="number" min="0" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} />
-              </div>
-              <div>
-                <FieldLabel>Reposición sugerida</FieldLabel>
-                <input type="number" min="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} />
-              </div>
-              <div>
-                <FieldLabel>Ubicación bodega</FieldLabel>
-                <input value={warehouseLocation} onChange={(e) => setWarehouseLocation(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} placeholder="Estante A-3" />
-              </div>
-              <div>
-                <FieldLabel>Peso gramos</FieldLabel>
-                <input type="number" min="0" value={weightGrams} onChange={(e) => setWeightGrams(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-              </div>
-              <div className="md:col-span-2">
-                <FieldLabel>Dimensiones cm</FieldLabel>
-                <div className="grid grid-cols-3 gap-2">
-                  <input type="number" min="0" value={dimL} onChange={(e) => setDimL(e.target.value)} placeholder="Largo" className="px-3 py-2" style={inputStyle} />
-                  <input type="number" min="0" value={dimW} onChange={(e) => setDimW(e.target.value)} placeholder="Ancho" className="px-3 py-2" style={inputStyle} />
-                  <input type="number" min="0" value={dimH} onChange={(e) => setDimH(e.target.value)} placeholder="Alto" className="px-3 py-2" style={inputStyle} />
-                </div>
-              </div>
+              <div><FieldLabel>Costo promedio</FieldLabel><input type="number" min="0" value={averageCost} onChange={(e) => setAverageCost(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div><FieldLabel>IVA %</FieldLabel><input type="number" min="0" max="100" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="flex items-center gap-2 pt-6"><input id="taxIncluded" type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} /><label htmlFor="taxIncluded" className="text-sm font-semibold">Precio incluye IVA</label></div>
+              <div><FieldLabel>Punto de pedido</FieldLabel><input type="number" min="0" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} /></div>
+              <div><FieldLabel>Reposición sugerida</FieldLabel><input type="number" min="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} /></div>
+              <div><FieldLabel>Ubicación bodega</FieldLabel><input value={warehouseLocation} onChange={(e) => setWarehouseLocation(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} placeholder="Estante A-3" /></div>
+              <div><FieldLabel>Peso gramos</FieldLabel><input type="number" min="0" value={weightGrams} onChange={(e) => setWeightGrams(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="md:col-span-2"><FieldLabel>Dimensiones cm</FieldLabel><div className="grid grid-cols-3 gap-2"><input type="number" min="0" value={dimL} onChange={(e) => setDimL(e.target.value)} placeholder="Largo" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimW} onChange={(e) => setDimW(e.target.value)} placeholder="Ancho" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimH} onChange={(e) => setDimH(e.target.value)} placeholder="Alto" className="px-3 py-2" style={inputStyle} /></div></div>
             </div>
           </section>
 
           <section className="grid gap-5 md:grid-cols-3">
-            <div className="space-y-2">
-              <FieldLabel>Marca</FieldLabel>
-              <input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-            </div>
-            <div className="space-y-2">
-              <FieldLabel>Temporada / colección</FieldLabel>
-              <input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-            </div>
-            <div className="space-y-2">
-              <FieldLabel>Proveedor</FieldLabel>
-              <input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} />
-            </div>
-
+            <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            <div className="space-y-2"><FieldLabel>Temporada / colección</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
             <div className="space-y-2 md:col-span-3">
               <FieldLabel>Categorías adicionales</FieldLabel>
-              <div className="flex gap-2">
-                <input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} />
-                <button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button>
-              </div>
-              {categoriesExtra.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {categoriesExtra.map((cat) => (
-                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={chipStyle()}>
-                      {cat}
-                      <button type="button" className="font-black text-white" onClick={() => removeCatChip(cat)}>×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="flex gap-2"><input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} /><button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button></div>
+              {categoriesExtra.length > 0 && (<div className="mt-2 flex flex-wrap gap-2">{categoriesExtra.map((cat) => (<span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>{cat}<button type="button" className="font-black" style={{ color: 'var(--admin-button-soft-text)' }} onClick={() => removeCatChip(cat)}>×</button></span>))}</div>)}
             </div>
           </section>
 
           <section className="grid gap-6 lg:grid-cols-2">
             <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
-              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
-                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Imagen portada</h3>
-                <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Se mostrará primero en la tienda.</p>
-              </div>
+              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}><h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Imagen portada</h3><p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Se mostrará primero en la tienda si la variante no tiene imagen propia.</p></div>
               <div className="p-5">
-                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={chipStyle()}>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0], false)} />
-                  Elegir portada
-                </label>
-                <div className="mt-4 h-64 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
-                  {imagen ? (
-                    <div className="relative h-full w-full">
-                      <img src={imagen} alt="Portada del producto" className="h-full w-full object-cover" />
-                      <button type="button" onClick={() => setImagen('')} className="absolute right-2 top-2 rounded-full border bg-white/90 px-2 py-1 text-xs text-slate-700 shadow">Quitar</button>
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Sin portada seleccionada</div>
-                  )}
-                </div>
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}><input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0] })} />Elegir portada</label>
+                <div className="mt-4 h-64 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>{imagen ? (<div className="relative h-full w-full"><img src={imagen} alt="Portada del producto" className="h-full w-full object-cover" /><button type="button" onClick={() => setImagen('')} className="absolute right-2 top-2 rounded-full border px-2 py-1 text-xs shadow" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}>Quitar</button></div>) : (<div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Sin portada seleccionada</div>)}</div>
               </div>
             </div>
 
             <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
-              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
-                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Galería</h3>
-                <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Máximo 5 imágenes adicionales.</p>
-              </div>
+              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}><h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Galería</h3><p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Máximo 5 imágenes generales del producto.</p></div>
               <div className="p-5">
-                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={chipStyle()}>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0], true)} />
-                  Añadir imagen
-                </label>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {imagenes.length === 0 ? (
-                    <div className="col-span-full rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>Sin imágenes adicionales</div>
-                  ) : (
-                    imagenes.map((src, index) => (
-                      <Thumb key={`${src}-${index}`} src={src} alt={`Galería ${index + 1}`} index={index} onRemove={() => setImagenes((prev) => prev.filter((_, i) => i !== index))} />
-                    ))
-                  )}
-                </div>
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}><input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], gallery: true })} />Añadir imagen</label>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{imagenes.length === 0 ? (<div className="col-span-full rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>Sin imágenes adicionales</div>) : (imagenes.map((src, index) => (<Thumb key={`${src}-${index}`} src={src} alt={`Galería ${index + 1}`} index={index} onRemove={() => setImagenes((prev) => prev.filter((_, i) => i !== index))} />)))}</div>
               </div>
             </div>
           </section>
 
-          <section className="space-y-2">
-            <FieldLabel>Notas internas</FieldLabel>
-            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Observaciones internas para inventario, compras o finanzas." />
-          </section>
+          <section className="space-y-2"><FieldLabel>Notas internas</FieldLabel><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Observaciones internas para inventario, compras o finanzas." /></section>
 
           <section className="flex flex-wrap items-center justify-between gap-4 border-t pt-5" style={{ borderColor: 'var(--admin-card-border)' }}>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="h-5 w-5 accent-pink-500" />
-              <span className="text-sm font-semibold">Producto activo en la tienda</span>
-            </label>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={actionButtonStyle('soft')}>
-                Cancelar
-              </button>
-              <button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>
-                {cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}
-              </button>
-            </div>
+            <label className="flex items-center gap-3"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} /><span className="text-sm font-semibold">Producto activo en la tienda</span></label>
+            <div className="flex gap-3"><button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={actionButtonStyle('soft')}>Cancelar</button><button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>{cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}</button></div>
           </section>
         </form>
       </div>
