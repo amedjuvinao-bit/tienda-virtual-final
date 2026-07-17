@@ -28,6 +28,14 @@
     ) !important;
 }
 
+.admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.gap-2 > button {
+  color: var(--admin-button-text, var(--admin-card-text)) !important;
+  -webkit-text-fill-color: var(--admin-button-text, var(--admin-card-text)) !important;
+  border-color: color-mix(in srgb, var(--admin-button-bg, var(--admin-primary)) 70%, var(--admin-card-border) 30%) !important;
+  background: var(--admin-button-bg, var(--admin-primary)) !important;
+  text-shadow: none !important;
+}
+
 .admin-area form > section:nth-of-type(3) > div > div:first-child > div.mt-2.flex.flex-wrap.gap-2 > span {
   color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
   -webkit-text-fill-color: var(--admin-primary-soft-text, var(--admin-card-text)) !important;
