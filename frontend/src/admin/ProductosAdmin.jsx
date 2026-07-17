@@ -223,18 +223,19 @@ const styles = {
     borderRadius: 999,
     background:
       'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 88%, #0f172a 12%), color-mix(in srgb, var(--admin-button-bg) 66%, #0f172a 34%))',
-    color: '#fff',
+    color: '#ffffff',
     boxShadow:
       '0 14px 30px color-mix(in srgb, var(--admin-button-bg) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.28)',
     textShadow: '0 1px 8px rgba(0,0,0,0.38)',
   },
   inventoryButton: {
-    border: '1px solid color-mix(in srgb, var(--admin-primary) 70%, var(--admin-card-border))',
+    border: '1px solid rgba(255,255,255,0.30)',
     borderRadius: 999,
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary) 16%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary) 8%, var(--admin-card-bg)))',
-    color: 'var(--admin-primary)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+    background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+    color: '#ffffff',
+    boxShadow:
+      '0 14px 30px rgba(124,58,237,0.28), inset 0 1px 0 rgba(255,255,255,0.28)',
+    textShadow: '0 1px 8px rgba(0,0,0,0.45)',
   },
   softButton: {
     border: '1px solid var(--admin-button-soft-border)',
@@ -248,7 +249,7 @@ const styles = {
     borderRadius: 999,
     background:
       'linear-gradient(135deg, var(--admin-danger), color-mix(in srgb, var(--admin-danger) 78%, #0f172a 22%))',
-    color: '#fff',
+    color: '#ffffff',
     textShadow: '0 1px 8px rgba(0,0,0,0.38)',
   },
   input: {
@@ -461,7 +462,7 @@ export default function ProductosAdmin() {
               <button
                 type="button"
                 onClick={() => navigate('/admin/productos/nuevo')}
-                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5 active:translate-y-0"
+                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5 active:translate-y-0 !text-white"
                 style={styles.primaryButton}
               >
                 <Plus className="h-4 w-4" />
@@ -750,7 +751,7 @@ export default function ProductosAdmin() {
                           <button
                             type="button"
                             onClick={() => navigate(`/admin/productos/editar/${product._id}`)}
-                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
+                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px] !text-white"
                             style={styles.primaryButton}
                           >
                             <Pencil className="h-4 w-4" />
@@ -761,7 +762,7 @@ export default function ProductosAdmin() {
                         <button
                           type="button"
                           onClick={() => navigate(`/admin/inventario?productId=${product._id}`)}
-                          className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
+                          className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px] !text-white"
                           style={styles.inventoryButton}
                         >
                           <Warehouse className="h-4 w-4" />
@@ -775,7 +776,7 @@ export default function ProductosAdmin() {
                               setProductToDelete(product._id);
                               setConfirmOpen(true);
                             }}
-                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
+                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px] !text-white"
                             style={styles.dangerButton}
                           >
                             <Trash2 className="h-4 w-4" />
