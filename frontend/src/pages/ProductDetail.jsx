@@ -1,11 +1,45 @@
 // src/pages/ProductDetail.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../lib/api";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import ProductDetailView from "../components/product-detail/ProductDetailView";
+import { getColorDisplayName, getColorVisualValue } from "../utils/colorDisplay";
+
+function decorateProductForPublic(product) {
+  if (!product) return product;
+
+  const rawColors = Array.isArray(product.colors) ? product.colors : [];
+  const colors = rawColors.map((color) => getColorDisplayName(color)).filter(Boolean);
+
+  const variants = Array.isArray(product.variants)
+    ? product.variants.map((variant) => {
+        const colorName = getColorDisplayName(variant?.color || '');
+        const size = String(variant?.size || '').trim();
+        const labelParts = [size, colorName].filter(Boolean);
+
+        return {
+          ...variant,
+          color: colorName || variant?.color || '',
+          colorValue: getColorVisualValue(variant?.color || ''),
+          colorLabel: colorName,
+          label: labelParts.length ? labelParts.join(' / ') : variant?.label || 'Variante general',
+        };
+      })
+    : [];
+
+  return {
+    ...product,
+    colors,
+    variants,
+    colorOptions: rawColors.map((color) => ({
+      value: getColorVisualValue(color),
+      label: getColorDisplayName(color),
+    })),
+  };
+}
 
 export default function ProductDetail() {
   const { id, slug } = useParams();
@@ -18,12 +52,10 @@ export default function ProductDetail() {
 
   const [config, setConfig] = useState(null);
 
-  // estados UI
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  // reseñas
   const [reviewName, setReviewName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
@@ -31,9 +63,8 @@ export default function ProductDetail() {
   const [reviewError, setReviewError] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState("");
 
-  // ===============================
-  // 🔥 CARGAR PRODUCTO
-  // ===============================
+  const publicProduct = useMemo(() => decorateProductForPublic(product), [product]);
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -42,29 +73,18 @@ export default function ProductDetail() {
         const productKey = id || slug;
         const res = await api.get(`/api/products/${productKey}`);
         const data = res.data?.product || res.data?.data || res.data;
+        const decorated = decorateProductForPublic(data);
 
         setProduct(data);
 
-        // valores por defecto
-        if (data?.sizes?.length) {
-          setSelectedSize(data.sizes[0]);
+        if (decorated?.sizes?.length) {
+          setSelectedSize(decorated.sizes[0]);
         } else {
           setSelectedSize("");
         }
 
-        if (data?.colors?.length) {
-          const firstColor = data.colors[0];
-          if (typeof firstColor === "string") {
-            setSelectedColor(firstColor);
-          } else {
-            setSelectedColor(
-              firstColor?.name ||
-                firstColor?.label ||
-                firstColor?.value ||
-                firstColor?.hex ||
-                ""
-            );
-          }
+        if (decorated?.colors?.length) {
+          setSelectedColor(decorated.colors[0]);
         } else {
           setSelectedColor("");
         }
@@ -81,9 +101,6 @@ export default function ProductDetail() {
     fetchProduct();
   }, [id, slug]);
 
-  // ===============================
-  // 🔥 CARGAR CONFIG DEL ADMIN
-  // ===============================
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -118,14 +135,11 @@ export default function ProductDetail() {
     fetchConfig();
   }, []);
 
-  // ===============================
-  // 🔥 ACCIONES
-  // ===============================
   const handleAddToCart = () => {
-    if (!product) return;
+    if (!publicProduct) return;
 
     addToCart({
-      ...product,
+      ...publicProduct,
       size: selectedSize,
       color: selectedColor,
       quantity,
@@ -133,8 +147,8 @@ export default function ProductDetail() {
   };
 
   const handleFavorite = () => {
-    if (!product) return;
-    toggleFavorite(product);
+    if (!publicProduct) return;
+    toggleFavorite(publicProduct);
   };
 
   const handleSubmitReview = async () => {
@@ -185,25 +199,19 @@ export default function ProductDetail() {
     }
   };
 
-  // ===============================
-  // 🔥 VALIDACIÓN
-  // ===============================
   if (loading) {
     return <div className="p-10 text-center">Cargando producto...</div>;
   }
 
-  if (!product) {
+  if (!publicProduct) {
     return <div className="p-10 text-center">Producto no encontrado</div>;
   }
 
-  // ===============================
-  // 🔥 RENDER
-  // ===============================
   return (
     <ProductDetailView
-      product={product}
+      product={publicProduct}
       config={config}
-      isFavorite={isFavorite(product)}
+      isFavorite={isFavorite(publicProduct)}
       onToggleFavorite={handleFavorite}
       onAddToCart={handleAddToCart}
       selectedSize={selectedSize}
