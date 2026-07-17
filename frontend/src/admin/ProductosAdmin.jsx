@@ -37,12 +37,14 @@ function formatNumber(value) {
 
 function shortId(value) {
   const text = String(value || '');
-  if (text.length <= 10) return text || '—';
+  if (!text) return '—';
+  if (text.length <= 10) return text;
   return `${text.slice(0, 6)}…${text.slice(-4)}`;
 }
 
 function getInventorySummary(product) {
   const fallbackStock = Number(product?.stock ?? 0) || 0;
+
   return product?.inventorySummary || {
     stock: fallbackStock,
     reservedStock: 0,
@@ -96,6 +98,7 @@ function getProductInitials(title = '') {
     .filter(Boolean);
 
   if (!words.length) return 'PR';
+
   return words
     .slice(0, 2)
     .map((word) => word[0])
@@ -164,7 +167,7 @@ function toneVars(tone = 'neutral') {
     },
     neutral: {
       background: 'var(--admin-button-soft-bg)',
-      color: 'var(--admin-button-soft-text)',
+      color: 'var(--admin-card-text)',
       borderColor: 'var(--admin-button-soft-border)',
     },
   };
@@ -215,7 +218,8 @@ const styles = {
     color: 'var(--admin-card-muted-text)',
   },
   primaryButton: {
-    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 72%, rgba(255,255,255,0.45) 28%)',
+    border:
+      '1px solid color-mix(in srgb, var(--admin-button-bg) 72%, rgba(255,255,255,0.45) 28%)',
     borderRadius: 999,
     background:
       'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 88%, #0f172a 12%), color-mix(in srgb, var(--admin-button-bg) 66%, #0f172a 34%))',
@@ -224,14 +228,23 @@ const styles = {
       '0 14px 30px color-mix(in srgb, var(--admin-button-bg) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.28)',
     textShadow: '0 1px 8px rgba(0,0,0,0.38)',
   },
+  inventoryButton: {
+    border: '1px solid color-mix(in srgb, var(--admin-primary) 70%, var(--admin-card-border))',
+    borderRadius: 999,
+    background:
+      'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary) 16%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary) 8%, var(--admin-card-bg)))',
+    color: 'var(--admin-primary)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+  },
   softButton: {
     border: '1px solid var(--admin-button-soft-border)',
     borderRadius: 999,
     background: 'var(--admin-button-soft-bg)',
-    color: 'var(--admin-button-soft-text)',
+    color: 'var(--admin-card-text)',
   },
   dangerButton: {
-    border: '1px solid color-mix(in srgb, var(--admin-danger) 75%, rgba(255,255,255,0.35) 25%)',
+    border:
+      '1px solid color-mix(in srgb, var(--admin-danger) 75%, rgba(255,255,255,0.35) 25%)',
     borderRadius: 999,
     background:
       'linear-gradient(135deg, var(--admin-danger), color-mix(in srgb, var(--admin-danger) 78%, #0f172a 22%))',
@@ -365,6 +378,7 @@ export default function ProductosAdmin() {
 
         if (product.trackInventory) acc.tracked += 1;
         if (product.active !== false) acc.active += 1;
+
         return acc;
       },
       {
@@ -415,7 +429,7 @@ export default function ProductosAdmin() {
 
     try {
       await api.delete(`/api/products/${productToDelete}`);
-      setProducts((prev) => prev.filter((p) => p._id !== productToDelete));
+      setProducts((prev) => prev.filter((product) => product._id !== productToDelete));
       toast.success('Producto eliminado');
     } catch (err) {
       console.error(err);
@@ -435,19 +449,17 @@ export default function ProductosAdmin() {
               <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>
                 Catálogo universal
               </p>
-              <h1
-                className="mt-1 text-3xl font-black leading-tight"
-                style={{ color: 'var(--admin-card-text)' }}
-              >
+              <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>
                 Productos
               </h1>
               <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>
-                Gestiona la ficha comercial. El stock real se consulta desde Inventario por sede y variante.
+                Gestiona la ficha comercial del producto. El stock real se consulta desde Inventario por sede y variante.
               </p>
             </div>
 
             <Can permission="products:create">
               <button
+                type="button"
                 onClick={() => navigate('/admin/productos/nuevo')}
                 className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5 active:translate-y-0"
                 style={styles.primaryButton}
@@ -466,20 +478,18 @@ export default function ProductosAdmin() {
               { label: 'Costo estimado', value: formatCurrency(summary.costValue), sub: `Venta ${formatCurrency(summary.saleValue)}`, icon: Layers3 },
             ].map((item) => {
               const Icon = item.icon;
+
               return (
                 <div key={item.label} className="p-4" style={styles.kpi}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.muted}>
                         {item.label}
                       </p>
-                      <p
-                        className="mt-2 truncate text-2xl font-black leading-none"
-                        style={{ color: 'var(--admin-card-text)' }}
-                      >
+                      <p className="mt-2 text-2xl font-black leading-none" style={{ color: 'var(--admin-card-text)' }}>
                         {item.value}
                       </p>
-                      <p className="mt-2 truncate text-xs font-semibold" style={styles.muted}>
+                      <p className="mt-2 text-xs font-semibold" style={styles.muted}>
                         {item.sub}
                       </p>
                     </div>
@@ -507,7 +517,7 @@ export default function ProductosAdmin() {
                 className="h-12 w-full pl-11 pr-4 text-sm font-semibold"
                 placeholder="Buscar producto, SKU o categoría…"
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(event) => setQ(event.target.value)}
                 style={styles.input}
               />
             </label>
@@ -614,13 +624,17 @@ export default function ProductosAdmin() {
               const marginSafe = Math.max(0, Math.min(100, Number(margin.marginPercent || 0)));
 
               return (
-                <article key={product._id} className="relative overflow-hidden p-4 transition hover:-translate-y-0.5 md:p-5" style={styles.productCard}>
+                <article
+                  key={product._id}
+                  className="relative overflow-hidden p-4 transition hover:-translate-y-0.5 md:p-5"
+                  style={styles.productCard}
+                >
                   <div
                     className="pointer-events-none absolute inset-y-0 left-0 w-1"
                     style={{ background: 'linear-gradient(180deg, var(--admin-primary), color-mix(in srgb, var(--admin-primary) 25%, transparent))' }}
                   />
 
-                  <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(170px,0.65fr)_minmax(210px,0.8fr)_140px] lg:items-center">
+                  <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(170px,0.65fr)_minmax(210px,0.8fr)_150px] lg:items-center">
                     <div className="flex min-w-0 gap-4">
                       <div
                         className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border text-sm font-black"
@@ -736,7 +750,7 @@ export default function ProductosAdmin() {
                           <button
                             type="button"
                             onClick={() => navigate(`/admin/productos/editar/${product._id}`)}
-                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[132px]"
+                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
                             style={styles.primaryButton}
                           >
                             <Pencil className="h-4 w-4" />
@@ -747,8 +761,8 @@ export default function ProductosAdmin() {
                         <button
                           type="button"
                           onClick={() => navigate(`/admin/inventario?productId=${product._id}`)}
-                          className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[132px]"
-                          style={styles.softButton}
+                          className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
+                          style={styles.inventoryButton}
                         >
                           <Warehouse className="h-4 w-4" />
                           Inventario
@@ -761,7 +775,7 @@ export default function ProductosAdmin() {
                               setProductToDelete(product._id);
                               setConfirmOpen(true);
                             }}
-                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[132px]"
+                            className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px]"
                             style={styles.dangerButton}
                           >
                             <Trash2 className="h-4 w-4" />
