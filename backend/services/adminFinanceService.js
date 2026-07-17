@@ -6,6 +6,7 @@ const Product = require('../models/Product');
 const CashSession = require('../models/CashSession');
 const FinanceExpense = require('../models/FinanceExpense');
 const { resolveVariantCommercialSnapshot } = require('../lib/products/productVariantConfig');
+const { formatLocalDate, resolveDateRange, safeDate } = require('../utils/dateRange');
 
 const CANCELLED_ORDER_STATUSES = ['cancelled', 'canceled', 'failed', 'refunded'];
 
@@ -45,104 +46,8 @@ function toObjectId(value) {
   return new mongoose.Types.ObjectId(String(value));
 }
 
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfDay(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function startOfMonth(date) {
-  const d = new Date(date);
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfMonth(date) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + 1, 0);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-function parseDateOnly(value) {
-  const text = clean(value);
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const [, year, month, day] = match;
-  return new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0);
-}
-
-function safeDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-
-  const dateOnly = parseDateOnly(value);
-  if (dateOnly) return dateOnly;
-
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function resolveDateRange(query = {}) {
-  const now = new Date();
-  const range = cleanLower(query.range || 'this_month');
-
-  let from;
-  let to;
-
-  if (range === 'today') {
-    from = startOfDay(now);
-    to = endOfDay(now);
-  } else if (range === 'yesterday') {
-    const y = addDays(now, -1);
-    from = startOfDay(y);
-    to = endOfDay(y);
-  } else if (range === 'last_7_days') {
-    from = startOfDay(addDays(now, -6));
-    to = endOfDay(now);
-  } else if (range === 'this_week') {
-    const day = now.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    from = startOfDay(addDays(now, -diff));
-    to = endOfDay(now);
-  } else if (range === 'previous_month') {
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    from = startOfMonth(prev);
-    to = endOfMonth(prev);
-  } else if (range === 'this_year') {
-    from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
-    to = endOfDay(now);
-  } else {
-    from = startOfMonth(now);
-    to = endOfDay(now);
-  }
-
-  const customFrom = safeDate(query.dateFrom || query.from || query.startDate);
-  const customTo = safeDate(query.dateTo || query.to || query.endDate);
-
-  if (customFrom) from = startOfDay(customFrom);
-  if (customTo) to = endOfDay(customTo);
-
-  return {
-    range,
-    from,
-    to,
-    fromISO: from.toISOString(),
-    toISO: to.toISOString(),
-  };
+function escapeRegex(value) {
+  return clean(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function buildBranchFilter(query = {}) {
@@ -170,9 +75,14 @@ function buildPaidOrdersFilter(query = {}) {
 function getOrderAmount(order = {}) {
   const total = money(order.total);
   if (total > 0) return total;
+
   const paymentAmount = money(order.payment?.amount);
   if (paymentAmount > 0) return paymentAmount;
-  return Math.max(0, money(order.subtotal) + money(order.shipping) - money(order.discount?.amount));
+
+  return Math.max(
+    0,
+    money(order.subtotal) + money(order.shipping) - money(order.discount?.amount)
+  );
 }
 
 function getItemQty(item = {}) {
@@ -186,7 +96,7 @@ function getItemUnitPrice(item = {}) {
 }
 
 function getProductIdFromItem(item = {}) {
-  const raw = item.product || item.productId || item._id || '';
+  const raw = item.product || item.productId || '';
   if (raw && typeof raw === 'object') return String(raw._id || raw.id || '');
   return String(raw || '');
 }
@@ -198,9 +108,7 @@ function getOrderItems(order = {}) {
 }
 
 function bucketKey(date) {
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(date);
 }
 
 function addGroupedAmount(map, key, amount, extra = {}) {
@@ -212,6 +120,7 @@ function addGroupedAmount(map, key, amount, extra = {}) {
     amount: 0,
     items: 0,
   };
+
   current.orders += Number(extra.orders || 0);
   current.items += Number(extra.items || 0);
   current.amount += money(amount);
@@ -260,8 +169,8 @@ function resolveItemCost(product, item = {}) {
     color: item.color || '',
   });
 
-  const resolvedCost = money(snapshot?.cost);
-  if (resolvedCost > 0) return resolvedCost;
+  const variantCost = money(snapshot?.cost);
+  if (variantCost > 0) return variantCost;
 
   return money(product.averageCost || product.cost || 0);
 }
@@ -288,7 +197,12 @@ function summarizeSalesFromOrders(orders = []) {
     const orderTaxes = money(order.taxes?.iva?.amount);
     const orderItems = getOrderItems(order);
     const orderItemsCount = orderItems.reduce((acc, item) => acc + getItemQty(item), 0);
-    const paymentMethod = cleanLower(order.payment?.method || order.payment?.methodType || order.payment?.provider || 'sin_metodo');
+    const paymentMethod = cleanLower(
+      order.payment?.method ||
+        order.payment?.methodType ||
+        order.payment?.provider ||
+        'sin_metodo'
+    );
     const dayKey = bucketKey(order.createdAt);
 
     revenue += amount;
@@ -298,10 +212,22 @@ function summarizeSalesFromOrders(orders = []) {
     taxes += orderTaxes;
     itemsCount += orderItemsCount;
 
-    addGroupedAmount(bySource, order.source || 'online', amount, { orders: 1, items: orderItemsCount });
-    addGroupedAmount(byChannel, order.channel || 'web', amount, { orders: 1, items: orderItemsCount });
-    addGroupedAmount(bySaleType, order.saleType || 'online_order', amount, { orders: 1, items: orderItemsCount });
-    addGroupedAmount(byPaymentMethod, paymentMethod, amount, { orders: 1, items: orderItemsCount });
+    addGroupedAmount(bySource, order.source || 'online', amount, {
+      orders: 1,
+      items: orderItemsCount,
+    });
+    addGroupedAmount(byChannel, order.channel || 'web', amount, {
+      orders: 1,
+      items: orderItemsCount,
+    });
+    addGroupedAmount(bySaleType, order.saleType || 'online_order', amount, {
+      orders: 1,
+      items: orderItemsCount,
+    });
+    addGroupedAmount(byPaymentMethod, paymentMethod, amount, {
+      orders: 1,
+      items: orderItemsCount,
+    });
 
     const current = byDay.get(dayKey) || {
       date: dayKey,
@@ -503,7 +429,9 @@ function summarizeCashSessions(sessions = []) {
     differenceAmount: signedMoney(differenceAmount),
     grossSales: money(grossSales),
     netSales: money(netSales),
-    paymentTotals: Object.fromEntries(Object.entries(paymentTotals).map(([key, value]) => [key, money(value)])),
+    paymentTotals: Object.fromEntries(
+      Object.entries(paymentTotals).map(([key, value]) => [key, money(value)])
+    ),
     movements: getCashMovementTotals(sessions),
     sessions: sessions.slice(0, 30).map((session) => ({
       _id: String(session._id),
@@ -520,10 +448,6 @@ function summarizeCashSessions(sessions = []) {
       netSales: money(session.salesSummary?.netSales),
     })),
   };
-}
-
-function escapeRegex(value) {
-  return clean(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function buildExpenseFilter(query = {}) {
@@ -568,13 +492,7 @@ async function getManualExpensesTotal(query = {}) {
 
   const rows = await FinanceExpense.aggregate([
     { $match: filter },
-    {
-      $group: {
-        _id: null,
-        amount: { $sum: '$amount' },
-        count: { $sum: 1 },
-      },
-    },
+    { $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } },
   ]);
 
   return {
@@ -594,14 +512,14 @@ async function listExpenses(query = {}) {
     FinanceExpense.find(filter).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
   ]);
 
-  const amount = data.reduce((acc, item) => acc + money(item.amount), 0);
+  const pageAmount = data.reduce((acc, item) => acc + money(item.amount), 0);
 
   return {
     page,
     limit,
     total,
     totalPages: Math.max(1, Math.ceil(total / limit)),
-    pageAmount: money(amount),
+    pageAmount: money(pageAmount),
     data,
   };
 }
