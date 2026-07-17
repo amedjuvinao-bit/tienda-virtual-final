@@ -143,6 +143,17 @@ const ADMIN_PERMISSION_MODULES = [
   },
 
   {
+    key: 'finance',
+    label: 'Finanzas',
+    description: 'Ingresos, gastos, caja, costos, utilidad y reportes financieros de la tienda.',
+    permissions: [
+      permission('finance:view', 'Ver finanzas', 'Permite consultar resumen financiero, ventas, caja, costos y utilidad.'),
+      permission('finance:expenses', 'Gestionar gastos', 'Permite crear, editar o anular gastos operativos.', { audit: true, sensitive: true }),
+      permission('finance:export', 'Exportar finanzas', 'Permite descargar reportes financieros.', { audit: true, sensitive: true }),
+    ],
+  },
+
+  {
     key: 'pos',
     label: 'POS / ventas físicas',
     description: 'Operación de ventas físicas desde punto de venta.',
@@ -307,6 +318,11 @@ const ADMIN_PERMISSION_ALIASES = {
   'pos:sales': 'pos:sell',
   'pos:print': 'pos:receipt',
   'pos:ticket': 'pos:receipt',
+
+  // Alias financieros para reportes antiguos.
+  'reports:finance': 'finance:view',
+  'finance:reports': 'finance:view',
+  'finance:gastos': 'finance:expenses',
 };
 
 function normalizePermission(value) {
@@ -398,7 +414,6 @@ module.exports = {
 
   normalizePermission,
   canonicalPermission,
-
   isKnownPermission,
   getPermissionMeta,
   getPermissionsByModule,
