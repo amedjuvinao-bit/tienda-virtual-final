@@ -42,6 +42,7 @@ function makeSku(category) {
 
 function normalizeStringArray(arr, max = Infinity) {
   if (!Array.isArray(arr)) return [];
+
   const seen = new Set();
   const out = [];
 
@@ -68,6 +69,11 @@ function hasInventoryDuplicatesFront(inv) {
     set.add(key);
   }
   return false;
+}
+
+function getInitialTrackInventory(productType, explicitValue) {
+  if (typeof explicitValue === 'boolean') return explicitValue;
+  return shouldTrackInventoryByType(productType);
 }
 
 function Thumb({ src, alt, onRemove, index }) {
@@ -117,9 +123,68 @@ const cardStyle = {
   boxShadow: 'var(--admin-glass-shadow)',
 };
 
-function getInitialTrackInventory(productType, explicitValue) {
-  if (typeof explicitValue === 'boolean') return explicitValue;
-  return shouldTrackInventoryByType(productType);
+const sectionStyle = {
+  borderColor: 'var(--admin-card-border)',
+  background: 'color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%)',
+};
+
+const variantButtonBase = {
+  borderRadius: 999,
+  border: '1px solid var(--admin-primary-soft-border)',
+  minWidth: 42,
+  minHeight: 34,
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.04em',
+  lineHeight: 1,
+};
+
+function variantButtonStyle(active) {
+  if (active) {
+    return {
+      ...variantButtonBase,
+      borderColor: 'color-mix(in srgb, var(--admin-primary) 90%, white 10%)',
+      background: 'linear-gradient(135deg, var(--admin-button-bg), color-mix(in srgb, var(--admin-button-bg) 72%, #0f172a 28%))',
+      color: '#ffffff',
+      boxShadow: '0 8px 18px color-mix(in srgb, var(--admin-primary) 24%, transparent)',
+      textShadow: '0 1px 6px rgba(0,0,0,0.35)',
+    };
+  }
+
+  return {
+    ...variantButtonBase,
+    borderColor: 'color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border))',
+    background: 'color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 14%)',
+    color: 'var(--admin-card-text)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+  };
+}
+
+function actionButtonStyle(kind = 'primary') {
+  if (kind === 'danger') {
+    return {
+      border: '1px solid color-mix(in srgb, var(--admin-danger) 80%, white 20%)',
+      background: 'linear-gradient(135deg, var(--admin-danger), color-mix(in srgb, var(--admin-danger) 75%, #0f172a 25%))',
+      color: '#ffffff',
+      textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+    };
+  }
+
+  if (kind === 'soft') {
+    return {
+      border: '1px solid color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border))',
+      background: 'color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 16%)',
+      color: 'var(--admin-card-text)',
+    };
+  }
+
+  return {
+    border: '1px solid color-mix(in srgb, var(--admin-button-bg) 76%, white 24%)',
+    background: 'linear-gradient(135deg, var(--admin-button-bg), color-mix(in srgb, var(--admin-button-bg) 70%, #0f172a 30%))',
+    color: '#ffffff',
+    textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+  };
 }
 
 export default function FormularioProducto() {
@@ -188,7 +253,6 @@ export default function FormularioProducto() {
     api.get(`/api/products/${id}`)
       .then(({ data }) => {
         const p = data || {};
-
         const loadedProductType = p.productType || 'physical';
         const loadedTrackInventory = getInitialTrackInventory(loadedProductType, p.trackInventory);
 
@@ -474,7 +538,6 @@ export default function FormularioProducto() {
       active: activo,
       category: categoria.trim(),
       categories: categoriesNormalized,
-
       productType,
       unitOfMeasure,
       trackInventory,
@@ -486,22 +549,18 @@ export default function FormularioProducto() {
             { key: 'color', label: 'Color', values: finalColors },
           ].filter((axis) => axis.values.length > 0)
         : [],
-
       colors: trackInventory ? finalColors : [],
       sizes: trackInventory ? normalizeStringArray(sizes) : [],
       inventory: trackInventory ? inventoryArray : [],
-
       reorderPoint: trackInventory ? Math.max(0, Number(reorderPoint || 0)) : 0,
       reorderQty: trackInventory ? Math.max(0, Number(reorderQty || 0)) : 0,
       warehouseLocation: trackInventory ? warehouseLocation || '' : '',
       weightGrams: Math.max(0, Number(weightGrams || 0)),
       dimensionsCm: dimensions,
-
       cost: Math.max(0, Number(cost || 0)),
       averageCost: Math.max(0, Number(averageCost || 0)),
       taxRate: Math.min(100, Math.max(0, Number(taxRate || 0))),
       taxIncluded: Boolean(taxIncluded),
-
       brand: brand || '',
       season: season || '',
       supplier,
@@ -627,7 +686,7 @@ export default function FormularioProducto() {
             </div>
           </section>
 
-          <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+          <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={sectionStyle}>
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
               <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
@@ -683,12 +742,8 @@ export default function FormularioProducto() {
                             key={item}
                             type="button"
                             onClick={() => toggleSize(item)}
-                            className="rounded-full border px-3 py-1.5 text-xs transition"
-                            style={{
-                              borderColor: active ? 'var(--admin-primary)' : 'var(--admin-card-border)',
-                              background: active ? 'var(--admin-button-bg)' : 'var(--admin-card-bg)',
-                              color: active ? 'var(--admin-button-text)' : 'var(--admin-card-text)',
-                            }}
+                            className="transition hover:-translate-y-0.5 active:translate-y-0"
+                            style={variantButtonStyle(active)}
                           >
                             {item}
                           </button>
@@ -698,16 +753,16 @@ export default function FormularioProducto() {
                   )}
                   <div className="mt-2 flex gap-2">
                     <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Agregar variantes separadas por coma" />
-                    <button type="button" onClick={addSizesFromInput} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--admin-button-bg)', color: 'var(--admin-button-text)' }}>
+                    <button type="button" onClick={addSizesFromInput} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>
                       Añadir
                     </button>
                   </div>
                   {sizes.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {sizes.map((size) => (
-                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
                           {size}
-                          <button type="button" onClick={() => toggleSize(size)}>×</button>
+                          <button type="button" className="font-black" onClick={() => toggleSize(size)}>×</button>
                         </span>
                       ))}
                     </div>
@@ -741,7 +796,7 @@ export default function FormularioProducto() {
                     </h3>
                     <div className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
                       Total matriz: <b style={{ color: 'var(--admin-card-text)' }}>{totalFromMatrix}</b>
-                      <button type="button" className="ml-3 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ background: 'var(--admin-button-soft-bg)', color: 'var(--admin-button-soft-text)' }} onClick={() => setStock(totalFromMatrix)}>
+                      <button type="button" className="ml-3 rounded-full px-3 py-1.5 text-xs font-semibold" style={actionButtonStyle('soft')} onClick={() => setStock(totalFromMatrix)}>
                         Usar como stock
                       </button>
                     </div>
@@ -862,12 +917,12 @@ export default function FormularioProducto() {
               <FieldLabel>Categorías adicionales</FieldLabel>
               <div className="flex gap-2">
                 <input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} />
-                <button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--admin-button-bg)', color: 'var(--admin-button-text)' }}>Añadir</button>
+                <button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button>
               </div>
               {categoriesExtra.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {categoriesExtra.map((cat) => (
-                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
+                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>
                       {cat}
                       <button type="button" onClick={() => removeCatChip(cat)}>×</button>
                     </span>
@@ -939,7 +994,7 @@ export default function FormularioProducto() {
               <button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
                 Cancelar
               </button>
-              <button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--admin-button-bg)', color: 'var(--admin-button-text)' }}>
+              <button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>
                 {cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}
               </button>
             </div>
