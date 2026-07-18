@@ -5,7 +5,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
-  BarChart3,
   CalendarDays,
   CircleDollarSign,
   Download,
@@ -144,6 +143,14 @@ function buildFinanceParams(filters) {
   return params;
 }
 
+function getExpenseBranchId(expense, fallback = '') {
+  if (!expense) return fallback;
+  if (typeof expense.branch === 'object' && expense.branch?._id) return String(expense.branch._id);
+  if (expense.branch) return String(expense.branch);
+  if (expense.branchId) return String(expense.branchId);
+  return fallback;
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -264,6 +271,18 @@ const styles = {
     color: '#ffffff',
     textShadow: '0 1px 8px rgba(0,0,0,0.38)',
   },
+  modalOverlay: {
+    background: 'rgba(0,0,0,0.58)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  },
+  modalCard: {
+    border: '1px solid var(--admin-card-border)',
+    borderRadius: 'calc(var(--admin-radius) + 8px)',
+    background: 'var(--admin-card-bg)',
+    color: 'var(--admin-card-text)',
+    boxShadow: '0 30px 90px rgba(0,0,0,0.30)',
+  },
 };
 
 function FinanceMetricCard({ icon: Icon, label, value, sub, tone = 'primary' }) {
@@ -337,7 +356,8 @@ function BreakdownList({ title, rows = [], emptyText = 'Sin datos para este peri
                     className="h-full rounded-full"
                     style={{
                       width: `${Math.min(100, Math.max(0, percent))}%`,
-                      background: 'linear-gradient(90deg, var(--admin-primary), color-mix(in srgb, var(--admin-primary) 55%, white 45%))',
+                      background:
+                        'linear-gradient(90deg, var(--admin-primary), color-mix(in srgb, var(--admin-primary) 55%, white 45%))',
                     }}
                   />
                 </div>
@@ -357,27 +377,7 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
-    <form onSubmit={onSubmit} className="p-4" style={styles.card}>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
-            {editing ? 'Editar gasto' : 'Nuevo gasto'}
-          </p>
-          <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
-            Registro operativo
-          </h3>
-        </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="grid h-9 w-9 place-items-center rounded-full transition hover:-translate-y-0.5"
-          style={styles.softButton}
-          aria-label="Cerrar formulario"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
+    <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Fecha
@@ -489,18 +489,29 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
         </label>
       </div>
 
-      <label className="mt-3 block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+      <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
         Descripción
         <textarea
           value={form.description}
           onChange={(event) => update('description', event.target.value)}
-          className="min-h-[88px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
+          className="min-h-[92px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
           style={styles.textarea}
           placeholder="Detalle del gasto"
         />
       </label>
 
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
+      <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+        Notas internas
+        <textarea
+          value={form.notes}
+          onChange={(event) => update('notes', event.target.value)}
+          className="min-h-[72px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
+          style={styles.textarea}
+          placeholder="Observaciones internas opcionales"
+        />
+      </label>
+
+      <div className="flex flex-wrap justify-end gap-2 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
         <button
           type="button"
           onClick={onCancel}
@@ -523,6 +534,60 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
   );
 }
 
+function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, saving, editing }) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[130] flex items-center justify-center p-4"
+      style={styles.modalOverlay}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-4xl overflow-hidden" style={styles.modalCard}>
+        <div
+          className="flex items-start justify-between gap-4 px-5 py-4 md:px-6"
+          style={{ borderBottom: '1px solid var(--admin-card-border)' }}
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>
+              {editing ? 'Editar gasto' : 'Nuevo gasto'}
+            </p>
+            <h3 className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>
+              Registro financiero
+            </h3>
+            <p className="mt-1 text-sm font-semibold" style={styles.muted}>
+              Registra egresos operativos para calcular utilidad neta real.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition hover:-translate-y-0.5"
+            style={styles.softButton}
+            aria-label="Cerrar gasto"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[72vh] overflow-y-auto px-5 py-5 md:px-6">
+          <ExpenseForm
+            branches={branches}
+            form={form}
+            setForm={setForm}
+            onSubmit={onSubmit}
+            onCancel={onCancel}
+            saving={saving}
+            editing={editing}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminFinancePage() {
   const [filters, setFilters] = useState({
     range: 'this_month',
@@ -539,7 +604,7 @@ export default function AdminFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState('');
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseForm, setExpenseForm] = useState({
@@ -605,14 +670,14 @@ export default function AdminFinancePage() {
     }));
   };
 
-  const resetExpenseForm = () => {
+  const closeExpenseModal = () => {
     setEditingExpense(null);
     setExpenseForm({
       ...emptyExpenseForm,
       date: todayInputValue(),
       branchId: filters.branchId || '',
     });
-    setShowExpenseForm(false);
+    setExpenseModalOpen(false);
   };
 
   const openCreateExpenseForm = () => {
@@ -622,7 +687,7 @@ export default function AdminFinancePage() {
       date: todayInputValue(),
       branchId: filters.branchId || '',
     });
-    setShowExpenseForm(true);
+    setExpenseModalOpen(true);
   };
 
   const openEditExpenseForm = (expense) => {
@@ -638,10 +703,10 @@ export default function AdminFinancePage() {
       invoiceNumber: expense?.invoiceNumber || '',
       reference: expense?.reference || '',
       paymentMethod: expense?.paymentMethod || 'cash',
-      branchId: String(expense?.branch || filters.branchId || ''),
+      branchId: getExpenseBranchId(expense, filters.branchId || ''),
       notes: expense?.notes || '',
     });
-    setShowExpenseForm(true);
+    setExpenseModalOpen(true);
   };
 
   const handleExpenseSubmit = async (event) => {
@@ -670,7 +735,7 @@ export default function AdminFinancePage() {
         toast.success('Gasto registrado');
       }
 
-      resetExpenseForm();
+      closeExpenseModal();
       await loadFinance();
     } catch (err) {
       console.error('Error guardando gasto financiero:', err);
@@ -713,6 +778,17 @@ export default function AdminFinancePage() {
 
   return (
     <div style={styles.page}>
+      <ExpenseModal
+        open={expenseModalOpen}
+        branches={branches}
+        form={expenseForm}
+        setForm={setExpenseForm}
+        onSubmit={handleExpenseSubmit}
+        onCancel={closeExpenseModal}
+        saving={savingExpense}
+        editing={Boolean(editingExpense)}
+      />
+
       <div style={styles.shell}>
         <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -973,41 +1049,29 @@ export default function AdminFinancePage() {
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              {showExpenseForm ? (
-                <ExpenseForm
-                  branches={branches}
-                  form={expenseForm}
-                  setForm={setExpenseForm}
-                  onSubmit={handleExpenseSubmit}
-                  onCancel={resetExpenseForm}
-                  saving={savingExpense}
-                  editing={Boolean(editingExpense)}
-                />
-              ) : (
-                <div className="p-4" style={styles.card}>
-                  <div className="flex h-full min-h-[280px] flex-col items-center justify-center text-center">
-                    <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}>
-                      <Landmark className="h-7 w-7" />
-                    </span>
-                    <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      Control de gastos operativos
-                    </h3>
-                    <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>
-                      Registra gastos manuales para que la utilidad neta combine ventas, costos, caja y egresos reales.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={openCreateExpenseForm}
-                      className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5"
-                      style={styles.primaryButton}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Registrar gasto
-                    </button>
-                  </div>
+            <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+              <div className="p-4" style={styles.card}>
+                <div className="flex h-full min-h-[280px] flex-col items-center justify-center text-center">
+                  <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}>
+                    <Landmark className="h-7 w-7" />
+                  </span>
+                  <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>
+                    Control de gastos operativos
+                  </h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>
+                    El botón abre una ventana visible para registrar o editar egresos sin perder el contexto del reporte.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreateExpenseForm}
+                    className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5"
+                    style={styles.primaryButton}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Registrar gasto
+                  </button>
                 </div>
-              )}
+              </div>
 
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
