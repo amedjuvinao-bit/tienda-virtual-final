@@ -1,12 +1,12 @@
 /* frontend/src/admin/adminLayoutSidebarFix.css
    Corrección puntual del layout admin.
    Mantiene el menú lateral visible en páginas largas sin alterar colores,
-   tamaños, fondos, botones ni estructura visual del panel. */
+   fondos, botones ni diseño visual del panel. */
 
 @media (min-width: 768px) {
-  /* El AdminLayout trae overflow-hidden por clase Tailwind.
-     Eso impide que position: sticky funcione correctamente en el sidebar.
-     Se conserva solo el bloqueo horizontal para no romper el diseño. */
+  /* El layout original usa un documento largo. Con sticky el menú seguía
+     perteneciendo al scroll de la página y podía desaparecer al bajar.
+     La solución estable es fijar solo el sidebar y compensar el contenido. */
   .admin-area {
     overflow-x: hidden !important;
     overflow-y: visible !important;
@@ -17,17 +17,20 @@
   }
 
   .admin-area .admin-sidebar-panel.admin-sidebar-glass {
-    position: sticky !important;
+    position: fixed !important;
     top: var(--admin-padding) !important;
-    height: calc(100vh - (var(--admin-padding) * 2)) !important;
-    max-height: calc(100vh - (var(--admin-padding) * 2)) !important;
+    left: var(--admin-padding) !important;
+    bottom: var(--admin-padding) !important;
+    width: var(--admin-sidebar-width) !important;
+    height: auto !important;
+    max-height: none !important;
     min-height: 0 !important;
-    align-self: flex-start !important;
     overflow: hidden !important;
-    z-index: 30;
+    z-index: 80 !important;
   }
 
   .admin-area .admin-sidebar-panel.admin-sidebar-glass > nav {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
     overflow-x: hidden !important;
@@ -36,5 +39,10 @@
 
   .admin-area .admin-sidebar-panel.admin-sidebar-glass .admin-sidebar-footer {
     flex-shrink: 0;
+  }
+
+  .admin-area .admin-main-column {
+    margin-left: calc(var(--admin-sidebar-width) + var(--admin-gap)) !important;
+    width: calc(100% - var(--admin-sidebar-width) - var(--admin-gap)) !important;
   }
 }
