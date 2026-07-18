@@ -19,6 +19,7 @@ import FooterSection from './components/FooterSection';
 import ScrollButton from './components/ScrollButton';
 import WhatsAppButton from './components/WhatsAppButton';
 import GlobalPageLoader from './components/GlobalPageLoader';
+import { AppConfirmProvider } from './components/AppConfirmProvider';
 import CarouselBanner from './components/CarouselBanner';
 import TrendingSection from './components/TrendingSection';
 import LookSection from './components/LookSection';
@@ -186,83 +187,85 @@ export default function App() {
       <FavoritesProvider>
         <CartProvider>
           <BrowserRouter>
-            <ScrollToHash />
-            <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
-            <GlobalFloatingButtons theme={themeFromServer} />
-            {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
+            <AppConfirmProvider>
+              <ScrollToHash />
+              <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
+              <GlobalFloatingButtons theme={themeFromServer} />
+              {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
 
-            <Routes>
-              <Route path="/" element={<Home theme={themeFromServer} />} />
-              <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
-              <Route path="/producto/:id" element={<ProductDetail />} />
-              <Route path="/p/:id" element={<ProductDetail />} />
-              <Route path="/admin/login" element={<Login />} />
-              <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/carrito" element={<Carrito />} />
-              <Route path="/favoritos" element={<Favoritos />} />
-              <Route path="/checkout" element={<CheckoutPage />} />
-              <Route path="/gracias" element={<GraciasPage />} />
-              <Route path="/probe-site-settings" element={<ApiProbe />} />
+              <Routes>
+                <Route path="/" element={<Home theme={themeFromServer} />} />
+                <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
+                <Route path="/producto/:id" element={<ProductDetail />} />
+                <Route path="/p/:id" element={<ProductDetail />} />
+                <Route path="/admin/login" element={<Login />} />
+                <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/carrito" element={<Carrito />} />
+                <Route path="/favoritos" element={<Favoritos />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/gracias" element={<GraciasPage />} />
+                <Route path="/probe-site-settings" element={<ApiProbe />} />
 
-              <Route
-                path="/admin"
-                element={
-                  <PrivateRoute>
-                    <AdminLayout />
-                  </PrivateRoute>
-                }
-              >
-                <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
-                <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
-                <Route path="ordenes" element={protectAdminContent(<OrdersAdmin />)} />
-                <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
-                <Route path="pos" element={protectAdminContent(<PosSalesPage />)} />
-                <Route path="caja" element={protectAdminContent(<CashSessionsPage />)} />
-                <Route path="finanzas" element={protectAdminContent(<AdminFinancePage />)} />
-                <Route path="inventario" element={protectAdminContent(<InventoryAdmin />)} />
-                <Route path="productos/nuevo" element={protectAdminContent(<FormularioProducto />)} />
-                <Route path="productos/editar/:id" element={protectAdminContent(<FormularioProducto />)} />
-                <Route path="carritos" element={protectAdminContent(<CarritosAdmin />)} />
-                <Route path="favoritos" element={protectAdminContent(<FavoritosAdmin />)} />
-                <Route path="apariencia" element={protectAdminContent(<AppearancePage />)} />
-                <Route path="configuracion" element={<Navigate to="/admin/configuracion/empresa" replace />} />
-                <Route path="configuracion/empresa" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/facturacion" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/correo" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/login-admin" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/panel-admin" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/usuarios" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/perfiles" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="configuracion/logs" element={protectAdminContent(<ConfiguracionPage />)} />
-                <Route path="paginas" element={protectAdminContent(<PagesAdmin />)} />
-                <Route path="paginas/:id" element={protectAdminContent(<PageEditor />)} />
-                <Route path="catalogo/:id" element={protectAdminContent(<CatalogPageEditor />)} />
-                <Route path="product-detail/:id" element={protectAdminContent(<ProductDetailPageEditor />)} />
-                <Route path="cart-page/:id" element={protectAdminContent(<CartPageEditor />)} />
-                <Route path="checkout-page/:id" element={protectAdminContent(<CheckoutPageEditor />)} />
-                <Route path="thanks-page/:id" element={protectAdminContent(<ThanksPageEditor />)} />
-                <Route path="favorites-page/:id" element={protectAdminContent(<FavoritesPageEditor />)} />
-                <Route path="notfound-page/:id" element={protectAdminContent(<NotFoundPageEditor />)} />
-              </Route>
+                <Route
+                  path="/admin"
+                  element={
+                    <PrivateRoute>
+                      <AdminLayout />
+                    </PrivateRoute>
+                  }
+                >
+                  <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
+                  <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
+                  <Route path="ordenes" element={protectAdminContent(<OrdersAdmin />)} />
+                  <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
+                  <Route path="pos" element={protectAdminContent(<PosSalesPage />)} />
+                  <Route path="caja" element={protectAdminContent(<CashSessionsPage />)} />
+                  <Route path="finanzas" element={protectAdminContent(<AdminFinancePage />)} />
+                  <Route path="inventario" element={protectAdminContent(<InventoryAdmin />)} />
+                  <Route path="productos/nuevo" element={protectAdminContent(<FormularioProducto />)} />
+                  <Route path="productos/editar/:id" element={protectAdminContent(<FormularioProducto />)} />
+                  <Route path="carritos" element={protectAdminContent(<CarritosAdmin />)} />
+                  <Route path="favoritos" element={protectAdminContent(<FavoritosAdmin />)} />
+                  <Route path="apariencia" element={protectAdminContent(<AppearancePage />)} />
+                  <Route path="configuracion" element={<Navigate to="/admin/configuracion/empresa" replace />} />
+                  <Route path="configuracion/empresa" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/facturacion" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/correo" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/login-admin" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/panel-admin" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/usuarios" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/perfiles" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/logs" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="paginas" element={protectAdminContent(<PagesAdmin />)} />
+                  <Route path="paginas/:id" element={protectAdminContent(<PageEditor />)} />
+                  <Route path="catalogo/:id" element={protectAdminContent(<CatalogPageEditor />)} />
+                  <Route path="product-detail/:id" element={protectAdminContent(<ProductDetailPageEditor />)} />
+                  <Route path="cart-page/:id" element={protectAdminContent(<CartPageEditor />)} />
+                  <Route path="checkout-page/:id" element={protectAdminContent(<CheckoutPageEditor />)} />
+                  <Route path="thanks-page/:id" element={protectAdminContent(<ThanksPageEditor />)} />
+                  <Route path="favorites-page/:id" element={protectAdminContent(<FavoritesPageEditor />)} />
+                  <Route path="notfound-page/:id" element={protectAdminContent(<NotFoundPageEditor />)} />
+                </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
 
-            <ToastContainer
-              position="top-right"
-              autoClose={3000}
-              hideProgressBar={false}
-              newestOnTop
-              closeOnClick
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-              theme="colored"
-            />
+              <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+              />
+            </AppConfirmProvider>
           </BrowserRouter>
         </CartProvider>
       </FavoritesProvider>
