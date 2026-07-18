@@ -1,5 +1,6 @@
 // frontend/src/admin/finance/AdminFinancePage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   ArrowDownRight,
@@ -300,10 +301,7 @@ function FinanceMetricCard({ icon: Icon, label, value, sub, tone = 'primary' }) 
             {sub}
           </p>
         </div>
-        <span
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border"
-          style={toneStyle(tone)}
-        >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border" style={toneStyle(tone)}>
           <Icon className="h-5 w-5" />
         </span>
       </div>
@@ -348,10 +346,7 @@ function BreakdownList({ title, rows = [], emptyText = 'Sin datos para este peri
                     {formatCurrency(row.amount)}
                   </span>
                 </div>
-                <div
-                  className="h-2 overflow-hidden rounded-full"
-                  style={{ background: 'color-mix(in srgb, var(--admin-card-border) 60%, transparent)' }}
-                >
+                <div className="h-2 overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--admin-card-border) 60%, transparent)' }}>
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -381,151 +376,67 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Fecha
-          <input
-            type="date"
-            value={form.date}
-            onChange={(event) => update('date', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-            required
-          />
+          <input type="date" value={form.date} onChange={(event) => update('date', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} required />
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Valor
-          <input
-            type="number"
-            min="0"
-            value={form.amount}
-            onChange={(event) => update('amount', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-            placeholder="0"
-            required
-          />
+          <input type="number" min="0" value={form.amount} onChange={(event) => update('amount', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} placeholder="0" required />
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Tipo
-          <select
-            value={form.type}
-            onChange={(event) => update('type', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-          >
-            {EXPENSE_TYPES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
+          <select value={form.type} onChange={(event) => update('type', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+            {EXPENSE_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Método
-          <select
-            value={form.paymentMethod}
-            onChange={(event) => update('paymentMethod', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-          >
-            {PAYMENT_METHODS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
+          <select value={form.paymentMethod} onChange={(event) => update('paymentMethod', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+            {PAYMENT_METHODS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Categoría
-          <input
-            value={form.category}
-            onChange={(event) => update('category', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-            placeholder="Ej: Transporte, empaque, publicidad"
-            required
-          />
+          <input value={form.category} onChange={(event) => update('category', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} placeholder="Ej: Transporte, empaque, publicidad" required />
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Proveedor
-          <input
-            value={form.vendor}
-            onChange={(event) => update('vendor', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-            placeholder="Opcional"
-          />
+          <input value={form.vendor} onChange={(event) => update('vendor', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} placeholder="Opcional" />
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Factura / soporte
-          <input
-            value={form.invoiceNumber}
-            onChange={(event) => update('invoiceNumber', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-            placeholder="Opcional"
-          />
+          <input value={form.invoiceNumber} onChange={(event) => update('invoiceNumber', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} placeholder="Opcional" />
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Sede
-          <select
-            value={form.branchId}
-            onChange={(event) => update('branchId', event.target.value)}
-            className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal"
-            style={styles.input}
-          >
+          <select value={form.branchId} onChange={(event) => update('branchId', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
             <option value="">General</option>
-            {branches.map((branch) => (
-              <option key={branch._id} value={branch._id}>
-                {branch.name || branch.code || 'Sede'}
-              </option>
-            ))}
+            {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name || branch.code || 'Sede'}</option>)}
           </select>
         </label>
       </div>
 
       <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
         Descripción
-        <textarea
-          value={form.description}
-          onChange={(event) => update('description', event.target.value)}
-          className="min-h-[92px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
-          style={styles.textarea}
-          placeholder="Detalle del gasto"
-        />
+        <textarea value={form.description} onChange={(event) => update('description', event.target.value)} className="min-h-[92px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal" style={styles.textarea} placeholder="Detalle del gasto" />
       </label>
 
       <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
         Notas internas
-        <textarea
-          value={form.notes}
-          onChange={(event) => update('notes', event.target.value)}
-          className="min-h-[72px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
-          style={styles.textarea}
-          placeholder="Observaciones internas opcionales"
-        />
+        <textarea value={form.notes} onChange={(event) => update('notes', event.target.value)} className="min-h-[72px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal" style={styles.textarea} placeholder="Observaciones internas opcionales" />
       </label>
 
       <div className="flex flex-wrap justify-end gap-2 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-black transition hover:-translate-y-0.5"
-          style={styles.softButton}
-        >
+        <button type="button" onClick={onCancel} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-black transition hover:-translate-y-0.5" style={styles.softButton}>
           Cancelar
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60"
-          style={styles.primaryButton}
-        >
+        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.primaryButton}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
           {editing ? 'Guardar cambios' : 'Registrar gasto'}
         </button>
@@ -535,66 +446,51 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
 }
 
 function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, saving, editing }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onCancel();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onCancel]);
+
   if (!open) return null;
 
-  return (
-    <div
-      className="fixed inset-0 z-[130] flex items-center justify-center p-4"
-      style={styles.modalOverlay}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="w-full max-w-4xl overflow-hidden" style={styles.modalCard}>
-        <div
-          className="flex items-start justify-between gap-4 px-5 py-4 md:px-6"
-          style={{ borderBottom: '1px solid var(--admin-card-border)' }}
-        >
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto px-4 py-8 sm:py-10" style={styles.modalOverlay} role="dialog" aria-modal="true">
+      <div className="w-full max-w-4xl overflow-hidden" style={{ ...styles.modalCard, maxHeight: 'calc(100vh - 5rem)' }}>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 md:px-6" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>
-              {editing ? 'Editar gasto' : 'Nuevo gasto'}
-            </p>
-            <h3 className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>
-              Registro financiero
-            </h3>
-            <p className="mt-1 text-sm font-semibold" style={styles.muted}>
-              Registra egresos operativos para calcular utilidad neta real.
-            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>{editing ? 'Editar gasto' : 'Nuevo gasto'}</p>
+            <h3 className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>Registro financiero</h3>
+            <p className="mt-1 text-sm font-semibold" style={styles.muted}>Registra egresos operativos para calcular utilidad neta real.</p>
           </div>
 
-          <button
-            type="button"
-            onClick={onCancel}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition hover:-translate-y-0.5"
-            style={styles.softButton}
-            aria-label="Cerrar gasto"
-          >
+          <button type="button" onClick={onCancel} className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Cerrar gasto">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="max-h-[72vh] overflow-y-auto px-5 py-5 md:px-6">
-          <ExpenseForm
-            branches={branches}
-            form={form}
-            setForm={setForm}
-            onSubmit={onSubmit}
-            onCancel={onCancel}
-            saving={saving}
-            editing={editing}
-          />
+        <div className="overflow-y-auto px-5 py-5 md:px-6" style={{ maxHeight: 'calc(100vh - 13rem)' }}>
+          <ExpenseForm branches={branches} form={form} setForm={setForm} onSubmit={onSubmit} onCancel={onCancel} saving={saving} editing={editing} />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 export default function AdminFinancePage() {
-  const [filters, setFilters] = useState({
-    range: 'this_month',
-    dateFrom: '',
-    dateTo: '',
-    branchId: '',
-  });
+  const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [summary, setSummary] = useState(null);
   const [sales, setSales] = useState(null);
   const [profit, setProfit] = useState(null);
@@ -607,10 +503,7 @@ export default function AdminFinancePage() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
-  const [expenseForm, setExpenseForm] = useState({
-    ...emptyExpenseForm,
-    date: todayInputValue(),
-  });
+  const [expenseForm, setExpenseForm] = useState({ ...emptyExpenseForm, date: todayInputValue() });
 
   const queryParams = useMemo(() => buildFinanceParams(filters), [filters]);
   const kpis = summary?.kpis || {};
@@ -655,38 +548,19 @@ export default function AdminFinancePage() {
     loadFinance();
   }, [loadFinance]);
 
-  const updateFilter = (field, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  const updateFilter = (field, value) => setFilters((prev) => ({ ...prev, [field]: value }));
 
-  const clearCustomDates = () => {
-    setFilters((prev) => ({
-      ...prev,
-      dateFrom: '',
-      dateTo: '',
-    }));
-  };
+  const clearCustomDates = () => setFilters((prev) => ({ ...prev, dateFrom: '', dateTo: '' }));
 
-  const closeExpenseModal = () => {
+  const closeExpenseModal = useCallback(() => {
     setEditingExpense(null);
-    setExpenseForm({
-      ...emptyExpenseForm,
-      date: todayInputValue(),
-      branchId: filters.branchId || '',
-    });
+    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '' });
     setExpenseModalOpen(false);
-  };
+  }, [filters.branchId]);
 
   const openCreateExpenseForm = () => {
     setEditingExpense(null);
-    setExpenseForm({
-      ...emptyExpenseForm,
-      date: todayInputValue(),
-      branchId: filters.branchId || '',
-    });
+    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '' });
     setExpenseModalOpen(true);
   };
 
@@ -721,11 +595,7 @@ export default function AdminFinancePage() {
     setSavingExpense(true);
 
     try {
-      const payload = {
-        ...expenseForm,
-        amount,
-        branchId: expenseForm.branchId || null,
-      };
+      const payload = { ...expenseForm, amount, branchId: expenseForm.branchId || null };
 
       if (editingExpense?._id) {
         await updateFinanceExpense(editingExpense._id, payload);
@@ -793,44 +663,21 @@ export default function AdminFinancePage() {
         <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
-              <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>
-                Centro financiero
-              </p>
-              <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>
-                Finanzas
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>
-                Controla ingresos, costos, caja, gastos y utilidad con datos reales de órdenes, POS e inventario.
-              </p>
+              <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>Centro financiero</p>
+              <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>Finanzas</h1>
+              <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>Controla ingresos, costos, caja, gastos y utilidad con datos reales de órdenes, POS e inventario.</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleExport('sales')}
-                disabled={Boolean(exporting)}
-                className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60"
-                style={styles.softButton}
-              >
+              <button type="button" onClick={() => handleExport('sales')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
                 {exporting === 'sales' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Ventas CSV
               </button>
-              <button
-                type="button"
-                onClick={() => handleExport('expenses')}
-                disabled={Boolean(exporting)}
-                className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60"
-                style={styles.softButton}
-              >
+              <button type="button" onClick={() => handleExport('expenses')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
                 {exporting === 'expenses' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 Gastos CSV
               </button>
-              <button
-                type="button"
-                onClick={openCreateExpenseForm}
-                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5"
-                style={styles.primaryButton}
-              >
+              <button type="button" onClick={openCreateExpenseForm} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
                 <Plus className="h-4 w-4" />
                 Nuevo gasto
               </button>
@@ -840,78 +687,36 @@ export default function AdminFinancePage() {
           <div className="mt-6 grid gap-3 lg:grid-cols-[180px_160px_160px_1fr_auto]">
             <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
               Periodo
-              <select
-                value={filters.range}
-                onChange={(event) => updateFilter('range', event.target.value)}
-                className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal"
-                style={styles.input}
-                disabled={Boolean(filters.dateFrom || filters.dateTo)}
-              >
-                {RANGE_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
+              <select value={filters.range} onChange={(event) => updateFilter('range', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} disabled={Boolean(filters.dateFrom || filters.dateTo)}>
+                {RANGE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
 
             <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
               Desde
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(event) => updateFilter('dateFrom', event.target.value)}
-                className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal"
-                style={styles.input}
-              />
+              <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} />
             </label>
 
             <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
               Hasta
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(event) => updateFilter('dateTo', event.target.value)}
-                className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal"
-                style={styles.input}
-              />
+              <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} />
             </label>
 
             <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
               Sede
-              <select
-                value={filters.branchId}
-                onChange={(event) => updateFilter('branchId', event.target.value)}
-                className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal"
-                style={styles.input}
-              >
+              <select value={filters.branchId} onChange={(event) => updateFilter('branchId', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
                 <option value="">Todas las sedes</option>
-                {branches.map((branch) => (
-                  <option key={branch._id} value={branch._id}>
-                    {branch.name || branch.code || 'Sede'}
-                  </option>
-                ))}
+                {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name || branch.code || 'Sede'}</option>)}
               </select>
             </label>
 
             <div className="flex items-end gap-2">
-              <button
-                type="button"
-                onClick={loadFinance}
-                className="inline-flex h-12 items-center gap-2 px-4 text-sm font-black transition hover:-translate-y-0.5"
-                style={styles.softButton}
-              >
+              <button type="button" onClick={loadFinance} className="inline-flex h-12 items-center gap-2 px-4 text-sm font-black transition hover:-translate-y-0.5" style={styles.softButton}>
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </button>
               {(filters.dateFrom || filters.dateTo) && (
-                <button
-                  type="button"
-                  onClick={clearCustomDates}
-                  className="grid h-12 w-12 place-items-center rounded-full transition hover:-translate-y-0.5"
-                  style={styles.softButton}
-                  aria-label="Limpiar fechas"
-                >
+                <button type="button" onClick={clearCustomDates} className="grid h-12 w-12 place-items-center rounded-full transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Limpiar fechas">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -935,9 +740,7 @@ export default function AdminFinancePage() {
           <div className="grid min-h-[420px] place-items-center p-10">
             <div className="text-center">
               <Loader2 className="mx-auto h-9 w-9 animate-spin" style={{ color: 'var(--admin-primary)' }} />
-              <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                Cargando información financiera real…
-              </p>
+              <p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Cargando información financiera real…</p>
             </div>
           </div>
         ) : (
@@ -958,41 +761,25 @@ export default function AdminFinancePage() {
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
-                      Rentabilidad
-                    </p>
-                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      Productos con mayor utilidad
-                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Rentabilidad</p>
+                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Productos con mayor utilidad</h3>
                   </div>
-                  <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('success')}>
-                    Bruta {formatCurrency(kpis.grossProfit)}
-                  </span>
+                  <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('success')}>Bruta {formatCurrency(kpis.grossProfit)}</span>
                 </div>
 
                 {topProducts.length === 0 ? (
-                  <p className="py-8 text-center text-sm font-semibold" style={styles.muted}>
-                    Sin productos vendidos en este periodo.
-                  </p>
+                  <p className="py-8 text-center text-sm font-semibold" style={styles.muted}>Sin productos vendidos en este periodo.</p>
                 ) : (
                   <div className="space-y-3">
                     {topProducts.slice(0, 8).map((product) => (
                       <div key={product.productId || product.title} className="grid gap-3 p-3 sm:grid-cols-[1fr_auto]" style={styles.softCard}>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                            {product.title || 'Producto'}
-                          </p>
-                          <p className="mt-1 text-xs font-semibold" style={styles.muted}>
-                            {formatNumber(product.qty)} uds · Venta {formatCurrency(product.revenue)} · Costo {formatCurrency(product.cogs)}
-                          </p>
+                          <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{product.title || 'Producto'}</p>
+                          <p className="mt-1 text-xs font-semibold" style={styles.muted}>{formatNumber(product.qty)} uds · Venta {formatCurrency(product.revenue)} · Costo {formatCurrency(product.cogs)}</p>
                         </div>
                         <div className="text-left sm:text-right">
-                          <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>
-                            {formatCurrency(product.grossProfit)}
-                          </p>
-                          <p className="text-xs font-bold" style={styles.muted}>
-                            {formatPercent(product.grossMarginPercent)} margen
-                          </p>
+                          <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(product.grossProfit)}</p>
+                          <p className="text-xs font-bold" style={styles.muted}>{formatPercent(product.grossMarginPercent)} margen</p>
                         </div>
                       </div>
                     ))}
@@ -1003,12 +790,8 @@ export default function AdminFinancePage() {
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
-                      Caja POS
-                    </p>
-                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      Resumen de caja
-                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Caja POS</p>
+                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Resumen de caja</h3>
                   </div>
                   <span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}>
                     <WalletCards className="h-5 w-5" />
@@ -1023,15 +806,9 @@ export default function AdminFinancePage() {
                     { label: 'Diferencia', value: formatCurrency(kpis.cashDifference), sub: 'Esperado vs contado' },
                   ].map((item) => (
                     <div key={item.label} className="p-3" style={styles.softCard}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>
-                        {item.value}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold" style={styles.muted}>
-                        {item.sub}
-                      </p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>{item.label}</p>
+                      <p className="mt-2 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{item.value}</p>
+                      <p className="mt-1 text-xs font-semibold" style={styles.muted}>{item.sub}</p>
                     </div>
                   ))}
                 </div>
@@ -1049,24 +826,13 @@ export default function AdminFinancePage() {
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+            <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
               <div className="p-4" style={styles.card}>
-                <div className="flex h-full min-h-[280px] flex-col items-center justify-center text-center">
-                  <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}>
-                    <Landmark className="h-7 w-7" />
-                  </span>
-                  <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>
-                    Control de gastos operativos
-                  </h3>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>
-                    El botón abre una ventana visible para registrar o editar egresos sin perder el contexto del reporte.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={openCreateExpenseForm}
-                    className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5"
-                    style={styles.primaryButton}
-                  >
+                <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
+                  <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}><Landmark className="h-7 w-7" /></span>
+                  <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Control de gastos operativos</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>Registra gastos manuales para que la utilidad neta combine ventas, costos, caja y egresos reales.</p>
+                  <button type="button" onClick={openCreateExpenseForm} className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
                     <Plus className="h-4 w-4" />
                     Registrar gasto
                   </button>
@@ -1076,22 +842,14 @@ export default function AdminFinancePage() {
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
-                      Gastos
-                    </p>
-                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      Últimos registros
-                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Gastos</p>
+                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Últimos registros</h3>
                   </div>
-                  <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('warning')}>
-                    {formatCurrency(expenses?.manualTotal || summary?.expenses?.manualTotal)}
-                  </span>
+                  <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('warning')}>{formatCurrency(expenses?.manualTotal || summary?.expenses?.manualTotal)}</span>
                 </div>
 
                 {expenseRows.length === 0 ? (
-                  <p className="py-10 text-center text-sm font-semibold" style={styles.muted}>
-                    No hay gastos registrados en este periodo.
-                  </p>
+                  <p className="py-10 text-center text-sm font-semibold" style={styles.muted}>No hay gastos registrados en este periodo.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[760px] text-left text-sm">
@@ -1107,45 +865,17 @@ export default function AdminFinancePage() {
                       <tbody>
                         {expenseRows.map((expense) => (
                           <tr key={expense._id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                            <td className="px-3 py-3 font-bold" style={{ color: 'var(--admin-card-text)' }}>
-                              {formatDate(expense.date)}
-                            </td>
+                            <td className="px-3 py-3 font-bold" style={{ color: 'var(--admin-card-text)' }}>{formatDate(expense.date)}</td>
                             <td className="px-3 py-3">
-                              <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>
-                                {expense.category || 'General'}
-                              </p>
-                              <p className="max-w-[260px] truncate text-xs font-semibold" style={styles.muted}>
-                                {expense.description || expense.vendor || 'Sin descripción'}
-                              </p>
+                              <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
+                              <p className="max-w-[260px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
                             </td>
-                            <td className="px-3 py-3">
-                              <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('neutral')}>
-                                {getLabel(EXPENSE_TYPES, expense.type, expense.type)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>
-                              {formatCurrency(expense.amount)}
-                            </td>
+                            <td className="px-3 py-3"><span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('neutral')}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</span></td>
+                            <td className="px-3 py-3 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
                             <td className="px-3 py-3">
                               <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditExpenseForm(expense)}
-                                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5"
-                                  style={styles.softButton}
-                                >
-                                  <Edit3 className="h-3.5 w-3.5" />
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCancelExpense(expense)}
-                                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5"
-                                  style={styles.dangerButton}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Anular
-                                </button>
+                                <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Editar</button>
+                                <button type="button" onClick={() => handleCancelExpense(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button>
                               </div>
                             </td>
                           </tr>
@@ -1159,51 +889,13 @@ export default function AdminFinancePage() {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}>
-                    <CalendarDays className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>
-                      Rango técnico
-                    </p>
-                    <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      {formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}
-                    </p>
-                  </div>
-                </div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><CalendarDays className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Rango técnico</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}</p></div></div>
               </div>
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('success')}>
-                    <Banknote className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>
-                      Ventas netas caja
-                    </p>
-                    <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      {formatCurrency(cash?.netSales || summary?.cash?.netSales)}
-                    </p>
-                  </div>
-                </div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('success')}><Banknote className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Ventas netas caja</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(cash?.netSales || summary?.cash?.netSales)}</p></div></div>
               </div>
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}>
-                    <Store className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>
-                      Sede filtrada
-                    </p>
-                    <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-                      {filters.branchId
-                        ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada'
-                        : 'Todas las sedes'}
-                    </p>
-                  </div>
-                </div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><Store className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Sede filtrada</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</p></div></div>
               </div>
             </div>
           </div>
