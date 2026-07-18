@@ -3,7 +3,12 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
+const {
+  buildVariantKey,
+  resolveVariantCommercialSnapshot,
+} = require('../lib/products/productVariantConfig');
 
 const { isValidObjectId } = mongoose;
 
@@ -38,6 +43,14 @@ function rateLimit(req, res, next) {
  * Helpers
  * ----------------------------------------------------- */
 
+function clean(value) {
+  return String(value || '').trim();
+}
+
+function cleanLower(value) {
+  return clean(value).toLowerCase();
+}
+
 function escapeRegex(s) {
   return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -56,6 +69,22 @@ function readProductId(raw) {
     .filter(Boolean);
 
   return String(candidates[0] || '').trim();
+}
+
+function readVariantId(raw = {}) {
+  return clean(raw.variantId || raw.variantKey || raw.selectedVariantId || raw.selectedVariantKey || '');
+}
+
+function getVariantSelector(raw = {}) {
+  const variantKey = cleanLower(readVariantId(raw));
+  const size = clean(raw.size || raw.talla || '');
+  const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
+
+  return {
+    variantKey: variantKey || buildVariantKey(size, color),
+    size,
+    color,
+  };
 }
 
 // Snapshot de precio robusto desde múltiples nombres
@@ -84,7 +113,7 @@ function sanitizeCartItems(items) {
     const image = String(raw?.image || raw?.product?.image || '').trim();
     const color = String(raw?.color || '').trim();
     const size = String(raw?.size || '').trim();
-    const variantId = String(raw?.variantId || '').trim();
+    const variantId = readVariantId(raw);
 
     const qtyNum = Number(raw?.qty ?? raw?.quantity ?? raw?.qtyNumber ?? 0);
     const qty = Number.isFinite(qtyNum) ? Math.max(0, Math.floor(qtyNum)) : 0;
@@ -106,6 +135,7 @@ function sanitizeCartItems(items) {
       color,
       size,
       variantId,
+      variantKey: variantId,
       qty,
       quantity: qty, // compatibilidad
     });
@@ -129,7 +159,7 @@ async function safePopulateItems(items) {
     if (validIds.length === 0) return arr.map((it) => ({ ...it, product: null }));
 
     const products = await Product.find({ _id: { $in: validIds } })
-      .select('title price image slug sku category inventory stock visible')
+      .select('title price image images slug sku barcode category inventory stock visible active trackInventory allowBackorder variants')
       .populate({ path: 'category', select: 'name' })
       .lean()
       .exec();
@@ -193,6 +223,51 @@ function computeAvailableStockForVariant(p, color, size) {
   );
   if (!v) return 0;
   return Number(v?.stock ?? v?.qty ?? v?.quantity ?? 0);
+}
+
+async function computeAvailableStockForCartItem(p, item) {
+  if (!p) return Infinity;
+  if (p.trackInventory === false || p.allowBackorder === true) return Infinity;
+
+  const selector = getVariantSelector(item);
+  const byVariant = Boolean(clean(selector.variantKey)) || Boolean(clean(item.color)) || Boolean(clean(item.size));
+
+  if (selector.variantKey && selector.variantKey !== 'default__default') {
+    const stockRow = await InventoryStock.findOne({
+      product: p._id,
+      variantKey: selector.variantKey,
+      deletedAt: null,
+      active: { $ne: false },
+    })
+      .select('stock reservedStock availableStock')
+      .lean()
+      .exec();
+
+    if (stockRow) {
+      const available = Number(stockRow.availableStock);
+      if (Number.isFinite(available)) return Math.max(0, available);
+      return Math.max(0, Number(stockRow.stock || 0) - Number(stockRow.reservedStock || 0));
+    }
+  }
+
+  return byVariant
+    ? computeAvailableStockForVariant(p, item.color, item.size)
+    : computeAvailableStockTotal(p);
+}
+
+function resolveCartCommercialSnapshot(p, item) {
+  if (!p) {
+    return {
+      price: Math.max(0, Number(item.price || 0)),
+      image: item.image || '',
+      sku: '',
+      barcode: '',
+      variantKey: readVariantId(item),
+    };
+  }
+
+  const selector = getVariantSelector(item);
+  return resolveVariantCommercialSnapshot(p, selector);
 }
 
 /* ============================
@@ -460,9 +535,9 @@ router.delete('/:sessionId', rateLimit, async (req, res) => {
 /**
  * ========================================
  * POST /api/cart/validate
- * - Ahora valida por variante (color/size) si aplica
- * - FIX: si viene sessionId sin carrito en DB pero llegan items en el body,
- *        validar esos items en lugar de responder 404.
+ * - Valida por variante avanzada si aplica
+ * - Usa precio/imagen/SKU/barcode de Product.variants
+ * - Usa InventoryStock real por variantKey para stock disponible
  * ========================================
  */
 router.post('/validate', async (req, res) => {
@@ -478,7 +553,6 @@ router.post('/validate', async (req, res) => {
       if (cart && Array.isArray(cart.items)) {
         sourceItems = cart.items;
       } else if (Array.isArray(items) && items.length > 0) {
-        // ✅ Fallback crítico: usar items del body cuando no hay carrito guardado
         sourceItems = items;
       } else {
         return res
@@ -501,18 +575,12 @@ router.post('/validate', async (req, res) => {
     const adjustments = [];
     for (const it of populated) {
       const p = it.product || null;
+      const commercial = resolveCartCommercialSnapshot(p, it);
 
-      const currentPrice = Math.max(0, Number(p?.price || it.price || 0));
-      const visible = p ? (p.visible !== false) : true;
-
-      // stock por variante si hay color/size, si no, stock total
-      const byVariant =
-        String(it.color || '').length > 0 || String(it.size || '').length > 0;
-      const available = p
-        ? (byVariant
-            ? computeAvailableStockForVariant(p, it.color, it.size)
-            : computeAvailableStockTotal(p))
-        : Infinity;
+      const currentPrice = Math.max(0, Number(commercial?.price ?? p?.price ?? it.price ?? 0));
+      const visible = p ? (p.visible !== false && p.active !== false) : true;
+      const available = await computeAvailableStockForCartItem(p, it);
+      const byVariant = Boolean(readVariantId(it)) || String(it.color || '').length > 0 || String(it.size || '').length > 0;
 
       let finalQty = Number(it.qty || 0);
       const note = [];
@@ -537,19 +605,26 @@ router.post('/validate', async (req, res) => {
 
       const finalItem = {
         ...it,
+        variantId: readVariantId(it) || commercial?.variantKey || '',
+        variantKey: readVariantId(it) || commercial?.variantKey || '',
+        variantSku: commercial?.sku || '',
+        variantBarcode: commercial?.barcode || '',
+        image: commercial?.image || it.image || p?.image || '',
         price: currentPrice,
         qty: finalQty,
         quantity: finalQty,
       };
       validated.push(finalItem);
 
-      if (note.length) {
+      if (note.length || Number(it.price || 0) !== currentPrice) {
         adjustments.push({
           productId: String(it._id),
+          variantId: finalItem.variantId,
           requestedQty: it.qty,
           finalQty,
           price: currentPrice,
-          note: note.join('; '),
+          previousPrice: Number(it.price || 0),
+          note: note.join('; ') || 'precio actualizado desde variante',
         });
       }
     }
@@ -560,8 +635,8 @@ router.post('/validate', async (req, res) => {
     res.status(200).json({
       ok: true,
       mode: strict ? 'strict' : 'soft',
-      items: validated,     // siempre con `_id`
-      adjustments,          // lista de cambios
+      items: validated,
+      adjustments,
       summary,
     });
   } catch (error) {

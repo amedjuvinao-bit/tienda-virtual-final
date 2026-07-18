@@ -1,36 +1,207 @@
 // src/admin/FormularioProducto.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import api from "../lib/api";
-import axios from "axios";
-import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
-import ColorBarPicker from "../components/ColorBarPicker.jsx";
+import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import ColorBarPicker from '../components/ColorBarPicker.jsx';
+import api from '../lib/api';
+import {
+  CATEGORY_SUGGESTIONS,
+  PRODUCT_TYPES,
+  UNIT_OPTIONS,
+  VARIANT_PRESETS,
+  getProductTypeMeta,
+  getVariantPresetMeta,
+  shouldTrackInventoryByType,
+} from './products/productCatalogConfig';
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-// Cloudinary (variables públicas Vite)
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_PRESET;
 const UPLOAD_FOLDER = import.meta.env.VITE_CLOUDINARY_FOLDER;
 
-// ---------- Helpers ----------
-function Thumb({ src, alt, onRemove, index, onClick }) {
-  const [loaded, setLoaded] = useState(false);
+function makeSku(category) {
+  const words = String(category || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const base = words.length >= 2
+    ? words.slice(0, 3).map((word) => word[0]).join('').toUpperCase()
+    : (words[0] || 'OT').slice(0, 3).toUpperCase();
+
+  const now = new Date();
+  const y = String(now.getFullYear()).slice(2);
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const rnd = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+
+  return `${base.padEnd(2, 'X')}-${y}${m}-${rnd}`;
+}
+
+function normalizeStringArray(arr, max = Infinity) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+
+  for (const item of arr) {
+    const value = String(item || '').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+    if (out.length >= max) break;
+  }
+
+  return out;
+}
+
+function toMoney(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.round(number)) : Math.max(0, Math.round(Number(fallback || 0)));
+}
+
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function buildVariantKey(size = '', color = '') {
+  const sizeKey = cleanText(size).toLowerCase();
+  const colorKey = cleanText(color).toLowerCase();
+  const key = `${sizeKey}__${colorKey}`;
+  return !key || key === '__' ? 'default__default' : key;
+}
+
+function buildVariantLabel(size = '', color = '') {
+  const parts = [cleanText(size), cleanText(color)].filter(Boolean);
+  return parts.join(' / ') || 'Variante general';
+}
+
+function getColorValue(color) {
+  return typeof color === 'string' ? color : color?.hex || color?.value || color?.name || '';
+}
+
+function hasInventoryDuplicatesFront(inv) {
+  const set = new Set();
+  for (const row of inv) {
+    const key = `${String(row?.color || '').toLowerCase()}|${String(row?.size || '').toLowerCase()}`;
+    if (set.has(key)) return true;
+    set.add(key);
+  }
+  return false;
+}
+
+function getInitialTrackInventory(productType, explicitValue) {
+  if (typeof explicitValue === 'boolean') return explicitValue;
+  return shouldTrackInventoryByType(productType);
+}
+
+function normalizeLoadedVariants(product = {}) {
+  if (Array.isArray(product.variants) && product.variants.length) {
+    return product.variants.map((variant, index) => {
+      const size = cleanText(variant.size || '');
+      const color = cleanText(variant.color || '');
+      const key = cleanText(variant.variantKey || buildVariantKey(size, color)).toLowerCase();
+      return {
+        variantKey: key,
+        label: cleanText(variant.label || buildVariantLabel(size, color)),
+        size,
+        color,
+        sku: cleanText(variant.sku || '').toUpperCase(),
+        barcode: cleanText(variant.barcode || ''),
+        price: variant.price ?? '',
+        cost: variant.cost ?? '',
+        originalPrice: variant.originalPrice ?? '',
+        image: cleanText(variant.image || ''),
+        images: normalizeStringArray(variant.images || [], 8),
+        initialStock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        active: variant.active !== false,
+        sortOrder: Number(variant.sortOrder ?? index),
+      };
+    });
+  }
+
+  const inventory = Array.isArray(product.inventory) ? product.inventory : [];
+  return inventory
+    .filter((row) => cleanText(row?.size || '') || cleanText(row?.color || ''))
+    .map((row, index) => {
+      const size = cleanText(row.size || '');
+      const color = cleanText(row.color || '');
+      return {
+        variantKey: buildVariantKey(size, color),
+        label: buildVariantLabel(size, color),
+        size,
+        color,
+        sku: '',
+        barcode: '',
+        price: '',
+        cost: '',
+        originalPrice: '',
+        image: '',
+        images: [],
+        initialStock: Math.max(0, Math.floor(Number(row.stock || 0))),
+        active: true,
+        sortOrder: index,
+      };
+    });
+}
+
+function mergeAdvancedVariants({ previous = [], sizes = [], colors = [], stockMap = {}, basePrice = 0, baseCost = 0 }) {
+  const cleanSizes = normalizeStringArray(sizes);
+  const cleanColors = normalizeStringArray(colors.map(getColorValue).filter(Boolean), 10);
+  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
+
+  const axisValues = cleanSizes.length ? cleanSizes : [''];
+  const colorValues = cleanColors.length ? cleanColors : [''];
+  const combos = [];
+
+  if (!cleanSizes.length && !cleanColors.length) return previous;
+
+  axisValues.forEach((size) => {
+    colorValues.forEach((color) => {
+      const key = buildVariantKey(size, color);
+      const existing = existingByKey.get(key);
+      const stockKey = `${size}|||${color}`;
+      const initialStock = Math.max(0, Math.floor(Number(stockMap[stockKey] ?? existing?.initialStock ?? 0)));
+
+      combos.push({
+        variantKey: key,
+        label: existing?.label || buildVariantLabel(size, color),
+        size,
+        color,
+        sku: existing?.sku || '',
+        barcode: existing?.barcode || '',
+        price: existing?.price ?? '',
+        cost: existing?.cost ?? '',
+        originalPrice: existing?.originalPrice ?? '',
+        image: existing?.image || '',
+        images: normalizeStringArray(existing?.images || [], 8),
+        initialStock,
+        active: existing?.active !== false,
+        sortOrder: existing?.sortOrder ?? combos.length,
+        _basePrice: basePrice,
+        _baseCost: baseCost,
+      });
+    });
+  });
+
+  return combos;
+}
+
+function Thumb({ src, alt, onRemove, index }) {
   return (
-    <div className="relative rounded-xl overflow-hidden border border-[#E9D6AA] transition-transform duration-300 hover:scale-[1.02] hover:shadow-lg group">
-      <img
-        src={src}
-        alt={alt}
-        onLoad={() => setLoaded(true)}
-        className={`w-full h-20 object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
-        onClick={onClick}
-      />
-      <div className="absolute top-1 left-1 text-[10px] bg-white/90 px-1.5 py-0.5 rounded">{index + 1}</div>
+    <div className="group relative overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+      <img src={src} alt={alt} className="h-20 w-full object-cover" />
+      <div className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}>
+        {index + 1}
+      </div>
       <button
         type="button"
         onClick={onRemove}
-        className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-white/90 hover:bg-white border shadow opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        title="Quitar"
+        className="absolute right-1 top-1 rounded border px-1.5 py-0.5 text-[10px] opacity-0 shadow transition group-hover:opacity-100"
+        style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
       >
         Quitar
       </button>
@@ -38,107 +209,108 @@ function Thumb({ src, alt, onRemove, index, onClick }) {
   );
 }
 
-function makeSku(category) {
-  const words = String(category || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  let base = "SKU";
-  if (words.length >= 2) base = (words[0][0] + words[1][0]).toUpperCase();
-  else if (words.length === 1) base = words[0].slice(0, 3).toUpperCase();
-
-  const now = new Date();
-  const y = String(now.getFullYear()).slice(2);
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const rnd = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-
-  return `${base}-${y}${m}-${rnd}`;
+function FieldLabel({ children, required = false, helper = '' }) {
+  return (
+    <label className="block text-sm font-semibold" style={{ color: 'var(--admin-card-text)' }}>
+      {children} {required && <span style={{ color: 'var(--admin-primary)' }}>*</span>}
+      {helper && (
+        <span className="ml-1 text-xs font-normal" style={{ color: 'var(--admin-card-muted-text)' }}>
+          {helper}
+        </span>
+      )}
+    </label>
+  );
 }
 
-// Normalizador de arrays string (trim + sin duplicados, case-insensitive)
-function normalizeStringArray(arr, max = Infinity) {
-  if (!Array.isArray(arr)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const item of arr) {
-    const v = String(item || "").trim();
-    if (!v) continue;
-    const key = v.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(v);
-      if (out.length >= max) break;
-    }
+const inputStyle = {
+  border: '1px solid var(--admin-input-border)',
+  borderRadius: 'var(--admin-radius)',
+  background: 'var(--admin-input-bg)',
+  color: 'var(--admin-input-text)',
+  outline: 'none',
+};
+
+const cardStyle = {
+  border: '1px solid var(--admin-card-border)',
+  borderRadius: 'calc(var(--admin-radius) + 8px)',
+  background: 'var(--admin-card-bg)',
+  color: 'var(--admin-card-text)',
+  boxShadow: 'var(--admin-glass-shadow)',
+};
+
+const sectionStyle = {
+  borderColor: 'var(--admin-card-border)',
+  background: 'color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%)',
+};
+
+const pillStyle = {
+  borderRadius: 999,
+  border: '1px solid color-mix(in srgb, var(--admin-primary) 64%, var(--admin-card-border) 36%)',
+  background: 'var(--admin-button-soft-bg)',
+  color: 'var(--admin-button-soft-text)',
+};
+
+function actionButtonStyle(kind = 'primary') {
+  if (kind === 'danger') {
+    return {
+      border: '1px solid var(--admin-danger)',
+      background: 'var(--admin-danger)',
+      color: 'var(--admin-danger-text, var(--admin-button-text))',
+    };
   }
-  return out;
-}
 
-// Valida duplicados (color+size) en inventory (front)
-function hasInventoryDuplicatesFront(inv) {
-  const set = new Set();
-  for (const r of inv) {
-    const key = `${(r.color || "").toLowerCase()}|${(r.size || "").toLowerCase()}`;
-    if (set.has(key)) return true;
-    set.add(key);
+  if (kind === 'soft') {
+    return {
+      border: '1px solid var(--admin-button-soft-border)',
+      background: 'var(--admin-button-soft-bg)',
+      color: 'var(--admin-button-soft-text)',
+    };
   }
-  return false;
+
+  return {
+    border: '1px solid var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-text)',
+  };
 }
 
-const SUGERIDAS = [
-  "Vestidos cortos",
-  "Vestidos largos",
-  "Conjuntos",
-  "Pantalones",
-  "Jeans",
-  "Shorts",
-  "Faldas",
-  "Blusas",
-  "Pijamas",
-  "Abrigos",
-  "Accesorios",
-];
-
-const SIZE_SUGGESTIONS = ["0-3M", "3-6M", "6-9M", "9-12M", "12-18M", "18-24M", "2", "4", "6", "8", "10", "12", "14"];
-
-// ---------- Componente ----------
 export default function FormularioProducto() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Básicos
-  const [sku, setSku] = useState("");
-  const [titulo, setTitulo] = useState("");
-  const [precio, setPrecio] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [imagen, setImagen] = useState("");
+  const [sku, setSku] = useState('');
+  const [titulo, setTitulo] = useState('');
+  const [precio, setPrecio] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [imagen, setImagen] = useState('');
   const [imagenes, setImagenes] = useState([]);
   const [activo, setActivo] = useState(true);
   const [cargando, setCargando] = useState(false);
 
-  // Categoría principal + adicionales
-  const [categoria, setCategoria] = useState("");
-  const [originalCategoria, setOriginalCategoria] = useState(""); // para detectar cambio
+  const [productType, setProductType] = useState('physical');
+  const [trackInventory, setTrackInventory] = useState(true);
+  const [unitOfMeasure, setUnitOfMeasure] = useState('unit');
+  const [allowBackorder, setAllowBackorder] = useState(false);
+  const [variantPreset, setVariantPreset] = useState('fashion');
+
+  const [categoria, setCategoria] = useState('');
+  const [originalCategoria, setOriginalCategoria] = useState('');
   const [catOptions, setCatOptions] = useState([]);
-  const [categoriesExtra, setCategoriesExtra] = useState([]); // chips
-  const [catInput, setCatInput] = useState("");
+  const [categoriesExtra, setCategoriesExtra] = useState([]);
+  const [catInput, setCatInput] = useState('');
 
-  // Colores
   const [colorsArr, setColorsArr] = useState([]);
-  const [colorsText, setColorsText] = useState("");
-
-  // Inventario simple
+  const [colorsText, setColorsText] = useState('');
   const [stock, setStock] = useState(0);
   const [sizes, setSizes] = useState([]);
-  const [sizeInput, setSizeInput] = useState("");
-
-  // Inventario por variantes (talla + color)
-  // key: `${size}|||${color}`
+  const [sizeInput, setSizeInput] = useState('');
   const [variantStock, setVariantStock] = useState({});
+  const [advancedVariants, setAdvancedVariants] = useState([]);
+  const [expandedVariant, setExpandedVariant] = useState('');
 
-  // Inventario avanzado + Contabilidad (opcionales)
   const [reorderPoint, setReorderPoint] = useState(0);
   const [reorderQty, setReorderQty] = useState(0);
-  const [warehouseLocation, setWarehouseLocation] = useState("");
+  const [warehouseLocation, setWarehouseLocation] = useState('');
   const [weightGrams, setWeightGrams] = useState(0);
   const [dimL, setDimL] = useState(0);
   const [dimW, setDimW] = useState(0);
@@ -149,70 +321,70 @@ export default function FormularioProducto() {
   const [taxRate, setTaxRate] = useState(0);
   const [taxIncluded, setTaxIncluded] = useState(true);
 
-  const [brand, setBrand] = useState("");
-  const [season, setSeason] = useState("");
-  const [supplierName, setSupplierName] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [notes, setNotes] = useState("");
+  const [brand, setBrand] = useState('');
+  const [season, setSeason] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const selectedType = useMemo(() => getProductTypeMeta(productType), [productType]);
+  const selectedPreset = useMemo(() => getVariantPresetMeta(variantPreset), [variantPreset]);
 
   const colorKeys = useMemo(() => {
     return (Array.isArray(colorsArr) ? colorsArr : [])
-      .map((c) => (typeof c === "string" ? c : c?.hex || c?.value || c?.name || ""))
+      .map(getColorValue)
       .filter(Boolean);
   }, [colorsArr]);
 
-  // ====== Carga edición ======
   useEffect(() => {
     if (!id) return;
+
     api.get(`/api/products/${id}`)
       .then(({ data }) => {
         const p = data || {};
-        setSku(p.sku || "");
-        setTitulo(p.title || "");
-        setPrecio(p.price || "");
-        setDescripcion(p.description || "");
-        setImagen(p.image || "");
+        const loadedProductType = p.productType || 'physical';
+        const loadedTrackInventory = getInitialTrackInventory(loadedProductType, p.trackInventory);
+
+        setSku(p.sku || '');
+        setTitulo(p.title || '');
+        setPrecio(p.price || '');
+        setDescripcion(p.description || '');
+        setImagen(p.image || '');
         setImagenes(Array.isArray(p.images) ? p.images : []);
         setActivo(p.active !== false);
-        setCategoria(p.category || "");
-        setOriginalCategoria(p.category || ""); // original
+        setProductType(loadedProductType);
+        setTrackInventory(loadedTrackInventory);
+        setUnitOfMeasure(p.unitOfMeasure || 'unit');
+        setAllowBackorder(p.allowBackorder === true);
+        setVariantPreset(p.variantPreset || (Array.isArray(p.sizes) && p.sizes.length ? 'fashion' : 'none'));
+        setCategoria(p.category || '');
+        setOriginalCategoria(p.category || '');
+        setCategoriesExtra(normalizeStringArray(p.categories || []));
 
-        // categorías adicionales (normalizadas)
-        const catsNorm = normalizeStringArray(p.categories || []);
-        setCategoriesExtra(catsNorm);
-
-        // colores
         let normalizedColors = [];
         if (Array.isArray(p.colors) && p.colors.length) {
-          normalizedColors = normalizeStringArray(
-            p.colors.map((c) => (typeof c === "string" ? c : c?.hex || c?.value || c?.name || "")),
-            10
-          );
+          normalizedColors = normalizeStringArray(p.colors.map(getColorValue), 10);
         }
-        // Derivar colores desde inventory si no llegaron en colors
-        if ((!normalizedColors || normalizedColors.length === 0) && Array.isArray(p.inventory)) {
-          normalizedColors = normalizeStringArray(
-            p.inventory.map((row) => String(row.color || "").trim()),
-            10
-          );
-        }
-        setColorsArr(normalizedColors);
-        setColorsText((normalizedColors || []).join(", "));
 
-        // tallas e inventory
+        if ((!normalizedColors || normalizedColors.length === 0) && Array.isArray(p.inventory)) {
+          normalizedColors = normalizeStringArray(p.inventory.map((row) => String(row.color || '').trim()), 10);
+        }
+
+        setColorsArr(normalizedColors);
+        setColorsText((normalizedColors || []).join(', '));
+
         const initialSizes = normalizeStringArray(p.sizes || []);
-        const derivedSizes =
-          initialSizes.length
-            ? initialSizes
-            : Array.isArray(p.inventory)
-            ? normalizeStringArray(p.inventory.map((row) => String(row.size || "").trim()))
+        const derivedSizes = initialSizes.length
+          ? initialSizes
+          : Array.isArray(p.inventory)
+            ? normalizeStringArray(p.inventory.map((row) => String(row.size || '').trim()))
             : [];
         setSizes(derivedSizes);
 
         if (Array.isArray(p.inventory)) {
           const map = {};
           p.inventory.forEach((row) => {
-            const key = `${row.size || ""}|||${row.color || ""}`;
+            const key = `${row.size || ''}|||${row.color || ''}`;
             map[key] = Number(row.stock || 0);
           });
           setVariantStock(map);
@@ -220,48 +392,47 @@ export default function FormularioProducto() {
           setVariantStock({});
         }
 
-        setStock(Number(p.stock ?? 0));
+        const loadedVariants = normalizeLoadedVariants(p);
+        setAdvancedVariants(loadedVariants);
+        if (loadedVariants[0]?.variantKey) setExpandedVariant(loadedVariants[0].variantKey);
 
-        // Opcionales
+        setStock(Number(p.stock ?? 0));
         setReorderPoint(Number(p.reorderPoint ?? 0));
         setReorderQty(Number(p.reorderQty ?? 0));
-        setWarehouseLocation(p.warehouseLocation || "");
+        setWarehouseLocation(p.warehouseLocation || '');
         setWeightGrams(Number(p.weightGrams ?? 0));
         setDimL(Number(p.dimensionsCm?.l ?? 0));
         setDimW(Number(p.dimensionsCm?.w ?? 0));
         setDimH(Number(p.dimensionsCm?.h ?? 0));
-
         setCost(Number(p.cost ?? 0));
         setAverageCost(Number(p.averageCost ?? 0));
         setTaxRate(Number(p.taxRate ?? 0));
         setTaxIncluded(p.taxIncluded !== false);
-
-        setBrand(p.brand || "");
-        setSeason(p.season || "");
-        setSupplierName(p.supplier?.name || "");
-        setBarcode(p.barcode || "");
-        setNotes(p.notes || "");
+        setBrand(p.brand || '');
+        setSeason(p.season || '');
+        setSupplierName(p.supplier?.name || '');
+        setBarcode(p.barcode || '');
+        setNotes(p.notes || '');
       })
       .catch((err) => {
         if (err?.response?.status === 404) {
-          toast.error("Este producto no existe (o fue eliminado).");
-          navigate("/admin/productos");
+          toast.error('Este producto no existe o fue eliminado.');
+          navigate('/admin/productos');
         } else {
-          toast.error("Error al cargar producto");
+          toast.error('Error al cargar producto');
         }
       });
   }, [id, navigate]);
 
-  // ====== Cargar opciones de categorías existentes ======
   useEffect(() => {
-    api.get(`/api/products`, { params: { _: Date.now() } })
+    api.get('/api/products', { params: { _: Date.now() } })
       .then(({ data }) => {
         const set = new Set();
         (Array.isArray(data) ? data : []).forEach((p) => {
           const cats = Array.isArray(p?.categories) && p.categories.length ? p.categories : p?.category ? [p.category] : [];
-          cats.forEach((c) => {
-            const v = String(c || "").trim();
-            if (v) set.add(v);
+          cats.forEach((cat) => {
+            const value = String(cat || '').trim();
+            if (value) set.add(value);
           });
         });
         setCatOptions([...set]);
@@ -269,262 +440,328 @@ export default function FormularioProducto() {
       .catch(() => {});
   }, []);
 
-  // ====== SKU auto por categoría ======
   useEffect(() => {
     if (!categoria) {
-      if (!id) setSku("");
+      if (!id) setSku('');
       return;
     }
+
     if (!id) {
-      // Creación: autogenera
       setSku(makeSku(categoria));
-    } else {
-      // Edición: si cambia la categoría respecto a la original, mostramos PREVIEW del nuevo SKU
-      if (originalCategoria && categoria !== originalCategoria) {
-        setSku(makeSku(categoria));
-      }
-      // Si vuelven a la original, mantenemos el SKU actual de DB (no lo tocamos aquí)
+      return;
+    }
+
+    if (originalCategoria && categoria !== originalCategoria) {
+      setSku(makeSku(categoria));
     }
   }, [categoria, id, originalCategoria]);
 
-  // ====== Subida Cloudinary ======
-  const subirImagen = async (file, isGallery = false) => {
+  useEffect(() => {
+    if (!id) {
+      setTrackInventory(shouldTrackInventoryByType(productType));
+      if (productType === 'digital' || productType === 'service') {
+        setVariantPreset('none');
+      }
+    }
+  }, [productType, id]);
+
+  useEffect(() => {
+    if (!trackInventory) return;
+
+    setAdvancedVariants((prev) => {
+      const merged = mergeAdvancedVariants({
+        previous: prev,
+        sizes,
+        colors: colorKeys,
+        stockMap: variantStock,
+        basePrice: toMoney(precio, 0),
+        baseCost: toMoney(cost || averageCost, 0),
+      });
+
+      if (!expandedVariant && merged[0]?.variantKey) {
+        setExpandedVariant(merged[0].variantKey);
+      }
+
+      return merged;
+    });
+  }, [trackInventory, sizes, colorKeys, variantStock, precio, cost, averageCost, expandedVariant]);
+
+  const subirImagen = async ({ file, gallery = false, variantKey = '' }) => {
     if (!file) return;
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      toast.error("Cloudinary no está configurado (CLOUD_NAME / UPLOAD_PRESET).");
+      toast.error('Cloudinary no está configurado.');
       return;
     }
 
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", UPLOAD_PRESET);
-    if (UPLOAD_FOLDER) formData.append("folder", UPLOAD_FOLDER);
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    if (UPLOAD_FOLDER) formData.append('folder', UPLOAD_FOLDER);
 
     try {
       const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, formData);
       const url = res.data.secure_url;
 
-      if (isGallery) {
-        setImagenes((prev) => {
-          const next = [...prev];
-          if (!next.includes(url)) next.push(url);
-          if (next.length > 5) next.length = 5; // cap
-          return next;
-        });
+      if (variantKey) {
+        setAdvancedVariants((prev) => prev.map((variant) => {
+          if (variant.variantKey !== variantKey) return variant;
+          if (gallery) {
+            return { ...variant, images: normalizeStringArray([...(variant.images || []), url], 8) };
+          }
+          return { ...variant, image: url };
+        }));
+        return;
+      }
+
+      if (gallery) {
+        setImagenes((prev) => normalizeStringArray([...prev, url], 5));
       } else {
         setImagen(url);
       }
-    } catch (e) {
-      console.error("Cloudinary upload error:", e?.response?.data || e.message);
-      toast.error("Error al subir imagen");
+    } catch (error) {
+      console.error('Cloudinary upload error:', error?.response?.data || error.message);
+      toast.error('Error al subir imagen');
     }
   };
 
-  const eliminarImagenGaleria = (index) => setImagenes((prev) => prev.filter((_, i) => i !== index));
+  const toggleSize = (size) => {
+    const value = String(size || '').trim();
+    if (!value) return;
 
-  // ====== Tallas ======
-  const toggleSize = (s) => {
-    const val = String(s || "").trim();
-    if (!val) return;
     setSizes((prev) => {
-      const exists = prev.some((x) => x.toLowerCase() === val.toLowerCase());
-      const next = exists ? prev.filter((x) => x.toLowerCase() !== val.toLowerCase()) : [...prev, val];
-      // limpiar entradas de variante que ya no existan
+      const exists = prev.some((item) => item.toLowerCase() === value.toLowerCase());
+      const next = exists
+        ? prev.filter((item) => item.toLowerCase() !== value.toLowerCase())
+        : [...prev, value];
+
       const map = {};
-      Object.entries(variantStock).forEach(([k, v]) => {
-        const [sz] = k.split("|||");
-        if (next.some((x) => x.toLowerCase() === sz.toLowerCase())) map[k] = v;
+      Object.entries(variantStock).forEach(([key, qty]) => {
+        const [variantValue] = key.split('|||');
+        if (next.some((item) => item.toLowerCase() === variantValue.toLowerCase())) map[key] = qty;
       });
       setVariantStock(map);
+
       return normalizeStringArray(next);
     });
   };
 
   const addSizesFromInput = () => {
     if (!sizeInput.trim()) return;
-    const parts = sizeInput.split(",").map((p) => p.trim()).filter(Boolean);
+    const parts = sizeInput.split(',').map((part) => part.trim()).filter(Boolean);
     setSizes((prev) => normalizeStringArray([...prev, ...parts]));
-    setSizeInput("");
+    setSizeInput('');
   };
 
-  // ====== Categorías extra (chips) ======
-  const addCatChip = (val) => {
-    const v = String(val || "").trim();
-    if (!v) return;
-    setCategoriesExtra((prev) => normalizeStringArray([...prev, v]));
+  const addCatChip = (value) => {
+    const clean = String(value || '').trim();
+    if (!clean) return;
+    setCategoriesExtra((prev) => normalizeStringArray([...prev, clean]));
   };
 
-  const removeCatChip = (val) => {
-    setCategoriesExtra((prev) => prev.filter((x) => x.toLowerCase() !== String(val).toLowerCase()));
+  const removeCatChip = (value) => {
+    setCategoriesExtra((prev) => prev.filter((item) => item.toLowerCase() !== String(value).toLowerCase()));
   };
 
-  const handleCatInputKey = (e) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
+  const handleCatInputKey = (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
       addCatChip(catInput);
-      setCatInput("");
+      setCatInput('');
     }
   };
 
-  // ====== Matriz de inventario ======
   const setCell = (size, color, value) => {
     const key = `${size}|||${color}`;
-    const n = Math.max(0, Math.floor(Number(value) || 0));
-    setVariantStock((prev) => ({ ...prev, [key]: n }));
+    const qty = Math.max(0, Math.floor(Number(value) || 0));
+    setVariantStock((prev) => ({ ...prev, [key]: qty }));
+    const variantKey = buildVariantKey(size, color);
+    setAdvancedVariants((prev) => prev.map((variant) => (
+      variant.variantKey === variantKey ? { ...variant, initialStock: qty } : variant
+    )));
+  };
+
+  const updateVariant = (variantKey, patch) => {
+    setAdvancedVariants((prev) => prev.map((variant) => (
+      variant.variantKey === variantKey ? { ...variant, ...patch } : variant
+    )));
+  };
+
+  const removeVariantImage = (variantKey, imageIndex) => {
+    setAdvancedVariants((prev) => prev.map((variant) => {
+      if (variant.variantKey !== variantKey) return variant;
+      return { ...variant, images: (variant.images || []).filter((_, index) => index !== imageIndex) };
+    }));
   };
 
   const totalFromMatrix = useMemo(() => {
-    return Object.values(variantStock).reduce((sum, n) => sum + (Number(n) || 0), 0);
+    return Object.values(variantStock).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
   }, [variantStock]);
 
-  const syncStockFromMatrix = () => {
-    setStock(totalFromMatrix);
-    toast.info("Stock general sincronizado con la suma de la matriz.");
-  };
-
   const inventoryArray = useMemo(() => {
+    if (!trackInventory) return [];
+
+    const rows = advancedVariants.length
+      ? advancedVariants.map((variant) => ({
+          size: variant.size || '',
+          color: variant.color || '',
+          stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        }))
+      : [];
+
+    if (rows.length) return rows;
+
     const out = [];
-    sizes.forEach((sz) => {
-      (Array.isArray(colorKeys) ? colorKeys : []).forEach((c) => {
-        const key = `${sz}|||${c}`;
+    sizes.forEach((size) => {
+      const colors = colorKeys.length ? colorKeys : [''];
+      colors.forEach((color) => {
+        const key = `${size}|||${color}`;
         const qty = Math.max(0, Math.floor(Number(variantStock[key] || 0)));
-        out.push({ size: sz, color: c, stock: qty });
+        out.push({ size, color, stock: qty });
       });
     });
-    // quitamos filas 0 para no ensuciar payload
-    return out.filter((r) => r.stock > 0);
-  }, [sizes, colorKeys, variantStock]);
 
-  // ====== Reglas mínimas para habilitar submit ======
+    return out;
+  }, [trackInventory, advancedVariants, sizes, colorKeys, variantStock]);
+
+  const variantPayload = useMemo(() => {
+    if (!trackInventory) return [];
+    return advancedVariants
+      .filter((variant) => variant.active !== false && (variant.size || variant.color || variant.label))
+      .map((variant, index) => ({
+        variantKey: variant.variantKey || buildVariantKey(variant.size, variant.color),
+        label: variant.label || buildVariantLabel(variant.size, variant.color),
+        size: variant.size || '',
+        color: variant.color || '',
+        sku: variant.sku || '',
+        barcode: variant.barcode || '',
+        price: variant.price === '' || variant.price == null ? null : toMoney(variant.price, precio),
+        cost: variant.cost === '' || variant.cost == null ? null : toMoney(variant.cost, cost || averageCost),
+        originalPrice: variant.originalPrice === '' || variant.originalPrice == null ? null : toMoney(variant.originalPrice, 0),
+        image: variant.image || '',
+        images: normalizeStringArray(variant.images || [], 8),
+        initialStock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
+        active: variant.active !== false,
+        sortOrder: index,
+      }));
+  }, [trackInventory, advancedVariants, precio, cost, averageCost]);
+
   const formInvalid = useMemo(() => {
-    const p = Number(precio);
-    const st = Number(stock);
+    const price = Number(precio);
     if (!titulo.trim()) return true;
     if (!categoria.trim()) return true;
-    if (!p || p <= 0 || Number.isNaN(p)) return true;
-    if (inventoryArray.length === 0 && (Number.isNaN(st) || st < 0)) return true;
+    if (!price || price <= 0 || Number.isNaN(price)) return true;
     return false;
-  }, [titulo, categoria, precio, stock, inventoryArray.length]);
+  }, [titulo, categoria, precio]);
 
-  // ====== Guardado ======
-  const guardarProducto = async (e) => {
-    e.preventDefault();
-    if (cargando) return; // anti doble-submit
+  const guardarProducto = async (event) => {
+    event.preventDefault();
+    if (cargando) return;
 
-    if (!sku) return toast.error("SKU es obligatorio (elige una categoría)");
-    if (!titulo.trim()) return toast.error("El título es obligatorio");
+    if (!sku) return toast.error('SKU es obligatorio. Elige una categoría.');
+    if (!titulo.trim()) return toast.error('El título es obligatorio');
 
-    const p = Number(precio);
-    if (!p || p <= 0 || Number.isNaN(p)) return toast.error("El precio debe ser mayor a 0");
+    const price = Number(precio);
+    if (!price || price <= 0 || Number.isNaN(price)) return toast.error('El precio debe ser mayor a 0');
+    if (!categoria.trim()) return toast.error('La categoría es obligatoria');
 
-    if (!categoria.trim()) return toast.error("La categoría es obligatoria");
-
-    // Normalizar colores de forma determinista (sin depender de setState)
     let finalColors = Array.isArray(colorsArr) ? [...colorsArr] : [];
     if (colorsText && colorsText.trim()) {
-      const parsed = colorsText.split(",").map((s) => s.trim()).filter(Boolean);
+      const parsed = colorsText.split(',').map((item) => item.trim()).filter(Boolean);
       finalColors = normalizeStringArray([...finalColors, ...parsed], 10);
     } else {
       finalColors = normalizeStringArray(finalColors, 10);
     }
+
     if (finalColors.length > 10) {
-      toast.error("Máximo 10 colores por producto.");
+      toast.error('Máximo 10 colores por producto.');
       return;
     }
 
-    // construir dimensiones solo si hay algo
-    const dimensions =
-      Number(dimL) || Number(dimW) || Number(dimH)
-        ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
-        : undefined;
+    const dimensions = Number(dimL) || Number(dimW) || Number(dimH)
+      ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
+      : undefined;
 
-    // supplier solo si trae nombre
-    const supplier =
-      supplierName && supplierName.trim()
-        ? { name: supplierName.trim() }
-        : undefined;
-
-    // categorías extra normalizadas
+    const supplier = supplierName && supplierName.trim() ? { name: supplierName.trim() } : undefined;
     const categoriesNormalized = normalizeStringArray(categoriesExtra);
 
-    // payload base
     const data = {
-      sku, // en PUT el backend lo ignora; en POST puede aceptarlo
+      sku,
       title: titulo,
-      price: Number(precio),
+      price,
       description: descripcion,
       image: imagen,
       images: Array.isArray(imagenes) ? imagenes.slice(0, 5) : [],
       active: activo,
-      colors: finalColors,
       category: categoria.trim(),
       categories: categoriesNormalized,
-
-      // inventario
-      sizes: normalizeStringArray(sizes),
-      inventory: inventoryArray,
-
-      // inventario avanzado y contabilidad
-      reorderPoint: Math.max(0, Number(reorderPoint || 0)),
-      reorderQty: Math.max(0, Number(reorderQty || 0)),
-      warehouseLocation: warehouseLocation || "",
+      productType,
+      unitOfMeasure,
+      trackInventory,
+      allowBackorder,
+      variantPreset,
+      variantAxes: trackInventory
+        ? [
+            { key: selectedPreset.axisLabel.toLowerCase(), label: selectedPreset.axisLabel, values: normalizeStringArray(sizes) },
+            { key: 'color', label: 'Color', values: finalColors },
+          ].filter((axis) => axis.values.length > 0)
+        : [],
+      colors: trackInventory ? finalColors : [],
+      sizes: trackInventory ? normalizeStringArray(sizes) : [],
+      inventory: trackInventory ? inventoryArray : [],
+      reorderPoint: trackInventory ? Math.max(0, Number(reorderPoint || 0)) : 0,
+      reorderQty: trackInventory ? Math.max(0, Number(reorderQty || 0)) : 0,
+      warehouseLocation: trackInventory ? warehouseLocation || '' : '',
       weightGrams: Math.max(0, Number(weightGrams || 0)),
       dimensionsCm: dimensions,
-
       cost: Math.max(0, Number(cost || 0)),
       averageCost: Math.max(0, Number(averageCost || 0)),
       taxRate: Math.min(100, Math.max(0, Number(taxRate || 0))),
       taxIncluded: Boolean(taxIncluded),
-
-      // comercial
-      brand: brand || "",
-      season: season || "",
+      brand: brand || '',
+      season: season || '',
       supplier,
-      barcode: barcode || "",
-
-      // notas
-      notes: notes || "",
+      barcode: barcode || '',
+      notes: notes || '',
     };
 
-    // reglas de stock:
-    // Si hay matriz e 'stock' es 0/undefined, no lo enviamos (el backend recalcula).
     const numericStock = Math.max(0, Math.floor(Number(stock) || 0));
-    const shouldOmitStock = (inventoryArray?.length || 0) > 0 && (!numericStock || numericStock <= 0);
-    if (!shouldOmitStock) {
-      data.stock = numericStock;
-    }
+    if (trackInventory && numericStock > 0) data.stock = numericStock;
 
-    // validación front de duplicados en inventory
-    if (hasInventoryDuplicatesFront(inventoryArray)) {
-      toast.error("Hay combinaciones duplicadas en (talla + color) en la matriz.");
+    if (trackInventory && hasInventoryDuplicatesFront(inventoryArray)) {
+      toast.error('Hay combinaciones duplicadas en la matriz de variantes.');
       return;
     }
 
     setCargando(true);
     try {
-      
+      let savedProduct = null;
       if (id) {
-        // Si cambió la categoría respecto a la original, pedimos REGENERAR SKU
-        const regen =
-          originalCategoria && categoria && categoria !== originalCategoria
-            ? "&regenSku=1"
-            : "";
-        await api.put(`/api/products/${id}?mode=replace${regen}`, data);
-        toast.success("Producto actualizado");
+        const regen = originalCategoria && categoria && categoria !== originalCategoria ? '&regenSku=1' : '';
+        const { data: updated } = await api.put(`/api/products/${id}?mode=replace${regen}`, data);
+        savedProduct = updated;
       } else {
-        await api.post(`/api/products`, data);
-        toast.success("Producto creado");
+        const { data: created } = await api.post('/api/products', data);
+        savedProduct = created;
       }
-      navigate("/admin/productos");
+
+      const productId = savedProduct?._id || savedProduct?.id || id;
+      if (trackInventory && productId && variantPayload.length) {
+        await api.put(`/api/admin/product-variants/${productId}`, {
+          variants: variantPayload,
+          syncLegacy: true,
+        });
+      }
+
+      toast.success(id ? 'Producto actualizado' : 'Producto creado');
+      navigate('/admin/productos');
     } catch (err) {
-      if (err?.message === "NO_ADMIN_TOKEN") {
-        toast.error("Token de administrador ausente. Inicia sesión de nuevo.");
+      if (err?.message === 'NO_ADMIN_TOKEN') {
+        toast.error('Token de administrador ausente. Inicia sesión de nuevo.');
         return;
       }
       const status = err?.response?.status;
-      const msg =
-        err?.response?.data?.message ||
-        (status === 401 ? "No autorizado (token inválido o expirado)" : status === 409 ? "Dato único duplicado (SKU/Slug/Barcode)" : "Error al guardar");
+      const msg = err?.response?.data?.message ||
+        (status === 401 ? 'No autorizado.' : status === 409 ? 'Dato único duplicado.' : 'Error al guardar');
       toast.error(msg);
       console.error(err);
     } finally {
@@ -532,585 +769,435 @@ export default function FormularioProducto() {
     }
   };
 
-  // ---------- UI ----------
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="bg-white rounded-2xl shadow-lg border border-[#E9D6AA]">
-        <div className="px-6 py-5 border-b bg-[#fff8fb] rounded-t-2xl">
-          <h2 className="text-2xl font-bold text-pink-600">{id ? "Editar Producto" : "Nuevo Producto"}</h2>
-          <p className="text-sm text-gray-500 mt-1">Completa los campos. La portada se mostrará primero; la galería permite hasta 5 fotos.</p>
+    <div className="mx-auto max-w-6xl p-6" style={{ color: 'var(--admin-card-text)' }}>
+      <div style={cardStyle}>
+        <div className="border-b px-6 py-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-glass-bg)' }}>
+          <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+            Catálogo universal
+          </p>
+          <h2 className="mt-1 text-2xl font-bold">{id ? 'Editar producto' : 'Nuevo producto'}</h2>
+          <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+            Configura productos universales, inventario real y variantes con precio e imágenes propias.
+          </p>
         </div>
 
-        <form onSubmit={guardarProducto} className="p-6 space-y-8">
-          {/* Datos básicos */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* SKU */}
+        <form onSubmit={guardarProducto} className="space-y-8 p-6">
+          <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                SKU <span className="text-pink-500">*</span>{" "}
-                <span className="text-xs text-gray-500">(se genera automáticamente por categoría)</span>
-              </label>
-              <input
-                type="text"
-                value={sku}
-                readOnly
-                disabled
-                className="w-full border rounded-xl px-3 py-2 outline-none bg-gray-100 text-gray-700 cursor-not-allowed"
-                placeholder="Se generará al elegir categoría"
-                required
-                aria-readonly="true"
-              />
+              <FieldLabel required helper="se genera por categoría">SKU</FieldLabel>
+              <input value={sku} disabled readOnly className="w-full px-3 py-2" style={{ ...inputStyle, opacity: 0.78 }} placeholder="Se generará al elegir categoría" />
               {id && originalCategoria && categoria && categoria !== originalCategoria && (
-                <p className="text-xs text-amber-600">
-                  Al guardar se <b>regenerará</b> el SKU según la nueva categoría.
+                <p className="text-xs" style={{ color: 'var(--admin-warning-text)' }}>
+                  Al guardar se regenerará el SKU según la nueva categoría.
                 </p>
               )}
             </div>
 
-            {/* Título */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Título <span className="text-pink-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                placeholder="Vestido de algodón para niña"
-                required
-              />
+            <div className="space-y-2 md:col-span-2">
+              <FieldLabel required>Título</FieldLabel>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Producto, servicio o combo" required />
             </div>
 
-            {/* Precio */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Precio <span className="text-pink-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                placeholder="89000"
-                required
-              />
+              <FieldLabel required>Tipo de producto</FieldLabel>
+              <select value={productType} onChange={(e) => setProductType(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                {PRODUCT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+              <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>{selectedType.description}</p>
             </div>
 
-            {/* Categoría principal */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Categoría <span className="text-pink-500">*</span>
-              </label>
-              <input
-                list="categoriasOptions"
-                value={categoria}
-                onChange={(e) => {
-                  setCategoria(e.target.value);
-                }}
-                className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                placeholder="Ej. Vestidos largos"
-                required
-              />
+              <FieldLabel required>Categoría</FieldLabel>
+              <input list="categoriasOptions" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Tecnología, belleza, servicios" required />
               <datalist id="categoriasOptions">
-                {[...new Set([...(catOptions || []), ...SUGERIDAS])].map((c) => (
-                  <option key={c} value={c} />
+                {[...new Set([...(catOptions || []), ...CATEGORY_SUGGESTIONS])].map((cat) => (
+                  <option key={cat} value={cat} />
                 ))}
               </datalist>
-              <p className="text-xs text-gray-500">
-                En <b>creación</b> se autogenera el SKU al elegir categoría. En <b>edición</b> se regenera si cambias la categoría.
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Unidad de medida</FieldLabel>
+              <select value={unitOfMeasure} onChange={(e) => setUnitOfMeasure(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                {UNIT_OPTIONS.map((unit) => (
+                  <option key={unit.value} value={unit.value}>{unit.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel required>Precio base</FieldLabel>
+              <input type="number" min="0" step="1" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="89000" required />
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Costo base</FieldLabel>
+              <input type="number" min="0" value={cost} onChange={(e) => setCost(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="0" />
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Código de barras base</FieldLabel>
+              <input value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="EAN / UPC / interno" />
+            </div>
+
+            <div className="space-y-2 md:col-span-3">
+              <FieldLabel>Descripción</FieldLabel>
+              <textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Descripción comercial, características, uso, cuidados o condiciones del servicio." />
+            </div>
+          </section>
+
+          <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={sectionStyle}>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
+              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                El producto guarda la ficha comercial. Inventario conserva las existencias reales por sede y variante.
               </p>
             </div>
 
-            {/* Descripción */}
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-sm font-medium">Descripción</label>
-              <textarea
-                rows={3}
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                placeholder="Materiales, cuidados, estilo..."
-              />
-            </div>
-
-            {/* Categorías adicionales (chips) */}
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-sm font-medium">Categorías adicionales</label>
-              <div className="flex gap-2">
-                <input
-                  list="categoriasOptions"
-                  value={catInput}
-                  onChange={(e) => setCatInput(e.target.value)}
-                  onKeyDown={handleCatInputKey}
-                  placeholder="Escribe y presiona Enter…"
-                  className="flex-1 border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    addCatChip(catInput);
-                    setCatInput("");
-                  }}
-                  className="no-glass px-4 py-2 rounded-xl bg-pink-500 text-white hover:bg-pink-600"
-                >
-                  Añadir
-                </button>
-              </div>
-              {categoriesExtra.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {categoriesExtra.map((c) => (
-                    <span
-                      key={c}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs bg-amber-50 border border-amber-200 text-amber-700"
-                    >
-                      {c}
-                      <button type="button" className="text-amber-600 hover:text-amber-800" onClick={() => removeCatChip(c)} title="Quitar">
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-gray-500">Estas categorías se sumarán al filtro (campo <code>categories</code>).</p>
-            </div>
-
-            {/* Stock */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Stock</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                placeholder="0"
-              />
-            </div>
-
-            {/* Tallas */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tallas</label>
-              <div className="flex flex-wrap gap-2">
-                {SIZE_SUGGESTIONS.map((s) => {
-                  const active = sizes.some((x) => x.toLowerCase() === s.toLowerCase());
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => toggleSize(s)}
-                      className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                        active ? "bg-pink-500 text-white border-pink-500" : "bg-white text-gray-700 border-gray-300 hover:border-pink-300"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="text"
-                  value={sizeInput}
-                  onChange={(e) => setSizeInput(e.target.value)}
-                  placeholder="Agregar tallas personalizadas (separa por comas)"
-                  className="flex-1 border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                />
-                <button type="button" onClick={addSizesFromInput} className="px-4 py-2 rounded-xl bg-pink-500 text-white hover:bg-pink-600">
-                  Añadir
-                </button>
-              </div>
-              {sizes.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {sizes.map((s) => (
-                    <span key={s} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs bg-pink-50 border border-pink-200 text-pink-700">
-                      {s}
-                      <button type="button" className="text-pink-600 hover:text-pink-800" onClick={() => toggleSize(s)} title="Quitar">
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Activo */}
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-3 select-none">
-                <input
-                  id="active"
-                  type="checkbox"
-                  checked={activo}
-                  onChange={(e) => setActivo(e.target.checked)}
-                  className="w-5 h-5 accent-pink-500 cursor-pointer"
-                />
-                <span className="text-sm font-medium">Activo</span>
-                <span className="text-xs text-gray-500">— mostrar producto en la tienda</span>
+            <div className="grid gap-3">
+              <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
+                <span className="text-sm font-semibold">Controlar inventario para este producto</span>
+              </label>
+              <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <input type="checkbox" checked={allowBackorder} onChange={(e) => setAllowBackorder(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} disabled={!trackInventory} />
+                <span className="text-sm font-semibold">Permitir venta sin stock disponible</span>
               </label>
             </div>
+
+            {trackInventory && (
+              <>
+                <div className="space-y-2">
+                  <FieldLabel>Plantilla de variantes</FieldLabel>
+                  <select value={variantPreset} onChange={(e) => setVariantPreset(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                    {VARIANT_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>{preset.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>{selectedPreset.helper}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Stock inicial heredado</FieldLabel>
+                  <input type="number" min="0" step="1" value={stock} onChange={(e) => setStock(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="0" />
+                  <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                    La existencia real queda en InventoryStock. Este valor solo sirve como respaldo inicial.
+                  </p>
+                </div>
+              </>
+            )}
           </section>
 
-          {/* Colores */}
-          <section className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              Colores <span className="ml-1 text-xs text-gray-400">(elige de la barra o añade manualmente)</span>
-            </label>
+          {trackInventory && (
+            <section className="space-y-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <FieldLabel>{selectedPreset.axisLabel || 'Variante'}</FieldLabel>
+                  {(selectedPreset.suggestions || []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPreset.suggestions.map((item) => {
+                        const active = sizes.some((size) => size.toLowerCase() === item.toLowerCase());
+                        return (
+                          <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-4 py-2 text-xs font-black transition hover:-translate-y-0.5" style={active ? actionButtonStyle() : pillStyle}>
+                            {item}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Agregar variantes separadas por coma" />
+                    <button type="button" onClick={addSizesFromInput} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>
+                      Añadir
+                    </button>
+                  </div>
+                  {sizes.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {sizes.map((size) => (
+                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                          {size}
+                          <button type="button" className="font-black" onClick={() => toggleSize(size)} style={{ color: 'var(--admin-button-soft-text)' }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-            <ColorBarPicker selected={colorsArr} onChange={setColorsArr} max={10} />
-
-            <div className="mt-2">
-              <label className="block text-xs text-gray-500 mb-1">También puedes editar como texto (separados por coma):</label>
-              <input
-                type="text"
-                value={colorsText}
-                onChange={(e) => setColorsText(e.target.value)}
-                onBlur={() => {
-                  const parsed = colorsText.split(",").map((s) => s.trim()).filter(Boolean);
-                  const merged = normalizeStringArray([...(colorsArr || []), ...parsed], 10);
-                  setColorsArr(merged);
-                  setColorsText(merged.join(", "));
-                }}
-                placeholder="Ej: pink, #f0c, gold"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
-              />
-            </div>
-          </section>
-
-          {/* Matriz inventario por talla x color (opcional) */}
-          {(sizes.length > 0 || colorKeys.length > 0) && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#D4AF37] tracking-wide">Inventario por talla y color (opcional)</h3>
-                <div className="text-sm text-gray-600">
-                  Total matriz: <b>{totalFromMatrix}</b>{" "}
-                  <button type="button" className="ml-3 px-3 py-1.5 rounded-full bg-amber-500 text-white hover:bg-amber-600" onClick={syncStockFromMatrix}>
-                    Usar como stock
-                  </button>
+                <div className="space-y-3">
+                  <FieldLabel helper="opcional">Colores / atributos visuales</FieldLabel>
+                  <ColorBarPicker selected={colorsArr} onChange={setColorsArr} max={10} />
+                  <input
+                    value={colorsText}
+                    onChange={(e) => setColorsText(e.target.value)}
+                    onBlur={() => {
+                      const parsed = colorsText.split(',').map((item) => item.trim()).filter(Boolean);
+                      const merged = normalizeStringArray([...(colorsArr || []), ...parsed], 10);
+                      setColorsArr(merged);
+                      setColorsText(merged.join(', '));
+                    }}
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="Ej: negro, blanco, #f0c, gold"
+                  />
                 </div>
               </div>
 
-              <div className="overflow-auto border rounded-lg">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="p-2 border-r text-left">Talla \ Color</th>
-                      {colorKeys.length === 0 ? (
-                        <th className="p-2 text-gray-400">— sin colores —</th>
-                      ) : (
-                        colorKeys.map((c) => (
-                          <th key={c} className="p-2 border-l">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-block w-4 h-4 rounded-full border" style={{ backgroundColor: c }} />
-                              <span className="font-normal">{c}</span>
-                            </div>
+              {(sizes.length > 0 || colorKeys.length > 0) && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                      Matriz de inventario inicial
+                    </h3>
+                    <div className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Total matriz: <b style={{ color: 'var(--admin-card-text)' }}>{totalFromMatrix}</b>
+                      <button type="button" className="ml-3 rounded-full px-3 py-1.5 text-xs font-semibold" style={actionButtonStyle('soft')} onClick={() => setStock(totalFromMatrix)}>
+                        Usar como stock
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-auto rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+                    <table className="min-w-full text-sm">
+                      <thead style={{ background: 'var(--admin-table-head-bg)', color: 'var(--admin-table-text)' }}>
+                        <tr>
+                          <th className="border-r p-2 text-left" style={{ borderColor: 'var(--admin-card-border)' }}>
+                            {selectedPreset.axisLabel || 'Variante'} \ Color
                           </th>
-                        ))
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sizes.length === 0 ? (
-                      <tr>
-                        <td className="p-3 text-gray-500">— sin tallas —</td>
-                      </tr>
-                    ) : (
-                      sizes.map((sz) => (
-                        <tr key={sz} className="even:bg-gray-50/40">
-                          <td className="p-2 border-r font-medium">{sz}</td>
                           {colorKeys.length === 0 ? (
-                            <td className="p-2 text-center text-gray-400">Agrega colores para usar la matriz</td>
+                            <th className="p-2" style={{ color: 'var(--admin-card-muted-text)' }}>Sin colores</th>
                           ) : (
-                            colorKeys.map((c) => {
-                              const key = `${sz}|||${c}`;
-                              return (
-                                <td key={key} className="p-1 border-l">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={variantStock[key] ?? 0}
-                                    onChange={(e) => setCell(sz, c, e.target.value)}
-                                    className="w-20 border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-pink-300"
-                                  />
-                                </td>
-                              );
-                            })
+                            colorKeys.map((color) => (
+                              <th key={color} className="border-l p-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-block h-4 w-4 rounded-full border" style={{ backgroundColor: color, borderColor: 'var(--admin-card-border)' }} />
+                                  <span className="font-normal">{color}</span>
+                                </div>
+                              </th>
+                            ))
                           )}
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-500">
-                Si no usas la matriz, solo se tendrá en cuenta el <b>Stock</b> general.
-              </p>
+                      </thead>
+                      <tbody>
+                        {sizes.length === 0 ? (
+                          <tr>
+                            <td className="p-3" style={{ color: 'var(--admin-card-muted-text)' }}>Sin variantes</td>
+                          </tr>
+                        ) : (
+                          sizes.map((size) => (
+                            <tr key={size}>
+                              <td className="border-r p-2 font-semibold" style={{ borderColor: 'var(--admin-card-border)' }}>{size}</td>
+                              {(colorKeys.length ? colorKeys : ['']).map((color) => {
+                                const key = `${size}|||${color}`;
+                                return (
+                                  <td key={key} className="border-l p-1" style={{ borderColor: 'var(--admin-card-border)' }}>
+                                    <input type="number" min="0" step="1" value={variantStock[key] ?? 0} onChange={(e) => setCell(size, color, e.target.value)} className="w-24 px-2 py-1 text-center" style={inputStyle} />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {advancedVariants.length > 0 && (
+                <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                  <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+                      Variantes avanzadas
+                    </p>
+                    <h3 className="text-lg font-bold">Precio, SKU e imágenes por variante</h3>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Si una variante no tiene precio o costo propio, usará el precio y costo base del producto.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 p-4">
+                    {advancedVariants.map((variant) => {
+                      const open = expandedVariant === variant.variantKey;
+                      const effectivePrice = variant.price !== '' && variant.price != null ? variant.price : precio || 0;
+                      const effectiveCost = variant.cost !== '' && variant.cost != null ? variant.cost : cost || averageCost || 0;
+                      const margin = Math.max(0, toMoney(effectivePrice) - toMoney(effectiveCost));
+                      return (
+                        <article key={variant.variantKey} className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)' }}>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="h-20 w-20 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                              {variant.image || imagen ? (
+                                <img src={variant.image || imagen} alt={variant.label} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Sin imagen</div>
+                              )}
+                            </div>
+                            <div className="min-w-[220px] flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border px-3 py-1 text-xs font-black" style={pillStyle}>{variant.label}</span>
+                                <span className="rounded-full border px-3 py-1 text-xs font-black" style={variant.active ? pillStyle : { ...pillStyle, opacity: 0.65 }}> {variant.active ? 'ACTIVA' : 'INACTIVA'} </span>
+                              </div>
+                              <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                                {variant.variantKey} · Stock inicial {variant.initialStock || 0}
+                              </p>
+                              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                                <span>Precio: <b style={{ color: 'var(--admin-card-text)' }}>${Number(effectivePrice || 0).toLocaleString('es-CO')}</b></span>
+                                <span>Costo: <b style={{ color: 'var(--admin-card-text)' }}>${Number(effectiveCost || 0).toLocaleString('es-CO')}</b></span>
+                                <span>Margen: <b style={{ color: 'var(--admin-primary)' }}>${margin.toLocaleString('es-CO')}</b></span>
+                              </div>
+                            </div>
+                            <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle(open ? 'soft' : 'primary')} onClick={() => setExpandedVariant(open ? '' : variant.variantKey)}>
+                              {open ? 'Cerrar' : 'Configurar'}
+                            </button>
+                          </div>
+
+                          {open && (
+                            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                              <div className="space-y-3 lg:col-span-2">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  <div>
+                                    <FieldLabel>Nombre visible</FieldLabel>
+                                    <input value={variant.label} onChange={(e) => updateVariant(variant.variantKey, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>SKU variante</FieldLabel>
+                                    <input value={variant.sku} onChange={(e) => updateVariant(variant.variantKey, { sku: e.target.value.toUpperCase() })} className="w-full px-3 py-2" style={inputStyle} placeholder="SKU propio" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Barcode variante</FieldLabel>
+                                    <input value={variant.barcode} onChange={(e) => updateVariant(variant.variantKey, { barcode: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="EAN / UPC" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Precio propio</FieldLabel>
+                                    <input type="number" min="0" value={variant.price ?? ''} onChange={(e) => updateVariant(variant.variantKey, { price: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder={`Base ${precio || 0}`} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Costo propio</FieldLabel>
+                                    <input type="number" min="0" value={variant.cost ?? ''} onChange={(e) => updateVariant(variant.variantKey, { cost: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder={`Base ${cost || averageCost || 0}`} />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Precio anterior</FieldLabel>
+                                    <input type="number" min="0" value={variant.originalPrice ?? ''} onChange={(e) => updateVariant(variant.variantKey, { originalPrice: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Opcional" />
+                                  </div>
+                                  <div>
+                                    <FieldLabel>Stock inicial</FieldLabel>
+                                    <input type="number" min="0" value={variant.initialStock ?? 0} onChange={(e) => {
+                                      const qty = Math.max(0, Math.floor(Number(e.target.value || 0)));
+                                      updateVariant(variant.variantKey, { initialStock: qty });
+                                      setCell(variant.size, variant.color, qty);
+                                    }} className="w-full px-3 py-2" style={inputStyle} />
+                                  </div>
+                                  <label className="flex items-center gap-3 pt-6">
+                                    <input type="checkbox" checked={variant.active !== false} onChange={(e) => updateVariant(variant.variantKey, { active: e.target.checked })} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
+                                    <span className="text-sm font-semibold">Variante activa</span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <FieldLabel>Imagen principal variante</FieldLabel>
+                                <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                                  {variant.image ? (
+                                    <img src={variant.image} alt={variant.label} className="h-36 w-full object-cover" />
+                                  ) : (
+                                    <div className="flex h-36 items-center justify-center text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Sin imagen propia</div>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], variantKey: variant.variantKey })} />
+                                    Subir portada
+                                  </label>
+                                  {variant.image && (
+                                    <button type="button" className="rounded-full px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')} onClick={() => updateVariant(variant.variantKey, { image: '' })}>Quitar</button>
+                                  )}
+                                </div>
+
+                                <FieldLabel>Galería variante</FieldLabel>
+                                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], variantKey: variant.variantKey, gallery: true })} />
+                                  Añadir imagen
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(variant.images || []).length === 0 ? (
+                                    <div className="col-span-full rounded-xl border border-dashed p-4 text-center text-xs" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                                      Sin galería propia
+                                    </div>
+                                  ) : (
+                                    variant.images.map((src, index) => (
+                                      <Thumb key={`${variant.variantKey}-${src}-${index}`} src={src} alt={`Imagen ${index + 1}`} index={index} onRemove={() => removeVariantImage(variant.variantKey, index)} />
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </section>
           )}
 
-          {/* Inventario avanzado y contabilidad (opcional) */}
-          <section className="space-y-4 border rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-[#D4AF37] tracking-wide">Inventario avanzado y contabilidad (opcional)</h3>
+          <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Finanzas y logística</h3>
+              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Estos datos alimentan margen, utilidad, envíos e informes financieros.
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium">Punto de pedido</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={reorderPoint}
-                  onChange={(e) => setReorderPoint(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Reposición sugerida</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={reorderQty}
-                  onChange={(e) => setReorderQty(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Ubicación en bodega</label>
-                <input
-                  type="text"
-                  value={warehouseLocation}
-                  onChange={(e) => setWarehouseLocation(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="Estante A-3"
-                />
-              </div>
+            <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
+              <div><FieldLabel>Costo promedio</FieldLabel><input type="number" min="0" value={averageCost} onChange={(e) => setAverageCost(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div><FieldLabel>IVA %</FieldLabel><input type="number" min="0" max="100" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="flex items-center gap-2 pt-6"><input id="taxIncluded" type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} /><label htmlFor="taxIncluded" className="text-sm font-semibold">Precio incluye IVA</label></div>
+              <div><FieldLabel>Punto de pedido</FieldLabel><input type="number" min="0" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} /></div>
+              <div><FieldLabel>Reposición sugerida</FieldLabel><input type="number" min="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} /></div>
+              <div><FieldLabel>Ubicación bodega</FieldLabel><input value={warehouseLocation} onChange={(e) => setWarehouseLocation(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} placeholder="Estante A-3" /></div>
+              <div><FieldLabel>Peso gramos</FieldLabel><input type="number" min="0" value={weightGrams} onChange={(e) => setWeightGrams(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="md:col-span-2"><FieldLabel>Dimensiones cm</FieldLabel><div className="grid grid-cols-3 gap-2"><input type="number" min="0" value={dimL} onChange={(e) => setDimL(e.target.value)} placeholder="Largo" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimW} onChange={(e) => setDimW(e.target.value)} placeholder="Ancho" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimH} onChange={(e) => setDimH(e.target.value)} placeholder="Alto" className="px-3 py-2" style={inputStyle} /></div></div>
+            </div>
+          </section>
 
-              <div>
-                <label className="block text-sm font-medium">Peso (g)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={weightGrams}
-                  onChange={(e) => setWeightGrams(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="0"
-                />
-              </div>
+          <section className="grid gap-5 md:grid-cols-3">
+            <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            <div className="space-y-2"><FieldLabel>Temporada / colección</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            <div className="space-y-2 md:col-span-3">
+              <FieldLabel>Categorías adicionales</FieldLabel>
+              <div className="flex gap-2"><input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} /><button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button></div>
+              {categoriesExtra.length > 0 && (<div className="mt-2 flex flex-wrap gap-2">{categoriesExtra.map((cat) => (<span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>{cat}<button type="button" className="font-black" style={{ color: 'var(--admin-button-soft-text)' }} onClick={() => removeCatChip(cat)}>×</button></span>))}</div>)}
+            </div>
+          </section>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium">Dimensiones (cm)</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <input type="number" min="0" value={dimL} onChange={(e) => setDimL(e.target.value)} placeholder="Largo" className="border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300" />
-                  <input type="number" min="0" value={dimW} onChange={(e) => setDimW(e.target.value)} placeholder="Ancho" className="border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300" />
-                  <input type="number" min="0" value={dimH} onChange={(e) => setDimH(e.target.value)} placeholder="Alto" className="border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300" />
-                </div>
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}><h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Imagen portada</h3><p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Se mostrará primero en la tienda si la variante no tiene imagen propia.</p></div>
+              <div className="p-5">
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}><input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0] })} />Elegir portada</label>
+                <div className="mt-4 h-64 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>{imagen ? (<div className="relative h-full w-full"><img src={imagen} alt="Portada del producto" className="h-full w-full object-cover" /><button type="button" onClick={() => setImagen('')} className="absolute right-2 top-2 rounded-full border px-2 py-1 text-xs shadow" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}>Quitar</button></div>) : (<div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Sin portada seleccionada</div>)}</div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium">Costo unitario (COP)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Costo promedio (COP)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={averageCost}
-                  onChange={(e) => setAverageCost(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">IVA %</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="19"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input id="tincluded" type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="w-5 h-5 accent-pink-500 cursor-pointer" />
-                <label htmlFor="tincluded" className="text-sm">Precio incluye IVA</label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium">Marca</label>
-                <input
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="Marca"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium">Temporada</label>
-                <input
-                  type="text"
-                  value={season}
-                  onChange={(e) => setSeason(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="SS25"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium">Proveedor (nombre)</label>
-                <input
-                  type="text"
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="Proveedor SA"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium">Código de barras</label>
-                <input
-                  type="text"
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="EAN/UPC"
-                />
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium">Notas internas</label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full border rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-300"
-                  placeholder="Observaciones para inventario/contabilidad"
-                />
+            <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+              <div className="border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}><h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Galería</h3><p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Máximo 5 imágenes generales del producto.</p></div>
+              <div className="p-5">
+                <label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}><input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen({ file: e.target.files?.[0], gallery: true })} />Añadir imagen</label>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{imagenes.length === 0 ? (<div className="col-span-full rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>Sin imágenes adicionales</div>) : (imagenes.map((src, index) => (<Thumb key={`${src}-${index}`} src={src} alt={`Galería ${index + 1}`} index={index} onRemove={() => setImagenes((prev) => prev.filter((_, i) => i !== index))} />)))}</div>
               </div>
             </div>
           </section>
 
-          {/* Imágenes */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Portada */}
-            <div className="rounded-2xl border border-[#E9D6AA] bg-white shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b bg-[#fff8fb]">
-                <h3 className="text-sm font-semibold text-[#D4AF37] tracking-wide">Imagen portada</h3>
-                <p className="text-xs text-gray-500">Se mostrará primero en la página de detalle.</p>
-              </div>
-              <div className="p-5">
-                <label className="inline-flex items-center px-4 py-2 rounded-full border border-pink-200 hover:border-pink-400 cursor-pointer text-pink-600 text-sm bg-pink-50/50">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0], false)} />
-                  Elegir portada
-                </label>
+          <section className="space-y-2"><FieldLabel>Notas internas</FieldLabel><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Observaciones internas para inventario, compras o finanzas." /></section>
 
-                <div className="mt-4">
-                  <div
-                    className="relative w-full h-64 rounded-xl border-2 border-[#D4AF37] overflow-hidden
-                               bg-[linear-gradient(45deg,#f3f4f6_25%,transparent_25%),linear-gradient(-45deg,#f3f4f6_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f3f4f6_75%),linear-gradient(-45deg,transparent_75%,#f3f4f6_75%)]
-                               bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0] transition-transform duration-300 hover:scale-[1.01] hover:shadow-lg"
-                  >
-                    {imagen ? (
-                      <>
-                        <img src={imagen} alt="Portada del producto" className="w-full h-full object-cover transition-opacity duration-500 opacity-100" />
-                        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-widest bg-[#D4AF37] text-white px-2 py-1 rounded-full shadow">
-                          Portada
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setImagen("")}
-                          className="absolute top-2 right-2 text-xs px-2 py-1 rounded-full bg-white/90 hover:bg-white border shadow"
-                        >
-                          Quitar
-                        </button>
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">Sin portada seleccionada</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Galería */}
-            <div className="rounded-2xl border border-[#E9D6AA] bg-white shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b bg-[#fff8fb] flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-[#D4AF37] tracking-wide">Galería (hasta 5)</h3>
-                  <p className="text-xs text-gray-500">Puedes subir varias imágenes.</p>
-                </div>
-                <span className="text-xs text-gray-500">{imagenes.length} / 5</span>
-              </div>
-
-              <div className="p-5">
-                <label className="inline-flex items-center px-4 py-2 rounded-full border border-pink-200 hover:border-pink-400 cursor-pointer text-pink-600 text-sm bg-pink-50/50">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      if (!files.length) return;
-                      // sube una a una, respetando cap y sin duplicar
-                      let stop = false;
-                      files.forEach((f) => {
-                        if (stop) return;
-                        setImagenes((prev) => {
-                          const next = [...prev];
-                          if (next.length >= 5) {
-                            stop = true;
-                            return next;
-                          }
-                          // Subir este archivo
-                          subirImagen(f, true);
-                          return next;
-                        });
-                      });
-                      e.target.value = "";
-                    }}
-                  />
-                  Elegir imágenes
-                </label>
-
-                <div className="mt-4 grid grid-cols-4 gap-3">
-                  {imagenes.map((img, idx) => (
-                    <Thumb key={img + idx} src={img} alt={`Galería ${idx + 1}`} index={idx} onRemove={() => eliminarImagenGaleria(idx)} onClick={() => setImagen(img)} />
-                  ))}
-                </div>
-
-                {imagenes.length === 0 && <p className="mt-3 text-[11px] text-gray-500">Consejo: usa fotos con orientación similar para una cuadrícula más simétrica.</p>}
-              </div>
-            </div>
+          <section className="flex flex-wrap items-center justify-between gap-4 border-t pt-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <label className="flex items-center gap-3"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} /><span className="text-sm font-semibold">Producto activo en la tienda</span></label>
+            <div className="flex gap-3"><button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={actionButtonStyle('soft')}>Cancelar</button><button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>{cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}</button></div>
           </section>
-
-          {/* Guardar */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={cargando || formInvalid}
-              className="bg-pink-500 hover:bg-pink-600 disabled:opacity-60 text-white px-6 py-2.5 rounded-full shadow transition-colors"
-            >
-              {cargando ? "Guardando..." : "Guardar producto"}
-            </button>
-          </div>
         </form>
       </div>
     </div>

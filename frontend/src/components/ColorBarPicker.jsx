@@ -1,6 +1,7 @@
 // src/components/ColorBarPicker.jsx
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import { getColorDisplayName, getColorVisualValue } from '../utils/colorDisplay';
 
 /**
  * ColorBarPicker
@@ -23,7 +24,7 @@ export default function ColorBarPicker({
       '#FFF9C4', '#FFE0B2', '#FFCCBC', '#D7CCC8',
       '#F48FB1', '#CE93D8', '#9FA8DA', '#90CAF9', '#80DEEA',
       '#80CBC4', '#A5D6A7', '#E6EE9C', '#FFE082', '#FFAB91',
-      '#D4AF37', // dorado
+      '#D4AF37',
       'pink', 'hotpink', 'fuchsia', 'crimson', 'salmon',
       'skyblue', 'royalblue', 'navy', 'teal', 'turquoise',
       'seagreen', 'limegreen', 'olive', 'khaki', 'coral',
@@ -36,88 +37,116 @@ export default function ColorBarPicker({
   const [custom, setCustom] = useState('');
 
   const addColor = (c) => {
-    const value = (c || '').trim();
+    const value = getColorVisualValue(c).trim();
     if (!value) return;
     if (selected.length >= max) return;
-    // evita duplicados (case-insensitive)
-    const exists = selected.some((s) => s.toLowerCase() === value.toLowerCase());
+    const exists = selected.some((s) => getColorVisualValue(s).toLowerCase() === value.toLowerCase());
     if (exists) return;
     onChange([...selected, value]);
     setCustom('');
   };
 
   const removeColor = (c) => {
-    onChange(selected.filter((s) => s.toLowerCase() !== c.toLowerCase()));
+    const value = getColorVisualValue(c).toLowerCase();
+    onChange(selected.filter((s) => getColorVisualValue(s).toLowerCase() !== value));
   };
 
   return (
     <div className="space-y-2">
-      {/* Barra de colores */}
       <div className="flex flex-wrap items-center gap-2">
-        {colors.map((c, idx) => (
-          <button
-            key={`${c}-${idx}`}
-            type="button"
-            title={c}
-            aria-label={`Agregar color ${c}`}
-            className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
-            style={{ backgroundColor: c }}
-            onClick={() => addColor(c)}
-            disabled={selected.length >= max}
-          />
-        ))}
+        {colors.map((c, idx) => {
+          const label = getColorDisplayName(c);
+          const visual = getColorVisualValue(c);
+          return (
+            <button
+              key={`${visual}-${idx}`}
+              type="button"
+              title={label}
+              aria-label={`Agregar color ${label}`}
+              className="h-6 w-6 rounded-full border transition-transform hover:scale-110 disabled:opacity-50"
+              style={{
+                backgroundColor: visual,
+                borderColor: 'var(--admin-card-border)',
+              }}
+              onClick={() => addColor(visual)}
+              disabled={selected.length >= max}
+            />
+          );
+        })}
       </div>
 
-      {/* Entrada manual */}
       <div className="flex items-center gap-2">
         <input
           type="text"
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
-          placeholder="Añadir color (p. ej. #f0c o 'pink')"
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+          placeholder="Añadir color por nombre o código"
+          className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+          style={{
+            borderColor: 'var(--admin-input-border)',
+            background: 'var(--admin-input-bg)',
+            color: 'var(--admin-input-text)',
+            '--tw-ring-color': 'color-mix(in srgb, var(--admin-primary) 32%, transparent)',
+          }}
         />
         <button
           type="button"
           onClick={() => addColor(custom)}
-          className="px-3 py-2 text-sm rounded-md bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          style={{
+            border: '1px solid var(--admin-button-border)',
+            background: 'var(--admin-button-bg)',
+            color: 'var(--admin-button-text)',
+          }}
           disabled={selected.length >= max}
         >
           Añadir
         </button>
       </div>
 
-      {/* Seleccionados */}
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {selected.map((c, idx) => (
-            <div
-              key={`${c}-${idx}`}
-              className="flex items-center gap-2 border border-gray-200 rounded-full px-2 py-1"
-            >
-              <span
-                className="inline-block w-4 h-4 rounded-full border border-gray-300"
-                style={{ backgroundColor: c }}
-                title={c}
-              />
-              <span className="text-xs text-gray-700">{c}</span>
-              <button
-                type="button"
-                onClick={() => removeColor(c)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label={`Quitar color ${c}`}
-                title="Quitar"
+          {selected.map((c, idx) => {
+            const label = getColorDisplayName(c);
+            const visual = getColorVisualValue(c);
+            return (
+              <div
+                key={`${visual}-${idx}`}
+                className="flex items-center gap-2 rounded-full border px-2 py-1"
+                style={{
+                  borderColor: 'var(--admin-card-border)',
+                  background: 'var(--admin-card-bg)',
+                  color: 'var(--admin-card-text)',
+                }}
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+                <span
+                  className="inline-block h-4 w-4 rounded-full border"
+                  style={{
+                    backgroundColor: visual,
+                    borderColor: 'var(--admin-card-border)',
+                  }}
+                  title={label}
+                  aria-label={label}
+                />
+                <span className="text-xs font-semibold">{label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeColor(c)}
+                  className="transition hover:opacity-75"
+                  aria-label={`Quitar color ${label}`}
+                  title="Quitar"
+                  style={{ color: 'var(--admin-card-muted-text)' }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Límite */}
-      <p className="text-xs text-gray-500">
-        Puedes seleccionar hasta {max} colores. Haz clic en un color de la barra o añádelo manualmente.
+      <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+        Puedes seleccionar hasta {max} colores. Se mostrará el nombre del color en la tienda, no el código hexadecimal.
       </p>
     </div>
   );

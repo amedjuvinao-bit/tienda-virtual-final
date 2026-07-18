@@ -3,6 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import './admin/productFormContrast.css';
+import './admin/finance/financeLayoutFix.css';
 
 // Toastify (estilos y contenedor global)
 import 'react-toastify/dist/ReactToastify.css';

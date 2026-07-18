@@ -3,39 +3,49 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import { getSessionId } from '../utils/getSessionId';
 
+function clean(value) {
+  return String(value || '').trim();
+}
+
+function readVariantId(item = {}) {
+  return clean(item.variantId || item.variantKey || item.selectedVariantId || item.selectedVariantKey || '');
+}
+
 // ---------- Helpers de mapeo ----------
 /**
- * Convierte un item local (tu estado) al formato que espera el backend.
- * Local típico: { _id, title, image, color, size, quantity, price? }
- * Backend espera: { productId, qty, price?, title?, image?, color?, size? }
+ * Convierte un item local (estado UI) al formato que espera el backend.
+ * Local: { _id, title, image, color, size, variantId, quantity, price }
+ * Backend: { productId, qty, price, title, image, color, size, variantId }
  */
 function toBackendItem(it) {
   const productId =
     it.productId || it._id || (it.product && (it.product._id || it.product.id)) || it.id || '';
   const qty = Number(it.qty ?? it.quantity ?? 1) || 1;
   const price = Number(it.price ?? it.unitPrice ?? it.priceNumber ?? 0) || 0;
+  const variantId = readVariantId(it);
 
   return {
     productId: String(productId),
     qty,
-    quantity: qty, // compatibilidad
+    quantity: qty,
     title: it.title || (it.product && it.product.title) || '',
     image: it.image || (it.product && it.product.image) || '',
-    color: it.color || '',
+    color: it.color || it.colorLabel || '',
     size: it.size || '',
-    price, // snapshot opcional (backend recalcula si hace falta)
+    variantId,
+    price,
   };
 }
 
 /**
  * Convierte un item que viene del backend al formato local.
- * Backend puede devolver productId como string o como objeto poblado.
  */
 function fromBackendItem(it) {
   const p = typeof it.productId === 'object' ? it.productId : null;
   const _id = p?._id || it.productId || it._id || it.id;
   const qty = Number(it.qty ?? it.quantity ?? 0) || 0;
   const price = Number(it.price ?? p?.price ?? 0) || 0;
+  const variantId = readVariantId(it);
 
   return {
     _id: String(_id || ''),
@@ -43,11 +53,13 @@ function fromBackendItem(it) {
     image: it.image || p?.image || '',
     color: it.color || '',
     size: it.size || '',
+    variantId,
+    variantKey: variantId,
     quantity: qty,
     price,
-    // opcionales
     slug: p?.slug,
-    sku: p?.sku ?? p?.skun,
+    sku: it.variantSku || p?.sku || p?.skun || '',
+    barcode: it.variantBarcode || p?.barcode || '',
   };
 }
 
@@ -85,6 +97,7 @@ function itemsShallowEqual(a, b) {
       x._id !== y._id ||
       (x.color || '') !== (y.color || '') ||
       (x.size || '') !== (y.size || '') ||
+      readVariantId(x) !== readVariantId(y) ||
       Number(x.quantity || 0) !== Number(y.quantity || 0) ||
       Number(x.price || 0) !== Number(y.price || 0)
     ) {
@@ -135,19 +148,18 @@ export function CartProvider({ children }) {
   useEffect(() => {
     const run = async () => {
       const sessionId = getSessionId();
-      if (cart.length === 0) return; // la limpieza la maneja clearCart()
+      if (cart.length === 0) return;
       if (syncingRef.current) return;
 
       const items = cart.map(toBackendItem);
       syncingRef.current = true;
       try {
         const putRes = await api.put(`/api/cart/${encodeURIComponent(sessionId)}`, { items });
-        // Tomamos la versión **canónica** del server si viene en la respuesta
         const srvItems = putRes?.data?.cart?.items;
         if (Array.isArray(srvItems)) {
           const mapped = srvItems.map(fromBackendItem).filter((x) => x._id);
           if (!itemsShallowEqual(mapped, cart)) {
-            setCart(mapped); // evita drift y respeta precios/ajustes del server
+            setCart(mapped);
           }
         }
       } catch (err) {
@@ -167,14 +179,17 @@ export function CartProvider({ children }) {
     } catch {}
   }, [cart]);
 
-  // ---------- Búsqueda índice (por _id + color + size) ----------
-  const findItemIndex = (product) =>
-    cart.findIndex(
+  // ---------- Búsqueda índice (producto + variante exacta) ----------
+  const findItemIndex = (product) => {
+    const incomingVariantId = readVariantId(product);
+    return cart.findIndex(
       (item) =>
         item._id === product._id &&
         (item.color || '') === (product.color || '') &&
-        (item.size || '') === (product.size || '')
+        (item.size || '') === (product.size || '') &&
+        readVariantId(item) === incomingVariantId
     );
+  };
 
   // ---------- Acciones CRUD locales ----------
   const addToCart = (product) => {
@@ -184,6 +199,7 @@ export function CartProvider({ children }) {
     );
     const safePrice = Number.isFinite(unitPrice) && unitPrice >= 0 ? unitPrice : 0;
     const inc = Number(product.quantity || 1) || 1;
+    const variantId = readVariantId(product);
 
     if (index !== -1) {
       const updated = [...cart];
@@ -197,8 +213,14 @@ export function CartProvider({ children }) {
           _id: String(product._id || product.id || ''),
           title: product.title || '',
           image: product.image || '',
-          color: product.color || '',
+          color: product.color || product.colorLabel || '',
+          colorValue: product.colorValue || '',
           size: product.size || '',
+          variantId,
+          variantKey: product.variantKey || variantId,
+          variantLabel: product.variantLabel || product.selectedVariant?.label || '',
+          variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
+          variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
           quantity: Math.max(1, inc),
           price: safePrice,
         },
@@ -206,23 +228,29 @@ export function CartProvider({ children }) {
     }
   };
 
-  const removeFromCart = (_id, color, size) => {
+  const removeFromCart = (_id, color, size, variantId = '') => {
     setCart(
       cart.filter(
         (it) =>
           !(
             it._id === _id &&
             (it.color || '') === (color || '') &&
-            (it.size || '') === (size || '')
+            (it.size || '') === (size || '') &&
+            (!variantId || readVariantId(it) === variantId)
           )
       )
     );
   };
 
-  const increaseQuantity = (_id, color, size) => {
+  const increaseQuantity = (_id, color, size, variantId = '') => {
     setCart(
       cart.map((it) => {
-        if (it._id === _id && (it.color || '') === (color || '') && (it.size || '') === (size || '')) {
+        if (
+          it._id === _id &&
+          (it.color || '') === (color || '') &&
+          (it.size || '') === (size || '') &&
+          (!variantId || readVariantId(it) === variantId)
+        ) {
           return { ...it, quantity: Math.max(1, Number(it.quantity || 0) + 1) };
         }
         return it;
@@ -230,10 +258,15 @@ export function CartProvider({ children }) {
     );
   };
 
-  const decreaseQuantity = (_id, color, size) => {
+  const decreaseQuantity = (_id, color, size, variantId = '') => {
     setCart(
       cart.map((it) => {
-        if (it._id === _id && (it.color || '') === (color || '') && (it.size || '') === (size || '')) {
+        if (
+          it._id === _id &&
+          (it.color || '') === (color || '') &&
+          (it.size || '') === (size || '') &&
+          (!variantId || readVariantId(it) === variantId)
+        ) {
           const next = Math.max(1, Number(it.quantity || 0) - 1);
           return { ...it, quantity: next };
         }
@@ -270,11 +303,14 @@ export function CartProvider({ children }) {
     const sessionId = getSessionId();
 
     try {
-      const { data } = await api.post('/api/cart/validate', { sessionId, mode });
+      const { data } = await api.post('/api/cart/validate', {
+        sessionId,
+        items: cart.map(toBackendItem),
+        mode,
+      });
       const items = Array.isArray(data?.items) ? data.items : [];
       const local = items.map(fromBackendItem).filter((x) => x._id);
 
-      // Actualiza el estado local con los valores validados (cantidades y precios)
       if (!itemsShallowEqual(local, cart)) setCart(local);
 
       return {
@@ -306,8 +342,8 @@ export function CartProvider({ children }) {
         increaseQuantity,
         decreaseQuantity,
         clearCart,
-        validateCart, // úsalo en Checkout si quieres
-        syncCart,     // opcional: fuerza recarga desde backend
+        validateCart,
+        syncCart,
         API_BASE: api.defaults.baseURL,
       }}
     >

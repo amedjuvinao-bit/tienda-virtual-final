@@ -26,11 +26,24 @@ export default function OrderDetailModal({
   const [loadingAux, setLoadingAux] = useState(false);
 
   const [emailMenuOpen, setEmailMenuOpen] = useState(false);
+  const [toast, setToast] = useState(null);
   const emailBtnRef = useRef(null);
 
   const printed = !!order?.printed;
   const archived = !!order?.archived;
   const disabled = savingId === order?._id;
+
+  const showToast = ({ type = 'info', title = '', message = '', actionLabel = '', onAction = null, persist = false }) => {
+    setToast({
+      id: Date.now(),
+      type,
+      title,
+      message,
+      actionLabel,
+      onAction,
+      persist,
+    });
+  };
 
   const electronicInvoiceUrl = useMemo(() => {
     const factusLinks = order?.factusLinks || {};
@@ -50,7 +63,18 @@ export default function OrderDetailModal({
     setStatusLocal(order?.status || 'pending');
     setTagsStr((Array.isArray(order?.tags) ? order.tags : []).join(', '));
     setEmailMenuOpen(false);
+    setToast(null);
   }, [open, order]);
+
+  useEffect(() => {
+    if (!toast || toast.persist) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setToast(null);
+    }, 4600);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -137,10 +161,19 @@ export default function OrderDetailModal({
       await api.post(`/api/orders/${order._id}/notes`, { text });
 
       setNoteText('');
+      showToast({
+        type: 'success',
+        title: 'Nota guardada',
+        message: 'La nota interna se agregó correctamente.',
+      });
       await fetchNotes();
       await fetchTimeline();
     } catch {
-      alert('No se pudo crear la nota.');
+      showToast({
+        type: 'error',
+        title: 'No se pudo crear la nota',
+        message: 'Revisa la conexión o intenta nuevamente.',
+      });
     } finally {
       setLoadingAux(false);
     }
@@ -159,23 +192,44 @@ export default function OrderDetailModal({
       setEmailMenuOpen(false);
 
       const preview = data?.previewUrl || data?.preview || null;
+      const to = data?.to || order?.customer?.emailOrPhone || order?.customer?.email || 'cliente';
 
       if (preview && typeof preview === 'string') {
-        const openPreview = confirm(
-          'Email generado en modo prueba. ¿Abrir vista previa?'
-        );
-
-        if (openPreview) {
-          window.open(preview, '_blank', 'noopener,noreferrer');
-        }
+        showToast({
+          type: 'info',
+          title: 'Vista previa de correo lista',
+          message: 'El correo fue generado en modo prueba. Puedes abrir la vista previa sin salir del panel.',
+          actionLabel: 'Abrir vista previa',
+          persist: true,
+          onAction: () => {
+            window.open(preview, '_blank', 'noopener,noreferrer');
+            setToast(null);
+          },
+        });
       } else {
-        alert('Email enviado.');
+        showToast({
+          type: 'success',
+          title: 'Correo enviado',
+          message: data?.message || `Correo enviado correctamente a ${to}.`,
+        });
       }
 
       await fetchTimeline();
     } catch (error) {
       console.error('email error', error);
-      alert('No se pudo enviar el email.');
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'No se pudo enviar el email.';
+
+      setEmailMenuOpen(false);
+      showToast({
+        type: 'error',
+        title: 'No se pudo enviar el correo',
+        message,
+        persist: true,
+      });
     } finally {
       setLoadingAux(false);
     }
@@ -204,7 +258,11 @@ export default function OrderDetailModal({
       }, 60_000);
     } catch (error) {
       console.error('PDF error', error);
-      alert('No se pudo generar o abrir el PDF.');
+      showToast({
+        type: 'error',
+        title: 'No se pudo abrir el PDF',
+        message: 'No fue posible generar o abrir el documento de la orden.',
+      });
     } finally {
       setLoadingAux(false);
     }
@@ -212,7 +270,11 @@ export default function OrderDetailModal({
 
   const openElectronicInvoice = () => {
     if (!electronicInvoiceUrl) {
-      alert('Esta orden aún no tiene enlace de factura electrónica.');
+      showToast({
+        type: 'warning',
+        title: 'Factura no disponible',
+        message: 'Esta orden aún no tiene enlace de factura electrónica.',
+      });
       return;
     }
 
@@ -225,6 +287,17 @@ export default function OrderDetailModal({
     try {
       setSavingTags(true);
       await onSaveTags(orderId, tags);
+      showToast({
+        type: 'success',
+        title: 'Etiquetas guardadas',
+        message: 'Las etiquetas internas quedaron actualizadas.',
+      });
+    } catch {
+      showToast({
+        type: 'error',
+        title: 'No se guardaron las etiquetas',
+        message: 'Revisa los datos e intenta nuevamente.',
+      });
     } finally {
       setSavingTags(false);
     }
@@ -265,6 +338,13 @@ export default function OrderDetailModal({
         }}
       />
 
+      {toast ? (
+        <OrderDetailToast
+          toast={toast}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
+
       <div className="relative z-[100000]">
         <OrderDetailProfessionalView
           order={order}
@@ -302,5 +382,158 @@ export default function OrderDetailModal({
       </div>
     </div>,
     document.body
+  );
+}
+
+function OrderDetailToast({ toast, onClose }) {
+  const type = toast?.type || 'info';
+
+  const meta = {
+    success: {
+      label: 'OK',
+      color: '#059669',
+      bg: 'rgba(236, 253, 245, 0.98)',
+      border: 'rgba(16, 185, 129, 0.36)',
+    },
+    error: {
+      label: 'Error',
+      color: '#dc2626',
+      bg: 'rgba(255, 241, 242, 0.98)',
+      border: 'rgba(244, 63, 94, 0.36)',
+    },
+    warning: {
+      label: 'Aviso',
+      color: '#d97706',
+      bg: 'rgba(255, 251, 235, 0.98)',
+      border: 'rgba(245, 158, 11, 0.38)',
+    },
+    info: {
+      label: 'Info',
+      color: ORDER_DETAIL_THEME.primary,
+      bg: ORDER_DETAIL_THEME.cardBg,
+      border: ORDER_DETAIL_THEME.cardBorder,
+    },
+  }[type] || {
+    label: 'Info',
+    color: ORDER_DETAIL_THEME.primary,
+    bg: ORDER_DETAIL_THEME.cardBg,
+    border: ORDER_DETAIL_THEME.cardBorder,
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        right: 24,
+        top: 24,
+        zIndex: 100002,
+        width: 'min(420px, calc(100vw - 32px))',
+        border: `1px solid ${meta.border}`,
+        borderRadius: 22,
+        background: meta.bg,
+        color: ORDER_DETAIL_THEME.cardText,
+        boxShadow: '0 24px 70px rgba(15, 23, 42, 0.25)',
+        overflow: 'hidden',
+        backdropFilter: 'blur(14px)',
+      }}
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 13,
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            minWidth: 40,
+            height: 40,
+            borderRadius: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255,255,255,0.72)',
+            color: meta.color,
+            border: `1px solid ${meta.border}`,
+            fontSize: 12,
+            fontWeight: 950,
+            textTransform: 'uppercase',
+          }}
+        >
+          {meta.label}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              margin: 0,
+              color: ORDER_DETAIL_THEME.cardText,
+              fontSize: 14,
+              fontWeight: 950,
+              lineHeight: 1.2,
+            }}
+          >
+            {toast?.title || 'Notificación'}
+          </div>
+
+          {toast?.message ? (
+            <div
+              style={{
+                marginTop: 5,
+                color: ORDER_DETAIL_THEME.mutedText,
+                fontSize: 12,
+                fontWeight: 700,
+                lineHeight: 1.45,
+              }}
+            >
+              {toast.message}
+            </div>
+          ) : null}
+
+          {toast?.actionLabel && typeof toast?.onAction === 'function' ? (
+            <button
+              type="button"
+              onClick={toast.onAction}
+              style={{
+                marginTop: 12,
+                border: 'none',
+                borderRadius: 999,
+                background: meta.color,
+                color: '#fff',
+                padding: '9px 13px',
+                fontSize: 11,
+                fontWeight: 950,
+                cursor: 'pointer',
+                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16)',
+              }}
+            >
+              {toast.actionLabel}
+            </button>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar notificación"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 12,
+            border: `1px solid ${meta.border}`,
+            background: 'rgba(255,255,255,0.72)',
+            color: ORDER_DETAIL_THEME.cardText,
+            cursor: 'pointer',
+            fontSize: 18,
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
+      </div>
+    </div>
   );
 }

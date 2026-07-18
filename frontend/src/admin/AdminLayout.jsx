@@ -35,6 +35,8 @@ import {
   UserRound,
   ScrollText,
   Sparkles,
+  WalletCards,
+  CircleDollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api, { setAdminToken } from '../lib/api';
@@ -279,10 +281,14 @@ export default function AdminLayout() {
   const mainLinks = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/productos', label: 'Productos', icon: Package },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },
+    { to: '/admin/clientes', label: 'Clientes', icon: UserRound },
+    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store },
+    { to: '/admin/caja', label: 'Caja', icon: WalletCards },
+    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign },
     { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch },
     { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart },
     { to: '/admin/favoritos', label: 'Favoritos', icon: Heart },
-    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },
   ];
 
   const designLinks = [

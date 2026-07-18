@@ -1,6 +1,25 @@
 // backend/models/Product.js
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
+const {
+  PRODUCT_TYPE_VALUES,
+  UNIT_OF_MEASURE_VALUES,
+  normalizeProductType,
+  normalizeUnitOfMeasure,
+  normalizeVariantPreset,
+  normalizeVariantAxes,
+  shouldTrackInventory,
+  buildSkuPrefix,
+} = require('../lib/products/productUniversalConfig');
+const {
+  cleanText,
+  cleanUpper,
+  cleanMoney,
+  buildVariantKey,
+  normalizeAttributes,
+  normalizeProductVariants,
+  normalizeStringArray,
+} = require('../lib/products/productVariantConfig');
 
 // ==== Subesquemas opcionales ====
 const InventoryItemSchema = new mongoose.Schema(
@@ -11,6 +30,97 @@ const InventoryItemSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+const VariantAxisSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    values: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const VariantAttributeSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const ProductVariantSchema = new mongoose.Schema(
+  {
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+    },
+    label: { type: String, trim: true, default: '' },
+    size: { type: String, trim: true, default: '' },
+    color: { type: String, trim: true, default: '' },
+    attributes: {
+      type: [VariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
+    sku: { type: String, trim: true, uppercase: true, default: '' },
+    barcode: { type: String, trim: true, default: '' },
+    price: { type: Number, default: null, min: 0 },
+    cost: { type: Number, default: null, min: 0 },
+    originalPrice: { type: Number, default: null, min: 0 },
+    image: { type: String, trim: true, default: '' },
+    images: {
+      type: [String],
+      default: [],
+      set: (arr) => normalizeStringArray(arr, 8),
+      validate: [
+        (arr) => Array.isArray(arr) && arr.length <= 8,
+        'La galería de la variante admite máximo 8 imágenes.',
+      ],
+    },
+    active: { type: Boolean, default: true },
+    sortOrder: { type: Number, default: 0, min: 0 },
+
+    // Solo se usa para carga inicial/sincronización; la existencia real vive en InventoryStock.
+    initialStock: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
+ProductVariantSchema.pre('validate', function normalizeVariantBeforeValidate(next) {
+  try {
+    this.size = cleanText(this.size, 80);
+    this.color = cleanText(this.color, 120);
+    this.variantKey = cleanText(this.variantKey || buildVariantKey(this.size, this.color), 180).toLowerCase();
+
+    if (!this.variantKey || this.variantKey === '__') {
+      this.variantKey = 'default__default';
+    }
+
+    if (!this.label) {
+      this.label = [this.size, this.color].filter(Boolean).join(' / ') || 'Variante general';
+    }
+
+    this.label = cleanText(this.label, 160);
+    this.attributes = normalizeAttributes(this.attributes);
+    this.sku = cleanUpper(this.sku, 100);
+    this.barcode = cleanText(this.barcode, 120);
+    this.image = cleanText(this.image, 1000);
+    this.images = normalizeStringArray(this.images, 8);
+    this.price = this.price == null ? null : cleanMoney(this.price, 0);
+    this.cost = this.cost == null ? null : cleanMoney(this.cost, 0);
+    this.originalPrice = this.originalPrice == null ? null : cleanMoney(this.originalPrice, 0);
+    this.initialStock = cleanMoney(this.initialStock, 0);
+    this.sortOrder = Math.max(0, Math.floor(Number(this.sortOrder || 0)));
+    this.active = this.active !== false;
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const DimensionsSchema = new mongoose.Schema(
   { l: { type: Number, default: 0, min: 0 }, w: { type: Number, default: 0, min: 0 }, h: { type: Number, default: 0, min: 0 } },
@@ -85,29 +195,63 @@ const productSchema = new mongoose.Schema(
       ],
     },
 
-    // Tallas
+    // Tallas / variantes heredadas. Se mantienen por compatibilidad.
     sizes: {
       type: [String],
       default: [],
-      set: (arr) => {
-        if (!Array.isArray(arr)) return [];
-        const out = [];
-        const seen = new Set();
-        for (const x of arr) {
-          const v = String(x || '').trim();
-          if (!v) continue;
-          const key = v.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            out.push(v);
-          }
-        }
-        return out;
-      },
+      set: normalizeUniqueStringArray,
     },
 
-    // Matriz de inventario (talla x color)
+    // Matriz de inventario heredada (talla x color)
     inventory: { type: [InventoryItemSchema], default: [] },
+
+    // Variantes comerciales avanzadas.
+    // Aquí viven precio/costo/SKU/barcode/imágenes por variante.
+    // InventoryStock sigue siendo la fuente real de existencias por sede.
+    variants: {
+      type: [ProductVariantSchema],
+      default: [],
+    },
+
+    // Tipo universal de producto
+    productType: {
+      type: String,
+      enum: PRODUCT_TYPE_VALUES,
+      default: 'physical',
+      set: normalizeProductType,
+      index: true,
+    },
+
+    unitOfMeasure: {
+      type: String,
+      enum: UNIT_OF_MEASURE_VALUES,
+      default: 'unit',
+      set: normalizeUnitOfMeasure,
+    },
+
+    trackInventory: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    allowBackorder: {
+      type: Boolean,
+      default: false,
+    },
+
+    variantPreset: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'fashion',
+      set: normalizeVariantPreset,
+    },
+
+    variantAxes: {
+      type: [VariantAxisSchema],
+      default: [],
+    },
 
     // Ojo: en tu API haces populate('category'), pero aquí es String.
     // Lo dejo String para no romper compatibilidad.
@@ -117,24 +261,10 @@ const productSchema = new mongoose.Schema(
     categories: {
       type: [String],
       default: [],
-      set: (arr) => {
-        if (!Array.isArray(arr)) return [];
-        const out = [];
-        const seen = new Set();
-        for (const x of arr) {
-          const v = String(x || '').trim();
-          if (!v) continue;
-          const key = v.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
-            out.push(v);
-          }
-        }
-        return out;
-      },
+      set: normalizeUniqueStringArray,
     },
 
-    // inventario/estado
+    // inventario/estado heredado. La fuente profesional es InventoryStock.
     stock: { type: Number, default: 0, min: 0 },
 
     // visible para el checkout/validador
@@ -150,7 +280,7 @@ const productSchema = new mongoose.Schema(
     weightGrams: { type: Number, default: 0, min: 0 },
     dimensionsCm: { type: DimensionsSchema, default: () => ({}) },
 
-    // contabilidad
+    // contabilidad / finanzas
     cost: { type: Number, default: 0, min: 0 },
     averageCost: { type: Number, default: 0, min: 0 },
     taxRate: { type: Number, default: 0, min: 0, max: 100 },
@@ -183,6 +313,11 @@ const productSchema = new mongoose.Schema(
 
 // ===== Índices =====
 productSchema.index({ categories: 1 });
+productSchema.index({ productType: 1, active: 1 });
+productSchema.index({ trackInventory: 1, active: 1 });
+productSchema.index({ 'variants.variantKey': 1 });
+productSchema.index({ 'variants.sku': 1 });
+productSchema.index({ 'variants.barcode': 1 });
 productSchema.index(
   { sku: 1 },
   { unique: true, partialFilterExpression: { sku: { $type: 'string' } } }
@@ -197,39 +332,32 @@ productSchema.index(
   { unique: true, partialFilterExpression: { barcode: { $type: 'string', $ne: '' } } }
 );
 
-// ===== Helpers para SKU =====
-const SKU_PREFIX = {
-  'vestidos cortos': 'VD',
-  'vestidos largos': 'VD',
-  conjuntos: 'CJ',
-  pantalones: 'PN',
-  jeans: 'JN',
-  shorts: 'SH',
-  faldas: 'FD',
-  blusas: 'BL',
-  pijamas: 'PJ',
-  abrigos: 'AB',
-  accesorios: 'AC',
-};
+function normalizeUniqueStringArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const x of arr) {
+    const v = String(x || '').trim();
+    if (!v) continue;
+    const key = v.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(v);
+    }
+  }
+  return out;
+}
 
+// ===== Helpers para SKU =====
 function pickPrefix(doc) {
   const cats = Array.isArray(doc.categories) && doc.categories.length
     ? doc.categories
     : (doc.category ? [doc.category] : []);
-  const first = (cats[0] || '').toString().toLowerCase();
 
-  if (first && SKU_PREFIX[first]) return SKU_PREFIX[first];
-  if (/vestid/i.test(first)) return 'VD';
-  if (/conjunt/i.test(first)) return 'CJ';
-  if (/pijama/i.test(first)) return 'PJ';
-  if (/jean/i.test(first)) return 'JN';
-  if (/pantal/i.test(first)) return 'PN';
-  if (/short/i.test(first)) return 'SH';
-  if (/falda/i.test(first)) return 'FD';
-  if (/blus/i.test(first)) return 'BL';
-  if (/abrigo|chaquet/i.test(first)) return 'AB';
-  if (/acces/i.test(first)) return 'AC';
-  return 'OT';
+  const firstCategory = (cats[0] || '').toString();
+  const source = firstCategory || doc.productType || 'OT';
+
+  return buildSkuPrefix(source);
 }
 
 async function nextSeq(key) {
@@ -297,6 +425,41 @@ function normalizeColorToHex(value) {
 // Autogenera SKU si no viene
 productSchema.pre('validate', async function (next) {
   try {
+    this.productType = normalizeProductType(this.productType);
+    this.unitOfMeasure = normalizeUnitOfMeasure(this.unitOfMeasure);
+    this.variantPreset = normalizeVariantPreset(this.variantPreset);
+
+    if (this.trackInventory === undefined || this.trackInventory === null) {
+      this.trackInventory = shouldTrackInventory(this.productType);
+    }
+
+    if (!Array.isArray(this.variantAxes) || this.variantAxes.length === 0) {
+      this.variantAxes = normalizeVariantAxes([], this.variantPreset);
+    } else {
+      this.variantAxes = normalizeVariantAxes(this.variantAxes, this.variantPreset);
+    }
+
+    this.variants = normalizeProductVariants(this.variants || [], {
+      _id: this._id,
+      title: this.title,
+      sku: this.sku,
+      price: this.price,
+      cost: this.cost,
+      averageCost: this.averageCost,
+      image: this.image,
+      images: this.images,
+      stock: this.stock,
+      sizes: this.sizes,
+      colors: this.colors,
+      inventory: this.inventory,
+      trackInventory: this.trackInventory,
+    }).map((variant) => ({
+      ...variant,
+      price: variant.price == null ? null : cleanMoney(variant.price, this.price || 0),
+      cost: variant.cost == null ? null : cleanMoney(variant.cost, this.cost || this.averageCost || 0),
+      originalPrice: variant.originalPrice == null ? null : cleanMoney(variant.originalPrice, 0),
+    }));
+
     if (!this.sku) {
       const prefix = pickPrefix(this);
       const now = new Date();
@@ -317,6 +480,37 @@ productSchema.pre('validate', async function (next) {
     next();
   } catch (err) {
     next(err);
+  }
+});
+
+// Marca si al guardar debe sincronizar la ficha comercial con InventoryStock.
+productSchema.pre('save', function markProductInventorySync(next) {
+  try {
+    this.$locals = this.$locals || {};
+    this.$locals.syncInventoryAfterSave =
+      this.isNew ||
+      this.isModified('title') ||
+      this.isModified('sku') ||
+      this.isModified('image') ||
+      this.isModified('category') ||
+      this.isModified('productType') ||
+      this.isModified('trackInventory') ||
+      this.isModified('variantPreset') ||
+      this.isModified('variantAxes') ||
+      this.isModified('sizes') ||
+      this.isModified('colors') ||
+      this.isModified('inventory') ||
+      this.isModified('variants') ||
+      this.isModified('stock') ||
+      this.isModified('reorderPoint') ||
+      this.isModified('reorderQty') ||
+      this.isModified('warehouseLocation') ||
+      this.isModified('cost') ||
+      this.isModified('averageCost');
+
+    next();
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -353,7 +547,8 @@ productSchema.pre('save', async function (next) {
   }
 });
 
-// Mantén stock en sync con inventory (suma variantes) si cambia
+// Mantén stock heredado en sync con inventory (suma variantes) si cambia.
+// La fuente profesional por sede es InventoryStock.
 productSchema.pre('save', function (next) {
   try {
     if (this.isModified('inventory') && Array.isArray(this.inventory)) {
@@ -368,4 +563,16 @@ productSchema.pre('save', function (next) {
   }
 });
 
-module.exports = mongoose.model('Product', productSchema);
+// Sincroniza catálogo comercial con inventario real sin sobrescribir movimientos existentes.
+productSchema.post('save', async function syncProductInventoryAfterSave(doc) {
+  if (!doc?.$locals?.syncInventoryAfterSave) return;
+
+  try {
+    const { syncProductInventoryFromProduct } = require('../services/productInventorySyncService');
+    await syncProductInventoryFromProduct(doc);
+  } catch (error) {
+    console.error('[Product] No se pudo sincronizar InventoryStock:', error.message);
+  }
+});
+
+module.exports = mongoose.models.Product || mongoose.model('Product', productSchema);

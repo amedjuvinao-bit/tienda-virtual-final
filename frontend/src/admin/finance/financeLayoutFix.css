@@ -1,0 +1,71 @@
+/* frontend/src/admin/finance/financeLayoutFix.css
+   Corrección puntual del módulo Finanzas.
+   No toca el menú, no toca el layout general del panel y no cambia el tema.
+   Solo corrige la sección inferior de gastos. */
+
+/* En Finanzas ya existe el botón principal "Nuevo gasto" en el encabezado.
+   El bloque lateral "Control de gastos operativos" repetía la misma acción y quitaba espacio útil.
+   Se oculta ese bloque y la tabla de gastos ocupa el ancho disponible. */
+.admin-area .grid:has(> div table.min-w-\[760px\]) {
+  grid-template-columns: 1fr !important;
+}
+
+.admin-area .grid:has(> div table.min-w-\[760px\]) > div:first-child {
+  display: none !important;
+}
+
+.admin-area .grid:has(> div table.min-w-\[760px\]) > div:last-child {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+@media (min-width: 1024px) {
+  .admin-area table.min-w-\[760px\] {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .admin-area table.min-w-\[760px\] th,
+  .admin-area table.min-w-\[760px\] td {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
+  .admin-area table.min-w-\[760px\] th:nth-child(1),
+  .admin-area table.min-w-\[760px\] td:nth-child(1) {
+    width: 20%;
+  }
+
+  .admin-area table.min-w-\[760px\] th:nth-child(2),
+  .admin-area table.min-w-\[760px\] td:nth-child(2) {
+    width: 22%;
+  }
+
+  .admin-area table.min-w-\[760px\] th:nth-child(3),
+  .admin-area table.min-w-\[760px\] td:nth-child(3) {
+    width: 16%;
+  }
+
+  .admin-area table.min-w-\[760px\] th:nth-child(4),
+  .admin-area table.min-w-\[760px\] td:nth-child(4) {
+    width: 16%;
+  }
+
+  .admin-area table.min-w-\[760px\] th:nth-child(5),
+  .admin-area table.min-w-\[760px\] td:nth-child(5) {
+    width: 26%;
+  }
+
+  .admin-area table.min-w-\[760px\] td:last-child > div {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .admin-area table.min-w-\[760px\] td:last-child button {
+    white-space: nowrap;
+  }
+}

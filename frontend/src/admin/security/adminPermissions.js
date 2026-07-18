@@ -13,6 +13,12 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],
+  clientes: ['customers:view'],
+  pos: ['pos:view'],
+  caja: ['pos:view'],
+  finanzas: ['finance:view'],
+  'pos/ventas': ['pos:view'],
+  'pos/nueva-venta': ['pos:sell'],
 
   apariencia: ['appearance:view'],
 
@@ -171,6 +177,12 @@ export function getRequiredPermissionsForAdminPath(pathname) {
 
   if (path.startsWith('productos/editar/')) {
     return ADMIN_ROUTE_PERMISSIONS['productos/editar'];
+  }
+
+  if (path.startsWith('pos/')) {
+    return path.includes('nueva-venta')
+      ? ADMIN_ROUTE_PERMISSIONS['pos/nueva-venta']
+      : ADMIN_ROUTE_PERMISSIONS.pos;
   }
 
   if (path.startsWith('paginas/')) {

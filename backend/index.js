@@ -1,10 +1,21 @@
 // backend/index.js
-console.log('▶️ Iniciando backend/index.js');
+console.log('Iniciando backend/index.js');
 
-require('dotenv').config({
-  path: require('path').join(__dirname, '.env'),
-  quiet: true,
-});
+const { env, assertEnv, getSafeEnvSummary, EnvConfigError } = require('./config/env');
+
+try {
+  assertEnv();
+  const summary = getSafeEnvSummary();
+  console.log(`Entorno validado: ${summary.nodeEnv} | MongoDB via ${summary.mongo.source} | puerto ${summary.port}`);
+} catch (error) {
+  if (error instanceof EnvConfigError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  console.error('Error validando configuración de entorno:', error.message);
+  process.exit(1);
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -15,20 +26,20 @@ const rateLimit = require('express-rate-limit');
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = env.port;
 
 function tryRequire(relPath) {
   try {
     const mod = require(relPath);
-    console.log(`➡️  Ruta cargada: ${relPath}`);
+    console.log(`Ruta cargada: ${relPath}`);
     return mod;
   } catch (e) {
     if (e.code === 'MODULE_NOT_FOUND') {
-      console.warn(`⚠️  Ruta NO encontrada, se omite: ${relPath}`);
+      console.warn(`Ruta NO encontrada, se omite: ${relPath}`);
       return null;
     }
 
-    console.error(`❌ Error al cargar ${relPath}:`, e.message);
+    console.error(`Error al cargar ${relPath}:`, e.message);
     return null;
   }
 }
@@ -65,6 +76,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
+const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
@@ -81,6 +93,13 @@ const adminRolesRoutes = tryRequire('./routes/adminRoles');
 const adminBranchProtectionRoutes = tryRequire('./routes/adminBranchProtection');
 const adminBranchesRoutes = tryRequire('./routes/adminBranches');
 const adminInventoryRoutes = tryRequire('./routes/adminInventory');
+const adminProductVariantsRoutes = tryRequire('./routes/adminProductVariants');
+const adminPosRoutes = tryRequire('./routes/adminPos');
+const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
+const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
+const adminFinanceRoutes = tryRequire('./routes/adminFinance');
+const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
+const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
@@ -122,7 +141,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
           await OrderEventModel.create({
             orderId: updatedOrder._id,
             type: 'status_changed',
-            message: `Estado: ${before.status || '—'} -> delivered`,
+            message: `Estado: ${before.status || '-'} -> delivered`,
             meta: {
               from: before.status || null,
               to: 'delivered',
@@ -141,6 +160,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   );
 }
 
+if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
@@ -153,6 +173,13 @@ if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
 if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProtectionRoutes);
 if (adminBranchesRoutes) app.use('/api/admin/branches', adminBranchesRoutes);
 if (adminInventoryRoutes) app.use('/api/admin/inventory', adminInventoryRoutes);
+if (adminProductVariantsRoutes) app.use('/api/admin/product-variants', adminProductVariantsRoutes);
+if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
+if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
+if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
+if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
+if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
+if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
@@ -160,39 +187,28 @@ if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettin
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);
 
-const INVENTORY_RESERVATION_EXPIRATION_ENABLED =
-  String(process.env.INVENTORY_RESERVATION_EXPIRATION_ENABLED || 'true')
-    .trim()
-    .toLowerCase() !== 'false';
-
-const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = Math.max(
-  30_000,
-  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS || 60_000)
-);
-
-const INVENTORY_RESERVATION_EXPIRATION_LIMIT = Math.max(
-  1,
-  Number(process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT || 50)
-);
+const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enabled;
+const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
+const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
-    console.log('ℹ️ Job de expiración de reservas desactivado por configuración.');
+    console.log('Job de expiracion de reservas desactivado por configuracion.');
     return;
   }
 
   const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
 
   if (typeof expireInventoryReservations !== 'function') {
-    console.warn('⚠️ No se inició el job de expiración: expireInventoryReservations no está disponible.');
+    console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
     return;
   }
 
   if (inventoryReservationExpirationTimer) {
-    console.log('ℹ️ Job de expiración de reservas ya estaba iniciado.');
+    console.log('Job de expiracion de reservas ya estaba iniciado.');
     return;
   }
 
@@ -200,63 +216,35 @@ function startInventoryReservationExpirationJob() {
     if (inventoryReservationExpirationRunning) return;
 
     if (mongoose.connection.readyState !== 1) {
-      console.warn('⚠️ Job de reservas omitido: MongoDB no está conectado.');
+      console.warn('Job de reservas omitido: MongoDB no esta conectado.');
       return;
     }
 
     inventoryReservationExpirationRunning = true;
-
     try {
-      const result = await expireInventoryReservations({
-        limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
-      });
-
-      const expiredCount = Number(result?.count || 0);
-
-      if (expiredCount > 0) {
-        console.log(`⏱️ Reservas vencidas liberadas automáticamente: ${expiredCount}`);
+      const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
+      if (result?.expired > 0) {
+        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
       }
     } catch (error) {
-      console.error('❌ Error expirando reservas de inventario:', error.message);
+      console.error('Error en job de expiracion de reservas:', error.message);
     } finally {
       inventoryReservationExpirationRunning = false;
     }
   };
 
-  setTimeout(runExpiration, 5_000);
-
-  inventoryReservationExpirationTimer = setInterval(
-    runExpiration,
-    INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS
-  );
-
-  if (typeof inventoryReservationExpirationTimer.unref === 'function') {
-    inventoryReservationExpirationTimer.unref();
-  }
-
-  console.log(
-    `✅ Job de expiración de reservas iniciado cada ${Math.round(
-      INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS / 1000
-    )} segundos. Límite por corrida: ${INVENTORY_RESERVATION_EXPIRATION_LIMIT}`
-  );
+  inventoryReservationExpirationTimer = setInterval(runExpiration, INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS);
+  runExpiration().catch(() => null);
+  console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
-app.get('/', (_req, res) => {
-  res.send('🟢 Servidor backend funcionando correctamente.');
-});
-
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(env.mongoUri)
   .then(() => {
-    console.log('✅ Conectado a MongoDB Atlas');
+    console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
-  })
-  .catch((error) => {
-    console.error('❌ Error al conectar MongoDB:', error.message);
-    console.warn('⚠️ Continuando sin conexión a MongoDB (solo para desarrollo).');
-  })
-  .finally(() => {
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
-  });
+  })
+  .catch((err) => console.error('Error MongoDB:', err));
