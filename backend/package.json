@@ -18,6 +18,7 @@
     "test:product-advanced-variants": "node scripts/testProductAdvancedVariantsModule.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",
+    "test:finance-module": "node scripts/testFinanceModuleClosure.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
