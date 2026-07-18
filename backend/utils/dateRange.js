@@ -20,6 +20,14 @@ function endOfDay(date) {
   return d;
 }
 
+function startOfLocalDay(date) {
+  return startOfDay(date);
+}
+
+function endOfLocalDay(date) {
+  return endOfDay(date);
+}
+
 function addDays(date, days) {
   const d = new Date(date);
   d.setDate(d.getDate() + Number(days || 0));
@@ -89,37 +97,37 @@ function resolveDateRange(query = {}, options = {}) {
   let to;
 
   if (range === 'today') {
-    from = startOfDay(now);
-    to = endOfDay(now);
+    from = startOfLocalDay(now);
+    to = endOfLocalDay(now);
   } else if (range === 'yesterday') {
     const yesterday = addDays(now, -1);
-    from = startOfDay(yesterday);
-    to = endOfDay(yesterday);
+    from = startOfLocalDay(yesterday);
+    to = endOfLocalDay(yesterday);
   } else if (range === 'last_7_days') {
-    from = startOfDay(addDays(now, -6));
-    to = endOfDay(now);
+    from = startOfLocalDay(addDays(now, -6));
+    to = endOfLocalDay(now);
   } else if (range === 'this_week') {
     const day = now.getDay();
     const diff = day === 0 ? 6 : day - 1;
-    from = startOfDay(addDays(now, -diff));
-    to = endOfDay(now);
+    from = startOfLocalDay(addDays(now, -diff));
+    to = endOfLocalDay(now);
   } else if (range === 'previous_month') {
     const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     from = startOfMonth(previous);
     to = endOfMonth(previous);
   } else if (range === 'this_year') {
     from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
-    to = endOfDay(now);
+    to = endOfLocalDay(now);
   } else {
     from = startOfMonth(now);
-    to = endOfDay(now);
+    to = endOfLocalDay(now);
   }
 
   const customFrom = safeDate(query.dateFrom || query.from || query.startDate);
   const customTo = safeDate(query.dateTo || query.to || query.endDate);
 
-  if (customFrom) from = startOfDay(customFrom);
-  if (customTo) to = endOfDay(customTo);
+  if (customFrom) from = startOfLocalDay(customFrom);
+  if (customTo) to = endOfLocalDay(customTo);
 
   return {
     range,
@@ -141,6 +149,7 @@ function isDateWithinRange(date, range) {
 module.exports = {
   addDays,
   endOfDay,
+  endOfLocalDay,
   endOfMonth,
   formatLocalDate,
   isDateWithinRange,
@@ -148,5 +157,6 @@ module.exports = {
   resolveDateRange,
   safeDate,
   startOfDay,
+  startOfLocalDay,
   startOfMonth,
 };
