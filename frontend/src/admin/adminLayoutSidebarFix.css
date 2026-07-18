@@ -1,0 +1,24 @@
+/* frontend/src/admin/adminLayoutSidebarFix.css
+   Corrección puntual del layout admin.
+   Mantiene el menú lateral completo visible al bajar en páginas largas
+   sin cambiar colores, tamaños, tema ni estructura visual existente. */
+
+@media (min-width: 768px) {
+  .admin-area .admin-layout-shell {
+    align-items: flex-start;
+  }
+
+  .admin-area .admin-sidebar-panel.admin-sidebar-glass {
+    position: sticky !important;
+    top: var(--admin-padding) !important;
+    height: calc(100vh - (var(--admin-padding) * 2)) !important;
+    max-height: calc(100vh - (var(--admin-padding) * 2)) !important;
+    min-height: 0 !important;
+    align-self: flex-start !important;
+    overflow: hidden !important;
+  }
+
+  .admin-area .admin-sidebar-panel.admin-sidebar-glass > nav {
+    min-height: 0;
+  }
+}
