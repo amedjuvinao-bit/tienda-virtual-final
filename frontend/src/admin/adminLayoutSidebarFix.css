@@ -1,9 +1,17 @@
 /* frontend/src/admin/adminLayoutSidebarFix.css
    Corrección puntual del layout admin.
-   Mantiene el menú lateral completo visible al bajar en páginas largas
-   sin cambiar colores, tamaños, tema ni estructura visual existente. */
+   Mantiene el menú lateral visible en páginas largas sin alterar colores,
+   tamaños, fondos, botones ni estructura visual del panel. */
 
 @media (min-width: 768px) {
+  /* El AdminLayout trae overflow-hidden por clase Tailwind.
+     Eso impide que position: sticky funcione correctamente en el sidebar.
+     Se conserva solo el bloqueo horizontal para no romper el diseño. */
+  .admin-area {
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+  }
+
   .admin-area .admin-layout-shell {
     align-items: flex-start;
   }
@@ -16,9 +24,17 @@
     min-height: 0 !important;
     align-self: flex-start !important;
     overflow: hidden !important;
+    z-index: 30;
   }
 
   .admin-area .admin-sidebar-panel.admin-sidebar-glass > nav {
     min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 2px;
+  }
+
+  .admin-area .admin-sidebar-panel.admin-sidebar-glass .admin-sidebar-footer {
+    flex-shrink: 0;
   }
 }
