@@ -49,6 +49,7 @@ import PosSalesPage from './admin/pos/PosSalesPage';
 import CashSessionsPage from './admin/cash/CashSessionsPage';
 import AdminFinancePage from './admin/finance/AdminFinancePage';
 import AdminCouponsPage from './admin/coupons/AdminCouponsPage';
+import AdminBillingPage from './admin/billing/AdminBillingPage';
 import AdminCustomersPage from './admin/customers/AdminCustomersPage';
 import PagesAdmin from './admin/pages/PagesAdmin';
 import PageEditor from './admin/pages/PageEditor';
@@ -219,6 +220,8 @@ export default function App() {
                   <Route path="dashboard" element={protectAdminContent(<Dashboard />)} />
                   <Route path="productos" element={protectAdminContent(<ProductosAdmin />)} />
                   <Route path="ordenes" element={protectAdminContent(<OrdersAdmin />)} />
+                  <Route path="facturacion" element={<Navigate to="/admin/facturacion/resumen" replace />} />
+                  <Route path="facturacion/:tab" element={protectAdminContent(<AdminBillingPage />)} />
                   <Route path="clientes" element={protectAdminContent(<AdminCustomersPage />)} />
                   <Route path="pos" element={protectAdminContent(<PosSalesPage />)} />
                   <Route path="caja" element={protectAdminContent(<CashSessionsPage />)} />
@@ -233,7 +236,7 @@ export default function App() {
                   <Route path="configuracion" element={<Navigate to="/admin/configuracion/empresa" replace />} />
                   <Route path="configuracion/empresa" element={protectAdminContent(<ConfiguracionPage />)} />
                   <Route path="configuracion/sedes" element={protectAdminContent(<ConfiguracionPage />)} />
-                  <Route path="configuracion/facturacion" element={protectAdminContent(<ConfiguracionPage />)} />
+                  <Route path="configuracion/facturacion" element={<Navigate to="/admin/facturacion/configuracion" replace />} />
                   <Route path="configuracion/pagos" element={protectAdminContent(<ConfiguracionPage />)} />
                   <Route path="configuracion/envios" element={protectAdminContent(<ConfiguracionPage />)} />
                   <Route path="configuracion/correo" element={protectAdminContent(<ConfiguracionPage />)} />
