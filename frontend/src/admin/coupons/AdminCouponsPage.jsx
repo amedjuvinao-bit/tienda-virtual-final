@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
@@ -22,7 +23,8 @@ import {
   updateAdminCoupon,
 } from './api/adminCouponsApi';
 
-const AUTO_CODE_PREFIX = 'CUP';
+const PUBLIC_CODE_PREFIX = 'CUP';
+const SAFE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const TYPE_OPTIONS = [
   { value: 'percentage', label: 'Porcentaje' },
@@ -131,29 +133,36 @@ function getStatusLabel(status) {
   return labels[status] || status || 'Sin estado';
 }
 
-function buildAutomaticCouponCode(coupons = []) {
+function getCryptoNumber() {
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const buffer = new Uint32Array(1);
+    window.crypto.getRandomValues(buffer);
+    return buffer[0];
+  }
+  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+}
+
+function randomSafeChunk(length = 4) {
+  return Array.from({ length }, () => {
+    const index = getCryptoNumber() % SAFE_CODE_ALPHABET.length;
+    return SAFE_CODE_ALPHABET[index];
+  }).join('');
+}
+
+function buildSecureCouponCode(coupons = []) {
   const existingCodes = new Set(
     (Array.isArray(coupons) ? coupons : [])
       .map((coupon) => String(coupon?.code || '').trim().toUpperCase())
       .filter(Boolean)
   );
 
-  const sequencePattern = new RegExp(`^${AUTO_CODE_PREFIX}-?(\\d{4,})$`, 'i');
-  const maxSequentialNumber = Array.from(existingCodes).reduce((max, code) => {
-    const match = code.match(sequencePattern);
-    if (!match) return max;
-    return Math.max(max, Number(match[1] || 0));
-  }, 0);
-
-  let nextNumber = maxSequentialNumber + 1;
-  let nextCode = `${AUTO_CODE_PREFIX}-${String(nextNumber).padStart(4, '0')}`;
-
-  while (existingCodes.has(nextCode) || existingCodes.has(nextCode.replace('-', ''))) {
-    nextNumber += 1;
-    nextCode = `${AUTO_CODE_PREFIX}-${String(nextNumber).padStart(4, '0')}`;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const candidate = `${PUBLIC_CODE_PREFIX}-${randomSafeChunk(4)}-${randomSafeChunk(4)}`;
+    if (!existingCodes.has(candidate)) return candidate;
   }
 
-  return nextCode;
+  const fallback = Date.now().toString(36).toUpperCase().slice(-6);
+  return `${PUBLIC_CODE_PREFIX}-${fallback}-${randomSafeChunk(3)}`;
 }
 
 function buildFormFromCoupon(coupon = {}) {
@@ -334,17 +343,34 @@ function CouponFormModal({
         </div>
 
         <div className="overflow-y-auto px-6 py-5 admin-thin-scrollbar">
+          <div
+            className="mb-4 flex items-start gap-3 rounded-3xl border p-4"
+            style={{
+              borderColor: 'var(--admin-card-border)',
+              background: 'var(--admin-primary-soft-bg)',
+              color: 'var(--admin-card-text)',
+            }}
+          >
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+            <div>
+              <p className="text-sm font-black">Código público seguro</p>
+              <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                El botón Auto genera un código aleatorio no consecutivo para evitar que clientes lo adivinen probando números.
+              </p>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-4">
             <Field
-              label="Código"
-              helper={editingId ? 'Puedes conservar o ajustar el código actual.' : 'Consecutivo automático genérico: CUP-0001, CUP-0002, CUP-0003...'}
+              label="Código público"
+              helper={editingId ? 'Puedes conservar o ajustar el código actual.' : 'Aleatorio seguro. Ejemplo: CUP-7K9X-P2Q4.'}
             >
               <div className="flex gap-2">
                 <input
                   style={inputStyle}
                   value={form.code}
                   onChange={(e) => patchForm('code', e.target.value.toUpperCase())}
-                  placeholder="CUP-0001"
+                  placeholder="CUP-7K9X-P2Q4"
                 />
                 {!editingId ? (
                   <button
@@ -356,7 +382,7 @@ function CouponFormModal({
                       background: 'var(--admin-primary-soft-bg)',
                       color: 'var(--admin-primary)',
                     }}
-                    title="Generar siguiente código consecutivo"
+                    title="Generar código público aleatorio"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     Auto
@@ -522,7 +548,7 @@ export default function AdminCouponsPage() {
     setEditingId('');
     setForm({
       ...EMPTY_FORM,
-      code: buildAutomaticCouponCode(rows),
+      code: buildSecureCouponCode(rows),
     });
     setFormOpen(true);
     setError('');
@@ -552,7 +578,7 @@ export default function AdminCouponsPage() {
   };
 
   const handleGenerateCode = () => {
-    patchForm('code', buildAutomaticCouponCode(rows));
+    patchForm('code', buildSecureCouponCode(rows));
   };
 
   const handleSave = async (event) => {
