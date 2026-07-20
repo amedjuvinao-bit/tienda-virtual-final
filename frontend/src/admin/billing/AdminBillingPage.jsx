@@ -270,6 +270,27 @@ function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft
   );
 }
 
+function DocumentActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft' }) {
+  const isPrimary = variant === 'primary';
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex h-9 min-w-[54px] items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
+        background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
+        color: isPrimary ? '#fff' : 'var(--admin-card-text)',
+      }}
+    >
+      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
+      <span className="leading-none">{children}</span>
+    </button>
+  );
+}
+
 function PanelHeader({ eyebrow, title, text, children }) {
   return (
     <div
@@ -424,16 +445,15 @@ function BillingDocumentsPanel() {
         {rows.length === 0 && !loading ? (
           <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[940px] text-left text-sm">
+          <div className="w-full overflow-hidden">
+            <table className="w-full table-fixed text-left text-sm">
               <thead>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Proveedor</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Soportes</th>
+                  <th className="w-[26%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
+                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / proveedor</th>
+                  <th className="w-[17%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
+                  <th className="w-[20%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Soportes</th>
                 </tr>
               </thead>
               <tbody>
@@ -449,30 +469,30 @@ function BillingDocumentsPanel() {
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
-                        {document.cufe ? <p className="mt-1 max-w-[240px] truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
+                        <p className="truncate font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
+                        {document.cufe ? <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">{customerName}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
+                        <p className="truncate font-black">{customerName}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <span className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]" style={statusStyle}>{getStatusLabel(document.status)}</span>
+                        <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={statusStyle}>
+                          <span className="truncate">{getStatusLabel(document.status)}</span>
+                        </span>
+                        <p className="mt-2 truncate text-sm font-black">{normalizeProviderLabel(document.provider?.name)}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">{normalizeProviderLabel(document.provider?.name)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
+                        <p className="font-bold leading-5">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
+                        <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-bold">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
-                      </td>
-                      <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap gap-2">
-                          <ActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? 'Abriendo...' : 'PDF'}</ActionButton>
-                          <ActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? 'Abriendo...' : 'XML'}</ActionButton>
-                          {document.links?.publicUrl ? <ActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>Ver</ActionButton> : null}
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
+                          <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
+                          {document.links?.publicUrl ? <DocumentActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>Ver</DocumentActionButton> : null}
                         </div>
                       </td>
                     </tr>
