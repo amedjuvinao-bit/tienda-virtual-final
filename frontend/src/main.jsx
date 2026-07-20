@@ -6,6 +6,7 @@ import './index.css';
 import './admin/productFormContrast.css';
 import './admin/finance/financeLayoutFix.css';
 import './admin/billing/billingDocumentsLayout.css';
+import './admin/billing/billingGenerateConfirmBridge';
 import './checkout/checkoutCouponBridge';
 
 // Toastify (estilos y contenedor global)
