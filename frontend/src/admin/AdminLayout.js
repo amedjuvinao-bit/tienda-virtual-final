@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Store, UserRound, Wallet } from 'lucide-react';
+import { BadgePercent, Store, UserRound, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OriginalAdminLayout from './AdminLayout.jsx';
 import { canAccessAdminPath } from './security/adminPermissions';
@@ -15,6 +15,8 @@ const MAIN_MENU_ORDER = [
   '/admin/clientes',
   '/admin/pos',
   '/admin/caja',
+  '/admin/finanzas',
+  '/admin/cupones',
   '/admin/inventario',
   '/admin/carritos',
   '/admin/favoritos',
@@ -44,6 +46,14 @@ const EXTRA_MAIN_LINKS = [
     mobileLabel: 'Caja',
     icon: Wallet,
     slotAfter: '/admin/pos',
+  },
+  {
+    key: 'cupones',
+    path: '/admin/cupones',
+    label: 'Cupones',
+    mobileLabel: 'Cupones',
+    icon: BadgePercent,
+    slotAfter: '/admin/finanzas',
   },
 ];
 
