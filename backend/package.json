@@ -22,6 +22,7 @@
     "test:coupons-backend": "node scripts/testCouponsBackendModule.js",
     "test:coupons-checkout": "node scripts/testCouponsCheckoutModule.js",
     "test:coupons-admin": "node scripts/testCouponsAdminFrontendModule.js",
+    "test:coupons-module": "node scripts/testCouponsModuleClosure.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
