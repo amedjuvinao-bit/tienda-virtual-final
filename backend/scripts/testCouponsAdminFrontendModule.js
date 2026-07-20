@@ -34,6 +34,10 @@ function assertIncludes(content, expected, message) {
   assert(String(content).includes(expected), message || `No se encontró: ${expected}`);
 }
 
+function assertNotIncludes(content, unexpected, message) {
+  assert(!String(content).includes(unexpected), message || `No debe existir: ${unexpected}`);
+}
+
 function assertMatches(content, pattern, message) {
   assert(pattern.test(String(content || '')), message || `No coincide el patrón: ${pattern}`);
 }
@@ -82,14 +86,18 @@ function validateAdminPage() {
 function validateAutomaticCodeGenerator() {
   const page = readProjectFile('frontend/src/admin/coupons/AdminCouponsPage.jsx');
   [
-    'AUTO_CODE_PREFIX',
+    "AUTO_CODE_PREFIX = 'CUP'",
     'buildAutomaticCouponCode',
-    'ROSA0001',
-    'ROSA0002',
+    'CUP-0001',
+    'CUP-0002',
     'handleGenerateCode',
     'Auto',
   ].forEach((needle) => assertIncludes(page, needle, `Página admin cupones no contiene generador: ${needle}`));
-  ok('Página admin genera código consecutivo automático para nuevos cupones');
+
+  assertNotIncludes(page, "AUTO_CODE_PREFIX = 'ROSA'", 'No se debe usar ROSA como prefijo estándar del proyecto');
+  assertNotIncludes(page, 'ROSA0001', 'No se debe usar una marca específica como código automático');
+
+  ok('Página admin genera código consecutivo automático con prefijo genérico');
 }
 
 function validateRoutingAndMenu() {
