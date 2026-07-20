@@ -76,6 +76,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
+const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
@@ -98,6 +99,7 @@ const adminPosRoutes = tryRequire('./routes/adminPos');
 const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
 const adminFinanceRoutes = tryRequire('./routes/adminFinance');
+const adminCouponsRoutes = tryRequire('./routes/adminCoupons');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
@@ -110,6 +112,7 @@ const pageRoutes = tryRequire('./routes/pages');
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
+if (couponRoutes) app.use('/api/coupons', couponRoutes);
 
 if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   app.patch(
@@ -178,6 +181,7 @@ if (adminPosRoutes) app.use('/api/admin/pos', adminPosRoutes);
 if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
 if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
+if (adminCouponsRoutes) app.use('/api/admin/coupons', adminCouponsRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
