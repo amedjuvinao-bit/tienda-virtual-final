@@ -79,10 +79,23 @@ function validateAdminPage() {
   ok('Página admin de cupones tiene listado, formulario y acciones');
 }
 
+function validateAutomaticCodeGenerator() {
+  const page = readProjectFile('frontend/src/admin/coupons/AdminCouponsPage.jsx');
+  [
+    'AUTO_CODE_PREFIX',
+    'buildAutomaticCouponCode',
+    'ROSA0001',
+    'ROSA0002',
+    'handleGenerateCode',
+    'Auto',
+  ].forEach((needle) => assertIncludes(page, needle, `Página admin cupones no contiene generador: ${needle}`));
+  ok('Página admin genera código consecutivo automático para nuevos cupones');
+}
+
 function validateRoutingAndMenu() {
   const app = readProjectFile('frontend/src/App.jsx');
   assertIncludes(app, "import AdminCouponsPage from './admin/coupons/AdminCouponsPage';", 'App.jsx no importa AdminCouponsPage');
-  assertMatches(app, /<Route\s+path="cupones"\s+element=\{protectAdminContent\(<AdminCouponsPage\s*\/?>\)\}/, 'App.jsx no registra la ruta /admin/cupones');
+  assertMatches(app, /<Route\s+path="cupones"\s+element=\{protectAdminContent\(<AdminCouponsPage\s*\/?\>\)\}/, 'App.jsx no registra la ruta /admin/cupones');
 
   const layout = readProjectFile('frontend/src/admin/AdminLayout.js');
   assertIncludes(layout, '/admin/cupones', 'AdminLayout.js no contiene enlace /admin/cupones');
@@ -107,6 +120,7 @@ function main() {
     validateFiles,
     validateApiClient,
     validateAdminPage,
+    validateAutomaticCodeGenerator,
     validateRoutingAndMenu,
     validatePackageScript,
   ].forEach((fn) => {
