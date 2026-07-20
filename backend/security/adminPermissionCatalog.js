@@ -117,6 +117,19 @@ const ADMIN_PERMISSION_MODULES = [
   },
 
   {
+    key: 'coupons',
+    label: 'Cupones / promociones',
+    description: 'Gestión de cupones, promociones, descuentos y reglas comerciales.',
+    permissions: [
+      permission('coupons:view', 'Ver cupones', 'Permite listar, consultar y validar cupones desde administración.'),
+      permission('coupons:create', 'Crear cupones', 'Permite crear cupones y promociones comerciales.', { audit: true, sensitive: true }),
+      permission('coupons:update', 'Editar cupones', 'Permite modificar reglas, fechas, límites y estado de cupones.', { audit: true, sensitive: true }),
+      permission('coupons:delete', 'Eliminar cupones', 'Permite eliminar lógicamente cupones y promociones.', { audit: true, sensitive: true, danger: true }),
+      permission('coupons:export', 'Exportar cupones', 'Permite exportar reportes de cupones y redenciones.', { audit: true, sensitive: true }),
+    ],
+  },
+
+  {
     key: 'billing',
     label: 'Facturación electrónica',
     description: 'Gestión de factura electrónica, documentos, proveedor DIAN/Factus, XML, PDF y notas crédito.',
@@ -323,6 +336,16 @@ const ADMIN_PERMISSION_ALIASES = {
   'reports:finance': 'finance:view',
   'finance:reports': 'finance:view',
   'finance:gastos': 'finance:expenses',
+
+  // Alias de promociones para compatibilidad.
+  'promotions:view': 'coupons:view',
+  'promotions:create': 'coupons:create',
+  'promotions:update': 'coupons:update',
+  'promotions:delete': 'coupons:delete',
+  'discounts:view': 'coupons:view',
+  'discounts:create': 'coupons:create',
+  'discounts:update': 'coupons:update',
+  'discounts:delete': 'coupons:delete',
 };
 
 function normalizePermission(value) {
