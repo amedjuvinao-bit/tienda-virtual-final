@@ -90,26 +90,6 @@ function formatDate(value) {
   });
 }
 
-function getInitialDocumentQuery() {
-  try {
-    return new URLSearchParams(window.location.search).get('q') || '';
-  } catch {
-    return '';
-  }
-}
-
-function buildGeneratedDocumentUrl(invoice = {}, order = {}) {
-  const searchText =
-    invoice?.invoiceNumber ||
-    invoice?.provider?.number ||
-    invoice?.orderNumber ||
-    order?.orderNumber ||
-    '';
-
-  const query = searchText ? `?q=${encodeURIComponent(searchText)}` : '';
-  return `${BASE_PATH}/documentos${query}`;
-}
-
 function normalizeProviderLabel(value) {
   const text = String(value || '').trim();
   if (!text) return 'Interno';
@@ -317,13 +297,12 @@ function PanelHeader({ eyebrow, title, text, children }) {
 }
 
 function BillingDocumentsPanel() {
-  const initialSearch = getInitialDocumentQuery();
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
-  const [query, setQuery] = useState(initialSearch);
-  const [typingQuery, setTypingQuery] = useState(initialSearch);
+  const [query, setQuery] = useState('');
+  const [typingQuery, setTypingQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
@@ -434,11 +413,6 @@ function BillingDocumentsPanel() {
         </div>
       </PanelHeader>
 
-      {initialSearch ? (
-        <MessageBox tone="success">
-          Mostrando la factura generada para: {initialSearch}. Si necesitas ver todo el listado, limpia el buscador.
-        </MessageBox>
-      ) : null}
       {error ? <MessageBox>{error}</MessageBox> : null}
 
       <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
@@ -448,18 +422,18 @@ function BillingDocumentsPanel() {
         </div>
 
         {rows.length === 0 && !loading ? (
-          <EmptyWorkBlock icon={FileText} title="Sin documentos visibles" text="No hay documentos para el filtro actual. Si acabas de generar una factura, presiona Actualizar o limpia el buscador." />
+          <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[940px] text-left text-sm">
               <thead>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="w-[25%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
-                  <th className="w-[20%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="w-[13%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado</th>
-                  <th className="w-[14%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Proveedor</th>
-                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
-                  <th className="w-[12%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Soportes</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Proveedor</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Soportes</th>
                 </tr>
               </thead>
               <tbody>
@@ -475,27 +449,27 @@ function BillingDocumentsPanel() {
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
                       <td className="px-4 py-4 align-top">
-                        <p className="truncate font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
+                        <p className="font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
-                        {document.cufe ? <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
+                        {document.cufe ? <p className="mt-1 max-w-[240px] truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="truncate font-black">{customerName}</p>
-                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
+                        <p className="font-black">{customerName}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <span className="inline-flex min-w-[92px] justify-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.05em]" style={statusStyle}>{getStatusLabel(document.status)}</span>
+                        <span className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]" style={statusStyle}>{getStatusLabel(document.status)}</span>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="truncate font-black">{normalizeProviderLabel(document.provider?.name)}</p>
-                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
+                        <p className="font-black">{normalizeProviderLabel(document.provider?.name)}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-bold">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <ActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? 'Abriendo...' : 'PDF'}</ActionButton>
                           <ActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? 'Abriendo...' : 'XML'}</ActionButton>
                           {document.links?.publicUrl ? <ActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>Ver</ActionButton> : null}
@@ -531,6 +505,7 @@ function BillingPendingOrdersPanel() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -567,14 +542,15 @@ function BillingPendingOrdersPanel() {
     if (!order?.id) return;
 
     try {
+      setNotice('');
       setError('');
       setActionLoading(`generate-${order.id}`);
       const result = await generateBillingInvoiceForOrder(order.id);
-      const invoice = result?.invoice || {};
-      window.location.assign(buildGeneratedDocumentUrl(invoice, order));
+      const number = result?.invoice?.invoiceNumber || result?.invoice?.provider?.number || '';
+      setNotice(number ? `Factura ${number} generada correctamente.` : 'Factura generada correctamente.');
+      await loadPendingOrders();
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'No se pudo generar la factura.');
-      await loadPendingOrders();
     } finally {
       setActionLoading('');
     }
@@ -606,6 +582,7 @@ function BillingPendingOrdersPanel() {
       </PanelHeader>
 
       {error ? <MessageBox>{error}</MessageBox> : null}
+      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
 
       <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
