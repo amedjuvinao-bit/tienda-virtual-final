@@ -1,5 +1,6 @@
 // frontend/src/admin/coupons/AdminCouponsPage.jsx
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BadgePercent,
   Loader2,
@@ -225,6 +226,197 @@ const textAreaStyle = {
   resize: 'vertical',
 };
 
+function CouponFormModal({ open, editingId, form, saving, patchForm, closeForm, handleSave }) {
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') closeForm?.();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, closeForm]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] flex min-h-screen items-center justify-center px-4 py-6">
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-[4px]"
+        onClick={closeForm}
+        aria-label="Cerrar formulario de cupón"
+      />
+
+      <form
+        onSubmit={handleSave}
+        className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border shadow-2xl"
+        style={{
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%), var(--admin-card-bg))',
+          borderColor: 'var(--admin-card-border)',
+          color: 'var(--admin-card-text)',
+          boxShadow: '0 36px 120px rgba(0,0,0,0.35)',
+        }}
+      >
+        <div
+          className="flex items-start justify-between gap-4 border-b px-6 py-5"
+          style={{ borderColor: 'var(--admin-card-border)' }}
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+              {editingId ? 'editar cupón' : 'nuevo cupón'}
+            </p>
+            <h2 className="mt-1 text-2xl font-black leading-tight">
+              {editingId ? form.code || 'Cupón' : 'Crear promoción'}
+            </h2>
+            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+              Configura descuento, vigencia y límites sin mover la página principal.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeForm}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border transition hover:-translate-y-0.5"
+            style={{
+              borderColor: 'var(--admin-card-border)',
+              background: 'var(--admin-primary-soft-bg)',
+              color: 'var(--admin-card-text)',
+            }}
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-6 py-5 admin-thin-scrollbar">
+          <div className="grid gap-4 lg:grid-cols-4">
+            <Field label="Código">
+              <input style={inputStyle} value={form.code} onChange={(e) => patchForm('code', e.target.value.toUpperCase())} placeholder="ROSAPRUEBA10" />
+            </Field>
+            <Field label="Nombre">
+              <input style={inputStyle} value={form.name} onChange={(e) => patchForm('name', e.target.value)} placeholder="10% lanzamiento" />
+            </Field>
+            <Field label="Tipo">
+              <select style={inputStyle} value={form.type} onChange={(e) => patchForm('type', e.target.value)}>
+                {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Valor" helper={form.type === 'percentage' ? 'Porcentaje 1 a 100' : form.type === 'fixed' ? 'Valor en pesos' : 'No aplica'}>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                max={form.type === 'percentage' ? '100' : undefined}
+                value={form.type === 'free_shipping' ? '0' : form.value}
+                disabled={form.type === 'free_shipping'}
+                onChange={(e) => patchForm('value', e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
+            <Field label="Compra mínima">
+              <input style={inputStyle} type="number" min="0" value={form.minSubtotal} onChange={(e) => patchForm('minSubtotal', e.target.value)} />
+            </Field>
+            <Field label="Tope descuento">
+              <input style={inputStyle} type="number" min="0" value={form.maxDiscountAmount} onChange={(e) => patchForm('maxDiscountAmount', e.target.value)} placeholder="Opcional" />
+            </Field>
+            <Field label="Límite total usos">
+              <input style={inputStyle} type="number" min="0" value={form.usageLimit} onChange={(e) => patchForm('usageLimit', e.target.value)} placeholder="Sin límite" />
+            </Field>
+            <Field label="Límite por cliente">
+              <input style={inputStyle} type="number" min="0" value={form.perCustomerLimit} onChange={(e) => patchForm('perCustomerLimit', e.target.value)} placeholder="Sin límite" />
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
+            <Field label="Estado">
+              <select style={inputStyle} value={form.status} onChange={(e) => patchForm('status', e.target.value)}>
+                {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Aplicar a">
+              <select style={inputStyle} value={form.appliesTo} onChange={(e) => patchForm('appliesTo', e.target.value)}>
+                {APPLIES_TO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Inicio">
+              <input style={inputStyle} type="datetime-local" value={form.startsAt} onChange={(e) => patchForm('startsAt', e.target.value)} />
+            </Field>
+            <Field label="Vence">
+              <input style={inputStyle} type="datetime-local" value={form.endsAt} onChange={(e) => patchForm('endsAt', e.target.value)} />
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Field label="Categorías incluidas" helper="Separadas por coma. Útil si aplica a categorías.">
+              <input style={inputStyle} value={form.categoriesText} onChange={(e) => patchForm('categoriesText', e.target.value)} placeholder="Vestidos largos, Bebé" />
+            </Field>
+            <Field label="Categorías excluidas">
+              <input style={inputStyle} value={form.excludedCategoriesText} onChange={(e) => patchForm('excludedCategoriesText', e.target.value)} placeholder="Ofertas, Liquidación" />
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Field label="Descripción">
+              <textarea style={textAreaStyle} value={form.description} onChange={(e) => patchForm('description', e.target.value)} placeholder="Texto visible o referencia interna del cupón" />
+            </Field>
+            <Field label="Notas internas">
+              <textarea style={textAreaStyle} value={form.internalNotes} onChange={(e) => patchForm('internalNotes', e.target.value)} placeholder="Observaciones para administración" />
+            </Field>
+          </div>
+        </div>
+
+        <div
+          className="flex flex-col gap-3 border-t px-6 py-4 md:flex-row md:items-center md:justify-between"
+          style={{ borderColor: 'var(--admin-card-border)' }}
+        >
+          <label className="inline-flex items-center gap-3 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(e) => patchForm('active', e.target.checked)}
+              style={{ accentColor: 'var(--admin-primary)' }}
+            />
+            Cupón activo para checkout
+          </label>
+
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={closeForm}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-black"
+              style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
+            >
+              <X className="h-4 w-4" />
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+              style={{ background: 'var(--admin-primary)' }}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Guardando...' : 'Guardar cupón'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>,
+    document.body
+  );
+}
+
 export default function AdminCouponsPage() {
   const confirm = useAppConfirm();
   const [rows, setRows] = useState([]);
@@ -375,6 +567,16 @@ export default function AdminCouponsPage() {
 
   return (
     <div className="space-y-5" style={{ color: 'var(--admin-card-text)' }}>
+      <CouponFormModal
+        open={formOpen}
+        editingId={editingId}
+        form={form}
+        saving={saving}
+        patchForm={patchForm}
+        closeForm={closeForm}
+        handleSave={handleSave}
+      />
+
       <div
         className="overflow-hidden rounded-[calc(var(--admin-radius)*0.9)] border"
         style={{
@@ -439,130 +641,6 @@ export default function AdminCouponsPage() {
         >
           {error}
         </div>
-      ) : null}
-
-      {formOpen ? (
-        <form
-          onSubmit={handleSave}
-          className="rounded-[calc(var(--admin-radius)*0.9)] border p-5"
-          style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)' }}
-        >
-          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
-                {editingId ? 'editar cupón' : 'nuevo cupón'}
-              </p>
-              <h2 className="mt-1 text-xl font-black">{editingId ? form.code || 'Cupón' : 'Crear promoción'}</h2>
-            </div>
-            <button
-              type="button"
-              onClick={closeForm}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black"
-              style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
-            >
-              <X className="h-4 w-4" />
-              Cancelar
-            </button>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-4">
-            <Field label="Código">
-              <input style={inputStyle} value={form.code} onChange={(e) => patchForm('code', e.target.value.toUpperCase())} placeholder="ROSAPRUEBA10" />
-            </Field>
-            <Field label="Nombre">
-              <input style={inputStyle} value={form.name} onChange={(e) => patchForm('name', e.target.value)} placeholder="10% lanzamiento" />
-            </Field>
-            <Field label="Tipo">
-              <select style={inputStyle} value={form.type} onChange={(e) => patchForm('type', e.target.value)}>
-                {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Valor" helper={form.type === 'percentage' ? 'Porcentaje 1 a 100' : form.type === 'fixed' ? 'Valor en pesos' : 'No aplica'}>
-              <input
-                style={inputStyle}
-                type="number"
-                min="0"
-                max={form.type === 'percentage' ? '100' : undefined}
-                value={form.type === 'free_shipping' ? '0' : form.value}
-                disabled={form.type === 'free_shipping'}
-                onChange={(e) => patchForm('value', e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-4">
-            <Field label="Compra mínima">
-              <input style={inputStyle} type="number" min="0" value={form.minSubtotal} onChange={(e) => patchForm('minSubtotal', e.target.value)} />
-            </Field>
-            <Field label="Tope descuento">
-              <input style={inputStyle} type="number" min="0" value={form.maxDiscountAmount} onChange={(e) => patchForm('maxDiscountAmount', e.target.value)} placeholder="Opcional" />
-            </Field>
-            <Field label="Límite total usos">
-              <input style={inputStyle} type="number" min="0" value={form.usageLimit} onChange={(e) => patchForm('usageLimit', e.target.value)} placeholder="Sin límite" />
-            </Field>
-            <Field label="Límite por cliente">
-              <input style={inputStyle} type="number" min="0" value={form.perCustomerLimit} onChange={(e) => patchForm('perCustomerLimit', e.target.value)} placeholder="Sin límite" />
-            </Field>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-4">
-            <Field label="Estado">
-              <select style={inputStyle} value={form.status} onChange={(e) => patchForm('status', e.target.value)}>
-                {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Aplicar a">
-              <select style={inputStyle} value={form.appliesTo} onChange={(e) => patchForm('appliesTo', e.target.value)}>
-                {APPLIES_TO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Inicio">
-              <input style={inputStyle} type="datetime-local" value={form.startsAt} onChange={(e) => patchForm('startsAt', e.target.value)} />
-            </Field>
-            <Field label="Vence">
-              <input style={inputStyle} type="datetime-local" value={form.endsAt} onChange={(e) => patchForm('endsAt', e.target.value)} />
-            </Field>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Field label="Categorías incluidas" helper="Separadas por coma. Útil si aplica a categorías.">
-              <input style={inputStyle} value={form.categoriesText} onChange={(e) => patchForm('categoriesText', e.target.value)} placeholder="Vestidos largos, Bebé" />
-            </Field>
-            <Field label="Categorías excluidas">
-              <input style={inputStyle} value={form.excludedCategoriesText} onChange={(e) => patchForm('excludedCategoriesText', e.target.value)} placeholder="Ofertas, Liquidación" />
-            </Field>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Field label="Descripción">
-              <textarea style={textAreaStyle} value={form.description} onChange={(e) => patchForm('description', e.target.value)} placeholder="Texto visible o referencia interna del cupón" />
-            </Field>
-            <Field label="Notas internas">
-              <textarea style={textAreaStyle} value={form.internalNotes} onChange={(e) => patchForm('internalNotes', e.target.value)} placeholder="Observaciones para administración" />
-            </Field>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <label className="inline-flex items-center gap-3 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) => patchForm('active', e.target.checked)}
-                style={{ accentColor: 'var(--admin-primary)' }}
-              />
-              Cupón activo para checkout
-            </label>
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-60"
-              style={{ background: 'var(--admin-primary)' }}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Guardando...' : 'Guardar cupón'}
-            </button>
-          </div>
-        </form>
       ) : null}
 
       <div
