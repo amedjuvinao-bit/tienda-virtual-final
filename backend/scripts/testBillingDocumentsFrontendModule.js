@@ -99,16 +99,19 @@ function validateDocumentsLayoutFix() {
   );
 
   [
-    'table.min-w-\\[940px\\]',
-    'min-width: 0 !important',
-    'grid-template-columns',
-    'td:last-child > div',
-    '@media (max-width: 1100px)',
+    'Mantiene una tabla administrativa limpia',
+    'table-layout: fixed',
+    'display: table-cell',
+    'text-overflow: ellipsis',
+    'td:nth-child(6) > div',
+    '@media (max-width: 1180px)',
   ].forEach((needle) => {
     assertIncludes(cssFile, needle, `billingDocumentsLayout.css no contiene ${needle}`);
   });
 
-  ok('Tabla de Documentos tiene ajuste responsive para que no quede mocha');
+  assertNotIncludes(cssFile, 'grid-template-areas', 'El diseño no debe volver al listado tipo tarjeta desordenado.');
+
+  ok('Documentos tiene diseño de tabla limpia, ancho y legible');
 }
 
 function validateBackendStillElectronicInvoice() {
