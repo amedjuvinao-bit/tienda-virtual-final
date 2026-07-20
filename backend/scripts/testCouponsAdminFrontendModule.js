@@ -83,21 +83,25 @@ function validateAdminPage() {
   ok('Página admin de cupones tiene listado, formulario y acciones');
 }
 
-function validateAutomaticCodeGenerator() {
+function validateSecureCodeGenerator() {
   const page = readProjectFile('frontend/src/admin/coupons/AdminCouponsPage.jsx');
   [
-    "AUTO_CODE_PREFIX = 'CUP'",
-    'buildAutomaticCouponCode',
-    'CUP-0001',
-    'CUP-0002',
-    'handleGenerateCode',
+    "PUBLIC_CODE_PREFIX = 'CUP'",
+    'SAFE_CODE_ALPHABET',
+    'buildSecureCouponCode',
+    'randomSafeChunk',
+    'window.crypto.getRandomValues',
+    'CUP-7K9X-P2Q4',
+    'Código público seguro',
     'Auto',
-  ].forEach((needle) => assertIncludes(page, needle, `Página admin cupones no contiene generador: ${needle}`));
+  ].forEach((needle) => assertIncludes(page, needle, `Página admin cupones no contiene generador seguro: ${needle}`));
 
   assertNotIncludes(page, "AUTO_CODE_PREFIX = 'ROSA'", 'No se debe usar ROSA como prefijo estándar del proyecto');
   assertNotIncludes(page, 'ROSA0001', 'No se debe usar una marca específica como código automático');
+  assertNotIncludes(page, 'CUP-0001', 'No se deben generar códigos públicos consecutivos predecibles');
+  assertNotIncludes(page, 'CUP-0002', 'No se deben generar códigos públicos consecutivos predecibles');
 
-  ok('Página admin genera código consecutivo automático con prefijo genérico');
+  ok('Página admin genera códigos públicos aleatorios y no predecibles');
 }
 
 function validateRoutingAndMenu() {
@@ -128,7 +132,7 @@ function main() {
     validateFiles,
     validateApiClient,
     validateAdminPage,
-    validateAutomaticCodeGenerator,
+    validateSecureCodeGenerator,
     validateRoutingAndMenu,
     validatePackageScript,
   ].forEach((fn) => {
