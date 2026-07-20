@@ -21,6 +21,11 @@ export async function getPendingBillingOrders(params = {}) {
   return unwrap(response);
 }
 
+export async function generateBillingInvoiceForOrder(orderId) {
+  const response = await api.post(`/api/admin/billing/orders/${orderId}/generate`);
+  return unwrap(response);
+}
+
 export async function getBillingSettings() {
   const response = await api.get('/api/admin/billing/settings');
   return unwrap(response);
@@ -50,6 +55,7 @@ export default {
   getBillingSummary,
   getBillingDocuments,
   getPendingBillingOrders,
+  generateBillingInvoiceForOrder,
   getBillingSettings,
   downloadOrderPdf,
   downloadOrderInvoiceXml,
