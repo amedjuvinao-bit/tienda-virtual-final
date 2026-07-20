@@ -48,6 +48,7 @@ import InventoryAdmin from './admin/InventoryAdmin';
 import PosSalesPage from './admin/pos/PosSalesPage';
 import CashSessionsPage from './admin/cash/CashSessionsPage';
 import AdminFinancePage from './admin/finance/AdminFinancePage';
+import AdminCouponsPage from './admin/coupons/AdminCouponsPage';
 import AdminCustomersPage from './admin/customers/AdminCustomersPage';
 import PagesAdmin from './admin/pages/PagesAdmin';
 import PageEditor from './admin/pages/PageEditor';
@@ -222,6 +223,7 @@ export default function App() {
                   <Route path="pos" element={protectAdminContent(<PosSalesPage />)} />
                   <Route path="caja" element={protectAdminContent(<CashSessionsPage />)} />
                   <Route path="finanzas" element={protectAdminContent(<AdminFinancePage />)} />
+                  <Route path="cupones" element={protectAdminContent(<AdminCouponsPage />)} />
                   <Route path="inventario" element={protectAdminContent(<InventoryAdmin />)} />
                   <Route path="productos/nuevo" element={protectAdminContent(<FormularioProducto />)} />
                   <Route path="productos/editar/:id" element={protectAdminContent(<FormularioProducto />)} />
