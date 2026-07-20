@@ -38,6 +38,10 @@ function assertIncludes(content, expected, message) {
   assert(String(content).includes(expected), message || `No se encontró: ${expected}`);
 }
 
+function assertNotIncludes(content, unexpected, message) {
+  assert(!String(content).includes(unexpected), message || `No debe existir: ${unexpected}`);
+}
+
 function assertMatches(content, pattern, message) {
   assert(pattern.test(String(content || '')), message || `No coincide el patrón: ${pattern}`);
 }
@@ -133,6 +137,24 @@ function validateRoutesAndPermissions() {
   ok('Rutas y permisos de cupones están montados');
 }
 
+function validateTestCouponSeed() {
+  const seed = readProjectFile('backend/scripts/seedTestCoupon.js');
+
+  [
+    "COUPON_PREFIX = 'CUP'",
+    'SAFE_CHARS',
+    'crypto.randomInt',
+    'generatePublicCouponCode',
+    'generateUniqueCouponCode',
+    'seed-test-coupon',
+  ].forEach((needle) => assertIncludes(seed, needle, `seedTestCoupon.js no contiene ${needle}`));
+
+  assertNotIncludes(seed, "const COUPON_CODE = 'ROSAPRUEBA10'", 'El seed no debe usar una marca fija como código de cupón');
+  assertNotIncludes(seed, "code: 'ROSAPRUEBA10'", 'El seed no debe crear cupones con marca fija');
+
+  ok('Seed de cupón de prueba genera código genérico y no predecible');
+}
+
 function validatePackageScript() {
   const pkg = readProjectFile('backend/package.json');
   assertIncludes(pkg, 'test:coupons-backend', 'package.json no tiene script test:coupons-backend');
@@ -147,6 +169,7 @@ function main() {
     validateCouponModel,
     validateCouponService,
     validateRoutesAndPermissions,
+    validateTestCouponSeed,
     validatePackageScript,
   ].forEach((step) => {
     try {
