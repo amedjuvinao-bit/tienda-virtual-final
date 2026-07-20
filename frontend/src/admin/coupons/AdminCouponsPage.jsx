@@ -22,6 +22,8 @@ import {
   updateAdminCoupon,
 } from './api/adminCouponsApi';
 
+const AUTO_CODE_PREFIX = 'ROSA';
+
 const TYPE_OPTIONS = [
   { value: 'percentage', label: 'Porcentaje' },
   { value: 'fixed', label: 'Valor fijo' },
@@ -129,6 +131,31 @@ function getStatusLabel(status) {
   return labels[status] || status || 'Sin estado';
 }
 
+function buildAutomaticCouponCode(coupons = []) {
+  const existingCodes = new Set(
+    (Array.isArray(coupons) ? coupons : [])
+      .map((coupon) => String(coupon?.code || '').trim().toUpperCase())
+      .filter(Boolean)
+  );
+
+  const sequencePattern = new RegExp(`^${AUTO_CODE_PREFIX}(\\d{4,})$`, 'i');
+  const maxSequentialNumber = Array.from(existingCodes).reduce((max, code) => {
+    const match = code.match(sequencePattern);
+    if (!match) return max;
+    return Math.max(max, Number(match[1] || 0));
+  }, 0);
+
+  let nextNumber = Math.max(maxSequentialNumber, existingCodes.size) + 1;
+  let nextCode = `${AUTO_CODE_PREFIX}${String(nextNumber).padStart(4, '0')}`;
+
+  while (existingCodes.has(nextCode)) {
+    nextNumber += 1;
+    nextCode = `${AUTO_CODE_PREFIX}${String(nextNumber).padStart(4, '0')}`;
+  }
+
+  return nextCode;
+}
+
 function buildFormFromCoupon(coupon = {}) {
   return {
     code: coupon.code || '',
@@ -226,7 +253,16 @@ const textAreaStyle = {
   resize: 'vertical',
 };
 
-function CouponFormModal({ open, editingId, form, saving, patchForm, closeForm, handleSave }) {
+function CouponFormModal({
+  open,
+  editingId,
+  form,
+  saving,
+  patchForm,
+  closeForm,
+  handleSave,
+  handleGenerateCode,
+}) {
   useEffect(() => {
     if (!open) return undefined;
 
@@ -299,8 +335,34 @@ function CouponFormModal({ open, editingId, form, saving, patchForm, closeForm, 
 
         <div className="overflow-y-auto px-6 py-5 admin-thin-scrollbar">
           <div className="grid gap-4 lg:grid-cols-4">
-            <Field label="Código">
-              <input style={inputStyle} value={form.code} onChange={(e) => patchForm('code', e.target.value.toUpperCase())} placeholder="ROSAPRUEBA10" />
+            <Field
+              label="Código"
+              helper={editingId ? 'Puedes conservar o ajustar el código actual.' : 'Consecutivo automático: ROSA0001, ROSA0002, ROSA0003...'}
+            >
+              <div className="flex gap-2">
+                <input
+                  style={inputStyle}
+                  value={form.code}
+                  onChange={(e) => patchForm('code', e.target.value.toUpperCase())}
+                  placeholder="ROSA0001"
+                />
+                {!editingId ? (
+                  <button
+                    type="button"
+                    onClick={handleGenerateCode}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-[calc(var(--admin-radius)*0.55)] border px-3 text-xs font-black transition hover:-translate-y-0.5"
+                    style={{
+                      borderColor: 'var(--admin-card-border)',
+                      background: 'var(--admin-primary-soft-bg)',
+                      color: 'var(--admin-primary)',
+                    }}
+                    title="Generar siguiente código consecutivo"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Auto
+                  </button>
+                ) : null}
+              </div>
             </Field>
             <Field label="Nombre">
               <input style={inputStyle} value={form.name} onChange={(e) => patchForm('name', e.target.value)} placeholder="10% lanzamiento" />
@@ -458,7 +520,10 @@ export default function AdminCouponsPage() {
 
   const openNewForm = () => {
     setEditingId('');
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      code: buildAutomaticCouponCode(rows),
+    });
     setFormOpen(true);
     setError('');
   };
@@ -484,6 +549,10 @@ export default function AdminCouponsPage() {
       if (field === 'active') next.status = value ? 'active' : 'inactive';
       return next;
     });
+  };
+
+  const handleGenerateCode = () => {
+    patchForm('code', buildAutomaticCouponCode(rows));
   };
 
   const handleSave = async (event) => {
@@ -575,6 +644,7 @@ export default function AdminCouponsPage() {
         patchForm={patchForm}
         closeForm={closeForm}
         handleSave={handleSave}
+        handleGenerateCode={handleGenerateCode}
       />
 
       <div
