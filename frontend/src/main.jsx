@@ -5,6 +5,7 @@ import App from './App';
 import './index.css';
 import './admin/productFormContrast.css';
 import './admin/finance/financeLayoutFix.css';
+import './checkout/checkoutCouponBridge';
 
 // Toastify (estilos y contenedor global)
 import 'react-toastify/dist/ReactToastify.css';
