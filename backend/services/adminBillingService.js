@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const { generateCUFE } = require('../lib/dian/cufe');
+const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 
 let extractFactusLinks = null;
 try {
@@ -197,6 +199,235 @@ async function getBillingSettingsSnapshot() {
   };
 }
 
+function getItems(order = {}) {
+  return Array.isArray(order.items) ? order.items : Array.isArray(order.cart) ? order.cart : [];
+}
+
+function buildCustomerSnapshot(order = {}) {
+  const customer = order.customer || {};
+  const billing = order.billing || {};
+  const fullName = [customer.name, customer.lastname].filter(Boolean).join(' ').trim();
+  const billingName = [billing.name, billing.lastname].filter(Boolean).join(' ').trim();
+
+  return {
+    documentType: customer.documentType || customer.tipoDocumento || billing.documentType || '13',
+    documentNumber:
+      customer.documentNumber ||
+      customer.document ||
+      customer.cedula ||
+      customer.identification ||
+      customer.id ||
+      billing.documentNumber ||
+      billing.id ||
+      '222222222222',
+    dv: customer.dv || billing.dv || '',
+    personType: customer.personType || billing.personType || 'natural',
+    businessName: customer.businessName || fullName || billingName || customer.email || 'Consumidor final',
+    email: customer.email || customer.emailOrPhone || billing.email || '',
+    phone: customer.phone || billing.phone || '',
+    address: customer.address || billing.address || '',
+    city: customer.city || billing.city || '',
+    department: customer.department || billing.department || '',
+    country: customer.country || billing.country || 'Colombia',
+  };
+}
+
+function calculateTotals(order = {}, settings = {}) {
+  const items = getItems(order);
+  const lineSubtotal = items.reduce((acc, item) => {
+    const quantity = Number(item.quantity || item.qty || 0) || 0;
+    const price = Number(item.price || item.unitPrice || item.priceNumber || item?.product?.price || 0) || 0;
+    return acc + quantity * price;
+  }, 0);
+
+  const subtotal = money(order.subtotal || lineSubtotal);
+  const shipping = money(order.shipping);
+  const ivaConfig = order?.taxes?.iva || settings?.billing?.taxes?.iva || {};
+  const ivaEnabled = ivaConfig.enabled !== false;
+  const ivaPercent = Number(ivaConfig.percent || 0) || 0;
+  const taxAmount = typeof ivaConfig.amount === 'number' ? money(ivaConfig.amount) : ivaEnabled ? Number(((subtotal * ivaPercent) / 100).toFixed(2)) : 0;
+  const total = money(order.total || subtotal + shipping + taxAmount);
+
+  return { subtotal, shipping, taxAmount, total, ivaConfig, ivaEnabled, ivaPercent };
+}
+
+function buildInvoiceNumber(resolution = {}) {
+  const prefix = cleanText(resolution.prefix || 'FE', 20).replace(/\s+/g, '').toUpperCase() || 'FE';
+  const currentNumber = Math.max(1, Number(resolution.currentNumber || resolution.rangeFrom || 1) || 1);
+  const padded = String(currentNumber).padStart(6, '0');
+  return {
+    invoiceNumber: `${prefix}${padded}`,
+    currentNumber,
+    nextNumber: currentNumber + 1,
+  };
+}
+
+function buildSettingsForInvoice(settings = {}) {
+  const billing = settings?.billing || {};
+  const dianConfig = billing.dian || {};
+  const resolution = billing.dianResolution || {};
+  const environment = dianConfig.mode === 'production' ? '1' : dianConfig.environment || resolution.environment || '2';
+
+  return {
+    ...(settings || {}),
+    billing: {
+      ...billing,
+      dianResolution: {
+        ...resolution,
+        environment,
+      },
+    },
+  };
+}
+
+async function generateInvoiceForOrder(orderId, options = {}) {
+  if (!mongoose.Types.ObjectId.isValid(String(orderId || ''))) {
+    const error = new Error('La orden enviada no es válida.');
+    error.status = 400;
+    error.code = 'INVALID_ORDER_ID';
+    throw error;
+  }
+
+  const existing = await ElectronicInvoice.findOne({ orderId }).lean();
+  if (existing) {
+    return {
+      created: false,
+      invoice: serializeElectronicInvoice(existing),
+      message: 'La orden ya tenía factura registrada.',
+    };
+  }
+
+  const order = await Order.findById(orderId).lean();
+  if (!order) {
+    const error = new Error('Orden no encontrada.');
+    error.status = 404;
+    error.code = 'ORDER_NOT_FOUND';
+    throw error;
+  }
+
+  const status = cleanText(order.status, 50).toLowerCase();
+  const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
+  const isBillable =
+    BILLABLE_ORDER_STATUSES.includes(status) ||
+    PAID_PAYMENT_STATUSES.includes(paymentStatus) ||
+    (String(order.source || '').toLowerCase() === 'pos' && money(order.total) > 0);
+
+  if (!isBillable) {
+    const error = new Error('Solo se pueden facturar órdenes pagadas o ventas POS cerradas.');
+    error.status = 422;
+    error.code = 'ORDER_NOT_BILLABLE';
+    throw error;
+  }
+
+  const settings = await SiteSettings.findOne().lean();
+  const settingsForInvoice = buildSettingsForInvoice(settings || {});
+  const billing = settingsForInvoice.billing || {};
+  const fiscalInfo = billing.fiscalInfo || {};
+  const dianResolution = billing.dianResolution || {};
+  const legalTexts = billing.legalTexts || {};
+  const providerName = billing?.electronicProvider?.provider || billing?.dian?.providerType || 'mock';
+  const providerMode = billing?.dian?.mode || 'internal';
+  const environment = dianResolution.environment || '2';
+  const { subtotal, shipping, taxAmount, total } = calculateTotals(order, settingsForInvoice);
+  const customerSnapshot = buildCustomerSnapshot(order);
+  const now = new Date();
+  const issueDate = now.toISOString().slice(0, 10);
+  const issueTime = now.toISOString().slice(11, 19);
+  const { invoiceNumber, currentNumber, nextNumber } = buildInvoiceNumber(dianResolution);
+
+  const cufeData = generateCUFE({
+    invoiceNumber,
+    issueDate,
+    issueTime,
+    grossAmount: subtotal,
+    taxAmount,
+    totalAmount: total,
+    companyNit: fiscalInfo.nit || billing?.dian?.providerNit || '900000000',
+    customerDocument: customerSnapshot.documentNumber || '222222222222',
+    technicalKey: dianResolution.technicalKey || billing?.dian?.technicalKey || 'INTERNAL',
+    environment,
+  });
+
+  let xmlContent = '';
+  try {
+    xmlContent = generateInvoiceXML({ order, settings: settingsForInvoice, cufeData });
+  } catch (error) {
+    xmlContent = '';
+  }
+
+  const qrUrl = `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=${cufeData.cufe}`;
+
+  const created = await ElectronicInvoice.create({
+    orderId: order._id,
+    orderNumber: order.orderNumber || '',
+    required: true,
+    status: 'generated',
+    customer: customerSnapshot,
+    fiscalInfo,
+    dianResolution: {
+      resolutionNumber: dianResolution.resolutionNumber || '',
+      prefix: dianResolution.prefix || '',
+      rangeFrom: Number(dianResolution.rangeFrom || 1),
+      rangeTo: Number(dianResolution.rangeTo || 1),
+      currentNumber,
+      resolutionDate: dianResolution.resolutionDate || '',
+      expirationDate: dianResolution.expirationDate || '',
+      documentType: dianResolution.documentType || '01',
+    },
+    legalTexts: {
+      invoiceLegalText: legalTexts.invoiceLegalText || '',
+      internalReceiptNote: legalTexts.internalReceiptNote || '',
+    },
+    invoiceNumber,
+    cufe: cufeData.cufe,
+    xmlContent,
+    qrUrl,
+    provider: {
+      name: providerName,
+      status: 'created',
+      referenceCode: `ORDER-${order.orderNumber || order._id}`,
+      number: invoiceNumber,
+      cufe: cufeData.cufe,
+      isValidated: false,
+      links: {},
+      raw: {
+        mode: providerMode,
+        source: 'admin-billing',
+      },
+    },
+    dianResponse: {
+      stage: providerMode === 'internal' || providerName === 'mock' ? 'internal_generated' : 'provider_pending',
+      environment,
+      issueDate,
+      issueTime,
+      message: providerMode === 'internal' || providerName === 'mock'
+        ? 'Comprobante interno generado desde módulo Facturación.'
+        : 'Documento generado y pendiente de envío al proveedor electrónico.',
+      code: 'GENERATED',
+      raw: {
+        subtotal,
+        shipping,
+        taxAmount,
+        total,
+      },
+    },
+    generatedAt: now,
+  });
+
+  if (settings?._id) {
+    await SiteSettings.updateOne(
+      { _id: settings._id, 'billing.dianResolution.currentNumber': currentNumber },
+      { $set: { 'billing.dianResolution.currentNumber': nextNumber } }
+    );
+  }
+
+  return {
+    created: true,
+    invoice: serializeElectronicInvoice(created.toObject()),
+    message: 'Factura generada correctamente.',
+  };
+}
+
 async function listElectronicInvoices(params = {}) {
   const { page, limit, skip } = normalizePage(params);
   const filter = {};
@@ -297,6 +528,7 @@ async function getBillingSummary() {
 module.exports = {
   getBillingSummary,
   getBillingSettingsSnapshot,
+  generateInvoiceForOrder,
   listElectronicInvoices,
   listPendingBillableOrders,
   serializeElectronicInvoice,
