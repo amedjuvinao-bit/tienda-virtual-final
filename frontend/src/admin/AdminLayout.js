@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BadgePercent, Store, UserRound, Wallet } from 'lucide-react';
+import { BadgePercent, ReceiptText, Store, UserRound, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OriginalAdminLayout from './AdminLayout.jsx';
 import { canAccessAdminPath } from './security/adminPermissions';
@@ -12,6 +12,7 @@ const MAIN_MENU_ORDER = [
   '/admin/dashboard',
   '/admin/productos',
   '/admin/ordenes',
+  '/admin/facturacion',
   '/admin/clientes',
   '/admin/pos',
   '/admin/caja',
@@ -23,6 +24,14 @@ const MAIN_MENU_ORDER = [
 ];
 
 const EXTRA_MAIN_LINKS = [
+  {
+    key: 'facturacion',
+    path: '/admin/facturacion',
+    label: 'Facturación',
+    mobileLabel: 'Facturación',
+    icon: ReceiptText,
+    slotAfter: '/admin/ordenes',
+  },
   {
     key: 'clientes',
     path: '/admin/clientes',
