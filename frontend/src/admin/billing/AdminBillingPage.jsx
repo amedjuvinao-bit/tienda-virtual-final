@@ -18,6 +18,7 @@ import FacturacionSection from '../configuracion/sections/FacturacionSection';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
+  generateBillingInvoiceForOrder,
   getBillingDocuments,
   getBillingSummary,
   getPendingBillingOrders,
@@ -122,7 +123,6 @@ function normalizePaymentStatus(value) {
 
 function getStatusLabel(status) {
   const value = String(status || '').toLowerCase();
-
   const labels = {
     pending: 'Pendiente',
     generated: 'Generada',
@@ -171,6 +171,23 @@ function getStatusStyle(status) {
   };
 }
 
+function MessageBox({ children, tone = 'error' }) {
+  const isError = tone === 'error';
+
+  return (
+    <div
+      className="rounded-[22px] border px-4 py-3 text-sm font-bold"
+      style={{
+        borderColor: isError ? 'rgba(244, 63, 94, 0.36)' : 'rgba(16, 185, 129, 0.36)',
+        background: isError ? 'rgba(244, 63, 94, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+        color: isError ? '#be123c' : '#047857',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function BillingMetricCard({ label, value, helper, icon: Icon }) {
   return (
     <article
@@ -183,10 +200,7 @@ function BillingMetricCard({ label, value, helper, icon: Icon }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.18em]"
-            style={{ color: 'var(--admin-card-muted-text)' }}
-          >
+          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>
             {label}
           </p>
           <p className="mt-2 text-2xl font-black">{value}</p>
@@ -256,6 +270,32 @@ function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft
   );
 }
 
+function PanelHeader({ eyebrow, title, text, children }) {
+  return (
+    <div
+      className="rounded-[28px] border p-4 shadow-sm"
+      style={{
+        background: 'var(--admin-card-bg)',
+        borderColor: 'var(--admin-card-border)',
+        color: 'var(--admin-card-text)',
+      }}
+    >
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
+            {eyebrow}
+          </p>
+          <h3 className="mt-1 text-2xl font-black">{title}</h3>
+          <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            {text}
+          </p>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function BillingDocumentsPanel() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -281,13 +321,7 @@ function BillingDocumentsPanel() {
     try {
       setLoading(true);
       setError('');
-      const data = await getBillingDocuments({
-        page,
-        limit: 20,
-        q: query,
-        status,
-      });
-
+      const data = await getBillingDocuments({ page, limit: 20, q: query, status });
       setRows(Array.isArray(data?.rows) ? data.rows : []);
       setTotal(Number(data?.total || 0));
       setPages(Math.max(1, Number(data?.pages || 1)));
@@ -343,106 +377,52 @@ function BillingDocumentsPanel() {
 
   return (
     <section className="grid gap-4">
-      <div
-        className="rounded-[28px] border p-4 shadow-sm"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
+      <PanelHeader
+        eyebrow="Documentos reales"
+        title="Facturas y comprobantes emitidos"
+        text="Información tomada de ElectronicInvoice, la misma usada por Órdenes."
       >
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
-              Documentos reales
-            </p>
-            <h3 className="mt-1 text-2xl font-black">Facturas y comprobantes emitidos</h3>
-            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Información tomada de ElectronicInvoice, la misma usada por Órdenes.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            <label
-              className="flex min-w-[260px] items-center gap-2 rounded-2xl border px-3 py-2"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                background: 'var(--admin-input-bg, var(--admin-card-bg))',
-              }}
-            >
-              <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
-              <input
-                value={typingQuery}
-                onChange={(event) => setTypingQuery(event.target.value)}
-                placeholder="Buscar orden, factura, cliente o CUFE"
-                className="w-full bg-transparent text-sm font-bold outline-none"
-                style={{ color: 'var(--admin-card-text)' }}
-              />
-            </label>
-
-            <select
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              className="rounded-2xl border px-3 py-2 text-sm font-black outline-none"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                background: 'var(--admin-input-bg, var(--admin-card-bg))',
-                color: 'var(--admin-card-text)',
-              }}
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-
-            <ActionButton icon={RefreshCw} onClick={loadDocuments} disabled={loading}>
-              Actualizar
-            </ActionButton>
-          </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <label
+            className="flex min-w-[260px] items-center gap-2 rounded-2xl border px-3 py-2"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
+          >
+            <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
+            <input
+              value={typingQuery}
+              onChange={(event) => setTypingQuery(event.target.value)}
+              placeholder="Buscar orden, factura, cliente o CUFE"
+              className="w-full bg-transparent text-sm font-bold outline-none"
+              style={{ color: 'var(--admin-card-text)' }}
+            />
+          </label>
+          <select
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+            className="rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <ActionButton icon={RefreshCw} onClick={loadDocuments} disabled={loading}>Actualizar</ActionButton>
         </div>
-      </div>
+      </PanelHeader>
 
-      {error ? (
-        <div
-          className="rounded-[24px] border px-4 py-3 text-sm font-bold"
-          style={{
-            borderColor: 'rgba(244, 63, 94, 0.36)',
-            background: 'rgba(244, 63, 94, 0.1)',
-            color: '#be123c',
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
+      {error ? <MessageBox>{error}</MessageBox> : null}
 
-      <div
-        className="overflow-hidden rounded-[28px] border shadow-sm"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
+      <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <div className="text-sm font-black">
-            {loading ? 'Cargando documentos...' : `${formatNumber(total)} documento(s)`}
-          </div>
-          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Página {formatNumber(page)} de {formatNumber(pages)}
-          </div>
+          <div className="text-sm font-black">{loading ? 'Cargando documentos...' : `${formatNumber(total)} documento(s)`}</div>
+          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {formatNumber(page)} de {formatNumber(pages)}</div>
         </div>
 
         {rows.length === 0 && !loading ? (
-          <EmptyWorkBlock
-            icon={FileText}
-            title="Sin documentos generados"
-            text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista."
-          />
+          <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[940px] text-left text-sm">
@@ -469,71 +449,30 @@ function BillingDocumentsPanel() {
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">
-                          {document.invoiceNumber || document.provider?.number || 'Sin número'}
-                        </p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                          Orden #{document.orderNumber || '—'}
-                        </p>
-                        {document.cufe ? (
-                          <p className="mt-1 max-w-[240px] truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                            CUFE {document.cufe}
-                          </p>
-                        ) : null}
+                        <p className="font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
+                        {document.cufe ? <p className="mt-1 max-w-[240px] truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-black">{customerName}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                          {customer.documentNumber || customer.email || 'Sin identificación'}
-                        </p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <span
-                          className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]"
-                          style={statusStyle}
-                        >
-                          {getStatusLabel(document.status)}
-                        </span>
-                        {document.errorMessage ? (
-                          <p className="mt-2 max-w-[220px] text-xs font-bold text-red-600">
-                            {document.errorMessage}
-                          </p>
-                        ) : null}
+                        <span className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]" style={statusStyle}>{getStatusLabel(document.status)}</span>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-black">{normalizeProviderLabel(document.provider?.name)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                          {document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}
-                        </p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-bold">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                          Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}
-                        </p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <div className="flex flex-wrap gap-2">
-                          <ActionButton
-                            icon={Download}
-                            onClick={() => openDocumentPdf(document)}
-                            disabled={!canOpenPdf || isPdfLoading}
-                            variant="primary"
-                          >
-                            {isPdfLoading ? 'Abriendo...' : 'PDF'}
-                          </ActionButton>
-                          <ActionButton
-                            icon={FileText}
-                            onClick={() => openDocumentXml(document)}
-                            disabled={!canOpenXml || isXmlLoading}
-                          >
-                            {isXmlLoading ? 'Abriendo...' : 'XML'}
-                          </ActionButton>
-                          {document.links?.publicUrl ? (
-                            <ActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>
-                              Ver
-                            </ActionButton>
-                          ) : null}
+                          <ActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? 'Abriendo...' : 'PDF'}</ActionButton>
+                          <ActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? 'Abriendo...' : 'XML'}</ActionButton>
+                          {document.links?.publicUrl ? <ActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>Ver</ActionButton> : null}
                         </div>
                       </td>
                     </tr>
@@ -545,16 +484,10 @@ function BillingDocumentsPanel() {
         )}
 
         <div className="flex flex-col gap-2 border-t px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Fuente: ElectronicInvoice. No se usa ningún modelo Invoice paralelo.
-          </p>
+          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Fuente: ElectronicInvoice. No se usa ningún modelo Invoice paralelo.</p>
           <div className="flex gap-2">
-            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
-              Anterior
-            </ActionButton>
-            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>
-              Siguiente
-            </ActionButton>
+            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</ActionButton>
+            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>Siguiente</ActionButton>
           </div>
         </div>
       </div>
@@ -570,7 +503,9 @@ function BillingPendingOrdersPanel() {
   const [query, setQuery] = useState('');
   const [typingQuery, setTypingQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -585,12 +520,7 @@ function BillingPendingOrdersPanel() {
     try {
       setLoading(true);
       setError('');
-      const data = await getPendingBillingOrders({
-        page,
-        limit: 20,
-        q: query,
-      });
-
+      const data = await getPendingBillingOrders({ page, limit: 20, q: query });
       setRows(Array.isArray(data?.rows) ? data.rows : []);
       setTotal(Number(data?.total || 0));
       setPages(Math.max(1, Number(data?.pages || 1)));
@@ -608,97 +538,63 @@ function BillingPendingOrdersPanel() {
     loadPendingOrders();
   }, [page, query]);
 
-  const openAdminOrder = (order) => {
-    const search = order?.orderNumber || order?.id || '';
-    const url = search ? `/admin/ordenes?buscar=${encodeURIComponent(search)}` : '/admin/ordenes';
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleGenerateInvoice = async (order) => {
+    if (!order?.id) return;
+
+    try {
+      setNotice('');
+      setError('');
+      setActionLoading(`generate-${order.id}`);
+      const result = await generateBillingInvoiceForOrder(order.id);
+      const number = result?.invoice?.invoiceNumber || result?.invoice?.provider?.number || '';
+      setNotice(number ? `Factura ${number} generada correctamente.` : 'Factura generada correctamente.');
+      await loadPendingOrders();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'No se pudo generar la factura.');
+    } finally {
+      setActionLoading('');
+    }
   };
 
   return (
     <section className="grid gap-4">
-      <div
-        className="rounded-[28px] border p-4 shadow-sm"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
+      <PanelHeader
+        eyebrow="Pendientes de emisión"
+        title="Órdenes por facturar"
+        text="Ventas pagadas que todavía no tienen registro en ElectronicInvoice."
       >
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
-              Pendientes de emisión
-            </p>
-            <h3 className="mt-1 text-2xl font-black">Órdenes por facturar</h3>
-            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Ventas pagadas que todavía no tienen registro en ElectronicInvoice.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            <label
-              className="flex min-w-[280px] items-center gap-2 rounded-2xl border px-3 py-2"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                background: 'var(--admin-input-bg, var(--admin-card-bg))',
-              }}
-            >
-              <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
-              <input
-                value={typingQuery}
-                onChange={(event) => setTypingQuery(event.target.value)}
-                placeholder="Buscar orden o cliente"
-                className="w-full bg-transparent text-sm font-bold outline-none"
-                style={{ color: 'var(--admin-card-text)' }}
-              />
-            </label>
-
-            <ActionButton icon={RefreshCw} onClick={loadPendingOrders} disabled={loading}>
-              Actualizar
-            </ActionButton>
-          </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <label
+            className="flex min-w-[280px] items-center gap-2 rounded-2xl border px-3 py-2"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
+          >
+            <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
+            <input
+              value={typingQuery}
+              onChange={(event) => setTypingQuery(event.target.value)}
+              placeholder="Buscar orden o cliente"
+              className="w-full bg-transparent text-sm font-bold outline-none"
+              style={{ color: 'var(--admin-card-text)' }}
+            />
+          </label>
+          <ActionButton icon={RefreshCw} onClick={loadPendingOrders} disabled={loading}>Actualizar</ActionButton>
         </div>
-      </div>
+      </PanelHeader>
 
-      {error ? (
-        <div
-          className="rounded-[24px] border px-4 py-3 text-sm font-bold"
-          style={{
-            borderColor: 'rgba(244, 63, 94, 0.36)',
-            background: 'rgba(244, 63, 94, 0.1)',
-            color: '#be123c',
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
+      {error ? <MessageBox>{error}</MessageBox> : null}
+      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
 
-      <div
-        className="overflow-hidden rounded-[28px] border shadow-sm"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
+      <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <div className="text-sm font-black">
-            {loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) pendiente(s)`}
-          </div>
-          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Página {formatNumber(page)} de {formatNumber(pages)}
-          </div>
+          <div className="text-sm font-black">{loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) pendiente(s)`}</div>
+          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {formatNumber(page)} de {formatNumber(pages)}</div>
         </div>
 
         {rows.length === 0 && !loading ? (
-          <EmptyWorkBlock
-            icon={ClipboardList}
-            title="Sin órdenes pendientes"
-            text="Cuando todas las órdenes pagadas ya tengan ElectronicInvoice, esta sección quedará vacía."
-          />
+          <EmptyWorkBlock icon={ClipboardList} title="Sin órdenes pendientes" text="Cuando una orden pagada no tenga ElectronicInvoice, aparecerá aquí para generar la factura." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Orden</th>
@@ -710,71 +606,54 @@ function BillingPendingOrdersPanel() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((order) => (
-                  <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-black">#{order.orderNumber || '—'}</p>
-                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        Creada: {formatDate(order.createdAt)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-black">{order.customerName || 'Cliente'}</p>
-                      <p className="mt-1 max-w-[220px] truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        {order.customerEmail || 'Sin correo'}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-black">{normalizeChannelLabel(order.source)}</p>
-                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        {order.itemsCount || 0} producto(s)
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <span
-                        className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]"
-                        style={getStatusStyle('validated')}
-                      >
-                        {normalizePaymentStatus(order.paymentStatus)}
-                      </span>
-                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        {order.paymentProvider || 'Sin método'}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-black">{formatCurrency(order.total)}</p>
-                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                        Envío {formatCurrency(order.shipping)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <ActionButton icon={ExternalLink} onClick={() => openAdminOrder(order)}>
-                          Ver orden
-                        </ActionButton>
-                        <ActionButton icon={ReceiptText} disabled variant="primary">
-                          Generar
-                        </ActionButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((order) => {
+                  const isGenerating = actionLoading === `generate-${order.id}`;
+
+                  return (
+                    <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black">#{order.orderNumber || '—'}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creada: {formatDate(order.createdAt)}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black">{order.customerName || 'Cliente'}</p>
+                        <p className="mt-1 max-w-[260px] truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black">{normalizeChannelLabel(order.source)}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(order.itemsCount || 0)} producto(s)</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <span className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]" style={{ borderColor: 'rgba(16, 185, 129, 0.36)', background: 'rgba(16, 185, 129, 0.12)', color: '#047857' }}>
+                          {normalizePaymentStatus(order.paymentStatus)}
+                        </span>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{order.paymentProvider || 'Sin proveedor'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black">{formatCurrency(order.total)}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Envío {formatCurrency(order.shipping)}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <ActionButton icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
+                          <ActionButton icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
+                            {isGenerating ? 'Generando...' : 'Generar'}
+                          </ActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
         <div className="flex flex-col gap-2 border-t px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Fuente: Order menos órdenes que ya existen en ElectronicInvoice.
-          </p>
+          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Fuente: Order menos órdenes que ya existen en ElectronicInvoice.</p>
           <div className="flex gap-2">
-            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
-              Anterior
-            </ActionButton>
-            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>
-              Siguiente
-            </ActionButton>
+            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</ActionButton>
+            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>Siguiente</ActionButton>
           </div>
         </div>
       </div>
@@ -806,51 +685,14 @@ function BillingSummaryPanel() {
 
   return (
     <div className="grid gap-5">
-      {error ? (
-        <div
-          className="rounded-[24px] border px-4 py-3 text-sm font-bold"
-          style={{
-            borderColor: 'rgba(244, 63, 94, 0.36)',
-            background: 'rgba(244, 63, 94, 0.1)',
-            color: '#be123c',
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
-
+      {error ? <MessageBox>{error}</MessageBox> : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <BillingMetricCard
-          icon={FileText}
-          label="Emitidas"
-          value={loading ? '...' : formatNumber(summary?.emitted || 0)}
-          helper="Documentos generados"
-        />
-        <BillingMetricCard
-          icon={ClipboardList}
-          label="Pendientes"
-          value={loading ? '...' : formatNumber(summary?.pending || 0)}
-          helper="Órdenes por facturar"
-        />
-        <BillingMetricCard
-          icon={AlertTriangle}
-          label="Errores"
-          value={loading ? '...' : formatNumber(summary?.errors || 0)}
-          helper="Emisiones fallidas"
-        />
-        <BillingMetricCard
-          icon={Send}
-          label="Proveedor"
-          value={normalizeProviderLabel(summary?.provider)}
-          helper="Según configuración actual"
-        />
+        <BillingMetricCard icon={FileText} label="Emitidas" value={loading ? '...' : formatNumber(summary?.emitted || 0)} helper="Documentos generados" />
+        <BillingMetricCard icon={ClipboardList} label="Pendientes" value={loading ? '...' : formatNumber(summary?.pending || 0)} helper="Órdenes por facturar" />
+        <BillingMetricCard icon={AlertTriangle} label="Errores" value={loading ? '...' : formatNumber(summary?.errors || 0)} helper="Emisiones fallidas" />
+        <BillingMetricCard icon={Send} label="Proveedor" value={normalizeProviderLabel(summary?.provider)} helper="Según configuración actual" />
       </div>
-
-      <EmptyWorkBlock
-        icon={ReceiptText}
-        title="Módulo unificado de facturación"
-        text="Esta pantalla centraliza la operación de facturación. Conserva la configuración existente y usa ElectronicInvoice como documento oficial para documentos, órdenes pendientes, comprobantes PDF y emisión electrónica."
-      />
+      <EmptyWorkBlock icon={ReceiptText} title="Módulo unificado de facturación" text="Esta pantalla centraliza la operación de facturación. Conserva la configuración existente y usa ElectronicInvoice como documento oficial para documentos, órdenes pendientes, comprobantes PDF y emisión electrónica." />
     </div>
   );
 }
@@ -885,33 +727,16 @@ export default function AdminBillingPage() {
 
   return (
     <div className="mx-auto grid max-w-7xl gap-5 p-3 md:p-5">
-      <section
-        className="overflow-hidden rounded-[32px] border shadow-sm"
-        style={{
-          background: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-card-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
+      <section className="overflow-hidden rounded-[32px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between md:p-6" style={{ borderColor: 'var(--admin-card-border)' }}>
           <div className="flex items-start gap-4">
-            <span
-              className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                background: 'var(--admin-soft-bg)',
-              }}
-            >
+            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
               <ActiveIcon className="h-6 w-6" />
             </span>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
-                Facturación
-              </p>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>Facturación</p>
               <h1 className="mt-1 text-3xl font-black">{activeData.label}</h1>
-              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>
-                {activeData.description}
-              </p>
+              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>{activeData.description}</p>
             </div>
           </div>
         </div>
