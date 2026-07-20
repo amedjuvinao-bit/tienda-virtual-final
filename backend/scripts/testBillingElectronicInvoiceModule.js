@@ -42,6 +42,12 @@ function assertIncludes(content, expected, message) {
   assert(String(content).includes(expected), message || `No se encontró ${expected}`);
 }
 
+function assertIncludesAny(content, expectedList, message) {
+  const text = String(content || '');
+  const found = expectedList.some((expected) => text.includes(expected));
+  assert(found, message || `No se encontró ninguna variante: ${expectedList.join(' | ')}`);
+}
+
 function assertNotIncludes(content, expected, message) {
   assert(!String(content).includes(expected), message || `No debe contener ${expected}`);
 }
@@ -77,13 +83,25 @@ function validateExistingElectronicInvoiceLayer() {
     assertIncludes(electronicInvoiceModel, needle, `ElectronicInvoice no contiene ${needle}`);
   });
 
-  [
+  assertIncludes(
+    ordersRoute,
     "require('../models/ElectronicInvoice')",
-    "findOne({\n      orderId",
-    "invoice-xml",
-    "generateOrderPdf",
-    "factusLinks",
-  ].forEach((needle) => {
+    'orders.js no importa ElectronicInvoice.'
+  );
+
+  assertIncludes(
+    ordersRoute,
+    'ElectronicInvoice.findOne',
+    'orders.js no consulta ElectronicInvoice desde órdenes.'
+  );
+
+  assertIncludesAny(
+    ordersRoute,
+    ['orderId: o?._id', 'orderId: order._id', 'orderId }', 'orderId,'],
+    'orders.js no conserva la relación ElectronicInvoice por orderId.'
+  );
+
+  ['invoice-xml', 'generateOrderPdf', 'factusLinks'].forEach((needle) => {
     assertIncludes(ordersRoute, needle, `orders.js no conserva integración existente con ${needle}`);
   });
 
