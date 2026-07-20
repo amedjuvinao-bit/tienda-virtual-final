@@ -68,7 +68,7 @@ table.min-w-\[940px\] tbody td {
 
 table.min-w-\[940px\] th:nth-child(1),
 table.min-w-\[940px\] td:nth-child(1) {
-  width: 25%;
+  width: 22%;
 }
 
 table.min-w-\[940px\] th:nth-child(2),
@@ -78,22 +78,22 @@ table.min-w-\[940px\] td:nth-child(2) {
 
 table.min-w-\[940px\] th:nth-child(3),
 table.min-w-\[940px\] td:nth-child(3) {
-  width: 12%;
+  width: 13%;
 }
 
 table.min-w-\[940px\] th:nth-child(4),
 table.min-w-\[940px\] td:nth-child(4) {
-  width: 12%;
+  width: 10%;
 }
 
 table.min-w-\[940px\] th:nth-child(5),
 table.min-w-\[940px\] td:nth-child(5) {
-  width: 16%;
+  width: 17%;
 }
 
 table.min-w-\[940px\] th:nth-child(6),
 table.min-w-\[940px\] td:nth-child(6) {
-  width: 19%;
+  width: 22%;
 }
 
 table.min-w-\[940px\] td:nth-child(1) p:first-child,
@@ -124,7 +124,9 @@ table.min-w-\[940px\] td:nth-child(5) p {
 }
 
 table.min-w-\[940px\] td:nth-child(3) span {
+  min-width: 92px;
   max-width: 100%;
+  justify-content: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -139,15 +141,15 @@ table.min-w-\[940px\] td:nth-child(6) > div {
   flex-wrap: nowrap !important;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 7px;
 }
 
 table.min-w-\[940px\] td:nth-child(6) button {
   width: auto !important;
-  min-width: 48px;
+  min-width: 56px;
   min-height: 34px;
-  padding: 7px 10px !important;
-  border-radius: 13px !important;
+  padding: 7px 12px !important;
+  border-radius: 14px !important;
   white-space: nowrap;
   box-shadow: none !important;
 }
@@ -155,21 +157,22 @@ table.min-w-\[940px\] td:nth-child(6) button {
 table.min-w-\[940px\] td:nth-child(6) button svg {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 1180px) {
+  div.overflow-x-auto:has(> table.min-w-\[940px\]) {
+    overflow-x: hidden !important;
+  }
+}
+
+@media (max-width: 760px) {
   div.overflow-x-auto:has(> table.min-w-\[940px\]) {
     overflow-x: auto !important;
   }
 
   table.min-w-\[940px\] {
-    min-width: 920px !important;
-  }
-}
-
-@media (max-width: 760px) {
-  table.min-w-\[940px\] {
-    min-width: 780px !important;
+    min-width: 860px !important;
   }
 
   table.min-w-\[940px\] th,
