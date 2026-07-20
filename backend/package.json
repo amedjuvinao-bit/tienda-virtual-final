@@ -21,6 +21,7 @@
     "test:finance-module": "node scripts/testFinanceModuleClosure.js",
     "test:coupons-backend": "node scripts/testCouponsBackendModule.js",
     "test:coupons-checkout": "node scripts/testCouponsCheckoutModule.js",
+    "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
     "customers:merge-duplicates:apply": "set CUSTOMERS_MERGE_APPLY=true&& node scripts/mergeDuplicateCustomers.js",
