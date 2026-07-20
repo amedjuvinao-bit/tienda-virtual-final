@@ -77,6 +77,7 @@ const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
+const invoiceRoutes = tryRequire('./routes/invoices');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
 const orderCouponCheckoutRoutes = tryRequire('./routes/orderCouponCheckout');
 const orderRoutes = tryRequire('./routes/orders');
@@ -101,6 +102,7 @@ const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
 const adminFinanceRoutes = tryRequire('./routes/adminFinance');
 const adminCouponsRoutes = tryRequire('./routes/adminCoupons');
+const adminInvoicesRoutes = tryRequire('./routes/adminInvoices');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
@@ -114,6 +116,7 @@ if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
+if (invoiceRoutes) app.use('/api/invoices', invoiceRoutes);
 
 if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   app.patch(
@@ -184,6 +187,7 @@ if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
 if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
 if (adminCouponsRoutes) app.use('/api/admin/coupons', adminCouponsRoutes);
+if (adminInvoicesRoutes) app.use('/api/admin/invoices', adminInvoicesRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
