@@ -61,6 +61,22 @@ router.get(
   }
 );
 
+router.post(
+  '/orders/:orderId/generate',
+  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  async (req, res) => {
+    try {
+      const data = await billingService.generateInvoiceForOrder(req.params.orderId, {
+        adminUser: req.adminUsername || req.user?.username || 'admin',
+      });
+
+      res.status(data.created ? 201 : 200).json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error generando factura desde la orden.');
+    }
+  }
+);
+
 router.get(
   '/settings',
   requirePermission.any(['billing:view', 'billing:settings']),
