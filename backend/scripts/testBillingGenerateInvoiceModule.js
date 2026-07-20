@@ -92,16 +92,25 @@ function validateFrontendGeneration() {
   [
     'generateBillingInvoiceForOrder',
     'handleGenerateInvoice',
-    'Factura generada correctamente',
+    'buildGeneratedDocumentUrl',
+    'window.location.assign(buildGeneratedDocumentUrl(invoice, order))',
+    'getInitialDocumentQuery',
+    'new URLSearchParams(window.location.search).get',
+    'Mostrando la factura generada para:',
     'Generando...',
     'Generar',
-    'await loadPendingOrders()',
     'return <BillingPendingOrdersPanel />;',
   ].forEach((needle) => {
-    assertIncludes(pageFile, needle, `AdminBillingPage no conecta botón Generar: falta ${needle}`);
+    assertIncludes(pageFile, needle, `AdminBillingPage no deja visible la factura generada inmediatamente: falta ${needle}`);
   });
 
-  ok('Frontend conecta botón Generar al endpoint de facturación');
+  assertNotIncludes(
+    pageFile,
+    'await loadPendingOrders();\n    } catch',
+    'Después de generar no debe quedarse solo recargando pendientes; debe llevar a Documentos.'
+  );
+
+  ok('Frontend genera y redirige a Documentos filtrando la factura creada');
 }
 
 function validateScriptRegistered() {
