@@ -187,6 +187,11 @@ async function applyCouponToCreatedOrder({ orderId, validation, req }) {
   order.shipping = finalShipping;
   order.total = finalTotal;
 
+  if (order.payment && typeof order.payment === 'object') {
+    order.payment.amount = finalTotal;
+    order.payment.amountInCents = Math.round(finalTotal * 100);
+  }
+
   await order.save();
 
   await Order.collection.updateOne(
