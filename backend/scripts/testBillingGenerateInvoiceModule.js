@@ -108,6 +108,32 @@ function validateFrontendGeneration() {
   ok('Frontend conecta botón Generar sin redirigir ni recargar la página');
 }
 
+function validateGenerateConfirmationBridge() {
+  const mainFile = read('frontend/src/main.jsx');
+  const bridgeFile = read('frontend/src/admin/billing/billingGenerateConfirmBridge.js');
+
+  assertIncludes(
+    mainFile,
+    './admin/billing/billingGenerateConfirmBridge',
+    'main.jsx debe cargar la confirmación visual de generar factura.'
+  );
+
+  [
+    'installBillingGenerateConfirmBridge',
+    "window.location.pathname === '/admin/facturacion/ordenes'",
+    "normalizeText(button.textContent) === 'Generar'",
+    '¿Seguro que deseas generar factura para la orden',
+    'ElectronicInvoice',
+    'window.confirm',
+    'event.stopImmediatePropagation',
+    'data-billing-generate-confirmed',
+  ].forEach((needle) => {
+    assertIncludes(bridgeFile, needle, `billingGenerateConfirmBridge no protege Generar factura: falta ${needle}`);
+  });
+
+  ok('Botón Generar factura exige confirmación visual antes de crear ElectronicInvoice');
+}
+
 function validateScriptRegistered() {
   const packageFile = read('backend/package.json');
   assertIncludes(
@@ -126,6 +152,7 @@ function main() {
     validateBackendGenerationService();
     validateBackendGenerationRoute();
     validateFrontendGeneration();
+    validateGenerateConfirmationBridge();
     validateScriptRegistered();
   } catch (error) {
     fail('Error validando generación de factura', error);
