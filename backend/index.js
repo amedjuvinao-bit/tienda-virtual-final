@@ -78,6 +78,7 @@ const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
+const orderCouponCheckoutRoutes = tryRequire('./routes/orderCouponCheckout');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
@@ -164,6 +165,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
+if (orderCouponCheckoutRoutes) app.use('/api/orders', orderCouponCheckoutRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
