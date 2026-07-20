@@ -20,6 +20,7 @@ import {
   downloadOrderPdf,
   getBillingDocuments,
   getBillingSummary,
+  getPendingBillingOrders,
   openBlob,
 } from './api/adminBillingApi';
 
@@ -95,6 +96,28 @@ function normalizeProviderLabel(value) {
   if (text === 'factus') return 'Factus';
   if (text === 'dian') return 'DIAN directa';
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function normalizeChannelLabel(value) {
+  const text = String(value || '').toLowerCase();
+  if (text === 'pos') return 'POS';
+  if (text === 'web' || text === 'online') return 'Tienda web';
+  return value || 'Sin canal';
+}
+
+function normalizePaymentStatus(value) {
+  const text = String(value || '').toLowerCase();
+  const labels = {
+    paid: 'Pagado',
+    approved: 'Aprobado',
+    captured: 'Capturado',
+    success: 'Pagado',
+    pending: 'Pendiente',
+    failed: 'Fallido',
+    rejected: 'Rechazado',
+  };
+
+  return labels[text] || value || 'Sin estado';
 }
 
 function getStatusLabel(status) {
@@ -539,6 +562,226 @@ function BillingDocumentsPanel() {
   );
 }
 
+function BillingPendingOrdersPanel() {
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [query, setQuery] = useState('');
+  const [typingQuery, setTypingQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQuery(typingQuery.trim());
+      setPage(1);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [typingQuery]);
+
+  const loadPendingOrders = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await getPendingBillingOrders({
+        page,
+        limit: 20,
+        q: query,
+      });
+
+      setRows(Array.isArray(data?.rows) ? data.rows : []);
+      setTotal(Number(data?.total || 0));
+      setPages(Math.max(1, Number(data?.pages || 1)));
+    } catch (err) {
+      setRows([]);
+      setTotal(0);
+      setPages(1);
+      setError(err?.response?.data?.message || err?.message || 'No se pudieron cargar las órdenes por facturar.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPendingOrders();
+  }, [page, query]);
+
+  const openAdminOrder = (order) => {
+    const search = order?.orderNumber || order?.id || '';
+    const url = search ? `/admin/ordenes?buscar=${encodeURIComponent(search)}` : '/admin/ordenes';
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <section className="grid gap-4">
+      <div
+        className="rounded-[28px] border p-4 shadow-sm"
+        style={{
+          background: 'var(--admin-card-bg)',
+          borderColor: 'var(--admin-card-border)',
+          color: 'var(--admin-card-text)',
+        }}
+      >
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
+              Pendientes de emisión
+            </p>
+            <h3 className="mt-1 text-2xl font-black">Órdenes por facturar</h3>
+            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+              Ventas pagadas que todavía no tienen registro en ElectronicInvoice.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <label
+              className="flex min-w-[280px] items-center gap-2 rounded-2xl border px-3 py-2"
+              style={{
+                borderColor: 'var(--admin-card-border)',
+                background: 'var(--admin-input-bg, var(--admin-card-bg))',
+              }}
+            >
+              <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
+              <input
+                value={typingQuery}
+                onChange={(event) => setTypingQuery(event.target.value)}
+                placeholder="Buscar orden o cliente"
+                className="w-full bg-transparent text-sm font-bold outline-none"
+                style={{ color: 'var(--admin-card-text)' }}
+              />
+            </label>
+
+            <ActionButton icon={RefreshCw} onClick={loadPendingOrders} disabled={loading}>
+              Actualizar
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <div
+          className="rounded-[24px] border px-4 py-3 text-sm font-bold"
+          style={{
+            borderColor: 'rgba(244, 63, 94, 0.36)',
+            background: 'rgba(244, 63, 94, 0.1)',
+            color: '#be123c',
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <div
+        className="overflow-hidden rounded-[28px] border shadow-sm"
+        style={{
+          background: 'var(--admin-card-bg)',
+          borderColor: 'var(--admin-card-border)',
+          color: 'var(--admin-card-text)',
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <div className="text-sm font-black">
+            {loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) pendiente(s)`}
+          </div>
+          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            Página {formatNumber(page)} de {formatNumber(pages)}
+          </div>
+        </div>
+
+        {rows.length === 0 && !loading ? (
+          <EmptyWorkBlock
+            icon={ClipboardList}
+            title="Sin órdenes pendientes"
+            text="Cuando todas las órdenes pagadas ya tengan ElectronicInvoice, esta sección quedará vacía."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead>
+                <tr style={{ color: 'var(--admin-card-muted-text)' }}>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Orden</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Canal</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Pago</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Total</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((order) => (
+                  <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                    <td className="px-4 py-4 align-top">
+                      <p className="font-black">#{order.orderNumber || '—'}</p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        Creada: {formatDate(order.createdAt)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <p className="font-black">{order.customerName || 'Cliente'}</p>
+                      <p className="mt-1 max-w-[220px] truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        {order.customerEmail || 'Sin correo'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <p className="font-black">{normalizeChannelLabel(order.source)}</p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        {order.itemsCount || 0} producto(s)
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <span
+                        className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]"
+                        style={getStatusStyle('validated')}
+                      >
+                        {normalizePaymentStatus(order.paymentStatus)}
+                      </span>
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        {order.paymentProvider || 'Sin método'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <p className="font-black">{formatCurrency(order.total)}</p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        Envío {formatCurrency(order.shipping)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <ActionButton icon={ExternalLink} onClick={() => openAdminOrder(order)}>
+                          Ver orden
+                        </ActionButton>
+                        <ActionButton icon={ReceiptText} disabled variant="primary">
+                          Generar
+                        </ActionButton>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 border-t px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            Fuente: Order menos órdenes que ya existen en ElectronicInvoice.
+          </p>
+          <div className="flex gap-2">
+            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+              Anterior
+            </ActionButton>
+            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>
+              Siguiente
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function BillingSummaryPanel() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -634,13 +877,7 @@ export default function AdminBillingPage() {
     }
 
     if (activeTab === 'ordenes') {
-      return (
-        <EmptyWorkBlock
-          icon={ClipboardList}
-          title="Órdenes por facturar"
-          text="Aquí se mostrarán las órdenes pagadas que todavía no tienen comprobante interno o factura electrónica. Esta pestaña se conectará después con /api/admin/billing/pending-orders."
-        />
-      );
+      return <BillingPendingOrdersPanel />;
     }
 
     return <BillingSummaryPanel />;
