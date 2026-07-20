@@ -24,6 +24,7 @@
     "test:coupons-admin": "node scripts/testCouponsAdminFrontendModule.js",
     "test:coupons-module": "node scripts/testCouponsModuleClosure.js",
     "test:billing-admin-shell": "node scripts/testBillingAdminShellModule.js",
+    "test:invoices-backend": "node scripts/testInvoicesBackendModule.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
