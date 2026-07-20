@@ -1,183 +1,141 @@
 /*
   Ajuste visual para Documentos de Facturación.
-  Convierte la tabla técnica en un listado tipo tarjeta para que no se vea
-  estrecha, cortada ni apretada en el panel administrativo.
-  No modifica menú, sidebar ni la lógica de facturación.
+  Mantiene una tabla administrativa limpia, ancha y legible.
+  No modifica menú, sidebar ni lógica de facturación.
 */
 
 div.overflow-x-auto:has(> table.min-w-\[940px\]) {
-  overflow-x: visible !important;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
 }
 
 table.min-w-\[940px\] {
-  display: block;
   width: 100% !important;
   min-width: 0 !important;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
 }
 
 table.min-w-\[940px\] thead {
-  display: none;
+  display: table-header-group;
 }
 
 table.min-w-\[940px\] tbody {
-  display: grid;
-  gap: 14px;
-  width: 100%;
-  padding: 14px;
+  display: table-row-group;
+}
+
+table.min-w-\[940px\] tr {
+  display: table-row;
+}
+
+table.min-w-\[940px\] th,
+table.min-w-\[940px\] td {
+  display: table-cell;
+  min-width: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+table.min-w-\[940px\] th {
+  background: var(--admin-soft-bg);
+  border-bottom: 1px solid var(--admin-card-border);
+  white-space: nowrap;
 }
 
 table.min-w-\[940px\] tbody tr {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(132px, 0.78fr);
-  grid-template-areas:
-    'documento cliente soportes'
-    'documento estado soportes'
-    'documento proveedor fechas';
-  gap: 12px 18px;
-  width: 100%;
-  padding: 16px;
-  border: 1px solid var(--admin-card-border) !important;
-  border-radius: 26px;
   background: var(--admin-card-bg);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+table.min-w-\[940px\] tbody tr:nth-child(even) {
+  background: var(--admin-soft-bg);
 }
 
 table.min-w-\[940px\] tbody tr:hover {
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.09);
+  background: var(--admin-active-nav-bg, var(--admin-soft-bg));
 }
 
-table.min-w-\[940px\] tbody td {
-  display: block;
-  min-width: 0;
-  overflow: visible;
-  padding: 0 !important;
-  border: 0 !important;
+table.min-w-\[940px\] th:nth-child(1),
+table.min-w-\[940px\] td:nth-child(1) {
+  width: 28%;
 }
 
-table.min-w-\[940px\] tbody td::before {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  line-height: 1;
-  text-transform: uppercase;
-  color: var(--admin-card-muted-text);
+table.min-w-\[940px\] th:nth-child(2),
+table.min-w-\[940px\] td:nth-child(2) {
+  width: 20%;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(1) {
-  grid-area: documento;
-  padding-right: 10px !important;
-  border-right: 1px solid var(--admin-card-border) !important;
+table.min-w-\[940px\] th:nth-child(3),
+table.min-w-\[940px\] td:nth-child(3) {
+  width: 13%;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(1)::before {
-  content: 'Documento';
+table.min-w-\[940px\] th:nth-child(4),
+table.min-w-\[940px\] td:nth-child(4) {
+  width: 13%;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(2) {
-  grid-area: cliente;
+table.min-w-\[940px\] th:nth-child(5),
+table.min-w-\[940px\] td:nth-child(5) {
+  width: 16%;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(2)::before {
-  content: 'Cliente';
+table.min-w-\[940px\] th:nth-child(6),
+table.min-w-\[940px\] td:nth-child(6) {
+  width: 10%;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(3) {
-  grid-area: estado;
+table.min-w-\[940px\] td:nth-child(1) p:first-child,
+table.min-w-\[940px\] td:nth-child(2) p:first-child,
+table.min-w-\[940px\] td:nth-child(4) p:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(3)::before {
-  content: 'Estado';
+table.min-w-\[940px\] td:nth-child(1) p:nth-child(3) {
+  max-width: 100% !important;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(4) {
-  grid-area: proveedor;
-}
-
-table.min-w-\[940px\] tbody td:nth-child(4)::before {
-  content: 'Proveedor';
-}
-
-table.min-w-\[940px\] tbody td:nth-child(5) {
-  grid-area: fechas;
-}
-
-table.min-w-\[940px\] tbody td:nth-child(5)::before {
-  content: 'Fechas';
-}
-
-table.min-w-\[940px\] tbody td:nth-child(6) {
-  grid-area: soportes;
-  align-self: stretch;
-}
-
-table.min-w-\[940px\] tbody td:nth-child(6)::before {
-  content: 'Soportes';
-}
-
-table.min-w-\[940px\] tbody td p,
-table.min-w-\[940px\] tbody td span {
+table.min-w-\[940px\] td:nth-child(3) span {
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(1) p:first-child {
-  font-size: 1.05rem;
-  line-height: 1.25;
+table.min-w-\[940px\] td:nth-child(5) p {
+  line-height: 1.35;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(6) > div {
+table.min-w-\[940px\] td:nth-child(6) > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  height: calc(100% - 16px);
-  align-content: start;
+  gap: 6px;
 }
 
-table.min-w-\[940px\] tbody td:nth-child(6) button {
+table.min-w-\[940px\] td:nth-child(6) button {
   width: 100%;
   min-width: 0;
-  padding-left: 10px !important;
-  padding-right: 10px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
   white-space: nowrap;
 }
 
 @media (max-width: 1180px) {
-  table.min-w-\[940px\] tbody tr {
-    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.42fr);
-    grid-template-areas:
-      'documento soportes'
-      'cliente soportes'
-      'estado soportes'
-      'proveedor fechas';
+  div.overflow-x-auto:has(> table.min-w-\[940px\]) {
+    overflow-x: auto !important;
   }
 
-  table.min-w-\[940px\] tbody td:nth-child(1) {
-    border-right: 0 !important;
-    padding-right: 0 !important;
+  table.min-w-\[940px\] {
+    min-width: 880px !important;
   }
 }
 
 @media (max-width: 760px) {
-  table.min-w-\[940px\] tbody {
-    padding: 10px;
-  }
-
-  table.min-w-\[940px\] tbody tr {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'documento'
-      'cliente'
-      'estado'
-      'proveedor'
-      'fechas'
-      'soportes';
-    padding: 14px;
-  }
-
-  table.min-w-\[940px\] tbody td:nth-child(6) > div {
-    grid-template-columns: minmax(0, 1fr);
+  table.min-w-\[940px\] {
+    min-width: 760px !important;
   }
 }
