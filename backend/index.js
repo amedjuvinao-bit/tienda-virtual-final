@@ -77,7 +77,6 @@ const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
-const invoiceRoutes = tryRequire('./routes/invoices');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
 const orderCouponCheckoutRoutes = tryRequire('./routes/orderCouponCheckout');
 const orderRoutes = tryRequire('./routes/orders');
@@ -102,7 +101,7 @@ const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
 const adminFinanceRoutes = tryRequire('./routes/adminFinance');
 const adminCouponsRoutes = tryRequire('./routes/adminCoupons');
-const adminInvoicesRoutes = tryRequire('./routes/adminInvoices');
+const adminBillingRoutes = tryRequire('./routes/adminBilling');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
@@ -116,7 +115,6 @@ if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
-if (invoiceRoutes) app.use('/api/invoices', invoiceRoutes);
 
 if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   app.patch(
@@ -187,7 +185,7 @@ if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
 if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
 if (adminCouponsRoutes) app.use('/api/admin/coupons', adminCouponsRoutes);
-if (adminInvoicesRoutes) app.use('/api/admin/invoices', adminInvoicesRoutes);
+if (adminBillingRoutes) app.use('/api/admin/billing', adminBillingRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
@@ -203,6 +201,48 @@ const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
+
+function startInventoryReservationExpirationJob() {
+  if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
+    console.log('Job de expiracion de reservas desactivado por configuracion.');
+    return;
+  }
+
+  const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
+
+  if (typeof expireInventoryReservations !== 'function') {
+    console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
+    return;
+  }
+
+  if (inventoryReservationExpirationTimer) {
+    console.log('Job de expiracion de reservas ya estaba iniciado.');
+    return;
+  }
+
+  const runExpiration = async () => {
+    if (inventoryReservationExpirationRunning) return;
+
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('Job de reservas omitido: MongoDB no esta conectado.');
+      return;
+    }
+
+    inventoryReservationExpirationRunning = true;
+    try {
+      const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
+      if (result?.expired > 0) {
+        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
+      }
+    } catch (error) {
+      console.error('Error en job de expiracion de reservas:', error.message);
+    } finally {
+      inventoryReservationExpirationRunning = false;
+    }
+  };
+
+  inventoryReservationTimer = null;
+}
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
