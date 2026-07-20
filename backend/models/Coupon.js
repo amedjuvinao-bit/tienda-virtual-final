@@ -25,7 +25,6 @@ const CouponSchema = new mongoose.Schema(
       trim: true,
       uppercase: true,
       maxlength: 40,
-      index: true,
     },
     name: { type: String, trim: true, maxlength: 120, default: '' },
     description: { type: String, trim: true, maxlength: 500, default: '' },
