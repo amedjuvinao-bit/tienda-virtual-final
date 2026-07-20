@@ -241,48 +241,6 @@ function startInventoryReservationExpirationJob() {
     }
   };
 
-  inventoryReservationTimer = null;
-}
-
-function startInventoryReservationExpirationJob() {
-  if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
-    console.log('Job de expiracion de reservas desactivado por configuracion.');
-    return;
-  }
-
-  const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
-
-  if (typeof expireInventoryReservations !== 'function') {
-    console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
-    return;
-  }
-
-  if (inventoryReservationExpirationTimer) {
-    console.log('Job de expiracion de reservas ya estaba iniciado.');
-    return;
-  }
-
-  const runExpiration = async () => {
-    if (inventoryReservationExpirationRunning) return;
-
-    if (mongoose.connection.readyState !== 1) {
-      console.warn('Job de reservas omitido: MongoDB no esta conectado.');
-      return;
-    }
-
-    inventoryReservationExpirationRunning = true;
-    try {
-      const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
-      if (result?.expired > 0) {
-        console.log(`Reservas expiradas automaticamente: ${result.expired}`);
-      }
-    } catch (error) {
-      console.error('Error en job de expiracion de reservas:', error.message);
-    } finally {
-      inventoryReservationExpirationRunning = false;
-    }
-  };
-
   inventoryReservationExpirationTimer = setInterval(runExpiration, INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS);
   runExpiration().catch(() => null);
   console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
