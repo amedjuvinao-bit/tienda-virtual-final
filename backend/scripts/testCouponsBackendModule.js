@@ -38,6 +38,10 @@ function assertIncludes(content, expected, message) {
   assert(String(content).includes(expected), message || `No se encontró: ${expected}`);
 }
 
+function assertMatches(content, pattern, message) {
+  assert(pattern.test(String(content || '')), message || `No coincide el patrón: ${pattern}`);
+}
+
 function validateFilesExist() {
   [
     'backend/models/Coupon.js',
@@ -105,9 +109,13 @@ function validateRoutesAndPermissions() {
     "requirePermission('coupons:update')",
     "requirePermission('coupons:delete')",
     "requirePermission.any(['coupons:view'",
-    "router.post(\n  '/validate'",
   ].forEach((needle) => assertIncludes(adminRoutes, needle, `adminCoupons.js no contiene ${needle}`));
 
+  assertMatches(
+    adminRoutes,
+    /router\.post\(\s*['"]\/validate['"]/,
+    'adminCoupons.js no expone POST /validate.'
+  );
   assertIncludes(publicRoutes, "router.post('/validate'", 'coupons.js no expone validación pública.');
   assertIncludes(indexFile, "./routes/coupons", 'index.js no carga rutas públicas de cupones.');
   assertIncludes(indexFile, "./routes/adminCoupons", 'index.js no carga rutas admin de cupones.');
