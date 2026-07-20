@@ -52,7 +52,7 @@ const CouponRedemptionSchema = new mongoose.Schema(
   }
 );
 
-CouponRedemptionSchema.index({ coupon: 1, order: 1 }, { unique: true, sparse: true });
+CouponRedemptionSchema.index({ coupon: 1, order: 1 });
 CouponRedemptionSchema.index({ code: 1, customer: 1, status: 1 });
 CouponRedemptionSchema.index({ code: 1, customerEmail: 1, status: 1 });
 
