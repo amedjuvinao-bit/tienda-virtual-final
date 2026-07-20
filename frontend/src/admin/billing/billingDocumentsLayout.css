@@ -1,106 +1,183 @@
 /*
-  Ajuste puntual para Documentos de Facturación.
-  Evita que la columna de soportes quede cortada en pantallas medianas.
-  No modifica menú, sidebar ni la configuración de facturación.
-
-  Se apunta a la tabla de documentos conectada al módulo de facturación,
-  que actualmente usa la clase Tailwind min-w-[940px].
+  Ajuste visual para Documentos de Facturación.
+  Convierte la tabla técnica en un listado tipo tarjeta para que no se vea
+  estrecha, cortada ni apretada en el panel administrativo.
+  No modifica menú, sidebar ni la lógica de facturación.
 */
+
+div.overflow-x-auto:has(> table.min-w-\[940px\]) {
+  overflow-x: visible !important;
+}
 
 table.min-w-\[940px\] {
   display: block;
   width: 100% !important;
   min-width: 0 !important;
-  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
-table.min-w-\[940px\] thead,
+table.min-w-\[940px\] thead {
+  display: none;
+}
+
 table.min-w-\[940px\] tbody {
-  display: block;
+  display: grid;
+  gap: 14px;
   width: 100%;
+  padding: 14px;
 }
 
-table.min-w-\[940px\] thead tr,
 table.min-w-\[940px\] tbody tr {
   display: grid;
-  grid-template-columns:
-    minmax(150px, 1.25fr)
-    minmax(145px, 1fr)
-    minmax(105px, 0.65fr)
-    minmax(105px, 0.7fr)
-    minmax(105px, 0.7fr)
-    minmax(96px, 0.58fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(132px, 0.78fr);
+  grid-template-areas:
+    'documento cliente soportes'
+    'documento estado soportes'
+    'documento proveedor fechas';
+  gap: 12px 18px;
   width: 100%;
+  padding: 16px;
+  border: 1px solid var(--admin-card-border) !important;
+  border-radius: 26px;
+  background: var(--admin-card-bg);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
-table.min-w-\[940px\] th,
-table.min-w-\[940px\] td {
+table.min-w-\[940px\] tbody tr:hover {
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.09);
+}
+
+table.min-w-\[940px\] tbody td {
   display: block;
   min-width: 0;
-  overflow: hidden;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
+  overflow: visible;
+  padding: 0 !important;
+  border: 0 !important;
 }
 
-table.min-w-\[940px\] td p,
-table.min-w-\[940px\] td span {
+table.min-w-\[940px\] tbody td::before {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--admin-card-muted-text);
+}
+
+table.min-w-\[940px\] tbody td:nth-child(1) {
+  grid-area: documento;
+  padding-right: 10px !important;
+  border-right: 1px solid var(--admin-card-border) !important;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(1)::before {
+  content: 'Documento';
+}
+
+table.min-w-\[940px\] tbody td:nth-child(2) {
+  grid-area: cliente;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(2)::before {
+  content: 'Cliente';
+}
+
+table.min-w-\[940px\] tbody td:nth-child(3) {
+  grid-area: estado;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(3)::before {
+  content: 'Estado';
+}
+
+table.min-w-\[940px\] tbody td:nth-child(4) {
+  grid-area: proveedor;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(4)::before {
+  content: 'Proveedor';
+}
+
+table.min-w-\[940px\] tbody td:nth-child(5) {
+  grid-area: fechas;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(5)::before {
+  content: 'Fechas';
+}
+
+table.min-w-\[940px\] tbody td:nth-child(6) {
+  grid-area: soportes;
+  align-self: stretch;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(6)::before {
+  content: 'Soportes';
+}
+
+table.min-w-\[940px\] tbody td p,
+table.min-w-\[940px\] tbody td span {
   max-width: 100%;
 }
 
-table.min-w-\[940px\] td:last-child > div {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+table.min-w-\[940px\] tbody td:nth-child(1) p:first-child {
+  font-size: 1.05rem;
+  line-height: 1.25;
 }
 
-table.min-w-\[940px\] td:last-child button {
+table.min-w-\[940px\] tbody td:nth-child(6) > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  height: calc(100% - 16px);
+  align-content: start;
+}
+
+table.min-w-\[940px\] tbody td:nth-child(6) button {
   width: 100%;
   min-width: 0;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
   white-space: nowrap;
 }
 
-@media (max-width: 1100px) {
-  table.min-w-\[940px\] thead {
-    display: none;
-  }
-
-  table.min-w-\[940px\] tbody {
-    display: grid;
-    gap: 12px;
-    padding: 12px;
-  }
-
+@media (max-width: 1180px) {
   table.min-w-\[940px\] tbody tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 12px;
-    border: 1px solid var(--admin-card-border) !important;
-    border-radius: 24px;
-    padding: 12px;
-    background: var(--admin-card-bg);
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.42fr);
+    grid-template-areas:
+      'documento soportes'
+      'cliente soportes'
+      'estado soportes'
+      'proveedor fechas';
   }
 
-  table.min-w-\[940px\] td {
-    padding: 0 !important;
-  }
-
-  table.min-w-\[940px\] td:last-child {
-    grid-column: 1 / -1;
-  }
-
-  table.min-w-\[940px\] td:last-child > div {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  table.min-w-\[940px\] tbody td:nth-child(1) {
+    border-right: 0 !important;
+    padding-right: 0 !important;
   }
 }
 
-@media (max-width: 720px) {
-  table.min-w-\[940px\] tbody tr {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 760px) {
+  table.min-w-\[940px\] tbody {
+    padding: 10px;
   }
 
-  table.min-w-\[940px\] td:last-child > div {
+  table.min-w-\[940px\] tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'documento'
+      'cliente'
+      'estado'
+      'proveedor'
+      'fechas'
+      'soportes';
+    padding: 14px;
+  }
+
+  table.min-w-\[940px\] tbody td:nth-child(6) > div {
     grid-template-columns: minmax(0, 1fr);
   }
 }
