@@ -88,6 +88,29 @@ function validateDocumentsPage() {
   ok('Pestaña Documentos consume /api/admin/billing/documents y muestra soportes reales');
 }
 
+function validateDocumentsLayoutFix() {
+  const mainFile = read('frontend/src/main.jsx');
+  const cssFile = read('frontend/src/admin/billing/billingDocumentsLayout.css');
+
+  assertIncludes(
+    mainFile,
+    './admin/billing/billingDocumentsLayout.css',
+    'main.jsx debe cargar el ajuste visual de Documentos de Facturación.'
+  );
+
+  [
+    'table.min-w-\\[940px\\]',
+    'min-width: 0 !important',
+    'grid-template-columns',
+    'td:last-child > div',
+    '@media (max-width: 1100px)',
+  ].forEach((needle) => {
+    assertIncludes(cssFile, needle, `billingDocumentsLayout.css no contiene ${needle}`);
+  });
+
+  ok('Tabla de Documentos tiene ajuste responsive para que no quede mocha');
+}
+
 function validateBackendStillElectronicInvoice() {
   const routeFile = read('backend/routes/adminBilling.js');
   const serviceFile = read('backend/services/adminBillingService.js');
@@ -106,6 +129,7 @@ function main() {
   try {
     validateFrontendApi();
     validateDocumentsPage();
+    validateDocumentsLayoutFix();
     validateBackendStillElectronicInvoice();
   } catch (error) {
     fail('Error validando Documentos de Facturación', error);
