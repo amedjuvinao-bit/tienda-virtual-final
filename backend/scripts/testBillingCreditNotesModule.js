@@ -95,6 +95,23 @@ function validateFrontendCreditNotesTab() {
   ok('Frontend agrega pestaña interna Notas crédito sin crear módulo separado');
 }
 
+function validateCreditNotesTableLayout() {
+  const cssFile = read('frontend/src/admin/billing/billingDocumentsLayout.css');
+
+  [
+    'Tabla interna de Notas crédito: evita columna derecha mocha.',
+    'table.min-w-\\[980px\\]',
+    'table.min-w-\\[980px\\] th:nth-child(6)',
+    'table.min-w-\\[980px\\] td:nth-child(6) > div',
+    'overflow-x: hidden !important',
+    'min-width: 72px',
+  ].forEach((needle) => {
+    assertIncludes(cssFile, needle, `CSS de notas crédito no evita tabla mocha: falta ${needle}`);
+  });
+
+  ok('Tabla de Notas crédito tiene ajuste visual propio sin recortes');
+}
+
 function validateSummaryIncludesCreditNotes() {
   const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
   const serviceFile = read('backend/services/adminBillingService.js');
@@ -113,6 +130,7 @@ function main() {
     validateBackendCreditNotes,
     validateFrontendCreditNotesApi,
     validateFrontendCreditNotesTab,
+    validateCreditNotesTableLayout,
     validateSummaryIncludesCreditNotes,
   ].forEach((step) => {
     try {
