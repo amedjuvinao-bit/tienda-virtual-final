@@ -111,6 +111,29 @@ function validateInvoiceModalReuse() {
   ok('Documentos reutiliza ElectronicInvoiceModal existente para notas crédito');
 }
 
+function validateInvoiceModalLayout() {
+  const mainFile = read('frontend/src/main.jsx');
+  const cssFile = read('frontend/src/admin/orders/electronicInvoice/electronicInvoiceModalFix.css');
+
+  assertIncludes(
+    mainFile,
+    './admin/orders/electronicInvoice/electronicInvoiceModalFix.css',
+    'main.jsx debe cargar el ajuste visual del modal de factura electrónica.'
+  );
+
+  [
+    'Ajuste visual puntual para el modal existente de factura electronica',
+    'max-height: calc(100vh - 64px)',
+    'z-index: 10000',
+    'background: var(--admin-modal-bg, var(--admin-card-bg, #ffffff))',
+    'overflow-y: auto',
+  ].forEach((needle) => {
+    assertIncludes(cssFile, needle, `electronicInvoiceModalFix.css no contiene ${needle}`);
+  });
+
+  ok('Modal existente de factura queda visible y centrado sin tocar Documentos');
+}
+
 function validateDocumentsLayoutFix() {
   const mainFile = read('frontend/src/main.jsx');
   const cssFile = read('frontend/src/admin/billing/billingDocumentsLayout.css');
@@ -156,6 +179,7 @@ function main() {
     validateFrontendApi();
     validateDocumentsPage();
     validateInvoiceModalReuse();
+    validateInvoiceModalLayout();
     validateDocumentsLayoutFix();
     validateBackendStillElectronicInvoice();
   } catch (error) {
