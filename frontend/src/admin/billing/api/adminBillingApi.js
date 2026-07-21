@@ -16,6 +16,11 @@ export async function getBillingDocuments(params = {}) {
   return unwrap(response);
 }
 
+export async function getBillingCreditNotes(params = {}) {
+  const response = await api.get('/api/admin/billing/credit-notes', { params });
+  return unwrap(response);
+}
+
 export async function getPendingBillingOrders(params = {}) {
   const response = await api.get('/api/admin/billing/pending-orders', { params });
   return unwrap(response);
@@ -54,6 +59,7 @@ export function openBlob(blob, mimeType = 'application/octet-stream') {
 export default {
   getBillingSummary,
   getBillingDocuments,
+  getBillingCreditNotes,
   getPendingBillingOrders,
   generateBillingInvoiceForOrder,
   getBillingSettings,
