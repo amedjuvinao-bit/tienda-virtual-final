@@ -96,20 +96,32 @@ function validateFrontendCreditNotesTab() {
 }
 
 function validateCreditNotesTableLayout() {
-  const cssFile = read('frontend/src/admin/billing/billingDocumentsLayout.css');
+  const legacyCss = read('frontend/src/admin/billing/billingDocumentsLayout.css');
+  const stabilityCss = read('frontend/src/admin/billing/billingLayoutStability.css');
+  const mainFile = read('frontend/src/main.jsx');
+  const syncBridge = read('frontend/src/admin/billing/billingSyncBridge.js');
 
   [
     'Tabla interna de Notas crédito: evita columna derecha mocha.',
     'table.min-w-\\[980px\\]',
     'table.min-w-\\[980px\\] th:nth-child(6)',
     'table.min-w-\\[980px\\] td:nth-child(6) > div',
-    'overflow-x: hidden !important',
-    'min-width: 72px',
   ].forEach((needle) => {
-    assertIncludes(cssFile, needle, `CSS de notas crédito no evita tabla mocha: falta ${needle}`);
+    assertIncludes(legacyCss, needle, `CSS base de notas crédito no evita tabla mocha: falta ${needle}`);
   });
 
-  ok('Tabla de Notas crédito tiene ajuste visual propio sin recortes');
+  [
+    '[data-billing-sync-root]',
+    'billingLayoutStability.css',
+    'table.min-w-\\[980px\\]',
+    'width: 24% !important',
+    'Sincronizar',
+  ].forEach((needle) => {
+    const target = needle === 'billingLayoutStability.css' ? mainFile : needle === 'Sincronizar' ? syncBridge : stabilityCss;
+    assertIncludes(target, needle, `Ajuste estable de layout no está completo: falta ${needle}`);
+  });
+
+  ok('Tabla de Notas crédito y controles de sincronización tienen ajuste visual sin recortes');
 }
 
 function validateSummaryIncludesCreditNotes() {
