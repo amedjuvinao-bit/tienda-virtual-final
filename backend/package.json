@@ -31,6 +31,7 @@
     "test:billing-summary": "node scripts/testBillingSummaryFrontendModule.js",
     "test:billing-credit-notes": "node scripts/testBillingCreditNotesModule.js",
     "test:billing-sync": "node scripts/testBillingSyncModule.js",
+    "billing:sync:live": "node scripts/syncFactusLive.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",

@@ -251,7 +251,28 @@ function validateFrontendSync() {
 function validatePackageScript() {
   const packageFile = read('backend/package.json');
   assertIncludes(packageFile, 'test:billing-sync', 'package.json debe registrar test:billing-sync.');
-  ok('Script test:billing-sync registrado');
+  assertIncludes(packageFile, 'billing:sync:live', 'package.json debe registrar billing:sync:live.');
+  ok('Scripts test:billing-sync y billing:sync:live registrados');
+}
+
+function validateLiveSyncScript() {
+  const liveScript = read('backend/scripts/syncFactusLive.js');
+
+  [
+    "require('../services/adminBillingSyncService')",
+    'syncInvoice',
+    'syncCreditNote',
+    '--invoice',
+    '--credit-note',
+    'assertCredentials',
+    'Factus respondió y el nuevo estado quedó guardado en MongoDB',
+  ].forEach((needle) => {
+    assertIncludes(liveScript, needle, `Script de prueba real incompleto: falta ${needle}`);
+  });
+
+  assertNotIncludes(liveScript, 'deleteMany(', 'La prueba real no debe eliminar registros.');
+  assertNotIncludes(liveScript, 'ElectronicInvoice.create(', 'La prueba real no debe crear facturas.');
+  ok('Script real valida una factura o nota sin crear ni eliminar documentos');
 }
 
 async function main() {
@@ -264,6 +285,7 @@ async function main() {
     validateBackendRoutes,
     validateFrontendSync,
     validatePackageScript,
+    validateLiveSyncScript,
   ]) {
     try {
       await step();
