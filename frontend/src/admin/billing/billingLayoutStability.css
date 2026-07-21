@@ -1,0 +1,144 @@
+/*
+  Estabilidad visual para Facturación.
+  Corrige desbordes causados por controles agregados progresivamente
+  y evita columnas derechas mochas en tablas administrativas.
+*/
+
+[data-billing-sync-root] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+[data-billing-sync-root] label {
+  flex: 1 1 220px !important;
+  min-width: 0 !important;
+  max-width: 280px !important;
+}
+
+[data-billing-sync-root] select {
+  flex: 0 1 150px !important;
+  min-width: 0 !important;
+  max-width: 170px !important;
+}
+
+[data-billing-sync-root] button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+[data-billing-sync-visible] {
+  min-width: 108px !important;
+}
+
+[data-billing-sync-notice] {
+  flex: 0 1 220px !important;
+  max-width: 220px !important;
+  min-width: 150px !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Notas crédito: misma lógica limpia de Documentos, sin recortes. */
+div.overflow-x-auto:has(> table.min-w-\[980px\]) {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+table.min-w-\[980px\] {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+
+table.min-w-\[980px\] th,
+table.min-w-\[980px\] td {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+table.min-w-\[980px\] th:nth-child(1),
+table.min-w-\[980px\] td:nth-child(1) {
+  width: 16% !important;
+}
+
+table.min-w-\[980px\] th:nth-child(2),
+table.min-w-\[980px\] td:nth-child(2) {
+  width: 18% !important;
+}
+
+table.min-w-\[980px\] th:nth-child(3),
+table.min-w-\[980px\] td:nth-child(3) {
+  width: 15% !important;
+}
+
+table.min-w-\[980px\] th:nth-child(4),
+table.min-w-\[980px\] td:nth-child(4) {
+  width: 15% !important;
+}
+
+table.min-w-\[980px\] th:nth-child(5),
+table.min-w-\[980px\] td:nth-child(5) {
+  width: 12% !important;
+}
+
+table.min-w-\[980px\] th:nth-child(6),
+table.min-w-\[980px\] td:nth-child(6) {
+  width: 24% !important;
+}
+
+table.min-w-\[980px\] td p,
+table.min-w-\[980px\] td span {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+table.min-w-\[980px\] td p.truncate,
+table.min-w-\[980px\] td span.truncate {
+  white-space: nowrap !important;
+}
+
+table.min-w-\[980px\] td:nth-child(6) > div {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-width: 100% !important;
+}
+
+table.min-w-\[980px\] td:nth-child(6) button {
+  min-width: 66px !important;
+  max-width: 92px !important;
+  padding: 7px 9px !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 1180px) {
+  [data-billing-sync-root] {
+    justify-content: flex-start !important;
+  }
+
+  [data-billing-sync-root] label {
+    max-width: none !important;
+  }
+
+  [data-billing-sync-notice] {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+
+  div.overflow-x-auto:has(> table.min-w-\[980px\]) {
+    overflow-x: auto !important;
+  }
+
+  table.min-w-\[980px\] {
+    min-width: 980px !important;
+  }
+}
