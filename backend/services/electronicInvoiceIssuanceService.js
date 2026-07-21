@@ -527,7 +527,11 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     ), 160);
     const remoteCufe = cleanText(providerDocument?.cufe, 220);
     const providerSucceeded = !isExternalProvider || providerResponse?.success === true;
-    const providerNumberMissing = isExternalProvider && providerName === 'factus' && !remoteNumber;
+    const providerNumberMissing =
+      isExternalProvider &&
+      providerName === 'factus' &&
+      providerResponse?.success === true &&
+      !remoteNumber;
 
     if (!providerSucceeded || providerNumberMissing) {
       const failureMessage = providerNumberMissing
