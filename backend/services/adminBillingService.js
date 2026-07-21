@@ -96,6 +96,19 @@ function getCreditNoteLinks(note = {}) {
   };
 }
 
+function serializeSync(sync = {}) {
+  return {
+    status: sync?.status || 'never',
+    provider: sync?.provider || '',
+    providerStatus: sync?.providerStatus || '',
+    message: sync?.message || '',
+    httpStatus: sync?.httpStatus ?? null,
+    adminUser: sync?.adminUser || '',
+    lastAttemptAt: sync?.lastAttemptAt || null,
+    lastSuccessAt: sync?.lastSuccessAt || null,
+  };
+}
+
 function serializeElectronicInvoice(invoice = {}) {
   const links = getInvoiceLinks(invoice);
 
@@ -125,6 +138,7 @@ function serializeElectronicInvoice(invoice = {}) {
     links,
     errorMessage: invoice.errorMessage || '',
     providerErrors: invoice.providerErrors || {},
+    sync: serializeSync(invoice.sync),
     creditNotesCount: Array.isArray(invoice.creditNotes) ? invoice.creditNotes.length : 0,
     generatedAt: invoice.generatedAt || null,
     sentAt: invoice.sentAt || null,
@@ -165,8 +179,13 @@ function serializeCreditNote(invoice = {}, note = {}, index = 0) {
       status: note?.provider?.status || '',
       number: note?.provider?.number || '',
       cufe: note?.provider?.cufe || note?.provider?.cude || '',
+      isValidated: note?.provider?.isValidated === true,
+      validatedAt: note?.provider?.validatedAt || '',
     },
     links,
+    errorMessage: note.errorMessage || '',
+    providerErrors: note.providerErrors || {},
+    sync: serializeSync(note.sync),
     createdAt: note.createdAt || invoice.updatedAt || invoice.createdAt || null,
     updatedAt: note.updatedAt || null,
     invoice: serializeElectronicInvoice(invoice),

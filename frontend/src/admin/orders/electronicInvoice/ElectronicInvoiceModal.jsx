@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import api from '../../../lib/api';
+import { syncBillingDocument } from '../../billing/api/adminBillingApi';
 
 import InvoiceSummaryTab from './InvoiceSummaryTab';
 import InvoiceErrorsTab from './InvoiceErrorsTab';
@@ -110,6 +111,13 @@ function formatCreditNoteDate(value) {
   return date.toLocaleString('es-CO');
 }
 
+function formatSyncDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('es-CO');
+}
+
 function getCreditNotePublicUrl(note) {
   return (
     note?.provider?.links?.public_url ||
@@ -136,6 +144,7 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
   const [retrying, setRetrying] = useState(false);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [creatingCreditNote, setCreatingCreditNote] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [retryMessage, setRetryMessage] = useState('');
   const [retryError, setRetryError] = useState('');
@@ -155,6 +164,46 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
   const clearMessages = () => {
     setRetryMessage('');
     setRetryError('');
+  };
+
+  const handleSyncInvoice = async () => {
+    const identifier =
+      currentInvoice?.id ||
+      currentInvoice?._id ||
+      currentInvoice?.invoiceNumber ||
+      currentInvoice?.provider?.number;
+
+    if (!identifier) {
+      setRetryMessage('');
+      setRetryError('No se encontró la factura que se debe sincronizar.');
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      clearMessages();
+      const data = await syncBillingDocument(identifier);
+
+      if (data?.invoice) {
+        setCurrentInvoice((previous) => ({
+          ...previous,
+          ...data.invoice,
+          creditNotes: previous?.creditNotes || data.invoice?.creditNotes || [],
+        }));
+      }
+
+      setRetryMessage(data?.message || 'Estado de la factura sincronizado correctamente.');
+    } catch (error) {
+      setRetryMessage('');
+      setRetryError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          'No fue posible sincronizar la factura.'
+      );
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleRetryInvoice = async () => {
@@ -436,10 +485,31 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
               >
                 Orden #{order?.orderNumber || '—'}
               </p>
+
+              {currentInvoice?.sync?.lastAttemptAt ? (
+                <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-modal-muted-text)' }}>
+                  {currentInvoice.sync.status === 'failed' ? 'Último intento de sincronización' : 'Última sincronización'}: {formatSyncDate(currentInvoice.sync.lastSuccessAt || currentInvoice.sync.lastAttemptAt)}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleSyncInvoice}
+              disabled={syncing}
+              className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                background: 'var(--admin-button-soft-bg)',
+                color: 'var(--admin-button-soft-text)',
+                borderColor: 'var(--admin-button-soft-border)',
+              }}
+            >
+              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
+
             {!alreadyValidated && (
               <>
                 <button

@@ -15,6 +15,24 @@ const CreditNoteItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const BillingSyncSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['never', 'success', 'failed'],
+      default: 'never',
+    },
+    provider: { type: String, default: '' },
+    providerStatus: { type: String, default: '' },
+    message: { type: String, default: '' },
+    httpStatus: { type: Number, default: null },
+    adminUser: { type: String, default: '' },
+    lastAttemptAt: { type: Date, default: null },
+    lastSuccessAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
     type: {
@@ -68,6 +86,11 @@ const CreditNoteSchema = new mongoose.Schema(
     },
 
     errorMessage: { type: String, default: '' },
+
+    sync: {
+      type: BillingSyncSchema,
+      default: () => ({}),
+    },
 
     createdBy: { type: String, default: 'admin' },
     createdAt: { type: Date, default: Date.now },
@@ -187,6 +210,11 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
     providerErrors: {
       type: Object,
       default: {},
+    },
+
+    sync: {
+      type: BillingSyncSchema,
+      default: () => ({}),
     },
 
     creditNotes: {

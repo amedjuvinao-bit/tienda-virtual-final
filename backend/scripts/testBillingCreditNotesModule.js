@@ -99,7 +99,7 @@ function validateCreditNotesTableLayout() {
   const legacyCss = read('frontend/src/admin/billing/billingDocumentsLayout.css');
   const stabilityCss = read('frontend/src/admin/billing/billingLayoutStability.css');
   const mainFile = read('frontend/src/main.jsx');
-  const syncBridge = read('frontend/src/admin/billing/billingSyncBridge.js');
+  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
 
   [
     'Tabla interna de Notas crédito: evita columna derecha mocha.',
@@ -111,15 +111,23 @@ function validateCreditNotesTableLayout() {
   });
 
   [
-    '[data-billing-sync-root]',
     'billingLayoutStability.css',
     'table.min-w-\\[980px\\]',
     'width: 24% !important',
-    'Sincronizar',
   ].forEach((needle) => {
-    const target = needle === 'billingLayoutStability.css' ? mainFile : needle === 'Sincronizar' ? syncBridge : stabilityCss;
+    const target = needle === 'billingLayoutStability.css' ? mainFile : stabilityCss;
     assertIncludes(target, needle, `Ajuste estable de layout no está completo: falta ${needle}`);
   });
+
+  ['syncBillingCreditNote', 'Sincronizar'].forEach((needle) => {
+    assertIncludes(pageFile, needle, `Acción nativa de sincronización no está completa: falta ${needle}`);
+  });
+
+  assertNotIncludes(mainFile, 'billingSyncBridge', 'main.jsx no debe cargar el bridge DOM eliminado.');
+  assert(
+    !fs.existsSync(path.join(PROJECT_ROOT, 'frontend/src/admin/billing/billingSyncBridge.js')),
+    'No debe existir el bridge DOM de sincronización.'
+  );
 
   ok('Tabla de Notas crédito y controles de sincronización tienen ajuste visual sin recortes');
 }

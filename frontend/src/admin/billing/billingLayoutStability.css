@@ -1,45 +1,7 @@
 /*
   Estabilidad visual para Facturación.
-  Corrige desbordes causados por controles agregados progresivamente
-  y evita columnas derechas mochas en tablas administrativas.
+  Evita columnas derechas mochas en tablas administrativas.
 */
-
-[data-billing-sync-root] {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-}
-
-[data-billing-sync-root] label {
-  flex: 1 1 220px !important;
-  min-width: 0 !important;
-  max-width: 280px !important;
-}
-
-[data-billing-sync-root] select {
-  flex: 0 1 150px !important;
-  min-width: 0 !important;
-  max-width: 170px !important;
-}
-
-[data-billing-sync-root] button {
-  flex-shrink: 0 !important;
-  white-space: nowrap !important;
-}
-
-[data-billing-sync-visible] {
-  min-width: 108px !important;
-}
-
-[data-billing-sync-notice] {
-  flex: 0 1 220px !important;
-  max-width: 220px !important;
-  min-width: 150px !important;
-  overflow-wrap: break-word !important;
-}
 
 /* Notas crédito: misma lógica limpia de Documentos, sin recortes. */
 div.overflow-x-auto:has(> table.min-w-\[980px\]) {
@@ -121,19 +83,6 @@ table.min-w-\[980px\] td:nth-child(6) button {
 }
 
 @media (max-width: 1180px) {
-  [data-billing-sync-root] {
-    justify-content: flex-start !important;
-  }
-
-  [data-billing-sync-root] label {
-    max-width: none !important;
-  }
-
-  [data-billing-sync-notice] {
-    flex: 1 1 100% !important;
-    max-width: 100% !important;
-  }
-
   div.overflow-x-auto:has(> table.min-w-\[980px\]) {
     overflow-x: auto !important;
   }

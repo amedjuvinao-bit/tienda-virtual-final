@@ -27,6 +27,8 @@ import {
   getBillingSummary,
   getPendingBillingOrders,
   openBlob,
+  syncBillingCreditNote,
+  syncBillingDocument,
 } from './api/adminBillingApi';
 
 const BILLING_TABS = [
@@ -112,6 +114,20 @@ function formatDate(value) {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -463,6 +479,7 @@ function BillingDocumentsPanel() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [invoiceModalData, setInvoiceModalData] = useState(null);
 
   useEffect(() => {
@@ -546,6 +563,31 @@ function BillingDocumentsPanel() {
     }
   };
 
+  const syncDocument = async (document) => {
+    const identifier = document?.id || document?.invoiceNumber || document?.provider?.number;
+    if (!identifier) return;
+
+    try {
+      setError('');
+      setNotice('');
+      setActionLoading(`sync-${document.id}`);
+      const data = await syncBillingDocument(identifier);
+      const updated = data?.invoice;
+
+      if (updated?.id) {
+        setRows((current) => current.map((row) => (row.id === updated.id ? updated : row)));
+      }
+
+      setNotice(data?.message || 'Estado de la factura sincronizado correctamente.');
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'No se pudo sincronizar la factura.';
+      await loadDocuments();
+      setError(message);
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const closeInvoiceManager = () => {
     setInvoiceModalData(null);
     loadDocuments();
@@ -590,6 +632,7 @@ function BillingDocumentsPanel() {
       </PanelHeader>
 
       {error ? <MessageBox>{error}</MessageBox> : null}
+      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
 
       <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
@@ -608,7 +651,7 @@ function BillingDocumentsPanel() {
                   <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
                   <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / proveedor</th>
                   <th className="w-[17%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
-                  <th className="w-[20%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Soportes</th>
+                  <th className="w-[20%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -619,6 +662,7 @@ function BillingDocumentsPanel() {
                   const isPdfLoading = actionLoading === `pdf-${document.id}`;
                   const isXmlLoading = actionLoading === `xml-${document.id}`;
                   const isManageLoading = actionLoading === `manage-${document.id}`;
+                  const isSyncLoading = actionLoading === `sync-${document.id}`;
                   const canOpenPdf = document.hasPdf || document.orderId;
                   const canOpenXml = document.hasXml || document.links?.xmlUrl;
 
@@ -639,16 +683,25 @@ function BillingDocumentsPanel() {
                         </span>
                         <p className="mt-2 truncate text-sm font-black">{normalizeProviderLabel(document.provider?.name)}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
+                        {document.sync?.status === 'failed' ? (
+                          <p className="mt-1 truncate text-[11px] font-bold" title={document.sync?.message || ''} style={{ color: '#be123c' }}>
+                            {document.sync?.message || 'Falló la última sincronización'}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-bold leading-5">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
+                        <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
+                          {document.sync?.status === 'failed' ? 'Último intento' : 'Sincronizado'}: {formatDateTime(document.sync?.lastSuccessAt || document.sync?.lastAttemptAt)}
+                        </p>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <div className="flex flex-wrap justify-end gap-2">
                           <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                           <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
+                          <DocumentActionButton icon={RefreshCw} onClick={() => syncDocument(document)} disabled={isSyncLoading}>{isSyncLoading ? '...' : 'Sincronizar'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>
@@ -691,6 +744,7 @@ function BillingCreditNotesPanel() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [invoiceModalData, setInvoiceModalData] = useState(null);
 
   useEffect(() => {
@@ -753,6 +807,32 @@ function BillingCreditNotesPanel() {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const syncCreditNote = async (note) => {
+    const invoiceIdentifier = note?.invoiceId || note?.invoiceNumber;
+    const noteIdentifier = note?.id || note?.noteNumber || note?.referenceCode;
+    if (!invoiceIdentifier || !noteIdentifier) return;
+
+    try {
+      setError('');
+      setNotice('');
+      setActionLoading(`sync-${note.id}`);
+      const data = await syncBillingCreditNote(invoiceIdentifier, noteIdentifier);
+      const updated = data?.creditNote;
+
+      if (updated?.id) {
+        setRows((current) => current.map((row) => (row.id === updated.id ? updated : row)));
+      }
+
+      setNotice(data?.message || 'Estado de la nota crédito sincronizado correctamente.');
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'No se pudo sincronizar la nota crédito.';
+      await loadCreditNotes();
+      setError(message);
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   return (
     <section className="grid gap-4">
       <PanelHeader
@@ -805,6 +885,7 @@ function BillingCreditNotesPanel() {
       </PanelHeader>
 
       {error ? <MessageBox>{error}</MessageBox> : null}
+      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
 
       <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
@@ -832,6 +913,7 @@ function BillingCreditNotesPanel() {
                   const customer = note.customer || {};
                   const customerName = customer.businessName || customer.name || customer.email || 'Cliente';
                   const isOpening = actionLoading === `invoice-${note.id}`;
+                  const isSyncing = actionLoading === `sync-${note.id}`;
                   const hasExternal = Boolean(note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl);
 
                   return (
@@ -856,6 +938,11 @@ function BillingCreditNotesPanel() {
                         </span>
                         <p className="mt-2 truncate text-sm font-black">{getCreditNoteTypeLabel(note.type)}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{normalizeProviderLabel(note.provider?.name)}</p>
+                        <p className="mt-1 truncate text-[11px] font-bold" title={note.sync?.message || ''} style={{ color: note.sync?.status === 'failed' ? '#be123c' : 'var(--admin-card-muted-text)' }}>
+                          {note.sync?.lastAttemptAt
+                            ? `${note.sync?.status === 'failed' ? 'Último intento' : 'Sincronizada'}: ${formatDateTime(note.sync?.lastSuccessAt || note.sync?.lastAttemptAt)}`
+                            : 'Sin sincronizar'}
+                        </p>
                       </td>
                       <td className="px-4 py-4 align-top">
                         <p className="font-black">{formatCurrency(note.totalAmount)}</p>
@@ -865,6 +952,7 @@ function BillingCreditNotesPanel() {
                         <div className="flex flex-wrap justify-end gap-2">
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
                           <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!hasExternal} variant="primary">Soporte</DocumentActionButton>
+                          <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>

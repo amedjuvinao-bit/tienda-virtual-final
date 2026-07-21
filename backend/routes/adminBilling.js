@@ -55,7 +55,7 @@ router.get(
 
 router.post(
   '/documents/:invoiceId/sync',
-  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const data = await billingSyncService.syncInvoice(req.params.invoiceId, {
@@ -83,7 +83,7 @@ router.get(
 
 router.post(
   '/credit-notes/:invoiceId/:noteId/sync',
-  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const data = await billingSyncService.syncCreditNote(req.params.invoiceId, req.params.noteId, {

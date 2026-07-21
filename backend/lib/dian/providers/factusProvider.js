@@ -7,6 +7,20 @@ let factusTokenCache = {
   expiresAt: 0,
 };
 
+async function fetchFactus(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function trimSafe(value, max = 500) {
   return String(value || '').trim().slice(0, max);
 }
@@ -116,7 +130,7 @@ async function getFactusAccessToken(credentials) {
   body.append('username', credentials.username);
   body.append('password', credentials.password);
 
-  const response = await fetch(`${credentials.apiUrl}/oauth/token`, {
+  const response = await fetchFactus(`${credentials.apiUrl}/oauth/token`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -221,6 +235,115 @@ async function listFactusBills({ credentials, tokenResult }) {
       ? null
       : data?.message || data?.error || data || `HTTP ${response.status}`,
   };
+}
+
+async function getFactusDocumentByNumber({ providerConfig = {}, number, type = 'invoice' } = {}) {
+  const safeNumber = encodeURIComponent(trimSafe(number, 160));
+  const resource = type === 'credit-note' ? 'credit-notes' : 'bills';
+
+  if (!safeNumber) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 400,
+      stage: 'document_number',
+      error: type === 'credit-note'
+        ? 'La nota crédito no tiene número Factus para consultar.'
+        : 'La factura no tiene número Factus para consultar.',
+    };
+  }
+
+  const credentials = getFactusCredentials({ providerConfig });
+  const missing = validateCredentials(credentials);
+
+  if (missing.length) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'config_incomplete',
+      error: `Configuración Factus incompleta. Faltan: ${missing.join(', ')}.`,
+      missing,
+    };
+  }
+
+  let tokenResult;
+
+  try {
+    tokenResult = await getFactusAccessToken(credentials);
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 503,
+      stage: 'auth',
+      error: error?.name === 'AbortError'
+        ? 'La autenticación con Factus superó el tiempo de espera.'
+        : error?.message || 'No fue posible autenticar con Factus.',
+    };
+  }
+
+  if (!tokenResult.success) {
+    return {
+      success: false,
+      provider: 'factus',
+      stage: 'auth',
+      ...tokenResult,
+    };
+  }
+
+  try {
+    const response = await fetchFactus(
+      `${credentials.apiUrl}/v2/${resource}/${safeNumber}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `${tokenResult.tokenType} ${tokenResult.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    return {
+      success: response.ok,
+      provider: 'factus',
+      status: response.status,
+      stage: type === 'credit-note' ? 'get_credit_note' : 'get_invoice',
+      data,
+      error: response.ok
+        ? null
+        : data?.message || data?.error || `Factus respondió HTTP ${response.status}.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 503,
+      stage: type === 'credit-note' ? 'get_credit_note' : 'get_invoice',
+      error: error?.name === 'AbortError'
+        ? 'La consulta a Factus superó el tiempo de espera.'
+        : error?.message || 'No fue posible consultar Factus.',
+    };
+  }
+}
+
+async function getInvoiceFromFactus({ providerConfig, invoiceNumber } = {}) {
+  return getFactusDocumentByNumber({
+    providerConfig,
+    number: invoiceNumber,
+    type: 'invoice',
+  });
+}
+
+async function getCreditNoteFromFactus({ providerConfig, creditNoteNumber } = {}) {
+  return getFactusDocumentByNumber({
+    providerConfig,
+    number: creditNoteNumber,
+    type: 'credit-note',
+  });
 }
 
 async function deleteFactusBillByReference({ credentials, tokenResult, referenceCode }) {
@@ -1093,6 +1216,8 @@ async function sendInvoiceToFactus(invoiceData) {
 module.exports = {
   sendInvoiceToFactus,
   sendCreditNoteToFactus,
+  getInvoiceFromFactus,
+  getCreditNoteFromFactus,
   deleteFactusBillByReference,
   getFactusCredentials,
   getFactusAccessToken,

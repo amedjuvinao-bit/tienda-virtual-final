@@ -355,6 +355,20 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
+    path: '/api/admin/billing/documents/:invoiceId/sync',
+    permission: 'billing:retry',
+    description: 'Consultar y actualizar el estado de una factura en el proveedor.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/billing/credit-notes/:invoiceId/:noteId/sync',
+    permission: 'billing:retry',
+    description: 'Consultar y actualizar el estado de una nota crédito en el proveedor.',
+    audit: true,
+  },
+  {
+    method: 'POST',
     path: '/api/dian-provider-test/credit-note',
     permission: 'billing:credit_note',
     description: 'Crear nota crédito electrónica.',
