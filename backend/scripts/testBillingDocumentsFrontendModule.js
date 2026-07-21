@@ -88,6 +88,29 @@ function validateDocumentsPage() {
   ok('Pestaña Documentos consume /api/admin/billing/documents y muestra soportes reales');
 }
 
+function validateInvoiceModalReuse() {
+  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+
+  [
+    "../orders/electronicInvoice/ElectronicInvoiceModal",
+    'openInvoiceManager',
+    'api.get(`/api/orders/${document.orderId}`)',
+    'ElectronicInvoiceModal',
+    'invoiceModalData',
+    'Factura',
+  ].forEach((needle) => {
+    assertIncludes(pageFile, needle, `Documentos no reutiliza el modal existente de factura: falta ${needle}`);
+  });
+
+  assertNotIncludes(
+    pageFile,
+    'CreateCreditNoteModal',
+    'No se debe crear un modal nuevo de nota crédito.'
+  );
+
+  ok('Documentos reutiliza ElectronicInvoiceModal existente para notas crédito');
+}
+
 function validateDocumentsLayoutFix() {
   const mainFile = read('frontend/src/main.jsx');
   const cssFile = read('frontend/src/admin/billing/billingDocumentsLayout.css');
@@ -132,6 +155,7 @@ function main() {
   try {
     validateFrontendApi();
     validateDocumentsPage();
+    validateInvoiceModalReuse();
     validateDocumentsLayoutFix();
     validateBackendStillElectronicInvoice();
   } catch (error) {
