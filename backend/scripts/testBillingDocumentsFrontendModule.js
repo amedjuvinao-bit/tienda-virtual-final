@@ -123,15 +123,21 @@ function validateInvoiceModalLayout() {
 
   [
     'Ajuste visual puntual para el modal existente de factura electronica',
+    'min(1180px, calc(100vw - 36px))',
+    'radial-gradient(circle at top left',
     'max-height: calc(100vh - 64px)',
     'z-index: 10000',
     'background: var(--admin-modal-bg, var(--admin-card-bg, #ffffff))',
-    'overflow-y: auto',
+    '[class~="xl:grid-cols-4"] > div:nth-child(3) p:last-child',
+    'overflow-wrap: anywhere',
+    'text-overflow: ellipsis',
+    'font-family: ui-monospace',
+    'max-height: calc(100vh - 260px)',
   ].forEach((needle) => {
     assertIncludes(cssFile, needle, `electronicInvoiceModalFix.css no contiene ${needle}`);
   });
 
-  ok('Modal existente de factura queda visible y centrado sin tocar Documentos');
+  ok('Modal existente de factura controla CUFE largo y mejora la presentación visual');
 }
 
 function validateDocumentsLayoutFix() {
