@@ -49,6 +49,19 @@ router.get(
 );
 
 router.get(
+  '/credit-notes',
+  requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
+  async (req, res) => {
+    try {
+      const data = await billingService.listCreditNotes(req.query || {});
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error listando notas crédito de facturación.');
+    }
+  }
+);
+
+router.get(
   '/pending-orders',
   requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
   async (req, res) => {
