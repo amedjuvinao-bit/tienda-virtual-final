@@ -8,6 +8,7 @@ const express = require('express');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const billingService = require('../services/adminBillingService');
+const billingSyncService = require('../services/adminBillingSyncService');
 
 const router = express.Router();
 
@@ -18,6 +19,10 @@ function sendError(res, error, fallback = 'Error procesando facturación.') {
     error: error?.code || 'BILLING_ADMIN_ERROR',
     message: error?.message || fallback,
   });
+}
+
+function currentAdmin(req) {
+  return req.adminUsername || req.user?.username || req.user?.email || 'admin';
 }
 
 router.use(requireAdmin);
@@ -48,6 +53,21 @@ router.get(
   }
 );
 
+router.post(
+  '/documents/:invoiceId/sync',
+  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  async (req, res) => {
+    try {
+      const data = await billingSyncService.syncInvoice(req.params.invoiceId, {
+        adminUser: currentAdmin(req),
+      });
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error sincronizando factura.');
+    }
+  }
+);
+
 router.get(
   '/credit-notes',
   requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
@@ -57,6 +77,21 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error listando notas crédito de facturación.');
+    }
+  }
+);
+
+router.post(
+  '/credit-notes/:invoiceId/:noteId/sync',
+  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  async (req, res) => {
+    try {
+      const data = await billingSyncService.syncCreditNote(req.params.invoiceId, req.params.noteId, {
+        adminUser: currentAdmin(req),
+      });
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error sincronizando nota crédito.');
     }
   }
 );
@@ -80,7 +115,7 @@ router.post(
   async (req, res) => {
     try {
       const data = await billingService.generateInvoiceForOrder(req.params.orderId, {
-        adminUser: req.adminUsername || req.user?.username || 'admin',
+        adminUser: currentAdmin(req),
       });
 
       res.status(data.created ? 201 : 200).json({ ok: true, data });
