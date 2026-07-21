@@ -84,6 +84,18 @@ function getInvoiceLinks(invoice = {}) {
   };
 }
 
+function getCreditNoteLinks(note = {}) {
+  const links = note?.provider?.links || {};
+  const rawLinks = note?.provider?.raw?.data?.links || note?.provider?.raw?.links || {};
+
+  return {
+    publicUrl: links.public_url || links.publicUrl || rawLinks.public_url || rawLinks.publicUrl || '',
+    qrUrl: links.qr || links.qrUrl || rawLinks.qr || rawLinks.qrUrl || '',
+    pdfUrl: links.pdf_url || links.pdfUrl || rawLinks.pdf_url || rawLinks.pdfUrl || '',
+    xmlUrl: links.xml_url || links.xmlUrl || rawLinks.xml_url || rawLinks.xmlUrl || '',
+  };
+}
+
 function serializeElectronicInvoice(invoice = {}) {
   const links = getInvoiceLinks(invoice);
 
@@ -121,6 +133,43 @@ function serializeElectronicInvoice(invoice = {}) {
     failedAt: invoice.failedAt || null,
     createdAt: invoice.createdAt || null,
     updatedAt: invoice.updatedAt || null,
+  };
+}
+
+function serializeCreditNote(invoice = {}, note = {}, index = 0) {
+  const links = getCreditNoteLinks(note);
+  const customer = invoice.customer || {};
+
+  return {
+    id: String(note._id || `${invoice._id || 'invoice'}-${index}`),
+    invoiceId: String(invoice._id || ''),
+    orderId: invoice.orderId ? String(invoice.orderId) : '',
+    orderNumber: invoice.orderNumber || '',
+    invoiceNumber: invoice.invoiceNumber || invoice?.provider?.number || note.billNumber || '',
+    invoiceStatus: invoice.status || 'pending',
+    invoiceCufe: invoice.cufe || invoice?.provider?.cufe || '',
+    customer,
+    noteNumber: note?.provider?.number || note.number || note.referenceCode || '',
+    referenceCode: note.referenceCode || note?.provider?.referenceCode || '',
+    billNumber: note.billNumber || invoice.invoiceNumber || invoice?.provider?.number || '',
+    type: note.type || 'total',
+    status: note.status || note?.provider?.status || 'created',
+    reasonCode: note.reasonCode || '',
+    reasonText: note.reasonText || note.reason || note.observation || '',
+    subtotal: money(note.subtotal),
+    taxAmount: money(note.taxAmount),
+    totalAmount: money(note.totalAmount || note.total || note.amount),
+    itemsCount: Array.isArray(note.items) ? note.items.length : 0,
+    provider: {
+      name: note?.provider?.name || invoice?.provider?.name || '',
+      status: note?.provider?.status || '',
+      number: note?.provider?.number || '',
+      cufe: note?.provider?.cufe || note?.provider?.cude || '',
+    },
+    links,
+    createdAt: note.createdAt || invoice.updatedAt || invoice.createdAt || null,
+    updatedAt: note.updatedAt || null,
+    invoice: serializeElectronicInvoice(invoice),
   };
 }
 
@@ -474,6 +523,58 @@ async function listElectronicInvoices(params = {}) {
   };
 }
 
+async function listCreditNotes(params = {}) {
+  const { page, limit, skip } = normalizePage(params);
+  const regex = makeRegex(params.q || params.search || '');
+  const invoiceFilter = { 'creditNotes.0': { $exists: true } };
+
+  if (regex) {
+    invoiceFilter.$or = [
+      { orderNumber: regex },
+      { invoiceNumber: regex },
+      { cufe: regex },
+      { 'provider.number': regex },
+      { 'customer.businessName': regex },
+      { 'customer.email': regex },
+      { 'customer.documentNumber': regex },
+      { 'creditNotes.provider.number': regex },
+      { 'creditNotes.referenceCode': regex },
+      { 'creditNotes.reasonText': regex },
+      { 'creditNotes.reason': regex },
+    ];
+  }
+
+  const invoices = await ElectronicInvoice.find(invoiceFilter).sort({ updatedAt: -1, createdAt: -1 }).lean();
+  const status = cleanText(params.status, 50).toLowerCase();
+  const type = cleanText(params.type, 50).toLowerCase();
+
+  const flattened = [];
+  invoices.forEach((invoice) => {
+    (Array.isArray(invoice.creditNotes) ? invoice.creditNotes : []).forEach((note, index) => {
+      const row = serializeCreditNote(invoice, note, index);
+      const rowStatus = cleanText(row.status, 50).toLowerCase();
+      const rowType = cleanText(row.type, 50).toLowerCase();
+
+      if (status && status !== 'all' && rowStatus !== status) return;
+      if (type && type !== 'all' && rowType !== type) return;
+      flattened.push(row);
+    });
+  });
+
+  flattened.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const total = flattened.length;
+  const rows = flattened.slice(skip, skip + limit);
+
+  return {
+    rows,
+    total,
+    page,
+    limit,
+    pages: Math.max(1, Math.ceil(total / limit)),
+  };
+}
+
 async function listPendingBillableOrders(params = {}) {
   const { page, limit, skip } = normalizePage(params);
   const orderIdsWithInvoice = await ElectronicInvoice.distinct('orderId', {});
@@ -511,12 +612,14 @@ async function getBillingSummary() {
   const validated = invoices.filter(isValidatedInvoice).length;
   const errors = invoices.filter(isRejectedOrFailed).length;
   const pending = Math.max(0, Number(billableTotal || 0) - ordersWithInvoice.length);
+  const creditNotes = invoices.reduce((acc, invoice) => acc + (Array.isArray(invoice.creditNotes) ? invoice.creditNotes.length : 0), 0);
 
   return {
     emitted,
     validated,
     pending,
     errors,
+    creditNotes,
     provider: settings.provider || 'mock',
     mode: settings.mode || 'internal',
     resolution: settings.resolution || {},
@@ -529,7 +632,9 @@ module.exports = {
   getBillingSummary,
   getBillingSettingsSnapshot,
   generateInvoiceForOrder,
+  listCreditNotes,
   listElectronicInvoices,
   listPendingBillableOrders,
+  serializeCreditNote,
   serializeElectronicInvoice,
 };
