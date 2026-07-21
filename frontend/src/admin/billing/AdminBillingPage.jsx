@@ -342,14 +342,14 @@ function DocumentActionButton({ children, icon: Icon, disabled, onClick, variant
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-9 min-w-[54px] items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-10 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 text-[11px] font-black shadow-sm transition hover:-translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
         color: isPrimary ? '#fff' : 'var(--admin-card-text)',
       }}
     >
-      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
+      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
       <span className="leading-none">{children}</span>
     </button>
   );
@@ -643,15 +643,15 @@ function BillingDocumentsPanel() {
         {rows.length === 0 && !loading ? (
           <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
-          <div className="w-full overflow-hidden">
-            <table className="w-full table-fixed text-left text-sm">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+              <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="w-[26%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
-                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / proveedor</th>
-                  <th className="w-[17%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
-                  <th className="w-[20%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                  <th className="w-[23%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
+                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / proveedor</th>
+                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
+                  <th className="w-[26%] px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -697,7 +697,10 @@ function BillingDocumentsPanel() {
                         </p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
+                        <div
+                          className="grid grid-cols-2 gap-2 rounded-2xl border p-2"
+                          style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
+                        >
                           <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                           <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
@@ -897,15 +900,15 @@ function BillingCreditNotesPanel() {
           <EmptyWorkBlock icon={RotateCcw} title="Sin notas crédito registradas" text="Cuando una factura tenga nota crédito total o parcial, aparecerá aquí sin salir del módulo de Facturación." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] table-fixed text-left text-sm">
-              <thead>
+            <table className="w-full min-w-[1180px] table-fixed text-left text-sm">
+              <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Nota crédito</th>
-                  <th className="w-[20%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Factura</th>
-                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="w-[17%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / tipo</th>
-                  <th className="w-[13%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
-                  <th className="w-[13%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Nota crédito</th>
+                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Factura</th>
+                  <th className="w-[15%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / tipo</th>
+                  <th className="w-[10%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
+                  <th className="w-[25%] px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -949,10 +952,15 @@ function BillingCreditNotesPanel() {
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(note.itemsCount || 0)} ítem(s)</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
+                        <div
+                          className="grid grid-cols-2 gap-2 rounded-2xl border p-2"
+                          style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
+                        >
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
                           <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!hasExternal} variant="primary">Soporte</DocumentActionButton>
-                          <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          <div className="col-span-2">
+                            <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          </div>
                         </div>
                       </td>
                     </tr>
