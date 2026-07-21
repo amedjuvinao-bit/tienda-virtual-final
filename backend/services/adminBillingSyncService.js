@@ -56,6 +56,8 @@ function extractFactusNumber(value = {}, type = 'invoice') {
 function resolveFactusInvoiceNumber(invoice = {}) {
   const rawCandidates = [
     invoice?.provider?.raw,
+    invoice?.provider?.raw?.response,
+    invoice?.dianResponse?.raw,
     invoice?.dianResponse?.raw?.providerResponse,
     invoice?.dianResponse?.raw?.billingSync?.response,
   ];
@@ -70,8 +72,7 @@ function resolveFactusInvoiceNumber(invoice = {}) {
   const source = cleanText(invoice?.provider?.raw?.source, 80).toLowerCase();
   const isLocalPlaceholder =
     source === 'admin-billing' &&
-    providerNumber &&
-    providerNumber === localNumber;
+    (!providerNumber || providerNumber === localNumber);
 
   if (isLocalPlaceholder) return '';
   return providerNumber || localNumber;

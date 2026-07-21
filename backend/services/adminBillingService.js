@@ -11,6 +11,7 @@ const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const { generateCUFE } = require('../lib/dian/cufe');
 const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
+const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
 
 let extractFactusLinks = null;
 try {
@@ -29,6 +30,74 @@ function cleanText(value, max = 180) {
 function money(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
+}
+
+function firstValue(...values) {
+  return values.find((value) => value !== undefined && value !== null && value !== '');
+}
+
+function hasProviderDocumentShape(value = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  return Boolean(firstValue(
+    value.number,
+    value.invoiceNumber,
+    value.reference_code,
+    value.referenceCode,
+    value.cufe,
+    value.is_validated,
+    value.validated_at
+  ) !== undefined);
+}
+
+function extractProviderDocument(providerResponse = {}) {
+  const data = providerResponse?.data;
+  const nested = data?.data;
+  const raw = providerResponse?.raw;
+  const candidates = [
+    nested?.bill,
+    nested?.invoice,
+    nested,
+    data?.bill,
+    data?.invoice,
+    data,
+    raw?.data?.data?.bill,
+    raw?.data?.data?.invoice,
+    raw?.data?.data,
+    raw?.data,
+    raw,
+  ];
+
+  return candidates.find(hasProviderDocumentShape) || {};
+}
+
+function providerMessage(providerResponse = {}, fallback = '') {
+  const value = firstValue(
+    providerResponse?.error,
+    providerResponse?.data?.message,
+    providerResponse?.message,
+    fallback
+  );
+
+  if (typeof value === 'string') return cleanText(value, 500);
+
+  try {
+    return cleanText(JSON.stringify(value), 500);
+  } catch {
+    return cleanText(fallback, 500);
+  }
+}
+
+function providerErrors(providerResponse = {}, providerDocument = {}) {
+  const errors = firstValue(
+    providerDocument?.errors,
+    providerResponse?.data?.errors,
+    providerResponse?.data?.data?.errors,
+    providerResponse?.raw?.errors,
+    {}
+  );
+
+  return errors && typeof errors === 'object' && !Array.isArray(errors) ? errors : {};
 }
 
 function makeRegex(value) {
@@ -61,7 +130,7 @@ function isValidatedInvoice(invoice = {}) {
     ['accepted', 'validated', 'validada', 'validado'].includes(status) ||
     ['accepted', 'validated', 'validada', 'validado'].includes(providerStatus) ||
     invoice?.provider?.isValidated === true ||
-    Boolean(invoice.cufe || invoice?.provider?.cufe || invoice?.provider?.raw?.cufe)
+    Boolean(invoice?.provider?.validatedAt || invoice?.acceptedAt)
   );
 }
 
@@ -393,8 +462,15 @@ async function generateInvoiceForOrder(orderId, options = {}) {
   const fiscalInfo = billing.fiscalInfo || {};
   const dianResolution = billing.dianResolution || {};
   const legalTexts = billing.legalTexts || {};
-  const providerName = billing?.electronicProvider?.provider || billing?.dian?.providerType || 'mock';
+  const providerName = cleanText(
+    billing?.electronicProvider?.provider || billing?.dian?.providerType || 'mock',
+    60
+  ).toLowerCase();
   const providerMode = billing?.dian?.mode || 'internal';
+  const isExternalProvider =
+    billing?.dian?.enabled === true &&
+    providerMode !== 'internal' &&
+    providerName !== 'mock';
   const environment = dianResolution.environment || '2';
   const { subtotal, shipping, taxAmount, total } = calculateTotals(order, settingsForInvoice);
   const customerSnapshot = buildCustomerSnapshot(order);
@@ -425,11 +501,86 @@ async function generateInvoiceForOrder(orderId, options = {}) {
 
   const qrUrl = `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=${cufeData.cufe}`;
 
+  let providerResponse = null;
+  let providerDocument = {};
+
+  if (isExternalProvider) {
+    try {
+      providerResponse = await sendElectronicInvoiceToProvider({
+        provider: providerName,
+        invoiceData: {
+          order,
+          settings: settingsForInvoice,
+          cufeData,
+          xmlContent,
+          provider: providerName,
+          providerConfig: billing.electronicProvider || {},
+        },
+      });
+    } catch (error) {
+      providerResponse = {
+        success: false,
+        provider: providerName,
+        stage: 'send_invoice',
+        error: error?.message || 'No fue posible enviar la factura al proveedor.',
+      };
+    }
+
+    providerDocument = extractProviderDocument(providerResponse);
+
+    if (providerResponse?.success !== true) {
+      const error = new Error(providerMessage(
+        providerResponse,
+        'Factus no confirmó la creación de la factura.'
+      ));
+      error.status = 502;
+      error.code = 'BILLING_PROVIDER_GENERATION_ERROR';
+      throw error;
+    }
+  }
+
+  const remoteNumber = cleanText(firstValue(
+    providerDocument?.number,
+    providerDocument?.invoiceNumber,
+    providerResponse?.data?.invoiceNumber
+  ), 160);
+  const remoteCufe = cleanText(providerDocument?.cufe, 220);
+
+  if (isExternalProvider && providerName === 'factus' && !remoteNumber) {
+    const error = new Error(
+      'Factus respondió la creación, pero no devolvió el número oficial de la factura.'
+    );
+    error.status = 502;
+    error.code = 'BILLING_PROVIDER_NUMBER_MISSING';
+    throw error;
+  }
+
+  const isProviderValidated =
+    providerDocument?.is_validated === true ||
+    providerDocument?.validated === true ||
+    Boolean(providerDocument?.validated_at || providerDocument?.validatedAt);
+  const officialLinks = providerDocument?.links && typeof providerDocument.links === 'object'
+    ? providerDocument.links
+    : {};
+  const nextStatus = isExternalProvider
+    ? (isProviderValidated ? 'accepted' : 'sent')
+    : 'generated';
+  const storedInvoiceNumber = remoteNumber || invoiceNumber;
+  const storedCufe = isExternalProvider ? remoteCufe : cufeData.cufe;
+  const responseMessage = providerMessage(
+    providerResponse,
+    isProviderValidated
+      ? 'Factura creada y validada correctamente por Factus.'
+      : isExternalProvider
+        ? 'Factura enviada al proveedor y pendiente de validación.'
+        : 'Comprobante interno generado desde módulo Facturación.'
+  );
+
   const created = await ElectronicInvoice.create({
     orderId: order._id,
     orderNumber: order.orderNumber || '',
     required: true,
-    status: 'generated',
+    status: nextStatus,
     customer: customerSnapshot,
     fiscalInfo,
     dianResolution: {
@@ -446,40 +597,62 @@ async function generateInvoiceForOrder(orderId, options = {}) {
       invoiceLegalText: legalTexts.invoiceLegalText || '',
       internalReceiptNote: legalTexts.internalReceiptNote || '',
     },
-    invoiceNumber,
-    cufe: cufeData.cufe,
+    invoiceNumber: storedInvoiceNumber,
+    cufe: storedCufe,
     xmlContent,
-    qrUrl,
+    qrUrl: officialLinks.qr || officialLinks.qr_url || (isExternalProvider ? '' : qrUrl),
+    pdfUrl: officialLinks.pdf || officialLinks.pdf_url || officialLinks.public_url || '',
+    xmlUrl: officialLinks.xml || officialLinks.xml_url || '',
     provider: {
       name: providerName,
-      status: 'created',
-      referenceCode: `ORDER-${order.orderNumber || order._id}`,
-      number: invoiceNumber,
-      cufe: cufeData.cufe,
-      isValidated: false,
-      links: {},
+      status: isProviderValidated
+        ? 'validated'
+        : isExternalProvider
+          ? 'sent'
+          : 'created',
+      referenceCode: cleanText(
+        providerDocument?.reference_code ||
+        providerDocument?.referenceCode ||
+        order.orderNumber ||
+        order._id,
+        180
+      ),
+      number: remoteNumber,
+      cufe: storedCufe,
+      isValidated: isProviderValidated,
+      validatedAt: providerDocument?.validated_at || providerDocument?.validatedAt || '',
+      links: officialLinks,
       raw: {
+        ...providerDocument,
         mode: providerMode,
         source: 'admin-billing',
+        response: providerResponse,
       },
     },
     dianResponse: {
-      stage: providerMode === 'internal' || providerName === 'mock' ? 'internal_generated' : 'provider_pending',
+      stage: isExternalProvider
+        ? (isProviderValidated ? 'provider_validated' : 'provider_sent')
+        : 'internal_generated',
       environment,
       issueDate,
       issueTime,
-      message: providerMode === 'internal' || providerName === 'mock'
-        ? 'Comprobante interno generado desde módulo Facturación.'
-        : 'Documento generado y pendiente de envío al proveedor electrónico.',
-      code: 'GENERATED',
+      message: responseMessage,
+      code: isExternalProvider
+        ? String(providerResponse?.status || (isProviderValidated ? 'VALIDATED' : 'SENT'))
+        : 'GENERATED',
       raw: {
         subtotal,
         shipping,
         taxAmount,
         total,
+        providerResponse,
       },
     },
+    providerErrors: providerErrors(providerResponse, providerDocument),
+    errorMessage: '',
     generatedAt: now,
+    sentAt: isExternalProvider ? now : null,
+    acceptedAt: isProviderValidated ? now : null,
   });
 
   if (settings?._id) {
@@ -492,7 +665,11 @@ async function generateInvoiceForOrder(orderId, options = {}) {
   return {
     created: true,
     invoice: serializeElectronicInvoice(created.toObject()),
-    message: 'Factura generada correctamente.',
+    message: isProviderValidated
+      ? 'Factura generada y validada correctamente por Factus.'
+      : isExternalProvider
+        ? 'Factura enviada correctamente al proveedor.'
+        : 'Comprobante interno generado correctamente.',
   };
 }
 
@@ -648,6 +825,7 @@ async function getBillingSummary() {
 }
 
 module.exports = {
+  extractProviderDocument,
   getBillingSummary,
   getBillingSettingsSnapshot,
   generateInvoiceForOrder,

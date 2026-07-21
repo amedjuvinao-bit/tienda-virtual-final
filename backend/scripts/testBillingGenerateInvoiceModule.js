@@ -51,8 +51,15 @@ function validateBackendGenerationService() {
     "require('../models/Order')",
     'generateCUFE',
     'generateInvoiceXML',
+    'sendElectronicInvoiceToProvider',
+    'extractProviderDocument',
+    'isExternalProvider',
+    'providerResponse?.success !== true',
+    "error.code = 'BILLING_PROVIDER_GENERATION_ERROR'",
+    'remoteNumber',
+    'remoteCufe',
     'ElectronicInvoice.create',
-    "status: 'generated'",
+    'status: nextStatus',
     'billing.dianResolution.currentNumber',
     'serializeElectronicInvoice(created.toObject())',
   ].forEach((needle) => {
@@ -60,7 +67,11 @@ function validateBackendGenerationService() {
   });
 
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
-  ok('Servicio genera factura sobre ElectronicInvoice sin modelo paralelo');
+  const providerCall = serviceFile.indexOf('await sendElectronicInvoiceToProvider');
+  const invoiceCreate = serviceFile.indexOf('await ElectronicInvoice.create');
+  assert(providerCall >= 0 && invoiceCreate > providerCall, 'La factura debe enviarse al proveedor antes de guardarse como emitida.');
+
+  ok('Servicio envía la factura al proveedor y guarda la respuesta oficial en ElectronicInvoice');
 }
 
 function validateBackendGenerationRoute() {
@@ -76,6 +87,31 @@ function validateBackendGenerationRoute() {
   });
 
   ok('Ruta admin genera factura desde orden usando el servicio de facturación');
+}
+
+function validateFactusCreationResponse() {
+  const { extractProviderDocument } = require('../services/adminBillingService');
+  const document = extractProviderDocument({
+    success: true,
+    status: 201,
+    data: {
+      status: 'Created',
+      message: 'Documento validado',
+      data: {
+        reference_code: '000228',
+        number: 'SETP990002109',
+        cufe: 'cufe-oficial-prueba',
+        is_validated: true,
+      },
+      invoiceNumber: 'SETP990002109',
+    },
+  });
+
+  assert(document.number === 'SETP990002109', 'No se extrajo data.number de la respuesta de creación Factus.');
+  assert(document.cufe === 'cufe-oficial-prueba', 'No se extrajo el CUFE oficial de Factus.');
+  assert(document.is_validated === true, 'No se conservó la validación real informada por Factus.');
+
+  ok('Respuesta de creación Factus conserva número, CUFE y validación oficiales');
 }
 
 function validateFrontendGeneration() {
@@ -106,6 +142,30 @@ function validateFrontendGeneration() {
   assertNotIncludes(pageFile, 'getInitialDocumentQuery', 'Documentos no debe cargarse filtrado por URL automáticamente.');
 
   ok('Frontend conecta botón Generar sin redirigir ni recargar la página');
+}
+
+function validateGeneratedIsNotValidated() {
+  const modalFile = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
+  const statusFile = read('frontend/src/admin/orders/electronicInvoice/invoiceStatusUtils.js');
+  const serviceFile = read('backend/services/adminBillingService.js');
+
+  assertNotIncludes(
+    modalFile,
+    "status === 'generated' ||",
+    'El modal no debe tratar una factura solamente generada como validada.'
+  );
+  assertNotIncludes(
+    statusFile,
+    "status === 'accepted' ||\n    status === 'generated'",
+    'El estado generated no debe mostrarse como validado.'
+  );
+  assertNotIncludes(
+    serviceFile,
+    'Boolean(invoice.cufe || invoice?.provider?.cufe',
+    'La existencia de un CUFE local no debe validar por sí sola la factura.'
+  );
+
+  ok('Estado generado permanece pendiente hasta confirmación real del proveedor');
 }
 
 function validateGenerateConfirmationBridge() {
@@ -151,7 +211,9 @@ function main() {
   try {
     validateBackendGenerationService();
     validateBackendGenerationRoute();
+    validateFactusCreationResponse();
     validateFrontendGeneration();
+    validateGeneratedIsNotValidated();
     validateGenerateConfirmationBridge();
     validateScriptRegistered();
   } catch (error) {

@@ -55,7 +55,7 @@ function invoiceIsAlreadyValidated(invoice) {
 
   return (
     status === 'accepted' ||
-    status === 'generated' ||
+    status === 'validated' ||
     invoice?.provider?.isValidated === true ||
     invoice?.provider?.raw?.is_validated === true
   );

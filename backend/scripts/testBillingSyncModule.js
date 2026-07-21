@@ -143,6 +143,19 @@ function validateProviderResponseNormalization() {
   );
   assert(
     resolveFactusInvoiceNumber({
+      invoiceNumber: 'FE000027',
+      provider: { number: 'FE000027', raw: {} },
+      dianResponse: {
+        raw: {
+          success: true,
+          data: { data: { number: 'SETP990007807', status: 1 } },
+        },
+      },
+    }) === 'SETP990007807',
+    'Debe recuperar el número real guardado directamente en dianResponse.raw.'
+  );
+  assert(
+    resolveFactusInvoiceNumber({
       invoiceNumber: 'SETP990007801',
       provider: { number: 'SETP990007801', raw: {} },
     }) === 'SETP990007801',
