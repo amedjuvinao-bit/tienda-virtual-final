@@ -14,7 +14,9 @@ import {
   Settings2,
 } from 'lucide-react';
 
+import api from '../../lib/api';
 import FacturacionSection from '../configuracion/sections/FacturacionSection';
+import ElectronicInvoiceModal from '../orders/electronicInvoice/ElectronicInvoiceModal';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
@@ -372,6 +374,29 @@ function SummaryQuickLink({ to, children, icon: Icon }) {
   );
 }
 
+function buildFallbackOrderForInvoice(document = {}) {
+  const customer = document.customer || {};
+
+  return {
+    _id: document.orderId || '',
+    orderNumber: document.orderNumber || '',
+    customer: {
+      name: customer.businessName || customer.name || 'Cliente',
+      email: customer.email || '',
+      documentNumber: customer.documentNumber || '',
+    },
+    billing: customer,
+    items: [],
+    cart: [],
+    electronicInvoice: document,
+  };
+}
+
+function unwrapOrderResponse(response) {
+  const payload = response?.data;
+  return payload?.data || payload?.order || payload || null;
+}
+
 function BillingDocumentsPanel() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -383,6 +408,7 @@ function BillingDocumentsPanel() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [invoiceModalData, setInvoiceModalData] = useState(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -449,6 +475,49 @@ function BillingDocumentsPanel() {
     } finally {
       setActionLoading('');
     }
+  };
+
+  const openInvoiceManager = async (document) => {
+    if (!document?.id) return;
+
+    try {
+      setError('');
+      setActionLoading(`manage-${document.id}`);
+
+      let order = null;
+      if (document.orderId) {
+        const response = await api.get(`/api/orders/${document.orderId}`);
+        order = unwrapOrderResponse(response);
+      }
+
+      const fallbackOrder = buildFallbackOrderForInvoice(document);
+      const resolvedOrder = order && (order._id || order.id) ? order : fallbackOrder;
+      const resolvedInvoice =
+        resolvedOrder?.electronicInvoice ||
+        resolvedOrder?.invoice ||
+        resolvedOrder?.dian ||
+        resolvedOrder?.factus ||
+        document;
+
+      setInvoiceModalData({
+        order: {
+          ...fallbackOrder,
+          ...resolvedOrder,
+          _id: resolvedOrder?._id || resolvedOrder?.id || fallbackOrder._id,
+          electronicInvoice: resolvedInvoice,
+        },
+        invoice: resolvedInvoice,
+      });
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'No se pudo abrir la administración de la factura.');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const closeInvoiceManager = () => {
+    setInvoiceModalData(null);
+    loadDocuments();
   };
 
   return (
@@ -518,6 +587,7 @@ function BillingDocumentsPanel() {
                   const customerName = customer.businessName || customer.name || customer.email || 'Cliente';
                   const isPdfLoading = actionLoading === `pdf-${document.id}`;
                   const isXmlLoading = actionLoading === `xml-${document.id}`;
+                  const isManageLoading = actionLoading === `manage-${document.id}`;
                   const canOpenPdf = document.hasPdf || document.orderId;
                   const canOpenXml = document.hasXml || document.links?.xmlUrl;
 
@@ -547,7 +617,7 @@ function BillingDocumentsPanel() {
                         <div className="flex flex-wrap justify-end gap-2">
                           <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
-                          {document.links?.publicUrl ? <DocumentActionButton icon={ExternalLink} onClick={() => window.open(document.links.publicUrl, '_blank', 'noopener,noreferrer')}>Ver</DocumentActionButton> : null}
+                          <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>
@@ -566,6 +636,14 @@ function BillingDocumentsPanel() {
           </div>
         </div>
       </div>
+
+      {invoiceModalData ? (
+        <ElectronicInvoiceModal
+          order={invoiceModalData.order}
+          invoice={invoiceModalData.invoice}
+          onClose={closeInvoiceManager}
+        />
+      ) : null}
     </section>
   );
 }
