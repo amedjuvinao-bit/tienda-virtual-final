@@ -29,6 +29,7 @@
     "test:billing-pending-orders": "node scripts/testBillingPendingOrdersFrontendModule.js",
     "test:billing-generate-invoice": "node scripts/testBillingGenerateInvoiceModule.js",
     "test:billing-summary": "node scripts/testBillingSummaryFrontendModule.js",
+    "test:billing-credit-notes": "node scripts/testBillingCreditNotesModule.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
     "customers:merge-duplicates": "node scripts/mergeDuplicateCustomers.js",
