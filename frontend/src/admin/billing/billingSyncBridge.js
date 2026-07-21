@@ -7,6 +7,10 @@ import { syncBillingCreditNote, syncBillingDocument } from './api/adminBillingAp
 const BRIDGE_MARK = 'billingSyncBridgeReady';
 const BTN_ATTR = 'data-billing-sync-visible';
 const NOTICE_ATTR = 'data-billing-sync-notice';
+const DOCUMENTS_PATH = '/admin/facturacion/documentos';
+const CREDIT_NOTES_PATH = '/admin/facturacion/notas-credito';
+
+let mountTimer = null;
 
 function isBillingPath() {
   return window.location.pathname.startsWith('/admin/facturacion/');
@@ -14,8 +18,8 @@ function isBillingPath() {
 
 function getMode() {
   const path = window.location.pathname;
-  if (path.includes('/notas-credito')) return 'credit-notes';
-  if (path.includes('/documentos')) return 'documents';
+  if (path.includes(CREDIT_NOTES_PATH) || path.includes('/notas-credito')) return 'credit-notes';
+  if (path.includes(DOCUMENTS_PATH) || path.includes('/documentos')) return 'documents';
   return '';
 }
 
@@ -156,9 +160,11 @@ function mountBillingSyncButton() {
 }
 
 function scheduleMount() {
-  window.requestAnimationFrame(() => {
-    window.setTimeout(mountBillingSyncButton, 120);
-  });
+  if (mountTimer) window.clearTimeout(mountTimer);
+  mountTimer = window.setTimeout(() => {
+    mountTimer = null;
+    mountBillingSyncButton();
+  }, 120);
 }
 
 if (typeof window !== 'undefined' && !window[BRIDGE_MARK]) {
