@@ -75,6 +75,7 @@ const BASE_PATH = '/admin/facturacion';
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Todos' },
   { value: 'pending', label: 'Pendientes' },
+  { value: 'processing', label: 'Procesando' },
   { value: 'generated', label: 'Generadas' },
   { value: 'sent', label: 'Enviadas' },
   { value: 'accepted', label: 'Aceptadas' },
@@ -180,6 +181,7 @@ function getStatusLabel(status) {
   const value = String(status || '').toLowerCase();
   const labels = {
     pending: 'Pendiente',
+    processing: 'Procesando',
     generated: 'Generada',
     created: 'Creada',
     sent: 'Enviada',
@@ -221,6 +223,14 @@ function getStatusStyle(status) {
       borderColor: 'rgba(245, 158, 11, 0.36)',
       background: 'rgba(245, 158, 11, 0.12)',
       color: '#92400e',
+    };
+  }
+
+  if (value === 'processing') {
+    return {
+      borderColor: 'rgba(59, 130, 246, 0.36)',
+      background: 'rgba(59, 130, 246, 0.12)',
+      color: '#1d4ed8',
     };
   }
 

@@ -33,6 +33,25 @@ const BillingSyncSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const InvoiceEmissionSchema = new mongoose.Schema(
+  {
+    state: {
+      type: String,
+      enum: ['processing', 'completed', 'failed'],
+      default: 'processing',
+    },
+    source: { type: String, default: '' },
+    initiatedBy: { type: String, default: 'system' },
+    lockToken: { type: String, default: '', select: false },
+    attempts: { type: Number, default: 1 },
+    firstAttemptAt: { type: Date, default: null },
+    lastAttemptAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    failedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
     type: {
@@ -118,6 +137,13 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Una clave estable por orden reserva la emisión antes de llamar al proveedor.
+    // El índice parcial permite conservar documentos históricos que aún no la tienen.
+    idempotencyKey: {
+      type: String,
+      trim: true,
+    },
+
     required: {
       type: Boolean,
       default: false,
@@ -127,6 +153,7 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       type: String,
       enum: [
         'pending',
+        'processing',
         'generated',
         'sent',
         'accepted',
@@ -136,6 +163,11 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       ],
       default: 'pending',
       index: true,
+    },
+
+    emission: {
+      type: InvoiceEmissionSchema,
+      default: undefined,
     },
 
     customer: {
@@ -232,6 +264,14 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
 );
 
 ElectronicInvoiceSchema.index({ status: 1, createdAt: -1 });
+ElectronicInvoiceSchema.index(
+  { idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: 'string' } },
+    name: 'uniq_electronic_invoice_idempotency_key',
+  }
+);
 ElectronicInvoiceSchema.index({ invoiceNumber: 1 });
 ElectronicInvoiceSchema.index({ cufe: 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.referenceCode': 1 });

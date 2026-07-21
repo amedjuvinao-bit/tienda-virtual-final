@@ -4,15 +4,16 @@
 // Servicio del módulo unificado de Facturación.
 // Usa el modelo existente ElectronicInvoice como fuente oficial.
 
-const mongoose = require('mongoose');
-
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const { buildAdminSiteSettings } = require('../lib/siteSettingsSecurity');
-const { generateCUFE } = require('../lib/dian/cufe');
-const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
-const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
+const {
+  BILLABLE_ORDER_STATUSES,
+  PAID_PAYMENT_STATUSES,
+  extractProviderDocument,
+  issueElectronicInvoiceForOrder,
+} = require('./electronicInvoiceIssuanceService');
 
 let extractFactusLinks = null;
 try {
@@ -21,9 +22,6 @@ try {
   extractFactusLinks = null;
 }
 
-const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
-const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
-
 function cleanText(value, max = 180) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
@@ -31,74 +29,6 @@ function cleanText(value, max = 180) {
 function money(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? number : 0;
-}
-
-function firstValue(...values) {
-  return values.find((value) => value !== undefined && value !== null && value !== '');
-}
-
-function hasProviderDocumentShape(value = {}) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-
-  return Boolean(firstValue(
-    value.number,
-    value.invoiceNumber,
-    value.reference_code,
-    value.referenceCode,
-    value.cufe,
-    value.is_validated,
-    value.validated_at
-  ) !== undefined);
-}
-
-function extractProviderDocument(providerResponse = {}) {
-  const data = providerResponse?.data;
-  const nested = data?.data;
-  const raw = providerResponse?.raw;
-  const candidates = [
-    nested?.bill,
-    nested?.invoice,
-    nested,
-    data?.bill,
-    data?.invoice,
-    data,
-    raw?.data?.data?.bill,
-    raw?.data?.data?.invoice,
-    raw?.data?.data,
-    raw?.data,
-    raw,
-  ];
-
-  return candidates.find(hasProviderDocumentShape) || {};
-}
-
-function providerMessage(providerResponse = {}, fallback = '') {
-  const value = firstValue(
-    providerResponse?.error,
-    providerResponse?.data?.message,
-    providerResponse?.message,
-    fallback
-  );
-
-  if (typeof value === 'string') return cleanText(value, 500);
-
-  try {
-    return cleanText(JSON.stringify(value), 500);
-  } catch {
-    return cleanText(fallback, 500);
-  }
-}
-
-function providerErrors(providerResponse = {}, providerDocument = {}) {
-  const errors = firstValue(
-    providerDocument?.errors,
-    providerResponse?.data?.errors,
-    providerResponse?.data?.data?.errors,
-    providerResponse?.raw?.errors,
-    {}
-  );
-
-  return errors && typeof errors === 'object' && !Array.isArray(errors) ? errors : {};
 }
 
 function makeRegex(value) {
@@ -203,6 +133,18 @@ function serializeElectronicInvoice(invoice = {}) {
       validatedAt: invoice?.provider?.validatedAt || '',
     },
     dianResponse: invoice.dianResponse || {},
+    emission: invoice.emission
+      ? {
+          state: invoice.emission.state || '',
+          source: invoice.emission.source || '',
+          initiatedBy: invoice.emission.initiatedBy || '',
+          attempts: Number(invoice.emission.attempts || 0),
+          firstAttemptAt: invoice.emission.firstAttemptAt || null,
+          lastAttemptAt: invoice.emission.lastAttemptAt || null,
+          completedAt: invoice.emission.completedAt || null,
+          failedAt: invoice.emission.failedAt || null,
+        }
+      : null,
     hasXml: Boolean(cleanText(invoice.xmlContent, 20) || links.xmlUrl),
     hasPdf: Boolean(links.pdfUrl || links.publicUrl),
     links,
@@ -344,340 +286,17 @@ async function getBillingSettingsSnapshot() {
   };
 }
 
-function getItems(order = {}) {
-  return Array.isArray(order.items) ? order.items : Array.isArray(order.cart) ? order.cart : [];
-}
-
-function buildCustomerSnapshot(order = {}) {
-  const customer = order.customer || {};
-  const billing = order.billing || {};
-  const fullName = [customer.name, customer.lastname].filter(Boolean).join(' ').trim();
-  const billingName = [billing.name, billing.lastname].filter(Boolean).join(' ').trim();
-
-  return {
-    documentType: customer.documentType || customer.tipoDocumento || billing.documentType || '13',
-    documentNumber:
-      customer.documentNumber ||
-      customer.document ||
-      customer.cedula ||
-      customer.identification ||
-      customer.id ||
-      billing.documentNumber ||
-      billing.id ||
-      '222222222222',
-    dv: customer.dv || billing.dv || '',
-    personType: customer.personType || billing.personType || 'natural',
-    businessName: customer.businessName || fullName || billingName || customer.email || 'Consumidor final',
-    email: customer.email || customer.emailOrPhone || billing.email || '',
-    phone: customer.phone || billing.phone || '',
-    address: customer.address || billing.address || '',
-    city: customer.city || billing.city || '',
-    department: customer.department || billing.department || '',
-    country: customer.country || billing.country || 'Colombia',
-  };
-}
-
-function calculateTotals(order = {}, settings = {}) {
-  const items = getItems(order);
-  const lineSubtotal = items.reduce((acc, item) => {
-    const quantity = Number(item.quantity || item.qty || 0) || 0;
-    const price = Number(item.price || item.unitPrice || item.priceNumber || item?.product?.price || 0) || 0;
-    return acc + quantity * price;
-  }, 0);
-
-  const subtotal = money(order.subtotal || lineSubtotal);
-  const shipping = money(order.shipping);
-  const ivaConfig = order?.taxes?.iva || settings?.billing?.taxes?.iva || {};
-  const ivaEnabled = ivaConfig.enabled !== false;
-  const ivaPercent = Number(ivaConfig.percent || 0) || 0;
-  const taxAmount = typeof ivaConfig.amount === 'number' ? money(ivaConfig.amount) : ivaEnabled ? Number(((subtotal * ivaPercent) / 100).toFixed(2)) : 0;
-  const total = money(order.total || subtotal + shipping + taxAmount);
-
-  return { subtotal, shipping, taxAmount, total, ivaConfig, ivaEnabled, ivaPercent };
-}
-
-function buildInvoiceNumber(resolution = {}) {
-  const prefix = cleanText(resolution.prefix || 'FE', 20).replace(/\s+/g, '').toUpperCase() || 'FE';
-  const currentNumber = Math.max(1, Number(resolution.currentNumber || resolution.rangeFrom || 1) || 1);
-  const padded = String(currentNumber).padStart(6, '0');
-  return {
-    invoiceNumber: `${prefix}${padded}`,
-    currentNumber,
-    nextNumber: currentNumber + 1,
-  };
-}
-
-function buildSettingsForInvoice(settings = {}) {
-  const billing = settings?.billing || {};
-  const dianConfig = billing.dian || {};
-  const resolution = billing.dianResolution || {};
-  const environment = dianConfig.mode === 'production' ? '1' : dianConfig.environment || resolution.environment || '2';
-
-  return {
-    ...(settings || {}),
-    billing: {
-      ...billing,
-      dianResolution: {
-        ...resolution,
-        environment,
-      },
-    },
-  };
-}
-
 async function generateInvoiceForOrder(orderId, options = {}) {
-  if (!mongoose.Types.ObjectId.isValid(String(orderId || ''))) {
-    const error = new Error('La orden enviada no es válida.');
-    error.status = 400;
-    error.code = 'INVALID_ORDER_ID';
-    throw error;
-  }
-
-  const existing = await ElectronicInvoice.findOne({ orderId }).lean();
-  if (existing) {
-    return {
-      created: false,
-      invoice: serializeElectronicInvoice(existing),
-      message: 'La orden ya tenía factura registrada.',
-    };
-  }
-
-  const order = await Order.findById(orderId).lean();
-  if (!order) {
-    const error = new Error('Orden no encontrada.');
-    error.status = 404;
-    error.code = 'ORDER_NOT_FOUND';
-    throw error;
-  }
-
-  const status = cleanText(order.status, 50).toLowerCase();
-  const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
-  const isBillable =
-    BILLABLE_ORDER_STATUSES.includes(status) ||
-    PAID_PAYMENT_STATUSES.includes(paymentStatus) ||
-    (String(order.source || '').toLowerCase() === 'pos' && money(order.total) > 0);
-
-  if (!isBillable) {
-    const error = new Error('Solo se pueden facturar órdenes pagadas o ventas POS cerradas.');
-    error.status = 422;
-    error.code = 'ORDER_NOT_BILLABLE';
-    throw error;
-  }
-
-  const settings = await SiteSettings.findOne().lean();
-  const settingsForInvoice = buildSettingsForInvoice(settings || {});
-  const billing = settingsForInvoice.billing || {};
-  const fiscalInfo = billing.fiscalInfo || {};
-  const dianResolution = billing.dianResolution || {};
-  const legalTexts = billing.legalTexts || {};
-  const providerName = cleanText(
-    billing?.electronicProvider?.provider || billing?.dian?.providerType || 'mock',
-    60
-  ).toLowerCase();
-  const providerMode = billing?.dian?.mode || 'internal';
-  const isExternalProvider =
-    billing?.dian?.enabled === true &&
-    providerMode !== 'internal' &&
-    providerName !== 'mock';
-  const environment = dianResolution.environment || '2';
-  const { subtotal, shipping, taxAmount, total } = calculateTotals(order, settingsForInvoice);
-  const customerSnapshot = buildCustomerSnapshot(order);
-  const now = new Date();
-  const issueDate = now.toISOString().slice(0, 10);
-  const issueTime = now.toISOString().slice(11, 19);
-  const { invoiceNumber, currentNumber, nextNumber } = buildInvoiceNumber(dianResolution);
-
-  const cufeData = generateCUFE({
-    invoiceNumber,
-    issueDate,
-    issueTime,
-    grossAmount: subtotal,
-    taxAmount,
-    totalAmount: total,
-    companyNit: fiscalInfo.nit || billing?.dian?.providerNit || '900000000',
-    customerDocument: customerSnapshot.documentNumber || '222222222222',
-    technicalKey: dianResolution.technicalKey || billing?.dian?.technicalKey || 'INTERNAL',
-    environment,
+  const result = await issueElectronicInvoiceForOrder({
+    orderId,
+    source: 'admin',
+    initiatedBy: options.adminUser || 'admin',
+    skipWhenElectronicBillingIsInactive: false,
   });
-
-  let xmlContent = '';
-  try {
-    xmlContent = generateInvoiceXML({ order, settings: settingsForInvoice, cufeData });
-  } catch (error) {
-    xmlContent = '';
-  }
-
-  const qrUrl = `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=${cufeData.cufe}`;
-
-  let providerResponse = null;
-  let providerDocument = {};
-
-  if (isExternalProvider) {
-    try {
-      providerResponse = await sendElectronicInvoiceToProvider({
-        provider: providerName,
-        invoiceData: {
-          order,
-          settings: settingsForInvoice,
-          cufeData,
-          xmlContent,
-          provider: providerName,
-          providerConfig: billing.electronicProvider || {},
-        },
-      });
-    } catch (error) {
-      providerResponse = {
-        success: false,
-        provider: providerName,
-        stage: 'send_invoice',
-        error: error?.message || 'No fue posible enviar la factura al proveedor.',
-      };
-    }
-
-    providerDocument = extractProviderDocument(providerResponse);
-
-    if (providerResponse?.success !== true) {
-      const error = new Error(providerMessage(
-        providerResponse,
-        'Factus no confirmó la creación de la factura.'
-      ));
-      error.status = 502;
-      error.code = 'BILLING_PROVIDER_GENERATION_ERROR';
-      throw error;
-    }
-  }
-
-  const remoteNumber = cleanText(firstValue(
-    providerDocument?.number,
-    providerDocument?.invoiceNumber,
-    providerResponse?.data?.invoiceNumber
-  ), 160);
-  const remoteCufe = cleanText(providerDocument?.cufe, 220);
-
-  if (isExternalProvider && providerName === 'factus' && !remoteNumber) {
-    const error = new Error(
-      'Factus respondió la creación, pero no devolvió el número oficial de la factura.'
-    );
-    error.status = 502;
-    error.code = 'BILLING_PROVIDER_NUMBER_MISSING';
-    throw error;
-  }
-
-  const isProviderValidated =
-    providerDocument?.is_validated === true ||
-    providerDocument?.validated === true ||
-    Boolean(providerDocument?.validated_at || providerDocument?.validatedAt);
-  const officialLinks = providerDocument?.links && typeof providerDocument.links === 'object'
-    ? providerDocument.links
-    : {};
-  const nextStatus = isExternalProvider
-    ? (isProviderValidated ? 'accepted' : 'sent')
-    : 'generated';
-  const storedInvoiceNumber = remoteNumber || invoiceNumber;
-  const storedCufe = isExternalProvider ? remoteCufe : cufeData.cufe;
-  const responseMessage = providerMessage(
-    providerResponse,
-    isProviderValidated
-      ? 'Factura creada y validada correctamente por Factus.'
-      : isExternalProvider
-        ? 'Factura enviada al proveedor y pendiente de validación.'
-        : 'Comprobante interno generado desde módulo Facturación.'
-  );
-
-  const created = await ElectronicInvoice.create({
-    orderId: order._id,
-    orderNumber: order.orderNumber || '',
-    required: true,
-    status: nextStatus,
-    customer: customerSnapshot,
-    fiscalInfo,
-    dianResolution: {
-      resolutionNumber: dianResolution.resolutionNumber || '',
-      prefix: dianResolution.prefix || '',
-      rangeFrom: Number(dianResolution.rangeFrom || 1),
-      rangeTo: Number(dianResolution.rangeTo || 1),
-      currentNumber,
-      resolutionDate: dianResolution.resolutionDate || '',
-      expirationDate: dianResolution.expirationDate || '',
-      documentType: dianResolution.documentType || '01',
-    },
-    legalTexts: {
-      invoiceLegalText: legalTexts.invoiceLegalText || '',
-      internalReceiptNote: legalTexts.internalReceiptNote || '',
-    },
-    invoiceNumber: storedInvoiceNumber,
-    cufe: storedCufe,
-    xmlContent,
-    qrUrl: officialLinks.qr || officialLinks.qr_url || (isExternalProvider ? '' : qrUrl),
-    pdfUrl: officialLinks.pdf || officialLinks.pdf_url || officialLinks.public_url || '',
-    xmlUrl: officialLinks.xml || officialLinks.xml_url || '',
-    provider: {
-      name: providerName,
-      status: isProviderValidated
-        ? 'validated'
-        : isExternalProvider
-          ? 'sent'
-          : 'created',
-      referenceCode: cleanText(
-        providerDocument?.reference_code ||
-        providerDocument?.referenceCode ||
-        order.orderNumber ||
-        order._id,
-        180
-      ),
-      number: remoteNumber,
-      cufe: storedCufe,
-      isValidated: isProviderValidated,
-      validatedAt: providerDocument?.validated_at || providerDocument?.validatedAt || '',
-      links: officialLinks,
-      raw: {
-        ...providerDocument,
-        mode: providerMode,
-        source: 'admin-billing',
-        response: providerResponse,
-      },
-    },
-    dianResponse: {
-      stage: isExternalProvider
-        ? (isProviderValidated ? 'provider_validated' : 'provider_sent')
-        : 'internal_generated',
-      environment,
-      issueDate,
-      issueTime,
-      message: responseMessage,
-      code: isExternalProvider
-        ? String(providerResponse?.status || (isProviderValidated ? 'VALIDATED' : 'SENT'))
-        : 'GENERATED',
-      raw: {
-        subtotal,
-        shipping,
-        taxAmount,
-        total,
-        providerResponse,
-      },
-    },
-    providerErrors: providerErrors(providerResponse, providerDocument),
-    errorMessage: '',
-    generatedAt: now,
-    sentAt: isExternalProvider ? now : null,
-    acceptedAt: isProviderValidated ? now : null,
-  });
-
-  if (settings?._id) {
-    await SiteSettings.updateOne(
-      { _id: settings._id, 'billing.dianResolution.currentNumber': currentNumber },
-      { $set: { 'billing.dianResolution.currentNumber': nextNumber } }
-    );
-  }
 
   return {
-    created: true,
-    invoice: serializeElectronicInvoice(created.toObject()),
-    message: isProviderValidated
-      ? 'Factura generada y validada correctamente por Factus.'
-      : isExternalProvider
-        ? 'Factura enviada correctamente al proveedor.'
-        : 'Comprobante interno generado correctamente.',
+    ...result,
+    invoice: result.invoice ? serializeElectronicInvoice(result.invoice) : null,
   };
 }
 

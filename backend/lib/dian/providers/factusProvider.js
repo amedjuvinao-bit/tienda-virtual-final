@@ -1078,9 +1078,14 @@ async function sendInvoiceToFactus(invoiceData) {
         };
       }
 
+      const expectedReferenceCode = String(payload.reference_code || '').trim();
       const pendingBill = listResult.bills.find((bill) => {
-        const referenceCode = getBillReferenceCode(bill);
-        return referenceCode && isPendingFactusBill(bill);
+        const referenceCode = String(getBillReferenceCode(bill) || '').trim();
+        return (
+          referenceCode &&
+          referenceCode === expectedReferenceCode &&
+          isPendingFactusBill(bill)
+        );
       });
 
       if (!pendingBill) {
@@ -1089,7 +1094,7 @@ async function sendInvoiceToFactus(invoiceData) {
           provider: 'factus',
           stage: 'pending_invoice_not_found',
           status: result.status,
-          error: 'Factus informa una factura pendiente, pero no se encontró en el listado de las últimas facturas.',
+          error: `Factus informa una factura pendiente, pero no se encontró una pendiente con la referencia ${expectedReferenceCode}. No se eliminó ningún otro documento.`,
           raw: {
             originalValidation: result.data,
             bills: listResult.bills,

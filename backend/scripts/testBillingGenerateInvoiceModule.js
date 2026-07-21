@@ -43,10 +43,12 @@ function assertNotIncludes(content, expected, message) {
 }
 
 function validateBackendGenerationService() {
-  const serviceFile = read('backend/services/adminBillingService.js');
+  const serviceFile = read('backend/services/electronicInvoiceIssuanceService.js');
+  const adminServiceFile = read('backend/services/adminBillingService.js');
 
   [
-    'generateInvoiceForOrder',
+    'issueElectronicInvoiceForOrder',
+    'createElectronicInvoiceIssuanceService',
     "require('../models/ElectronicInvoice')",
     "require('../models/Order')",
     'generateCUFE',
@@ -54,24 +56,28 @@ function validateBackendGenerationService() {
     'sendElectronicInvoiceToProvider',
     'extractProviderDocument',
     'isExternalProvider',
-    'providerResponse?.success !== true',
-    "error.code = 'BILLING_PROVIDER_GENERATION_ERROR'",
+    'providerSucceeded',
+    "'BILLING_PROVIDER_GENERATION_ERROR'",
     'remoteNumber',
     'remoteCufe',
-    'ElectronicInvoice.create',
+    'InvoiceModel.create',
     'status: nextStatus',
     'billing.dianResolution.currentNumber',
-    'serializeElectronicInvoice(created.toObject())',
+    'idempotencyKey',
+    "status: 'processing'",
   ].forEach((needle) => {
-    assertIncludes(serviceFile, needle, `adminBillingService no genera factura correctamente: falta ${needle}`);
+    assertIncludes(serviceFile, needle, `El motor unificado no genera factura correctamente: falta ${needle}`);
   });
 
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
-  const providerCall = serviceFile.indexOf('await sendElectronicInvoiceToProvider');
-  const invoiceCreate = serviceFile.indexOf('await ElectronicInvoice.create');
-  assert(providerCall >= 0 && invoiceCreate > providerCall, 'La factura debe enviarse al proveedor antes de guardarse como emitida.');
+  const invoiceClaim = serviceFile.indexOf('claimedInvoice = await InvoiceModel.create');
+  const providerCall = serviceFile.indexOf('providerResponse = await sendToProvider');
+  assert(invoiceClaim >= 0 && providerCall > invoiceClaim, 'La orden debe reservarse antes de contactar al proveedor.');
 
-  ok('Servicio envía la factura al proveedor y guarda la respuesta oficial en ElectronicInvoice');
+  assertIncludes(adminServiceFile, 'issueElectronicInvoiceForOrder', 'El módulo admin no delega al motor unificado.');
+  assertIncludes(adminServiceFile, "source: 'admin'", 'El módulo admin no registra el origen de la emisión.');
+
+  ok('Motor unificado reserva la orden y guarda la respuesta oficial en ElectronicInvoice');
 }
 
 function validateBackendGenerationRoute() {
