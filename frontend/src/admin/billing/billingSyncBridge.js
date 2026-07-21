@@ -29,6 +29,16 @@ function getRefreshButton() {
   );
 }
 
+function prepareControlContainer(container) {
+  if (!container) return;
+
+  container.setAttribute('data-billing-sync-root', 'true');
+  container.style.flexWrap = 'wrap';
+  container.style.maxWidth = '100%';
+  container.style.minWidth = '0';
+  container.style.alignItems = 'center';
+}
+
 function setNotice(text, tone = 'success') {
   const root = window.document.querySelector('[data-billing-sync-root]') || window.document.body;
   let notice = window.document.querySelector(`[${NOTICE_ATTR}]`);
@@ -36,12 +46,18 @@ function setNotice(text, tone = 'success') {
   if (!notice) {
     notice = window.document.createElement('div');
     notice.setAttribute(NOTICE_ATTR, 'true');
-    notice.style.marginTop = '10px';
+    notice.style.marginTop = '0';
     notice.style.borderRadius = '18px';
     notice.style.border = '1px solid rgba(16, 185, 129, 0.36)';
-    notice.style.padding = '10px 14px';
-    notice.style.fontSize = '12px';
+    notice.style.padding = '8px 12px';
+    notice.style.fontSize = '11px';
     notice.style.fontWeight = '900';
+    notice.style.lineHeight = '1.25';
+    notice.style.maxWidth = '240px';
+    notice.style.minWidth = '0';
+    notice.style.whiteSpace = 'normal';
+    notice.style.wordBreak = 'normal';
+    notice.style.overflowWrap = 'break-word';
     root.appendChild(notice);
   }
 
@@ -127,7 +143,7 @@ function createButton() {
   const button = window.document.createElement('button');
   button.type = 'button';
   button.setAttribute(BTN_ATTR, 'true');
-  button.textContent = 'Sincronizar visibles';
+  button.textContent = 'Sincronizar';
   button.title = 'Sincronizar estados visibles contra el proveedor disponible';
   button.style.display = 'inline-flex';
   button.style.alignItems = 'center';
@@ -135,12 +151,14 @@ function createButton() {
   button.style.gap = '8px';
   button.style.border = '1px solid var(--admin-card-border)';
   button.style.borderRadius = '16px';
-  button.style.padding = '9px 13px';
+  button.style.padding = '9px 12px';
   button.style.background = 'var(--admin-soft-bg)';
   button.style.color = 'var(--admin-card-text)';
   button.style.fontSize = '12px';
   button.style.fontWeight = '900';
   button.style.cursor = 'pointer';
+  button.style.whiteSpace = 'nowrap';
+  button.style.flexShrink = '0';
   button.addEventListener('click', () => syncVisibleDocuments(button));
   return button;
 }
@@ -155,7 +173,7 @@ function mountBillingSyncButton() {
   const container = refreshButton.parentElement;
   if (!container || container.querySelector(`[${BTN_ATTR}]`)) return;
 
-  container.setAttribute('data-billing-sync-root', 'true');
+  prepareControlContainer(container);
   container.appendChild(createButton());
 }
 
