@@ -36,6 +36,7 @@ function hasDocumentShape(value = {}) {
   return Boolean(
     firstValue(
       value.number,
+      value.invoiceNumber,
       value.reference_code,
       value.referenceCode,
       value.cufe,
@@ -45,6 +46,35 @@ function hasDocumentShape(value = {}) {
       value.status
     ) !== undefined
   );
+}
+
+function extractFactusNumber(value = {}, type = 'invoice') {
+  const remote = extractRemoteDocument(value, type);
+  return cleanText(firstValue(remote?.number, remote?.invoiceNumber), 160);
+}
+
+function resolveFactusInvoiceNumber(invoice = {}) {
+  const rawCandidates = [
+    invoice?.provider?.raw,
+    invoice?.dianResponse?.raw?.providerResponse,
+    invoice?.dianResponse?.raw?.billingSync?.response,
+  ];
+
+  for (const candidate of rawCandidates) {
+    const remoteNumber = extractFactusNumber(candidate, 'invoice');
+    if (remoteNumber) return remoteNumber;
+  }
+
+  const providerNumber = cleanText(invoice?.provider?.number, 160);
+  const localNumber = cleanText(invoice?.invoiceNumber, 160);
+  const source = cleanText(invoice?.provider?.raw?.source, 80).toLowerCase();
+  const isLocalPlaceholder =
+    source === 'admin-billing' &&
+    providerNumber &&
+    providerNumber === localNumber;
+
+  if (isLocalPlaceholder) return '';
+  return providerNumber || localNumber;
 }
 
 function extractRemoteDocument(payload = {}, type = 'invoice') {
@@ -355,7 +385,20 @@ async function syncInvoice(identifier, options = {}) {
     throw createServiceError(result);
   }
 
-  const invoiceNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
+  const invoiceNumber = resolveFactusInvoiceNumber(invoice);
+  if (!invoiceNumber) {
+    const result = {
+      success: false,
+      provider,
+      status: 422,
+      stage: 'provider_number_missing',
+      error:
+        'Esta factura todavía no tiene un número asignado por Factus. ' +
+        'El número mostrado es un consecutivo interno y no se puede sincronizar hasta enviarla al proveedor.',
+    };
+    await saveInvoiceSyncFailure(invoice, provider, result, options);
+    throw createServiceError(result);
+  }
   const result = await getInvoiceFromFactus({ providerConfig, invoiceNumber });
 
   if (!result.success) {
@@ -616,6 +659,7 @@ async function syncCreditNote(invoiceIdentifier, noteIdentifier, options = {}) {
 module.exports = {
   extractRemoteDocument,
   normalizeRemoteStatus,
+  resolveFactusInvoiceNumber,
   syncCreditNote,
   syncInvoice,
 };

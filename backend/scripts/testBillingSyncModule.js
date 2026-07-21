@@ -56,6 +56,8 @@ function validateBackendSyncService() {
     'getCreditNoteFromFactus',
     'extractRemoteDocument',
     'normalizeRemoteStatus',
+    'resolveFactusInvoiceNumber',
+    'provider_number_missing',
     'serializeElectronicInvoice',
     'serializeCreditNote',
     'billingSync',
@@ -89,6 +91,7 @@ function validateProviderResponseNormalization() {
   const {
     extractRemoteDocument,
     normalizeRemoteStatus,
+    resolveFactusInvoiceNumber,
   } = require('../services/adminBillingSyncService');
 
   const invoice = extractRemoteDocument({
@@ -118,8 +121,35 @@ function validateProviderResponseNormalization() {
   assert(normalizeRemoteStatus(creditNote, 'credit-note').localStatus === 'pending', 'Nota no validada debe quedar pendiente.');
   assert(normalizeRemoteStatus({ status: 'rejected' }, 'invoice').localStatus === 'rejected', 'Rechazo remoto debe conservarse.');
   assert(normalizeRemoteStatus({ status: 'failed' }, 'credit-note').localStatus === 'failed', 'Fallo remoto debe conservarse.');
+  assert(
+    resolveFactusInvoiceNumber({
+      invoiceNumber: 'FE000027',
+      provider: {
+        number: 'FE000027',
+        raw: { source: 'admin-billing', mode: 'sandbox' },
+      },
+    }) === '',
+    'Un consecutivo interno no debe consultarse como número Factus.'
+  );
+  assert(
+    resolveFactusInvoiceNumber({
+      invoiceNumber: 'FE000027',
+      provider: {
+        number: 'FE000027',
+        raw: { data: { bill: { number: 'SETP990007806', status: 1 } } },
+      },
+    }) === 'SETP990007806',
+    'Debe recuperarse el número real desde la respuesta guardada de Factus.'
+  );
+  assert(
+    resolveFactusInvoiceNumber({
+      invoiceNumber: 'SETP990007801',
+      provider: { number: 'SETP990007801', raw: {} },
+    }) === 'SETP990007801',
+    'Las facturas históricas con número Factus deben seguir sincronizando.'
+  );
 
-  ok('Estados y formatos de respuesta del proveedor se normalizan correctamente');
+  ok('Estados, respuestas y números reales de Factus se normalizan correctamente');
 }
 
 async function validateFactusQueries() {
