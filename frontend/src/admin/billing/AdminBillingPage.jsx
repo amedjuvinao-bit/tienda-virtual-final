@@ -342,14 +342,14 @@ function DocumentActionButton({ children, icon: Icon, disabled, onClick, variant
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-10 w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 text-[11px] font-black shadow-sm transition hover:-translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2 text-[11px] font-black transition hover:-translate-y-px hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
         color: isPrimary ? '#fff' : 'var(--admin-card-text)',
       }}
     >
-      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
       <span className="leading-none">{children}</span>
     </button>
   );
@@ -594,7 +594,7 @@ function BillingDocumentsPanel() {
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Documentos reales"
         title="Facturas y comprobantes emitidos"
@@ -643,15 +643,15 @@ function BillingDocumentsPanel() {
         {rows.length === 0 && !loading ? (
           <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+          <div className="w-full min-w-0 overflow-hidden">
+            <table className="w-full table-fixed text-left text-sm">
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="w-[23%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Documento</th>
-                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / proveedor</th>
-                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fechas</th>
-                  <th className="w-[26%] px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                  <th className="w-[24%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Documento</th>
+                  <th className="w-[17%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Cliente</th>
+                  <th className="w-[19%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Estado / proveedor</th>
+                  <th className="w-[16%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Fechas</th>
+                  <th className="w-[24%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.12em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -667,17 +667,17 @@ function BillingDocumentsPanel() {
                   const canOpenXml = document.hasXml || document.links?.xmlUrl;
 
                   return (
-                    <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                      <td className="px-4 py-4 align-top">
+                    <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                      <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
                         {document.cufe ? <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{customerName}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={statusStyle}>
                           <span className="truncate">{getStatusLabel(document.status)}</span>
                         </span>
@@ -689,18 +689,15 @@ function BillingDocumentsPanel() {
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="font-bold leading-5">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
                           {document.sync?.status === 'failed' ? 'Último intento' : 'Sincronizado'}: {formatDateTime(document.sync?.lastSuccessAt || document.sync?.lastAttemptAt)}
                         </p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <div
-                          className="grid grid-cols-2 gap-2 rounded-2xl border p-2"
-                          style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
-                        >
+                      <td className="px-3 py-4 align-top">
+                        <div className="grid grid-cols-2 gap-1.5">
                           <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                           <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
@@ -837,7 +834,7 @@ function BillingCreditNotesPanel() {
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Bandeja fiscal"
         title="Notas crédito"
@@ -899,16 +896,16 @@ function BillingCreditNotesPanel() {
         {rows.length === 0 && !loading ? (
           <EmptyWorkBlock icon={RotateCcw} title="Sin notas crédito registradas" text="Cuando una factura tenga nota crédito total o parcial, aparecerá aquí sin salir del módulo de Facturación." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] table-fixed text-left text-sm">
+          <div className="w-full min-w-0 overflow-hidden">
+            <table className="w-full table-fixed text-left text-sm">
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Nota crédito</th>
-                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Factura</th>
-                  <th className="w-[15%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="w-[16%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / tipo</th>
-                  <th className="w-[10%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
-                  <th className="w-[25%] px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                  <th className="w-[16%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Nota crédito</th>
+                  <th className="w-[18%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Factura</th>
+                  <th className="w-[16%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Cliente</th>
+                  <th className="w-[18%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Estado / tipo</th>
+                  <th className="w-[11%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Valor</th>
+                  <th className="w-[21%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.12em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -920,22 +917,22 @@ function BillingCreditNotesPanel() {
                   const hasExternal = Boolean(note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl);
 
                   return (
-                    <tr key={note.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                      <td className="px-4 py-4 align-top">
+                    <tr key={note.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                      <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{note.noteNumber || note.referenceCode || 'Sin número'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Ref. {note.referenceCode || '—'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(note.createdAt)}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{note.invoiceNumber || note.billNumber || 'Sin factura'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{note.orderNumber || '—'}</p>
                         <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {note.invoiceCufe || '—'}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{customerName}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={getStatusStyle(note.status)}>
                           <span className="truncate">{getStatusLabel(note.status)}</span>
                         </span>
@@ -947,20 +944,15 @@ function BillingCreditNotesPanel() {
                             : 'Sin sincronizar'}
                         </p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="font-black">{formatCurrency(note.totalAmount)}</p>
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(note.itemsCount || 0)} ítem(s)</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <div
-                          className="grid grid-cols-2 gap-2 rounded-2xl border p-2"
-                          style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
-                        >
+                      <td className="px-3 py-4 align-top">
+                        <div className="grid gap-1.5">
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
                           <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!hasExternal} variant="primary">Soporte</DocumentActionButton>
-                          <div className="col-span-2">
-                            <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
-                          </div>
+                          <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>
