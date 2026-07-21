@@ -160,14 +160,151 @@ table.min-w-\[940px\] td:nth-child(6) button svg {
   flex-shrink: 0;
 }
 
+/* Tabla interna de Notas crédito: evita columna derecha mocha. */
+div.overflow-x-auto:has(> table.min-w-\[980px\]) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+  border-radius: 0 0 24px 24px;
+}
+
+table.min-w-\[980px\] {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--admin-card-bg);
+}
+
+table.min-w-\[980px\] thead {
+  display: table-header-group;
+}
+
+table.min-w-\[980px\] tbody {
+  display: table-row-group;
+}
+
+table.min-w-\[980px\] tr {
+  display: table-row;
+}
+
+table.min-w-\[980px\] th,
+table.min-w-\[980px\] td {
+  display: table-cell;
+  min-width: 0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+table.min-w-\[980px\] th {
+  height: 44px;
+  padding: 0 12px !important;
+  background: var(--admin-soft-bg);
+  border-bottom: 1px solid var(--admin-card-border);
+  font-size: 10px !important;
+  letter-spacing: 0.13em !important;
+  white-space: nowrap;
+}
+
+table.min-w-\[980px\] tbody tr {
+  background: var(--admin-card-bg);
+  transition: background 0.16s ease;
+}
+
+table.min-w-\[980px\] tbody tr:hover {
+  background: var(--admin-soft-bg);
+}
+
+table.min-w-\[980px\] tbody td {
+  height: 82px;
+  padding: 12px 12px !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid var(--admin-card-border);
+}
+
+table.min-w-\[980px\] th:nth-child(1),
+table.min-w-\[980px\] td:nth-child(1) {
+  width: 17%;
+}
+
+table.min-w-\[980px\] th:nth-child(2),
+table.min-w-\[980px\] td:nth-child(2) {
+  width: 19%;
+}
+
+table.min-w-\[980px\] th:nth-child(3),
+table.min-w-\[980px\] td:nth-child(3) {
+  width: 16%;
+}
+
+table.min-w-\[980px\] th:nth-child(4),
+table.min-w-\[980px\] td:nth-child(4) {
+  width: 16%;
+}
+
+table.min-w-\[980px\] th:nth-child(5),
+table.min-w-\[980px\] td:nth-child(5) {
+  width: 13%;
+}
+
+table.min-w-\[980px\] th:nth-child(6),
+table.min-w-\[980px\] td:nth-child(6) {
+  width: 19%;
+}
+
+table.min-w-\[980px\] td p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+table.min-w-\[980px\] td p.truncate {
+  white-space: nowrap;
+}
+
+table.min-w-\[980px\] td:nth-child(4) span {
+  min-width: 92px;
+  max-width: 100%;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table.min-w-\[980px\] td:nth-child(6) > div {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+table.min-w-\[980px\] td:nth-child(6) button {
+  width: auto !important;
+  min-width: 72px;
+  min-height: 34px;
+  padding: 7px 10px !important;
+  border-radius: 14px !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+
+table.min-w-\[980px\] td:nth-child(6) button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 1180px) {
-  div.overflow-x-auto:has(> table.min-w-\[940px\]) {
+  div.overflow-x-auto:has(> table.min-w-\[940px\]),
+  div.overflow-x-auto:has(> table.min-w-\[980px\]) {
     overflow-x: hidden !important;
   }
 }
 
 @media (max-width: 760px) {
-  div.overflow-x-auto:has(> table.min-w-\[940px\]) {
+  div.overflow-x-auto:has(> table.min-w-\[940px\]),
+  div.overflow-x-auto:has(> table.min-w-\[980px\]) {
     overflow-x: auto !important;
   }
 
@@ -175,8 +312,14 @@ table.min-w-\[940px\] td:nth-child(6) button svg {
     min-width: 860px !important;
   }
 
+  table.min-w-\[980px\] {
+    min-width: 920px !important;
+  }
+
   table.min-w-\[940px\] th,
-  table.min-w-\[940px\] td {
+  table.min-w-\[940px\] td,
+  table.min-w-\[980px\] th,
+  table.min-w-\[980px\] td {
     padding-left: 10px !important;
     padding-right: 10px !important;
   }
