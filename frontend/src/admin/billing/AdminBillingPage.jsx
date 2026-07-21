@@ -9,6 +9,7 @@ import {
   FileText,
   RefreshCw,
   ReceiptText,
+  RotateCcw,
   Search,
   Send,
   Settings2,
@@ -21,6 +22,7 @@ import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
   generateBillingInvoiceForOrder,
+  getBillingCreditNotes,
   getBillingDocuments,
   getBillingSummary,
   getPendingBillingOrders,
@@ -39,6 +41,12 @@ const BILLING_TABS = [
     label: 'Documentos',
     icon: FileText,
     description: 'Facturas, comprobantes y soportes generados.',
+  },
+  {
+    id: 'notas-credito',
+    label: 'Notas crédito',
+    icon: RotateCcw,
+    description: 'Bandeja de notas crédito asociadas a facturas electrónicas.',
   },
   {
     id: 'ordenes',
@@ -66,6 +74,21 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rechazadas' },
   { value: 'failed', label: 'Fallidas' },
   { value: 'error', label: 'Error' },
+];
+
+const CREDIT_NOTE_STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'created', label: 'Creadas' },
+  { value: 'validated', label: 'Validadas' },
+  { value: 'pending', label: 'Pendientes' },
+  { value: 'rejected', label: 'Rechazadas' },
+  { value: 'failed', label: 'Fallidas' },
+];
+
+const CREDIT_NOTE_TYPE_OPTIONS = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'total', label: 'Total' },
+  { value: 'partial', label: 'Parcial' },
 ];
 
 function formatNumber(value) {
@@ -136,6 +159,7 @@ function getStatusLabel(status) {
   const labels = {
     pending: 'Pendiente',
     generated: 'Generada',
+    created: 'Creada',
     sent: 'Enviada',
     accepted: 'Aceptada',
     validated: 'Validada',
@@ -145,6 +169,10 @@ function getStatusLabel(status) {
   };
 
   return labels[value] || status || 'Pendiente';
+}
+
+function getCreditNoteTypeLabel(type) {
+  return String(type || '').toLowerCase() === 'partial' ? 'Parcial' : 'Total';
 }
 
 function getStatusStyle(status) {
@@ -166,7 +194,7 @@ function getStatusStyle(status) {
     };
   }
 
-  if (['sent', 'generated'].includes(value)) {
+  if (['sent', 'generated', 'created'].includes(value)) {
     return {
       borderColor: 'rgba(245, 158, 11, 0.36)',
       background: 'rgba(245, 158, 11, 0.12)',
@@ -397,6 +425,33 @@ function unwrapOrderResponse(response) {
   return payload?.data || payload?.order || payload || null;
 }
 
+async function buildInvoiceModalData(document = {}) {
+  let order = null;
+  if (document.orderId) {
+    const response = await api.get(`/api/orders/${document.orderId}`);
+    order = unwrapOrderResponse(response);
+  }
+
+  const fallbackOrder = buildFallbackOrderForInvoice(document);
+  const resolvedOrder = order && (order._id || order.id) ? order : fallbackOrder;
+  const resolvedInvoice =
+    resolvedOrder?.electronicInvoice ||
+    resolvedOrder?.invoice ||
+    resolvedOrder?.dian ||
+    resolvedOrder?.factus ||
+    document;
+
+  return {
+    order: {
+      ...fallbackOrder,
+      ...resolvedOrder,
+      _id: resolvedOrder?._id || resolvedOrder?.id || fallbackOrder._id,
+      electronicInvoice: resolvedInvoice,
+    },
+    invoice: resolvedInvoice,
+  };
+}
+
 function BillingDocumentsPanel() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -483,31 +538,7 @@ function BillingDocumentsPanel() {
     try {
       setError('');
       setActionLoading(`manage-${document.id}`);
-
-      let order = null;
-      if (document.orderId) {
-        const response = await api.get(`/api/orders/${document.orderId}`);
-        order = unwrapOrderResponse(response);
-      }
-
-      const fallbackOrder = buildFallbackOrderForInvoice(document);
-      const resolvedOrder = order && (order._id || order.id) ? order : fallbackOrder;
-      const resolvedInvoice =
-        resolvedOrder?.electronicInvoice ||
-        resolvedOrder?.invoice ||
-        resolvedOrder?.dian ||
-        resolvedOrder?.factus ||
-        document;
-
-      setInvoiceModalData({
-        order: {
-          ...fallbackOrder,
-          ...resolvedOrder,
-          _id: resolvedOrder?._id || resolvedOrder?.id || fallbackOrder._id,
-          electronicInvoice: resolvedInvoice,
-        },
-        invoice: resolvedInvoice,
-      });
+      setInvoiceModalData(await buildInvoiceModalData(document));
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'No se pudo abrir la administración de la factura.');
     } finally {
@@ -642,6 +673,225 @@ function BillingDocumentsPanel() {
           order={invoiceModalData.order}
           invoice={invoiceModalData.invoice}
           onClose={closeInvoiceManager}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function BillingCreditNotesPanel() {
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [query, setQuery] = useState('');
+  const [typingQuery, setTypingQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [type, setType] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState('');
+  const [error, setError] = useState('');
+  const [invoiceModalData, setInvoiceModalData] = useState(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQuery(typingQuery.trim());
+      setPage(1);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [typingQuery]);
+
+  const loadCreditNotes = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await getBillingCreditNotes({ page, limit: 20, q: query, status, type });
+      setRows(Array.isArray(data?.rows) ? data.rows : []);
+      setTotal(Number(data?.total || 0));
+      setPages(Math.max(1, Number(data?.pages || 1)));
+    } catch (err) {
+      setRows([]);
+      setTotal(0);
+      setPages(1);
+      setError(err?.response?.data?.message || err?.message || 'No se pudieron cargar las notas crédito.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCreditNotes();
+  }, [page, query, status, type]);
+
+  const openCreditNoteInvoice = async (note) => {
+    const document = note?.invoice || {
+      id: note.invoiceId,
+      orderId: note.orderId,
+      orderNumber: note.orderNumber,
+      invoiceNumber: note.invoiceNumber,
+      cufe: note.invoiceCufe,
+      customer: note.customer,
+      provider: note.provider,
+      status: note.invoiceStatus,
+      creditNotes: [note],
+    };
+
+    try {
+      setError('');
+      setActionLoading(`invoice-${note.id}`);
+      setInvoiceModalData(await buildInvoiceModalData(document));
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'No se pudo abrir la factura relacionada.');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const openExternalCreditNote = (note) => {
+    const url = note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl || '';
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <section className="grid gap-4">
+      <PanelHeader
+        eyebrow="Bandeja fiscal"
+        title="Notas crédito"
+        text="Administración central de notas crédito guardadas dentro de ElectronicInvoice.creditNotes."
+      >
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+          <label
+            className="flex min-w-[260px] items-center gap-2 rounded-2xl border px-3 py-2"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
+          >
+            <Search className="h-4 w-4" style={{ color: 'var(--admin-card-muted-text)' }} />
+            <input
+              value={typingQuery}
+              onChange={(event) => setTypingQuery(event.target.value)}
+              placeholder="Buscar nota, factura, cliente o motivo"
+              className="w-full bg-transparent text-sm font-bold outline-none"
+              style={{ color: 'var(--admin-card-text)' }}
+            />
+          </label>
+          <select
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+            className="rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          >
+            {CREDIT_NOTE_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={type}
+            onChange={(event) => {
+              setType(event.target.value);
+              setPage(1);
+            }}
+            className="rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          >
+            {CREDIT_NOTE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <ActionButton icon={RefreshCw} onClick={loadCreditNotes} disabled={loading}>Actualizar</ActionButton>
+        </div>
+      </PanelHeader>
+
+      {error ? <MessageBox>{error}</MessageBox> : null}
+
+      <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <div className="text-sm font-black">{loading ? 'Cargando notas crédito...' : `${formatNumber(total)} nota(s) crédito`}</div>
+          <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {formatNumber(page)} de {formatNumber(pages)}</div>
+        </div>
+
+        {rows.length === 0 && !loading ? (
+          <EmptyWorkBlock icon={RotateCcw} title="Sin notas crédito registradas" text="Cuando una factura tenga nota crédito total o parcial, aparecerá aquí sin salir del módulo de Facturación." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] table-fixed text-left text-sm">
+              <thead>
+                <tr style={{ color: 'var(--admin-card-muted-text)' }}>
+                  <th className="w-[19%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Nota crédito</th>
+                  <th className="w-[20%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Factura</th>
+                  <th className="w-[18%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
+                  <th className="w-[17%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado / tipo</th>
+                  <th className="w-[13%] px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
+                  <th className="w-[13%] px-4 py-3 text-right text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((note) => {
+                  const customer = note.customer || {};
+                  const customerName = customer.businessName || customer.name || customer.email || 'Cliente';
+                  const isOpening = actionLoading === `invoice-${note.id}`;
+                  const hasExternal = Boolean(note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl);
+
+                  return (
+                    <tr key={note.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                      <td className="px-4 py-4 align-top">
+                        <p className="truncate font-black">{note.noteNumber || note.referenceCode || 'Sin número'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Ref. {note.referenceCode || '—'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(note.createdAt)}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="truncate font-black">{note.invoiceNumber || note.billNumber || 'Sin factura'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{note.orderNumber || '—'}</p>
+                        <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {note.invoiceCufe || '—'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="truncate font-black">{customerName}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={getStatusStyle(note.status)}>
+                          <span className="truncate">{getStatusLabel(note.status)}</span>
+                        </span>
+                        <p className="mt-2 truncate text-sm font-black">{getCreditNoteTypeLabel(note.type)}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{normalizeProviderLabel(note.provider?.name)}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-black">{formatCurrency(note.totalAmount)}</p>
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(note.itemsCount || 0)} ítem(s)</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
+                          <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!hasExternal} variant="primary">Soporte</DocumentActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 border-t px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Fuente: ElectronicInvoice.creditNotes. No se crea módulo separado.</p>
+          <div className="flex gap-2">
+            <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</ActionButton>
+            <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>Siguiente</ActionButton>
+          </div>
+        </div>
+      </div>
+
+      {invoiceModalData ? (
+        <ElectronicInvoiceModal
+          order={invoiceModalData.order}
+          invoice={invoiceModalData.invoice}
+          onClose={() => {
+            setInvoiceModalData(null);
+            loadCreditNotes();
+          }}
         />
       ) : null}
     </section>
@@ -869,11 +1119,12 @@ function BillingSummaryPanel() {
     <div className="grid gap-5">
       <PanelHeader
         eyebrow="Control general"
-        title="Resumen de facturación"
-        text="Indicadores reales tomados de ElectronicInvoice, órdenes pendientes y configuración actual."
+        title="Módulo unificado de facturación"
+        text="Indicadores reales tomados de ElectronicInvoice, notas crédito, órdenes pendientes y configuración actual."
       >
         <div className="flex flex-wrap gap-2">
           <SummaryQuickLink to={`${BASE_PATH}/documentos`} icon={FileText}>Ver documentos</SummaryQuickLink>
+          <SummaryQuickLink to={`${BASE_PATH}/notas-credito`} icon={RotateCcw}>Notas crédito</SummaryQuickLink>
           <SummaryQuickLink to={`${BASE_PATH}/ordenes`} icon={ClipboardList}>Órdenes pendientes</SummaryQuickLink>
           <ActionButton icon={RefreshCw} onClick={loadSummary} disabled={loading}>Actualizar</ActionButton>
         </div>
@@ -881,9 +1132,10 @@ function BillingSummaryPanel() {
 
       {error ? <MessageBox>{error}</MessageBox> : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <BillingMetricCard icon={FileText} label="Emitidas" value={loading ? '...' : formatNumber(summary?.emitted || 0)} helper={`${formatNumber(summary?.validated || 0)} validadas`} />
         <BillingMetricCard icon={ClipboardList} label="Pendientes" value={loading ? '...' : formatNumber(summary?.pending || 0)} helper="Órdenes por facturar" />
+        <BillingMetricCard icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatNumber(summary?.creditNotes || 0)} helper="Devoluciones y ajustes" />
         <BillingMetricCard icon={AlertTriangle} label="Errores" value={loading ? '...' : formatNumber(summary?.errors || 0)} helper="Rechazadas o fallidas" />
         <BillingMetricCard icon={Send} label="Proveedor" value={normalizeProviderLabel(summary?.provider)} helper={normalizeModeLabel(summary?.mode)} />
       </div>
@@ -1004,6 +1256,10 @@ export default function AdminBillingPage() {
 
     if (activeTab === 'documentos') {
       return <BillingDocumentsPanel />;
+    }
+
+    if (activeTab === 'notas-credito') {
+      return <BillingCreditNotesPanel />;
     }
 
     if (activeTab === 'ordenes') {
