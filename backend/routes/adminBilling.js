@@ -29,7 +29,7 @@ router.use(requireAdmin);
 
 router.get(
   '/summary',
-  requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
+  requirePermission('billing:view'),
   async (_req, res) => {
     try {
       const data = await billingService.getBillingSummary();
@@ -42,7 +42,7 @@ router.get(
 
 router.get(
   '/documents',
-  requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
+  requirePermission('billing:view'),
   async (req, res) => {
     try {
       const data = await billingService.listElectronicInvoices(req.query || {});
@@ -70,7 +70,7 @@ router.post(
 
 router.get(
   '/credit-notes',
-  requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
+  requirePermission('billing:view'),
   async (req, res) => {
     try {
       const data = await billingService.listCreditNotes(req.query || {});
@@ -98,7 +98,7 @@ router.post(
 
 router.get(
   '/pending-orders',
-  requirePermission.any(['billing:view', 'orders:view', 'finance:view']),
+  requirePermission('billing:view'),
   async (req, res) => {
     try {
       const data = await billingService.listPendingBillableOrders(req.query || {});
@@ -111,7 +111,7 @@ router.get(
 
 router.post(
   '/orders/:orderId/generate',
-  requirePermission.any(['billing:view', 'orders:update', 'orders:view']),
+  requirePermission('billing:create'),
   async (req, res) => {
     try {
       const data = await billingService.generateInvoiceForOrder(req.params.orderId, {
@@ -127,7 +127,7 @@ router.post(
 
 router.get(
   '/settings',
-  requirePermission.any(['billing:view', 'billing:settings']),
+  requirePermission('billing:settings'),
   async (_req, res) => {
     try {
       const data = await billingService.getBillingSettingsSnapshot();

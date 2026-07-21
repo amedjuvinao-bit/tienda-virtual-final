@@ -9,10 +9,13 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import api from '../../../lib/api';
+import useAdminPermissions from '../../security/useAdminPermissions';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function InvoiceDocumentsTab({ invoice }) {
+  const { can } = useAdminPermissions();
+  const canDownload = can('billing:download');
   const xmlUrl =
     invoice?.xmlUrl ||
     invoice?.downloads?.xml?.url ||
@@ -42,6 +45,7 @@ export default function InvoiceDocumentsTab({ invoice }) {
         fileName={`factura-${getInvoiceReference(invoice)}.xml`}
         emptyText="XML no disponible todavía."
         protectedDownload
+        allowed={canDownload}
       />
 
       <DocumentCard
@@ -52,6 +56,7 @@ export default function InvoiceDocumentsTab({ invoice }) {
         fileName={`factura-${getInvoiceReference(invoice)}`}
         emptyText="Enlace público no disponible."
         onlyOpen
+        allowed={canDownload}
       />
     </div>
   );
@@ -66,6 +71,7 @@ function DocumentCard({
   emptyText,
   onlyOpen = false,
   protectedDownload = false,
+  allowed = true,
 }) {
   const [loadingAction, setLoadingAction] = useState('');
   const [error, setError] = useState('');
@@ -192,7 +198,18 @@ function DocumentCard({
         {description}
       </p>
 
-      {hasUrl ? (
+      {!allowed ? (
+        <p
+          className="mt-5 rounded-xl px-4 py-3 text-center text-sm font-medium"
+          style={{
+            background: 'var(--admin-primary-soft-bg)',
+            color: 'var(--admin-card-muted-text)',
+            border: '1px solid var(--admin-primary-soft-border, var(--admin-card-border))',
+          }}
+        >
+          No tienes permiso para abrir o descargar este documento.
+        </p>
+      ) : hasUrl ? (
         <div className="mt-5 space-y-2">
           <button
             type="button"

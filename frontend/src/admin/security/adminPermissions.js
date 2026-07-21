@@ -13,7 +13,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],
-  facturacion: ['settings:billing'],
+  facturacion: ['billing:view', 'billing:settings'],
   clientes: ['customers:view'],
   pos: ['pos:view'],
   caja: ['pos:view'],

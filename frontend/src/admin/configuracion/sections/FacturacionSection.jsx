@@ -37,13 +37,16 @@ export default function FacturacionSection() {
   });
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [credentialStatus, setCredentialStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data } = await api.get('/api/site-settings');
+        const { data } = await api.get('/api/site-settings/admin');
+
+        setCredentialStatus(data?._credentialStatus || {});
 
         if (data?.billing) {
           const loadedMode = data.billing.dian?.mode || 'internal';
@@ -87,9 +90,11 @@ export default function FacturacionSection() {
     try {
       setSaving(true);
 
-      await api.put('/api/site-settings', {
+      const { data } = await api.put('/api/site-settings', {
         billing,
       });
+
+      setCredentialStatus(data?._credentialStatus || {});
 
       alert('Configuración de facturación guardada correctamente');
     } catch (error) {
@@ -255,6 +260,7 @@ export default function FacturacionSection() {
 
                 <ElectronicProviderBlock
                   value={billing.electronicProvider}
+                  credentialStatus={credentialStatus}
                   onChange={(val) =>
                     setBilling((prev) => ({
                       ...prev,
@@ -316,6 +322,7 @@ export default function FacturacionSection() {
               (isDianActive ? (
                 <DianResolutionBlock
                   value={billing.dianResolution}
+                  credentialStatus={credentialStatus}
                   onChange={handleDianResolutionChange}
                 />
               ) : (

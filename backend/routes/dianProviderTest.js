@@ -1,7 +1,12 @@
 // backend/routes/dianProviderTest.js
 const express = require('express');
+const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 
 const router = express.Router();
+
+router.use(requireAdmin);
+router.use(requirePermission('billing:settings'));
 
 function trimSafe(value, max = 300) {
   return String(value || '').trim().slice(0, max);

@@ -1,7 +1,11 @@
 import React from 'react';
 import BillingField from './BillingField';
 
-export default function DianResolutionBlock({ value = {}, onChange }) {
+export default function DianResolutionBlock({
+  value = {},
+  onChange,
+  credentialStatus = {},
+}) {
   const updateField = (field, newValue) => {
     if (typeof onChange !== 'function') return;
 
@@ -95,11 +99,23 @@ export default function DianResolutionBlock({ value = {}, onChange }) {
 
       <BillingField label="Clave técnica DIAN">
         <input
+          type="password"
           value={value.technicalKey || ''}
           onChange={(e) => updateField('technicalKey', e.target.value)}
           className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-          placeholder="Clave técnica entregada por la DIAN"
+          placeholder={
+            credentialStatus['billing.dianResolution.technicalKey']
+              ? 'Clave configurada; escribe para reemplazarla'
+              : 'Clave técnica entregada por la DIAN'
+          }
+          autoComplete="new-password"
+          spellCheck={false}
         />
+        {credentialStatus['billing.dianResolution.technicalKey'] && !value.technicalKey ? (
+          <span className="mt-1 block text-xs font-medium text-emerald-600">
+            Clave configurada y protegida.
+          </span>
+        ) : null}
       </BillingField>
 
       <BillingField label="Ambiente DIAN">

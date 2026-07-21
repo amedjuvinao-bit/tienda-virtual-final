@@ -18,6 +18,7 @@ import {
 import api from '../../lib/api';
 import FacturacionSection from '../configuracion/sections/FacturacionSection';
 import ElectronicInvoiceModal from '../orders/electronicInvoice/ElectronicInvoiceModal';
+import useAdminPermissions from '../security/useAdminPermissions';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
@@ -36,30 +37,35 @@ const BILLING_TABS = [
     id: 'resumen',
     label: 'Resumen',
     icon: ReceiptText,
+    permission: 'billing:view',
     description: 'Estado general de facturación, pendientes y alertas.',
   },
   {
     id: 'documentos',
     label: 'Documentos',
     icon: FileText,
+    permission: 'billing:view',
     description: 'Facturas, comprobantes y soportes generados.',
   },
   {
     id: 'notas-credito',
     label: 'Notas crédito',
     icon: RotateCcw,
+    permission: 'billing:view',
     description: 'Bandeja de notas crédito asociadas a facturas electrónicas.',
   },
   {
     id: 'ordenes',
     label: 'Órdenes por facturar',
     icon: ClipboardList,
+    permission: 'billing:view',
     description: 'Ventas pagadas que aún requieren comprobante.',
   },
   {
     id: 'configuracion',
     label: 'Configuración',
     icon: Settings2,
+    permission: 'billing:settings',
     description: 'Datos fiscales, proveedor, resolución, impuestos y textos legales.',
   },
 ];
@@ -469,6 +475,9 @@ async function buildInvoiceModalData(document = {}) {
 }
 
 function BillingDocumentsPanel() {
+  const { can } = useAdminPermissions();
+  const canDownload = can('billing:download');
+  const canSync = can('billing:retry');
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -698,10 +707,10 @@ function BillingDocumentsPanel() {
                       </td>
                       <td className="px-3 py-4 align-top">
                         <div className="grid grid-cols-2 gap-1.5">
-                          <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
-                          <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
+                          <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canDownload || !canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
+                          <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canDownload || !canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                           <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
-                          <DocumentActionButton icon={RefreshCw} onClick={() => syncDocument(document)} disabled={isSyncLoading}>{isSyncLoading ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          <DocumentActionButton icon={RefreshCw} onClick={() => syncDocument(document)} disabled={!canSync || isSyncLoading}>{isSyncLoading ? '...' : 'Sincronizar'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>
@@ -733,6 +742,9 @@ function BillingDocumentsPanel() {
 }
 
 function BillingCreditNotesPanel() {
+  const { can } = useAdminPermissions();
+  const canDownload = can('billing:download');
+  const canSync = can('billing:retry');
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -951,8 +963,8 @@ function BillingCreditNotesPanel() {
                       <td className="px-3 py-4 align-top">
                         <div className="grid gap-1.5">
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
-                          <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!hasExternal} variant="primary">Soporte</DocumentActionButton>
-                          <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!canDownload || !hasExternal} variant="primary">Soporte</DocumentActionButton>
+                          <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={!canSync || isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>
@@ -987,6 +999,8 @@ function BillingCreditNotesPanel() {
 }
 
 function BillingPendingOrdersPanel() {
+  const { can } = useAdminPermissions();
+  const canGenerate = can('billing:create');
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -1127,9 +1141,15 @@ function BillingPendingOrdersPanel() {
                       <td className="px-4 py-4 align-top">
                         <div className="flex flex-wrap justify-end gap-2">
                           <ActionButton icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
-                          <ActionButton icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
-                            {isGenerating ? 'Generando...' : 'Generar'}
-                          </ActionButton>
+                          {canGenerate ? (
+                            <ActionButton icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
+                              {isGenerating ? 'Generando...' : 'Generar'}
+                            </ActionButton>
+                          ) : (
+                            <span className="rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                              Solo lectura
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1327,14 +1347,27 @@ function BillingSummaryPanel() {
 
 export default function AdminBillingPage() {
   const location = useLocation();
+  const { can } = useAdminPermissions();
+  const canView = can('billing:view');
+  const canConfigure = can('billing:settings');
+
+  const visibleTabs = useMemo(
+    () =>
+      BILLING_TABS.filter((tab) =>
+        tab.permission === 'billing:settings' ? canConfigure : canView
+      ),
+    [canConfigure, canView]
+  );
 
   const activeTab = useMemo(() => {
     const parts = location.pathname.split('/').filter(Boolean);
     const last = parts[parts.length - 1];
-    return BILLING_TABS.some((tab) => tab.id === last) ? last : 'resumen';
-  }, [location.pathname]);
+    return visibleTabs.some((tab) => tab.id === last)
+      ? last
+      : visibleTabs[0]?.id || 'resumen';
+  }, [location.pathname, visibleTabs]);
 
-  const activeData = BILLING_TABS.find((tab) => tab.id === activeTab) || BILLING_TABS[0];
+  const activeData = visibleTabs.find((tab) => tab.id === activeTab) || visibleTabs[0] || BILLING_TABS[0];
   const ActiveIcon = activeData.icon || ReceiptText;
 
   const renderContent = () => {
@@ -1374,7 +1407,7 @@ export default function AdminBillingPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto border-b px-5 py-3 md:px-6" style={{ borderColor: 'var(--admin-card-border)' }}>
-          {BILLING_TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <NavLink

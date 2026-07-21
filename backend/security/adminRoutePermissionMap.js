@@ -321,6 +321,43 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
    * ======================================================= */
   {
     method: 'GET',
+    path: '/api/admin/billing/summary',
+    permission: 'billing:view',
+    description: 'Consultar resumen de facturación electrónica.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/documents',
+    permission: 'billing:view',
+    description: 'Listar documentos de facturación electrónica.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/credit-notes',
+    permission: 'billing:view',
+    description: 'Listar notas crédito electrónicas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/pending-orders',
+    permission: 'billing:view',
+    description: 'Listar órdenes pendientes por facturar.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/billing/orders/:orderId/generate',
+    permission: 'billing:create',
+    description: 'Generar factura electrónica desde una orden.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/settings',
+    permission: 'billing:settings',
+    description: 'Consultar configuración técnica de facturación.',
+  },
+  {
+    method: 'GET',
     path: '/api/dian-provider-test',
     permission: 'billing:view',
     description: 'Consultar estado de proveedor de facturación electrónica.',
@@ -369,11 +406,33 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
-    path: '/api/dian-provider-test/credit-note',
-    permission: 'billing:credit_note',
-    description: 'Crear nota crédito electrónica.',
+    path: '/api/payments/admin/delete-factus-invoice/:orderId',
+    permission: 'billing:retry',
+    description: 'Eliminar en Factus una factura todavía no validada.',
     audit: true,
     danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/create-credit-note/:orderId',
+    permission: 'billing:credit_note',
+    description: 'Crear una nota crédito electrónica desde una factura.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/retry-electronic-invoice/:orderId',
+    permission: 'billing:retry',
+    description: 'Reintentar la emisión de una factura electrónica.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/dian-provider/test-provider',
+    permission: 'billing:settings',
+    description: 'Validar la configuración del proveedor electrónico.',
+    audit: true,
   },
   {
     method: 'GET',
@@ -459,6 +518,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
    * CONFIGURACIÓN / APARIENCIA / SITE SETTINGS
    * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/site-settings/admin',
+    permission: 'settings:view',
+    description: 'Consultar configuración administrativa sin exponer secretos.',
+  },
   {
     method: 'PUT',
     path: '/api/site-settings',

@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const { buildAdminSiteSettings } = require('../lib/siteSettingsSecurity');
 const { generateCUFE } = require('../lib/dian/cufe');
 const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
@@ -320,12 +321,19 @@ function buildBillableOrderFilter(orderIdsWithInvoice = [], params = {}) {
 
 async function getBillingSettingsSnapshot() {
   const settings = await SiteSettings.findOne().lean();
-  const billing = settings?.billing || {};
+  const safeSettings = buildAdminSiteSettings(settings || {});
+  const billing = safeSettings?.billing || {};
+  const credentialStatus = Object.fromEntries(
+    Object.entries(safeSettings?._credentialStatus || {}).filter(([path]) =>
+      path.startsWith('billing.')
+    )
+  );
 
   return {
-    store: settings?.store || {},
-    publicUrl: settings?.publicUrl || '',
+    store: safeSettings?.store || {},
+    publicUrl: safeSettings?.publicUrl || '',
     billing,
+    credentialStatus,
     provider:
       billing?.electronicProvider?.provider ||
       billing?.dian?.providerType ||

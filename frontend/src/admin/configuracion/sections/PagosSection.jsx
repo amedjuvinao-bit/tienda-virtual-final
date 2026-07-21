@@ -2,7 +2,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import InfoCard from '../components/InfoCard';
 import EmptyHint from '../components/EmptyHint';
-import { fetchSiteSettings, saveSiteSettings } from '../../../lib/siteSettingsApi';
+import {
+  fetchAdminSiteSettings,
+  saveSiteSettings,
+} from '../../../lib/siteSettingsApi';
 
 const PROVIDERS = [
   {
@@ -371,6 +374,7 @@ export default function PagosSection() {
 
   const [form, setForm] = useState(() => normalizePayments({}));
   const [showSecrets, setShowSecrets] = useState({});
+  const [credentialStatus, setCredentialStatus] = useState({});
 
   useEffect(() => {
     let cancel = false;
@@ -378,11 +382,12 @@ export default function PagosSection() {
     const load = async () => {
       try {
         setLoadingConfig(true);
-        const data = await fetchSiteSettings();
+        const data = await fetchAdminSiteSettings();
         if (cancel) return;
 
         const payments = data?.theme?.global?.payments || {};
         setForm(normalizePayments(payments));
+        setCredentialStatus(data?._credentialStatus || {});
       } catch (err) {
         console.error('Error cargando pagos', err);
       } finally {
@@ -411,9 +416,13 @@ export default function PagosSection() {
 
     return providerMeta.fields.filter((field) => {
       const value = providerValues[field.key];
-      return String(value || '').trim() !== '';
+      const statusPath = `theme.global.payments.credentials.${form.provider}.${field.key}`;
+      return (
+        String(value || '').trim() !== '' ||
+        (field.secret && credentialStatus[statusPath] === true)
+      );
     }).length;
-  }, [providerMeta, providerValues]);
+  }, [credentialStatus, form.provider, providerMeta, providerValues]);
 
   const requiredCount = providerMeta?.fields?.length || 0;
   const isProviderReady =
@@ -479,8 +488,6 @@ export default function PagosSection() {
     try {
       setLoading(true);
 
-      const data = await fetchSiteSettings();
-
       const cleanedCredentials = Object.fromEntries(
         Object.entries(form.credentials || {}).map(([providerKey, providerValuesRaw]) => {
           const providerValuesSafe =
@@ -511,17 +518,15 @@ export default function PagosSection() {
       };
 
       const updated = {
-        ...data,
         theme: {
-          ...data.theme,
           global: {
-            ...data.theme?.global,
             payments: payloadPayments,
           },
         },
       };
 
-      await saveSiteSettings(updated);
+      const saved = await saveSiteSettings(updated);
+      setCredentialStatus(saved?._credentialStatus || {});
 
       alert('✅ Configuración de pagos guardada');
     } catch (err) {
@@ -713,6 +718,9 @@ export default function PagosSection() {
                     {providerMeta.fields.map((field) => {
                       const compoundKey = `${providerMeta.value}.${field.key}`;
                       const value = providerValues[field.key] || '';
+                      const statusPath = `theme.global.payments.credentials.${providerMeta.value}.${field.key}`;
+                      const secretConfigured =
+                        field.secret && credentialStatus[statusPath] === true;
                       const isSecretVisible = !!showSecrets[compoundKey];
                       const inputType = field.secret
                         ? isSecretVisible
@@ -757,7 +765,11 @@ export default function PagosSection() {
                                 }
                                 className={`w-full rounded-xl border border-gray-300 px-3 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-400 ${field.secret ? 'pr-24' : ''
                                   }`}
-                                placeholder={field.placeholder}
+                                placeholder={
+                                  secretConfigured && !value
+                                    ? 'Configurado; escribe para reemplazarlo'
+                                    : field.placeholder
+                                }
                                 autoComplete="off"
                                 spellCheck={false}
                               />
@@ -777,8 +789,10 @@ export default function PagosSection() {
                           </div>
 
                           <span className="mt-1 block text-xs text-gray-500">
-                            {field.secret
-                              ? 'Campo sensible. Se recomienda manejarlo con cuidado y no compartirlo.'
+                            {secretConfigured && !value
+                              ? 'Credencial configurada y protegida. Su valor no se vuelve a mostrar.'
+                              : field.secret
+                                ? 'Campo sensible. Se recomienda manejarlo con cuidado y no compartirlo.'
                               : 'Campo visible de configuración del proveedor.'}
                           </span>
                         </label>
@@ -794,6 +808,9 @@ export default function PagosSection() {
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {providerMeta.fields.map((field) => {
                         const value = providerValues[field.key] || '';
+                        const statusPath = `theme.global.payments.credentials.${providerMeta.value}.${field.key}`;
+                        const secretConfigured =
+                          field.secret && credentialStatus[statusPath] === true;
 
                         return (
                           <div
@@ -804,7 +821,13 @@ export default function PagosSection() {
                               {field.label}
                             </div>
                             <div className="mt-1 break-all text-sm text-gray-700">
-                              {field.secret ? maskValue(value) : value || 'No configurado'}
+                              {field.secret
+                                ? value
+                                  ? maskValue(value)
+                                  : secretConfigured
+                                    ? 'Configurado (valor protegido)'
+                                    : 'No configurado'
+                                : value || 'No configurado'}
                             </div>
                           </div>
                         );

@@ -10,6 +10,7 @@ const SiteSettings = require('../models/SiteSettings');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 
 const {
   confirmInventoryReservation,
@@ -867,11 +868,6 @@ async function generateElectronicInvoiceAfterPayment({ orderId, transaction, pay
       cufeData,
     });
 
-    console.log(
-      '🧾 CUSTOMER FOR FACTUS:',
-      JSON.stringify(order.customer, null, 2)
-    );
-
     const providerInvoiceData = {
       order: {
         ...order,
@@ -915,10 +911,6 @@ async function generateElectronicInvoiceAfterPayment({ orderId, transaction, pay
         invoiceData: providerInvoiceData,
       });
 
-      console.log(
-        '📡 RESPUESTA PROVIDER DIAN FULL:',
-        JSON.stringify(providerResponse, null, 2)
-      );
     } catch (err) {
       console.error('❌ ERROR EN ENVÍO A PROVIDER DIAN:', err.message);
     }
@@ -1109,15 +1101,6 @@ router.post('/wompi/checkout-data', async (req, res) => {
       });
     }
 
-    console.log('WOMPI SIGN DEBUG', {
-      reference,
-      amountInCents,
-      currency,
-      integrityKey: wompi.integrityKey,
-      integrityKeyLength: String(wompi.integrityKey || '').length,
-      signature,
-    });
-
     return res.json({
       ok: true,
       provider: 'wompi',
@@ -1277,13 +1260,6 @@ router.post('/admin/wompi/test-merchant', requireAdmin, async (req, res) => {
 });
 
 router.post('/wompi/webhook', async (req, res) => {
-  console.log('🔥 WOMPI WEBHOOK HIT', new Date().toISOString());
-  console.log('📦 BODY WEBHOOK:', JSON.stringify(req.body, null, 2));
-  console.log(
-    '🔐 HEADER CHECKSUM:',
-    req.get('x-event-checksum') || req.get('X-Event-Checksum')
-  );
-
   let shouldGenerateDian = false;
   let dianOrderId = null;
   let dianTransaction = null;
@@ -1307,10 +1283,6 @@ router.post('/wompi/webhook', async (req, res) => {
       payload,
       wompi.webhookSecret
     ).toLowerCase();
-
-    console.log('CHECKSUM Wompi');
-    console.log('PROVIDED:', providedChecksum);
-    console.log('CALCULATED:', calculatedChecksum);
 
     if (!providedChecksum || providedChecksum !== calculatedChecksum) {
       return res.status(400).json({
@@ -1600,8 +1572,6 @@ router.post('/payu/checkout-data', async (req, res) => {
       payu: {
         merchantId: payu.merchantId,
         accountId: payu.accountId,
-        apiLogin: payu.apiLogin,
-        apiKey: payu.apiKey,
         referenceCode,
         description: `Pago orden ${order.orderNumber || referenceCode}`,
         amount,
@@ -1756,6 +1726,7 @@ router.post(
 router.post(
   '/admin/delete-factus-invoice/:orderId',
   requireAdmin,
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const orderId = trimSafe(req.params.orderId, 100);
@@ -1895,6 +1866,7 @@ router.post(
 router.post(
   '/admin/create-credit-note/:orderId',
   requireAdmin,
+  requirePermission('billing:credit_note'),
   async (req, res) => {
     try {
       const { orderId } = req.params;
@@ -2173,6 +2145,7 @@ router.post(
 router.post(
   '/admin/retry-electronic-invoice/:orderId',
   requireAdmin,
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const orderId = trimSafe(req.params.orderId, 100);

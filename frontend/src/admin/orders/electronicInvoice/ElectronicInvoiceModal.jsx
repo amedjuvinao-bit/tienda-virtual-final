@@ -13,6 +13,7 @@ import {
 
 import api from '../../../lib/api';
 import { syncBillingDocument } from '../../billing/api/adminBillingApi';
+import useAdminPermissions from '../../security/useAdminPermissions';
 
 import InvoiceSummaryTab from './InvoiceSummaryTab';
 import InvoiceErrorsTab from './InvoiceErrorsTab';
@@ -138,6 +139,10 @@ function getCreditNoteQrUrl(note) {
 }
 
 export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
+  const { can } = useAdminPermissions();
+  const canSync = can('billing:retry');
+  const canDelete = can('billing:retry');
+  const canCreateCreditNote = can('billing:credit_note');
   const [activeTab, setActiveTab] = useState('summary');
   const [currentInvoice, setCurrentInvoice] = useState(invoice);
 
@@ -495,80 +500,88 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleSyncInvoice}
-              disabled={syncing}
-              className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                background: 'var(--admin-button-soft-bg)',
-                color: 'var(--admin-button-soft-text)',
-                borderColor: 'var(--admin-button-soft-border)',
-              }}
-            >
-              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Sincronizando...' : 'Sincronizar'}
-            </button>
+            {canSync ? (
+              <button
+                type="button"
+                onClick={handleSyncInvoice}
+                disabled={syncing}
+                className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: 'var(--admin-button-soft-bg)',
+                  color: 'var(--admin-button-soft-text)',
+                  borderColor: 'var(--admin-button-soft-border)',
+                }}
+              >
+                <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                {syncing ? 'Sincronizando...' : 'Sincronizar'}
+              </button>
+            ) : null}
 
             {!alreadyValidated && (
               <>
-                <button
-                  type="button"
-                  onClick={handleDeleteInvoice}
-                  disabled={deletingInvoice}
-                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: 'var(--admin-danger-soft-bg, rgba(239,68,68,.12))',
-                    color: 'var(--admin-danger-text, #dc2626)',
-                    borderColor: 'var(--admin-danger-border, rgba(239,68,68,.25))',
-                  }}
-                >
-                  <Trash2
-                    size={16}
-                    className={deletingInvoice ? 'animate-pulse' : ''}
-                  />
-                  {deletingInvoice ? 'Eliminando...' : 'Eliminar factura'}
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteInvoice}
+                    disabled={deletingInvoice}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: 'var(--admin-danger-soft-bg, rgba(239,68,68,.12))',
+                      color: 'var(--admin-danger-text, #dc2626)',
+                      borderColor: 'var(--admin-danger-border, rgba(239,68,68,.25))',
+                    }}
+                  >
+                    <Trash2
+                      size={16}
+                      className={deletingInvoice ? 'animate-pulse' : ''}
+                    />
+                    {deletingInvoice ? 'Eliminando...' : 'Eliminar factura'}
+                  </button>
+                ) : null}
 
-                <button
-                  type="button"
-                  onClick={handleRetryInvoice}
-                  disabled={retrying}
-                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: 'var(--admin-button-soft-bg)',
-                    color: 'var(--admin-button-soft-text)',
-                    borderColor: 'var(--admin-button-soft-border)',
-                  }}
-                >
-                  <RefreshCw
-                    size={16}
-                    className={retrying ? 'animate-spin' : ''}
-                  />
-                  {retrying ? 'Reintentando...' : 'Reintentar factura'}
-                </button>
+                {canSync ? (
+                  <button
+                    type="button"
+                    onClick={handleRetryInvoice}
+                    disabled={retrying}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: 'var(--admin-button-soft-bg)',
+                      color: 'var(--admin-button-soft-text)',
+                      borderColor: 'var(--admin-button-soft-border)',
+                    }}
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={retrying ? 'animate-spin' : ''}
+                    />
+                    {retrying ? 'Reintentando...' : 'Reintentar factura'}
+                  </button>
+                ) : null}
               </>
             )}
 
             {alreadyValidated && (
               <>
-                <button
-                  type="button"
-                  onClick={openCreditNoteForm}
-                  disabled={creatingCreditNote}
-                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    background: 'var(--admin-warning-soft-bg, rgba(245, 158, 11, 0.12))',
-                    color: 'var(--admin-warning-text, #d97706)',
-                    borderColor: 'var(--admin-warning-border, rgba(245, 158, 11, 0.28))',
-                  }}
-                >
-                  <RotateCcw
-                    size={16}
-                    className={creatingCreditNote ? 'animate-spin' : ''}
-                  />
-                  {creatingCreditNote ? 'Creando...' : 'Crear nota crédito'}
-                </button>
+                {canCreateCreditNote ? (
+                  <button
+                    type="button"
+                    onClick={openCreditNoteForm}
+                    disabled={creatingCreditNote}
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: 'var(--admin-warning-soft-bg, rgba(245, 158, 11, 0.12))',
+                      color: 'var(--admin-warning-text, #d97706)',
+                      borderColor: 'var(--admin-warning-border, rgba(245, 158, 11, 0.28))',
+                    }}
+                  >
+                    <RotateCcw
+                      size={16}
+                      className={creatingCreditNote ? 'animate-spin' : ''}
+                    />
+                    {creatingCreditNote ? 'Creando...' : 'Crear nota crédito'}
+                  </button>
+                ) : null}
 
                 <span
                   className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold"

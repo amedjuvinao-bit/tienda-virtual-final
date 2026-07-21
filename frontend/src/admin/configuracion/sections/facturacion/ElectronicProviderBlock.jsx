@@ -31,16 +31,22 @@ function ProviderInput({
   value,
   onChange,
   required = false,
+  configured = false,
 }) {
-  const hasError = required && isEmpty(value);
+  const hasError = required && isEmpty(value) && !configured;
+  const resolvedPlaceholder = configured
+    ? `${placeholder} configurado; escribe para reemplazarlo`
+    : placeholder;
 
   return (
     <div className="grid gap-1">
       <input
         type={type}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         value={value || ''}
         onChange={onChange}
+        autoComplete="new-password"
+        spellCheck={false}
         className={`rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 ${
           hasError
             ? 'border-red-300 bg-red-50 focus:ring-red-100'
@@ -52,17 +58,30 @@ function ProviderInput({
         show={hasError}
         text={`Campo obligatorio: ${placeholder}`}
       />
+
+      {configured && isEmpty(value) ? (
+        <p className="text-xs font-medium text-emerald-600">
+          Credencial configurada y protegida.
+        </p>
+      ) : null}
     </div>
   );
 }
 
-export default function ElectronicProviderBlock({ value = {}, onChange }) {
+export default function ElectronicProviderBlock({
+  value = {},
+  onChange,
+  credentialStatus = {},
+}) {
   const provider = value?.provider || 'mock';
 
   const requiredFields = REQUIRED_FIELDS_BY_PROVIDER[provider] || [];
 
-  const missingFields = requiredFields.filter((field) =>
-    isEmpty(value?.[field.key])
+  const isConfigured = (field) =>
+    credentialStatus[`billing.electronicProvider.${field}`] === true;
+
+  const missingFields = requiredFields.filter(
+    (field) => isEmpty(value?.[field.key]) && !isConfigured(field.key)
   );
 
   const handleChange = (field, val) => {
@@ -140,9 +159,11 @@ export default function ElectronicProviderBlock({ value = {}, onChange }) {
           />
 
           <ProviderInput
+            type="password"
             placeholder="Client Secret"
             value={value?.clientSecret}
             required
+            configured={isConfigured('clientSecret')}
             onChange={(e) => handleChange('clientSecret', e.target.value)}
           />
 
@@ -158,6 +179,7 @@ export default function ElectronicProviderBlock({ value = {}, onChange }) {
             placeholder="Contraseña"
             value={value?.password}
             required
+            configured={isConfigured('password')}
             onChange={(e) => handleChange('password', e.target.value)}
           />
 
@@ -185,16 +207,20 @@ export default function ElectronicProviderBlock({ value = {}, onChange }) {
           />
 
           <ProviderInput
+            type="password"
             placeholder="Software PIN"
             value={value?.softwarePin}
             required
+            configured={isConfigured('softwarePin')}
             onChange={(e) => handleChange('softwarePin', e.target.value)}
           />
 
           <ProviderInput
+            type="password"
             placeholder="Technical Key"
             value={value?.technicalKey}
             required
+            configured={isConfigured('technicalKey')}
             onChange={(e) => handleChange('technicalKey', e.target.value)}
           />
         </div>
