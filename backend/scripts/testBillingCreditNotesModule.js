@@ -51,7 +51,7 @@ function validateBackendCreditNotes() {
     'async function listCreditNotes',
     "'creditNotes.0': { $exists: true }",
     'ElectronicInvoice.find(invoiceFilter)',
-    'ElectronicInvoice.creditNotes',
+    'serializeCreditNote(invoice, note, index)',
     'listCreditNotes',
   ].forEach((needle) => {
     assertIncludes(serviceFile, needle, `Servicio de facturación no expone notas crédito: falta ${needle}`);
