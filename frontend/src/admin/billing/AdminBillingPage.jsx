@@ -684,7 +684,7 @@ function BillingDocumentsPanel() {
                         <p className="mt-2 truncate text-sm font-black">{normalizeProviderLabel(document.provider?.name)}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{document.provider?.status || document.dianResponse?.code || 'Sin respuesta'}</p>
                         {document.sync?.status === 'failed' ? (
-                          <p className="mt-1 truncate text-[11px] font-bold" title={document.sync?.message || ''} style={{ color: '#be123c' }}>
+                          <p className="mt-1 whitespace-normal break-words text-[11px] font-bold leading-4" title={document.sync?.message || ''} style={{ color: '#be123c' }}>
                             {document.sync?.message || 'Falló la última sincronización'}
                           </p>
                         ) : null}
