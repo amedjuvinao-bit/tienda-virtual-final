@@ -8,6 +8,7 @@ import './admin/finance/financeLayoutFix.css';
 import './admin/billing/billingDocumentsLayout.css';
 import './admin/orders/electronicInvoice/electronicInvoiceModalFix.css';
 import './admin/billing/billingGenerateConfirmBridge';
+import './admin/billing/billingSyncBridge';
 import './checkout/checkoutCouponBridge';
 
 // Toastify (estilos y contenedor global)
