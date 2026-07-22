@@ -182,10 +182,16 @@ function mergeConnectionCandidate(currentBilling = {}, body = {}) {
   };
 }
 
+function firstObject(value) {
+  if (Array.isArray(value)) {
+    return value.find((item) => item && typeof item === 'object') || null;
+  }
+  return value && typeof value === 'object' ? value : null;
+}
+
 function extractCompany(data = {}) {
-  const source = [data?.data?.data, data?.data, data?.company, data].find(
-    (value) => value && typeof value === 'object' && !Array.isArray(value)
-  ) || {};
+  const candidates = [data?.data?.data, data?.data, data?.company, data];
+  const source = candidates.map(firstObject).find(Boolean) || {};
 
   return {
     id: source.id || source.company_id || null,
@@ -285,7 +291,16 @@ async function fetchFactusCompany(runtimeConfig, token) {
       );
     }
 
-    return extractCompany(data);
+    const company = extractCompany(data);
+    if (!company.id && !company.nit && !company.name) {
+      throw createServiceError(
+        'Factus respondió, pero no fue posible identificar la empresa vinculada a las credenciales.',
+        'FACTUS_COMPANY_IDENTITY_MISSING',
+        422
+      );
+    }
+
+    return company;
   } catch (error) {
     if (error instanceof BillingConfigurationError) throw error;
     if (error?.name === 'AbortError') {
