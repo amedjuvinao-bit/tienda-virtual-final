@@ -92,6 +92,52 @@ const OfficialDocumentsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const InvoiceEmailAttachmentSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['pdf', 'xml'], required: true },
+    fileName: { type: String, default: '' },
+    contentType: { type: String, default: '' },
+    byteLength: { type: Number, default: 0 },
+    sha256: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
+const InvoiceEmailAttemptSchema = new mongoose.Schema(
+  {
+    status: { type: String, enum: ['sent', 'error'], required: true },
+    recipient: { type: String, default: '' },
+    source: { type: String, enum: ['automatic', 'manual'], default: 'manual' },
+    initiatedBy: { type: String, default: '' },
+    messageId: { type: String, default: '' },
+    errorMessage: { type: String, default: '' },
+    attemptedAt: { type: Date, default: Date.now },
+    attachments: { type: [InvoiceEmailAttachmentSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const InvoiceEmailDeliverySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['pending', 'sending', 'sent', 'error'],
+      default: 'pending',
+    },
+    recipient: { type: String, default: '' },
+    source: { type: String, enum: ['automatic', 'manual'], default: 'automatic' },
+    initiatedBy: { type: String, default: '' },
+    attempts: { type: Number, default: 0 },
+    messageId: { type: String, default: '' },
+    lastError: { type: String, default: '' },
+    lastAttemptAt: { type: Date, default: null },
+    lastSentAt: { type: Date, default: null },
+    attachments: { type: [InvoiceEmailAttachmentSchema], default: [] },
+    history: { type: [InvoiceEmailAttemptSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
     type: {
@@ -269,6 +315,11 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
     officialDocuments: {
       type: OfficialDocumentsSchema,
       default: undefined,
+    },
+
+    emailDelivery: {
+      type: InvoiceEmailDeliverySchema,
+      default: () => ({}),
     },
 
     provider: {

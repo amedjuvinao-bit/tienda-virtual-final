@@ -9,6 +9,9 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const billingService = require('../services/adminBillingService');
 const billingSyncService = require('../services/adminBillingSyncService');
+const {
+  sendValidatedInvoiceEmail,
+} = require('../services/electronicInvoiceEmailService');
 
 const router = express.Router();
 
@@ -61,9 +64,74 @@ router.post(
       const data = await billingSyncService.syncInvoice(req.params.invoiceId, {
         adminUser: currentAdmin(req),
       });
+
+      if (
+        data?.invoice?.provider?.isValidated === true ||
+        ['accepted', 'validated'].includes(String(data?.invoice?.status || '').toLowerCase())
+      ) {
+        try {
+          const emailResult = await sendValidatedInvoiceEmail(
+            data.invoice.id || req.params.invoiceId,
+            {
+              automatic: true,
+              initiatedBy: currentAdmin(req),
+            }
+          );
+          data.invoice = billingService.serializeElectronicInvoice(
+            emailResult.invoice?.toObject
+              ? emailResult.invoice.toObject()
+              : emailResult.invoice
+          );
+          data.emailDelivery = emailResult.delivery;
+        } catch (emailError) {
+          // La sincronización fiscal ya fue exitosa. Un error SMTP se informa
+          // por separado y jamás revierte la factura validada.
+          if (emailError?.invoice) {
+            data.invoice = billingService.serializeElectronicInvoice(
+              emailError.invoice?.toObject
+                ? emailError.invoice.toObject()
+                : emailError.invoice
+            );
+          }
+          data.emailWarning = emailError?.message || 'No se pudo enviar la factura por correo.';
+        }
+      }
+
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error sincronizando factura.');
+    }
+  }
+);
+
+router.post(
+  '/documents/:invoiceId/email',
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const emailResult = await sendValidatedInvoiceEmail(
+        req.params.invoiceId,
+        {
+          automatic: false,
+          initiatedBy: currentAdmin(req),
+        }
+      );
+      const invoice = billingService.serializeElectronicInvoice(
+        emailResult.invoice?.toObject
+          ? emailResult.invoice.toObject()
+          : emailResult.invoice
+      );
+
+      res.json({
+        ok: true,
+        data: {
+          invoice,
+          delivery: emailResult.delivery,
+          message: emailResult.message,
+        },
+      });
+    } catch (error) {
+      sendError(res, error, 'Error enviando la factura por correo.');
     }
   }
 );

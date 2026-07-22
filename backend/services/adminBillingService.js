@@ -7,6 +7,7 @@
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
+const MailSettings = require('../models/MailSettings');
 const { buildAdminSiteSettings } = require('../lib/siteSettingsSecurity');
 const {
   BILLABLE_ORDER_STATUSES,
@@ -109,6 +110,47 @@ function serializeSync(sync = {}) {
   };
 }
 
+function serializeEmailDelivery(delivery = {}, customer = {}) {
+  const history = Array.isArray(delivery?.history) ? delivery.history : [];
+
+  return {
+    status: delivery?.status || 'pending',
+    recipient: delivery?.recipient || customer?.email || '',
+    source: delivery?.source || 'automatic',
+    initiatedBy: delivery?.initiatedBy || '',
+    attempts: Number(delivery?.attempts || 0),
+    messageId: delivery?.messageId || '',
+    lastError: delivery?.lastError || '',
+    lastAttemptAt: delivery?.lastAttemptAt || null,
+    lastSentAt: delivery?.lastSentAt || null,
+    attachments: Array.isArray(delivery?.attachments) ? delivery.attachments : [],
+    history: history.slice(-10),
+  };
+}
+
+async function getMailConfigurationSnapshot() {
+  const settings = await MailSettings.findOne({ key: 'main' })
+    .select('+smtpPasswordEncrypted')
+    .lean();
+
+  const configured = Boolean(
+    settings?.enabled &&
+      settings?.fromEmail &&
+      settings?.smtpHost &&
+      settings?.smtpPort &&
+      settings?.smtpUser &&
+      settings?.smtpPasswordEncrypted
+  );
+
+  return {
+    loaded: true,
+    enabled: settings?.enabled === true,
+    configured,
+    fromEmail: settings?.fromEmail || '',
+    fromName: settings?.fromName || '',
+  };
+}
+
 function serializeElectronicInvoice(invoice = {}) {
   const links = getInvoiceLinks(invoice);
   const providerName = cleanText(invoice?.provider?.name, 60).toLowerCase();
@@ -169,6 +211,7 @@ function serializeElectronicInvoice(invoice = {}) {
       pdf: officialDocuments?.pdf || null,
       xml: officialDocuments?.xml || null,
     },
+    emailDelivery: serializeEmailDelivery(invoice.emailDelivery, invoice.customer),
     links,
     errorMessage: invoice.errorMessage || '',
     providerErrors: invoice.providerErrors || {},
@@ -354,13 +397,15 @@ async function listElectronicInvoices(params = {}) {
     }
   }
 
-  const [total, rows] = await Promise.all([
+  const [total, rows, mailConfiguration] = await Promise.all([
     ElectronicInvoice.countDocuments(filter),
     ElectronicInvoice.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    getMailConfigurationSnapshot(),
   ]);
 
   return {
     rows: rows.map(serializeElectronicInvoice),
+    mailConfiguration,
     total,
     page,
     limit,
@@ -478,9 +523,11 @@ module.exports = {
   getBillingSummary,
   getBillingSettingsSnapshot,
   generateInvoiceForOrder,
+  getMailConfigurationSnapshot,
   listCreditNotes,
   listElectronicInvoices,
   listPendingBillableOrders,
   serializeCreditNote,
   serializeElectronicInvoice,
+  serializeEmailDelivery,
 };

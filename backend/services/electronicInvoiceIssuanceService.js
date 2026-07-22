@@ -403,6 +403,10 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
   const isValidObjectId = overrides.isValidObjectId || mongoose.Types.ObjectId.isValid;
   const nowFactory = overrides.now || (() => new Date());
   const tokenFactory = overrides.randomUUID || (() => crypto.randomUUID());
+  const sendValidatedInvoiceEmail =
+    typeof overrides.sendValidatedInvoiceEmail === 'function'
+      ? overrides.sendValidatedInvoiceEmail
+      : null;
 
   async function findExistingInvoice(orderId, idempotencyKey) {
     return lean(InvoiceModel.findOne({
@@ -918,12 +922,40 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       );
     }
 
+    let deliveredInvoice = completedInvoice;
+    let emailDelivery = null;
+
+    if (
+      sendValidatedInvoiceEmail &&
+      providerName === 'factus' &&
+      isExternalProvider &&
+      isProviderValidated
+    ) {
+      try {
+        const emailResult = await sendValidatedInvoiceEmail(completedInvoice._id, {
+          automatic: true,
+          initiatedBy: cleanText(initiatedBy || normalizedSource || 'system', 160),
+        });
+        deliveredInvoice = emailResult?.invoice || deliveredInvoice;
+        emailDelivery = emailResult?.delivery || null;
+      } catch (emailError) {
+        // El correo es un proceso posterior: nunca cambia el estado fiscal
+        // ni convierte una factura validada en una factura fallida.
+        deliveredInvoice = emailError?.invoice || deliveredInvoice;
+        emailDelivery = emailError?.delivery || {
+          status: 'error',
+          lastError: cleanText(emailError?.message, 500),
+        };
+      }
+    }
+
     return {
       created: retryInvoice === null,
       reused: retryInvoice !== null,
       retried: retryInvoice !== null,
       inProgress: false,
-      invoice: toPlain(completedInvoice),
+      invoice: toPlain(deliveredInvoice),
+      emailDelivery,
       message: isProviderValidated
         ? 'Factura generada y validada correctamente por Factus.'
         : isExternalProvider
@@ -935,7 +967,14 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
   return { issueElectronicInvoiceForOrder };
 }
 
-const defaultService = createElectronicInvoiceIssuanceService();
+const defaultService = createElectronicInvoiceIssuanceService({
+  sendValidatedInvoiceEmail: async (...args) => {
+    const {
+      sendValidatedInvoiceEmail,
+    } = require('./electronicInvoiceEmailService');
+    return sendValidatedInvoiceEmail(...args);
+  },
+});
 
 module.exports = {
   BILLABLE_ORDER_STATUSES,

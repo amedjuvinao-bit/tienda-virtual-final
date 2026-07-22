@@ -29,6 +29,7 @@ import {
   getDownloadErrorMessage,
   getBillingSummary,
   getPendingBillingOrders,
+  sendBillingDocumentEmail,
   syncBillingCreditNote,
   syncBillingDocument,
 } from './api/adminBillingApi';
@@ -196,6 +197,30 @@ function getStatusLabel(status) {
   return labels[value] || status || 'Pendiente';
 }
 
+function getEmailStatusLabel(status) {
+  const value = String(status || 'pending').toLowerCase();
+  if (value === 'sent') return 'Enviado';
+  if (value === 'sending') return 'Enviando';
+  if (value === 'error') return 'Error';
+  return 'Pendiente';
+}
+
+function getEmailStatusStyle(status) {
+  const value = String(status || 'pending').toLowerCase();
+  if (value === 'sent') return getStatusStyle('accepted');
+  if (value === 'error') return getStatusStyle('error');
+  if (value === 'sending') return getStatusStyle('processing');
+  return getStatusStyle('pending');
+}
+
+function isValidatedDocument(document = {}) {
+  const status = String(document?.status || '').toLowerCase();
+  return (
+    ['accepted', 'validated'].includes(status) ||
+    document?.provider?.isValidated === true
+  );
+}
+
 function getCreditNoteTypeLabel(type) {
   return String(type || '').toLowerCase() === 'partial' ? 'Parcial' : 'Total';
 }
@@ -351,7 +376,14 @@ function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft
   );
 }
 
-function DocumentActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft' }) {
+function DocumentActionButton({
+  children,
+  icon: Icon,
+  disabled,
+  onClick,
+  variant = 'soft',
+  className = '',
+}) {
   const isPrimary = variant === 'primary';
 
   return (
@@ -359,7 +391,7 @@ function DocumentActionButton({ children, icon: Icon, disabled, onClick, variant
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2 text-[11px] font-black transition hover:-translate-y-px hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`inline-flex h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2 text-[11px] font-black transition hover:-translate-y-px hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
@@ -501,6 +533,11 @@ function BillingDocumentsPanel() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [invoiceModalData, setInvoiceModalData] = useState(null);
+  const [mailConfiguration, setMailConfiguration] = useState({
+    loaded: false,
+    enabled: false,
+    configured: false,
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -517,10 +554,22 @@ function BillingDocumentsPanel() {
       setError('');
       const data = await getBillingDocuments({ page, limit: 20, q: query, status });
       setRows(Array.isArray(data?.rows) ? data.rows : []);
+      setMailConfiguration(
+        data?.mailConfiguration || {
+          loaded: true,
+          enabled: false,
+          configured: false,
+        }
+      );
       setTotal(Number(data?.total || 0));
       setPages(Math.max(1, Number(data?.pages || 1)));
     } catch (err) {
       setRows([]);
+      setMailConfiguration({
+        loaded: false,
+        enabled: false,
+        configured: false,
+      });
       setTotal(0);
       setPages(1);
       setError(err?.response?.data?.message || err?.message || 'No se pudieron cargar los documentos.');
@@ -608,6 +657,36 @@ function BillingDocumentsPanel() {
     }
   };
 
+  const emailDocument = async (document) => {
+    const identifier = document?.id || document?.invoiceNumber || document?.provider?.number;
+    if (!identifier) return;
+
+    try {
+      setError('');
+      setNotice('');
+      setActionLoading(`email-${document.id}`);
+      const data = await sendBillingDocumentEmail(identifier);
+      const updated = data?.invoice;
+
+      if (updated?.id) {
+        setRows((current) =>
+          current.map((row) => (row.id === updated.id ? updated : row))
+        );
+      }
+
+      setNotice(data?.message || 'Factura enviada al correo fiscal del comprador.');
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'No se pudo enviar la factura por correo.';
+      await loadDocuments();
+      setError(message);
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const closeInvoiceManager = () => {
     setInvoiceModalData(null);
     loadDocuments();
@@ -653,6 +732,11 @@ function BillingDocumentsPanel() {
 
       {error ? <MessageBox>{error}</MessageBox> : null}
       {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
+      {mailConfiguration.loaded && !mailConfiguration.configured ? (
+        <MessageBox>
+          Correo no configurado o desactivado. Revisa Configuración &gt; Correo antes de enviar facturas.
+        </MessageBox>
+      ) : null}
 
       <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
@@ -668,7 +752,7 @@ function BillingDocumentsPanel() {
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="w-[24%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Documento</th>
-                  <th className="w-[17%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Cliente</th>
+                  <th className="w-[17%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Cliente / correo</th>
                   <th className="w-[19%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Estado / proveedor</th>
                   <th className="w-[16%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Fechas</th>
                   <th className="w-[24%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.12em]">Acciones</th>
@@ -683,8 +767,15 @@ function BillingDocumentsPanel() {
                   const isXmlLoading = actionLoading === `xml-${document.id}`;
                   const isManageLoading = actionLoading === `manage-${document.id}`;
                   const isSyncLoading = actionLoading === `sync-${document.id}`;
+                  const isEmailLoading = actionLoading === `email-${document.id}`;
                   const canOpenPdf = document.hasPdf || document.orderId;
                   const canOpenXml = document.hasXml && document.orderId;
+                  const emailDelivery = document.emailDelivery || {};
+                  const emailRecipient = emailDelivery.recipient || customer.email || '';
+                  const canEmail =
+                    mailConfiguration.configured &&
+                    Boolean(emailRecipient) &&
+                    isValidatedDocument(document);
 
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
@@ -695,7 +786,21 @@ function BillingDocumentsPanel() {
                       </td>
                       <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{customerName}</p>
-                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || 'Sin identificación'}</p>
+                        <p className="mt-1 truncate text-xs font-bold" title={emailRecipient} style={{ color: 'var(--admin-card-muted-text)' }}>{emailRecipient || 'Sin correo fiscal'}</p>
+                        <span className="mt-2 inline-flex max-w-full rounded-full border px-2.5 py-1 text-[10px] font-black uppercase" style={getEmailStatusStyle(emailDelivery.status)}>
+                          Correo: {getEmailStatusLabel(emailDelivery.status)}
+                        </span>
+                        {emailDelivery.status === 'error' && emailDelivery.lastError ? (
+                          <p className="mt-1 whitespace-normal break-words text-[11px] font-bold leading-4" title={emailDelivery.lastError} style={{ color: '#be123c' }}>
+                            {emailDelivery.lastError}
+                          </p>
+                        ) : null}
+                        {emailDelivery.lastSentAt ? (
+                          <p className="mt-1 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                            Último envío: {formatDateTime(emailDelivery.lastSentAt)}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={statusStyle}>
@@ -722,6 +827,19 @@ function BillingDocumentsPanel() {
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canDownload || !canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                           <DocumentActionButton icon={ExternalLink} onClick={() => openInvoiceManager(document)} disabled={isManageLoading}>{isManageLoading ? '...' : 'Factura'}</DocumentActionButton>
                           <DocumentActionButton icon={RefreshCw} onClick={() => syncDocument(document)} disabled={!canSync || isSyncLoading}>{isSyncLoading ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          <DocumentActionButton
+                            icon={Send}
+                            onClick={() => emailDocument(document)}
+                            disabled={!canDownload || !canEmail || isEmailLoading}
+                            variant={emailDelivery.status === 'sent' ? 'soft' : 'primary'}
+                            className="col-span-2"
+                          >
+                            {isEmailLoading
+                              ? 'Enviando...'
+                              : emailDelivery.status === 'sent'
+                                ? 'Reenviar'
+                                : 'Enviar correo'}
+                          </DocumentActionButton>
                         </div>
                       </td>
                     </tr>

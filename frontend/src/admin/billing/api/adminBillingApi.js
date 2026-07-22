@@ -36,6 +36,13 @@ export async function syncBillingDocument(invoiceId) {
   return unwrap(response);
 }
 
+export async function sendBillingDocumentEmail(invoiceId) {
+  const response = await api.post(
+    `/api/admin/billing/documents/${encodeURIComponent(invoiceId)}/email`
+  );
+  return unwrap(response);
+}
+
 export async function syncBillingCreditNote(invoiceId, noteId) {
   const response = await api.post(
     `/api/admin/billing/credit-notes/${encodeURIComponent(invoiceId)}/${encodeURIComponent(noteId)}/sync`
@@ -127,6 +134,7 @@ export default {
   getPendingBillingOrders,
   generateBillingInvoiceForOrder,
   syncBillingDocument,
+  sendBillingDocumentEmail,
   syncBillingCreditNote,
   getBillingSettings,
   downloadOrderPdf,

@@ -232,6 +232,10 @@ MailSettingsSchema.pre('validate', function (next) {
 MailSettingsSchema.methods.toSafeObject = function toSafeObject() {
   const settings = this.toObject();
 
+  settings.hasSmtpPassword = Boolean(
+    settings.smtpPasswordEncrypted || settings.hasSmtpPassword
+  );
+
   delete settings.smtpPasswordEncrypted;
   delete settings.passwordUpdatedAt;
   delete settings.__v;
@@ -240,7 +244,9 @@ MailSettingsSchema.methods.toSafeObject = function toSafeObject() {
 };
 
 MailSettingsSchema.statics.getSingleton = async function getSingleton() {
-  let settings = await this.findOne({ key: MAIL_SETTINGS_KEY });
+  let settings = await this.findOne({ key: MAIL_SETTINGS_KEY }).select(
+    '+smtpPasswordEncrypted +passwordUpdatedAt'
+  );
 
   if (!settings) {
     settings = await this.create({
