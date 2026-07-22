@@ -32,6 +32,7 @@
     "test:billing-credit-notes": "node scripts/testBillingCreditNotesModule.js",
     "test:billing-sync": "node scripts/testBillingSyncModule.js",
     "test:billing-security": "node scripts/testBillingSecurityModule.js",
+    "test:billing-configuration": "node scripts/testBillingConfigurationModule.js",
     "test:billing-idempotency": "node scripts/testBillingIdempotencyModule.js",
     "test:billing-fiscal-checkout": "node scripts/testBillingFiscalCheckoutModule.js",
     "test:billing-totals": "node scripts/testBillingTotalsModule.js",
