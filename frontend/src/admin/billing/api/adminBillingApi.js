@@ -50,6 +50,30 @@ export async function syncBillingCreditNote(invoiceId, noteId) {
   return unwrap(response);
 }
 
+export async function createBillingCreditNote(invoiceId, payload) {
+  const response = await api.post(
+    `/api/admin/billing/credit-notes/${encodeURIComponent(invoiceId)}`,
+    payload
+  );
+  return unwrap(response);
+}
+
+export async function downloadBillingCreditNotePdf(invoiceId, noteId) {
+  const response = await api.get(
+    `/api/admin/billing/credit-notes/${encodeURIComponent(invoiceId)}/${encodeURIComponent(noteId)}/pdf`,
+    { responseType: 'blob' }
+  );
+  return normalizeDownloadResponse(response, `nota-credito-${noteId}.pdf`);
+}
+
+export async function downloadBillingCreditNoteXml(invoiceId, noteId) {
+  const response = await api.get(
+    `/api/admin/billing/credit-notes/${encodeURIComponent(invoiceId)}/${encodeURIComponent(noteId)}/xml`,
+    { responseType: 'blob' }
+  );
+  return normalizeDownloadResponse(response, `nota-credito-${noteId}.xml`);
+}
+
 export async function getBillingSettings() {
   const response = await api.get('/api/admin/billing/settings');
   return unwrap(response);
@@ -136,6 +160,9 @@ export default {
   syncBillingDocument,
   sendBillingDocumentEmail,
   syncBillingCreditNote,
+  createBillingCreditNote,
+  downloadBillingCreditNotePdf,
+  downloadBillingCreditNoteXml,
   getBillingSettings,
   downloadOrderPdf,
   downloadOrderInvoiceXml,

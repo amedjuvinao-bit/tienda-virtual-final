@@ -741,16 +741,10 @@ function buildFactusCreditNotePayload({
   reasonText = 'Devolución de factura',
   type = 'total',
   selectedItems = [],
-  billNumber = '',
+  billId = 0,
+  referenceCode = '',
   numberingRangeId = 0,
 }) {
-  const invoiceNumber =
-    billNumber ||
-    electronicInvoice?.invoiceNumber ||
-    electronicInvoice?.provider?.number ||
-    electronicInvoice?.provider?.raw?.number ||
-    '';
-
   const resolvedNumberingRangeId = Number(
     numberingRangeId ||
       settings?.billing?.electronicProvider?.creditNoteNumberingRangeId ||
@@ -761,103 +755,57 @@ function buildFactusCreditNotePayload({
     
   );
 
-  const orderItems = Array.isArray(order?.items)
-    ? order.items
-    : Array.isArray(order?.cart)
-      ? order.cart
-      : [];
+  const invoicePayload = buildFactusInvoicePayload({ order });
+  const originalItems = Array.isArray(invoicePayload.items) ? invoicePayload.items : [];
+  const selectedByCode = new Map(
+    (Array.isArray(selectedItems) ? selectedItems : []).map((item) => [
+      String(item?.codeReference || item?.code_reference || item?.productId || ''),
+      item,
+    ])
+  );
+  const sourceItems = type === 'partial'
+    ? originalItems.filter((item) => selectedByCode.has(String(item.code_reference || '')))
+    : originalItems;
 
-  const itemsSource =
-    type === 'partial' && selectedItems.length
-      ? selectedItems
-      : orderItems;
-
-  const items = itemsSource.map((item) => {
-    const quantity = toNumber(
-      item?.quantity ?? item?.qty ?? 1,
-      1
-    );
-
-    const price = toMoney(
-      item?.price ??
-        item?.unitPrice ??
-        item?.priceNumber ??
-        0
-    );
-
-    const taxRate = toMoney(
-      item?.taxRate ??
-        item?.tax_rate ??
-        order?.taxes?.iva?.percent ??
-        0
-    ).toFixed(2);
-
-    const subtotalLine = toMoney(quantity * price);
-
-    const taxAmount =
-      Number(taxRate) > 0
-        ? toMoney(subtotalLine * (Number(taxRate) / 100))
-        : 0;
-
-    return {
-      code_reference: String(
-        item?.productId ||
-          item?.product ||
-          item?._id ||
-          item?.title ||
-          'ITEM'
-      ),
-
-      name: String(item?.title || item?.name || 'Producto'),
-
+  const items = sourceItems.map((item) => {
+    const selected = selectedByCode.get(String(item.code_reference || '')) || {};
+    const originalQuantity = Math.max(0, toNumber(item.quantity, 0));
+    const quantity = type === 'partial'
+      ? Math.min(originalQuantity, Math.max(0, toNumber(selected.quantity, 0)))
+      : originalQuantity;
+    const ratio = originalQuantity > 0 ? quantity / originalQuantity : 0;
+    const discountAmount = toMoney(toNumber(item.discount_amount, 0) * ratio);
+    const creditItem = {
+      ...item,
       quantity,
-
-      discount_rate: 0,
-
-      price,
-
-      tax_rate: taxRate,
-
-      unit_measure_code: '94',
-
-      standard_code: '999',
-
-      taxes: [
-        {
-          code: '01',
-          rate: taxRate,
-          base: subtotalLine.toFixed(2),
-          amount: taxAmount.toFixed(2),
-        },
-      ],
-
-      is_excluded: Number(taxRate) <= 0,
-
-      withholding_taxes: [],
+      note: trimSafe(reasonText, 250),
     };
-  });
 
-  const subtotal = toMoney(
-    items.reduce((acc, item) => {
-      return acc + item.quantity * item.price;
-    }, 0)
-  );
+    if (discountAmount > 0) creditItem.discount_amount = discountAmount.toFixed(2);
+    else delete creditItem.discount_amount;
 
-  const ivaPercent = toMoney(
-    order?.taxes?.iva?.percent || 0
-  );
+    return creditItem;
+  }).filter((item) => Number(item.quantity || 0) > 0);
 
-  const ivaAmount =
-    ivaPercent > 0
-      ? toMoney(subtotal * (ivaPercent / 100))
-      : 0;
-
-  const total = toMoney(subtotal + ivaAmount);
+  const totals = items.reduce((acc, item) => {
+    const gross = toMoney(toNumber(item.quantity, 0) * toNumber(item.price, 0));
+    const discount = toMoney(item.discount_amount || 0);
+    const taxable = toMoney(Math.max(0, gross - discount));
+    const rate = item.is_excluded === true
+      ? 0
+      : toNumber(item.tax_rate ?? item?.taxes?.[0]?.rate, 0);
+    const tax = toMoney(taxable * (rate / 100));
+    acc.subtotal = toMoney(acc.subtotal + gross);
+    acc.discount = toMoney(acc.discount + discount);
+    acc.tax = toMoney(acc.tax + tax);
+    acc.total = toMoney(acc.total + taxable + tax);
+    return acc;
+  }, { subtotal: 0, discount: 0, tax: 0, total: 0 });
 
   const payload = {
-    reference_code: `NC-${order?.orderNumber}-${Date.now()}`,
+    reference_code: trimSafe(referenceCode, 100),
 
-    bill_number: invoiceNumber,
+    bill_id: Number(billId || 0),
 
     correction_concept_code: String(reasonCode),
 
@@ -865,13 +813,11 @@ function buildFactusCreditNotePayload({
 
     observation: reasonText,
 
-    customer: buildFactusCustomer(order),
-
     payment_details: [
       {
         payment_form: '1',
         payment_method_code: '10',
-        amount: total.toFixed(2),
+        amount: totals.total.toFixed(2),
       },
     ],
 
@@ -879,6 +825,18 @@ function buildFactusCreditNotePayload({
   };
 
   payload.numbering_range_id = resolvedNumberingRangeId;
+
+  if (!payload.reference_code) {
+    throw new Error('La nota crédito requiere un código de referencia idempotente.');
+  }
+
+  if (!Number.isInteger(payload.bill_id) || payload.bill_id <= 0) {
+    throw new Error('La factura relacionada no tiene el ID oficial de Factus.');
+  }
+
+  if (!items.length || totals.total <= 0) {
+    throw new Error('La nota crédito no contiene ítems válidos para acreditar.');
+  }
 
   return payload;
 }
@@ -932,11 +890,6 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
       numberingRangeId: rangeResult.id,
     });
 
-    console.log(
-      '🧾 FACTUS CREDIT NOTE PAYLOAD:',
-      JSON.stringify(payload, null, 2)
-    );
-
     const result = await postFactusCreditNoteValidate({
       credentials,
       tokenResult,
@@ -944,14 +897,6 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
     });
 
     if (!result.ok) {
-      console.log(
-        '❌ FACTUS CREDIT NOTE VALIDATION FULL:',
-        
-        JSON.stringify(result.data, null, 2)
-        
-      );
-      console.log('❌ FACTUS FULL RESULT OBJECT:', result);
-
      const providerMessage =
         result.data?.message ||
         result.data?.error ||
@@ -1002,9 +947,9 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
   }
 }
 
-function safeFactusFileName(value, invoiceNumber, type) {
+function safeFactusFileName(value, invoiceNumber, type, documentLabel = 'factura') {
   const extension = type === 'pdf' ? '.pdf' : '.xml';
-  const fallback = `factura-${trimSafe(invoiceNumber, 160) || 'factus'}`;
+  const fallback = `${documentLabel}-${trimSafe(invoiceNumber, 160) || 'factus'}`;
   const base = trimSafe(value || fallback, 220)
     .replace(/[\\/]+/g, '-')
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
@@ -1063,7 +1008,13 @@ function decodeFactusBase64Document(encoded, type = 'pdf') {
   return buffer;
 }
 
-async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber, type }) {
+async function downloadFactusDocument({
+  credentials,
+  tokenResult,
+  invoiceNumber,
+  type,
+  resource = 'bills',
+}) {
   const normalizedType = type === 'pdf' ? 'pdf' : type === 'xml' ? 'xml' : '';
   const safeNumber = encodeURIComponent(String(invoiceNumber || '').trim());
 
@@ -1083,10 +1034,11 @@ async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber,
     };
   }
 
+  const safeResource = resource === 'credit-notes' ? 'credit-notes' : 'bills';
   const endpoint =
     normalizedType === 'pdf'
-      ? `/v2/bills/${safeNumber}/download-pdf`
-      : `/v2/bills/${safeNumber}/download-xml`;
+      ? `/v2/${safeResource}/${safeNumber}/download-pdf`
+      : `/v2/${safeResource}/${safeNumber}/download-xml`;
 
   const response = await fetchFactus(`${credentials.apiUrl}${endpoint}`, {
     method: 'GET',
@@ -1128,7 +1080,12 @@ async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber,
     buffer,
     byteLength: buffer.length,
     contentType: normalizedType === 'pdf' ? 'application/pdf' : 'application/xml; charset=utf-8',
-    fileName: safeFactusFileName(payload.fileName, invoiceNumber, normalizedType),
+    fileName: safeFactusFileName(
+      payload.fileName,
+      invoiceNumber,
+      normalizedType,
+      safeResource === 'credit-notes' ? 'nota-credito' : 'factura'
+    ),
   };
 }
 
@@ -1190,6 +1147,7 @@ async function downloadInvoiceDocumentFromFactus({
       tokenResult,
       invoiceNumber,
       type: normalizedType,
+      resource: 'bills',
     });
   } catch (error) {
     return {
@@ -1200,6 +1158,57 @@ async function downloadInvoiceDocumentFromFactus({
       error: error?.name === 'AbortError'
         ? `La descarga ${normalizedType.toUpperCase()} en Factus superó el tiempo de espera.`
         : error?.message || `No fue posible descargar el ${normalizedType.toUpperCase()} de Factus.`,
+    };
+  }
+}
+
+async function downloadCreditNoteDocumentFromFactus({
+  providerConfig = {},
+  creditNoteNumber,
+  type,
+} = {}) {
+  const normalizedType = type === 'pdf' ? 'pdf' : type === 'xml' ? 'xml' : '';
+  if (!normalizedType || !trimSafe(creditNoteNumber, 160)) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'credit_note_document_input',
+      error: 'La nota crédito requiere número oficial y tipo PDF o XML.',
+    };
+  }
+
+  const credentials = getFactusCredentials({ providerConfig });
+  const missing = validateCredentials(credentials);
+  if (missing.length) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'config_incomplete',
+      error: `Configuración Factus incompleta. Faltan: ${missing.join(', ')}.`,
+      missing,
+    };
+  }
+
+  try {
+    const tokenResult = await getFactusAccessToken(credentials);
+    if (!tokenResult.success) return { success: false, provider: 'factus', stage: 'auth', ...tokenResult };
+
+    return await downloadFactusDocument({
+      credentials,
+      tokenResult,
+      invoiceNumber: creditNoteNumber,
+      type: normalizedType,
+      resource: 'credit-notes',
+    });
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 503,
+      stage: `download_credit_note_${normalizedType}`,
+      error: error?.message || `No fue posible descargar el ${normalizedType.toUpperCase()} de la nota crédito.`,
     };
   }
 }
@@ -1454,9 +1463,11 @@ module.exports = {
   getFactusCredentials,
   getFactusAccessToken,
   downloadInvoiceDocumentFromFactus,
+  downloadCreditNoteDocumentFromFactus,
   extractFactusDownloadPayload,
   decodeFactusBase64Document,
   postFactusCreditNoteValidate,
   buildFactusCustomer,
   buildFactusInvoicePayload,
+  buildFactusCreditNotePayload,
 };

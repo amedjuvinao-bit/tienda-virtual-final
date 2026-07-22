@@ -175,6 +175,7 @@ function serializeElectronicInvoice(invoice = {}) {
     dianResolution: invoice.dianResolution || {},
     provider: {
       name: invoice?.provider?.name || '',
+      id: Number(invoice?.provider?.id || 0) || null,
       status: invoice?.provider?.status || '',
       referenceCode: invoice?.provider?.referenceCode || '',
       number: invoice?.provider?.number || '',
@@ -230,6 +231,7 @@ function serializeElectronicInvoice(invoice = {}) {
 function serializeCreditNote(invoice = {}, note = {}, index = 0) {
   const links = getCreditNoteLinks(note);
   const customer = invoice.customer || {};
+  const officialDocuments = note.officialDocuments || {};
 
   return {
     id: String(note._id || `${invoice._id || 'invoice'}-${index}`),
@@ -251,15 +253,37 @@ function serializeCreditNote(invoice = {}, note = {}, index = 0) {
     taxAmount: money(note.taxAmount),
     totalAmount: money(note.totalAmount || note.total || note.amount),
     itemsCount: Array.isArray(note.items) ? note.items.length : 0,
+    items: Array.isArray(note.items) ? note.items : [],
+    idempotencyKey: note.idempotencyKey || '',
+    emission: note.emission
+      ? {
+          state: note.emission.state || '',
+          source: note.emission.source || '',
+          initiatedBy: note.emission.initiatedBy || '',
+          attempts: Number(note.emission.attempts || 0),
+          firstAttemptAt: note.emission.firstAttemptAt || null,
+          lastAttemptAt: note.emission.lastAttemptAt || null,
+          completedAt: note.emission.completedAt || null,
+          failedAt: note.emission.failedAt || null,
+        }
+      : null,
     provider: {
       name: note?.provider?.name || invoice?.provider?.name || '',
+      id: Number(note?.provider?.id || 0) || null,
       status: note?.provider?.status || '',
       number: note?.provider?.number || '',
+      cude: note?.provider?.cude || note?.provider?.cufe || '',
       cufe: note?.provider?.cufe || note?.provider?.cude || '',
       isValidated: note?.provider?.isValidated === true,
       validatedAt: note?.provider?.validatedAt || '',
     },
     links,
+    hasPdf: Boolean(officialDocuments?.pdf?.available || note?.provider?.isValidated),
+    hasXml: Boolean(officialDocuments?.xml?.available || note?.provider?.isValidated),
+    officialDocuments: {
+      pdf: officialDocuments?.pdf || null,
+      xml: officialDocuments?.xml || null,
+    },
     errorMessage: note.errorMessage || '',
     providerErrors: note.providerErrors || {},
     sync: serializeSync(note.sync),

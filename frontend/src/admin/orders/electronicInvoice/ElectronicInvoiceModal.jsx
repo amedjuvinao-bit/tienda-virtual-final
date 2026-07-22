@@ -9,10 +9,18 @@ import {
   CheckCircle2,
   Trash2,
   RotateCcw,
+  Download,
 } from 'lucide-react';
 
 import api from '../../../lib/api';
-import { syncBillingDocument } from '../../billing/api/adminBillingApi';
+import {
+  createBillingCreditNote,
+  downloadBillingCreditNotePdf,
+  downloadBillingCreditNoteXml,
+  downloadBlob,
+  getDownloadErrorMessage,
+  syncBillingDocument,
+} from '../../billing/api/adminBillingApi';
 import useAdminPermissions from '../../security/useAdminPermissions';
 
 import InvoiceSummaryTab from './InvoiceSummaryTab';
@@ -31,7 +39,7 @@ const TABS = [
 const CREDIT_NOTE_REASONS = [
   {
     value: '1',
-    label: 'Devolución total o parcial de los bienes',
+    label: 'Devolución parcial o no aceptación parcial del servicio',
   },
   {
     value: '2',
@@ -47,9 +55,18 @@ const CREDIT_NOTE_REASONS = [
   },
   {
     value: '5',
-    label: 'Otros motivos',
+    label: 'Descuento comercial por pronto pago',
+  },
+  {
+    value: '6',
+    label: 'Descuento comercial por volumen de ventas',
   },
 ];
+
+function createCreditNoteRequestKey() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `nc_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`;
+}
 
 function invoiceIsAlreadyValidated(invoice) {
   const status = String(invoice?.status || '').trim().toLowerCase();
@@ -143,6 +160,7 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
   const canSync = can('billing:retry');
   const canDelete = can('billing:retry');
   const canCreateCreditNote = can('billing:credit_note');
+  const canDownload = can('billing:download');
   const [activeTab, setActiveTab] = useState('summary');
   const [currentInvoice, setCurrentInvoice] = useState(invoice);
 
@@ -150,15 +168,17 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [creatingCreditNote, setCreatingCreditNote] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [noteDocumentLoading, setNoteDocumentLoading] = useState('');
 
   const [retryMessage, setRetryMessage] = useState('');
   const [retryError, setRetryError] = useState('');
 
   const [showCreditNoteForm, setShowCreditNoteForm] = useState(false);
   const [creditNoteType, setCreditNoteType] = useState('total');
-  const [creditNoteReasonCode, setCreditNoteReasonCode] = useState('1');
+  const [creditNoteReasonCode, setCreditNoteReasonCode] = useState('2');
   const [creditNoteObservation, setCreditNoteObservation] = useState('');
   const [selectedCreditNoteItems, setSelectedCreditNoteItems] = useState({});
+  const [creditNoteRequestKey, setCreditNoteRequestKey] = useState(createCreditNoteRequestKey);
 
   const alreadyValidated = invoiceIsAlreadyValidated(currentInvoice);
   const orderItems = getOrderItems(order);
@@ -312,6 +332,7 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
     }
 
     clearMessages();
+    setCreditNoteRequestKey(createCreditNoteRequestKey());
     setShowCreditNoteForm(true);
   };
 
@@ -397,28 +418,26 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
       setCreatingCreditNote(true);
       clearMessages();
 
-      const response = await api.post(
-        `/api/payments/admin/create-credit-note/${orderId}`,
-        {
-          type: creditNoteType,
-          reasonCode: creditNoteReasonCode,
-          reason: creditNoteObservation.trim(),
-          selectedItems: creditNoteType === 'partial' ? partialItems : [],
-          items: creditNoteType === 'partial' ? partialItems : [],
-        }
-      );
+      const invoiceId = currentInvoice?.id || currentInvoice?._id;
+      if (!invoiceId) {
+        throw new Error('No se encontró la factura relacionada.');
+      }
 
-      if (response?.data?.success) {
-        setRetryMessage('Nota crédito creada correctamente en Factus.');
+      const result = await createBillingCreditNote(invoiceId, {
+        type: creditNoteType,
+        reasonCode: creditNoteReasonCode,
+        reason: creditNoteObservation.trim(),
+        selectedItems: creditNoteType === 'partial' ? partialItems : [],
+        idempotencyKey: creditNoteRequestKey,
+      });
+
+      if (result?.invoice) {
+        setRetryMessage(result?.message || 'Nota crédito creada correctamente en Factus.');
         setShowCreditNoteForm(false);
-
-        if (response?.data?.invoice) {
-          setCurrentInvoice(response.data.invoice);
-        }
+        setCurrentInvoice(result.invoice);
       } else {
         setRetryError(
-          response?.data?.message ||
-            response?.data?.error ||
+          result?.message ||
             'No se pudo crear la nota crédito.'
         );
       }
@@ -427,7 +446,10 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
 
       const backendError = error?.response?.data;
 
-      if (backendError?.code === 'FACTUS_PENDING_CREDIT_NOTE') {
+      if (
+        backendError?.error === 'FACTUS_PENDING_CREDIT_NOTE' ||
+        backendError?.error === 'BILLING_CREDIT_NOTE_IN_PROGRESS'
+      ) {
         setRetryError(
           'Factus reporta una nota crédito pendiente para esta factura. Debes sincronizar el estado antes de crear otra nota crédito.'
         );
@@ -440,6 +462,28 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
       }
     } finally {
       setCreatingCreditNote(false);
+    }
+  };
+
+  const handleDownloadCreditNote = async (note, type) => {
+    const invoiceId = currentInvoice?.id || currentInvoice?._id;
+    const noteId = note?._id || note?.id || note?.provider?.number || note?.referenceCode;
+    if (!invoiceId || !noteId) return;
+
+    try {
+      clearMessages();
+      setNoteDocumentLoading(`${type}-${noteId}`);
+      const result = type === 'pdf'
+        ? await downloadBillingCreditNotePdf(invoiceId, noteId)
+        : await downloadBillingCreditNoteXml(invoiceId, noteId);
+      downloadBlob(result, `nota-credito-${note?.provider?.number || noteId}.${type}`);
+    } catch (error) {
+      setRetryError(await getDownloadErrorMessage(
+        error,
+        `No fue posible descargar el ${type.toUpperCase()} oficial de la nota crédito.`
+      ));
+    } finally {
+      setNoteDocumentLoading('');
     }
   };
 
@@ -686,7 +730,9 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
                 <select
                   value={creditNoteType}
                   onChange={(event) => {
-                    setCreditNoteType(event.target.value);
+                    const nextType = event.target.value;
+                    setCreditNoteType(nextType);
+                    setCreditNoteReasonCode(nextType === 'partial' ? '1' : '2');
                     setSelectedCreditNoteItems({});
                   }}
                   className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
@@ -737,6 +783,7 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
                 onChange={(event) =>
                   setCreditNoteObservation(event.target.value)
                 }
+                maxLength={250}
                 rows={3}
                 placeholder="Ejemplo: Cliente solicita devolución por talla incorrecta. Se genera nota crédito parcial por el producto devuelto."
                 className="mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none"
@@ -950,6 +997,8 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
               {creditNotes.map((note, index) => {
                 const publicUrl = getCreditNotePublicUrl(note);
                 const qrUrl = getCreditNoteQrUrl(note);
+                const noteId = note?._id || note?.id || note?.provider?.number || note?.referenceCode;
+                const noteValidated = note?.provider?.isValidated === true || note?.status === 'validated';
 
                 return (
                   <div
@@ -1016,6 +1065,13 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
                           Referencia: {note?.referenceCode || '—'} · Factura:
                           {' '}
                           {note?.billNumber || '—'}
+                        </p>
+
+                        <p
+                          className="mt-1 break-all text-xs"
+                          style={{ color: 'var(--admin-card-muted-text)' }}
+                        >
+                          CUDE: {note?.provider?.cude || note?.provider?.cufe || '—'}
                         </p>
                       </div>
 
@@ -1124,6 +1180,37 @@ export default function ElectronicInvoiceModal({ order, invoice, onClose }) {
                         </div>
                       </div>
                     )}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={!canDownload || !noteValidated || noteDocumentLoading === `pdf-${noteId}`}
+                        onClick={() => handleDownloadCreditNote(note, 'pdf')}
+                        className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          background: 'var(--admin-primary-soft-bg)',
+                          color: 'var(--admin-primary-soft-text)',
+                          borderColor: 'var(--admin-primary-soft-border)',
+                        }}
+                      >
+                        <Download size={15} />
+                        {noteDocumentLoading === `pdf-${noteId}` ? 'Descargando...' : 'PDF oficial'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canDownload || !noteValidated || noteDocumentLoading === `xml-${noteId}`}
+                        onClick={() => handleDownloadCreditNote(note, 'xml')}
+                        className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          background: 'var(--admin-button-soft-bg)',
+                          color: 'var(--admin-button-soft-text)',
+                          borderColor: 'var(--admin-button-soft-border)',
+                        }}
+                      >
+                        <FileText size={15} />
+                        {noteDocumentLoading === `xml-${noteId}` ? 'Descargando...' : 'XML oficial'}
+                      </button>
+                    </div>
 
                     {(publicUrl || qrUrl) && (
                       <div className="mt-4 flex flex-wrap gap-2">

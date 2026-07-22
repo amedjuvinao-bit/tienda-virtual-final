@@ -36,11 +36,10 @@ const {
 } = require('../lib/dian/providers/factusProvider');
 
 const {
-  sendCreditNoteToFactus,
-} = require('../lib/dian/providers/factusProvider');
+  createOfficialCreditNote,
+} = require('../services/electronicCreditNoteService');
 
 const {
-  addCreditNoteCreatedEvent,
   addInvoiceGeneratedEvent,
   addInvoiceValidatedEvent,
   addInvoiceFailedEvent,
@@ -1692,274 +1691,31 @@ router.post(
   requirePermission('billing:credit_note'),
   async (req, res) => {
     try {
-      const { orderId } = req.params;
-
-      const {
-        reason = '',
-        reasonCode = '1',
-        type = 'total',
-        selectedItems = [],
-        items = [],
-      } = req.body || {};
-
-      const creditNoteItems =
-        Array.isArray(selectedItems) && selectedItems.length
-          ? selectedItems
-          : Array.isArray(items)
-            ? items
-            : [];
-
-      const cleanReason = trimSafe(
-        reason || 'Nota crédito generada desde el panel administrativo.',
-        500
-      );
-      const order = await Order.findById(orderId);
-
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          error: 'Orden no encontrada.',
-        });
-      }
-
-      const invoice = await ElectronicInvoice.findOne({
-        orderId,
-      });
-
-      
-
+      const invoice = await ElectronicInvoice.findOne({ orderId: req.params.orderId });
       if (!invoice) {
         return res.status(404).json({
           success: false,
-          error: 'Factura electrónica no encontrada.',
+          error: 'BILLING_INVOICE_NOT_FOUND',
+          message: 'Factura electrónica no encontrada.',
         });
       }
 
-      const existingTotalCreditNote =
-        Array.isArray(invoice.creditNotes) &&
-        invoice.creditNotes.some(
-          (note) =>
-            note.type === 'total' &&
-            ['validated', 'sent'].includes(note.status)
-        );
-
-      if (type === 'total' && existingTotalCreditNote) {
-        return res.status(409).json({
-          success: false,
-          error:
-            'Esta factura ya tiene una nota crédito total registrada.',
-        });
-      }
-      const invoiceTotalAmount =
-        Number(invoice?.provider?.raw?.totals?.total || 0) ||
-        Number(order?.total || 0);
-
-      const currentValidatedCreditTotal = Array.isArray(invoice.creditNotes)
-        ? invoice.creditNotes
-            .filter(
-              (note) =>
-                note.type === 'partial' &&
-                ['validated', 'sent'].includes(note.status)
-            )
-            .reduce(
-              (sum, note) => sum + Number(note.totalAmount || 0),
-              0
-            )
-        : 0;
-
-      const requestedPartialTotal =
-        type === 'partial'
-          ? creditNoteItems.reduce(
-              (sum, item) =>
-                sum +
-                Number(item.price || 0) *
-                  Number(item.quantity || 0),
-              0
-            )
-          : 0;
-
-      if (
-        type === 'partial' &&
-        invoiceTotalAmount > 0 &&
-        currentValidatedCreditTotal + requestedPartialTotal >
-          invoiceTotalAmount
-      ) {
-        return res.status(409).json({
-          success: false,
-          error:
-            'El valor acumulado de las notas crédito supera el total de la factura.',
-        });
-      }
-
-      const billNumber =
-        invoice?.provider?.number ||
-        invoice?.invoiceNumber ||
-        invoice?.provider?.raw?.number ||
-        '';
-
-      if (!billNumber) {
-        return res.status(400).json({
-          success: false,
-          error: 'La factura no tiene número Factus.',
-        });
-      }
-
-      const settings = await SiteSettings.findOne();
-      const electronicProvider =
-        settings?.billing?.electronicProvider || {};
-
-
-      
-      const creditNoteResult = await sendCreditNoteToFactus({
-        electronicInvoice: invoice,
-        invoice,
-        order,
-        settings,
-        type,
-        reasonCode,
-        reasonText: cleanReason,
-        selectedItems: creditNoteItems,
-        billNumber,
-        providerConfig: electronicProvider,
+      const result = await createOfficialCreditNote(invoice._id, req.body || {}, {
+        adminUser: req.headers['x-admin-user'] || 'admin',
       });
 
-      if (!creditNoteResult.success) {
-        return res.status(400).json({
-          success: false,
-          error:
-            creditNoteResult.error ||
-            'No se pudo crear la nota crédito.',
-          code: creditNoteResult.code || 'CREDIT_NOTE_ERROR',
-          canRetry: creditNoteResult.canRetry !== false,
-          requiresSync: creditNoteResult.requiresSync === true,
-          raw: creditNoteResult.raw || null,
-          payload: creditNoteResult.payload || null,
-        });
-      }
-
-      if (!Array.isArray(invoice.creditNotes)) {
-        invoice.creditNotes = [];
-      }
-
-      const creditNoteData =
-        creditNoteResult?.data?.data ||
-        creditNoteResult?.data ||
-        {};
-
-      invoice.creditNotes.push({
-        createdAt: new Date(),
-
-        type,
-
-        reasonCode,
-        reasonText: cleanReason,
-
-        referenceCode:
-          creditNoteData?.reference_code || '',
-
-        billNumber:
-          creditNoteData?.bill?.number ||
-          billNumber ||
-          '',
-
-        subtotal:
-          Number(creditNoteData?.totals?.gross_amount || 0),
-
-        taxAmount:
-          Number(creditNoteData?.totals?.tax_amount || 0),
-
-        totalAmount:
-          Number(creditNoteData?.totals?.total || 0),
-
-        status:
-          creditNoteData?.is_validated === true
-            ? 'validated'
-            : 'sent',
-
-        provider: {
-          name: 'factus',
-
-          status:
-            creditNoteResult?.data?.status ||
-            creditNoteData?.status ||
-            '',
-
-          number:
-            creditNoteData?.number || '',
-
-          cufe:
-            creditNoteData?.cude ||
-            creditNoteData?.cufe ||
-            '',
-
-          isValidated:
-            creditNoteData?.is_validated === true,
-
-          validatedAt:
-            creditNoteData?.validated_at || '',
-
-          links:
-            creditNoteData?.links || {},
-
-          raw:
-            creditNoteResult?.data || {},
-        },
-
-        items:
-          Array.isArray(creditNoteData?.items)
-            ? creditNoteData.items.map((item) => ({
-                productId: String(item?.code_reference || ''),
-                codeReference: String(item?.code_reference || ''),
-                name: String(item?.name || ''),
-                quantity: Number(item?.quantity || 0),
-                price: Number(item?.price || 0),
-                taxRate: String(
-                  item?.taxes?.[0]?.rates?.[0]?.rate || '0.00'
-                ),
-                isExcluded:
-                  item?.taxes?.[0]?.is_excluded === true,
-                raw: item,
-              }))
-            : [],
-      });
-
-      await invoice.save();
-
-      await addCreditNoteCreatedEvent({
-        order,
-        creditNoteData,
-        by: req.headers['x-admin-user'] || 'admin',
-      });
-      await OrderEvent.create({
-        orderId,
-        type: 'credit_note_created',
-        message: `Nota crédito ${type} creada en Factus.`,
-        meta: {
-          type,
-          reason,
-          creditNoteNumber:
-            creditNoteResult?.data?.number || '',
-        },
-        by: req.headers['x-admin-user'] || 'admin',
-      });
-
-      return res.json({
+      return res.status(result.created ? 201 : 200).json({
         success: true,
-        message: 'Nota crédito creada correctamente.',
-        data: creditNoteResult.data,
-        invoice,
+        created: result.created,
+        reused: result.reused,
+        message: result.message,
+        invoice: result.invoice,
       });
     } catch (error) {
-      console.error(
-        '❌ ERROR CREANDO NOTA CRÉDITO:',
-        error
-      );
-
-      return res.status(500).json({
+      return res.status(Number(error?.status || 500)).json({
         success: false,
-        error:
-          error.message ||
-          'Error interno creando nota crédito.',
+        error: error?.code || 'BILLING_CREDIT_NOTE_ERROR',
+        message: error?.message || 'Error interno creando nota crédito.',
       });
     }
   }

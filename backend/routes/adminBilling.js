@@ -12,6 +12,12 @@ const billingSyncService = require('../services/adminBillingSyncService');
 const {
   sendValidatedInvoiceEmail,
 } = require('../services/electronicInvoiceEmailService');
+const {
+  createOfficialCreditNote,
+} = require('../services/electronicCreditNoteService');
+const {
+  downloadOfficialCreditNoteDocument,
+} = require('../services/electronicCreditNoteDocumentService');
 
 const router = express.Router();
 
@@ -26,6 +32,20 @@ function sendError(res, error, fallback = 'Error procesando facturación.') {
 
 function currentAdmin(req) {
   return req.adminUsername || req.user?.username || req.user?.email || 'admin';
+}
+
+function sendOfficialFile(res, result) {
+  const fileName = String(result?.fileName || 'documento')
+    .replace(/[\r\n"\\/]+/g, '-')
+    .slice(0, 220);
+  res.setHeader('Content-Type', result?.contentType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Length', String(result?.buffer?.length || 0));
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Invoice-Document-Source', 'factus-official');
+  res.setHeader('X-Credit-Note-Number', result?.number || '');
+  return res.send(result.buffer);
 }
 
 router.use(requireAdmin);
@@ -145,6 +165,70 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error listando notas crédito de facturación.');
+    }
+  }
+);
+
+router.post(
+  '/credit-notes/:invoiceId',
+  requirePermission('billing:credit_note'),
+  async (req, res) => {
+    try {
+      const result = await createOfficialCreditNote(req.params.invoiceId, req.body || {}, {
+        adminUser: currentAdmin(req),
+      });
+      const plainInvoice = result.invoice?.toObject
+        ? result.invoice.toObject()
+        : result.invoice || {};
+      const invoice = {
+        ...billingService.serializeElectronicInvoice(plainInvoice),
+        creditNotes: Array.isArray(plainInvoice.creditNotes) ? plainInvoice.creditNotes : [],
+      };
+      res.status(result.created ? 201 : 200).json({
+        ok: true,
+        data: {
+          created: result.created,
+          reused: result.reused,
+          invoice,
+          message: result.message,
+        },
+      });
+    } catch (error) {
+      sendError(res, error, 'Error creando nota crédito.');
+    }
+  }
+);
+
+router.get(
+  '/credit-notes/:invoiceId/:noteId/pdf',
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const result = await downloadOfficialCreditNoteDocument({
+        invoiceId: req.params.invoiceId,
+        noteId: req.params.noteId,
+        type: 'pdf',
+      });
+      return sendOfficialFile(res, result);
+    } catch (error) {
+      return sendError(res, error, 'Error descargando PDF de la nota crédito.');
+    }
+  }
+);
+
+router.get(
+  '/credit-notes/:invoiceId/:noteId/xml',
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const result = await downloadOfficialCreditNoteDocument({
+        invoiceId: req.params.invoiceId,
+        noteId: req.params.noteId,
+        type: 'xml',
+      });
+      return sendOfficialFile(res, result);
+    } catch (error) {
+      return sendError(res, error, 'Error descargando XML de la nota crédito.');
     }
   }
 );

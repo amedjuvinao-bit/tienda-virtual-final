@@ -22,6 +22,8 @@ import useAdminPermissions from '../security/useAdminPermissions';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
+  downloadBillingCreditNotePdf,
+  downloadBillingCreditNoteXml,
   downloadBlob,
   generateBillingInvoiceForOrder,
   getBillingCreditNotes,
@@ -90,6 +92,8 @@ const STATUS_OPTIONS = [
 const CREDIT_NOTE_STATUS_OPTIONS = [
   { value: 'all', label: 'Todos' },
   { value: 'created', label: 'Creadas' },
+  { value: 'processing', label: 'Procesando' },
+  { value: 'sent', label: 'Enviadas' },
   { value: 'validated', label: 'Validadas' },
   { value: 'pending', label: 'Pendientes' },
   { value: 'rejected', label: 'Rechazadas' },
@@ -943,9 +947,27 @@ function BillingCreditNotesPanel() {
     }
   };
 
-  const openExternalCreditNote = (note) => {
-    const url = note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl || '';
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  const downloadCreditNoteDocument = async (note, documentType) => {
+    const invoiceIdentifier = note?.invoiceId || note?.invoiceNumber;
+    const noteIdentifier = note?.id || note?.noteNumber || note?.referenceCode;
+    if (!invoiceIdentifier || !noteIdentifier) return;
+
+    try {
+      setError('');
+      setNotice('');
+      setActionLoading(`${documentType}-${note.id}`);
+      const result = documentType === 'pdf'
+        ? await downloadBillingCreditNotePdf(invoiceIdentifier, noteIdentifier)
+        : await downloadBillingCreditNoteXml(invoiceIdentifier, noteIdentifier);
+      downloadBlob(result, `nota-credito-${note.noteNumber || note.id}.${documentType}`);
+    } catch (err) {
+      setError(await getDownloadErrorMessage(
+        err,
+        `No se pudo descargar el ${documentType.toUpperCase()} oficial de la nota crédito.`
+      ));
+    } finally {
+      setActionLoading('');
+    }
   };
 
   const syncCreditNote = async (note) => {
@@ -1055,13 +1077,16 @@ function BillingCreditNotesPanel() {
                   const customerName = customer.businessName || customer.name || customer.email || 'Cliente';
                   const isOpening = actionLoading === `invoice-${note.id}`;
                   const isSyncing = actionLoading === `sync-${note.id}`;
-                  const hasExternal = Boolean(note?.links?.publicUrl || note?.links?.pdfUrl || note?.links?.qrUrl);
+                  const isPdfLoading = actionLoading === `pdf-${note.id}`;
+                  const isXmlLoading = actionLoading === `xml-${note.id}`;
+                  const isValidated = note?.provider?.isValidated === true || note.status === 'validated';
 
                   return (
                     <tr key={note.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
                       <td className="px-3 py-4 align-top">
                         <p className="truncate font-black">{note.noteNumber || note.referenceCode || 'Sin número'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Ref. {note.referenceCode || '—'}</p>
+                        <p className="mt-1 truncate text-[11px] font-semibold" title={note.provider?.cude || note.provider?.cufe || ''} style={{ color: 'var(--admin-card-muted-text)' }}>CUDE {note.provider?.cude || note.provider?.cufe || '—'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(note.createdAt)}</p>
                       </td>
                       <td className="px-3 py-4 align-top">
@@ -1090,10 +1115,11 @@ function BillingCreditNotesPanel() {
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(note.itemsCount || 0)} ítem(s)</p>
                       </td>
                       <td className="px-3 py-4 align-top">
-                        <div className="grid gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5">
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
-                          <DocumentActionButton icon={Download} onClick={() => openExternalCreditNote(note)} disabled={!canDownload || !hasExternal} variant="primary">Soporte</DocumentActionButton>
                           <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={!canSync || isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>
+                          <DocumentActionButton icon={Download} onClick={() => downloadCreditNoteDocument(note, 'pdf')} disabled={!canDownload || !isValidated || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
+                          <DocumentActionButton icon={FileText} onClick={() => downloadCreditNoteDocument(note, 'xml')} disabled={!canDownload || !isValidated || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>
                         </div>
                       </td>
                     </tr>

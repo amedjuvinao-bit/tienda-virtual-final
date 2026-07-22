@@ -166,6 +166,7 @@ function assertRemoteIdentity({
   remoteNumber,
   storedProviderCufe = '',
   remoteCufe = '',
+  documentLabel = 'factura',
 } = {}) {
   const expectedNumber = normalizedIdentity(requestedNumber);
   const receivedNumber = normalizedIdentity(remoteNumber);
@@ -173,14 +174,14 @@ function assertRemoteIdentity({
   const receivedCufe = normalizedIdentity(remoteCufe);
 
   if (!receivedNumber) {
-    const error = new Error('Factus respondió, pero no devolvió el número oficial de la factura consultada.');
+    const error = new Error(`Factus respondió, pero no devolvió el número oficial de la ${documentLabel} consultada.`);
     error.code = 'BILLING_PROVIDER_IDENTITY_MISSING';
     return error;
   }
 
   if (expectedNumber && expectedNumber !== receivedNumber) {
     const error = new Error(
-      'Factus devolvió una factura diferente a la solicitada. No se modificaron el número ni el CUFE guardados.'
+      `Factus devolvió una ${documentLabel} diferente a la solicitada. No se modificaron el número ni la identificación fiscal guardados.`
     );
     error.code = 'BILLING_PROVIDER_IDENTITY_MISMATCH';
     return error;
@@ -188,7 +189,7 @@ function assertRemoteIdentity({
 
   if (expectedCufe && receivedCufe && expectedCufe !== receivedCufe) {
     const error = new Error(
-      'El CUFE devuelto por Factus no coincide con el CUFE oficial guardado. La sincronización fue bloqueada.'
+      `La identificación fiscal devuelta por Factus no coincide con la guardada para la ${documentLabel}. La sincronización fue bloqueada.`
     );
     error.code = 'BILLING_PROVIDER_CUFE_MISMATCH';
     return error;
@@ -517,6 +518,7 @@ async function syncInvoice(identifier, options = {}) {
   invoice.provider = {
     ...toPlain(invoice.provider),
     name: 'factus',
+    id: Number(remote.id || invoice?.provider?.id || 0) || null,
     status: normalized.providerStatus,
     referenceCode: cleanText(firstValue(remote.reference_code, remote.referenceCode, invoice?.provider?.referenceCode), 180),
     number: remoteNumber,
@@ -628,7 +630,18 @@ async function syncCreditNote(invoiceIdentifier, noteIdentifier, options = {}) {
     throw createServiceError(result);
   }
 
-  const creditNoteNumber = cleanText(note?.provider?.number || note.referenceCode, 160);
+  const creditNoteNumber = cleanText(note?.provider?.number, 160);
+  if (!creditNoteNumber) {
+    const missingResult = {
+      success: false,
+      provider,
+      status: 422,
+      stage: 'credit_note_number_missing',
+      error: 'La nota crédito todavía no tiene número oficial de Factus para sincronizar.',
+    };
+    await saveCreditNoteSyncFailure(invoice, index, provider, missingResult, options);
+    throw createServiceError(missingResult);
+  }
   const result = await getCreditNoteFromFactus({ providerConfig, creditNoteNumber });
 
   if (!result.success) {
@@ -653,7 +666,28 @@ async function syncCreditNote(invoiceIdentifier, noteIdentifier, options = {}) {
   const now = new Date();
   const links = extractLinks(remote);
   const remoteNumber = cleanText(firstValue(remote.number, note?.provider?.number, note.referenceCode), 160);
-  const remoteFiscalKey = cleanText(firstValue(remote.cude, remote.cufe, note?.provider?.cufe), 220);
+  const storedFiscalKey = cleanText(firstValue(note?.provider?.cude, note?.provider?.cufe), 220);
+  const remoteFiscalKey = cleanText(firstValue(remote.cude, remote.cufe, storedFiscalKey), 220);
+  const identityError = assertRemoteIdentity({
+    requestedNumber: creditNoteNumber,
+    remoteNumber,
+    storedProviderCufe: storedFiscalKey,
+    remoteCufe: cleanText(firstValue(remote.cude, remote.cufe), 220),
+    documentLabel: 'nota crédito',
+  });
+
+  if (identityError) {
+    const mismatchResult = {
+      ...result,
+      success: false,
+      status: 502,
+      stage: 'provider_identity_mismatch',
+      error: identityError.message,
+      code: identityError.code,
+    };
+    await saveCreditNoteSyncFailure(invoice, index, provider, mismatchResult, options);
+    throw createServiceError(mismatchResult);
+  }
   const validatedAt = firstValue(remote.validated_at, remote.validatedAt, note?.provider?.validatedAt, '');
   const message = providerMessage(
     result,
@@ -677,9 +711,11 @@ async function syncCreditNote(invoiceIdentifier, noteIdentifier, options = {}) {
   note.provider = {
     ...toPlain(note.provider),
     name: 'factus',
+    id: Number(remote.id || note?.provider?.id || 0) || null,
     status: normalized.providerStatus,
     number: remoteNumber,
     cufe: remoteFiscalKey,
+    cude: remoteFiscalKey,
     isValidated: normalized.isValidated,
     validatedAt,
     links: {
