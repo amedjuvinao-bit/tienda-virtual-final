@@ -119,14 +119,14 @@ export default function DianResolutionBlock({
       </BillingField>
 
       <BillingField label="Ambiente DIAN">
-        <select
-          value={value.environment || '2'}
-          onChange={(e) => updateField('environment', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-        >
-          <option value="2">Pruebas / habilitación</option>
-          <option value="1">Producción</option>
-        </select>
+        <input
+          value={value.environment === '1' ? 'Producción' : 'Pruebas / habilitación'}
+          readOnly
+          className="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-3 py-2.5 text-gray-600"
+        />
+        <span className="mt-1 block text-xs text-gray-500">
+          El ambiente se controla únicamente desde el paso Tipo de emisión.
+        </span>
       </BillingField>
     </div>
   );
