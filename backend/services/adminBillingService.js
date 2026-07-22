@@ -111,6 +111,13 @@ function serializeSync(sync = {}) {
 
 function serializeElectronicInvoice(invoice = {}) {
   const links = getInvoiceLinks(invoice);
+  const providerName = cleanText(invoice?.provider?.name, 60).toLowerCase();
+  const providerNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
+  const hasOfficialFactusDocument =
+    providerName === 'factus' &&
+    Boolean(providerNumber) &&
+    isValidatedInvoice(invoice);
+  const officialDocuments = invoice.officialDocuments || {};
 
   return {
     id: String(invoice._id || ''),
@@ -146,8 +153,22 @@ function serializeElectronicInvoice(invoice = {}) {
           failedAt: invoice.emission.failedAt || null,
         }
       : null,
-    hasXml: Boolean(cleanText(invoice.xmlContent, 20) || links.xmlUrl),
-    hasPdf: Boolean(links.pdfUrl || links.publicUrl),
+    hasXml: Boolean(
+      officialDocuments?.xml?.available ||
+      hasOfficialFactusDocument ||
+      cleanText(invoice.xmlContent, 20) ||
+      links.xmlUrl
+    ),
+    hasPdf: Boolean(
+      officialDocuments?.pdf?.available ||
+      hasOfficialFactusDocument ||
+      links.pdfUrl ||
+      links.publicUrl
+    ),
+    officialDocuments: {
+      pdf: officialDocuments?.pdf || null,
+      xml: officialDocuments?.xml || null,
+    },
     links,
     errorMessage: invoice.errorMessage || '',
     providerErrors: invoice.providerErrors || {},
