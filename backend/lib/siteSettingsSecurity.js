@@ -97,11 +97,25 @@ function buildPublicSiteSettings(rawSettings) {
   return safe;
 }
 
-function stripProtectedWriteFields(flatSet = {}) {
+function stripProtectedWriteFields(flatSet = {}, options = {}) {
   const safeSet = {};
+  const allowBilling = options?.allowBilling === true;
 
   for (const [path, value] of Object.entries(flatSet || {})) {
-    const hasInternalSegment = String(path || '')
+    const normalizedPath = String(path || '');
+    const isBillingPath =
+      normalizedPath === 'billing' || normalizedPath.startsWith('billing.');
+
+    if (isBillingPath && !allowBilling) {
+      const error = new Error(
+        'La configuración de facturación solo puede modificarse mediante la ruta fiscal protegida.'
+      );
+      error.code = 'BILLING_DEDICATED_ENDPOINT_REQUIRED';
+      error.status = 409;
+      throw error;
+    }
+
+    const hasInternalSegment = normalizedPath
       .split('.')
       .some((segment) => segment.startsWith('_'));
 
