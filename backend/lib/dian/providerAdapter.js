@@ -4,6 +4,7 @@ const { sendInvoiceToFactus } = require('./providers/factusProvider');
 const {
   BillingConfigurationError,
   buildRuntimeFactusConfig,
+  hasLegacyPlaintextBillingSecrets,
   SUPPORTED_EXTERNAL_PROVIDER,
 } = require('../billing/billingConfigurationSecurity');
 
@@ -21,9 +22,17 @@ async function sendElectronicInvoiceToProvider({ provider, invoiceData }) {
   }
 
   try {
-    const runtimeProviderConfig = buildRuntimeFactusConfig(
-      invoiceData?.settings?.billing || {}
-    );
+    const billing = invoiceData?.settings?.billing || {};
+
+    if (hasLegacyPlaintextBillingSecrets(billing)) {
+      throw new BillingConfigurationError(
+        'Las credenciales de facturación deben migrarse al almacenamiento cifrado antes de emitir.',
+        'BILLING_CREDENTIALS_MIGRATION_REQUIRED',
+        503
+      );
+    }
+
+    const runtimeProviderConfig = buildRuntimeFactusConfig(billing);
 
     return sendInvoiceToFactus({
       ...(invoiceData || {}),
