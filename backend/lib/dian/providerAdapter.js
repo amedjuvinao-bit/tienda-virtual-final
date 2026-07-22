@@ -1,40 +1,47 @@
 // backend/lib/dian/providerAdapter.js
 
 const { sendInvoiceToFactus } = require('./providers/factusProvider');
-const { sendInvoiceDirectToDIAN } = require('./providers/dianDirectProvider');
-const { sendInvoiceToCarvajal } = require('./providers/carvajalProvider');
-const { sendInvoiceToSiigo } = require('./providers/siigoProvider');
-const { sendInvoiceToAlegra } = require('./providers/alegraProvider');
+const {
+  BillingConfigurationError,
+  buildRuntimeFactusConfig,
+  SUPPORTED_EXTERNAL_PROVIDER,
+} = require('../billing/billingConfigurationSecurity');
 
 async function sendElectronicInvoiceToProvider({ provider, invoiceData }) {
   const selectedProvider = String(provider || '').trim().toLowerCase();
 
-  if (selectedProvider === 'factus') {
-    return sendInvoiceToFactus(invoiceData);
+  if (selectedProvider !== SUPPORTED_EXTERNAL_PROVIDER) {
+    return {
+      success: false,
+      provider: selectedProvider || 'vacío',
+      status: 422,
+      stage: 'provider_selection',
+      error: `Proveedor de facturación no habilitado: ${selectedProvider || 'vacío'}.`,
+    };
   }
 
-  if (selectedProvider === 'dian') {
-    return sendInvoiceDirectToDIAN(invoiceData);
-  }
+  try {
+    const runtimeProviderConfig = buildRuntimeFactusConfig(
+      invoiceData?.settings?.billing || {}
+    );
 
-  if (selectedProvider === 'carvajal') {
-    return sendInvoiceToCarvajal(invoiceData);
+    return sendInvoiceToFactus({
+      ...(invoiceData || {}),
+      provider: SUPPORTED_EXTERNAL_PROVIDER,
+      providerConfig: runtimeProviderConfig,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      provider: SUPPORTED_EXTERNAL_PROVIDER,
+      status: Number(error?.status || 422),
+      stage: 'secure_configuration',
+      error:
+        error instanceof BillingConfigurationError
+          ? error.message
+          : 'La configuración segura de Factus no está disponible.',
+    };
   }
-
-  if (selectedProvider === 'siigo') {
-    return sendInvoiceToSiigo(invoiceData);
-  }
-
-  if (selectedProvider === 'alegra') {
-    return sendInvoiceToAlegra(invoiceData);
-  }
-
-  return {
-    success: false,
-    provider: selectedProvider || 'vacío',
-    status: 'unsupported_provider',
-    error: `Proveedor DIAN no soportado: ${selectedProvider || 'vacío'}`,
-  };
 }
 
 module.exports = {
