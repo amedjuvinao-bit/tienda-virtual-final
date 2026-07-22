@@ -9,7 +9,6 @@ import './admin/billing/billingDocumentsLayout.css';
 import './admin/billing/billingLayoutStability.css';
 import './admin/orders/electronicInvoice/electronicInvoiceModalFix.css';
 import './admin/billing/billingGenerateConfirmBridge';
-import './checkout/checkoutCouponBridge';
 
 // Toastify (estilos y contenedor global)
 import 'react-toastify/dist/ReactToastify.css';

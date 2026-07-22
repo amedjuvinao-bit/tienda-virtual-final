@@ -39,6 +39,10 @@ function moneySafe(value, fallback = 0) {
   return Math.max(0, numberSafe(value, fallback));
 }
 
+function roundMoney(value, fallback = 0) {
+  return Math.round(moneySafe(value, fallback) * 100) / 100;
+}
+
 function optionalMoney(value) {
   if (value === '' || value === null || value === undefined) return null;
   return moneySafe(value, 0);
@@ -219,6 +223,10 @@ function validateCouponStatus(coupon, now = new Date()) {
     return { ok: false, code: 'COUPON_DRAFT', message: 'El cupón aún está en borrador.' };
   }
 
+  if (coupon.status === 'expired') {
+    return { ok: false, code: 'COUPON_EXPIRED', message: 'El cupón ya venció.' };
+  }
+
   if (coupon.startsAt && new Date(coupon.startsAt) > now) {
     return { ok: false, code: 'COUPON_NOT_STARTED', message: 'El cupón todavía no está vigente.' };
   }
@@ -259,6 +267,29 @@ function getItemLineTotal(item) {
   return qty * price;
 }
 
+function isItemEligibleForCoupon(coupon = {}, item = {}) {
+  const appliesTo = coupon.appliesTo || 'all';
+  const productId = getItemProductId(item);
+  const categories = getItemCategories(item);
+  const allowedProductIds = new Set((coupon.productIds || []).map(String));
+  const excludedProductIds = new Set((coupon.excludedProductIds || []).map(String));
+  const allowedCategories = new Set((coupon.categories || []).map(normalizeLower));
+  const excludedCategories = new Set((coupon.excludedCategories || []).map(normalizeLower));
+
+  if (productId && excludedProductIds.has(productId)) return false;
+  if (categories.some((category) => excludedCategories.has(category))) return false;
+
+  if (appliesTo === 'products') {
+    return allowedProductIds.size === 0 || Boolean(productId && allowedProductIds.has(productId));
+  }
+
+  if (appliesTo === 'categories') {
+    return allowedCategories.size === 0 || categories.some((category) => allowedCategories.has(category));
+  }
+
+  return true;
+}
+
 function calculateEligibleSubtotal(coupon, items = [], fallbackSubtotal = 0) {
   const appliesTo = coupon.appliesTo || 'all';
   const subtotal = moneySafe(fallbackSubtotal, 0);
@@ -267,29 +298,8 @@ function calculateEligibleSubtotal(coupon, items = [], fallbackSubtotal = 0) {
     return subtotal;
   }
 
-  const allowedProductIds = new Set((coupon.productIds || []).map(String));
-  const excludedProductIds = new Set((coupon.excludedProductIds || []).map(String));
-  const allowedCategories = new Set((coupon.categories || []).map(normalizeLower));
-  const excludedCategories = new Set((coupon.excludedCategories || []).map(normalizeLower));
-
   return items.reduce((sum, item) => {
-    const productId = getItemProductId(item);
-    const categories = getItemCategories(item);
-
-    if (productId && excludedProductIds.has(productId)) return sum;
-    if (categories.some((category) => excludedCategories.has(category))) return sum;
-
-    let eligible = appliesTo === 'all';
-
-    if (appliesTo === 'products') {
-      eligible = allowedProductIds.size === 0 || (productId && allowedProductIds.has(productId));
-    }
-
-    if (appliesTo === 'categories') {
-      eligible = allowedCategories.size === 0 || categories.some((category) => allowedCategories.has(category));
-    }
-
-    return eligible ? sum + getItemLineTotal(item) : sum;
+    return isItemEligibleForCoupon(coupon, item) ? sum + getItemLineTotal(item) : sum;
   }, 0);
 }
 
@@ -327,19 +337,26 @@ function calculateDiscount(coupon, { subtotal = 0, shippingAmount = 0, items = [
     discountAmount = Math.min(discountAmount, Number(coupon.maxDiscountAmount || 0));
   }
 
-  discountAmount = Math.min(Math.round(discountAmount), safeSubtotal);
-  shippingDiscountAmount = Math.min(Math.round(shippingDiscountAmount), safeShipping);
+  discountAmount = Math.min(roundMoney(discountAmount), roundMoney(safeSubtotal));
+  shippingDiscountAmount = Math.min(
+    roundMoney(shippingDiscountAmount),
+    roundMoney(safeShipping)
+  );
 
   return {
-    eligibleSubtotal: Math.round(eligibleSubtotal),
+    eligibleSubtotal: roundMoney(eligibleSubtotal),
     discountAmount,
     shippingDiscountAmount,
-    totalDiscountAmount: discountAmount + shippingDiscountAmount,
+    totalDiscountAmount: roundMoney(discountAmount + shippingDiscountAmount),
     message: '',
   };
 }
 
-async function ensurePerCustomerLimit(coupon, { customerId = '', customerEmail = '' } = {}) {
+async function ensurePerCustomerLimit(
+  coupon,
+  { customerId = '', customerEmail = '' } = {},
+  options = {}
+) {
   const limit = Number(coupon.perCustomerLimit || 0);
   if (!Number.isFinite(limit) || limit <= 0) return { ok: true };
 
@@ -361,7 +378,11 @@ async function ensurePerCustomerLimit(coupon, { customerId = '', customerEmail =
     ],
   };
 
-  const count = await CouponRedemption.countDocuments(query);
+  let countQuery = CouponRedemption.countDocuments(query);
+  if (options.session && typeof countQuery.session === 'function') {
+    countQuery = countQuery.session(options.session);
+  }
+  const count = await countQuery;
 
   if (count >= limit) {
     return {
@@ -508,13 +529,17 @@ async function deleteCoupon(id, actor = {}) {
   return serializeCoupon(coupon);
 }
 
-async function validateCoupon(input = {}) {
+async function validateCoupon(input = {}, options = {}) {
   const code = normalizeCode(input.code);
   if (!code) {
     return { valid: false, code: 'COUPON_CODE_REQUIRED', message: 'Debes ingresar un cupón.' };
   }
 
-  const coupon = await Coupon.findOne({ code, deletedAt: null });
+  let couponQuery = Coupon.findOne({ code, deletedAt: null });
+  if (options.session && typeof couponQuery.session === 'function') {
+    couponQuery = couponQuery.session(options.session);
+  }
+  const coupon = await couponQuery;
   const statusValidation = validateCouponStatus(coupon);
   if (!statusValidation.ok) return { valid: false, ...statusValidation };
 
@@ -534,7 +559,7 @@ async function validateCoupon(input = {}) {
   const customerLimit = await ensurePerCustomerLimit(coupon, {
     customerId: input.customerId,
     customerEmail: input.customerEmail || input.email,
-  });
+  }, options);
 
   if (!customerLimit.ok) {
     return { valid: false, ...customerLimit, coupon: serializeCoupon(coupon) };
@@ -573,7 +598,9 @@ async function validateCoupon(input = {}) {
       discountAmount: discount.discountAmount,
       shippingDiscountAmount: discount.shippingDiscountAmount,
       totalDiscountAmount: discount.totalDiscountAmount,
-      totalAfterDiscount: Math.max(0, subtotal + shippingAmount - discount.totalDiscountAmount),
+      totalAfterDiscount: roundMoney(
+        Math.max(0, subtotal + shippingAmount - discount.totalDiscountAmount)
+      ),
     },
   };
 }
@@ -613,11 +640,37 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
   const session = options.session || null;
   const redemption = await CouponRedemption.create([redemptionPayload], { session }).then((rows) => rows[0]);
 
-  await Coupon.updateOne(
-    { _id: couponObjectId },
+  const usageUpdate = await Coupon.updateOne(
+    {
+      _id: couponObjectId,
+      deletedAt: null,
+      active: { $ne: false },
+      status: { $in: ['active', null] },
+      $or: [
+        { usageLimit: null },
+        { usageLimit: { $exists: false } },
+        { usageLimit: { $lte: 0 } },
+        {
+          $expr: {
+            $lt: [
+              { $ifNull: ['$usageCount', 0] },
+              { $ifNull: ['$usageLimit', 0] },
+            ],
+          },
+        },
+      ],
+    },
     { $inc: { usageCount: 1 } },
     { session }
   );
+
+  if (!usageUpdate.matchedCount) {
+    throw createServiceError(
+      'El cupón dejó de estar disponible antes de finalizar la orden.',
+      409,
+      'COUPON_USAGE_LIMIT_REACHED'
+    );
+  }
 
   return redemption?.toObject ? redemption.toObject() : redemption;
 }
@@ -625,6 +678,8 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
 module.exports = {
   normalizeCode,
   serializeCoupon,
+  isItemEligibleForCoupon,
+  calculateEligibleSubtotal,
   calculateDiscount,
   validateCoupon,
   listCoupons,

@@ -43,6 +43,8 @@ const MAX_LEN = {
   tag: 24,
   idempotencyKey: 120,
   title: 160,
+  variantKey: 180,
+  couponCode: 40,
   paymentProviderLabel: 80,
   paymentCurrency: 12,
   paymentCheckoutLabel: 180,
@@ -107,6 +109,16 @@ function normalizeCart(cart) {
       quantity: isPositiveInt(quantity) ? quantity : 0,
       color: trimTo(raw.color, 40) || undefined,
       size: trimTo(raw.size, 40) || undefined,
+      variantId:
+        trimTo(
+          raw.variantId || raw.variantKey || raw.selectedVariantId || raw.selectedVariantKey,
+          MAX_LEN.variantKey
+        ) || undefined,
+      variantKey:
+        trimTo(
+          raw.variantKey || raw.variantId || raw.selectedVariantKey || raw.selectedVariantId,
+          MAX_LEN.variantKey
+        ) || undefined,
       image: trimTo(raw.image, 300) || undefined,
     });
   }
@@ -394,6 +406,14 @@ module.exports = function validateOrderPayload(body) {
 
   // ---- tags (opcional)
   cleaned.tags = normalizeTags(body.tags);
+
+  // ---- cupón (el servidor volverá a validarlo con precios vigentes)
+  cleaned.couponCode = trimTo(
+    body.couponCode || body?.coupon?.code || body.discountCode,
+    MAX_LEN.couponCode
+  )
+    .toUpperCase()
+    .replace(/\s+/g, '') || undefined;
 
   // ---- idempotency (opcional)
   cleaned.idempotencyKey = trimTo(body.idempotencyKey, MAX_LEN.idempotencyKey) || undefined;

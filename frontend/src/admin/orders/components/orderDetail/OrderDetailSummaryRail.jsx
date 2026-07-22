@@ -56,6 +56,15 @@ function firstValidNumber(...values) {
   return found === undefined ? 0 : Number(found);
 }
 
+function firstConfiguredNumber(...values) {
+  const found = values.find((value) => {
+    if (value === undefined || value === null || value === '') return false;
+    return Number.isFinite(Number(value));
+  });
+
+  return found === undefined ? 0 : Number(found);
+}
+
 function getProviderTotals(order) {
   const invoice =
     order?.electronicInvoice ||
@@ -86,7 +95,8 @@ function getOrderTaxes(order) {
     order?.ivaAmount
   );
 
-  const ivaRate = firstValidNumber(
+  const ivaRate = firstConfiguredNumber(
+    order?.taxes?.iva?.percent,
     order?.taxes?.iva?.rate,
     order?.taxes?.ivaRate,
     order?.taxRate,
@@ -101,6 +111,9 @@ function getOrderTaxes(order) {
 
 function getOrderDiscount(order) {
   return firstValidNumber(
+    order?.pricing?.productDiscount,
+    order?.discount?.amount,
+    order?.coupon?.discountAmount,
     order?.discount,
     order?.discountAmount,
     order?.couponDiscount,
@@ -133,6 +146,15 @@ function getMoneyBreakdown(order, summary) {
   );
 
   const discount = getOrderDiscount(order);
+  const shippingDiscount = firstValidNumber(
+    order?.pricing?.shippingDiscount,
+    order?.coupon?.shippingDiscountAmount
+  );
+  const originalShipping = firstConfiguredNumber(
+    order?.pricing?.originalShipping,
+    order?.coupon?.originalShippingAmount,
+    shipping
+  );
 
   const total = firstValidNumber(
     summary?.total,
@@ -168,9 +190,12 @@ function getMoneyBreakdown(order, summary) {
   return {
     subtotal,
     discount,
+    shippingDiscount,
+    couponCode: order?.coupon?.code || '',
     ivaAmount,
     ivaRate,
     shipping,
+    originalShipping,
     surcharge,
     prepayment,
     total,
@@ -401,18 +426,26 @@ export default function OrderDetailSummaryRail({ order }) {
 
           {breakdown.discount > 0 ? (
             <RailMoneyLine
-              label="Descuento"
+              label={breakdown.couponCode ? `Descuento · ${breakdown.couponCode}` : 'Descuento'}
               value={`-${toCOP(breakdown.discount)}`}
               muted
             />
           ) : null}
 
           <RailMoneyLine
-            label={`IVA ${breakdown.ivaRate || 19}%`}
+            label={`IVA ${breakdown.ivaRate}%`}
             value={toCOP(breakdown.ivaAmount)}
           />
 
-          <RailMoneyLine label="Envío" value={toCOP(breakdown.shipping)} />
+          <RailMoneyLine label="Envío" value={toCOP(breakdown.originalShipping)} />
+
+          {breakdown.shippingDiscount > 0 ? (
+            <RailMoneyLine
+              label="Descuento de envío"
+              value={`-${toCOP(breakdown.shippingDiscount)}`}
+              muted
+            />
+          ) : null}
 
           {breakdown.surcharge > 0 ? (
             <RailMoneyLine label="Recargo" value={toCOP(breakdown.surcharge)} />

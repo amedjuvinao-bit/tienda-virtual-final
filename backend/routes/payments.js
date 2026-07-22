@@ -1122,6 +1122,35 @@ router.post('/wompi/webhook', async (req, res) => {
       });
     }
 
+    const transactionAmountInCents = Math.round(Number(transaction.amount_in_cents || 0));
+    const expectedAmountInCents = amountToCents(existingOrder.total);
+
+    if (
+      transactionAmountInCents <= 0 ||
+      expectedAmountInCents <= 0 ||
+      transactionAmountInCents !== expectedAmountInCents
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error: 'WOMPI_AMOUNT_MISMATCH',
+        message: 'El valor confirmado por Wompi no coincide con el total de la orden.',
+      });
+    }
+
+    const transactionCurrency = trimSafe(transaction.currency, 12).toUpperCase();
+    const expectedCurrency = trimSafe(
+      existingOrder.payment?.currency || payments.currency || 'COP',
+      12
+    ).toUpperCase();
+
+    if (transactionCurrency && transactionCurrency !== expectedCurrency) {
+      return res.status(409).json({
+        ok: false,
+        error: 'WOMPI_CURRENCY_MISMATCH',
+        message: 'La moneda confirmada por Wompi no coincide con la orden.',
+      });
+    }
+
     const mapped = parseWompiTransactionStatus(transaction.status);
     const shouldRestock =
       mapped.paymentStatus === 'failed' || mapped.paymentStatus === 'cancelled';
@@ -1362,6 +1391,13 @@ router.post('/payu/checkout-data', async (req, res) => {
         referenceCode,
         description: `Pago orden ${order.orderNumber || referenceCode}`,
         amount,
+        tax: Number(order.taxes?.iva?.amount || 0),
+        taxReturnBase: Number(
+          order.pricing?.taxableBase ??
+            order.pricing?.subtotalAfterDiscount ??
+            order.subtotal ??
+            amount
+        ),
         currency,
         redirectUrl,
         confirmationUrl,

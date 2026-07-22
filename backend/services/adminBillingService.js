@@ -121,6 +121,7 @@ function serializeElectronicInvoice(invoice = {}) {
     invoiceNumber: invoice.invoiceNumber || invoice?.provider?.number || '',
     cufe: invoice.cufe || invoice?.provider?.cufe || '',
     customer: invoice.customer || {},
+    totals: invoice.totals || {},
     fiscalInfo: invoice.fiscalInfo || {},
     dianResolution: invoice.dianResolution || {},
     provider: {

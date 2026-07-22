@@ -501,6 +501,30 @@ function buildFactusCustomer(order = {}) {
   return factusCustomer;
 }
 
+function allocateFactusDiscounts(orderItems = [], totalDiscount = 0) {
+  const lines = orderItems.map((item) => {
+    const quantity = Math.max(0, toNumber(item?.quantity ?? item?.qty ?? 0, 0));
+    const price = Math.max(0, toNumber(item?.price ?? item?.unitPrice ?? item?.priceNumber ?? 0, 0));
+    return Math.round(quantity * price * 100);
+  });
+  const subtotalCents = lines.reduce((sum, value) => sum + value, 0);
+  let remainingCents = Math.min(Math.round(toMoney(totalDiscount) * 100), subtotalCents);
+
+  return lines.map((lineCents, index) => {
+    if (remainingCents <= 0 || subtotalCents <= 0) return 0;
+    const isLast = index === lines.length - 1;
+    const allocated = isLast
+      ? Math.min(lineCents, remainingCents)
+      : Math.min(
+          lineCents,
+          remainingCents,
+          Math.round((Math.round(toMoney(totalDiscount) * 100) * lineCents) / subtotalCents)
+        );
+    remainingCents -= allocated;
+    return allocated / 100;
+  });
+}
+
 function buildFactusInvoicePayload(invoiceData = {}) {
   const order = invoiceData?.order || {};
   const transaction = invoiceData?.transaction || {};
@@ -513,24 +537,43 @@ function buildFactusInvoicePayload(invoiceData = {}) {
     return acc + quantity * price;
   }, 0);
 
-  const subtotal = toMoney(order?.subtotal || calculatedItemsTotal);
-  const shipping = toMoney(order?.shipping || 0);
-  const ivaAmount = toMoney(order?.taxes?.iva?.amount || 0);
-  const ivaPercent = toMoney(order?.taxes?.iva?.percent || 0);
-  const total = toMoney(order?.total || subtotal + shipping + ivaAmount);
+  const subtotal = Number.isFinite(Number(order?.subtotal))
+    ? toMoney(order.subtotal)
+    : toMoney(calculatedItemsTotal);
+  const shipping = toMoney(order?.shipping ?? order?.pricing?.shipping ?? 0);
+  const ivaAmount = toMoney(order?.taxes?.iva?.amount ?? order?.pricing?.taxAmount ?? 0);
+  const ivaPercent = toMoney(order?.taxes?.iva?.percent ?? 0);
+  const productDiscount = toMoney(
+    order?.pricing?.productDiscount ??
+      order?.discount?.amount ??
+      order?.discountAmount ??
+      (typeof order?.discount === 'number' ? order.discount : 0)
+  );
+  const netSubtotal = toMoney(
+    order?.pricing?.subtotalAfterDiscount ?? subtotal - productDiscount
+  );
+  const total = Number.isFinite(Number(order?.total))
+    ? toMoney(order.total)
+    : toMoney(netSubtotal + shipping + ivaAmount);
 
-  const hasIva = ivaPercent > 0 && ivaAmount > 0;
+  const ivaEnabled = order?.taxes?.iva?.enabled !== false && ivaPercent > 0;
+  const hasIva = ivaEnabled;
   const ivaRate = hasIva ? ivaPercent.toFixed(2) : '0.00';
+  const explicitDiscountTotal = toMoney(
+    orderItems.reduce((sum, item) => sum + toNumber(item?.discountAmount, 0), 0)
+  );
+  const allocatedDiscounts = explicitDiscountTotal > 0
+    ? orderItems.map((item) => toMoney(item?.discountAmount || 0))
+    : allocateFactusDiscounts(orderItems, productDiscount);
 
-  const items = orderItems.map((item) => {
+  const items = orderItems.map((item, index) => {
     const quantity = toNumber(item?.quantity ?? item?.qty ?? 1, 1);
     const price = toMoney(item?.price ?? item?.unitPrice ?? item?.priceNumber ?? 0);
-
-    return {
+    const discountAmount = toMoney(allocatedDiscounts[index] || 0);
+    const factusItem = {
       code_reference: String(item?.productId || item?.product || item?._id || item?.title || 'ITEM'),
       name: String(item?.title || 'Producto'),
       quantity,
-      discount_rate: 0,
       price,
 
       unit_measure_code: '94',
@@ -549,6 +592,12 @@ function buildFactusInvoicePayload(invoiceData = {}) {
       tribute_id: 1,
       withholding_taxes: [],
     };
+
+    if (discountAmount > 0) {
+      factusItem.discount_amount = discountAmount.toFixed(2);
+    }
+
+    return factusItem;
   });
 
   if (shipping > 0) {
@@ -633,6 +682,8 @@ function buildFactusInvoicePayload(invoiceData = {}) {
 
     totals: {
       subtotal,
+      discount: productDiscount,
+      taxable_base: netSubtotal,
       shipping,
       iva: ivaAmount,
       total,

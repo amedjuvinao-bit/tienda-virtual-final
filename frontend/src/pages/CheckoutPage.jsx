@@ -792,6 +792,11 @@ const GLOBAL_STYLES = `
 function CheckoutPage() {
   const [deliveryType, setDeliveryType] = useState('envio');
   const [discountCode, setDiscountCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [checkoutQuote, setCheckoutQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [sameAddress, setSameAddress] = useState(true);
   const [wantsNewsletter, setWantsNewsletter] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -930,9 +935,20 @@ function CheckoutPage() {
     return 20000;
   }, [deliveryType, shippingConfig, shippingConfigLoading, matchedZone, subtotal]);
 
+  const quotePricing = checkoutQuote?.pricing || null;
+  const quotedSubtotal = Number(quotePricing?.subtotal ?? subtotal);
+  const productDiscount = Number(quotePricing?.productDiscount || 0);
+  const shippingDiscount = Number(quotePricing?.shippingDiscount || 0);
+  const finalShipping = Number(quotePricing?.shipping ?? shipping);
+  const taxAmount = Number(quotePricing?.tax?.amount || 0);
+  const taxPercent = Number(quotePricing?.tax?.percent || 0);
+  const total = Number(
+    quotePricing?.total ?? quotedSubtotal - productDiscount + finalShipping + taxAmount
+  );
+
   const shippingEta = useMemo(() => {
     if (deliveryType === 'retiro') return 'Retiro disponible en tienda';
-    if (shipping === 0) {
+    if (finalShipping === 0) {
       return matchedZone?.eta || shippingConfig?.estimatedTime || shippingConfig?.fallback?.eta || 'Envío gratis aplicado';
     }
     return (
@@ -941,7 +957,7 @@ function CheckoutPage() {
       shippingConfig?.estimatedTime ||
       'Tiempo no configurado'
     );
-  }, [deliveryType, shipping, matchedZone, shippingConfig]);
+  }, [deliveryType, finalShipping, matchedZone, shippingConfig]);
 
   const shippingLabel = useMemo(() => {
     if (deliveryType === 'retiro') return 'Retiro en tienda';
@@ -949,8 +965,6 @@ function CheckoutPage() {
     if (customerCity) return `Envío a ${customerCity}`;
     return 'Envío configurado';
   }, [deliveryType, matchedZone, customerCity]);
-
-  const total = subtotal + shipping;
 
   const paymentProviderMeta = useMemo(
     () => getPaymentProviderMeta(paymentsConfig.provider),
@@ -988,6 +1002,106 @@ function CheckoutPage() {
 
   const navigate = useNavigate();
   const [isPlacing, setIsPlacing] = useState(false);
+
+  const buildQuoteRequestPayload = (couponCode = '') => ({
+    sessionId: getSessionId(),
+    items: (currentCart || []).map((item) => ({
+      productId: String(item.productId || item._id || item.id || item?.product?._id || ''),
+      title: item.title || item?.product?.title || '',
+      image: item.image || item?.product?.image || '',
+      color: item.color || '',
+      size: item.size || '',
+      variantId: item.variantId || item.variantKey || '',
+      quantity: getItemQuantity(item),
+      price: Number(item.price ?? item?.product?.price ?? 0),
+    })),
+    customer: {
+      deliveryType,
+      country: customerCountry,
+      countryCode: selectedCountry?.code || '',
+      department: selectedRegion,
+      departmentCode: selectedRegion,
+      city: customerCity,
+      email: String(customerEmailOrPhone || '').includes('@')
+        ? String(customerEmailOrPhone || '').trim()
+        : '',
+      emailOrPhone: customerEmailOrPhone,
+    },
+    couponCode,
+  });
+
+  const handleApplyCoupon = () => {
+    const code = String(discountCode || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    if (!code) {
+      setAppliedCoupon(null);
+      setCouponMessage('');
+      setCouponError('Ingresa un código de descuento.');
+      return;
+    }
+
+    setCouponError('');
+    setCouponMessage('Validando cupón...');
+    setAppliedCoupon({ code });
+  };
+
+  useEffect(() => {
+    if (!Array.isArray(currentCart) || currentCart.length === 0) {
+      setCheckoutQuote(null);
+      setQuoteLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const couponCode = appliedCoupon?.code || '';
+    const timer = window.setTimeout(async () => {
+      try {
+        setQuoteLoading(true);
+        const { data } = await api.post('/api/orders/quote', buildQuoteRequestPayload(couponCode));
+        if (cancelled) return;
+
+        setCheckoutQuote(data || null);
+
+        if (couponCode && data?.coupon) {
+          setCouponError('');
+          setAppliedCoupon(data.coupon);
+          setDiscountCode(data.coupon.code || couponCode);
+          setCouponMessage(data.coupon.message || 'Cupón aplicado correctamente.');
+        } else if (!couponCode) {
+          setCouponMessage('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        const response = error?.response?.data || {};
+        if (response.pricing) setCheckoutQuote({ pricing: response.pricing });
+
+        if (couponCode) {
+          setAppliedCoupon(null);
+          setCouponMessage('');
+          setCouponError(
+            response.message || error?.userMessage || 'No se pudo aplicar el cupón.'
+          );
+        }
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    currentCart,
+    deliveryType,
+    customerCountry,
+    selectedCountry?.code,
+    selectedRegion,
+    customerCity,
+    customerEmailOrPhone,
+    appliedCoupon?.code,
+  ]);
 
   useEffect(() => {
     let cancel = false;
@@ -1240,6 +1354,10 @@ function CheckoutPage() {
     }
 
     if (!currentCart || currentCart.length === 0 || itemCount === 0) errs.push('El carrito está vacío.');
+    if (quoteLoading) errs.push('Espera mientras verificamos IVA, descuentos y total.');
+    if (!quoteLoading && currentCart?.length > 0 && !quotePricing) {
+      errs.push('No fue posible verificar el total final con el servidor.');
+    }
     if (subtotal <= 0) errs.push('El subtotal debe ser mayor a 0.');
     if (total <= 0) errs.push('El total debe ser mayor a 0.');
 
@@ -1281,6 +1399,10 @@ function CheckoutPage() {
     orderId,
     orderNumber,
     orderSubtotal,
+    orderDiscount,
+    orderTax,
+    orderShipping,
+    orderTotal,
     lineItemCount,
   }) => {
     console.log('Entrando a openWompiCheckout');
@@ -1363,6 +1485,10 @@ function CheckoutPage() {
             orderNumber,
             customerName,
             subtotal: orderSubtotal,
+            discount: orderDiscount,
+            tax: orderTax,
+            shipping: orderShipping,
+            total: orderTotal,
             itemCount: lineItemCount,
             transactionId: tx?.id || '',
           },
@@ -1461,6 +1587,7 @@ function CheckoutPage() {
         image: it.image || it?.product?.image || '',
         color: it.color || '',
         size: it.size || '',
+        variantId: it.variantId || it.variantKey || '',
         quantity: Number(it.quantity ?? it.qty ?? 0) || 0,
         price: Number(it.price ?? it?.product?.price ?? 0) || 0,
       }))
@@ -1531,7 +1658,8 @@ function CheckoutPage() {
       cart: finalItems,
       subtotal: Number(finalSummary.subtotal || 0),
       shipping,
-      total: Number(finalSummary.subtotal || 0) + shipping,
+      total,
+      couponCode: appliedCoupon?.code || '',
       customer,
       billing: checkoutConfig.showBillingSection ? billing : undefined,
       payment
@@ -1551,6 +1679,14 @@ function CheckoutPage() {
 
       const createdOrderId = response.data?._id || response.data?.order?._id || '';
       const createdOrderNumber = response.data?.orderNumber || response.data?.order?.code || '';
+      const createdPricing = response.data?.pricing || {};
+      const createdSubtotal = Number(response.data?.subtotal ?? createdPricing.subtotal ?? order.subtotal);
+      const createdDiscount = Number(
+        createdPricing.totalDiscount ?? response.data?.coupon?.totalDiscountAmount ?? 0
+      );
+      const createdTax = Number(response.data?.taxes?.iva?.amount ?? createdPricing.taxAmount ?? 0);
+      const createdShipping = Number(response.data?.shipping ?? createdPricing.shipping ?? 0);
+      const createdTotal = Number(response.data?.total ?? createdPricing.total ?? order.total);
 
       if (!(response.status === 201 || response.status === 200) || !createdOrderId) {
         setErrors(['Ocurrió un problema al procesar tu orden. Intenta nuevamente.']);
@@ -1566,7 +1702,11 @@ function CheckoutPage() {
             orderId: createdOrderId,
             orderNumber: createdOrderNumber,
             customerName,
-            subtotal: order.subtotal,
+            subtotal: createdSubtotal,
+            discount: createdDiscount,
+            tax: createdTax,
+            shipping: createdShipping,
+            total: createdTotal,
             itemCount: finalItems.length,
           }
         });
@@ -1577,7 +1717,11 @@ function CheckoutPage() {
           await openWompiCheckout({
             orderId: createdOrderId,
             orderNumber: createdOrderNumber,
-            orderSubtotal: order.subtotal,
+            orderSubtotal: createdSubtotal,
+            orderDiscount: createdDiscount,
+            orderTax: createdTax,
+            orderShipping: createdShipping,
+            orderTotal: createdTotal,
             lineItemCount: finalItems.length,
           });
           return;
@@ -1671,6 +1815,8 @@ function CheckoutPage() {
   let disableReason = '';
   if (!paymentCanProceed) disableReason = 'No hay un método de pago activo o configurado.';
   else if (!currentCart || currentCart.length === 0 || itemCount === 0) disableReason = 'El carrito está vacío.';
+  else if (quoteLoading) disableReason = 'Verificando IVA, descuentos y total...';
+  else if (!quotePricing) disableReason = 'No se pudo verificar el total final.';
   else if (subtotal <= 0) disableReason = 'El subtotal debe ser mayor a 0.';
   else if (total <= 0) disableReason = 'El total debe ser mayor a 0.';
 
@@ -1990,7 +2136,7 @@ function CheckoutPage() {
                       </div>
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: checkoutConfig.style.accentColor }}>
-                      {shipping === 0 ? 'Gratis' : `$ ${shipping.toLocaleString('es-CO')}`}
+                      {finalShipping === 0 ? 'Gratis' : `$ ${finalShipping.toLocaleString('es-CO')}`}
                     </div>
                   </div>
                 </div>
@@ -2076,6 +2222,8 @@ function CheckoutPage() {
                     !currentCart ||
                     currentCart.length === 0 ||
                     itemCount === 0 ||
+                    quoteLoading ||
+                    !quotePricing ||
                     subtotal <= 0 ||
                     total <= 0 ||
                     !paymentCanProceed
@@ -2174,12 +2322,44 @@ function CheckoutPage() {
                         className="co-input"
                         placeholder="Código de descuento"
                         value={discountCode}
-                        onChange={(e) => setDiscountCode(e.target.value)}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setDiscountCode(nextValue);
+                          setCouponError('');
+                          if (
+                            appliedCoupon?.code &&
+                            String(nextValue || '').trim().toUpperCase().replace(/\s+/g, '') !== appliedCoupon.code
+                          ) {
+                            setAppliedCoupon(null);
+                            setCouponMessage('');
+                          }
+                        }}
                         autoComplete="off"
                         name="discountCode"
                       />
-                      <button className="co-btn-secondary" type="button">Aplicar</button>
+                      <button
+                        className="co-btn-secondary"
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={quoteLoading}
+                      >
+                        {quoteLoading && appliedCoupon?.code ? 'Validando...' : 'Aplicar'}
+                      </button>
                     </div>
+
+                    {(couponMessage || couponError) && (
+                      <div
+                        role={couponError ? 'alert' : 'status'}
+                        style={{
+                          marginTop: '8px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: couponError ? '#be123c' : '#047857',
+                        }}
+                      >
+                        {couponError || couponMessage}
+                      </div>
+                    )}
 
                     <hr className="co-totals-divider" style={{ marginTop: '20px' }} />
                     <div className="co-totals">
@@ -2188,15 +2368,41 @@ function CheckoutPage() {
                           {checkoutConfig.subtotalLabelText}
                         </span>
                         <span style={{ color: checkoutConfig.style.subtotalValueColor, fontWeight: 500 }}>
-                          ${subtotal.toLocaleString('es-CO')}
+                          ${quotedSubtotal.toLocaleString('es-CO')}
                         </span>
                       </div>
+                      {productDiscount > 0 && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#047857' }}>
+                            Descuento{appliedCoupon?.code ? ` · ${appliedCoupon.code}` : ''}
+                          </span>
+                          <span style={{ fontWeight: 600, color: '#047857' }}>
+                            -${productDiscount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
+                      {(taxPercent > 0 || taxAmount > 0) && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#6b7280' }}>IVA ({taxPercent}%)</span>
+                          <span style={{ fontWeight: 500 }}>
+                            ${taxAmount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
                       <div className="co-totals-row">
                         <span style={{ color: '#6b7280' }}>Envío</span>
                         <span style={{ fontWeight: 500 }}>
                           {shipping === 0 ? 'Gratis' : `$${shipping.toLocaleString('es-CO')}`}
                         </span>
                       </div>
+                      {shippingDiscount > 0 && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#047857' }}>Descuento de envío</span>
+                          <span style={{ fontWeight: 600, color: '#047857' }}>
+                            -${shippingDiscount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
                       <hr className="co-totals-divider" />
                       <div className="co-totals-row co-totals-total">
                         <span style={{ color: checkoutConfig.style.totalTextColor }}>

@@ -52,6 +52,23 @@ const InvoiceEmissionSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const InvoiceTotalsSchema = new mongoose.Schema(
+  {
+    currency: { type: String, default: 'COP' },
+    subtotal: { type: Number, default: 0 },
+    productDiscount: { type: Number, default: 0 },
+    subtotalAfterDiscount: { type: Number, default: 0 },
+    originalShipping: { type: Number, default: 0 },
+    shippingDiscount: { type: Number, default: 0 },
+    shipping: { type: Number, default: 0 },
+    totalDiscount: { type: Number, default: 0 },
+    taxableBase: { type: Number, default: 0 },
+    taxAmount: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
     type: {
@@ -167,6 +184,11 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
 
     emission: {
       type: InvoiceEmissionSchema,
+      default: undefined,
+    },
+
+    totals: {
+      type: InvoiceTotalsSchema,
       default: undefined,
     },
 

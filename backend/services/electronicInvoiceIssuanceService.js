@@ -19,7 +19,11 @@ function cleanText(value, max = 180) {
 
 function money(value) {
   const number = Number(value || 0);
-  return Number.isFinite(number) ? number : 0;
+  return Number.isFinite(number) ? Math.round(number * 100) / 100 : 0;
+}
+
+function hasFiniteNumber(value) {
+  return value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value));
 }
 
 function firstValue(...values) {
@@ -159,19 +163,165 @@ function calculateTotals(order = {}, settings = {}) {
     return acc + quantity * price;
   }, 0);
 
-  const subtotal = money(order.subtotal || lineSubtotal);
-  const shipping = money(order.shipping);
-  const ivaConfig = order?.taxes?.iva || settings?.billing?.taxes?.iva || {};
-  const ivaEnabled = ivaConfig.enabled !== false;
-  const ivaPercent = Number(ivaConfig.percent || 0) || 0;
-  const taxAmount = typeof ivaConfig.amount === 'number'
-    ? money(ivaConfig.amount)
-    : ivaEnabled
-      ? Number(((subtotal * ivaPercent) / 100).toFixed(2))
-      : 0;
-  const total = money(order.total || subtotal + shipping + taxAmount);
+  const subtotal = hasFiniteNumber(order.subtotal) ? money(order.subtotal) : money(lineSubtotal);
+  const productDiscount = hasFiniteNumber(order?.pricing?.productDiscount)
+    ? money(order.pricing.productDiscount)
+    : money(order?.discount?.amount ?? order?.discountAmount ?? (
+      typeof order?.discount === 'number' ? order.discount : 0
+    ));
+  const subtotalAfterDiscount = hasFiniteNumber(order?.pricing?.subtotalAfterDiscount)
+    ? money(order.pricing.subtotalAfterDiscount)
+    : money(Math.max(0, subtotal - productDiscount));
+  const originalShipping = hasFiniteNumber(order?.pricing?.originalShipping)
+    ? money(order.pricing.originalShipping)
+    : money(order.shipping);
+  const shippingDiscount = hasFiniteNumber(order?.pricing?.shippingDiscount)
+    ? money(order.pricing.shippingDiscount)
+    : 0;
+  const shipping = hasFiniteNumber(order.shipping)
+    ? money(order.shipping)
+    : money(Math.max(0, originalShipping - shippingDiscount));
+  const ivaConfig = order?.taxes?.iva || {};
+  const legacyTaxConfig = settings?.billing?.taxes?.iva || {};
+  const ivaEnabled = ivaConfig.enabled === undefined
+    ? legacyTaxConfig.enabled !== false
+    : ivaConfig.enabled === true;
+  const ivaPercent = Number(ivaConfig.percent ?? legacyTaxConfig.percent ?? 0) || 0;
+  const explicitTotal = hasFiniteNumber(order.total) ? money(order.total) : null;
+  const impliedTaxAmount = explicitTotal !== null
+    ? money(Math.max(0, explicitTotal - subtotalAfterDiscount - shipping))
+    : null;
+  let taxAmount;
 
-  return { subtotal, shipping, taxAmount, total };
+  if (
+    hasFiniteNumber(ivaConfig.amount) &&
+    (Number(order?.pricing?.version || 0) >= 2 || Number(ivaConfig.amount) > 0 || impliedTaxAmount === 0)
+  ) {
+    taxAmount = money(ivaConfig.amount);
+  } else if (impliedTaxAmount !== null) {
+    // Las órdenes históricas podían guardar total con IVA pero conservar
+    // taxes.iva.amount en cero por el valor predeterminado del esquema.
+    taxAmount = impliedTaxAmount;
+  } else if (ivaEnabled) {
+    taxAmount = money((subtotalAfterDiscount * ivaPercent) / 100);
+  } else {
+    taxAmount = 0;
+  }
+
+  const total = explicitTotal !== null
+    ? explicitTotal
+    : money(subtotalAfterDiscount + shipping + taxAmount);
+  const totalDiscount = money(productDiscount + shippingDiscount);
+
+  return {
+    currency: order?.pricing?.currency || order?.payment?.currency || 'COP',
+    subtotal,
+    productDiscount,
+    subtotalAfterDiscount,
+    originalShipping,
+    shippingDiscount,
+    shipping,
+    totalDiscount,
+    taxableBase: subtotalAfterDiscount,
+    taxAmount,
+    total,
+  };
+}
+
+function assertTotalsReconciled(order = {}, totals = {}) {
+  if (Number(order?.pricing?.version || 0) < 2) return;
+
+  const expectedTotal = money(
+    totals.subtotalAfterDiscount + totals.shipping + totals.taxAmount
+  );
+  const paymentAmount = hasFiniteNumber(order?.payment?.amount)
+    ? money(order.payment.amount)
+    : expectedTotal;
+
+  if (Math.abs(expectedTotal - totals.total) > 0.01) {
+    throw createBillingError(
+      'Los totales de la orden no concilian antes de emitir la factura.',
+      422,
+      'BILLING_TOTAL_MISMATCH',
+      { expectedTotal, storedTotal: totals.total }
+    );
+  }
+
+  const snapshotChecks = [
+    ['subtotal', order?.pricing?.subtotal, totals.subtotal],
+    ['productDiscount', order?.pricing?.productDiscount, totals.productDiscount],
+    ['subtotalAfterDiscount', order?.pricing?.subtotalAfterDiscount, totals.subtotalAfterDiscount],
+    ['originalShipping', order?.pricing?.originalShipping, totals.originalShipping],
+    ['shippingDiscount', order?.pricing?.shippingDiscount, totals.shippingDiscount],
+    ['shipping', order?.pricing?.shipping, totals.shipping],
+    ['totalDiscount', order?.pricing?.totalDiscount, totals.totalDiscount],
+    ['taxableBase', order?.pricing?.taxableBase, totals.taxableBase],
+    ['taxAmount', order?.pricing?.taxAmount, totals.taxAmount],
+    ['total', order?.pricing?.total, totals.total],
+    ['taxes.iva.taxableBase', order?.taxes?.iva?.taxableBase, totals.taxableBase],
+    ['taxes.iva.amount', order?.taxes?.iva?.amount, totals.taxAmount],
+  ];
+  const inconsistentSnapshot = snapshotChecks.find(([, stored, expected]) => (
+    hasFiniteNumber(stored) && Math.abs(money(stored) - money(expected)) > 0.01
+  ));
+
+  if (inconsistentSnapshot) {
+    const [field, stored, expected] = inconsistentSnapshot;
+    throw createBillingError(
+      `La fotografía económica de la orden no concilia en ${field}.`,
+      422,
+      'BILLING_PRICING_SNAPSHOT_MISMATCH',
+      { field, stored: money(stored), expected: money(expected) }
+    );
+  }
+
+  const items = getItems(order);
+  if (items.length > 0) {
+    const lineSnapshot = items.reduce(
+      (acc, item) => {
+        const quantity = Number(item.quantity || item.qty || 0) || 0;
+        const price = Number(item.price || item.unitPrice || item.priceNumber || 0) || 0;
+        acc.subtotal += hasFiniteNumber(item.lineSubtotal)
+          ? money(item.lineSubtotal)
+          : money(quantity * price);
+        acc.discount += money(item.discountAmount);
+        acc.taxableBase += hasFiniteNumber(item.taxableBase)
+          ? money(item.taxableBase)
+          : money(quantity * price - money(item.discountAmount));
+        acc.tax += money(item.taxAmount);
+        return acc;
+      },
+      { subtotal: 0, discount: 0, taxableBase: 0, tax: 0 }
+    );
+    const lineChecks = [
+      ['items.lineSubtotal', lineSnapshot.subtotal, totals.subtotal],
+      ['items.discountAmount', lineSnapshot.discount, totals.productDiscount],
+      ['items.taxableBase', lineSnapshot.taxableBase, totals.taxableBase],
+      ['items.taxAmount', lineSnapshot.tax, totals.taxAmount],
+    ];
+    const inconsistentLines = lineChecks.find(([, stored, expected]) => (
+      Math.abs(money(stored) - money(expected)) > 0.01
+    ));
+
+    if (inconsistentLines) {
+      const [field, stored, expected] = inconsistentLines;
+      throw createBillingError(
+        `Las líneas de la orden no concilian en ${field}.`,
+        422,
+        'BILLING_LINE_TOTAL_MISMATCH',
+        { field, stored: money(stored), expected: money(expected) }
+      );
+    }
+  }
+
+  if (paymentAmount > 0 && Math.abs(paymentAmount - totals.total) > 0.01) {
+    throw createBillingError(
+      'El valor del pago no coincide con el total que se va a facturar.',
+      422,
+      'BILLING_PAYMENT_TOTAL_MISMATCH',
+      { paymentAmount, invoiceTotal: totals.total }
+    );
+  }
 }
 
 function buildSettingsForInvoice(settings = {}) {
@@ -348,7 +498,20 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     }
 
     const environment = dianResolution.environment || '2';
-    const { subtotal, shipping, taxAmount, total } = calculateTotals(order, settingsForInvoice);
+    const totals = calculateTotals(order, settingsForInvoice);
+    assertTotalsReconciled(order, totals);
+    const {
+      subtotal,
+      productDiscount,
+      subtotalAfterDiscount,
+      originalShipping,
+      shippingDiscount,
+      shipping,
+      totalDiscount,
+      taxableBase,
+      taxAmount,
+      total,
+    } = totals;
     const customerSnapshot = buildCustomerSnapshot(order);
     const now = nowFactory();
     const issueDate = now.toISOString().slice(0, 10);
@@ -360,7 +523,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       invoiceNumber,
       issueDate,
       issueTime,
-      grossAmount: subtotal,
+      grossAmount: subtotalAfterDiscount,
       taxAmount,
       totalAmount: total,
       companyNit: fiscalInfo.nit || billing?.dian?.providerNit || '900000000',
@@ -395,6 +558,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
           firstAttemptAt: now,
           lastAttemptAt: now,
         },
+        totals,
         customer: customerSnapshot,
         fiscalInfo,
         dianResolution: {
@@ -498,6 +662,33 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     const transactionPayment = readPaymentMethodFromTransaction(transaction);
     const providerOrder = {
       ...order,
+      subtotal,
+      shipping,
+      total,
+      pricing: {
+        ...(order.pricing || {}),
+        version: Number(order?.pricing?.version || 1),
+        currency: totals.currency,
+        subtotal,
+        productDiscount,
+        subtotalAfterDiscount,
+        originalShipping,
+        shippingDiscount,
+        shipping,
+        totalDiscount,
+        taxableBase,
+        taxAmount,
+        total,
+      },
+      taxes: {
+        ...(order.taxes || {}),
+        iva: {
+          ...(order?.taxes?.iva || {}),
+          enabled: taxAmount > 0 || order?.taxes?.iva?.enabled === true,
+          taxableBase,
+          amount: taxAmount,
+        },
+      },
       payment: {
         ...(order.payment || {}),
         methodType: order.payment?.methodType || transactionPayment.methodType || '',
@@ -584,7 +775,13 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
               raw: {
                 source: normalizedSource,
                 subtotal,
+                productDiscount,
+                subtotalAfterDiscount,
+                originalShipping,
+                shippingDiscount,
                 shipping,
+                totalDiscount,
+                taxableBase,
                 taxAmount,
                 total,
                 providerResponse,
@@ -677,7 +874,13 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
                 120
               ),
               subtotal,
+              productDiscount,
+              subtotalAfterDiscount,
+              originalShipping,
+              shippingDiscount,
               shipping,
+              totalDiscount,
+              taxableBase,
               taxAmount,
               total,
               providerResponse,
@@ -737,6 +940,7 @@ const defaultService = createElectronicInvoiceIssuanceService();
 module.exports = {
   BILLABLE_ORDER_STATUSES,
   PAID_PAYMENT_STATUSES,
+  assertTotalsReconciled,
   buildCustomerSnapshot,
   calculateTotals,
   createElectronicInvoiceIssuanceService,

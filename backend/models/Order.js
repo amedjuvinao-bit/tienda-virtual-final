@@ -149,6 +149,19 @@ const OrderItemSchema = new mongoose.Schema(
       min: [0, 'El precio no puede ser negativo'],
       set: cleanMoney,
     },
+    variantId: { type: String, trim: true, default: '' },
+    variantKey: { type: String, trim: true, default: '' },
+    variantSku: { type: String, trim: true, default: '' },
+    variantBarcode: { type: String, trim: true, default: '' },
+    category: { type: String, trim: true, default: '' },
+    categories: { type: [String], default: [] },
+    lineSubtotal: { type: Number, min: 0, default: 0, set: cleanMoney },
+    discountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    discountRate: { type: Number, min: 0, max: 100, default: 0 },
+    taxableBase: { type: Number, min: 0, default: 0, set: cleanMoney },
+    taxRate: { type: Number, min: 0, default: 0 },
+    taxAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    lineTotal: { type: Number, min: 0, default: 0, set: cleanMoney },
   },
   { _id: true }
 );
@@ -240,6 +253,45 @@ const DiscountSchema = new mongoose.Schema(
         adminRole: '',
       }),
     },
+  },
+  { _id: false }
+);
+
+/* ========= Cupón y conciliación monetaria ========= */
+const CouponSnapshotSchema = new mongoose.Schema(
+  {
+    coupon: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon', default: null },
+    redemption: { type: mongoose.Schema.Types.ObjectId, ref: 'CouponRedemption', default: null },
+    code: { type: String, trim: true, uppercase: true, default: '' },
+    type: { type: String, trim: true, lowercase: true, default: '' },
+    value: { type: Number, min: 0, default: 0 },
+    name: { type: String, trim: true, default: '' },
+    discountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    shippingDiscountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    totalDiscountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    originalShippingAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    finalShippingAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    status: { type: String, trim: true, lowercase: true, default: '' },
+    message: { type: String, trim: true, default: '' },
+    appliedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const PricingSnapshotSchema = new mongoose.Schema(
+  {
+    version: { type: Number, default: 2 },
+    currency: { type: String, trim: true, uppercase: true, default: 'COP' },
+    subtotal: { type: Number, min: 0, default: 0, set: cleanMoney },
+    productDiscount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    subtotalAfterDiscount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    originalShipping: { type: Number, min: 0, default: 0, set: cleanMoney },
+    shippingDiscount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    shipping: { type: Number, min: 0, default: 0, set: cleanMoney },
+    totalDiscount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    taxableBase: { type: Number, min: 0, default: 0, set: cleanMoney },
+    taxAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    total: { type: Number, min: 0, default: 0, set: cleanMoney },
   },
   { _id: false }
 );
@@ -413,6 +465,16 @@ const OrderSchema = new mongoose.Schema(
       }),
     },
 
+    coupon: {
+      type: CouponSnapshotSchema,
+      default: undefined,
+    },
+
+    pricing: {
+      type: PricingSnapshotSchema,
+      default: undefined,
+    },
+
     /* ========= Flags operativos ========= */
     printed: { type: Boolean, default: false, index: true },
     archived: { type: Boolean, default: false, index: true },
@@ -493,6 +555,7 @@ const OrderSchema = new mongoose.Schema(
         percent: { type: Number, default: 0 },
         code: { type: String, default: '01' },
         name: { type: String, default: 'IVA' },
+        taxableBase: { type: Number, default: 0, min: 0, set: cleanMoney },
         amount: { type: Number, default: 0 },
       },
     },
