@@ -30,6 +30,9 @@ const {
 } = require('../services/inventoryReservationService');
 const couponService = require('../services/couponService');
 const { buildOrderQuote } = require('../services/orderPricingService');
+const {
+  downloadOfficialInvoiceDocument,
+} = require('../services/electronicInvoiceDocumentService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -2521,84 +2524,180 @@ router.post('/:id/email', requireAdmin, async (req, res) => {
  * XML FACTURA ELECTRÓNICA
  * GET /api/orders/:id/invoice-xml
  * ======================================================= */
-router.get('/:id/invoice-xml', requireAdmin, async (req, res) => {
-  try {
-    const orderId = req.params.id;
+function safeInvoiceDownloadName(value, fallback, extension) {
+  const name = String(value || fallback || 'factura')
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^[_\.]+|[_\.]+$/g, '') || 'factura';
 
-    const invoice = await ElectronicInvoice.findOne({ orderId }).lean();
+  return name.toLowerCase().endsWith(extension)
+    ? name
+    : `${name}${extension}`;
+}
 
-    if (!invoice) {
-      return res.status(404).json({
-        error: 'INVOICE_NOT_FOUND',
-        message: 'No se encontró factura electrónica para esta orden.',
+function sendOfficialInvoiceDocument(res, documentResult) {
+  const extension = documentResult.type === 'pdf' ? '.pdf' : '.xml';
+  const fallback = `factura-${documentResult.invoiceNumber || 'factus'}`;
+  const fileName = safeInvoiceDownloadName(
+    documentResult.fileName,
+    fallback,
+    extension
+  );
+
+  res.setHeader('Content-Type', documentResult.contentType);
+  res.setHeader('Content-Length', String(documentResult.buffer.length));
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Invoice-Document-Source', 'factus');
+  res.setHeader('X-Invoice-Number', documentResult.invoiceNumber || '');
+  res.setHeader(
+    'Access-Control-Expose-Headers',
+    'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+  );
+  return res.status(200).send(documentResult.buffer);
+}
+
+function sendInvoiceDocumentError(res, error, fallback) {
+  const candidate = Number(error?.status || error?.statusCode || 500);
+  const status = Number.isInteger(candidate) && candidate >= 400 && candidate <= 599
+    ? candidate
+    : 500;
+  return res.status(status).json({
+    error: error?.code || 'INVOICE_DOCUMENT_DOWNLOAD_ERROR',
+    message: error?.message || fallback,
+  });
+}
+
+router.get(
+  '/:id/invoice-xml',
+  requireAdmin,
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const orderId = req.params.id;
+
+      const documentResult = await downloadOfficialInvoiceDocument({
+        orderId,
+        type: 'xml',
       });
+
+      if (documentResult.official) {
+        return sendOfficialInvoiceDocument(res, documentResult);
+      }
+
+      const invoice = documentResult.invoice?.toObject
+        ? documentResult.invoice.toObject()
+        : documentResult.invoice;
+
+      if (!invoice) {
+        return res.status(404).json({
+          error: 'INVOICE_NOT_FOUND',
+          message: 'No se encontró factura electrónica para esta orden.',
+        });
+      }
+
+      const xmlContent = String(invoice.xmlContent || '').trim();
+
+      if (!xmlContent) {
+        return res.status(404).json({
+          error: 'XML_NOT_FOUND',
+          message: 'La factura electrónica no tiene XML guardado.',
+        });
+      }
+
+      const invoiceNumber =
+        invoice.invoiceNumber ||
+        invoice?.provider?.number ||
+        invoice?.provider?.raw?.number ||
+        orderId;
+
+      const safeFileName = safeInvoiceDownloadName(
+        `factura-${invoiceNumber || orderId}`,
+        `factura-${orderId}`,
+        '.xml'
+      );
+
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Invoice-Document-Source', 'internal');
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${safeFileName}"`
+      );
+
+      return res.status(200).send(xmlContent);
+    } catch (error) {
+      console.error('GET /orders/:id/invoice-xml', error);
+
+      return sendInvoiceDocumentError(
+        res,
+        error,
+        'No se pudo descargar el XML de la factura.'
+      );
     }
-
-    const xmlContent = String(invoice.xmlContent || '').trim();
-
-    if (!xmlContent) {
-      return res.status(404).json({
-        error: 'XML_NOT_FOUND',
-        message: 'La factura electrónica no tiene XML guardado.',
-      });
-    }
-
-    const invoiceNumber =
-      invoice.invoiceNumber ||
-      invoice?.provider?.number ||
-      invoice?.provider?.raw?.number ||
-      orderId;
-
-    const safeFileName = String(invoiceNumber)
-      .replace(/[^\w.-]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-
-    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="factura-${safeFileName || orderId}.xml"`
-    );
-
-    return res.status(200).send(xmlContent);
-  } catch (error) {
-    console.error('GET /orders/:id/invoice-xml', error);
-
-    return res.status(500).json({
-      error: 'XML_DOWNLOAD_ERROR',
-      message: 'No se pudo descargar el XML de la factura.',
-    });
   }
-});
+);
 /* =========================================================
  * PDF
  * ======================================================= */
-router.get('/:id/pdf', requireAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
+router.get(
+  '/:id/pdf',
+  requireAdmin,
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const id = req.params.id;
 
-    const order = await Order.findById(id)
-      .populate({ path: 'items.product', select: 'title sku price image slug' })
-      .lean();
+      const order = await Order.findById(id)
+        .populate({ path: 'items.product', select: 'title sku price image slug' })
+        .lean();
 
-    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+      if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const invoice = await ElectronicInvoice.findOne({
-      orderId: order._id,
-    }).lean();
+      const invoice = await ElectronicInvoice.findOne({
+        orderId: order._id,
+      }).lean();
 
-    const settings = await SiteSettings.findOne().lean();
+      if (invoice) {
+        const documentResult = await downloadOfficialInvoiceDocument({
+          orderId: order._id,
+          type: 'pdf',
+        });
 
-    await generateOrderPdf({
-      order,
-      invoice,
-      settings,
-      res,
-    });
-  } catch (e) {
-    console.error('GET /orders/:id/pdf', e);
-    res.status(500).json({ error: 'No se pudo generar el PDF' });
+        if (documentResult.official) {
+          return sendOfficialInvoiceDocument(res, documentResult);
+        }
+      }
+
+      const settings = await SiteSettings.findOne().lean();
+
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+      );
+
+      await generateOrderPdf({
+        order,
+        invoice,
+        settings,
+        res,
+      });
+    } catch (e) {
+      console.error('GET /orders/:id/pdf', e);
+      return sendInvoiceDocumentError(
+        res,
+        e,
+        'No se pudo descargar el PDF de la factura.'
+      );
+    }
   }
-});
+);
 
 /* =========================================================
  * Reembolso
