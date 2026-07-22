@@ -2,24 +2,15 @@
 
 const crypto = require('crypto');
 
-const FACTUS_API_URLS = Object.freeze({
-  habilitacion: 'https://api-sandbox.factus.com.co',
-  production: 'https://api.factus.com.co',
-});
-
 const INTERNAL_MODE = 'internal';
 const HABILITATION_MODE = 'habilitacion';
 const PRODUCTION_MODE = 'production';
 const SUPPORTED_EXTERNAL_PROVIDER = 'factus';
 const ENCRYPTED_PREFIX = 'billing:v1';
-const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
-const SECRET_FIELDS = Object.freeze([
-  'clientSecret',
-  'password',
-  'softwarePin',
-  'technicalKey',
-]);
+const FACTUS_API_URLS = Object.freeze({
+  habilitacion: 'https://api-sandbox.factus.com.co',
+  production: 'https://api.factus.com.co',
+});
 
 class BillingConfigurationError extends Error {
   constructor(message, code = 'BILLING_CONFIGURATION_INVALID', status = 422, details = []) {
@@ -31,27 +22,23 @@ class BillingConfigurationError extends Error {
   }
 }
 
-function cleanText(value, max = 300) {
-  return String(value ?? '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, max);
+function clean(value, max = 300) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
 
 function clone(value) {
-  if (value === undefined || value === null) return value;
-  return JSON.parse(JSON.stringify(value));
+  return value === undefined || value === null
+    ? value
+    : JSON.parse(JSON.stringify(value));
 }
 
 function normalizeMode(value) {
-  const mode = cleanText(value, 40).toLowerCase();
-
+  const mode = clean(value, 40).toLowerCase();
+  if (!mode || mode === INTERNAL_MODE) return INTERNAL_MODE;
   if (['habilitation', 'habilitacion', 'sandbox', 'test', 'testing'].includes(mode)) {
     return HABILITATION_MODE;
   }
-
   if (mode === PRODUCTION_MODE) return PRODUCTION_MODE;
-  if (mode === INTERNAL_MODE || !mode) return INTERNAL_MODE;
 
   throw new BillingConfigurationError(
     'El ambiente de facturación indicado no es válido.',
@@ -60,20 +47,17 @@ function normalizeMode(value) {
 }
 
 function resolveFactusApiUrl(mode) {
-  const normalizedMode = normalizeMode(mode);
-
-  if (normalizedMode === PRODUCTION_MODE) return FACTUS_API_URLS.production;
-  if (normalizedMode === HABILITATION_MODE) return FACTUS_API_URLS.habilitacion;
+  const normalized = normalizeMode(mode);
+  if (normalized === PRODUCTION_MODE) return FACTUS_API_URLS.production;
+  if (normalized === HABILITATION_MODE) return FACTUS_API_URLS.habilitacion;
   return '';
 }
 
 function assertOfficialFactusUrl(value, mode) {
-  const apiUrl = cleanText(value, 300).replace(/\/+$/, '');
   const expected = resolveFactusApiUrl(mode);
+  const received = clean(value, 300).replace(/\/+$/, '');
 
-  if (!apiUrl || !expected) return expected;
-
-  if (apiUrl !== expected) {
+  if (received && expected && received !== expected) {
     throw new BillingConfigurationError(
       'La URL de Factus no puede editarse manualmente. El sistema utiliza la URL oficial del ambiente seleccionado.',
       'FACTUS_API_URL_NOT_ALLOWED'
@@ -84,7 +68,7 @@ function assertOfficialFactusUrl(value, mode) {
 }
 
 function getEncryptionKey() {
-  const secret = cleanText(process.env.BILLING_ENCRYPTION_KEY, 1000);
+  const secret = String(process.env.BILLING_ENCRYPTION_KEY || '').trim();
 
   if (!secret) {
     throw new BillingConfigurationError(
@@ -106,23 +90,17 @@ function getEncryptionKey() {
 }
 
 function isEncryptedBillingSecret(value) {
-  return cleanText(value, 5000).startsWith(`${ENCRYPTED_PREFIX}:`);
+  return String(value || '').trim().startsWith(`${ENCRYPTED_PREFIX}:`);
 }
 
 function encryptBillingSecret(value) {
-  const plainText = String(value ?? '');
-  if (!plainText) return '';
-  if (isEncryptedBillingSecret(plainText)) return plainText;
+  const plain = String(value ?? '');
+  if (!plain) return '';
+  if (isEncryptedBillingSecret(plain)) return plain;
 
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv, {
-    authTagLength: AUTH_TAG_LENGTH,
-  });
-  const encrypted = Buffer.concat([
-    cipher.update(plainText, 'utf8'),
-    cipher.final(),
-  ]);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   return [
@@ -134,15 +112,19 @@ function encryptBillingSecret(value) {
 }
 
 function decryptBillingSecret(value) {
-  const encryptedValue = String(value ?? '').trim();
-  if (!encryptedValue) return '';
+  const stored = String(value ?? '').trim();
+  if (!stored) return '';
+  if (!isEncryptedBillingSecret(stored)) return stored;
 
-  // Compatibilidad controlada para migrar configuraciones antiguas.
-  // El siguiente guardado seguro reemplaza estos valores por AES-256-GCM.
-  if (!isEncryptedBillingSecret(encryptedValue)) return encryptedValue;
-
-  const parts = encryptedValue.split(':');
-  if (parts.length !== 6 || `${parts[0]}:${parts[1]}` !== ENCRYPTED_PREFIX) {
+  const parts = stored.split(':');
+  if (
+    parts.length !== 5 ||
+    parts[0] !== 'billing' ||
+    parts[1] !== 'v1' ||
+    !parts[2] ||
+    !parts[3] ||
+    !parts[4]
+  ) {
     throw new BillingConfigurationError(
       'Una credencial cifrada de facturación tiene un formato inválido.',
       'BILLING_ENCRYPTED_VALUE_INVALID',
@@ -150,31 +132,17 @@ function decryptBillingSecret(value) {
     );
   }
 
-  const [, , version, ivBase64, authTagBase64, encryptedBase64] = parts;
-  if (version !== 'v1') {
-    throw new BillingConfigurationError(
-      'La versión de cifrado de una credencial de facturación no es compatible.',
-      'BILLING_ENCRYPTION_VERSION_UNSUPPORTED',
-      500
-    );
-  }
-
   try {
-    const key = getEncryptionKey();
     const decipher = crypto.createDecipheriv(
       'aes-256-gcm',
-      key,
-      Buffer.from(ivBase64, 'base64'),
-      { authTagLength: AUTH_TAG_LENGTH }
+      getEncryptionKey(),
+      Buffer.from(parts[2], 'base64')
     );
-    decipher.setAuthTag(Buffer.from(authTagBase64, 'base64'));
-
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(encryptedBase64, 'base64')),
+    decipher.setAuthTag(Buffer.from(parts[3], 'base64'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(parts[4], 'base64')),
       decipher.final(),
-    ]);
-
-    return decrypted.toString('utf8');
+    ]).toString('utf8');
   } catch (error) {
     if (error instanceof BillingConfigurationError) throw error;
     throw new BillingConfigurationError(
@@ -185,8 +153,15 @@ function decryptBillingSecret(value) {
   }
 }
 
-function calculateColombianNitDv(nitValue) {
-  const digits = cleanText(nitValue, 20).replace(/\D/g, '');
+function mergeSecret(incoming, previous) {
+  const selected = String(incoming ?? '').trim()
+    ? String(incoming)
+    : String(previous ?? '');
+  return selected ? encryptBillingSecret(selected) : '';
+}
+
+function calculateColombianNitDv(value) {
+  const digits = clean(value, 20).replace(/\D/g, '');
   if (!digits) return '';
 
   const weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3];
@@ -195,105 +170,80 @@ function calculateColombianNitDv(nitValue) {
     .split('')
     .reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
   const remainder = sum % 11;
-
   return String(remainder <= 1 ? remainder : 11 - remainder);
 }
 
-function normalizeInteger(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+function integer(value, fallback, min = 0) {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(parsed)));
+  return Number.isFinite(parsed) ? Math.max(min, Math.trunc(parsed)) : fallback;
 }
 
-function normalizeNumber(value, fallback, { min = 0, max = 100 } = {}) {
+function number(value, fallback, min = 0, max = 100) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
 }
 
-function normalizeIsoDate(value, fieldLabel) {
-  const date = cleanText(value, 10);
+function isoDate(value, label) {
+  const date = clean(value, 10);
   if (!date) return '';
-
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
     throw new BillingConfigurationError(
-      `${fieldLabel} debe tener formato AAAA-MM-DD.`,
+      `${label} debe tener formato AAAA-MM-DD.`,
       'BILLING_DATE_INVALID'
     );
   }
-
   return date;
 }
 
-function sanitizeFiscalInfo(value = {}, current = {}, externalEnabled = false) {
-  const input = value && typeof value === 'object' ? value : {};
-  const previous = current && typeof current === 'object' ? current : {};
-  const fiscalInfo = {
-    businessName: cleanText(input.businessName ?? previous.businessName, 180),
-    nit: cleanText(input.nit ?? previous.nit, 20).replace(/\D/g, ''),
-    dv: cleanText(input.dv ?? previous.dv, 1).replace(/\D/g, ''),
-    taxRegime: cleanText(input.taxRegime ?? previous.taxRegime, 100),
-    taxResponsibility: cleanText(
-      input.taxResponsibility ?? previous.taxResponsibility,
-      120
-    ),
-    taxLevelCode: cleanText(input.taxLevelCode ?? previous.taxLevelCode, 30),
-    responsibilityCode: cleanText(
-      input.responsibilityCode ?? previous.responsibilityCode,
-      30
-    ),
-    legalRepresentative: cleanText(
-      input.legalRepresentative ?? previous.legalRepresentative,
-      180
-    ),
-    billingEmail: cleanText(input.billingEmail ?? previous.billingEmail, 180).toLowerCase(),
-    address: cleanText(input.address ?? previous.address, 220),
-    city: cleanText(input.city ?? previous.city, 120),
-    cityCode: cleanText(input.cityCode ?? previous.cityCode, 20).replace(/\D/g, ''),
-    municipalityCode: cleanText(
-      input.municipalityCode ?? previous.municipalityCode,
-      20
-    ).replace(/\D/g, ''),
-    department: cleanText(input.department ?? previous.department, 120),
-    departmentCode: cleanText(
-      input.departmentCode ?? previous.departmentCode,
-      20
-    ).replace(/\D/g, ''),
-    country: cleanText(input.country ?? previous.country ?? 'CO', 3).toUpperCase() || 'CO',
+function sanitizeFiscalInfo(incoming = {}, previous = {}, external = false) {
+  const input = incoming && typeof incoming === 'object' ? incoming : {};
+  const old = previous && typeof previous === 'object' ? previous : {};
+  const fiscal = {
+    businessName: clean(input.businessName ?? old.businessName, 180),
+    nit: clean(input.nit ?? old.nit, 20).replace(/\D/g, ''),
+    dv: clean(input.dv ?? old.dv, 1).replace(/\D/g, ''),
+    taxRegime: clean(input.taxRegime ?? old.taxRegime, 100),
+    taxResponsibility: clean(input.taxResponsibility ?? old.taxResponsibility, 120),
+    taxLevelCode: clean(input.taxLevelCode ?? old.taxLevelCode, 30),
+    responsibilityCode: clean(input.responsibilityCode ?? old.responsibilityCode, 30),
+    legalRepresentative: clean(input.legalRepresentative ?? old.legalRepresentative, 180),
+    billingEmail: clean(input.billingEmail ?? old.billingEmail, 180).toLowerCase(),
+    address: clean(input.address ?? old.address, 220),
+    city: clean(input.city ?? old.city, 120),
+    cityCode: clean(input.cityCode ?? old.cityCode, 20).replace(/\D/g, ''),
+    municipalityCode: clean(input.municipalityCode ?? old.municipalityCode, 20).replace(/\D/g, ''),
+    department: clean(input.department ?? old.department, 120),
+    departmentCode: clean(input.departmentCode ?? old.departmentCode, 20).replace(/\D/g, ''),
+    country: clean(input.country ?? old.country ?? 'CO', 3).toUpperCase() || 'CO',
   };
 
-  if (fiscalInfo.billingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fiscalInfo.billingEmail)) {
+  if (fiscal.billingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fiscal.billingEmail)) {
     throw new BillingConfigurationError(
       'El correo de facturación no tiene un formato válido.',
       'BILLING_EMAIL_INVALID'
     );
   }
-
-  if (fiscalInfo.nit && (fiscalInfo.nit.length < 7 || fiscalInfo.nit.length > 15)) {
+  if (fiscal.nit && (fiscal.nit.length < 7 || fiscal.nit.length > 15)) {
     throw new BillingConfigurationError(
       'El NIT debe contener entre 7 y 15 dígitos, sin puntos ni guiones.',
       'BILLING_NIT_INVALID'
     );
   }
-
-  if (fiscalInfo.nit && fiscalInfo.dv) {
-    const expectedDv = calculateColombianNitDv(fiscalInfo.nit);
-    if (expectedDv !== fiscalInfo.dv) {
-      throw new BillingConfigurationError(
-        `El dígito de verificación del NIT no es correcto. Debe ser ${expectedDv}.`,
-        'BILLING_NIT_DV_INVALID'
-      );
-    }
+  if (fiscal.nit && fiscal.dv && calculateColombianNitDv(fiscal.nit) !== fiscal.dv) {
+    throw new BillingConfigurationError(
+      `El dígito de verificación del NIT no es correcto. Debe ser ${calculateColombianNitDv(fiscal.nit)}.`,
+      'BILLING_NIT_DV_INVALID'
+    );
   }
-
-  if (fiscalInfo.country !== 'CO') {
+  if (fiscal.country !== 'CO') {
     throw new BillingConfigurationError(
       'La integración fiscal actual solo admite empresas registradas en Colombia.',
       'BILLING_COUNTRY_UNSUPPORTED'
     );
   }
 
-  if (externalEnabled) {
+  if (external) {
     const required = [
       ['businessName', 'razón social'],
       ['nit', 'NIT'],
@@ -302,10 +252,7 @@ function sanitizeFiscalInfo(value = {}, current = {}, externalEnabled = false) {
       ['address', 'dirección fiscal'],
       ['municipalityCode', 'código del municipio'],
     ];
-    const missing = required
-      .filter(([key]) => !fiscalInfo[key])
-      .map(([, label]) => label);
-
+    const missing = required.filter(([key]) => !fiscal[key]).map(([, label]) => label);
     if (missing.length) {
       throw new BillingConfigurationError(
         `Faltan datos fiscales obligatorios: ${missing.join(', ')}.`,
@@ -316,27 +263,17 @@ function sanitizeFiscalInfo(value = {}, current = {}, externalEnabled = false) {
     }
   }
 
-  return fiscalInfo;
+  return fiscal;
 }
 
-function sanitizeResolution(value = {}, current = {}) {
-  const input = value && typeof value === 'object' ? value : {};
-  const previous = current && typeof current === 'object' ? current : {};
-  const rangeFrom = normalizeInteger(input.rangeFrom ?? previous.rangeFrom, 1, { min: 1 });
-  const rangeTo = normalizeInteger(input.rangeTo ?? previous.rangeTo, rangeFrom, { min: 1 });
-  const currentNumber = normalizeInteger(
-    input.currentNumber ?? previous.currentNumber,
-    rangeFrom,
-    { min: 1 }
-  );
-  const resolutionDate = normalizeIsoDate(
-    input.resolutionDate ?? previous.resolutionDate,
-    'La fecha de la resolución'
-  );
-  const expirationDate = normalizeIsoDate(
-    input.expirationDate ?? previous.expirationDate,
-    'La fecha de vencimiento'
-  );
+function sanitizeResolution(incoming = {}, previous = {}, mode = INTERNAL_MODE) {
+  const input = incoming && typeof incoming === 'object' ? incoming : {};
+  const old = previous && typeof previous === 'object' ? previous : {};
+  const rangeFrom = integer(input.rangeFrom ?? old.rangeFrom, 1, 1);
+  const rangeTo = integer(input.rangeTo ?? old.rangeTo, rangeFrom, 1);
+  const currentNumber = integer(input.currentNumber ?? old.currentNumber, rangeFrom, 1);
+  const resolutionDate = isoDate(input.resolutionDate ?? old.resolutionDate, 'La fecha de la resolución');
+  const expirationDate = isoDate(input.expirationDate ?? old.expirationDate, 'La fecha de vencimiento');
 
   if (rangeTo < rangeFrom) {
     throw new BillingConfigurationError(
@@ -344,14 +281,12 @@ function sanitizeResolution(value = {}, current = {}) {
       'BILLING_RANGE_INVALID'
     );
   }
-
   if (currentNumber < rangeFrom || currentNumber > rangeTo) {
     throw new BillingConfigurationError(
       'El consecutivo actual debe estar dentro del rango autorizado.',
       'BILLING_CURRENT_NUMBER_OUT_OF_RANGE'
     );
   }
-
   if (resolutionDate && expirationDate && expirationDate < resolutionDate) {
     throw new BillingConfigurationError(
       'La fecha de vencimiento no puede ser anterior a la fecha de la resolución.',
@@ -360,105 +295,77 @@ function sanitizeResolution(value = {}, current = {}) {
   }
 
   return {
-    resolutionNumber: cleanText(
-      input.resolutionNumber ?? previous.resolutionNumber,
-      100
-    ),
-    prefix: cleanText(input.prefix ?? previous.prefix, 20)
-      .replace(/\s+/g, '')
-      .toUpperCase(),
+    resolutionNumber: clean(input.resolutionNumber ?? old.resolutionNumber, 100),
+    prefix: clean(input.prefix ?? old.prefix, 20).replace(/\s+/g, '').toUpperCase(),
     rangeFrom,
     rangeTo,
     currentNumber,
     resolutionDate,
     expirationDate,
-    documentType: cleanText(input.documentType ?? previous.documentType ?? '01', 10) || '01',
-    technicalKey: mergeEncryptedSecret(
-      input.technicalKey,
-      previous.technicalKey
-    ),
-    environment: '2',
-    numberingRangeId: normalizeInteger(
-      input.numberingRangeId ?? previous.numberingRangeId,
+    documentType: clean(input.documentType ?? old.documentType ?? '01', 40) || '01',
+    technicalKey: mergeSecret(input.technicalKey, old.technicalKey),
+    environment: mode === PRODUCTION_MODE ? '1' : '2',
+    numberingRangeId: integer(input.numberingRangeId ?? old.numberingRangeId, 0, 0),
+    creditNoteNumberingRangeId: integer(
+      input.creditNoteNumberingRangeId ?? old.creditNoteNumberingRangeId,
       0,
-      { min: 0 }
-    ),
-    creditNoteNumberingRangeId: normalizeInteger(
-      input.creditNoteNumberingRangeId ?? previous.creditNoteNumberingRangeId,
-      0,
-      { min: 0 }
+      0
     ),
   };
 }
 
-function mergeEncryptedSecret(incomingValue, previousValue) {
-  const incoming = String(incomingValue ?? '');
-  const previous = String(previousValue ?? '');
-  const selected = incoming.trim() ? incoming : previous;
-
-  if (!selected) return '';
-  return encryptBillingSecret(selected);
-}
-
-function sanitizeProvider(value = {}, current = {}, mode = INTERNAL_MODE) {
-  const input = value && typeof value === 'object' ? value : {};
-  const previous = current && typeof current === 'object' ? current : {};
-  const requestedProvider = cleanText(
-    input.provider ?? previous.provider ?? (mode === INTERNAL_MODE ? 'mock' : 'factus'),
+function sanitizeProvider(incoming = {}, previous = {}, mode = INTERNAL_MODE) {
+  const input = incoming && typeof incoming === 'object' ? incoming : {};
+  const old = previous && typeof previous === 'object' ? previous : {};
+  const requested = clean(
+    input.provider ?? old.provider ?? (mode === INTERNAL_MODE ? 'mock' : 'factus'),
     40
   ).toLowerCase();
 
-  if (![SUPPORTED_EXTERNAL_PROVIDER, 'mock', ''].includes(requestedProvider)) {
+  if (!['', 'mock', SUPPORTED_EXTERNAL_PROVIDER].includes(requested)) {
     throw new BillingConfigurationError(
-      `El proveedor ${requestedProvider} no está implementado y no puede activarse.`,
+      `El proveedor ${requested} no está implementado y no puede activarse.`,
       'BILLING_PROVIDER_NOT_IMPLEMENTED'
     );
   }
-
-  const provider = mode === INTERNAL_MODE ? 'mock' : SUPPORTED_EXTERNAL_PROVIDER;
-  if (mode !== INTERNAL_MODE && requestedProvider && requestedProvider !== SUPPORTED_EXTERNAL_PROVIDER) {
+  if (mode !== INTERNAL_MODE && requested && requested !== SUPPORTED_EXTERNAL_PROVIDER) {
     throw new BillingConfigurationError(
       'Factus es el único proveedor electrónico habilitado actualmente.',
       'BILLING_PROVIDER_NOT_IMPLEMENTED'
     );
   }
 
+  const provider = mode === INTERNAL_MODE ? 'mock' : SUPPORTED_EXTERNAL_PROVIDER;
   const apiUrl = mode === INTERNAL_MODE
     ? ''
-    : assertOfficialFactusUrl(input.apiUrl ?? previous.apiUrl, mode);
-
-  const providerConfig = {
+    : assertOfficialFactusUrl(input.apiUrl ?? old.apiUrl, mode);
+  const result = {
     provider,
     apiUrl,
-    clientId: cleanText(input.clientId ?? previous.clientId, 300),
-    clientSecret: mergeEncryptedSecret(input.clientSecret, previous.clientSecret),
-    username: cleanText(input.username ?? previous.username, 300),
-    password: mergeEncryptedSecret(input.password, previous.password),
-    softwareId: cleanText(input.softwareId ?? previous.softwareId, 300),
-    softwarePin: mergeEncryptedSecret(input.softwarePin, previous.softwarePin),
-    technicalKey: mergeEncryptedSecret(input.technicalKey, previous.technicalKey),
-    numberingRangeId: normalizeInteger(
-      input.numberingRangeId ?? previous.numberingRangeId,
+    clientId: clean(input.clientId ?? old.clientId, 300),
+    clientSecret: mergeSecret(input.clientSecret, old.clientSecret),
+    username: clean(input.username ?? old.username, 300),
+    password: mergeSecret(input.password, old.password),
+    softwareId: clean(input.softwareId ?? old.softwareId, 300),
+    softwarePin: mergeSecret(input.softwarePin, old.softwarePin),
+    technicalKey: mergeSecret(input.technicalKey, old.technicalKey),
+    numberingRangeId: integer(input.numberingRangeId ?? old.numberingRangeId, 0, 0),
+    creditNoteNumberingRangeId: integer(
+      input.creditNoteNumberingRangeId ?? old.creditNoteNumberingRangeId,
       0,
-      { min: 0 }
+      0
     ),
-    creditNoteNumberingRangeId: normalizeInteger(
-      input.creditNoteNumberingRangeId ?? previous.creditNoteNumberingRangeId,
-      0,
-      { min: 0 }
-    ),
-    lastConnectionStatus: cleanText(previous.lastConnectionStatus, 40),
-    lastConnectionMessage: cleanText(previous.lastConnectionMessage, 500),
-    lastConnectionAt: previous.lastConnectionAt || null,
-    lastConnectionEnvironment: cleanText(previous.lastConnectionEnvironment, 40),
-    lastConnectionFingerprint: cleanText(previous.lastConnectionFingerprint, 128),
+    lastConnectionStatus: clean(old.lastConnectionStatus, 40),
+    lastConnectionMessage: clean(old.lastConnectionMessage, 500),
+    lastConnectionAt: old.lastConnectionAt || null,
+    lastConnectionEnvironment: clean(old.lastConnectionEnvironment, 40),
+    lastConnectionFingerprint: clean(old.lastConnectionFingerprint, 128),
   };
 
   if (mode !== INTERNAL_MODE) {
     const missing = ['clientId', 'clientSecret', 'username', 'password'].filter(
-      (field) => !providerConfig[field]
+      (field) => !result[field]
     );
-
     if (missing.length) {
       throw new BillingConfigurationError(
         `Faltan credenciales obligatorias de Factus: ${missing.join(', ')}.`,
@@ -469,20 +376,14 @@ function sanitizeProvider(value = {}, current = {}, mode = INTERNAL_MODE) {
     }
   }
 
-  return providerConfig;
+  return result;
 }
 
-function sanitizeTaxes(value = {}, current = {}) {
-  const inputIva = value?.iva && typeof value.iva === 'object' ? value.iva : {};
-  const previousIva = current?.iva && typeof current.iva === 'object' ? current.iva : {};
-  const enabled = inputIva.enabled === undefined
-    ? previousIva.enabled !== false
-    : inputIva.enabled === true;
-  const percent = normalizeNumber(
-    inputIva.percent ?? previousIva.percent,
-    enabled ? 19 : 0,
-    { min: 0, max: 100 }
-  );
+function sanitizeTaxes(incoming = {}, previous = {}) {
+  const input = incoming?.iva && typeof incoming.iva === 'object' ? incoming.iva : {};
+  const old = previous?.iva && typeof previous.iva === 'object' ? previous.iva : {};
+  const enabled = input.enabled === undefined ? old.enabled !== false : input.enabled === true;
+  const percent = number(input.percent ?? old.percent, enabled ? 19 : 0, 0, 100);
 
   if (enabled && percent <= 0) {
     throw new BillingConfigurationError(
@@ -501,24 +402,17 @@ function sanitizeTaxes(value = {}, current = {}) {
   };
 }
 
-function sanitizeLegalTexts(value = {}, current = {}) {
-  const input = value && typeof value === 'object' ? value : {};
-  const previous = current && typeof current === 'object' ? current : {};
-
+function sanitizeLegalTexts(incoming = {}, previous = {}) {
+  const input = incoming && typeof incoming === 'object' ? incoming : {};
+  const old = previous && typeof previous === 'object' ? previous : {};
   return {
-    invoiceLegalText: cleanText(
-      input.invoiceLegalText ?? previous.invoiceLegalText,
-      2000
-    ),
-    internalReceiptNote: cleanText(
-      input.internalReceiptNote ?? previous.internalReceiptNote,
-      2000
-    ),
+    invoiceLegalText: clean(input.invoiceLegalText ?? old.invoiceLegalText, 2000),
+    internalReceiptNote: clean(input.internalReceiptNote ?? old.internalReceiptNote, 2000),
   };
 }
 
 function buildRuntimeFactusConfig(billing = {}) {
-  const mode = normalizeMode(billing?.dian?.mode || INTERNAL_MODE);
+  const mode = normalizeMode(billing?.dian?.mode);
   if (mode === INTERNAL_MODE) {
     throw new BillingConfigurationError(
       'La facturación electrónica externa no está activa.',
@@ -527,7 +421,7 @@ function buildRuntimeFactusConfig(billing = {}) {
   }
 
   const provider = billing?.electronicProvider || {};
-  if (cleanText(provider.provider, 40).toLowerCase() !== SUPPORTED_EXTERNAL_PROVIDER) {
+  if (clean(provider.provider, 40).toLowerCase() !== SUPPORTED_EXTERNAL_PROVIDER) {
     throw new BillingConfigurationError(
       'Factus es el único proveedor electrónico habilitado actualmente.',
       'BILLING_PROVIDER_NOT_IMPLEMENTED'
@@ -537,22 +431,17 @@ function buildRuntimeFactusConfig(billing = {}) {
   const runtime = {
     provider: SUPPORTED_EXTERNAL_PROVIDER,
     apiUrl: assertOfficialFactusUrl(provider.apiUrl, mode),
-    clientId: cleanText(provider.clientId, 300),
+    clientId: clean(provider.clientId, 300),
     clientSecret: decryptBillingSecret(provider.clientSecret),
-    username: cleanText(provider.username, 300),
+    username: clean(provider.username, 300),
     password: decryptBillingSecret(provider.password),
-    softwareId: cleanText(provider.softwareId, 300),
+    softwareId: clean(provider.softwareId, 300),
     softwarePin: decryptBillingSecret(provider.softwarePin),
     technicalKey: decryptBillingSecret(provider.technicalKey),
-    numberingRangeId: normalizeInteger(provider.numberingRangeId, 0, { min: 0 }),
-    creditNoteNumberingRangeId: normalizeInteger(
-      provider.creditNoteNumberingRangeId,
-      0,
-      { min: 0 }
-    ),
+    numberingRangeId: integer(provider.numberingRangeId, 0, 0),
+    creditNoteNumberingRangeId: integer(provider.creditNoteNumberingRangeId, 0, 0),
     environment: mode === PRODUCTION_MODE ? 'production' : 'habilitacion',
   };
-
   const missing = ['clientId', 'clientSecret', 'username', 'password'].filter(
     (field) => !runtime[field]
   );
@@ -564,31 +453,21 @@ function buildRuntimeFactusConfig(billing = {}) {
       missing
     );
   }
-
   return runtime;
 }
 
-function buildFactusCredentialFingerprint(runtimeConfig = {}) {
-  return crypto
-    .createHash('sha256')
-    .update(
-      [
-        runtimeConfig.apiUrl,
-        runtimeConfig.clientId,
-        runtimeConfig.username,
-        runtimeConfig.clientSecret,
-        runtimeConfig.password,
-      ].join('|')
-    )
-    .digest('hex');
+function buildFactusCredentialFingerprint(config = {}) {
+  return crypto.createHash('sha256').update([
+    config.apiUrl,
+    config.clientId,
+    config.username,
+    config.clientSecret,
+    config.password,
+  ].join('|')).digest('hex');
 }
 
-function prepareBillingConfigurationForStorage(
-  incomingBilling = {},
-  currentBilling = {},
-  options = {}
-) {
-  if (!incomingBilling || typeof incomingBilling !== 'object' || Array.isArray(incomingBilling)) {
+function prepareBillingConfigurationForStorage(incoming = {}, current = {}, options = {}) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
     throw new BillingConfigurationError(
       'La configuración de facturación debe ser un objeto.',
       'BILLING_CONFIGURATION_TYPE_INVALID',
@@ -596,108 +475,78 @@ function prepareBillingConfigurationForStorage(
     );
   }
 
-  const previous = currentBilling && typeof currentBilling === 'object'
-    ? clone(currentBilling)
+  const old = current && typeof current === 'object' ? clone(current) : {};
+  const incomingDian = incoming.dian && typeof incoming.dian === 'object'
+    ? incoming.dian
     : {};
-  const incomingDian = incomingBilling.dian && typeof incomingBilling.dian === 'object'
-    ? incomingBilling.dian
-    : {};
-  const mode = normalizeMode(incomingDian.mode ?? previous?.dian?.mode);
-  const externalEnabled = mode !== INTERNAL_MODE;
-  const provider = sanitizeProvider(
-    incomingBilling.electronicProvider,
-    previous.electronicProvider,
-    mode
-  );
-  const resolution = sanitizeResolution(
-    incomingBilling.dianResolution,
-    previous.dianResolution
-  );
-  resolution.environment = mode === PRODUCTION_MODE ? '1' : '2';
+  const mode = normalizeMode(incomingDian.mode ?? old?.dian?.mode);
+  const external = mode !== INTERNAL_MODE;
+  const provider = sanitizeProvider(incoming.electronicProvider, old.electronicProvider, mode);
 
-  const billing = {
-    fiscalInfo: sanitizeFiscalInfo(
-      incomingBilling.fiscalInfo,
-      previous.fiscalInfo,
-      externalEnabled
-    ),
-    dianResolution: resolution,
+  const result = {
+    fiscalInfo: sanitizeFiscalInfo(incoming.fiscalInfo, old.fiscalInfo, external),
+    dianResolution: sanitizeResolution(incoming.dianResolution, old.dianResolution, mode),
     dian: {
-      enabled: externalEnabled,
+      enabled: external,
       mode,
       environment: mode === PRODUCTION_MODE ? '1' : '2',
-      providerType: externalEnabled ? 'provider' : '',
-      softwareId: cleanText(previous?.dian?.softwareId, 300),
-      softwarePin: mergeEncryptedSecret(
-        incomingDian.softwarePin,
-        previous?.dian?.softwarePin
-      ),
-      softwareSecurityCode: mergeEncryptedSecret(
+      providerType: external ? 'provider' : '',
+      softwareId: clean(incomingDian.softwareId ?? old?.dian?.softwareId, 300),
+      softwarePin: mergeSecret(incomingDian.softwarePin, old?.dian?.softwarePin),
+      softwareSecurityCode: mergeSecret(
         incomingDian.softwareSecurityCode,
-        previous?.dian?.softwareSecurityCode
+        old?.dian?.softwareSecurityCode
       ),
-      testSetId: cleanText(incomingDian.testSetId ?? previous?.dian?.testSetId, 300),
-      providerNit: cleanText(
-        incomingDian.providerNit ?? previous?.dian?.providerNit,
-        20
-      ).replace(/\D/g, ''),
-      providerDv: cleanText(
-        incomingDian.providerDv ?? previous?.dian?.providerDv,
-        1
-      ).replace(/\D/g, ''),
-      certificateFileName: cleanText(previous?.dian?.certificateFileName, 240),
-      certificatePath: mergeEncryptedSecret(
-        incomingDian.certificatePath,
-        previous?.dian?.certificatePath
-      ),
-      certificatePassword: mergeEncryptedSecret(
+      testSetId: clean(incomingDian.testSetId ?? old?.dian?.testSetId, 300),
+      providerNit: clean(incomingDian.providerNit ?? old?.dian?.providerNit, 20).replace(/\D/g, ''),
+      providerDv: clean(incomingDian.providerDv ?? old?.dian?.providerDv, 1).replace(/\D/g, ''),
+      certificateFileName: clean(old?.dian?.certificateFileName, 240),
+      certificatePath: mergeSecret(incomingDian.certificatePath, old?.dian?.certificatePath),
+      certificatePassword: mergeSecret(
         incomingDian.certificatePassword,
-        previous?.dian?.certificatePassword
+        old?.dian?.certificatePassword
       ),
-      certificateUploadedAt: previous?.dian?.certificateUploadedAt || null,
+      certificateUploadedAt: old?.dian?.certificateUploadedAt || null,
       wsdlUrl: '',
       productionWsdlUrl: '',
       habilitationWsdlUrl: '',
-      lastTestStatus: cleanText(previous?.dian?.lastTestStatus, 40),
-      lastTestMessage: cleanText(previous?.dian?.lastTestMessage, 500),
-      lastTestAt: previous?.dian?.lastTestAt || null,
-      lastSyncStatus: cleanText(previous?.dian?.lastSyncStatus, 40),
-      lastSyncMessage: cleanText(previous?.dian?.lastSyncMessage, 500),
-      lastSyncAt: previous?.dian?.lastSyncAt || null,
+      lastTestStatus: clean(old?.dian?.lastTestStatus, 40),
+      lastTestMessage: clean(old?.dian?.lastTestMessage, 500),
+      lastTestAt: old?.dian?.lastTestAt || null,
+      lastSyncStatus: clean(old?.dian?.lastSyncStatus, 40),
+      lastSyncMessage: clean(old?.dian?.lastSyncMessage, 500),
+      lastSyncAt: old?.dian?.lastSyncAt || null,
     },
     electronicProvider: provider,
-    legalTexts: sanitizeLegalTexts(
-      incomingBilling.legalTexts,
-      previous.legalTexts
-    ),
-    taxes: sanitizeTaxes(incomingBilling.taxes, previous.taxes),
+    legalTexts: sanitizeLegalTexts(incoming.legalTexts, old.legalTexts),
+    taxes: sanitizeTaxes(incoming.taxes, old.taxes),
   };
 
-  if (externalEnabled) {
-    const runtime = buildRuntimeFactusConfig(billing);
+  if (external) {
+    const runtime = buildRuntimeFactusConfig(result);
     const fingerprint = buildFactusCredentialFingerprint(runtime);
 
     if (provider.lastConnectionFingerprint !== fingerprint) {
-      billing.electronicProvider.lastConnectionStatus = 'none';
-      billing.electronicProvider.lastConnectionMessage = '';
-      billing.electronicProvider.lastConnectionAt = null;
-      billing.electronicProvider.lastConnectionEnvironment = '';
-      billing.electronicProvider.lastConnectionFingerprint = '';
+      Object.assign(result.electronicProvider, {
+        lastConnectionStatus: 'none',
+        lastConnectionMessage: '',
+        lastConnectionAt: null,
+        lastConnectionEnvironment: '',
+        lastConnectionFingerprint: '',
+      });
     }
 
     if (mode === PRODUCTION_MODE && options.skipProductionReadiness !== true) {
       const missing = [];
       if (provider.numberingRangeId <= 0) missing.push('rango activo para facturas');
-      if (provider.creditNoteNumberingRangeId <= 0) {
-        missing.push('rango activo para notas crédito');
-      }
-      if (billing.electronicProvider.lastConnectionStatus !== 'success') {
+      if (provider.creditNoteNumberingRangeId <= 0) missing.push('rango activo para notas crédito');
+      if (result.electronicProvider.lastConnectionStatus !== 'success') {
         missing.push('conexión Factus verificada');
       }
-      if (billing.electronicProvider.lastConnectionEnvironment !== 'production') {
+      if (result.electronicProvider.lastConnectionEnvironment !== 'production') {
         missing.push('verificación realizada contra Producción');
       }
-      if (billing.electronicProvider.lastConnectionFingerprint !== fingerprint) {
+      if (result.electronicProvider.lastConnectionFingerprint !== fingerprint) {
         missing.push('credenciales verificadas sin cambios posteriores');
       }
 
@@ -712,7 +561,7 @@ function prepareBillingConfigurationForStorage(
     }
   }
 
-  return billing;
+  return result;
 }
 
 function hasLegacyPlaintextBillingSecrets(billing = {}) {
@@ -720,16 +569,18 @@ function hasLegacyPlaintextBillingSecrets(billing = {}) {
   const dian = billing?.dian || {};
   const resolution = billing?.dianResolution || {};
   const values = [
-    ...SECRET_FIELDS.map((field) => provider[field]),
+    provider.clientSecret,
+    provider.password,
+    provider.softwarePin,
+    provider.technicalKey,
     dian.softwarePin,
     dian.softwareSecurityCode,
     dian.certificatePath,
     dian.certificatePassword,
     resolution.technicalKey,
   ];
-
   return values.some(
-    (value) => String(value ?? '').trim() && !isEncryptedBillingSecret(value)
+    (value) => String(value || '').trim() && !isEncryptedBillingSecret(value)
   );
 }
 
