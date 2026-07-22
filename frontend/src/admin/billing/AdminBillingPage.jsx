@@ -359,7 +359,7 @@ function EmptyWorkBlock({ title, text, icon: Icon }) {
   );
 }
 
-function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft' }) {
+function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft', className = '' }) {
   const isPrimary = variant === 'primary';
 
   return (
@@ -367,7 +367,7 @@ function ActionButton({ children, icon: Icon, disabled, onClick, variant = 'soft
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-55"
+      className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${className}`}
       style={{
         borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
@@ -1217,7 +1217,7 @@ function BillingPendingOrdersPanel() {
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Pendientes de emisión"
         title="Órdenes por facturar"
@@ -1244,7 +1244,7 @@ function BillingPendingOrdersPanel() {
       {error ? <MessageBox>{error}</MessageBox> : null}
       {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
 
-      <div className="overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+      <div className="min-w-0 overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
           <div className="text-sm font-black">{loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) pendiente(s)`}</div>
           <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {formatNumber(page)} de {formatNumber(pages)}</div>
@@ -1253,16 +1253,16 @@ function BillingPendingOrdersPanel() {
         {rows.length === 0 && !loading ? (
           <EmptyWorkBlock icon={ClipboardList} title="Sin órdenes pendientes" text="Cuando una orden pagada no tenga ElectronicInvoice, aparecerá aquí para generar la factura." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
+          <div className="w-full min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+              <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Orden</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cliente</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Canal</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Pago</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Total</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                  <th className="w-[13%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Orden</th>
+                  <th className="w-[28%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Cliente</th>
+                  <th className="w-[11%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Canal</th>
+                  <th className="w-[14%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Pago</th>
+                  <th className="w-[14%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Total</th>
+                  <th className="w-[20%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.12em]">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -1271,37 +1271,37 @@ function BillingPendingOrdersPanel() {
 
                   return (
                     <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                      <td className="px-4 py-4 align-top">
-                        <p className="font-black">#{order.orderNumber || '—'}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creada: {formatDate(order.createdAt)}</p>
+                      <td className="px-3 py-4 align-top">
+                        <p className="break-words font-black">#{order.orderNumber || '—'}</p>
+                        <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Creada: {formatDate(order.createdAt)}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <p className="font-black">{order.customerName || 'Cliente'}</p>
-                        <p className="mt-1 max-w-[260px] truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
+                      <td className="px-3 py-4 align-top">
+                        <p className="break-words font-black leading-5">{order.customerName || 'Cliente'}</p>
+                        <p className="mt-1 break-words text-xs font-bold leading-5 [overflow-wrap:anywhere]" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-3 py-4 align-top">
                         <p className="font-black">{normalizeChannelLabel(order.source)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(order.itemsCount || 0)} producto(s)</p>
+                        <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(order.itemsCount || 0)} producto(s)</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <span className="inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]" style={{ borderColor: 'rgba(16, 185, 129, 0.36)', background: 'rgba(16, 185, 129, 0.12)', color: '#047857' }}>
+                      <td className="px-3 py-4 align-top">
+                        <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.06em]" style={{ borderColor: 'rgba(16, 185, 129, 0.36)', background: 'rgba(16, 185, 129, 0.12)', color: '#047857' }}>
                           {normalizePaymentStatus(order.paymentStatus)}
                         </span>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{order.paymentProvider || 'Sin proveedor'}</p>
+                        <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{order.paymentProvider || 'Sin proveedor'}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <p className="font-black">{formatCurrency(order.total)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Envío {formatCurrency(order.shipping)}</p>
+                      <td className="px-3 py-4 align-top">
+                        <p className="whitespace-nowrap font-black">{formatCurrency(order.total)}</p>
+                        <p className="mt-1 whitespace-nowrap text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Envío {formatCurrency(order.shipping)}</p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <ActionButton icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
+                      <td className="px-3 py-4 align-top">
+                        <div className="grid gap-1.5">
+                          <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
                           {canGenerate ? (
-                            <ActionButton icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
+                            <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
                               {isGenerating ? 'Generando...' : 'Generar'}
                             </ActionButton>
                           ) : (
-                            <span className="rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                            <span className="w-full rounded-xl border px-3 py-2 text-center text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
                               Solo lectura
                             </span>
                           )}

@@ -74,7 +74,22 @@ function validatePendingOrdersPage() {
     'La pestaña Órdenes por facturar no debe seguir como bloque vacío.'
   );
 
-  ok('Pestaña Órdenes por facturar consume pending-orders y deja de estar vacía');
+  [
+    'min-w-[760px] table-fixed',
+    'w-[28%]',
+    '[overflow-wrap:anywhere]',
+    'w-full whitespace-nowrap rounded-xl',
+  ].forEach((needle) => {
+    assertIncludes(pageFile, needle, `La tabla de órdenes debe conservar su distribución legible: falta ${needle}`);
+  });
+
+  assertNotIncludes(
+    pageFile,
+    'max-w-[260px] truncate',
+    'La tabla no debe recortar el correo del cliente.'
+  );
+
+  ok('Pestaña Órdenes por facturar consume pending-orders y mantiene una tabla ancha y legible');
 }
 
 function validateBackendPendingOrders() {
