@@ -73,6 +73,7 @@ const env = {
   frontendUrl: clean(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.VITE_FRONTEND_URL),
   backendUrl: clean(process.env.BACKEND_URL || process.env.API_URL || process.env.VITE_BACKEND_URL),
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
+  billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
   cloudinary: {
     cloudName: cloudName.value,
     cloudNameSource: cloudName.name,
@@ -106,6 +107,10 @@ function assertEnv() {
     errors.push(`La variable ${env.mongoUriSource} no parece una cadena MongoDB válida. Debe iniciar por mongodb:// o mongodb+srv://.`);
   }
 
+  if (env.billingEncryptionKey && env.billingEncryptionKey.length < 32) {
+    errors.push('BILLING_ENCRYPTION_KEY debe tener al menos 32 caracteres. No uses contraseñas cortas para cifrar credenciales fiscales.');
+  }
+
   if (errors.length) {
     throw new EnvConfigError(`Configuración de entorno inválida:\n- ${errors.join('\n- ')}`, errors);
   }
@@ -131,6 +136,9 @@ function getSafeEnvSummary() {
     frontendUrlConfigured: Boolean(env.frontendUrl),
     backendUrlConfigured: Boolean(env.backendUrl),
     jwtConfigured: Boolean(env.jwtSecret),
+    billingEncryptionConfigured: Boolean(
+      env.billingEncryptionKey && env.billingEncryptionKey.length >= 32
+    ),
     cloudinary: {
       backendConfigured: cloudinaryBackendConfigured,
       cloudNameConfigured: Boolean(env.cloudinary.cloudName),
