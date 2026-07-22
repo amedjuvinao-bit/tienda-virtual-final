@@ -1,5 +1,9 @@
 // backend/lib/dian/cufe.js
 const crypto = require("crypto");
+const {
+  decryptBillingSecret,
+  isEncryptedBillingSecret,
+} = require("../billing/billingConfigurationSecurity");
 
 function cleanString(value) {
   return String(value ?? "").trim();
@@ -8,6 +12,13 @@ function cleanString(value) {
 function formatNumber(value) {
   const number = Number(value || 0);
   return number.toFixed(2);
+}
+
+function resolveTechnicalKey(value) {
+  const technicalKey = cleanString(value);
+  return isEncryptedBillingSecret(technicalKey)
+    ? decryptBillingSecret(technicalKey)
+    : technicalKey;
 }
 
 function generateCUFE({
@@ -31,7 +42,7 @@ function generateCUFE({
     formatNumber(totalAmount),
     cleanString(companyNit),
     cleanString(customerDocument),
-    cleanString(technicalKey),
+    resolveTechnicalKey(technicalKey),
     cleanString(environment || "2"),
   ].join("");
 
