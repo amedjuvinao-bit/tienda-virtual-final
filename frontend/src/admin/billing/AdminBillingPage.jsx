@@ -22,12 +22,13 @@ import useAdminPermissions from '../security/useAdminPermissions';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
+  downloadBlob,
   generateBillingInvoiceForOrder,
   getBillingCreditNotes,
   getBillingDocuments,
+  getDownloadErrorMessage,
   getBillingSummary,
   getPendingBillingOrders,
-  openBlob,
   syncBillingCreditNote,
   syncBillingDocument,
 } from './api/adminBillingApi';
@@ -533,36 +534,36 @@ function BillingDocumentsPanel() {
   }, [page, query, status]);
 
   const openDocumentPdf = async (document) => {
-    const publicUrl = document?.links?.pdfUrl || document?.links?.publicUrl || '';
-    if (publicUrl) {
-      window.open(publicUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     if (!document?.orderId) return;
 
     try {
+      setError('');
       setActionLoading(`pdf-${document.id}`);
-      const blob = await downloadOrderPdf(document.orderId);
-      openBlob(blob, 'application/pdf');
+      const download = await downloadOrderPdf(document.orderId);
+      downloadBlob(
+        download,
+        `factura-${document.invoiceNumber || document.provider?.number || document.orderNumber || document.id}.pdf`
+      );
+    } catch (err) {
+      setError(await getDownloadErrorMessage(err, 'No se pudo descargar el PDF oficial.'));
     } finally {
       setActionLoading('');
     }
   };
 
   const openDocumentXml = async (document) => {
-    const publicUrl = document?.links?.xmlUrl || '';
-    if (publicUrl) {
-      window.open(publicUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     if (!document?.orderId) return;
 
     try {
+      setError('');
       setActionLoading(`xml-${document.id}`);
-      const blob = await downloadOrderInvoiceXml(document.orderId);
-      openBlob(blob, 'application/xml');
+      const download = await downloadOrderInvoiceXml(document.orderId);
+      downloadBlob(
+        download,
+        `factura-${document.invoiceNumber || document.provider?.number || document.orderNumber || document.id}.xml`
+      );
+    } catch (err) {
+      setError(await getDownloadErrorMessage(err, 'No se pudo descargar el XML oficial.'));
     } finally {
       setActionLoading('');
     }
@@ -683,7 +684,7 @@ function BillingDocumentsPanel() {
                   const isManageLoading = actionLoading === `manage-${document.id}`;
                   const isSyncLoading = actionLoading === `sync-${document.id}`;
                   const canOpenPdf = document.hasPdf || document.orderId;
-                  const canOpenXml = document.hasXml || document.links?.xmlUrl;
+                  const canOpenXml = document.hasXml && document.orderId;
 
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
