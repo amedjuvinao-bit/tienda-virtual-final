@@ -4,9 +4,9 @@ const express = require('express');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
-  getAdminSettingsWithEncryptedBilling,
-  updateBillingConfiguration,
-} = require('../services/billingConfigurationService');
+  getAdminSettingsWithBillingReadiness,
+  updateBillingConfigurationWithReadiness,
+} = require('../services/billingConnectionOrchestrationService');
 const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
@@ -21,13 +21,6 @@ function currentAdmin(req) {
     req.adminUserId ||
     'admin'
   );
-}
-
-function toFrontendSettings(settings = {}) {
-  if (settings?.billing?.dian?.mode === 'habilitacion') {
-    settings.billing.dian.mode = 'habilitation';
-  }
-  return settings;
 }
 
 function sendConfigurationError(res, error) {
@@ -49,15 +42,15 @@ function sendConfigurationError(res, error) {
 }
 
 // Intercepta la lectura administrativa antes del router genérico para migrar
-// credenciales antiguas a cifrado autenticado sin exponerlas al navegador.
+// credenciales antiguas, ocultar secretos y calcular el estado real de producción.
 router.get(
   '/admin',
   requireAdmin,
   requirePermission('settings:view'),
   async (_req, res) => {
     try {
-      const settings = await getAdminSettingsWithEncryptedBilling();
-      return res.json(toFrontendSettings(settings));
+      const settings = await getAdminSettingsWithBillingReadiness();
+      return res.json(settings);
     } catch (error) {
       return sendConfigurationError(res, error);
     }
@@ -86,11 +79,14 @@ router.put('/', (req, res, next) => {
           );
         }
 
-        const settings = await updateBillingConfiguration(body.billing, {
-          adminUser: currentAdmin(req),
-        });
+        const settings = await updateBillingConfigurationWithReadiness(
+          body.billing,
+          {
+            adminUser: currentAdmin(req),
+          }
+        );
 
-        return res.json(toFrontendSettings(settings));
+        return res.json(settings);
       } catch (error) {
         return sendConfigurationError(res, error);
       }
