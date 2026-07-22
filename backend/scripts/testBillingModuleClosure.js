@@ -27,6 +27,7 @@ const BILLING_TESTS = [
   ['Motor único e idempotencia', 'testBillingIdempotencyModule.js'],
   ['Seguridad y permisos', 'testBillingSecurityModule.js'],
   ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
+  ['Conexión real y readiness de Factus', 'testBillingConnectionModule.js'],
 ];
 
 const results = { ok: 0, fail: 0 };
