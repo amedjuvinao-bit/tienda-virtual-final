@@ -23,6 +23,13 @@ function currentAdmin(req) {
   );
 }
 
+function toFrontendSettings(settings = {}) {
+  if (settings?.billing?.dian?.mode === 'habilitacion') {
+    settings.billing.dian.mode = 'habilitation';
+  }
+  return settings;
+}
+
 function sendConfigurationError(res, error) {
   const status = Number(error?.status || error?.statusCode || 500);
   const safeStatus = status >= 400 && status <= 599 ? status : 500;
@@ -50,7 +57,7 @@ router.get(
   async (_req, res) => {
     try {
       const settings = await getAdminSettingsWithEncryptedBilling();
-      return res.json(settings);
+      return res.json(toFrontendSettings(settings));
     } catch (error) {
       return sendConfigurationError(res, error);
     }
@@ -83,7 +90,7 @@ router.put('/', (req, res, next) => {
           adminUser: currentAdmin(req),
         });
 
-        return res.json(settings);
+        return res.json(toFrontendSettings(settings));
       } catch (error) {
         return sendConfigurationError(res, error);
       }
