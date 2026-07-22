@@ -1,5 +1,6 @@
 // backend/routes/dianProviderTest.js
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
@@ -10,6 +11,17 @@ const {
 } = require('../lib/billing/billingConfigurationSecurity');
 
 const router = express.Router();
+const connectionTestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_CONNECTION_TEST_RATE_LIMIT',
+    message: 'Se alcanzó el límite temporal de pruebas de conexión con Factus.',
+  },
+});
 
 router.use(requireAdmin);
 router.use(requirePermission('billing:settings'));
@@ -24,7 +36,7 @@ function currentAdmin(req) {
   );
 }
 
-router.post('/test-provider', async (req, res) => {
+router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
     const result = await testFactusConnection(req.body || {}, {
       adminUser: currentAdmin(req),
