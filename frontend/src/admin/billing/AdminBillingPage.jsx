@@ -3,10 +3,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
+  BarChart3,
+  CircleDollarSign,
   ClipboardList,
+  CreditCard,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   FileText,
+  Percent,
   RefreshCw,
   ReceiptText,
   RotateCcw,
@@ -22,12 +27,14 @@ import useAdminPermissions from '../security/useAdminPermissions';
 import {
   downloadOrderInvoiceXml,
   downloadOrderPdf,
+  downloadBillingReportCsv,
   downloadBillingCreditNotePdf,
   downloadBillingCreditNoteXml,
   downloadBlob,
   generateBillingInvoiceForOrder,
   getBillingCreditNotes,
   getBillingDocuments,
+  getBillingReport,
   getDownloadErrorMessage,
   getBillingSummary,
   getPendingBillingOrders,
@@ -64,6 +71,13 @@ const BILLING_TABS = [
     icon: ClipboardList,
     permission: 'billing:view',
     description: 'Ventas pagadas que aún requieren comprobante.',
+  },
+  {
+    id: 'reportes',
+    label: 'Reportes',
+    icon: BarChart3,
+    permission: 'billing:view',
+    description: 'Ventas, impuestos, notas crédito, estados y exportación por período.',
   },
   {
     id: 'configuracion',
@@ -106,6 +120,43 @@ const CREDIT_NOTE_TYPE_OPTIONS = [
   { value: 'partial', label: 'Parcial' },
 ];
 
+const REPORT_STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'validated', label: 'Validados' },
+  { value: 'pending', label: 'Pendientes' },
+  { value: 'processing', label: 'Procesando' },
+  { value: 'generated', label: 'Generados' },
+  { value: 'sent', label: 'Enviados' },
+  { value: 'rejected', label: 'Rechazados' },
+  { value: 'failed', label: 'Fallidos' },
+  { value: 'error', label: 'Con error' },
+];
+
+const REPORT_TYPE_OPTIONS = [
+  { value: 'all', label: 'Facturas y notas crédito' },
+  { value: 'invoice', label: 'Solo facturas' },
+  { value: 'credit_note', label: 'Solo notas crédito' },
+];
+
+function dateInputValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function defaultReportFilters() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 29);
+  return {
+    from: dateInputValue(from),
+    to: dateInputValue(to),
+    type: 'all',
+    status: 'all',
+  };
+}
+
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('es-CO');
 }
@@ -128,6 +179,11 @@ function formatDate(value) {
     month: 'short',
     day: '2-digit',
   });
+}
+
+function formatReportDate(value) {
+  if (!value) return '—';
+  return formatDate(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
 }
 
 function formatDateTime(value) {
@@ -1327,6 +1383,287 @@ function BillingPendingOrdersPanel() {
   );
 }
 
+function BillingReportsPanel() {
+  const { can } = useAdminPermissions();
+  const canDownload = can('billing:download');
+  const [draftFilters, setDraftFilters] = useState(defaultReportFilters);
+  const [filters, setFilters] = useState(defaultReportFilters);
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const loadReport = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await getBillingReport(filters);
+      setReport(data || {});
+    } catch (err) {
+      setReport(null);
+      setError(err?.response?.data?.message || err?.message || 'No se pudo generar el reporte de facturación.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReport();
+  }, [filters]);
+
+  const applyFilters = (event) => {
+    event.preventDefault();
+    setNotice('');
+    if (!draftFilters.from || !draftFilters.to) {
+      setError('Selecciona la fecha inicial y la fecha final.');
+      return;
+    }
+    if (draftFilters.from > draftFilters.to) {
+      setError('La fecha inicial no puede ser posterior a la fecha final.');
+      return;
+    }
+    setError('');
+    setFilters({ ...draftFilters });
+  };
+
+  const resetFilters = () => {
+    const next = defaultReportFilters();
+    setDraftFilters(next);
+    setFilters(next);
+    setError('');
+    setNotice('');
+  };
+
+  const exportReport = async () => {
+    if (!canDownload) return;
+    try {
+      setExporting(true);
+      setError('');
+      setNotice('');
+      const download = await downloadBillingReportCsv(filters);
+      downloadBlob(download, `reporte-facturacion-${filters.from}-a-${filters.to}.csv`);
+      setNotice('Reporte CSV exportado con los mismos filtros visibles.');
+    } catch (err) {
+      setError(await getDownloadErrorMessage(err, 'No se pudo exportar el reporte de facturación.'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const metrics = report?.metrics || {};
+  const breakdowns = report?.breakdowns || {};
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  const statuses = Array.isArray(breakdowns.statuses) ? breakdowns.statuses : [];
+  const paymentMethods = Array.isArray(breakdowns.paymentMethods) ? breakdowns.paymentMethods : [];
+  const daily = Array.isArray(breakdowns.daily) ? breakdowns.daily : [];
+
+  return (
+    <section className="grid min-w-0 gap-4">
+      <PanelHeader
+        eyebrow="Control financiero y fiscal"
+        title="Reportes de facturación"
+        text="Cifras calculadas desde ElectronicInvoice y Order, con notas crédito aplicadas en su fecha real de emisión."
+      >
+        <div className="flex flex-wrap gap-2">
+          <ActionButton icon={RefreshCw} onClick={loadReport} disabled={loading}>Actualizar</ActionButton>
+          <ActionButton icon={FileSpreadsheet} onClick={exportReport} disabled={!canDownload || exporting || loading} variant="primary">
+            {exporting ? 'Exportando...' : 'Exportar CSV'}
+          </ActionButton>
+        </div>
+      </PanelHeader>
+
+      <form
+        onSubmit={applyFilters}
+        className="grid gap-3 rounded-[28px] border p-4 shadow-sm md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.35fr_1.2fr_auto] xl:items-end"
+        style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
+      >
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Desde</span>
+          <input
+            type="date"
+            value={draftFilters.from}
+            max={draftFilters.to || undefined}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
+            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Hasta</span>
+          <input
+            type="date"
+            value={draftFilters.to}
+            min={draftFilters.from || undefined}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
+            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Documentos</span>
+          <select
+            value={draftFilters.type}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, type: event.target.value }))}
+            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          >
+            {REPORT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Estado</span>
+          <select
+            value={draftFilters.status}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}
+            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+          >
+            {REPORT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <ActionButton icon={BarChart3} onClick={applyFilters} disabled={loading} variant="primary">{loading ? 'Generando...' : 'Aplicar'}</ActionButton>
+          <ActionButton disabled={loading} onClick={resetFilters}>Limpiar</ActionButton>
+        </div>
+      </form>
+
+      {error ? <MessageBox>{error}</MessageBox> : null}
+      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <BillingMetricCard icon={CircleDollarSign} label="Total facturado" value={loading ? '...' : formatCurrency(metrics.invoiced)} helper={`${formatNumber(metrics.validatedInvoices)} factura(s) validada(s)`} />
+        <BillingMetricCard icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatCurrency(metrics.credited)} helper={`${formatNumber(metrics.validatedCreditNotes)} nota(s) validada(s)`} />
+        <BillingMetricCard icon={BarChart3} label="Facturación neta" value={loading ? '...' : formatCurrency(metrics.net)} helper="Facturas menos notas crédito" />
+        <BillingMetricCard icon={Percent} label="IVA neto" value={loading ? '...' : formatCurrency(metrics.netTax)} helper={`${formatCurrency(metrics.invoiceTax)} facturado · ${formatCurrency(metrics.creditedTax)} reversado`} />
+        <BillingMetricCard icon={CreditCard} label="Descuentos" value={loading ? '...' : formatCurrency(metrics.discounts)} helper={`${formatCurrency(metrics.shipping)} cobrado por envíos`} />
+        <BillingMetricCard icon={FileSpreadsheet} label="Documentos" value={loading ? '...' : formatNumber(metrics.documents)} helper={`${formatNumber(metrics.invoices)} factura(s) · ${formatNumber(metrics.creditNotes)} nota(s)`} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SummaryPanelCard eyebrow="Estados fiscales" title="Documentos por estado">
+          {statuses.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead style={{ color: 'var(--admin-card-muted-text)' }}>
+                  <tr>
+                    <th className="px-2 py-2 text-[10px] font-black uppercase">Estado</th>
+                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Facturas</th>
+                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Notas</th>
+                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Neto fiscal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statuses.map((row) => (
+                    <tr key={row.key} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                      <td className="px-2 py-2.5"><span className="inline-flex rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.key)}>{row.label}</span></td>
+                      <td className="px-2 py-2.5 text-right font-black">{formatNumber(row.invoices)}</td>
+                      <td className="px-2 py-2.5 text-right font-black">{formatNumber(row.creditNotes)}</td>
+                      <td className="px-2 py-2.5 text-right font-black">{formatCurrency(row.net)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay documentos para los filtros seleccionados.</p>}
+        </SummaryPanelCard>
+
+        <SummaryPanelCard eyebrow="Recaudo" title="Resultado por medio de pago">
+          {paymentMethods.length ? (
+            <div className="grid gap-2">
+              {paymentMethods.slice(0, 8).map((row) => (
+                <div key={row.key} className="flex items-center justify-between gap-3 rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black">{row.label}</p>
+                    <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(row.invoices)} factura(s) · {formatNumber(row.creditNotes)} nota(s)</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-black">{formatCurrency(row.net)}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay medios de pago para mostrar.</p>}
+        </SummaryPanelCard>
+      </div>
+
+      <SummaryPanelCard eyebrow="Comportamiento diario" title="Facturación neta por fecha">
+        {daily.length ? (
+          <div className="max-h-[380px] overflow-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="sticky top-0" style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-muted-text)' }}>
+                <tr>
+                  <th className="px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Facturas</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Notas</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Facturado</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Acreditado</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Neto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {daily.map((row) => (
+                  <tr key={row.key} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                    <td className="px-3 py-2.5 font-black">{formatReportDate(row.key)}</td>
+                    <td className="px-3 py-2.5 text-right font-bold">{formatNumber(row.invoices)}</td>
+                    <td className="px-3 py-2.5 text-right font-bold">{formatNumber(row.creditNotes)}</td>
+                    <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(row.invoiced)}</td>
+                    <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(row.credited)}</td>
+                    <td className="px-3 py-2.5 text-right font-black">{formatCurrency(row.net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay movimiento diario para mostrar.</p>}
+      </SummaryPanelCard>
+
+      <SummaryPanelCard
+        eyebrow="Detalle verificable"
+        title="Últimos documentos del período"
+        footer={<p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Se muestran hasta 30 registros. El CSV incluye los {formatNumber(report?.totalRows || 0)} documentos que cumplen los filtros.</p>}
+      >
+        {rows.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] table-fixed text-left text-sm">
+              <thead style={{ color: 'var(--admin-card-muted-text)' }}>
+                <tr>
+                  <th className="w-[14%] px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
+                  <th className="w-[20%] px-3 py-2 text-[10px] font-black uppercase">Documento</th>
+                  <th className="w-[24%] px-3 py-2 text-[10px] font-black uppercase">Cliente</th>
+                  <th className="w-[14%] px-3 py-2 text-[10px] font-black uppercase">Estado</th>
+                  <th className="w-[14%] px-3 py-2 text-right text-[10px] font-black uppercase">Total</th>
+                  <th className="w-[14%] px-3 py-2 text-right text-[10px] font-black uppercase">Impacto fiscal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={`${row.documentType}-${row.id}`} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                    <td className="px-3 py-3 font-bold">{formatReportDate(row.dateKey)}</td>
+                    <td className="px-3 py-3 align-top">
+                      <p className="truncate font-black">{row.number}</p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{row.documentTypeLabel}{row.referenceNumber ? ` · Factura ${row.referenceNumber}` : ''}</p>
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <p className="truncate font-black">{row.customerName}</p>
+                      <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{row.orderNumber || '—'} · {row.channel} · {row.paymentMethod}</p>
+                    </td>
+                    <td className="px-3 py-3"><span className="inline-flex rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.status)}>{row.statusLabel}</span></td>
+                    <td className="px-3 py-3 text-right font-black">{formatCurrency(row.total)}</td>
+                    <td className="px-3 py-3 text-right font-black">{row.validated ? formatCurrency(row.fiscalImpact) : 'Sin impacto'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay detalle para los filtros seleccionados.</p>}
+      </SummaryPanelCard>
+
+      <div className="rounded-[22px] border px-4 py-3 text-xs font-bold leading-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)', color: 'var(--admin-card-muted-text)' }}>
+        Los valores fiscales solo suman facturas y notas crédito validadas. Los documentos pendientes, rechazados o fallidos aparecen en los conteos y en el detalle, pero no alteran el total facturado ni el neto.
+      </div>
+    </section>
+  );
+}
+
 function BillingSummaryPanel() {
   const [summary, setSummary] = useState(null);
   const [latestDocuments, setLatestDocuments] = useState([]);
@@ -1389,6 +1726,7 @@ function BillingSummaryPanel() {
           <SummaryQuickLink to={`${BASE_PATH}/documentos`} icon={FileText}>Ver documentos</SummaryQuickLink>
           <SummaryQuickLink to={`${BASE_PATH}/notas-credito`} icon={RotateCcw}>Notas crédito</SummaryQuickLink>
           <SummaryQuickLink to={`${BASE_PATH}/ordenes`} icon={ClipboardList}>Órdenes pendientes</SummaryQuickLink>
+          <SummaryQuickLink to={`${BASE_PATH}/reportes`} icon={BarChart3}>Reportes</SummaryQuickLink>
           <ActionButton icon={RefreshCw} onClick={loadSummary} disabled={loading}>Actualizar</ActionButton>
         </div>
       </PanelHeader>
@@ -1540,6 +1878,10 @@ export default function AdminBillingPage() {
 
     if (activeTab === 'ordenes') {
       return <BillingPendingOrdersPanel />;
+    }
+
+    if (activeTab === 'reportes') {
+      return <BillingReportsPanel />;
     }
 
     return <BillingSummaryPanel />;

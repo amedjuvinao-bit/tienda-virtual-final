@@ -38,6 +38,7 @@
     "test:billing-official-documents": "node scripts/testBillingOfficialDocumentsModule.js",
     "test:billing-email-documents": "node scripts/testBillingEmailDocumentsModule.js",
     "test:billing-credit-notes-official": "node scripts/testBillingCreditNotesOfficialModule.js",
+    "test:billing-reports": "node scripts/testBillingReportsModule.js",
     "test:billing-module": "node scripts/testBillingModuleClosure.js",
     "billing:sync:live": "node scripts/syncFactusLive.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",

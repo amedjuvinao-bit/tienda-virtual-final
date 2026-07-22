@@ -8,6 +8,7 @@ const express = require('express');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const billingService = require('../services/adminBillingService');
+const billingReportService = require('../services/adminBillingReportService');
 const billingSyncService = require('../services/adminBillingSyncService');
 const {
   sendValidatedInvoiceEmail,
@@ -72,6 +73,38 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error listando documentos de facturación.');
+    }
+  }
+);
+
+router.get(
+  '/reports',
+  requirePermission('billing:view'),
+  async (req, res) => {
+    try {
+      const data = await billingReportService.buildBillingReport(req.query || {});
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error generando el reporte de facturación.');
+    }
+  }
+);
+
+router.get(
+  '/reports/export',
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const result = await billingReportService.buildBillingReportCsv(req.query || {});
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+      res.setHeader('Content-Length', String(result.buffer.length));
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Billing-Report-Rows', String(result.totalRows));
+      return res.send(result.buffer);
+    } catch (error) {
+      return sendError(res, error, 'Error exportando el reporte de facturación.');
     }
   }
 );

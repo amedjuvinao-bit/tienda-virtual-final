@@ -14,6 +14,7 @@ const BILLING_TESTS = [
   ['Factura electrónica y modal', 'testBillingElectronicInvoiceModule.js'],
   ['Resumen de Facturación', 'testBillingSummaryFrontendModule.js'],
   ['Órdenes pendientes por facturar', 'testBillingPendingOrdersFrontendModule.js'],
+  ['Reportes de Facturación', 'testBillingReportsModule.js'],
   ['Generación administrativa de factura', 'testBillingGenerateInvoiceModule.js'],
   ['Bandeja de documentos', 'testBillingDocumentsFrontendModule.js'],
   ['Sincronización con Factus', 'testBillingSyncModule.js'],
