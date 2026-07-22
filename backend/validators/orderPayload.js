@@ -19,6 +19,8 @@ const MAX_TAGS = 20;
 const PAYMENT_PROVIDERS = ['bold', 'wompi', 'mercado-pago', 'payu', 'manual'];
 const PAYMENT_MODES = ['sandbox', 'production'];
 const PAYMENT_STATUSES = ['pending_gateway', 'pending_manual', 'paid', 'failed', 'cancelled'];
+const BILLING_PERSON_TYPES = ['natural', 'juridica'];
+const BILLING_DOCUMENT_TYPES = ['CC', 'NIT', 'CE', 'TI', 'PP', 'PPT', 'RC'];
 
 const MAX_LEN = {
   name: 80,
@@ -33,6 +35,11 @@ const MAX_LEN = {
   country: 80,
   department: 80,
   billingExtra: 120,
+  businessName: 180,
+  email: 180,
+  countryCode: 3,
+  departmentCode: 20,
+  tributeCode: 10,
   tag: 24,
   idempotencyKey: 120,
   title: 160,
@@ -135,6 +142,36 @@ function normalizePayment(raw) {
   };
 }
 
+function normalizeCountryCode(value, fallback = '') {
+  const raw = trimTo(value, MAX_LEN.country).toUpperCase();
+
+  if (raw === 'COLOMBIA') return 'CO';
+  if (/^[A-Z]{2,3}$/.test(raw)) return raw;
+
+  return trimTo(fallback, MAX_LEN.countryCode).toUpperCase();
+}
+
+function normalizeDocumentNumber(value, documentType = '', dv = '') {
+  const raw = trimTo(value, MAX_LEN.id);
+  let normalized = raw.replace(/[.\-\s]/g, '');
+  const safeDv = trimTo(dv, 1);
+
+  if (
+    String(documentType || '').toUpperCase() === 'NIT' &&
+    /^\d$/.test(safeDv) &&
+    new RegExp(`[-\s]${safeDv}$`).test(raw) &&
+    normalized.endsWith(safeDv)
+  ) {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized;
+}
+
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 module.exports = function validateOrderPayload(body) {
   const errors = [];
 
@@ -194,14 +231,18 @@ module.exports = function validateOrderPayload(body) {
     name: trimTo(c.name, MAX_LEN.name),
     lastname: trimTo(c.lastname, MAX_LEN.lastname),
     id: trimTo(c.id, MAX_LEN.id),
+    documentType: trimTo(c.documentType, 20).toUpperCase() || undefined,
     emailOrPhone: trimTo(c.emailOrPhone || c.email || c.phone, MAX_LEN.emailOrPhone),
+    email: trimTo(c.email, MAX_LEN.email) || undefined,
     phone: trimTo(c.phone, MAX_LEN.phone) || undefined,
     address: trimTo(c.address, MAX_LEN.address),
     city: trimTo(c.city, MAX_LEN.city),
     municipalityId: trimTo(c.municipalityId || c.municipality_id, MAX_LEN.municipalityId) || undefined,
     postalCode: trimTo(c.postalCode, MAX_LEN.postalCode) || undefined,
     country: trimTo(c.country, MAX_LEN.country),
+    countryCode: normalizeCountryCode(c.countryCode || c.country) || undefined,
     department: trimTo(c.department, MAX_LEN.department) || undefined,
+    departmentCode: trimTo(c.departmentCode || c.department, MAX_LEN.departmentCode) || undefined,
     deliveryType,
     wantsNewsletter: !!c.wantsNewsletter,
   };
@@ -218,20 +259,121 @@ module.exports = function validateOrderPayload(body) {
   }
 
   // ---- billing
-  const b = body.billing || {};
+  const hasBillingBlock = !!body.billing && typeof body.billing === 'object';
+  const b = hasBillingBlock ? body.billing : {};
+  const useSameAddress = b.useSameAddress !== false;
+  const personType = trimTo(b.personType, 20).toLowerCase() || 'natural';
+  const documentType = trimTo(b.documentType || c.documentType, 20).toUpperCase() || 'CC';
+  const documentNumber = normalizeDocumentNumber(
+    b.documentNumber || b.identification || b.id || c.id,
+    documentType,
+    b.dv
+  );
+  const firstName = trimTo(b.firstName || b.name || c.name, MAX_LEN.name);
+  const lastName = trimTo(b.lastName || b.lastname || c.lastname, MAX_LEN.lastname);
+  const emailFromCustomer = looksLikeEmail(c.email)
+    ? c.email
+    : looksLikeEmail(c.emailOrPhone)
+      ? c.emailOrPhone
+      : '';
+  const countryCode = normalizeCountryCode(
+    b.countryCode || b.country,
+    normalizeCountryCode(c.country)
+  );
+  const municipalityCode = trimTo(
+    useSameAddress
+      ? c.municipalityId || c.municipality_id || b.municipalityCode || b.cityCode
+      : b.municipalityCode || b.cityCode || b.municipalityId,
+    MAX_LEN.municipalityId
+  );
+
   cleaned.billing = {
-    useSameAddress: !!b.useSameAddress,
-    name: trimTo(b.name, MAX_LEN.name) || undefined,
-    lastname: trimTo(b.lastname, MAX_LEN.lastname) || undefined,
-    id: trimTo(b.id, MAX_LEN.id) || undefined,
-    address: trimTo(b.address, MAX_LEN.address) || undefined,
+    useSameAddress,
+    personType: BILLING_PERSON_TYPES.includes(personType) ? personType : '',
+    documentType: BILLING_DOCUMENT_TYPES.includes(documentType) ? documentType : '',
+    documentNumber,
+    id: documentNumber,
+    dv: documentType === 'NIT' ? trimTo(b.dv, 1) : '',
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    name: firstName || undefined,
+    lastname: lastName || undefined,
+    businessName: trimTo(b.businessName || b.company, MAX_LEN.businessName) || undefined,
+    email: trimTo(b.email || emailFromCustomer, MAX_LEN.email).toLowerCase() || undefined,
+    address: trimTo(useSameAddress ? c.address : b.address, MAX_LEN.address) || undefined,
     extra: trimTo(b.extra, MAX_LEN.billingExtra) || undefined,
-    city: trimTo(b.city, MAX_LEN.city) || undefined,
-    department: trimTo(b.department, MAX_LEN.department) || undefined,
-    postalCode: trimTo(b.postalCode, MAX_LEN.postalCode) || undefined,
-    phone: trimTo(b.phone, MAX_LEN.phone) || undefined,
-    country: trimTo(b.country, MAX_LEN.country) || undefined,
+    city: trimTo(useSameAddress ? c.city : b.city, MAX_LEN.city) || undefined,
+    cityCode: municipalityCode || undefined,
+    municipalityCode: municipalityCode || undefined,
+    department: trimTo(
+      useSameAddress ? b.department || c.department : b.department,
+      MAX_LEN.department
+    ) || undefined,
+    departmentCode: trimTo(
+      useSameAddress ? b.departmentCode || c.departmentCode || c.department : b.departmentCode,
+      MAX_LEN.departmentCode
+    ) || undefined,
+    postalCode: trimTo(useSameAddress ? c.postalCode : b.postalCode, MAX_LEN.postalCode) || undefined,
+    phone: trimTo(b.phone || c.phone, MAX_LEN.phone) || undefined,
+    country: trimTo(b.countryName || (useSameAddress ? c.country : b.country), MAX_LEN.country) || undefined,
+    countryCode,
+    tributeCode: trimTo(b.tributeCode || 'ZZ', MAX_LEN.tributeCode).toUpperCase() || 'ZZ',
   };
+
+  if (hasBillingBlock) {
+    if (!BILLING_PERSON_TYPES.includes(personType)) {
+      errors.push('El tipo de persona para facturación es inválido.');
+    }
+
+    if (!BILLING_DOCUMENT_TYPES.includes(documentType)) {
+      errors.push('El tipo de documento para facturación es inválido.');
+    }
+
+    if (isBlank(documentNumber)) {
+      errors.push('El número de documento para facturación es obligatorio.');
+    }
+
+    if (personType === 'juridica' && documentType !== 'NIT') {
+      errors.push('Una persona jurídica debe identificarse con NIT.');
+    }
+
+    if (documentType === 'NIT' && !/^\d$/.test(String(cleaned.billing.dv || ''))) {
+      errors.push('El DV del NIT es obligatorio y debe contener un solo dígito.');
+    }
+
+    if (personType === 'juridica' && isBlank(cleaned.billing.businessName)) {
+      errors.push('La razón social es obligatoria para persona jurídica.');
+    }
+
+    if (personType === 'natural') {
+      if (isBlank(firstName)) errors.push('El nombre para facturación es obligatorio.');
+      if (isBlank(lastName)) errors.push('El apellido para facturación es obligatorio.');
+    }
+
+    if (!looksLikeEmail(cleaned.billing.email)) {
+      errors.push('El correo electrónico para facturación no es válido.');
+    }
+
+    if (isBlank(cleaned.billing.address)) {
+      errors.push('La dirección para facturación es obligatoria.');
+    }
+
+    if (isBlank(countryCode)) {
+      errors.push('El país para facturación es obligatorio.');
+    }
+
+    if (countryCode === 'CO') {
+      if (isBlank(cleaned.billing.department)) {
+        errors.push('El departamento para facturación es obligatorio.');
+      }
+      if (isBlank(cleaned.billing.city)) {
+        errors.push('La ciudad para facturación es obligatoria.');
+      }
+      if (isBlank(municipalityCode)) {
+        errors.push('La ciudad para facturación debe tener un código DIAN válido.');
+      }
+    }
+  }
 
   // ---- payment
   cleaned.payment = normalizePayment(body.payment);

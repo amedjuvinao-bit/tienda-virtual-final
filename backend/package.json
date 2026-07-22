@@ -33,6 +33,7 @@
     "test:billing-sync": "node scripts/testBillingSyncModule.js",
     "test:billing-security": "node scripts/testBillingSecurityModule.js",
     "test:billing-idempotency": "node scripts/testBillingIdempotencyModule.js",
+    "test:billing-fiscal-checkout": "node scripts/testBillingFiscalCheckoutModule.js",
     "billing:sync:live": "node scripts/syncFactusLive.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",

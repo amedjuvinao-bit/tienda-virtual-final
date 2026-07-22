@@ -381,12 +381,129 @@ async function deleteFactusBillByReference({ credentials, tokenResult, reference
   };
 }
 
+const FACTUS_DOCUMENT_CODES = Object.freeze({
+  RC: '11',
+  TI: '12',
+  CC: '13',
+  CE: '22',
+  NIT: '31',
+  PP: '41',
+  PASAPORTE: '41',
+  PPT: '48',
+});
+
+function normalizeFactusDocumentCode(value) {
+  const normalized = trimSafe(value, 30).toUpperCase();
+
+  if (FACTUS_DOCUMENT_CODES[normalized]) return FACTUS_DOCUMENT_CODES[normalized];
+  if (Object.values(FACTUS_DOCUMENT_CODES).includes(normalized)) return normalized;
+
+  return '13';
+}
+
+function normalizeFactusCountryCode(value) {
+  const normalized = trimSafe(value, 80).toUpperCase();
+
+  if (normalized === 'COLOMBIA') return 'CO';
+  if (/^[A-Z]{2,3}$/.test(normalized)) return normalized;
+
+  return 'CO';
+}
+
+function normalizeFactusIdentification(value, documentCode, dv) {
+  const raw = trimSafe(value, 40);
+  let normalized = raw.replace(/[.\-\s]/g, '');
+  const safeDv = trimSafe(dv, 1);
+
+  if (
+    documentCode === '31' &&
+    /^\d$/.test(safeDv) &&
+    new RegExp(`[-\s]${safeDv}$`).test(raw) &&
+    normalized.endsWith(safeDv)
+  ) {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized;
+}
+
+function buildFactusCustomer(order = {}) {
+  const customer = order?.customer || {};
+  const billing = order?.billing || {};
+  const personType = trimSafe(billing?.personType || customer?.personType || 'natural', 30).toLowerCase();
+  const isCompany = personType === 'juridica';
+  const documentCode = normalizeFactusDocumentCode(
+    billing?.documentType || customer?.documentType || 'CC'
+  );
+  const rawIdentification = normalizeFactusIdentification(
+    billing?.documentNumber ||
+      billing?.identification ||
+      billing?.id ||
+      customer?.documentNumber ||
+      customer?.identification ||
+      customer?.id ||
+      '',
+    documentCode,
+    billing?.dv || customer?.dv
+  );
+  const firstName = trimSafe(billing?.firstName || billing?.name || customer?.name, 100);
+  const lastName = trimSafe(billing?.lastName || billing?.lastname || customer?.lastname, 100);
+  const naturalName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const isPosConsumerFinal =
+    !rawIdentification &&
+    String(order?.source || '').trim().toLowerCase() === 'pos' &&
+    /consumidor final/i.test(naturalName);
+  const identification = isPosConsumerFinal ? '222222222222' : rawIdentification;
+  const businessName = trimSafe(
+    billing?.businessName || billing?.company || customer?.businessName || '',
+    180
+  );
+  const countryCode = normalizeFactusCountryCode(
+    billing?.countryCode || billing?.country || customer?.countryCode || customer?.country
+  );
+  const municipalityCode = trimSafe(
+    billing?.municipalityCode ||
+      billing?.cityCode ||
+      billing?.municipalityId ||
+      customer?.municipalityId ||
+      customer?.municipality_id ||
+      '',
+    30
+  );
+  const emailCandidate = billing?.email || customer?.email || customer?.emailOrPhone || '';
+
+  const factusCustomer = {
+    identification_document_code: documentCode,
+    identification,
+    legal_organization_code: isCompany ? '1' : '2',
+    tribute_code: trimSafe(billing?.tributeCode || customer?.tributeCode || 'ZZ', 10).toUpperCase() || 'ZZ',
+    address: trimSafe(billing?.address || customer?.address || '', 180),
+    email: isValidEmail(emailCandidate) ? trimSafe(emailCandidate, 180) : '',
+    phone: trimSafe(billing?.phone || customer?.phone || '', 40),
+    country_code: countryCode,
+  };
+
+  if (documentCode === '31' && /^\d$/.test(trimSafe(billing?.dv || customer?.dv, 1))) {
+    factusCustomer.dv = trimSafe(billing?.dv || customer?.dv, 1);
+  }
+
+  if (isCompany) {
+    factusCustomer.company = businessName;
+    if (businessName) factusCustomer.trade_name = businessName;
+  } else {
+    factusCustomer.names = naturalName || (isPosConsumerFinal ? 'Consumidor final' : '');
+  }
+
+  if (countryCode === 'CO' && municipalityCode) {
+    factusCustomer.municipality_code = municipalityCode;
+  }
+
+  return factusCustomer;
+}
+
 function buildFactusInvoicePayload(invoiceData = {}) {
   const order = invoiceData?.order || {};
   const transaction = invoiceData?.transaction || {};
-  const settings = invoiceData?.settings || {};
-  const fiscalInfo = settings?.billing?.fiscalInfo || {};
-  const customer = order?.customer || {};
   const orderItems = Array.isArray(order?.items) ? order.items : [];
 
   const calculatedItemsTotal = orderItems.reduce((acc, item) => {
@@ -497,75 +614,13 @@ function buildFactusInvoicePayload(invoiceData = {}) {
     factusPaymentMethodCode = '48';
   }
 
-  const customerEmail =
-    isValidEmail(customer?.email)
-      ? trimSafe(customer.email, 180)
-      : isValidEmail(customer?.emailOrPhone)
-        ? trimSafe(customer.emailOrPhone, 180)
-        : isValidEmail(fiscalInfo?.billingEmail)
-          ? trimSafe(fiscalInfo.billingEmail, 180)
-          : 'cliente.pruebas@factus.com.co';
-
-  const customerMunicipalityId = trimSafe(
-    customer?.municipalityId ||
-    customer?.municipality_id ||
-    '',
-    30
-  );
-
-  const fiscalBusinessName = trimSafe(
-    fiscalInfo?.businessName ||
-    fiscalInfo?.company ||
-    fiscalInfo?.legalName ||
-    fiscalInfo?.legalRepresentative ||
-    fiscalInfo?.representativeName ||
-    '',
-    180
-  );
-
   return {
     reference_code: String(order?.orderNumber || order?._id || `ORDER-${Date.now()}`),
     document: '01',
     send_email: false,
     observation: 'Factura generada desde tienda virtual.',
 
-    customer: {
-      identification: String(customer?.id || '222222222222'),
-
-      identification_document_code: '13',
-      identification_document_id: 3,
-
-      dv: '',
-
-      company: fiscalBusinessName,
-      trade_name: fiscalBusinessName,
-      graphic_representation_name: fiscalBusinessName,
-
-      names:
-        [customer?.name, customer?.lastname]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || 'Cliente final',
-
-      address: String(customer?.address || 'Dirección no registrada'),
-
-      email: customerEmail,
-
-      phone: String(customer?.phone || '3000000000'),
-
-      legal_organization_id: 2,
-      tribute_id: 21,
-
-      merchant_registration: trimSafe(
-        fiscalInfo?.nit ||
-        fiscalInfo?.taxId ||
-        fiscalInfo?.taxIdentification ||
-        '',
-        80
-      ),
-
-      municipality_code: customerMunicipalityId || null,
-    },
+    customer: buildFactusCustomer(order),
     payment_details: [
       {
         payment_form: '1',
@@ -654,8 +709,6 @@ function buildFactusCreditNotePayload({
       0
     
   );
-
-  const customer = order?.customer || {};
 
   const orderItems = Array.isArray(order?.items)
     ? order.items
@@ -761,21 +814,7 @@ function buildFactusCreditNotePayload({
 
     observation: reasonText,
 
-    customer: {
-      identification: String(customer?.id || ''),
-
-      identification_document_code: '13',
-
-      names:
-        [customer?.name, customer?.lastname]
-          .filter(Boolean)
-          .join(' ')
-          .trim(),
-
-      email: customer?.email || customer?.emailOrPhone || '',
-      phone: customer?.phone || '',
-      address: customer?.address || '',
-    },
+    customer: buildFactusCustomer(order),
 
     payment_details: [
       {
@@ -1023,7 +1062,12 @@ async function sendInvoiceToFactus(invoiceData) {
 
     console.log('🧾 FACTUS PAYLOAD RESUMEN:', JSON.stringify({
       reference_code: payload.reference_code,
-      customer: payload.customer,
+      customer: {
+        identification_document_code: payload.customer?.identification_document_code,
+        legal_organization_code: payload.customer?.legal_organization_code,
+        country_code: payload.customer?.country_code,
+        has_municipality: Boolean(payload.customer?.municipality_code),
+      },
       payment_details: payload.payment_details,
       totals: payload.totals,
       items: payload.items.map((item) => ({
@@ -1227,4 +1271,6 @@ module.exports = {
   getFactusCredentials,
   getFactusAccessToken,
   postFactusCreditNoteValidate,
+  buildFactusCustomer,
+  buildFactusInvoicePayload,
 };

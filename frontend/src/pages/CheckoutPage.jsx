@@ -14,6 +14,9 @@ import ModalPrivacidad from '../components/ModalPrivacidad';
 import ModalTerminos from '../components/ModalTerminos';
 import ModalContacto from '../components/ModalContacto';
 import { redirectToPayU } from '../lib/payuRedirect';
+import CheckoutDianCustomerFields from '../checkout/dian/CheckoutDianCustomerFields';
+import { dianCustomerDefaults } from '../checkout/dian/dianCustomerDefaults';
+import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
 
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -818,6 +821,10 @@ function CheckoutPage() {
   const [selectedRegion, setSelectedRegion] = useState('');
   const [citiesList, setCitiesList] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
+  const [billingRegions, setBillingRegions] = useState([]);
+  const [billingRegionsLoading, setBillingRegionsLoading] = useState(false);
+  const [billingCities, setBillingCities] = useState([]);
+  const [billingCitiesLoading, setBillingCitiesLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState('');
   const [customerLastname, setCustomerLastname] = useState('');
@@ -829,18 +836,7 @@ function CheckoutPage() {
   const [customerPostalCode, setCustomerPostalCode] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [customerCountry, setCustomerCountry] = useState('Colombia');
-  
-
-  const [billingName, setBillingName] = useState('');
-  const [billingLastname, setBillingLastname] = useState('');
-  const [billingAddress, setBillingAddress] = useState('');
-  const [billingCity, setBillingCity] = useState('');
-  const [billingDepartment, setBillingDepartment] = useState('');
-  const [billingPostalCode, setBillingPostalCode] = useState('');
-  const [billingPhone, setBillingPhone] = useState('');
-  const [billingExtra, setBillingExtra] = useState('');
-  const [billingId, setBillingId] = useState('');
-  const [billingCountry, setBillingCountry] = useState('Colombia');
+  const [dianCustomer, setDianCustomer] = useState(dianCustomerDefaults);
 
   const { cart, clearCart } = useCart();
   const currentCart = cartView ?? cart;
@@ -1077,16 +1073,11 @@ function CheckoutPage() {
           const co = list.find(c => c.code === 'CO');
           setCustomerCountry(co ? co.name : '');
         }
-        const hasBilling = list.some(c => c.name?.toLowerCase() === String(billingCountry).toLowerCase());
-        if (!hasBilling) {
-          const co = list.find(c => c.code === 'CO');
-          setBillingCountry(co ? co.name : '');
-        }
       })
       .catch(() => setCountries([]))
       .finally(() => !cancel && setCountriesLoading(false));
     return () => { cancel = true; };
-  }, [customerCountry, billingCountry]);
+  }, []);
 
   useEffect(() => {
     if (!selectedCountry || selectedCountry.code !== 'CO') {
@@ -1118,6 +1109,112 @@ function CheckoutPage() {
     return () => { cancel = true; };
   }, [selectedCountry?.code, selectedRegion]);
 
+  useEffect(() => {
+    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+
+    if (sameAddress || countryCode !== 'CO') {
+      setBillingRegions([]);
+      setBillingCities([]);
+      return;
+    }
+
+    let cancel = false;
+    setBillingRegionsLoading(true);
+
+    api.get('/api/geo/regions', { params: { country: 'CO' } })
+      .then((res) => {
+        if (!cancel) setBillingRegions(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancel) setBillingRegions([]);
+      })
+      .finally(() => {
+        if (!cancel) setBillingRegionsLoading(false);
+      });
+
+    return () => { cancel = true; };
+  }, [sameAddress, dianCustomer.country]);
+
+  useEffect(() => {
+    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+    const departmentCode = String(dianCustomer.departmentCode || '').trim();
+
+    if (sameAddress || countryCode !== 'CO' || !departmentCode) {
+      setBillingCities([]);
+      return;
+    }
+
+    let cancel = false;
+    setBillingCitiesLoading(true);
+
+    api.get('/api/geo/cities', {
+      params: { country: 'CO', region: departmentCode, limit: 10000 },
+    })
+      .then((res) => {
+        if (!cancel) setBillingCities(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancel) setBillingCities([]);
+      })
+      .finally(() => {
+        if (!cancel) setBillingCitiesLoading(false);
+      });
+
+    return () => { cancel = true; };
+  }, [sameAddress, dianCustomer.country, dianCustomer.departmentCode]);
+
+  const resolvedDianCustomer = useMemo(() => {
+    const emailFromContact = String(customerEmailOrPhone || '').includes('@')
+      ? String(customerEmailOrPhone || '').trim()
+      : '';
+    const countryCode = String(selectedCountry?.code || '').trim().toUpperCase();
+    const selectedDepartment = regions.find(
+      (region) => String(region?.code || '').trim() === String(selectedRegion || '').trim()
+    );
+
+    return {
+      ...dianCustomer,
+      personType: dianCustomer.personType || 'natural',
+      documentType: dianCustomer.documentType || 'CC',
+      documentNumber: String(dianCustomer.documentNumber || customerId || '').trim(),
+      firstName: dianCustomer.firstName || customerName,
+      lastName: dianCustomer.lastName || customerLastname,
+      email: dianCustomer.email || emailFromContact,
+      phone: dianCustomer.phone || customerPhone,
+      tributeCode: dianCustomer.tributeCode || 'ZZ',
+      ...(sameAddress
+        ? {
+            address: customerAddress,
+            extra: '',
+            city: customerCity,
+            cityCode: customerCityCode,
+            municipalityCode: customerCityCode,
+            department: selectedDepartment?.name || selectedRegion,
+            departmentCode: selectedRegion,
+            postalCode: customerPostalCode,
+            country: countryCode,
+            countryName: selectedCountry?.name || customerCountry,
+          }
+        : {}),
+    };
+  }, [
+    dianCustomer,
+    sameAddress,
+    customerId,
+    customerName,
+    customerLastname,
+    customerEmailOrPhone,
+    customerPhone,
+    customerAddress,
+    customerCity,
+    customerCityCode,
+    customerPostalCode,
+    customerCountry,
+    selectedCountry,
+    selectedRegion,
+    regions,
+  ]);
+
   const validateCheckout = () => {
     const errs = [];
     const isBlank = (v) => !v || String(v).trim() === '';
@@ -1136,6 +1233,10 @@ function CheckoutPage() {
       if (isBlank(customerCountry)) errs.push('El país es obligatorio.');
       if (selectedCountry?.code === 'CO' && isBlank(selectedRegion)) errs.push('El departamento es obligatorio para Colombia.');
       if (isBlank(customerCity)) errs.push('La ciudad es obligatoria.');
+    }
+
+    if (checkoutConfig.showBillingSection) {
+      errs.push(...validateDianCustomer(resolvedDianCustomer));
     }
 
     if (!currentCart || currentCart.length === 0 || itemCount === 0) errs.push('El carrito está vacío.');
@@ -1379,24 +1480,39 @@ function CheckoutPage() {
       city: customerCity,
       postalCode: customerPostalCode,
       country: customerCountry,
+      countryCode: selectedCountry?.code || '',
       municipalityId: customerCityCode,
       department: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
+      departmentCode: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
       deliveryType,
       wantsNewsletter
     };
 
     const billing = {
       useSameAddress: sameAddress,
-      name: billingName,
-      lastname: billingLastname,
-      id: String(billingId || '').trim() || undefined,
-      address: billingAddress,
-      extra: billingExtra,
-      city: billingCity,
-      department: billingDepartment,
-      postalCode: billingPostalCode,
-      phone: billingPhone,
-      country: billingCountry
+      personType: resolvedDianCustomer.personType,
+      documentType: resolvedDianCustomer.documentType,
+      documentNumber: resolvedDianCustomer.documentNumber,
+      id: resolvedDianCustomer.documentNumber,
+      dv: resolvedDianCustomer.documentType === 'NIT' ? resolvedDianCustomer.dv : '',
+      firstName: resolvedDianCustomer.firstName,
+      lastName: resolvedDianCustomer.lastName,
+      name: resolvedDianCustomer.firstName,
+      lastname: resolvedDianCustomer.lastName,
+      businessName: resolvedDianCustomer.businessName,
+      email: resolvedDianCustomer.email,
+      phone: resolvedDianCustomer.phone,
+      address: resolvedDianCustomer.address,
+      extra: resolvedDianCustomer.extra,
+      city: resolvedDianCustomer.city,
+      cityCode: resolvedDianCustomer.cityCode,
+      municipalityCode: resolvedDianCustomer.municipalityCode,
+      department: resolvedDianCustomer.department,
+      departmentCode: resolvedDianCustomer.departmentCode,
+      postalCode: resolvedDianCustomer.postalCode,
+      country: resolvedDianCustomer.countryName || resolvedDianCustomer.country,
+      countryCode: resolvedDianCustomer.country,
+      tributeCode: resolvedDianCustomer.tributeCode || 'ZZ',
     };
 
     const payment = {
@@ -1417,7 +1533,7 @@ function CheckoutPage() {
       shipping,
       total: Number(finalSummary.subtotal || 0) + shipping,
       customer,
-      billing,
+      billing: checkoutConfig.showBillingSection ? billing : undefined,
       payment
     };
 
@@ -1924,87 +2040,25 @@ function CheckoutPage() {
               </div>
 
               {checkoutConfig.showBillingSection && (
-                <div className="co-card">
-                  <h2 className="co-card-title">{checkoutConfig.billingSectionTitle}</h2>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: sameAddress ? '0' : '20px' }}>
-                    <label className="co-radio-option">
-                      <input type="radio" name="billing" checked={sameAddress} onChange={() => setSameAddress(true)} />
-                      <span>La misma dirección de envío</span>
-                    </label>
-                    <label className="co-radio-option">
-                      <input type="radio" name="billing" checked={!sameAddress} onChange={() => setSameAddress(false)} />
-                      <span>{checkoutConfig.billingToggleText}</span>
-                    </label>
-                  </div>
-
-                  {!sameAddress && (
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div>
-                        <label className="co-field-label">País</label>
-                        <select
-                          className="co-input"
-                          value={billingCountry}
-                          onChange={(e) => { setBillingCountry(e.target.value); setBillingCity(''); }}
-                          disabled={countriesLoading}
-                          name="billingCountry"
-                          autoComplete="country-name"
-                        >
-                          <option value="">{countriesLoading ? 'Cargando países...' : 'Selecciona país'}</option>
-                          {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
-                        </select>
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.nameLabelText}</label>
-                          <input type="text" className="co-input" placeholder="María" value={billingName} onChange={(e) => setBillingName(e.target.value)} name="billingFirstName" autoComplete="given-name" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">Apellidos</label>
-                          <input type="text" className="co-input" placeholder="García" value={billingLastname} onChange={(e) => setBillingLastname(e.target.value)} name="billingLastName" autoComplete="family-name" />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">{checkoutConfig.documentLabelText} (opcional)</label>
-                        <input type="text" className="co-input" placeholder="12345678" value={billingId} onChange={(e) => setBillingId(e.target.value)} name="billingId" />
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">{checkoutConfig.addressLabelText}</label>
-                        <input type="text" className="co-input" placeholder="Calle 10 # 20-30" value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} name="billingAddress" autoComplete="address-line1" />
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">Casa, apartamento, etc. (opcional)</label>
-                        <input type="text" className="co-input" placeholder="Apto 5" value={billingExtra} onChange={(e) => setBillingExtra(e.target.value)} name="billingExtra" />
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.cityLabelText}</label>
-                          <input type="text" className="co-input" placeholder="Bogotá" value={billingCity} onChange={(e) => setBillingCity(e.target.value)} name="billingCity" autoComplete="address-level2" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">Provincia / Estado</label>
-                          <input type="text" className="co-input" placeholder="Cundinamarca" value={billingDepartment} onChange={(e) => setBillingDepartment(e.target.value)} name="billingDepartment" />
-                        </div>
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">Código postal (opcional)</label>
-                          <input type="text" className="co-input" placeholder="110111" value={billingPostalCode} onChange={(e) => setBillingPostalCode(e.target.value)} name="billingPostalCode" autoComplete="postal-code" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.phoneLabelText} (opcional)</label>
-                          <input type="tel" className="co-input" placeholder="+57 300..." value={billingPhone} onChange={(e) => setBillingPhone(e.target.value)} name="billingPhone" autoComplete="tel" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <CheckoutDianCustomerFields
+                  value={resolvedDianCustomer}
+                  onChange={(nextValue, changedFields) => {
+                    setDianCustomer((current) => ({
+                      ...current,
+                      ...(changedFields || nextValue),
+                    }));
+                  }}
+                  useSameAddress={sameAddress}
+                  onUseSameAddressChange={setSameAddress}
+                  countries={countries}
+                  countriesLoading={countriesLoading}
+                  regions={billingRegions}
+                  regionsLoading={billingRegionsLoading}
+                  cities={billingCities}
+                  citiesLoading={billingCitiesLoading}
+                  title={checkoutConfig.billingSectionTitle || 'Datos para facturación electrónica'}
+                  differentAddressLabel={checkoutConfig.billingToggleText}
+                />
               )}
 
               {checkoutConfig.showConfirmButton && (

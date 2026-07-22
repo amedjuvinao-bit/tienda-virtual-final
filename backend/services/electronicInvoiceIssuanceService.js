@@ -112,28 +112,43 @@ function buildCustomerSnapshot(order = {}) {
   const customer = order.customer || {};
   const billing = order.billing || {};
   const fullName = [customer.name, customer.lastname].filter(Boolean).join(' ').trim();
-  const billingName = [billing.name, billing.lastname].filter(Boolean).join(' ').trim();
+  const billingName = [
+    billing.firstName || billing.name,
+    billing.lastName || billing.lastname,
+  ].filter(Boolean).join(' ').trim();
 
   return {
-    documentType: customer.documentType || customer.tipoDocumento || billing.documentType || '13',
+    documentType: billing.documentType || customer.documentType || customer.tipoDocumento || 'CC',
     documentNumber:
+      billing.documentNumber ||
+      billing.identification ||
+      billing.id ||
       customer.documentNumber ||
       customer.document ||
       customer.cedula ||
       customer.identification ||
       customer.id ||
-      billing.documentNumber ||
-      billing.id ||
       '222222222222',
-    dv: customer.dv || billing.dv || '',
-    personType: customer.personType || billing.personType || 'natural',
-    businessName: customer.businessName || fullName || billingName || customer.email || 'Consumidor final',
-    email: customer.email || customer.emailOrPhone || billing.email || '',
-    phone: customer.phone || billing.phone || '',
-    address: customer.address || billing.address || '',
-    city: customer.city || billing.city || '',
-    department: customer.department || billing.department || '',
-    country: customer.country || billing.country || 'Colombia',
+    dv: billing.dv || customer.dv || '',
+    personType: billing.personType || customer.personType || 'natural',
+    firstName: billing.firstName || billing.name || customer.name || '',
+    lastName: billing.lastName || billing.lastname || customer.lastname || '',
+    businessName: billing.businessName || customer.businessName || billingName || fullName || '',
+    email: billing.email || customer.email || customer.emailOrPhone || '',
+    phone: billing.phone || customer.phone || '',
+    address: billing.address || customer.address || '',
+    city: billing.city || customer.city || '',
+    municipalityCode:
+      billing.municipalityCode ||
+      billing.cityCode ||
+      customer.municipalityId ||
+      customer.municipality_id ||
+      '',
+    department: billing.department || customer.department || '',
+    departmentCode: billing.departmentCode || customer.departmentCode || '',
+    country: billing.country || customer.country || 'Colombia',
+    countryCode: billing.countryCode || customer.countryCode || 'CO',
+    tributeCode: billing.tributeCode || customer.tributeCode || 'ZZ',
   };
 }
 
