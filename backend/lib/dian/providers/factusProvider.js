@@ -1002,7 +1002,69 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
   }
 }
 
+function safeFactusFileName(value, invoiceNumber, type) {
+  const extension = type === 'pdf' ? '.pdf' : '.xml';
+  const fallback = `factura-${trimSafe(invoiceNumber, 160) || 'factus'}`;
+  const base = trimSafe(value || fallback, 220)
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^[_\.]+|[_\.]+$/g, '') || fallback;
+
+  return base.toLowerCase().endsWith(extension)
+    ? base
+    : `${base}${extension}`;
+}
+
+function extractFactusDownloadPayload(data = {}, type = 'pdf') {
+  const payload = data?.data?.data || data?.data || data || {};
+  const field = type === 'pdf'
+    ? 'pdf_base_64_encoded'
+    : 'xml_base_64_encoded';
+  const encoded = trimSafe(
+    payload?.[field] ||
+      payload?.base_64_encoded ||
+      payload?.base64 ||
+      payload?.content,
+    60_000_000
+  ).replace(/^data:[^;]+;base64,/i, '').replace(/\s+/g, '');
+
+  return {
+    encoded,
+    fileName: payload?.file_name || payload?.fileName || '',
+  };
+}
+
+function decodeFactusBase64Document(encoded, type = 'pdf') {
+  const value = String(encoded || '').trim();
+
+  if (
+    !value ||
+    value.length % 4 === 1 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(value)
+  ) {
+    return null;
+  }
+
+  const buffer = Buffer.from(value, 'base64');
+  if (!buffer.length) return null;
+
+  if (type === 'pdf' && buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    return null;
+  }
+
+  if (type === 'xml') {
+    const start = buffer.subarray(0, Math.min(buffer.length, 200))
+      .toString('utf8')
+      .replace(/^\uFEFF/, '')
+      .trimStart();
+    if (!start.startsWith('<')) return null;
+  }
+
+  return buffer;
+}
+
 async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber, type }) {
+  const normalizedType = type === 'pdf' ? 'pdf' : type === 'xml' ? 'xml' : '';
   const safeNumber = encodeURIComponent(String(invoiceNumber || '').trim());
 
   if (!safeNumber) {
@@ -1012,12 +1074,21 @@ async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber,
     };
   }
 
+  if (!normalizedType) {
+    return {
+      success: false,
+      status: 422,
+      stage: 'document_type',
+      error: 'Tipo de documento Factus no soportado.',
+    };
+  }
+
   const endpoint =
-    type === 'pdf'
+    normalizedType === 'pdf'
       ? `/v2/bills/${safeNumber}/download-pdf`
       : `/v2/bills/${safeNumber}/download-xml`;
 
-  const response = await fetch(`${credentials.apiUrl}${endpoint}`, {
+  const response = await fetchFactus(`${credentials.apiUrl}${endpoint}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -1031,16 +1102,106 @@ async function downloadFactusDocument({ credentials, tokenResult, invoiceNumber,
     return {
       success: false,
       status: response.status,
-      error: data?.message || data?.error || `No se pudo descargar ${type}.`,
+      stage: `download_${normalizedType}`,
+      error: data?.message || data?.error || `No se pudo descargar ${normalizedType}.`,
       raw: data,
+    };
+  }
+
+  const payload = extractFactusDownloadPayload(data, normalizedType);
+  const buffer = decodeFactusBase64Document(payload.encoded, normalizedType);
+
+  if (!buffer) {
+    return {
+      success: false,
+      status: 502,
+      stage: `download_${normalizedType}_invalid`,
+      error: `Factus respondió, pero no devolvió un ${normalizedType.toUpperCase()} válido.`,
     };
   }
 
   return {
     success: true,
     status: response.status,
-    data,
+    provider: 'factus',
+    type: normalizedType,
+    buffer,
+    byteLength: buffer.length,
+    contentType: normalizedType === 'pdf' ? 'application/pdf' : 'application/xml; charset=utf-8',
+    fileName: safeFactusFileName(payload.fileName, invoiceNumber, normalizedType),
   };
+}
+
+async function downloadInvoiceDocumentFromFactus({
+  providerConfig = {},
+  invoiceNumber,
+  type,
+} = {}) {
+  const normalizedType = type === 'pdf' ? 'pdf' : type === 'xml' ? 'xml' : '';
+
+  if (!normalizedType) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'document_type',
+      error: 'Solo se pueden descargar documentos PDF o XML de Factus.',
+    };
+  }
+
+  if (!trimSafe(invoiceNumber, 160)) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'document_number',
+      error: 'La factura no tiene número oficial de Factus para descargar el documento.',
+    };
+  }
+
+  const credentials = getFactusCredentials({ providerConfig });
+  const missing = validateCredentials(credentials);
+
+  if (missing.length) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 422,
+      stage: 'config_incomplete',
+      error: `Configuración Factus incompleta. Faltan: ${missing.join(', ')}.`,
+      missing,
+    };
+  }
+
+  try {
+    const tokenResult = await getFactusAccessToken(credentials);
+
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'auth',
+        ...tokenResult,
+      };
+    }
+
+    return await downloadFactusDocument({
+      credentials,
+      tokenResult,
+      invoiceNumber,
+      type: normalizedType,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      status: 503,
+      stage: `download_${normalizedType}`,
+      error: error?.name === 'AbortError'
+        ? `La descarga ${normalizedType.toUpperCase()} en Factus superó el tiempo de espera.`
+        : error?.message || `No fue posible descargar el ${normalizedType.toUpperCase()} de Factus.`,
+    };
+  }
 }
 
 async function postFactusInvoiceValidate({ credentials, tokenResult, payload }) {
@@ -1261,23 +1422,6 @@ async function sendInvoiceToFactus(invoiceData) {
     const invoiceNumber =
       result?.data?.data?.number || '';
 
-    const pdfDownload = await downloadFactusDocument({
-      credentials,
-      tokenResult,
-      invoiceNumber,
-      type: 'pdf',
-    });
-
-    const xmlDownload = await downloadFactusDocument({
-      credentials,
-      tokenResult,
-      invoiceNumber,
-      type: 'xml',
-    });
-
-    console.log('📄 FACTUS PDF DOWNLOAD:', pdfDownload);
-    console.log('📄 FACTUS XML DOWNLOAD:', xmlDownload);
-
     return {
       success: true,
       provider: 'factus',
@@ -1288,18 +1432,6 @@ async function sendInvoiceToFactus(invoiceData) {
         ...result.data,
 
         invoiceNumber,
-
-        downloads: {
-          pdf: {
-            success: false,
-            error: 'No descargado todavía',
-          },
-
-          xml: {
-            success: false,
-            error: 'No descargado todavía',
-          },
-        },
       },
     };
   } catch (error) {
@@ -1321,6 +1453,9 @@ module.exports = {
   deleteFactusBillByReference,
   getFactusCredentials,
   getFactusAccessToken,
+  downloadInvoiceDocumentFromFactus,
+  extractFactusDownloadPayload,
+  decodeFactusBase64Document,
   postFactusCreditNoteValidate,
   buildFactusCustomer,
   buildFactusInvoicePayload,
