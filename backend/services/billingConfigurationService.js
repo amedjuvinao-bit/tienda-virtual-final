@@ -7,42 +7,80 @@ const {
   BillingConfigurationError,
   buildFactusCredentialFingerprint,
   buildRuntimeFactusConfig,
-  hasLegacyPlaintextBillingSecrets,
+  encryptBillingSecret,
+  isEncryptedBillingSecret,
   prepareBillingConfigurationForStorage,
 } = require('../lib/billing/billingConfigurationSecurity');
-const {
-  getFactusAccessToken,
-} = require('../lib/dian/providers/factusProvider');
+
+const LEGACY_SECRET_PATHS = Object.freeze([
+  'billing.electronicProvider.clientSecret',
+  'billing.electronicProvider.password',
+  'billing.electronicProvider.softwarePin',
+  'billing.electronicProvider.technicalKey',
+  'billing.dian.softwarePin',
+  'billing.dian.softwareSecurityCode',
+  'billing.dian.certificatePath',
+  'billing.dian.certificatePassword',
+  'billing.dianResolution.technicalKey',
+]);
 
 function cleanText(value, max = 500) {
-  return String(value ?? '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, max);
+  return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
 
 function createServiceError(message, code, status = 500, details = []) {
   return new BillingConfigurationError(message, code, status, details);
 }
 
+function getNested(object, path) {
+  return String(path || '')
+    .split('.')
+    .filter(Boolean)
+    .reduce((value, key) => value?.[key], object);
+}
+
 async function getOrCreateSettingsDocument() {
   let settings = await SiteSettings.findOne();
-
   if (!settings) {
-    settings = await SiteSettings.create({
-      billing: {},
-      updatedBy: 'system',
-    });
+    settings = await SiteSettings.create({ billing: {}, updatedBy: 'system' });
   }
-
   return settings;
+}
+
+async function migrateLegacyBillingSecrets(settings) {
+  const source = settings?.toObject
+    ? settings.toObject({ depopulate: true })
+    : settings || {};
+  const $set = {};
+
+  LEGACY_SECRET_PATHS.forEach((path) => {
+    const value = String(getNested(source, path) ?? '');
+    if (value.trim() && !isEncryptedBillingSecret(value)) {
+      $set[path] = encryptBillingSecret(value);
+    }
+  });
+
+  if (!Object.keys($set).length) return settings;
+
+  const migrated = await SiteSettings.findByIdAndUpdate(
+    settings._id,
+    { $set },
+    { new: true, runValidators: true, strict: false }
+  );
+
+  return migrated || settings;
+}
+
+async function getAdminSettingsWithEncryptedBilling() {
+  const settings = await getOrCreateSettingsDocument();
+  const migrated = await migrateLegacyBillingSecrets(settings);
+  return buildAdminSiteSettings(migrated.toObject());
 }
 
 async function assertProductionMailReady() {
   const mail = await MailSettings.findOne({ key: 'main' })
     .select('+smtpPasswordEncrypted')
     .lean();
-
   const ready = Boolean(
     mail?.enabled === true &&
       mail?.fromEmail &&
@@ -63,32 +101,6 @@ async function assertProductionMailReady() {
   }
 }
 
-async function migrateLegacyBillingSecrets(settings) {
-  const rawBilling = settings?.billing?.toObject
-    ? settings.billing.toObject({ depopulate: true })
-    : settings?.billing || {};
-
-  if (!hasLegacyPlaintextBillingSecrets(rawBilling)) return settings;
-
-  const migratedBilling = prepareBillingConfigurationForStorage(
-    rawBilling,
-    rawBilling,
-    { skipProductionReadiness: true }
-  );
-
-  settings.billing = migratedBilling;
-  settings.markModified('billing');
-  await settings.save();
-
-  return settings;
-}
-
-async function getAdminSettingsWithEncryptedBilling() {
-  const settings = await getOrCreateSettingsDocument();
-  await migrateLegacyBillingSecrets(settings);
-  return buildAdminSiteSettings(settings.toObject());
-}
-
 async function updateBillingConfiguration(incomingBilling, options = {}) {
   const settings = await getOrCreateSettingsDocument();
   const currentBilling = settings?.billing?.toObject
@@ -103,13 +115,29 @@ async function updateBillingConfiguration(incomingBilling, options = {}) {
     await assertProductionMailReady();
   }
 
-  settings.billing = preparedBilling;
-  settings.updatedBy = cleanText(options.adminUser || 'admin', 180) || 'admin';
-  settings.markModified('billing');
-
   try {
-    await settings.save();
+    const updated = await SiteSettings.findByIdAndUpdate(
+      settings._id,
+      {
+        $set: {
+          billing: preparedBilling,
+          updatedBy: cleanText(options.adminUser || 'admin', 180) || 'admin',
+        },
+      },
+      { new: true, runValidators: true, strict: false }
+    );
+
+    if (!updated) {
+      throw createServiceError(
+        'No se encontró la configuración que debía actualizarse.',
+        'BILLING_CONFIGURATION_NOT_FOUND',
+        404
+      );
+    }
+
+    return buildAdminSiteSettings(updated.toObject());
   } catch (error) {
+    if (error instanceof BillingConfigurationError) throw error;
     if (error?.name === 'ValidationError') {
       const details = Object.values(error.errors || {})
         .map((item) => cleanText(item?.message, 300))
@@ -121,11 +149,8 @@ async function updateBillingConfiguration(incomingBilling, options = {}) {
         details
       );
     }
-
     throw error;
   }
-
-  return buildAdminSiteSettings(settings.toObject());
 }
 
 function mergeConnectionCandidate(currentBilling = {}, body = {}) {
@@ -135,7 +160,6 @@ function mergeConnectionCandidate(currentBilling = {}, body = {}) {
   const providerConfig = body?.providerConfig && typeof body.providerConfig === 'object'
     ? body.providerConfig
     : {};
-  const mode = body?.mode || bodyBilling?.dian?.mode || currentBilling?.dian?.mode;
 
   return {
     ...currentBilling,
@@ -143,7 +167,7 @@ function mergeConnectionCandidate(currentBilling = {}, body = {}) {
     dian: {
       ...(currentBilling.dian || {}),
       ...(bodyBilling.dian || {}),
-      mode,
+      mode: body?.mode || bodyBilling?.dian?.mode || currentBilling?.dian?.mode,
     },
     electronicProvider: {
       ...(currentBilling.electronicProvider || {}),
@@ -159,13 +183,7 @@ function mergeConnectionCandidate(currentBilling = {}, body = {}) {
 }
 
 function extractCompany(data = {}) {
-  const candidates = [
-    data?.data?.data,
-    data?.data,
-    data?.company,
-    data,
-  ];
-  const source = candidates.find(
+  const source = [data?.data?.data, data?.data, data?.company, data].find(
     (value) => value && typeof value === 'object' && !Array.isArray(value)
   ) || {};
 
@@ -182,21 +200,82 @@ function extractCompany(data = {}) {
   };
 }
 
-async function fetchFactusCompany(runtimeConfig, tokenResult) {
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 20000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${runtimeConfig.apiUrl}/v2/companies`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `${tokenResult.tokenType || 'Bearer'} ${tokenResult.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
+    const response = await fetch(url, { ...options, signal: controller.signal });
     const data = await response.json().catch(() => ({}));
+    return { response, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function authenticateFactus(runtimeConfig) {
+  const body = new URLSearchParams();
+  body.append('grant_type', 'password');
+  body.append('client_id', runtimeConfig.clientId);
+  body.append('client_secret', runtimeConfig.clientSecret);
+  body.append('username', runtimeConfig.username);
+  body.append('password', runtimeConfig.password);
+
+  try {
+    const { response, data } = await fetchJsonWithTimeout(
+      `${runtimeConfig.apiUrl}/oauth/token`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      }
+    );
+
+    if (!response.ok || !data?.access_token) {
+      throw createServiceError(
+        'Factus rechazó las credenciales configuradas.',
+        'FACTUS_AUTH_REJECTED',
+        422
+      );
+    }
+
+    return {
+      accessToken: data.access_token,
+      tokenType: data.token_type || 'Bearer',
+    };
+  } catch (error) {
+    if (error instanceof BillingConfigurationError) throw error;
+    if (error?.name === 'AbortError') {
+      throw createServiceError(
+        'La autenticación con Factus superó el tiempo de espera.',
+        'FACTUS_AUTH_TIMEOUT',
+        504
+      );
+    }
+    throw createServiceError(
+      'No fue posible autenticar con Factus.',
+      'FACTUS_AUTH_CONNECTION_ERROR',
+      502
+    );
+  }
+}
+
+async function fetchFactusCompany(runtimeConfig, token) {
+  try {
+    const { response, data } = await fetchJsonWithTimeout(
+      `${runtimeConfig.apiUrl}/v2/companies`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `${token.tokenType} ${token.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
       throw createServiceError(
@@ -216,34 +295,35 @@ async function fetchFactusCompany(runtimeConfig, tokenResult) {
         504
       );
     }
-
     throw createServiceError(
       'No fue posible consultar la empresa vinculada en Factus.',
       'FACTUS_COMPANY_CONNECTION_ERROR',
       502
     );
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
-async function recordConnectionResult(settings, data = {}) {
-  settings.set('billing.electronicProvider.lastConnectionStatus', data.status || 'error');
-  settings.set(
-    'billing.electronicProvider.lastConnectionMessage',
-    cleanText(data.message, 500)
+async function recordConnectionResult(settingsId, data = {}, adminUser = 'admin') {
+  await SiteSettings.findByIdAndUpdate(
+    settingsId,
+    {
+      $set: {
+        'billing.electronicProvider.lastConnectionStatus': data.status || 'error',
+        'billing.electronicProvider.lastConnectionMessage': cleanText(data.message, 500),
+        'billing.electronicProvider.lastConnectionAt': new Date(),
+        'billing.electronicProvider.lastConnectionEnvironment': cleanText(
+          data.environment,
+          40
+        ),
+        'billing.electronicProvider.lastConnectionFingerprint': cleanText(
+          data.fingerprint,
+          128
+        ),
+        updatedBy: cleanText(adminUser, 180) || 'admin',
+      },
+    },
+    { runValidators: true, strict: false }
   );
-  settings.set('billing.electronicProvider.lastConnectionAt', new Date());
-  settings.set(
-    'billing.electronicProvider.lastConnectionEnvironment',
-    cleanText(data.environment, 40)
-  );
-  settings.set(
-    'billing.electronicProvider.lastConnectionFingerprint',
-    cleanText(data.fingerprint, 128)
-  );
-  settings.markModified('billing.electronicProvider');
-  await settings.save();
 }
 
 async function testFactusConnection(body = {}, options = {}) {
@@ -251,78 +331,56 @@ async function testFactusConnection(body = {}, options = {}) {
   const currentBilling = settings?.billing?.toObject
     ? settings.billing.toObject({ depopulate: true })
     : settings?.billing || {};
-  const candidateInput = mergeConnectionCandidate(currentBilling, body);
-  const candidateBilling = prepareBillingConfigurationForStorage(
-    candidateInput,
+  const candidate = prepareBillingConfigurationForStorage(
+    mergeConnectionCandidate(currentBilling, body),
     currentBilling,
     { skipProductionReadiness: true }
   );
-  const runtimeConfig = buildRuntimeFactusConfig(candidateBilling);
+  const runtimeConfig = buildRuntimeFactusConfig(candidate);
   const fingerprint = buildFactusCredentialFingerprint(runtimeConfig);
 
-  let tokenResult;
   try {
-    tokenResult = await getFactusAccessToken(runtimeConfig);
+    const token = await authenticateFactus(runtimeConfig);
+    const company = await fetchFactusCompany(runtimeConfig, token);
+    const message = company.name
+      ? `Conexión verificada con Factus para ${company.name}.`
+      : 'Conexión y empresa verificadas correctamente con Factus.';
+
+    await recordConnectionResult(
+      settings._id,
+      {
+        status: 'success',
+        message,
+        environment: runtimeConfig.environment,
+        fingerprint,
+      },
+      options.adminUser
+    );
+
+    return {
+      provider: 'factus',
+      environment: runtimeConfig.environment,
+      status: 'success',
+      message,
+      company,
+      verifiedAt: new Date().toISOString(),
+    };
   } catch (error) {
-    await recordConnectionResult(settings, {
-      status: 'error',
-      message: 'No fue posible conectar con Factus.',
-      environment: runtimeConfig.environment,
-      fingerprint: '',
-    }).catch(() => null);
-
-    if (error?.name === 'AbortError') {
-      throw createServiceError(
-        'La autenticación con Factus superó el tiempo de espera.',
-        'FACTUS_AUTH_TIMEOUT',
-        504
-      );
-    }
-
-    throw createServiceError(
-      'No fue posible autenticar con Factus.',
-      'FACTUS_AUTH_CONNECTION_ERROR',
-      502
-    );
+    await recordConnectionResult(
+      settings._id,
+      {
+        status: 'error',
+        message:
+          error instanceof BillingConfigurationError
+            ? error.message
+            : 'No fue posible conectar con Factus.',
+        environment: runtimeConfig.environment,
+        fingerprint: '',
+      },
+      options.adminUser
+    ).catch(() => null);
+    throw error;
   }
-
-  if (!tokenResult?.success || !tokenResult?.accessToken) {
-    await recordConnectionResult(settings, {
-      status: 'error',
-      message: 'Factus rechazó las credenciales configuradas.',
-      environment: runtimeConfig.environment,
-      fingerprint: '',
-    }).catch(() => null);
-
-    throw createServiceError(
-      'Factus rechazó las credenciales configuradas.',
-      'FACTUS_AUTH_REJECTED',
-      422
-    );
-  }
-
-  const company = await fetchFactusCompany(runtimeConfig, tokenResult);
-  const message = company.name
-    ? `Conexión verificada con Factus para ${company.name}.`
-    : 'Conexión y empresa verificadas correctamente con Factus.';
-
-  await recordConnectionResult(settings, {
-    status: 'success',
-    message,
-    environment: runtimeConfig.environment,
-    fingerprint,
-  });
-  settings.updatedBy = cleanText(options.adminUser || 'admin', 180) || 'admin';
-  await settings.save();
-
-  return {
-    provider: 'factus',
-    environment: runtimeConfig.environment,
-    status: 'success',
-    message,
-    company,
-    verifiedAt: new Date().toISOString(),
-  };
 }
 
 module.exports = {
