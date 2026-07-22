@@ -122,22 +122,37 @@ function validateAdminSettingsRedaction() {
   ok('Respuesta administrativa informa credenciales configuradas sin devolver su valor');
 }
 
-function validateSecretPreservationOnUpdate() {
+function validateDedicatedBillingWriteBoundary() {
   const filtered = stripProtectedWriteFields({
-    'billing.electronicProvider.clientSecret': '',
-    'billing.electronicProvider.password': '  ',
-    'billing.electronicProvider.apiUrl': 'https://factus.test',
     'theme.global.payments.credentials.wompi.integrityKey': 'new-integrity-key',
-    'billing._credentialStatus.password': true,
+    'theme._credentialStatus.password': true,
   });
 
-  assert(!('billing.electronicProvider.clientSecret' in filtered), 'Un secreto vacío no debe borrar el guardado.');
-  assert(!('billing.electronicProvider.password' in filtered), 'Una contraseña vacía no debe borrar la guardada.');
-  assert(filtered['billing.electronicProvider.apiUrl'] === 'https://factus.test', 'Los campos normales deben actualizarse.');
-  assert(filtered['theme.global.payments.credentials.wompi.integrityKey'] === 'new-integrity-key', 'Un secreto nuevo debe poder reemplazar al anterior.');
-  assert(!('billing._credentialStatus.password' in filtered), 'Metadatos internos no deben guardarse.');
+  assert(
+    filtered['theme.global.payments.credentials.wompi.integrityKey'] === 'new-integrity-key',
+    'Un secreto nuevo de pagos debe poder reemplazar al anterior.'
+  );
+  assert(
+    !('theme._credentialStatus.password' in filtered),
+    'Metadatos internos no deben guardarse.'
+  );
 
-  ok('Guardar otros ajustes conserva secretos existentes y acepta reemplazos explícitos');
+  let billingError = null;
+  try {
+    stripProtectedWriteFields({
+      'billing.electronicProvider.clientSecret': 'nuevo-secreto',
+    });
+  } catch (error) {
+    billingError = error;
+  }
+
+  assert(billingError, 'La ruta genérica debe bloquear cualquier escritura de billing.');
+  assert(
+    billingError.code === 'BILLING_DEDICATED_ENDPOINT_REQUIRED',
+    'La escritura fiscal debe redirigirse a la ruta protegida.'
+  );
+
+  ok('Configuración fiscal queda aislada de la ruta genérica de apariencia');
 }
 
 function validateBackendPermissions() {
@@ -160,13 +175,15 @@ function validateBackendPermissions() {
   const billingRoutes = read('backend/routes/adminBilling.js');
   const paymentRoutes = read('backend/routes/payments.js');
   const providerRoutes = read('backend/routes/dianProviderTest.js');
+  const protectedSettings = read('backend/routes/billingSettingsProtection.js');
 
   assertIncludes(billingRoutes, "requirePermission('billing:create')", 'Generar factura debe exigir billing:create.');
   assertIncludes(paymentRoutes, "requirePermission('billing:credit_note')", 'Nota crédito debe exigir billing:credit_note.');
   assertIncludes(paymentRoutes, "requirePermission('billing:retry')", 'Reintentos y eliminación pendiente deben exigir billing:retry.');
   assertIncludes(providerRoutes, "requirePermission('billing:settings')", 'Prueba de proveedor debe exigir billing:settings.');
+  assertIncludes(protectedSettings, "requirePermission('billing:settings')", 'Guardar configuración debe exigir billing:settings.');
 
-  ok('Backend exige permisos específicos para consultar, generar, sincronizar y acreditar');
+  ok('Backend exige permisos específicos para consultar, configurar, generar, sincronizar y acreditar');
 }
 
 function validateNoCredentialLeaksInPaymentResponses() {
@@ -205,7 +222,8 @@ function validateFrontendPermissionAwareness() {
 function validateScriptRegistered() {
   const packageFile = read('backend/package.json');
   assertIncludes(packageFile, 'test:billing-security', 'package.json debe registrar test:billing-security.');
-  ok('Prueba de seguridad registrada para ejecución desde terminal');
+  assertIncludes(packageFile, 'test:billing-configuration', 'package.json debe registrar test:billing-configuration.');
+  ok('Pruebas de seguridad y configuración registradas para ejecución desde terminal');
 }
 
 function main() {
@@ -214,7 +232,7 @@ function main() {
   try {
     validatePublicSettingsRedaction();
     validateAdminSettingsRedaction();
-    validateSecretPreservationOnUpdate();
+    validateDedicatedBillingWriteBoundary();
     validateBackendPermissions();
     validateNoCredentialLeaksInPaymentResponses();
     validateFrontendPermissionAwareness();
