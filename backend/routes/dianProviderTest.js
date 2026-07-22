@@ -4,8 +4,8 @@ const rateLimit = require('express-rate-limit');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
-  testFactusConnection,
-} = require('../services/billingConfigurationService');
+  testFactusConnectionWithIdentity,
+} = require('../services/billingConnectionOrchestrationService');
 const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
@@ -38,7 +38,7 @@ function currentAdmin(req) {
 
 router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
-    const result = await testFactusConnection(req.body || {}, {
+    const result = await testFactusConnectionWithIdentity(req.body || {}, {
       adminUser: currentAdmin(req),
     });
 
@@ -50,6 +50,7 @@ router.post('/test-provider', connectionTestLimiter, async (req, res) => {
       message: result.message,
       company: result.company,
       verifiedAt: result.verifiedAt,
+      readiness: result.readiness,
     });
   } catch (error) {
     const status = Number(error?.status || error?.statusCode || 500);
