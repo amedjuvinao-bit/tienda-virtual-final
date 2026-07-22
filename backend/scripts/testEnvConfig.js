@@ -41,6 +41,12 @@ try {
     ok('JWT_SECRET configurado');
   }
 
+  if (!summary.billingEncryptionConfigured) {
+    warn('BILLING_ENCRYPTION_KEY no esta configurado. La facturacion electronica externa permanecera bloqueada hasta definir una llave de al menos 32 caracteres.');
+  } else {
+    ok('Cifrado de credenciales fiscales configurado');
+  }
+
   if (!summary.cloudinary.backendConfigured) {
     warn('Cloudinary backend no esta completamente configurado. Para subir imagenes desde el backend se requieren CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.');
   } else {
