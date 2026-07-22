@@ -118,14 +118,17 @@ function normalizeRemoteStatus(remote = {}, type = 'invoice') {
   const statusText = providerStatusText(remote);
   const statusNumber = Number(remote.status);
   const hasValidatedFlag = remote.is_validated === true || remote.validated === true;
+  const hasPendingFlag = remote.is_validated === false || remote.validated === false;
   const hasFiscalKey = Boolean(firstValue(remote.cufe, remote.cude));
   const hasValidationDate = Boolean(firstValue(remote.validated_at, remote.validatedAt));
   const isValidated =
-    hasValidatedFlag ||
-    statusNumber === 1 ||
-    hasFiscalKey ||
-    hasValidationDate ||
-    includesAny(statusText, ['validated', 'accepted', 'validada', 'validado', 'aprobada', 'aprobado']);
+    !hasPendingFlag && (
+      hasValidatedFlag ||
+      statusNumber === 1 ||
+      hasFiscalKey ||
+      hasValidationDate ||
+      includesAny(statusText, ['validated', 'accepted', 'validada', 'validado', 'aprobada', 'aprobado'])
+    );
 
   if (includesAny(statusText, ['rejected', 'rechazada', 'rechazado'])) {
     return { localStatus: 'rejected', providerStatus: 'rejected', isValidated: false };
@@ -152,6 +155,46 @@ function normalizeRemoteStatus(remote = {}, type = 'invoice') {
     providerStatus: 'pending',
     isValidated: false,
   };
+}
+
+function normalizedIdentity(value) {
+  return cleanText(value, 220).replace(/\s+/g, '').toUpperCase();
+}
+
+function assertRemoteIdentity({
+  requestedNumber,
+  remoteNumber,
+  storedProviderCufe = '',
+  remoteCufe = '',
+} = {}) {
+  const expectedNumber = normalizedIdentity(requestedNumber);
+  const receivedNumber = normalizedIdentity(remoteNumber);
+  const expectedCufe = normalizedIdentity(storedProviderCufe);
+  const receivedCufe = normalizedIdentity(remoteCufe);
+
+  if (!receivedNumber) {
+    const error = new Error('Factus respondió, pero no devolvió el número oficial de la factura consultada.');
+    error.code = 'BILLING_PROVIDER_IDENTITY_MISSING';
+    return error;
+  }
+
+  if (expectedNumber && expectedNumber !== receivedNumber) {
+    const error = new Error(
+      'Factus devolvió una factura diferente a la solicitada. No se modificaron el número ni el CUFE guardados.'
+    );
+    error.code = 'BILLING_PROVIDER_IDENTITY_MISMATCH';
+    return error;
+  }
+
+  if (expectedCufe && receivedCufe && expectedCufe !== receivedCufe) {
+    const error = new Error(
+      'El CUFE devuelto por Factus no coincide con el CUFE oficial guardado. La sincronización fue bloqueada.'
+    );
+    error.code = 'BILLING_PROVIDER_CUFE_MISMATCH';
+    return error;
+  }
+
+  return null;
 }
 
 function extractLinks(remote = {}) {
@@ -267,9 +310,11 @@ function createServiceError(result = {}, fallback = 'No fue posible sincronizar 
   else if (providerStatus === 501) error.status = 501;
   else error.status = 502;
 
-  error.code = result?.stage === 'config_incomplete'
-    ? 'BILLING_PROVIDER_CONFIG_INCOMPLETE'
-    : 'BILLING_PROVIDER_SYNC_ERROR';
+  error.code = result?.code || (
+    result?.stage === 'config_incomplete'
+      ? 'BILLING_PROVIDER_CONFIG_INCOMPLETE'
+      : 'BILLING_PROVIDER_SYNC_ERROR'
+  );
   return error;
 }
 
@@ -419,12 +464,32 @@ async function syncInvoice(identifier, options = {}) {
     await saveInvoiceSyncFailure(invoice, provider, malformedResult, options);
     throw createServiceError(malformedResult);
   }
+  const remoteNumber = cleanText(firstValue(remote.number, remote.invoiceNumber), 160);
+  const remoteCufe = cleanText(firstValue(remote.cufe, invoice?.provider?.cufe, invoice.cufe), 220);
+  const identityError = assertRemoteIdentity({
+    requestedNumber: invoiceNumber,
+    remoteNumber,
+    storedProviderCufe: invoice?.provider?.cufe,
+    remoteCufe: cleanText(remote.cufe, 220),
+  });
+
+  if (identityError) {
+    const mismatchResult = {
+      ...result,
+      success: false,
+      status: 502,
+      stage: 'provider_identity_mismatch',
+      error: identityError.message,
+      code: identityError.code,
+    };
+    await saveInvoiceSyncFailure(invoice, provider, mismatchResult, options);
+    throw createServiceError(mismatchResult);
+  }
+
   const normalized = normalizeRemoteStatus(remote, 'invoice');
   const previousStatus = invoice.status || invoice?.provider?.status || 'pending';
   const now = new Date();
   const links = extractLinks(remote);
-  const remoteNumber = cleanText(firstValue(remote.number, invoice?.provider?.number, invoice.invoiceNumber), 160);
-  const remoteCufe = cleanText(firstValue(remote.cufe, invoice?.provider?.cufe, invoice.cufe), 220);
   const validatedAt = firstValue(remote.validated_at, remote.validatedAt, invoice?.provider?.validatedAt, '');
   const message = providerMessage(
     result,
@@ -659,6 +724,7 @@ async function syncCreditNote(invoiceIdentifier, noteIdentifier, options = {}) {
 
 module.exports = {
   extractRemoteDocument,
+  assertRemoteIdentity,
   normalizeRemoteStatus,
   resolveFactusInvoiceNumber,
   syncCreditNote,
