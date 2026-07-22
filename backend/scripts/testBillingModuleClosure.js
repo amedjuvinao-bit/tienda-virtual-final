@@ -26,6 +26,7 @@ const BILLING_TESTS = [
   ['Datos fiscales del checkout', 'testBillingFiscalCheckoutModule.js'],
   ['Motor único e idempotencia', 'testBillingIdempotencyModule.js'],
   ['Seguridad y permisos', 'testBillingSecurityModule.js'],
+  ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
 ];
 
 const results = { ok: 0, fail: 0 };
