@@ -69,6 +69,29 @@ const InvoiceTotalsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const OfficialDocumentFileSchema = new mongoose.Schema(
+  {
+    available: { type: Boolean, default: false },
+    provider: { type: String, default: '' },
+    invoiceNumber: { type: String, default: '' },
+    cufe: { type: String, default: '' },
+    fileName: { type: String, default: '' },
+    contentType: { type: String, default: '' },
+    byteLength: { type: Number, default: 0 },
+    sha256: { type: String, default: '' },
+    lastDownloadedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const OfficialDocumentsSchema = new mongoose.Schema(
+  {
+    pdf: { type: OfficialDocumentFileSchema, default: undefined },
+    xml: { type: OfficialDocumentFileSchema, default: undefined },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
     type: {
@@ -242,6 +265,11 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
     xmlUrl: String,
     xmlContent: String,
     qrUrl: String,
+
+    officialDocuments: {
+      type: OfficialDocumentsSchema,
+      default: undefined,
+    },
 
     provider: {
       name: { type: String, default: '' },
