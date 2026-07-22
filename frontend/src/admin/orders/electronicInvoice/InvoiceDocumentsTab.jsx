@@ -9,23 +9,17 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import api from '../../../lib/api';
+import { getDownloadErrorMessage } from '../../billing/api/adminBillingApi';
 import useAdminPermissions from '../../security/useAdminPermissions';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-export default function InvoiceDocumentsTab({ invoice }) {
+export default function InvoiceDocumentsTab({ order, invoice }) {
   const { can } = useAdminPermissions();
   const canDownload = can('billing:download');
-  const xmlUrl =
-    invoice?.xmlUrl ||
-    invoice?.downloads?.xml?.url ||
-    invoice?.provider?.links?.xml ||
-    invoice?.provider?.raw?.links?.xml ||
-    invoice?.providerResponse?.data?.data?.links?.xml ||
-    (invoice?.orderId
-      ? `${API_BASE}/api/orders/${invoice.orderId}/invoice-xml`
-      : '') ||
-    '';
+  const orderId = order?._id || order?.id || invoice?.orderId || '';
+  const pdfUrl = orderId ? `/api/orders/${encodeURIComponent(orderId)}/pdf` : '';
+  const xmlUrl = orderId
+    ? `/api/orders/${encodeURIComponent(orderId)}/invoice-xml`
+    : '';
 
   const publicUrl =
     invoice?.publicUrl ||
@@ -36,11 +30,22 @@ export default function InvoiceDocumentsTab({ invoice }) {
     '';
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <DocumentCard
+        icon={<FileDown size={22} />}
+        title="PDF oficial"
+        description="Representación gráfica descargada de Factus con el número oficial de la factura."
+        url={pdfUrl}
+        fileName={`factura-${getInvoiceReference(invoice)}.pdf`}
+        emptyText="PDF oficial no disponible todavía."
+        protectedDownload
+        allowed={canDownload}
+      />
+
       <DocumentCard
         icon={<FileCode2 size={22} />}
-        title="XML"
-        description="Archivo técnico validado para facturación electrónica."
+        title="XML oficial"
+        description="Archivo electrónico descargado de Factus para la factura consultada."
         url={xmlUrl}
         fileName={`factura-${getInvoiceReference(invoice)}.xml`}
         emptyText="XML no disponible todavía."
@@ -50,8 +55,8 @@ export default function InvoiceDocumentsTab({ invoice }) {
 
       <DocumentCard
         icon={<ExternalLink size={22} />}
-        title="Factura pública"
-        description="Representación visual oficial generada por Factus."
+        title="Consulta pública"
+        description="Enlace público o QR informado por Factus, cuando esté disponible."
         url={publicUrl}
         fileName={`factura-${getInvoiceReference(invoice)}`}
         emptyText="Enlace público no disponible."
@@ -78,17 +83,24 @@ function DocumentCard({
 
   const hasUrl = Boolean(url);
 
-  const downloadBlob = (blob) => {
-    const blobUrl = window.URL.createObjectURL(blob);
+  const resolvedFileName = (response) => {
+    const disposition = String(response?.headers?.['content-disposition'] || '');
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    return match?.[1] || fileName || 'factura';
+  };
+
+  const downloadBlob = (blob, response) => {
+    const contentType = response?.headers?.['content-type'] || blob?.type || 'application/octet-stream';
+    const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: contentType }));
 
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = fileName || 'factura';
+    link.download = resolvedFileName(response);
     document.body.appendChild(link);
     link.click();
     link.remove();
 
-    window.URL.revokeObjectURL(blobUrl);
+    window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
   };
 
   const handleOpen = async () => {
@@ -111,7 +123,10 @@ function DocumentCard({
         responseType: 'blob',
       });
 
-      const blobUrl = window.URL.createObjectURL(response.data);
+      const contentType = response?.headers?.['content-type'] || 'application/octet-stream';
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: contentType })
+      );
       window.open(blobUrl, '_blank', 'noopener,noreferrer');
 
       window.setTimeout(() => {
@@ -119,7 +134,12 @@ function DocumentCard({
       }, 3000);
     } catch (openError) {
       console.error('Error abriendo documento de factura:', openError);
-      setError('No fue posible abrir el archivo XML.');
+      setError(
+        await getDownloadErrorMessage(
+          openError,
+          `No fue posible abrir ${title.toLowerCase()}.`
+        )
+      );
     } finally {
       setLoadingAction('');
     }
@@ -141,7 +161,7 @@ function DocumentCard({
           responseType: 'blob',
         });
 
-        downloadBlob(response.data);
+        downloadBlob(response.data, response);
         return;
       }
 
@@ -155,7 +175,12 @@ function DocumentCard({
       downloadBlob(blob);
     } catch (downloadError) {
       console.error('Error descargando documento de factura:', downloadError);
-      setError('No fue posible descargar el archivo.');
+      setError(
+        await getDownloadErrorMessage(
+          downloadError,
+          `No fue posible descargar ${title.toLowerCase()}.`
+        )
+      );
     } finally {
       setLoadingAction('');
     }
