@@ -1,0 +1,248 @@
+/* eslint-disable no-console */
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+process.env.BILLING_ENCRYPTION_KEY =
+  process.env.BILLING_ENCRYPTION_KEY ||
+  'billing-configuration-test-key-32-characters-minimum';
+
+const {
+  FACTUS_API_URLS,
+  buildRuntimeFactusConfig,
+  calculateColombianNitDv,
+  decryptBillingSecret,
+  encryptBillingSecret,
+  prepareBillingConfigurationForStorage,
+  resolveFactusApiUrl,
+} = require('../lib/billing/billingConfigurationSecurity');
+const {
+  buildAdminSiteSettings,
+  stripProtectedWriteFields,
+} = require('../lib/siteSettingsSecurity');
+
+const ROOT = path.join(__dirname, '..', '..');
+const results = { ok: 0, fail: 0 };
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function ok(message) {
+  results.ok += 1;
+  console.log(`OK  ${message}`);
+}
+
+function read(relativePath) {
+  const fullPath = path.join(ROOT, relativePath);
+  assert(fs.existsSync(fullPath), `No existe ${relativePath}`);
+  return fs.readFileSync(fullPath, 'utf8');
+}
+
+function expectCode(fn, code) {
+  let captured = null;
+  try {
+    fn();
+  } catch (error) {
+    captured = error;
+  }
+  assert(captured, `Se esperaba el error ${code}.`);
+  assert(captured.code === code, `Se esperaba ${code}, llegó ${captured.code || captured.message}.`);
+}
+
+function validBilling(overrides = {}) {
+  const base = {
+    fiscalInfo: {
+      businessName: 'Tienda Virtual SAS',
+      nit: '819003632',
+      dv: '1',
+      billingEmail: 'facturacion@tienda.test',
+      address: 'Calle 1 # 2-3',
+      city: 'Zona Bananera',
+      municipalityCode: '47980',
+      department: 'Magdalena',
+      departmentCode: '47',
+      country: 'CO',
+    },
+    dianResolution: {
+      rangeFrom: 1,
+      rangeTo: 1000,
+      currentNumber: 1,
+      documentType: '01',
+    },
+    dian: { enabled: true, mode: 'habilitation', environment: '2' },
+    electronicProvider: {
+      provider: 'factus',
+      apiUrl: FACTUS_API_URLS.habilitacion,
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      username: 'usuario@tienda.test',
+      password: 'password-seguro',
+    },
+    taxes: {
+      iva: { enabled: true, percent: 19, code: 'OTRO', name: 'Otro' },
+    },
+    legalTexts: {},
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    fiscalInfo: { ...base.fiscalInfo, ...(overrides.fiscalInfo || {}) },
+    dianResolution: { ...base.dianResolution, ...(overrides.dianResolution || {}) },
+    dian: { ...base.dian, ...(overrides.dian || {}) },
+    electronicProvider: {
+      ...base.electronicProvider,
+      ...(overrides.electronicProvider || {}),
+    },
+    taxes: { ...base.taxes, ...(overrides.taxes || {}) },
+  };
+}
+
+function testOfficialUrlBoundary() {
+  assert(
+    resolveFactusApiUrl('habilitation') === 'https://api-sandbox.factus.com.co',
+    'Habilitación debe usar el dominio sandbox oficial.'
+  );
+  assert(
+    resolveFactusApiUrl('production') === 'https://api.factus.com.co',
+    'Producción debe usar el dominio oficial.'
+  );
+  expectCode(
+    () =>
+      prepareBillingConfigurationForStorage(
+        validBilling({ electronicProvider: { apiUrl: 'https://malicioso.example' } }),
+        {}
+      ),
+    'FACTUS_API_URL_NOT_ALLOWED'
+  );
+  ok('Factus solo usa URLs oficiales derivadas del ambiente');
+}
+
+function testEncryptionAndRedaction() {
+  const encrypted = encryptBillingSecret('secreto-prueba');
+  assert(encrypted.startsWith('billing:v1:'), 'El secreto debe quedar versionado.');
+  assert(!encrypted.includes('secreto-prueba'), 'No puede persistirse texto plano.');
+  assert(decryptBillingSecret(encrypted) === 'secreto-prueba', 'El descifrado debe ser íntegro.');
+
+  const prepared = prepareBillingConfigurationForStorage(validBilling(), {});
+  assert(prepared.electronicProvider.clientSecret.startsWith('billing:v1:'), 'Client Secret sin cifrar.');
+  assert(prepared.electronicProvider.password.startsWith('billing:v1:'), 'Contraseña sin cifrar.');
+
+  const runtime = buildRuntimeFactusConfig(prepared);
+  assert(runtime.clientSecret === 'client-secret', 'Runtime no recuperó Client Secret.');
+  assert(runtime.password === 'password-seguro', 'Runtime no recuperó contraseña.');
+
+  const safe = buildAdminSiteSettings({ billing: prepared });
+  assert(safe.billing.electronicProvider.clientSecret === undefined, 'Client Secret llegó al navegador.');
+  assert(safe.billing.electronicProvider.password === undefined, 'Contraseña llegó al navegador.');
+  ok('Credenciales usan AES-256-GCM y no regresan al navegador');
+}
+
+function testAuthoritativeValidation() {
+  expectCode(
+    () => prepareBillingConfigurationForStorage(validBilling({ electronicProvider: { provider: 'siigo' } }), {}),
+    'BILLING_PROVIDER_NOT_IMPLEMENTED'
+  );
+  expectCode(
+    () => prepareBillingConfigurationForStorage(validBilling({ fiscalInfo: { dv: '9' } }), {}),
+    'BILLING_NIT_DV_INVALID'
+  );
+  expectCode(
+    () =>
+      prepareBillingConfigurationForStorage(
+        validBilling({ dianResolution: { rangeFrom: 100, rangeTo: 10, currentNumber: 50 } }),
+        {}
+      ),
+    'BILLING_RANGE_INVALID'
+  );
+
+  const prepared = prepareBillingConfigurationForStorage(validBilling(), {});
+  assert(calculateColombianNitDv('819003632') === '1', 'Cálculo de DV incorrecto.');
+  assert(prepared.dian.mode === 'habilitacion', 'Modo no normalizado.');
+  assert(prepared.electronicProvider.provider === 'factus', 'Proveedor externo distinto de Factus.');
+  assert(prepared.taxes.iva.code === '01' && prepared.taxes.iva.name === 'IVA', 'Impuesto incoherente.');
+  ok('NIT, DV, rangos, proveedor e IVA tienen validación autoritativa');
+}
+
+function testProductionFailClosed() {
+  expectCode(
+    () =>
+      prepareBillingConfigurationForStorage(
+        validBilling({
+          dian: { mode: 'production', environment: '1' },
+          electronicProvider: { apiUrl: FACTUS_API_URLS.production },
+        }),
+        {}
+      ),
+    'BILLING_PRODUCTION_NOT_READY'
+  );
+  ok('Producción queda bloqueada sin conexión y rangos verificados');
+}
+
+function testDedicatedRouteAndPermissions() {
+  expectCode(
+    () => stripProtectedWriteFields({ 'billing.electronicProvider.provider': 'factus' }),
+    'BILLING_DEDICATED_ENDPOINT_REQUIRED'
+  );
+
+  const index = read('backend/index.js');
+  const protectedIndex = index.indexOf("app.use('/api/site-settings', billingSettingsProtectionRoutes)");
+  const genericIndex = index.indexOf("app.use('/api/site-settings', siteSettingsRoutes)");
+  assert(protectedIndex >= 0 && genericIndex > protectedIndex, 'Orden de rutas inseguro.');
+
+  const route = read('backend/routes/billingSettingsProtection.js');
+  assert(route.includes("requirePermission('billing:settings')"), 'Guardar no exige billing:settings.');
+  assert(route.includes('updateBillingConfiguration'), 'La ruta no usa el servicio seguro.');
+  ok('La escritura fiscal queda aislada y protegida por permiso específico');
+}
+
+function testRealConnectionAndRuntime() {
+  const route = read('backend/routes/dianProviderTest.js');
+  const service = read('backend/services/billingConfigurationService.js');
+  const adapter = read('backend/lib/dian/providerAdapter.js');
+
+  assert(!route.includes('mock_ready') && !route.includes('config_ready'), 'La prueba todavía simula éxito.');
+  assert(service.includes('/oauth/token'), 'No existe autenticación OAuth real.');
+  assert(service.includes('/v2/companies'), 'No se verifica la empresa vinculada.');
+  assert(adapter.includes('buildRuntimeFactusConfig'), 'La emisión no atraviesa la frontera segura.');
+  ['dianDirectProvider', 'carvajalProvider', 'siigoProvider', 'alegraProvider'].forEach((name) => {
+    assert(!adapter.includes(name), `${name} permanece habilitado.`);
+  });
+  ok('Conexión y emisión utilizan únicamente Factus con credenciales seguras');
+}
+
+function testRegistration() {
+  const packageFile = read('backend/package.json');
+  assert(packageFile.includes('test:billing-configuration'), 'Falta registrar la prueba.');
+  ok('Prueba de configuración registrada');
+}
+
+function main() {
+  console.log('\nValidando Configuración de Facturación...');
+  const tests = [
+    testOfficialUrlBoundary,
+    testEncryptionAndRedaction,
+    testAuthoritativeValidation,
+    testProductionFailClosed,
+    testDedicatedRouteAndPermissions,
+    testRealConnectionAndRuntime,
+    testRegistration,
+  ];
+
+  tests.forEach((test) => {
+    try {
+      test();
+    } catch (error) {
+      results.fail += 1;
+      console.error(`FAIL ${test.name}`);
+      console.error(`     ${error.message}`);
+    }
+  });
+
+  console.log(`\nResumen Configuración Facturación -> OK: ${results.ok} FAIL: ${results.fail}`);
+  if (results.fail > 0) process.exit(1);
+}
+
+main();
