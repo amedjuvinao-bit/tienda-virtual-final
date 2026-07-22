@@ -52,14 +52,66 @@ export async function downloadOrderPdf(orderId) {
   const response = await api.get(`/api/orders/${orderId}/pdf`, {
     responseType: 'blob',
   });
-  return response.data;
+  return normalizeDownloadResponse(response, `factura-${orderId}.pdf`);
 }
 
 export async function downloadOrderInvoiceXml(orderId) {
   const response = await api.get(`/api/orders/${orderId}/invoice-xml`, {
     responseType: 'blob',
   });
-  return response.data;
+  return normalizeDownloadResponse(response, `factura-${orderId}.xml`);
+}
+
+function normalizeDownloadResponse(response, fallbackFileName) {
+  const disposition = String(response?.headers?.['content-disposition'] || '');
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  const basicMatch = disposition.match(/filename="?([^";]+)"?/i);
+  let fileName = fallbackFileName;
+
+  try {
+    fileName = decodeURIComponent(utf8Match?.[1] || basicMatch?.[1] || fallbackFileName);
+  } catch {
+    fileName = basicMatch?.[1] || fallbackFileName;
+  }
+
+  return {
+    blob: response.data,
+    fileName,
+    contentType: response?.headers?.['content-type'] || 'application/octet-stream',
+    source: response?.headers?.['x-invoice-document-source'] || '',
+    invoiceNumber: response?.headers?.['x-invoice-number'] || '',
+  };
+}
+
+export function downloadBlob(download, fallbackFileName = 'factura') {
+  const blob = download?.blob || download;
+  const fileName = download?.fileName || fallbackFileName;
+  const contentType = download?.contentType || blob?.type || 'application/octet-stream';
+  const url = URL.createObjectURL(new Blob([blob], { type: contentType }));
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function getDownloadErrorMessage(error, fallbackMessage) {
+  const data = error?.response?.data;
+
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      const parsed = JSON.parse(text);
+      return parsed?.message || parsed?.error || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
+  return data?.message || data?.error || error?.message || fallbackMessage;
 }
 
 export function openBlob(blob, mimeType = 'application/octet-stream') {
@@ -79,5 +131,7 @@ export default {
   getBillingSettings,
   downloadOrderPdf,
   downloadOrderInvoiceXml,
+  downloadBlob,
+  getDownloadErrorMessage,
   openBlob,
 };
