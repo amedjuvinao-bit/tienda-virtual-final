@@ -4,6 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   BarChart3,
+  Check,
   CircleDollarSign,
   ClipboardList,
   CreditCard,
@@ -354,31 +355,38 @@ function MessageBox({ children, tone = 'error' }) {
   );
 }
 
-function BillingMetricCard({ label, value, helper, icon: Icon }) {
+function BillingMetricCard({ label, value, helper, icon: Icon, featured = false, className = '' }) {
   return (
     <article
-      className="rounded-[26px] border p-4 shadow-sm"
+      className={`relative min-w-0 overflow-hidden rounded-[26px] border p-5 shadow-sm ${className}`}
       style={{
-        background: 'var(--admin-card-bg)',
-        borderColor: 'var(--admin-card-border)',
+        background: featured
+          ? 'linear-gradient(135deg, var(--admin-active-nav-bg), var(--admin-card-bg) 72%)'
+          : 'var(--admin-card-bg)',
+        borderColor: featured ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         color: 'var(--admin-card-text)',
       }}
     >
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ background: featured ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)' }}
+      />
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>
             {label}
           </p>
-          <p className="mt-2 text-2xl font-black">{value}</p>
-          <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <p className={`${featured ? 'text-3xl' : 'text-2xl'} mt-2 break-words font-black leading-tight [overflow-wrap:anywhere]`}>{value}</p>
+          <p className="mt-2 break-words text-xs font-semibold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
             {helper}
           </p>
         </div>
         <span
-          className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
           style={{
-            borderColor: 'var(--admin-card-border)',
-            background: 'var(--admin-soft-bg)',
+            borderColor: featured ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
+            background: featured ? 'var(--admin-card-bg)' : 'var(--admin-soft-bg)',
           }}
         >
           <Icon className="h-5 w-5" />
@@ -474,13 +482,13 @@ function PanelHeader({ eyebrow, title, text, children }) {
         color: 'var(--admin-card-text)',
       }}
     >
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
             {eyebrow}
           </p>
           <h3 className="mt-1 text-2xl font-black">{title}</h3>
-          <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <p className="mt-1 max-w-3xl break-words text-sm font-semibold leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>
             {text}
           </p>
         </div>
@@ -1457,113 +1465,139 @@ function BillingReportsPanel() {
   const statuses = Array.isArray(breakdowns.statuses) ? breakdowns.statuses : [];
   const paymentMethods = Array.isArray(breakdowns.paymentMethods) ? breakdowns.paymentMethods : [];
   const daily = Array.isArray(breakdowns.daily) ? breakdowns.daily : [];
+  const paymentMaximum = Math.max(1, ...paymentMethods.map((row) => Math.abs(Number(row.net) || 0)));
+  const dailyMaximum = Math.max(1, ...daily.map((row) => Math.abs(Number(row.net) || 0)));
 
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="grid min-w-0 gap-5">
       <PanelHeader
         eyebrow="Control financiero y fiscal"
         title="Reportes de facturación"
-        text="Cifras calculadas desde ElectronicInvoice y Order, con notas crédito aplicadas en su fecha real de emisión."
+        text="Una vista clara de ventas, impuestos y devoluciones, con cada nota crédito aplicada en su fecha real de emisión."
       >
-        <div className="flex flex-wrap gap-2">
-          <ActionButton icon={RefreshCw} onClick={loadReport} disabled={loading}>Actualizar</ActionButton>
-          <ActionButton icon={FileSpreadsheet} onClick={exportReport} disabled={!canDownload || exporting || loading} variant="primary">
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
+          <ActionButton className="min-h-10 whitespace-nowrap px-4" icon={RefreshCw} onClick={loadReport} disabled={loading}>Actualizar</ActionButton>
+          <ActionButton className="min-h-10 whitespace-nowrap px-4" icon={FileSpreadsheet} onClick={exportReport} disabled={!canDownload || exporting || loading} variant="primary">
             {exporting ? 'Exportando...' : 'Exportar CSV'}
           </ActionButton>
         </div>
       </PanelHeader>
 
-      <form
-        onSubmit={applyFilters}
-        className="grid gap-3 rounded-[28px] border p-4 shadow-sm md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.35fr_1.2fr_auto] xl:items-end"
+      <section
+        className="rounded-[28px] border p-4 shadow-sm md:p-5"
         style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
       >
-        <label className="grid gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Desde</span>
-          <input
-            type="date"
-            value={draftFilters.from}
-            max={draftFilters.to || undefined}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
-            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Hasta</span>
-          <input
-            type="date"
-            value={draftFilters.to}
-            min={draftFilters.from || undefined}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
-            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
-          />
-        </label>
-        <label className="grid gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Documentos</span>
-          <select
-            value={draftFilters.type}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, type: event.target.value }))}
-            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
-          >
-            {REPORT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Estado</span>
-          <select
-            value={draftFilters.status}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}
-            className="w-full rounded-2xl border px-3 py-2 text-sm font-black outline-none"
-            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
-          >
-            {REPORT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </label>
-        <div className="flex gap-2">
-          <ActionButton icon={BarChart3} onClick={applyFilters} disabled={loading} variant="primary">{loading ? 'Generando...' : 'Aplicar'}</ActionButton>
-          <ActionButton disabled={loading} onClick={resetFilters}>Limpiar</ActionButton>
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>Consulta personalizada</p>
+            <h3 className="mt-1 text-lg font-black">Filtros del reporte</h3>
+          </div>
+          <p className="text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>El CSV conservará esta misma selección.</p>
         </div>
-      </form>
+
+        <form onSubmit={applyFilters} className="grid gap-4">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="grid min-w-0 gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Desde</span>
+              <input
+                type="date"
+                value={draftFilters.from}
+                max={draftFilters.to || undefined}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
+                className="h-11 min-w-0 w-full rounded-2xl border px-3 text-sm font-black outline-none"
+                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+              />
+            </label>
+            <label className="grid min-w-0 gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Hasta</span>
+              <input
+                type="date"
+                value={draftFilters.to}
+                min={draftFilters.from || undefined}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
+                className="h-11 min-w-0 w-full rounded-2xl border px-3 text-sm font-black outline-none"
+                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+              />
+            </label>
+            <label className="grid min-w-0 gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Documentos</span>
+              <select
+                value={draftFilters.type}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, type: event.target.value }))}
+                className="h-11 min-w-0 w-full rounded-2xl border px-3 text-sm font-black outline-none"
+                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+              >
+                {REPORT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="grid min-w-0 gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Estado</span>
+              <select
+                value={draftFilters.status}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}
+                className="h-11 min-w-0 w-full rounded-2xl border px-3 text-sm font-black outline-none"
+                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))', color: 'var(--admin-card-text)' }}
+              >
+                {REPORT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <p className="break-words text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+              Período aplicado: <strong style={{ color: 'var(--admin-card-text)' }}>{formatReportDate(filters.from)} – {formatReportDate(filters.to)}</strong>
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <ActionButton className="min-h-10 min-w-[116px] whitespace-nowrap px-4" icon={BarChart3} onClick={applyFilters} disabled={loading} variant="primary">{loading ? 'Generando...' : 'Aplicar filtros'}</ActionButton>
+              <ActionButton className="min-h-10 min-w-[96px] whitespace-nowrap px-4" disabled={loading} onClick={resetFilters}>Limpiar</ActionButton>
+            </div>
+          </div>
+        </form>
+      </section>
 
       {error ? <MessageBox>{error}</MessageBox> : null}
-      {notice ? <MessageBox tone="success">{notice}</MessageBox> : null}
+      {notice ? (
+        <div
+          role="status"
+          className="flex min-w-0 items-center gap-3 rounded-[20px] border px-4 py-3 text-sm font-bold"
+          style={{ borderColor: 'rgba(16, 185, 129, 0.36)', background: 'rgba(16, 185, 129, 0.1)', color: '#047857' }}
+        >
+          <Check className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 break-words">{notice}</span>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <BillingMetricCard icon={CircleDollarSign} label="Total facturado" value={loading ? '...' : formatCurrency(metrics.invoiced)} helper={`${formatNumber(metrics.validatedInvoices)} factura(s) validada(s)`} />
-        <BillingMetricCard icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatCurrency(metrics.credited)} helper={`${formatNumber(metrics.validatedCreditNotes)} nota(s) validada(s)`} />
-        <BillingMetricCard icon={BarChart3} label="Facturación neta" value={loading ? '...' : formatCurrency(metrics.net)} helper="Facturas menos notas crédito" />
-        <BillingMetricCard icon={Percent} label="IVA neto" value={loading ? '...' : formatCurrency(metrics.netTax)} helper={`${formatCurrency(metrics.invoiceTax)} facturado · ${formatCurrency(metrics.creditedTax)} reversado`} />
-        <BillingMetricCard icon={CreditCard} label="Descuentos" value={loading ? '...' : formatCurrency(metrics.discounts)} helper={`${formatCurrency(metrics.shipping)} cobrado por envíos`} />
-        <BillingMetricCard icon={FileSpreadsheet} label="Documentos" value={loading ? '...' : formatNumber(metrics.documents)} helper={`${formatNumber(metrics.invoices)} factura(s) · ${formatNumber(metrics.creditNotes)} nota(s)`} />
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-12">
+        <BillingMetricCard className="xl:col-span-6" featured icon={BarChart3} label="Facturación neta" value={loading ? '...' : formatCurrency(metrics.net)} helper="Facturas validadas menos notas crédito validadas" />
+        <BillingMetricCard className="xl:col-span-3" icon={CircleDollarSign} label="Total facturado" value={loading ? '...' : formatCurrency(metrics.invoiced)} helper={`${formatNumber(metrics.validatedInvoices)} factura(s) validada(s)`} />
+        <BillingMetricCard className="xl:col-span-3" icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatCurrency(metrics.credited)} helper={`${formatNumber(metrics.validatedCreditNotes)} nota(s) validada(s)`} />
+        <BillingMetricCard className="xl:col-span-4" icon={Percent} label="IVA neto" value={loading ? '...' : formatCurrency(metrics.netTax)} helper={`${formatCurrency(metrics.invoiceTax)} facturado · ${formatCurrency(metrics.creditedTax)} reversado`} />
+        <BillingMetricCard className="xl:col-span-4" icon={CreditCard} label="Descuentos" value={loading ? '...' : formatCurrency(metrics.discounts)} helper={`${formatCurrency(metrics.shipping)} cobrado por envíos`} />
+        <BillingMetricCard className="xl:col-span-4" icon={FileSpreadsheet} label="Documentos" value={loading ? '...' : formatNumber(metrics.documents)} helper={`${formatNumber(metrics.invoices)} factura(s) · ${formatNumber(metrics.creditNotes)} nota(s)`} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <SummaryPanelCard eyebrow="Estados fiscales" title="Documentos por estado">
           {statuses.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <tr>
-                    <th className="px-2 py-2 text-[10px] font-black uppercase">Estado</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Facturas</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Notas</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-black uppercase">Neto fiscal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statuses.map((row) => (
-                    <tr key={row.key} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                      <td className="px-2 py-2.5"><span className="inline-flex rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.key)}>{row.label}</span></td>
-                      <td className="px-2 py-2.5 text-right font-black">{formatNumber(row.invoices)}</td>
-                      <td className="px-2 py-2.5 text-right font-black">{formatNumber(row.creditNotes)}</td>
-                      <td className="px-2 py-2.5 text-right font-black">{formatCurrency(row.net)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid gap-2">
+              {statuses.map((row) => (
+                <div
+                  key={row.key}
+                  className="grid min-w-0 gap-3 rounded-2xl border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}
+                >
+                  <div className="min-w-0">
+                    <span className="inline-flex max-w-full break-words rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.key)}>{row.label}</span>
+                    <p className="mt-2 break-words text-xs font-semibold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      {formatNumber(row.invoices)} factura(s) · {formatNumber(row.creditNotes)} nota(s)
+                    </p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Neto fiscal</p>
+                    <p className="mt-1 break-words text-base font-black [overflow-wrap:anywhere]">{formatCurrency(row.net)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay documentos para los filtros seleccionados.</p>}
         </SummaryPanelCard>
@@ -1572,12 +1606,23 @@ function BillingReportsPanel() {
           {paymentMethods.length ? (
             <div className="grid gap-2">
               {paymentMethods.slice(0, 8).map((row) => (
-                <div key={row.key} className="flex items-center justify-between gap-3 rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black">{row.label}</p>
-                    <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(row.invoices)} factura(s) · {formatNumber(row.creditNotes)} nota(s)</p>
+                <div key={row.key} className="grid min-w-0 gap-3 rounded-2xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-black">{row.label}</p>
+                      <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(row.invoices)} factura(s) · {formatNumber(row.creditNotes)} nota(s)</p>
+                    </div>
+                    <span className="shrink-0 text-right text-sm font-black">{formatCurrency(row.net)}</span>
                   </div>
-                  <span className="shrink-0 text-sm font-black">{formatCurrency(row.net)}</span>
+                  <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--admin-card-bg)' }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(4, (Math.abs(Number(row.net) || 0) / paymentMaximum) * 100)}%`,
+                        background: 'var(--admin-accent, #ec4899)',
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -1587,31 +1632,37 @@ function BillingReportsPanel() {
 
       <SummaryPanelCard eyebrow="Comportamiento diario" title="Facturación neta por fecha">
         {daily.length ? (
-          <div className="max-h-[380px] overflow-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="sticky top-0" style={{ background: 'var(--admin-card-bg)', color: 'var(--admin-card-muted-text)' }}>
-                <tr>
-                  <th className="px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Facturas</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Notas</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Facturado</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Acreditado</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-black uppercase">Neto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {daily.map((row) => (
-                  <tr key={row.key} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                    <td className="px-3 py-2.5 font-black">{formatReportDate(row.key)}</td>
-                    <td className="px-3 py-2.5 text-right font-bold">{formatNumber(row.invoices)}</td>
-                    <td className="px-3 py-2.5 text-right font-bold">{formatNumber(row.creditNotes)}</td>
-                    <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(row.invoiced)}</td>
-                    <td className="px-3 py-2.5 text-right font-bold">{formatCurrency(row.credited)}</td>
-                    <td className="px-3 py-2.5 text-right font-black">{formatCurrency(row.net)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid max-h-[430px] gap-2 overflow-y-auto pr-1">
+            {daily.map((row) => {
+              const netValue = Number(row.net) || 0;
+              return (
+                <div
+                  key={row.key}
+                  className="grid min-w-0 gap-3 rounded-2xl border p-3 md:grid-cols-[120px_minmax(0,1fr)_150px] md:items-center"
+                  style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}
+                >
+                  <div>
+                    <p className="text-sm font-black">{formatReportDate(row.key)}</p>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(row.invoices)} factura(s) · {formatNumber(row.creditNotes)} nota(s)</p>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--admin-card-bg)' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.max(3, (Math.abs(netValue) / dailyMaximum) * 100)}%`,
+                          background: netValue < 0 ? '#e11d48' : 'var(--admin-accent, #ec4899)',
+                        }}
+                      />
+                    </div>
+                    <p className="mt-2 break-words text-[11px] font-semibold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      {formatCurrency(row.invoiced)} facturado · {formatCurrency(row.credited)} acreditado
+                    </p>
+                  </div>
+                  <p className="break-words text-base font-black md:text-right [overflow-wrap:anywhere]">{formatCurrency(row.net)}</p>
+                </div>
+              );
+            })}
           </div>
         ) : <p className="text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay movimiento diario para mostrar.</p>}
       </SummaryPanelCard>
@@ -1623,32 +1674,32 @@ function BillingReportsPanel() {
       >
         {rows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead style={{ color: 'var(--admin-card-muted-text)' }}>
                 <tr>
-                  <th className="w-[14%] px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
-                  <th className="w-[20%] px-3 py-2 text-[10px] font-black uppercase">Documento</th>
-                  <th className="w-[24%] px-3 py-2 text-[10px] font-black uppercase">Cliente</th>
-                  <th className="w-[14%] px-3 py-2 text-[10px] font-black uppercase">Estado</th>
-                  <th className="w-[14%] px-3 py-2 text-right text-[10px] font-black uppercase">Total</th>
-                  <th className="w-[14%] px-3 py-2 text-right text-[10px] font-black uppercase">Impacto fiscal</th>
+                  <th className="w-[12%] px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
+                  <th className="w-[19%] px-3 py-2 text-[10px] font-black uppercase">Documento</th>
+                  <th className="w-[27%] px-3 py-2 text-[10px] font-black uppercase">Cliente</th>
+                  <th className="w-[13%] px-3 py-2 text-[10px] font-black uppercase">Estado</th>
+                  <th className="w-[13%] px-3 py-2 text-right text-[10px] font-black uppercase">Total</th>
+                  <th className="w-[16%] px-3 py-2 text-right text-[10px] font-black uppercase">Impacto fiscal</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={`${row.documentType}-${row.id}`} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                    <td className="px-3 py-3 font-bold">{formatReportDate(row.dateKey)}</td>
+                    <td className="px-3 py-3 align-top font-bold">{formatReportDate(row.dateKey)}</td>
                     <td className="px-3 py-3 align-top">
-                      <p className="truncate font-black">{row.number}</p>
-                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{row.documentTypeLabel}{row.referenceNumber ? ` · Factura ${row.referenceNumber}` : ''}</p>
+                      <p className="break-words font-black [overflow-wrap:anywhere]">{row.number}</p>
+                      <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{row.documentTypeLabel}{row.referenceNumber ? ` · Factura ${row.referenceNumber}` : ''}</p>
                     </td>
                     <td className="px-3 py-3 align-top">
-                      <p className="truncate font-black">{row.customerName}</p>
-                      <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{row.orderNumber || '—'} · {row.channel} · {row.paymentMethod}</p>
+                      <p className="break-words font-black [overflow-wrap:anywhere]">{row.customerName}</p>
+                      <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{row.orderNumber || '—'} · {row.channel} · {row.paymentMethod}</p>
                     </td>
-                    <td className="px-3 py-3"><span className="inline-flex rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.status)}>{row.statusLabel}</span></td>
-                    <td className="px-3 py-3 text-right font-black">{formatCurrency(row.total)}</td>
-                    <td className="px-3 py-3 text-right font-black">{row.validated ? formatCurrency(row.fiscalImpact) : 'Sin impacto'}</td>
+                    <td className="px-3 py-3 align-top"><span className="inline-flex max-w-full break-words rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.status)}>{row.statusLabel}</span></td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{formatCurrency(row.total)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{row.validated ? formatCurrency(row.fiscalImpact) : 'Sin impacto'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1903,25 +1954,27 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto border-b px-5 py-3 md:px-6" style={{ borderColor: 'var(--admin-card-border)' }}>
-          {visibleTabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <NavLink
-                key={tab.id}
-                to={`${BASE_PATH}/${tab.id}`}
-                className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-black transition"
-                style={({ isActive }) => ({
-                  borderColor: isActive ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
-                  background: isActive ? 'var(--admin-active-nav-bg)' : 'var(--admin-soft-bg)',
-                  color: isActive ? 'var(--admin-active-nav-text)' : 'var(--admin-card-text)',
-                })}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="whitespace-nowrap">{tab.label}</span>
-              </NavLink>
-            );
-          })}
+        <div className="overflow-x-auto border-b px-4 py-3 md:px-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <nav className="flex min-w-max items-center gap-1.5" aria-label="Secciones de facturación">
+            {visibleTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <NavLink
+                  key={tab.id}
+                  to={`${BASE_PATH}/${tab.id}`}
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black transition"
+                  style={({ isActive }) => ({
+                    borderColor: isActive ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
+                    background: isActive ? 'var(--admin-active-nav-bg)' : 'var(--admin-soft-bg)',
+                    color: isActive ? 'var(--admin-active-nav-text)' : 'var(--admin-card-text)',
+                  })}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{tab.label}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
         </div>
 
         <div className="p-5 md:p-6">{renderContent()}</div>

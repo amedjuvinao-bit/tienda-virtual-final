@@ -144,6 +144,36 @@ function validateFrontend() {
     ],
     'Pestaña Reportes muestra filtros, indicadores, desgloses y exportación'
   );
+  assertIncludes(
+    pageFile,
+    [
+      'aria-label="Secciones de facturación"',
+      'flex min-w-max items-center gap-1.5',
+      'shrink-0 items-center justify-center gap-1.5 whitespace-nowrap',
+    ],
+    'Navegación de Facturación conserva una sola línea y no recorta Configuración'
+  );
+  assertIncludes(
+    pageFile,
+    [
+      'sm:grid-cols-2 xl:grid-cols-4',
+      'Filtros del reporte',
+      'Aplicar filtros',
+      'xl:col-span-6',
+      'featured icon={BarChart3}',
+    ],
+    'Reportes separa filtros y prioriza visualmente la facturación neta'
+  );
+  assertIncludes(
+    pageFile,
+    [
+      'paymentMaximum',
+      'dailyMaximum',
+      'break-words font-black [overflow-wrap:anywhere]">{row.number}',
+      'break-words font-black [overflow-wrap:anywhere]">{row.customerName}',
+    ],
+    'Estados, tendencias y detalle evitan textos cortados y desbordamientos'
+  );
 }
 
 function validateRegistration() {
