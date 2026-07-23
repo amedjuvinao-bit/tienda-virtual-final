@@ -28,6 +28,7 @@ const BILLING_TESTS = [
   ['Seguridad y permisos', 'testBillingSecurityModule.js'],
   ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
   ['Conexión real y readiness de Factus', 'testBillingConnectionModule.js'],
+  ['Compatibilidad de datos fiscales históricos', 'testBillingFiscalCompatibilityModule.js'],
 ];
 
 const results = { ok: 0, fail: 0 };
