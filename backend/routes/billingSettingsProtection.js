@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const SiteSettings = require('../models/SiteSettings');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
@@ -18,6 +19,8 @@ const {
 } = require('../services/billingNumberingRangePersistenceService');
 const {
   BillingConfigurationError,
+  PRODUCTION_MODE,
+  normalizeMode,
 } = require('../lib/billing/billingConfigurationSecurity');
 
 const router = express.Router();
@@ -85,6 +88,25 @@ function preserveSynchronizedRangeIds(billing = {}) {
   };
 }
 
+async function assertDedicatedFirstProductionActivation(incomingBilling = {}) {
+  const stored = await SiteSettings.findOne()
+    .select('billing.dian.mode')
+    .lean();
+  const storedMode = normalizeMode(stored?.billing?.dian?.mode);
+  const requestedMode = normalizeMode(
+    incomingBilling?.dian?.mode ?? stored?.billing?.dian?.mode
+  );
+
+  if (requestedMode === PRODUCTION_MODE && storedMode !== PRODUCTION_MODE) {
+    throw new BillingConfigurationError(
+      'La primera activación de Producción debe realizarse con el botón “Validar todo y activar producción”.',
+      'BILLING_PRODUCTION_DEDICATED_ACTIVATION_REQUIRED',
+      409,
+      ['usar el flujo de activación productiva por cliente']
+    );
+  }
+}
+
 // Intercepta la lectura administrativa antes del router genérico para migrar
 // credenciales antiguas, normalizar datos fiscales históricos, ocultar secretos
 // y calcular el estado real de producción.
@@ -125,6 +147,7 @@ router.put('/', (req, res, next) => {
           );
         }
 
+        await assertDedicatedFirstProductionActivation(body.billing);
         const rangeSnapshot = await readNumberingRangeSnapshot();
         const hydratedBilling = await hydrateBillingConfiguration(
           preserveSynchronizedRangeIds(body.billing)
