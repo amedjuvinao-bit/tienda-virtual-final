@@ -13,6 +13,13 @@ const FACTUS_RANGE_DOCUMENTS = Object.freeze({
   creditNote: '22',
 });
 
+const SECRET_FIELDS = Object.freeze([
+  'clientSecret',
+  'password',
+  'softwarePin',
+  'technicalKey',
+]);
+
 function cleanText(value, max = 500) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
@@ -22,6 +29,11 @@ function toInteger(value, fallback = 0) {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
 }
 
+function positiveInteger(value) {
+  const parsed = toInteger(value, 0);
+  return parsed > 0 ? parsed : 0;
+}
+
 function toBoolean(value, fallback = false) {
   if (value === true || value === 1 || value === '1') return true;
   if (value === false || value === 0 || value === '0') return false;
@@ -29,8 +41,13 @@ function toBoolean(value, fallback = false) {
 }
 
 function isoDate(value) {
-  const normalized = cleanText(value, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '';
+  const normalized = cleanText(value, 20);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+
+  const dmy = normalized.match(/^(\d{2})[-/]([0-1]\d)[-/](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+
+  return '';
 }
 
 function todayIso() {
@@ -50,32 +67,61 @@ function extractRangeList(payload = {}) {
   return candidates.find(Array.isArray) || [];
 }
 
-function rangeDocumentCode(range = {}, fallback = '') {
+function normalizeDocumentCode(value, expectedDocument = '') {
+  const raw = cleanText(value, 160);
+  const normalized = raw.toLowerCase();
+
+  if (raw === FACTUS_RANGE_DOCUMENTS.invoice) {
+    return FACTUS_RANGE_DOCUMENTS.invoice;
+  }
+  if (raw === FACTUS_RANGE_DOCUMENTS.creditNote) {
+    return FACTUS_RANGE_DOCUMENTS.creditNote;
+  }
+  if (normalized.includes('nota') && normalized.includes('cr')) {
+    return FACTUS_RANGE_DOCUMENTS.creditNote;
+  }
+  if (normalized.includes('factura')) {
+    return FACTUS_RANGE_DOCUMENTS.invoice;
+  }
+
+  return cleanText(expectedDocument, 20);
+}
+
+function rangeDocumentCode(range = {}, expectedDocument = '') {
   const document = range?.document;
-  return cleanText(
+  const raw =
     document?.code ||
-      document?.id ||
-      range?.document_code ||
-      range?.document_id ||
-      (typeof document === 'string' || typeof document === 'number' ? document : '') ||
-      fallback,
-    20
-  );
+    document?.id ||
+    range?.document_code ||
+    range?.document_id ||
+    range?.documentCode ||
+    (typeof document === 'string' || typeof document === 'number'
+      ? document
+      : '');
+
+  return normalizeDocumentCode(raw, expectedDocument);
 }
 
 function rangeDocumentName(range = {}, fallback = '') {
   const document = range?.document;
   return cleanText(
-    document?.name || range?.document_name || range?.documentName || fallback,
+    document?.name ||
+      range?.document_name ||
+      range?.documentName ||
+      (typeof document === 'string' && !/^\d+$/.test(document)
+        ? document
+        : '') ||
+      fallback,
     160
   );
 }
 
 function normalizeFactusRange(range = {}, expectedDocument = '') {
-  const id = toInteger(range?.id || range?.numbering_range_id, 0);
-  const from = toInteger(range?.from ?? range?.range_from, 0);
-  const to = toInteger(range?.to ?? range?.range_to, 0);
-  const current = toInteger(range?.current ?? range?.current_number, from);
+  const id = positiveInteger(range?.id || range?.numbering_range_id);
+  const from = positiveInteger(range?.from ?? range?.range_from);
+  const to = positiveInteger(range?.to ?? range?.range_to);
+  const rawCurrent = toInteger(range?.current ?? range?.current_number, 0);
+  const current = rawCurrent > 0 ? rawCurrent : from;
   const startDate = isoDate(range?.start_date || range?.resolution_date);
   const endDate = isoDate(range?.end_date || range?.expiration_date);
   const document = rangeDocumentCode(range, expectedDocument);
@@ -110,14 +156,20 @@ function normalizeFactusRange(range = {}, expectedDocument = '') {
     from,
     to,
     current,
-    resolutionNumber: cleanText(range?.resolution_number, 120),
+    resolutionNumber: cleanText(
+      range?.resolution_number || range?.resolutionNumber,
+      120
+    ),
     startDate,
     endDate,
     active,
     expired: expiredByFlag || expiredByDate,
     exhausted,
     eligible,
-    technicalKey: cleanText(range?.technical_key, 1000),
+    technicalKey: cleanText(
+      range?.technical_key || range?.technicalKey,
+      1000
+    ),
   };
 }
 
@@ -125,6 +177,63 @@ function publicRange(range = {}) {
   const { technicalKey, ...safe } = range;
   void technicalKey;
   return safe;
+}
+
+function candidateBillingFromPayload(payload = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
+  if (payload.billing && typeof payload.billing === 'object') return payload.billing;
+  return payload;
+}
+
+function preserveSecret(incomingValue, storedValue) {
+  return cleanText(incomingValue, 2000) ? incomingValue : storedValue;
+}
+
+function mergeCandidateBilling(storedBilling = {}, payload = {}) {
+  const incoming = candidateBillingFromPayload(payload);
+  const storedProvider = storedBilling?.electronicProvider || {};
+  const incomingProvider = incoming?.electronicProvider || {};
+  const provider = {
+    ...storedProvider,
+    ...incomingProvider,
+  };
+
+  SECRET_FIELDS.forEach((field) => {
+    provider[field] = preserveSecret(
+      incomingProvider?.[field],
+      storedProvider?.[field]
+    );
+  });
+
+  // El navegador nunca decide el estado de verificación ni la vinculación de
+  // rangos. Estos metadatos siempre salen del documento persistido.
+  [
+    'lastConnectionStatus',
+    'lastConnectionMessage',
+    'lastConnectionAt',
+    'lastConnectionEnvironment',
+    'lastConnectionFingerprint',
+    'lastConnectionCompany',
+    'numberingRangesEnvironment',
+    'numberingRangesFingerprint',
+    'numberingRangesSyncedAt',
+  ].forEach((field) => {
+    provider[field] = storedProvider?.[field];
+  });
+
+  return {
+    ...storedBilling,
+    ...incoming,
+    dian: {
+      ...(storedBilling?.dian || {}),
+      ...(incoming?.dian || {}),
+    },
+    dianResolution: {
+      ...(storedBilling?.dianResolution || {}),
+      ...(incoming?.dianResolution || {}),
+    },
+    electronicProvider: provider,
+  };
 }
 
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 20000) {
@@ -233,7 +342,7 @@ async function fetchRangesByDocument(runtime, token, documentCode) {
   }
 }
 
-async function getCurrentContext() {
+async function getCurrentContext(candidatePayload = {}) {
   const settings = await SiteSettings.findOne();
   if (!settings) {
     throw new BillingConfigurationError(
@@ -243,12 +352,13 @@ async function getCurrentContext() {
     );
   }
 
-  const billing = settings?.billing?.toObject
+  const storedBilling = settings?.billing?.toObject
     ? settings.billing.toObject({ depopulate: true })
     : settings.billing || {};
+  const billing = mergeCandidateBilling(storedBilling, candidatePayload);
   const runtime = buildRuntimeFactusConfig(billing);
   const fingerprint = buildFactusCredentialFingerprint(runtime);
-  const provider = billing?.electronicProvider || {};
+  const provider = storedBilling?.electronicProvider || {};
 
   if (
     provider.lastConnectionStatus !== 'success' ||
@@ -256,13 +366,20 @@ async function getCurrentContext() {
     provider.lastConnectionFingerprint !== fingerprint
   ) {
     throw new BillingConfigurationError(
-      'Debes verificar nuevamente la conexión real con Factus antes de consultar rangos.',
+      'Debes verificar nuevamente la conexión real con Factus para este ambiente y estas credenciales antes de consultar rangos.',
       'FACTUS_CONNECTION_REQUIRED_FOR_NUMBERING_RANGES',
       409
     );
   }
 
-  return { settings, billing, provider, runtime, fingerprint };
+  return {
+    settings,
+    storedBilling,
+    billing,
+    provider,
+    runtime,
+    fingerprint,
+  };
 }
 
 async function invalidateNumberingRangesIfContextChanged(billingPayload = {}) {
@@ -275,19 +392,9 @@ async function invalidateNumberingRangesIfContextChanged(billingPayload = {}) {
   let runtime;
 
   try {
-    const candidate = {
-      ...storedBilling,
-      ...(billingPayload?.billing || {}),
-      dian: {
-        ...(storedBilling.dian || {}),
-        ...(billingPayload?.billing?.dian || {}),
-      },
-      electronicProvider: {
-        ...(storedBilling.electronicProvider || {}),
-        ...(billingPayload?.billing?.electronicProvider || {}),
-      },
-    };
-    runtime = buildRuntimeFactusConfig(candidate);
+    runtime = buildRuntimeFactusConfig(
+      mergeCandidateBilling(storedBilling, billingPayload)
+    );
   } catch {
     return false;
   }
@@ -295,8 +402,8 @@ async function invalidateNumberingRangesIfContextChanged(billingPayload = {}) {
   const provider = storedBilling.electronicProvider || {};
   const fingerprint = buildFactusCredentialFingerprint(runtime);
   const hasRanges =
-    toInteger(provider.numberingRangeId, 0) > 0 ||
-    toInteger(provider.creditNoteNumberingRangeId, 0) > 0;
+    positiveInteger(provider.numberingRangeId) > 0 ||
+    positiveInteger(provider.creditNoteNumberingRangeId) > 0;
   const sameContext =
     provider.numberingRangesEnvironment === runtime.environment &&
     provider.numberingRangesFingerprint === fingerprint;
@@ -322,8 +429,8 @@ async function invalidateNumberingRangesIfContextChanged(billingPayload = {}) {
   return true;
 }
 
-async function listFactusNumberingRanges() {
-  const context = await getCurrentContext();
+async function listFactusNumberingRanges(candidatePayload = {}) {
+  const context = await getCurrentContext(candidatePayload);
   const token = await authenticateFactus(context.runtime);
   const [invoiceRanges, creditNoteRanges] = await Promise.all([
     fetchRangesByDocument(
@@ -342,13 +449,15 @@ async function listFactusNumberingRanges() {
     environment: context.runtime.environment,
     syncedAt: new Date().toISOString(),
     selected: {
-      invoiceRangeId: toInteger(context.provider.numberingRangeId, 0) || null,
+      invoiceRangeId: positiveInteger(context.provider.numberingRangeId) || null,
       creditNoteRangeId:
-        toInteger(context.provider.creditNoteNumberingRangeId, 0) || null,
+        positiveInteger(context.provider.creditNoteNumberingRangeId) || null,
     },
     invoiceRanges: invoiceRanges.map(publicRange),
     creditNoteRanges: creditNoteRanges.map(publicRange),
-    eligibleInvoiceRanges: invoiceRanges.filter((range) => range.eligible).map(publicRange),
+    eligibleInvoiceRanges: invoiceRanges
+      .filter((range) => range.eligible)
+      .map(publicRange),
     eligibleCreditNoteRanges: creditNoteRanges
       .filter((range) => range.eligible)
       .map(publicRange),
@@ -361,7 +470,7 @@ async function listFactusNumberingRanges() {
 }
 
 function requireEligibleRange(ranges, id, label) {
-  const selectedId = toInteger(id, 0);
+  const selectedId = positiveInteger(id);
   const selected = ranges.find(
     (range) => range.id === selectedId && range.eligible === true
   );
@@ -378,8 +487,12 @@ function requireEligibleRange(ranges, id, label) {
   return selected;
 }
 
-async function saveFactusNumberingRangeSelection(input = {}, adminUser = 'admin') {
-  const listed = await listFactusNumberingRanges();
+async function saveFactusNumberingRangeSelection(
+  input = {},
+  adminUser = 'admin',
+  candidatePayload = {}
+) {
+  const listed = await listFactusNumberingRanges(candidatePayload);
   const invoice = requireEligibleRange(
     listed._private.invoiceRanges,
     input.invoiceRangeId,
@@ -453,7 +566,9 @@ module.exports = {
   FACTUS_RANGE_DOCUMENTS,
   extractRangeList,
   invalidateNumberingRangesIfContextChanged,
+  isoDate,
   listFactusNumberingRanges,
+  mergeCandidateBilling,
   normalizeFactusRange,
   publicRange,
   saveFactusNumberingRangeSelection,
