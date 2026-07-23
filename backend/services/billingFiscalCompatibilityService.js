@@ -32,6 +32,38 @@ function firstDigits(values = [], max = 30) {
   return '';
 }
 
+function normalizeColombianNit(rawNit, rawDv) {
+  const text = cleanText(rawNit, 40).replace(/\./g, '');
+  const suppliedDv = onlyDigits(rawDv, 2).slice(0, 1);
+  const separated = text.match(/^(\d+)\s*-\s*(\d)$/);
+  let nit = '';
+  let legacyDv = suppliedDv;
+
+  if (separated) {
+    nit = separated[1];
+    legacyDv = legacyDv || separated[2];
+  } else {
+    const digits = onlyDigits(text, 20);
+    const possibleNit = digits.slice(0, -1);
+    const possibleDv = digits.slice(-1);
+    const hasEmbeddedDv =
+      digits.length >= 8 &&
+      ((suppliedDv && possibleDv === suppliedDv) || !suppliedDv) &&
+      calculateColombianNitDv(possibleNit) === possibleDv;
+
+    nit = hasEmbeddedDv ? possibleNit : digits;
+    if (hasEmbeddedDv) legacyDv = legacyDv || possibleDv;
+  }
+
+  const calculatedDv = nit ? calculateColombianNitDv(nit) : '';
+
+  return {
+    nit,
+    dv: calculatedDv || legacyDv,
+    suppliedDv: legacyDv,
+  };
+}
+
 function buildCanonicalFiscalInfo({
   fiscalInfo = {},
   store = {},
@@ -48,15 +80,16 @@ function buildCanonicalFiscalInfo({
     ...incoming,
   };
 
-  const nit = firstDigits(
-    [merged.nit, merged.taxId, merged.identification, merged.documentNumber],
-    20
+  const normalizedNit = normalizeColombianNit(
+    firstText(
+      [merged.nit, merged.taxId, merged.identification, merged.documentNumber],
+      40
+    ),
+    firstDigits(
+      [merged.dv, merged.verificationDigit, merged.digitoVerificacion],
+      2
+    )
   );
-  const explicitDv = firstDigits(
-    [merged.dv, merged.verificationDigit, merged.digitoVerificacion],
-    2
-  ).slice(0, 1);
-  const calculatedDv = nit ? calculateColombianNitDv(nit) : '';
   const municipalityCode = firstDigits(
     [
       merged.municipalityCode,
@@ -82,8 +115,8 @@ function buildCanonicalFiscalInfo({
       ],
       180
     ),
-    nit,
-    dv: explicitDv || calculatedDv,
+    nit: normalizedNit.nit,
+    dv: normalizedNit.dv,
     billingEmail: firstText(
       [merged.billingEmail, merged.email, storeData.email],
       180
@@ -133,7 +166,12 @@ function buildCompatibilitySet(settings = {}) {
   canonicalFields.forEach((field) => {
     const existing = cleanText(current?.[field], 500);
     const resolved = cleanText(canonical?.[field], 500);
-    if (!existing && resolved) {
+    const deterministicFiscalField = field === 'nit' || field === 'dv';
+
+    if (
+      resolved &&
+      (!existing || (deterministicFiscalField && existing !== resolved))
+    ) {
       $set[`billing.fiscalInfo.${field}`] = resolved;
     }
   });
@@ -185,4 +223,5 @@ module.exports = {
   ensureStoredFiscalInfoCompatibility,
   hydrateBillingConfiguration,
   hydrateBillingPayload,
+  normalizeColombianNit,
 };
