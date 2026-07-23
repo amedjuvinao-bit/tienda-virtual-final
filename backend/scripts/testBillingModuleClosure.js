@@ -29,6 +29,7 @@ const BILLING_TESTS = [
   ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
   ['Conexión real y readiness de Factus', 'testBillingConnectionModule.js'],
   ['Compatibilidad de datos fiscales históricos', 'testBillingFiscalCompatibilityModule.js'],
+  ['Rangos oficiales de numeración Factus', 'testBillingNumberingRangesModule.js'],
 ];
 
 const results = { ok: 0, fail: 0 };
