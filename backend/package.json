@@ -35,6 +35,7 @@
     "test:billing-configuration": "node scripts/testBillingConfigurationModule.js",
     "test:billing-connection": "node scripts/testBillingConnectionModule.js",
     "test:billing-fiscal-compatibility": "node scripts/testBillingFiscalCompatibilityModule.js",
+    "test:billing-numbering-ranges": "node scripts/testBillingNumberingRangesModule.js",
     "test:billing-idempotency": "node scripts/testBillingIdempotencyModule.js",
     "test:billing-fiscal-checkout": "node scripts/testBillingFiscalCheckoutModule.js",
     "test:billing-totals": "node scripts/testBillingTotalsModule.js",
