@@ -182,6 +182,17 @@ function mergeConnectionCandidate(currentBilling = {}, body = {}) {
   };
 }
 
+function buildFactusConnectionRuntimeConfig(currentBilling = {}, body = {}) {
+  const candidate = mergeConnectionCandidate(currentBilling, body);
+
+  return buildRuntimeFactusConfig({
+    dian: {
+      mode: candidate?.dian?.mode,
+    },
+    electronicProvider: candidate?.electronicProvider || {},
+  });
+}
+
 function firstObject(value) {
   if (Array.isArray(value)) {
     return value.find((item) => item && typeof item === 'object') || null;
@@ -346,15 +357,12 @@ async function testFactusConnection(body = {}, options = {}) {
   const currentBilling = settings?.billing?.toObject
     ? settings.billing.toObject({ depopulate: true })
     : settings?.billing || {};
-  const candidate = prepareBillingConfigurationForStorage(
-    mergeConnectionCandidate(currentBilling, body),
-    currentBilling,
-    { skipProductionReadiness: true }
-  );
-  const runtimeConfig = buildRuntimeFactusConfig(candidate);
-  const fingerprint = buildFactusCredentialFingerprint(runtimeConfig);
+  let runtimeConfig = null;
+  let fingerprint = '';
 
   try {
+    runtimeConfig = buildFactusConnectionRuntimeConfig(currentBilling, body);
+    fingerprint = buildFactusCredentialFingerprint(runtimeConfig);
     const token = await authenticateFactus(runtimeConfig);
     const company = await fetchFactusCompany(runtimeConfig, token);
     const message = company.name
@@ -389,7 +397,7 @@ async function testFactusConnection(body = {}, options = {}) {
           error instanceof BillingConfigurationError
             ? error.message
             : 'No fue posible conectar con Factus.',
-        environment: runtimeConfig.environment,
+        environment: runtimeConfig?.environment || '',
         fingerprint: '',
       },
       options.adminUser
@@ -399,6 +407,7 @@ async function testFactusConnection(body = {}, options = {}) {
 }
 
 module.exports = {
+  buildFactusConnectionRuntimeConfig,
   getAdminSettingsWithEncryptedBilling,
   testFactusConnection,
   updateBillingConfiguration,
