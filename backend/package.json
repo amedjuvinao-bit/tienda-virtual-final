@@ -37,6 +37,7 @@
     "test:billing-fiscal-compatibility": "node scripts/testBillingFiscalCompatibilityModule.js",
     "test:billing-numbering-ranges": "node scripts/testBillingNumberingRangesModule.js",
     "test:billing-client-activation": "node scripts/testBillingClientActivationModule.js",
+    "test:billing-invoice-recovery": "node scripts/testBillingInvoiceRecoveryModule.js",
     "test:billing-resilience": "node scripts/testBillingAdvancedResilienceModule.js",
     "test:billing-resilience:strict": "node scripts/testBillingAdvancedResilienceModule.js --strict",
     "test:billing-idempotency": "node scripts/testBillingIdempotencyModule.js",
