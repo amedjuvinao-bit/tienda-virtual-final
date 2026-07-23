@@ -3,6 +3,7 @@ import FactusNumberingRangesBlock from './FactusNumberingRangesBlock';
 
 export default function DianResolutionBlock({
   value = {},
+  billing = {},
   onChange,
   credentialStatus = {},
 }) {
@@ -10,7 +11,11 @@ export default function DianResolutionBlock({
 
   return (
     <div className="grid gap-4">
-      <FactusNumberingRangesBlock value={value} onChange={onChange} />
+      <FactusNumberingRangesBlock
+        value={value}
+        billing={billing}
+        onChange={onChange}
+      />
 
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
         <strong className="block text-gray-900">Ambiente fiscal</strong>
