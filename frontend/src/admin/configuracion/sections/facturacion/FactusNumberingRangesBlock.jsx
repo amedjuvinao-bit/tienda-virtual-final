@@ -91,9 +91,11 @@ export default function FactusNumberingRangesBlock({
   value = {},
   billing = {},
   onChange,
+  onActivated,
 }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [environment, setEnvironment] = useState('');
   const [invoiceRanges, setInvoiceRanges] = useState([]);
@@ -103,6 +105,10 @@ export default function FactusNumberingRangesBlock({
   );
   const [creditNoteRangeId, setCreditNoteRangeId] = useState(
     Number(value.creditNoteNumberingRangeId || 0)
+  );
+  const [selectionSaved, setSelectionSaved] = useState(
+    Number(value.numberingRangeId || 0) > 0 &&
+      Number(value.creditNoteNumberingRangeId || 0) > 0
   );
   const [feedback, setFeedback] = useState(null);
 
@@ -128,23 +134,31 @@ export default function FactusNumberingRangesBlock({
           value.creditNoteNumberingRangeId ||
           0
       );
+      const nextInvoiceId = invoices.some(
+        (range) => Number(range.id) === storedInvoiceId
+      )
+        ? storedInvoiceId
+        : invoices.length === 1
+          ? Number(invoices[0].id)
+          : 0;
+      const nextCreditId = creditNotes.some(
+        (range) => Number(range.id) === storedCreditId
+      )
+        ? storedCreditId
+        : creditNotes.length === 1
+          ? Number(creditNotes[0].id)
+          : 0;
 
       setEnvironment(data.environment || '');
       setInvoiceRanges(invoices);
       setCreditNoteRanges(creditNotes);
-      setInvoiceRangeId(
-        invoices.some((range) => Number(range.id) === storedInvoiceId)
-          ? storedInvoiceId
-          : invoices.length === 1
-            ? Number(invoices[0].id)
-            : 0
-      );
-      setCreditNoteRangeId(
-        creditNotes.some((range) => Number(range.id) === storedCreditId)
-          ? storedCreditId
-          : creditNotes.length === 1
-            ? Number(creditNotes[0].id)
-            : 0
+      setInvoiceRangeId(nextInvoiceId);
+      setCreditNoteRangeId(nextCreditId);
+      setSelectionSaved(
+        nextInvoiceId > 0 &&
+          nextCreditId > 0 &&
+          nextInvoiceId === storedInvoiceId &&
+          nextCreditId === storedCreditId
       );
       setLoaded(true);
 
@@ -157,6 +171,7 @@ export default function FactusNumberingRangesBlock({
       }
     } catch (error) {
       setLoaded(false);
+      setSelectionSaved(false);
       setFeedback({
         type: 'error',
         message: apiError(
@@ -190,11 +205,13 @@ export default function FactusNumberingRangesBlock({
       if (typeof onChange === 'function' && data.dianResolution) {
         onChange(data.dianResolution);
       }
+      setSelectionSaved(true);
       setFeedback({
         type: 'success',
         message: data.message || 'Rangos oficiales guardados correctamente.',
       });
     } catch (error) {
+      setSelectionSaved(false);
       setFeedback({
         type: 'error',
         message: apiError(
@@ -207,8 +224,83 @@ export default function FactusNumberingRangesBlock({
     }
   };
 
+  const activateProduction = async () => {
+    if (environment !== 'production') {
+      setFeedback({
+        type: 'error',
+        message:
+          'La activación final solo se ejecuta con la cuenta productiva del propietario de la tienda.',
+      });
+      return;
+    }
+    if (!selectionSaved || !(invoiceRangeId > 0) || !(creditNoteRangeId > 0)) {
+      setFeedback({
+        type: 'error',
+        message:
+          'Guarda primero el rango oficial de facturas y el rango oficial de notas crédito.',
+      });
+      return;
+    }
+
+    try {
+      setActivating(true);
+      setFeedback(null);
+      const candidate = {
+        ...billing,
+        dian: {
+          ...(billing.dian || {}),
+          enabled: true,
+          mode: 'production',
+          environment: '1',
+        },
+        dianResolution: {
+          ...(billing.dianResolution || {}),
+          ...value,
+          numberingRangeId: invoiceRangeId,
+          creditNoteNumberingRangeId: creditNoteRangeId,
+          environment: '1',
+        },
+        electronicProvider: {
+          ...(billing.electronicProvider || {}),
+          provider: 'factus',
+          numberingRangeId: invoiceRangeId,
+          creditNoteNumberingRangeId: creditNoteRangeId,
+        },
+      };
+      const { data } = await api.post(
+        '/api/dian-provider/activate-production',
+        {
+          billing: candidate,
+          invoiceRangeId,
+          creditNoteRangeId,
+        }
+      );
+
+      if (typeof onActivated === 'function' && data.settings) {
+        onActivated(data.settings);
+      }
+      setFeedback({
+        type: 'success',
+        message:
+          data.message ||
+          'Facturación electrónica activada correctamente en Producción.',
+      });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: apiError(
+          error,
+          'No fue posible activar Factus en Producción.'
+        ),
+      });
+    } finally {
+      setActivating(false);
+    }
+  };
+
   const storedInvoiceId = Number(value.numberingRangeId || 0);
   const storedCreditId = Number(value.creditNoteNumberingRangeId || 0);
+  const busy = loading || saving || activating;
 
   return (
     <div className="grid gap-4">
@@ -228,7 +320,7 @@ export default function FactusNumberingRangesBlock({
       <button
         type="button"
         onClick={queryRanges}
-        disabled={loading || saving}
+        disabled={busy}
         className="rounded-xl border border-pink-300 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? 'Consultando Factus...' : 'Consultar rangos oficiales'}
@@ -247,22 +339,29 @@ export default function FactusNumberingRangesBlock({
             label="Rango para facturas electrónicas"
             ranges={invoiceRanges}
             selectedId={invoiceRangeId}
-            onChange={setInvoiceRangeId}
+            onChange={(nextId) => {
+              setInvoiceRangeId(nextId);
+              setSelectionSaved(false);
+              setFeedback(null);
+            }}
           />
 
           <RangeSelector
             label="Rango para notas crédito"
             ranges={creditNoteRanges}
             selectedId={creditNoteRangeId}
-            onChange={setCreditNoteRangeId}
+            onChange={(nextId) => {
+              setCreditNoteRangeId(nextId);
+              setSelectionSaved(false);
+              setFeedback(null);
+            }}
           />
 
           <button
             type="button"
             onClick={saveSelection}
             disabled={
-              saving ||
-              loading ||
+              busy ||
               !(invoiceRangeId > 0) ||
               !(creditNoteRangeId > 0)
             }
@@ -270,6 +369,42 @@ export default function FactusNumberingRangesBlock({
           >
             {saving ? 'Validando y guardando...' : 'Guardar rangos seleccionados'}
           </button>
+
+          {environment === 'production' ? (
+            <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+              <div>
+                <strong className="block text-gray-900">
+                  Activación final del cliente
+                </strong>
+                <p className="mt-1">
+                  El backend volverá a verificar la empresa, ambos rangos y el
+                  correo transaccional. Esta acción no genera facturas ni notas
+                  crédito.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={activateProduction}
+                disabled={
+                  busy ||
+                  !selectionSaved ||
+                  !(invoiceRangeId > 0) ||
+                  !(creditNoteRangeId > 0)
+                }
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {activating
+                  ? 'Validando y activando...'
+                  : 'Validar todo y activar producción'}
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              La habilitación sirve para probar el módulo. La activación final
+              aparecerá cuando el propietario conecte su cuenta de Producción y
+              Factus devuelva los dos rangos oficiales.
+            </div>
+          )}
         </div>
       ) : null}
 
