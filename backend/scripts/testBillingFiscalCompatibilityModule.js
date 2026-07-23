@@ -11,6 +11,7 @@ process.env.BILLING_ENCRYPTION_KEY =
 const {
   buildCanonicalFiscalInfo,
   buildCompatibilitySet,
+  normalizeColombianNit,
 } = require('../services/billingFiscalCompatibilityService');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -55,7 +56,31 @@ function testLegacyFiscalFieldsAreReused() {
   ok('Datos fiscales históricos se normalizan sin pedirlos nuevamente');
 }
 
-function testMigrationOnlyFillsEmptyCanonicalFields() {
+function testFormattedNitAndStaleDvAreNormalized() {
+  const separated = normalizeColombianNit('819.003.632-1', '9');
+  assert(separated.nit === '819003632', 'No separó el DV incluido en el NIT.');
+  assert(separated.dv === '1', 'No corrigió el DV usando el cálculo oficial.');
+
+  const embedded = normalizeColombianNit('8190036321', '');
+  assert(embedded.nit === '819003632', 'No detectó el DV incorporado al final.');
+  assert(embedded.dv === '1', 'No conservó el DV incorporado válido.');
+
+  const { $set } = buildCompatibilitySet({
+    billing: {
+      fiscalInfo: {
+        nit: '819.003.632-1',
+        dv: '9',
+      },
+    },
+  });
+
+  assert($set['billing.fiscalInfo.nit'] === '819003632', 'No preparó la normalización del NIT.');
+  assert($set['billing.fiscalInfo.dv'] === '1', 'No preparó la corrección del DV obsoleto.');
+
+  ok('NIT con formato histórico y DV inconsistente se corrigen de forma determinística');
+}
+
+function testMigrationFillsMissingFieldsWithoutOverwritingValidNit() {
   const settings = {
     billing: {
       fiscalInfo: {
@@ -81,10 +106,10 @@ function testMigrationOnlyFillsEmptyCanonicalFields() {
   assert($set['billing.fiscalInfo.municipalityCode'] === '47980', 'No preparó el municipio.');
   assert(
     !Object.prototype.hasOwnProperty.call($set, 'billing.fiscalInfo.nit'),
-    'La migración intentó sobrescribir un NIT ya guardado.'
+    'La migración intentó sobrescribir un NIT ya normalizado.'
   );
 
-  ok('Migración completa únicamente campos canónicos vacíos');
+  ok('Migración conserva el NIT válido y completa únicamente lo necesario');
 }
 
 function testNoInventedMunicipalityCode() {
@@ -143,7 +168,8 @@ function main() {
 
   [
     testLegacyFiscalFieldsAreReused,
-    testMigrationOnlyFillsEmptyCanonicalFields,
+    testFormattedNitAndStaleDvAreNormalized,
+    testMigrationFillsMissingFieldsWithoutOverwritingValidNit,
     testNoInventedMunicipalityCode,
     testRoutesUseCompatibilityLayer,
     testFrontendShowsRequiredFiscalFields,
