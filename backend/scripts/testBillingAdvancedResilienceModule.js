@@ -15,9 +15,9 @@ const {
   createElectronicInvoiceIssuanceService,
 } = require('../services/electronicInvoiceIssuanceService');
 const {
+  buildRequestFingerprint,
   normalizePartialItems,
   normalizeRequest,
-  buildRequestFingerprint,
 } = require('../services/electronicCreditNoteService');
 const {
   requireProductionCandidate,
@@ -29,20 +29,13 @@ const {
 
 const ROOT = path.join(__dirname, '..', '..');
 const STRICT = process.argv.includes('--strict');
-const FIXED_DATE = new Date('2026-07-23T12:00:00.000Z');
 const VALID_ID = '507f1f77bcf86cd799439011';
-
-const results = {
-  ok: 0,
-  fail: [],
-  risks: [],
-};
+const FIXED_DATE = new Date('2026-07-23T12:00:00.000Z');
+const results = { ok: 0, fail: [], risks: [] };
 
 function read(relativePath) {
   const filePath = path.join(ROOT, relativePath);
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`No existe ${relativePath}`);
-  }
+  if (!fs.existsSync(filePath)) throw new Error(`No existe ${relativePath}`);
   return fs.readFileSync(filePath, 'utf8');
 }
 
@@ -62,8 +55,7 @@ function risk(severity, title, detail) {
 }
 
 function fail(title, error) {
-  const detail = error?.stack || error?.message || String(error);
-  results.fail.push({ title, detail });
+  results.fail.push({ title, error: error?.stack || error?.message || String(error) });
   console.error(`FAIL     ${title}`);
   console.error(`         ${error?.message || String(error)}`);
 }
@@ -75,12 +67,13 @@ async function expectCode(action, expectedCode) {
   } catch (error) {
     captured = error;
   }
-
-  assert(captured, `Se esperaba el error ${expectedCode}.`);
-  assert(
-    captured.code === expectedCode,
-    `Se esperaba ${expectedCode}, llegó ${captured.code || captured.message}.`
-  );
+  assert(captured, `Se esperaba ${expectedCode || 'una excepción'}.`);
+  if (expectedCode) {
+    assert(
+      captured.code === expectedCode,
+      `Se esperaba ${expectedCode}, llegó ${captured.code || captured.message}.`
+    );
+  }
   return captured;
 }
 
@@ -101,8 +94,8 @@ function query(value) {
 function setPath(target, dottedPath, value) {
   const parts = String(dottedPath).split('.');
   let current = target;
-  for (let index = 0; index < parts.length - 1; index += 1) {
-    const key = parts[index];
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const key = parts[i];
     if (!current[key] || typeof current[key] !== 'object') current[key] = {};
     current = current[key];
   }
@@ -115,8 +108,8 @@ function applySet(target, values = {}) {
   return next;
 }
 
-function baseOrder(overrides = {}) {
-  const order = {
+function validOrder(overrides = {}) {
+  const base = {
     _id: VALID_ID,
     orderNumber: 'ORD-RESILIENCE-001',
     status: 'paid',
@@ -124,7 +117,7 @@ function baseOrder(overrides = {}) {
     items: [
       {
         productId: 'SKU-1',
-        title: 'Producto de prueba',
+        title: 'Producto prueba',
         quantity: 1,
         price: 100,
         lineSubtotal: 100,
@@ -159,12 +152,7 @@ function baseOrder(overrides = {}) {
         amount: 19,
       },
     },
-    payment: {
-      status: 'paid',
-      amount: 119,
-      currency: 'COP',
-      method: 'card',
-    },
+    payment: { status: 'paid', amount: 119, currency: 'COP', method: 'card' },
     billing: {
       documentType: 'CC',
       documentNumber: '1000000000',
@@ -181,21 +169,21 @@ function baseOrder(overrides = {}) {
   };
 
   return {
-    ...order,
+    ...base,
     ...overrides,
-    pricing: { ...order.pricing, ...(overrides.pricing || {}) },
+    pricing: { ...base.pricing, ...(overrides.pricing || {}) },
     taxes: {
-      ...order.taxes,
+      ...base.taxes,
       ...(overrides.taxes || {}),
-      iva: { ...order.taxes.iva, ...(overrides.taxes?.iva || {}) },
+      iva: { ...base.taxes.iva, ...(overrides.taxes?.iva || {}) },
     },
-    payment: { ...order.payment, ...(overrides.payment || {}) },
-    billing: { ...order.billing, ...(overrides.billing || {}) },
+    payment: { ...base.payment, ...(overrides.payment || {}) },
+    billing: { ...base.billing, ...(overrides.billing || {}) },
   };
 }
 
-function externalSettings(overrides = {}) {
-  const settings = {
+function settings(overrides = {}) {
+  const base = {
     _id: 'settings-main',
     billing: {
       fiscalInfo: {
@@ -206,11 +194,7 @@ function externalSettings(overrides = {}) {
         address: 'Calle 10 # 20-30',
         municipalityCode: '11001',
       },
-      dian: {
-        enabled: true,
-        mode: 'habilitacion',
-        environment: '2',
-      },
+      dian: { enabled: true, mode: 'habilitacion', environment: '2' },
       dianResolution: {
         resolutionNumber: '18760000001',
         prefix: 'SETP',
@@ -237,25 +221,22 @@ function externalSettings(overrides = {}) {
   };
 
   return {
-    ...settings,
+    ...base,
     ...overrides,
     billing: {
-      ...settings.billing,
+      ...base.billing,
       ...(overrides.billing || {}),
       fiscalInfo: {
-        ...settings.billing.fiscalInfo,
+        ...base.billing.fiscalInfo,
         ...(overrides.billing?.fiscalInfo || {}),
       },
-      dian: {
-        ...settings.billing.dian,
-        ...(overrides.billing?.dian || {}),
-      },
+      dian: { ...base.billing.dian, ...(overrides.billing?.dian || {}) },
       dianResolution: {
-        ...settings.billing.dianResolution,
+        ...base.billing.dianResolution,
         ...(overrides.billing?.dianResolution || {}),
       },
       electronicProvider: {
-        ...settings.billing.electronicProvider,
+        ...base.billing.electronicProvider,
         ...(overrides.billing?.electronicProvider || {}),
       },
     },
@@ -263,7 +244,7 @@ function externalSettings(overrides = {}) {
 }
 
 function internalSettings() {
-  return externalSettings({
+  return settings({
     billing: {
       dian: { enabled: false, mode: 'internal', environment: '2' },
       electronicProvider: { provider: 'mock' },
@@ -271,7 +252,7 @@ function internalSettings() {
   });
 }
 
-function successfulProviderResponse(extra = {}) {
+function successResponse(extra = {}) {
   return {
     success: true,
     status: 201,
@@ -283,10 +264,7 @@ function successfulProviderResponse(extra = {}) {
         cufe: 'cufe-oficial-resilience',
         reference_code: 'ORD-RESILIENCE-001',
         is_validated: true,
-        links: {
-          pdf: 'https://factus.test/factura.pdf',
-          xml: 'https://factus.test/factura.xml',
-        },
+        links: { pdf: 'https://factus.test/a.pdf', xml: 'https://factus.test/a.xml' },
       },
       ...extra,
     },
@@ -294,9 +272,8 @@ function successfulProviderResponse(extra = {}) {
 }
 
 function invoiceHarness(options = {}) {
-  let state = options.existingInvoice || null;
+  let state = options.existing || null;
   let createCalls = 0;
-  let updateCalls = 0;
 
   const model = {
     findOne() {
@@ -305,8 +282,8 @@ function invoiceHarness(options = {}) {
     async create(payload) {
       createCalls += 1;
       if (options.duplicateOnCreate) {
-        state = options.duplicateWinner || {
-          _id: 'invoice-winner',
+        state = {
+          _id: 'winner',
           ...payload,
           status: 'processing',
           emission: { ...payload.emission, state: 'processing' },
@@ -319,19 +296,12 @@ function invoiceHarness(options = {}) {
       return state;
     },
     async findOneAndUpdate(_filter, update) {
-      updateCalls += 1;
-      const nextStatus = update?.$set?.status;
-      const isFailureUpdate = nextStatus === 'failed';
-      const isFinalUpdate = ['accepted', 'sent', 'generated'].includes(nextStatus);
-
-      if (options.throwOnFailurePersistence && isFailureUpdate) {
-        throw new Error('MongoDB unavailable while persisting provider failure');
-      }
-      if (options.throwOnFinalPersistence && isFinalUpdate) {
-        throw new Error('MongoDB unavailable after provider success');
-      }
-      if (options.nullOnFinalPersistence && isFinalUpdate) return null;
-
+      const status = update?.$set?.status;
+      const isFailure = status === 'failed';
+      const isFinal = ['accepted', 'sent', 'generated'].includes(status);
+      if (options.throwFailureWrite && isFailure) throw new Error('Mongo failure write');
+      if (options.throwFinalWrite && isFinal) throw new Error('Mongo final write');
+      if (options.nullFinalWrite && isFinal) return null;
       state = applySet(state || {}, update?.$set || {});
       return state;
     },
@@ -345,14 +315,11 @@ function invoiceHarness(options = {}) {
     get createCalls() {
       return createCalls;
     },
-    get updateCalls() {
-      return updateCalls;
-    },
   };
 }
 
-function buildService(options = {}) {
-  const invoice = options.invoice || invoiceHarness(options.invoiceOptions || {});
+function serviceHarness(options = {}) {
+  const invoice = invoiceHarness(options.invoice || {});
   let providerCalls = 0;
   let emailCalls = 0;
 
@@ -360,36 +327,32 @@ function buildService(options = {}) {
     ElectronicInvoice: invoice.model,
     Order: {
       findById() {
-        return query(options.order === undefined ? baseOrder() : options.order);
+        return query(options.order === undefined ? validOrder() : options.order);
       },
     },
     SiteSettings: {
       findOne() {
-        return query(options.settings === undefined ? externalSettings() : options.settings);
+        return query(options.settings === undefined ? settings() : options.settings);
       },
       async updateOne() {
-        if (options.settingsUpdateError) throw new Error('settings update failed');
-        return { acknowledged: true, modifiedCount: 1 };
+        return { acknowledged: true };
       },
     },
-    isValidObjectId: options.isValidObjectId || (() => true),
+    isValidObjectId: options.validId || (() => true),
     now: () => new Date(FIXED_DATE),
-    randomUUID: () => 'lock-token-resilience',
+    randomUUID: () => 'lock-resilience',
     generateCUFE: () => ({ cufe: 'local-cufe-resilience' }),
-    generateInvoiceXML:
-      options.generateInvoiceXML || (() => '<Invoice>resilience</Invoice>'),
+    generateInvoiceXML: options.xml || (() => '<Invoice />'),
     sendElectronicInvoiceToProvider: async (payload) => {
       providerCalls += 1;
       if (options.providerThrow) throw new Error(options.providerThrow);
-      if (typeof options.providerResponse === 'function') {
-        return options.providerResponse(payload);
-      }
-      return options.providerResponse || successfulProviderResponse();
+      if (typeof options.provider === 'function') return options.provider(payload);
+      return options.provider || successResponse();
     },
-    sendValidatedInvoiceEmail: options.sendValidatedInvoiceEmail
+    sendValidatedInvoiceEmail: options.email
       ? async (...args) => {
           emailCalls += 1;
-          return options.sendValidatedInvoiceEmail(...args);
+          return options.email(...args);
         }
       : null,
   });
@@ -406,207 +369,155 @@ function buildService(options = {}) {
   };
 }
 
-async function testInputAndEconomicBarriers() {
-  const invalid = buildService({ isValidObjectId: () => false });
+async function barriers() {
   await expectCode(
-    () => invalid.service.issueElectronicInvoiceForOrder({ orderId: 'bad' }),
+    () => serviceHarness({ validId: () => false }).service.issueElectronicInvoiceForOrder({ orderId: 'bad' }),
     'INVALID_ORDER_ID'
   );
-
-  const missing = buildService({ order: null });
   await expectCode(
-    () => missing.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
+    () => serviceHarness({ order: null }).service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'ORDER_NOT_FOUND'
   );
-
-  const unpaid = buildService({
-    order: baseOrder({ status: 'pending', payment: { status: 'pending', amount: 119 } }),
-  });
   await expectCode(
-    () => unpaid.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
+    () =>
+      serviceHarness({
+        order: validOrder({ status: 'pending', payment: { status: 'pending' } }),
+      }).service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'ORDER_NOT_BILLABLE'
   );
 
-  const totalMismatch = buildService({
-    order: baseOrder({ total: 130, pricing: { total: 130 }, payment: { amount: 130 } }),
+  const totalMismatch = serviceHarness({
+    order: validOrder({ total: 130, pricing: { total: 130 }, payment: { amount: 130 } }),
   });
   await expectCode(
     () => totalMismatch.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_TOTAL_MISMATCH'
   );
-  assert(totalMismatch.providerCalls === 0, 'Contactó al proveedor con totales inconsistentes.');
+  assert(totalMismatch.providerCalls === 0, 'Contactó Factus con total inconsistente.');
 
-  const paymentMismatch = buildService({
-    order: baseOrder({ payment: { amount: 118 } }),
+  const paymentMismatch = serviceHarness({
+    order: validOrder({ payment: { amount: 118 } }),
   });
   await expectCode(
     () => paymentMismatch.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_PAYMENT_TOTAL_MISMATCH'
   );
-  assert(paymentMismatch.providerCalls === 0, 'Contactó al proveedor con pago inconsistente.');
+  assert(paymentMismatch.providerCalls === 0, 'Contactó Factus con pago inconsistente.');
 
-  const lineMismatchOrder = baseOrder();
-  lineMismatchOrder.items[0].taxAmount = 18;
-  const lineMismatch = buildService({ order: lineMismatchOrder });
+  const brokenLines = validOrder();
+  brokenLines.items[0].taxAmount = 18;
   await expectCode(
-    () => lineMismatch.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
+    () => serviceHarness({ order: brokenLines }).service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_LINE_TOTAL_MISMATCH'
   );
-
-  ok('Bloquea ID inválido, orden inexistente/no pagada y descuadres de total, pago y líneas');
+  ok('Bloquea órdenes inválidas, impagas y descuadres de total, pago o líneas');
 }
 
-async function testIdempotencyAndConcurrency() {
-  const staleDate = new Date('2026-01-01T00:00:00.000Z');
+async function concurrency() {
   const existing = {
     _id: 'invoice-existing',
     orderId: VALID_ID,
-    idempotencyKey: `electronic-invoice:order:${VALID_ID}`,
     status: 'processing',
-    emission: { state: 'processing', lastAttemptAt: staleDate },
+    idempotencyKey: `electronic-invoice:order:${VALID_ID}`,
+    emission: { state: 'processing', lastAttemptAt: new Date('2025-01-01') },
   };
-  const current = buildService({
-    invoiceOptions: { existingInvoice: existing },
-  });
-  const result = await current.service.issueElectronicInvoiceForOrder({
+  const current = serviceHarness({ invoice: { existing } });
+  const reused = await current.service.issueElectronicInvoiceForOrder({
     orderId: VALID_ID,
     allowRetry: true,
   });
-  assert(result.reused === true && result.inProgress === true, 'No reutilizó emisión en curso.');
-  assert(current.providerCalls === 0, 'Duplicó llamada al proveedor para emisión en curso.');
+  assert(reused.reused && reused.inProgress, 'No reutilizó emisión en curso.');
+  assert(current.providerCalls === 0, 'Duplicó llamada al proveedor.');
 
-  const duplicate = buildService({
-    invoiceOptions: { duplicateOnCreate: true },
-  });
-  const duplicateResult = await duplicate.service.issueElectronicInvoiceForOrder({
-    orderId: VALID_ID,
-  });
-  assert(duplicateResult.reused === true, 'No recuperó carrera por índice único.');
-  assert(duplicate.providerCalls === 0, 'El perdedor de la carrera llamó al proveedor.');
-
-  ok('Índice idempotente y reserva previa evitan doble emisión concurrente');
+  const duplicate = serviceHarness({ invoice: { duplicateOnCreate: true } });
+  const race = await duplicate.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
+  assert(race.reused && duplicate.providerCalls === 0, 'Falló recuperación de carrera idempotente.');
+  ok('Reserva previa e índice único evitan doble emisión concurrente');
 
   risk(
     'CRÍTICO',
-    'Una factura en processing puede quedar bloqueada indefinidamente',
-    'La emisión de facturas no aplica vencimiento ni recuperación del lock. Incluso con lastAttemptAt antiguo, devuelve “en proceso” y no permite recuperación automática.'
+    'Factura processing sin vencimiento ni recuperación automática',
+    'Un proceso caído deja la factura bloqueada indefinidamente porque el motor no compara lastAttemptAt con un límite de tiempo.'
   );
 }
 
-async function testProviderFailuresAndMalformedResponses() {
-  const thrown = buildService({ providerThrow: 'socket reset' });
+async function providerFailures() {
+  const thrown = serviceHarness({ providerThrow: 'socket reset' });
   await expectCode(
     () => thrown.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_PROVIDER_GENERATION_ERROR'
   );
-  assert(thrown.invoice.state?.status === 'failed', 'No marcó como fallida la excepción de red.');
+  assert(thrown.invoice.state?.status === 'failed', 'No guardó fallo de red.');
 
-  const rejected = buildService({
-    providerResponse: {
-      success: false,
-      status: 503,
-      error: 'Factus temporalmente no disponible',
-    },
-  });
   await expectCode(
-    () => rejected.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
+    () =>
+      serviceHarness({
+        provider: { success: false, status: 503, error: 'Factus no disponible' },
+      }).service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_PROVIDER_GENERATION_ERROR'
   );
 
-  const missingNumber = buildService({
-    providerResponse: {
-      success: true,
-      status: 201,
-      data: { data: { cufe: 'cufe-without-number', is_validated: true } },
-    },
-  });
   await expectCode(
-    () => missingNumber.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
+    () =>
+      serviceHarness({
+        provider: {
+          success: true,
+          status: 201,
+          data: { data: { cufe: 'sin-numero', is_validated: true } },
+        },
+      }).service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
     'BILLING_PROVIDER_NUMBER_MISSING'
   );
 
-  const sent = buildService({
-    providerResponse: {
+  const pending = serviceHarness({
+    provider: {
       success: true,
       status: 201,
       data: {
         data: {
           number: 'SETP990000002',
           cufe: '',
-          reference_code: 'ORD-RESILIENCE-001',
           is_validated: false,
+          reference_code: 'ORD-RESILIENCE-001',
         },
       },
     },
   });
-  const sentResult = await sent.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
-  assert(sentResult.invoice.status === 'sent', 'Marcó como aceptada una factura no validada.');
-
-  ok('Excepciones de red, 503, respuesta sin número y validación pendiente se manejan sin falsos éxitos');
+  const pendingResult = await pending.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
+  assert(pendingResult.invoice.status === 'sent', 'Presentó como aceptada una factura pendiente.');
+  ok('Maneja excepción de red, 503, respuesta sin número y validación pendiente');
 }
 
-async function testEmailIsolation() {
-  const harness = buildService({
-    sendValidatedInvoiceEmail: async () => {
+async function emailAndRanges() {
+  const email = serviceHarness({
+    email: async () => {
       const error = new Error('SMTP timeout');
       error.delivery = { status: 'error', lastError: 'SMTP timeout' };
       throw error;
     },
   });
-  const result = await harness.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
-  assert(result.invoice.status === 'accepted', 'El correo degradó el estado fiscal aceptado.');
-  assert(result.emailDelivery?.status === 'error', 'No informó el fallo del correo.');
-  assert(harness.emailCalls === 1, 'No intentó el correo automático una sola vez.');
-  ok('Fallo SMTP no convierte una factura fiscalmente aceptada en fallida');
-}
+  const result = await email.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
+  assert(result.invoice.status === 'accepted', 'SMTP degradó estado fiscal.');
+  assert(result.emailDelivery?.status === 'error' && email.emailCalls === 1, 'No informó fallo SMTP.');
 
-async function testInactiveModeAndMissingRanges() {
-  const inactive = buildService({ settings: internalSettings() });
+  const inactive = serviceHarness({ settings: internalSettings() });
   const skipped = await inactive.service.issueElectronicInvoiceForOrder({
     orderId: VALID_ID,
     skipWhenElectronicBillingIsInactive: true,
   });
-  assert(skipped.skipped === true, 'No omitió facturación externa desactivada.');
-  assert(inactive.providerCalls === 0, 'Contactó proveedor en modo interno omitido.');
+  assert(skipped.skipped && inactive.providerCalls === 0, 'Llamó proveedor con modo externo desactivado.');
 
-  const invoiceRange = await sendInvoiceToFactus({
-    providerConfig: {
-      apiUrl: 'https://api-sandbox.factus.com.co',
-      clientId: 'x',
-      clientSecret: 'x',
-      username: 'x',
-      password: 'x',
-      numberingRangeId: 0,
-    },
-  });
-  assert(
-    invoiceRange.code === 'FACTUS_INVOICE_NUMBERING_RANGE_REQUIRED',
-    'Intentó emitir factura sin rango oficial.'
-  );
-
+  const invoiceRange = await sendInvoiceToFactus({ providerConfig: { numberingRangeId: 0 } });
   const creditRange = await sendCreditNoteToFactus({
-    providerConfig: {
-      apiUrl: 'https://api-sandbox.factus.com.co',
-      clientId: 'x',
-      clientSecret: 'x',
-      username: 'x',
-      password: 'x',
-      creditNoteNumberingRangeId: 0,
-    },
+    providerConfig: { creditNoteNumberingRangeId: 0 },
   });
-  assert(
-    creditRange.code === 'FACTUS_CREDIT_NOTE_NUMBERING_RANGE_REQUIRED',
-    'Intentó emitir nota crédito sin rango oficial.'
-  );
-
-  ok('Modo interno y ausencia de rangos bloquean llamadas fiscales antes de tocar Factus');
+  assert(invoiceRange.code === 'FACTUS_INVOICE_NUMBERING_RANGE_REQUIRED', 'No bloqueó factura sin rango.');
+  assert(creditRange.code === 'FACTUS_CREDIT_NOTE_NUMBERING_RANGE_REQUIRED', 'No bloqueó nota sin rango.');
+  ok('Aísla SMTP, respeta modo interno y bloquea documentos sin rangos');
 }
 
-async function testCreditNoteBarriers() {
-  await expectCode(
-    () => Promise.resolve(normalizeRequest({ type: 'other' })),
-    'BILLING_CREDIT_NOTE_TYPE_INVALID'
-  );
+async function creditNotes() {
+  await expectCode(() => Promise.resolve(normalizeRequest({ type: 'otro' })), 'BILLING_CREDIT_NOTE_TYPE_INVALID');
   await expectCode(
     () =>
       Promise.resolve(
@@ -614,7 +525,7 @@ async function testCreditNoteBarriers() {
           type: 'total',
           reasonCode: '1',
           reason: 'Devolución',
-          idempotencyKey: 'credit-note-0001',
+          idempotencyKey: 'credit-note-001',
         })
       ),
     'BILLING_CREDIT_NOTE_REASON_TYPE_MISMATCH'
@@ -631,12 +542,10 @@ async function testCreditNoteBarriers() {
       ),
     'BILLING_CREDIT_NOTE_IDEMPOTENCY_KEY_INVALID'
   );
-
-  const order = baseOrder();
   await expectCode(
     () =>
       Promise.resolve(
-        normalizePartialItems(order, [
+        normalizePartialItems(validOrder(), [
           { productId: 'SKU-1', quantity: 1 },
           { productId: 'SKU-1', quantity: 1 },
         ])
@@ -644,147 +553,119 @@ async function testCreditNoteBarriers() {
     'BILLING_CREDIT_NOTE_ITEMS_INVALID'
   );
   await expectCode(
-    () =>
-      Promise.resolve(
-        normalizePartialItems(order, [{ productId: 'SKU-1', quantity: 2 }])
-      ),
+    () => Promise.resolve(normalizePartialItems(validOrder(), [{ productId: 'SKU-1', quantity: 2 }])),
     'BILLING_CREDIT_NOTE_QUANTITY_INVALID'
   );
 
-  const request = {
-    type: 'partial',
-    reasonCode: '1',
-    reasonText: 'Devolución parcial',
-  };
-  const first = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 1 }]);
-  const repeated = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 1 }]);
-  const changed = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 2 }]);
-  assert(first === repeated && first !== changed, 'Huella de nota crédito no es estable.');
+  const request = { type: 'partial', reasonCode: '1', reasonText: 'Devolución parcial' };
+  const a = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 1 }]);
+  const b = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 1 }]);
+  const c = buildRequestFingerprint(request, [{ productId: 'SKU-1', quantity: 2 }]);
+  assert(a === b && a !== c, 'Huella idempotente inestable.');
 
-  const creditService = read('backend/services/electronicCreditNoteService.js');
-  assert(creditService.includes('CREDIT_NOTE_LOCK_MS'), 'Notas crédito no tienen lock temporal.');
-  assert(creditService.includes("'creditNoteControl.lockedAt': { $lt: staleBefore }"), 'No recupera lock vencido.');
-  assert(creditService.includes('BILLING_CREDIT_NOTE_PERSISTENCE_ERROR'), 'No detecta pérdida de persistencia después de Factus.');
-
-  ok('Notas crédito bloquean tipo/motivo/clave/cantidades inválidas y recuperan locks vencidos');
+  const source = read('backend/services/electronicCreditNoteService.js');
+  assert(source.includes('CREDIT_NOTE_LOCK_MS'), 'Nota crédito sin lock temporal.');
+  assert(source.includes("'creditNoteControl.lockedAt': { $lt: staleBefore }"), 'No recupera lock vencido.');
+  assert(source.includes('BILLING_CREDIT_NOTE_PERSISTENCE_ERROR'), 'No detecta pérdida de persistencia.');
+  ok('Notas crédito validan motivo, tipo, clave, cantidades, identidad y lock vencido');
 }
 
-async function testProductionActivationBarriers() {
+async function activation() {
   await expectCode(
     () =>
       Promise.resolve(
         requireProductionCandidate(
-          {
-            dian: { mode: 'habilitacion' },
-            electronicProvider: { provider: 'factus' },
-          },
+          { dian: { mode: 'habilitacion' }, electronicProvider: { provider: 'factus' } },
           {}
         )
       ),
     'BILLING_CLIENT_ACTIVATION_INCOMPLETE'
   );
 
-  const activation = read('backend/services/billingClientActivationOrchestrator.js');
+  const source = read('backend/services/billingClientActivationOrchestrator.js');
   const settingsRoute = read('backend/routes/billingSettingsProtection.js');
   const providerRoute = read('backend/routes/dianProviderTest.js');
+  [
+    'ACTIVATION_LOCK_MS',
+    'assertMailReady',
+    'testFactusConnectionWithIdentity',
+    'saveFactusNumberingRangeSelection',
+    'readyForProduction',
+  ].forEach((token) => assert(source.includes(token), `Activación incompleta: ${token}.`));
+  assert(settingsRoute.includes('assertDedicatedFirstProductionActivation'), 'Guardar general salta activación dedicada.');
+  assert(providerRoute.includes('productionActivationLimiter'), 'Activación sin rate limit.');
+  assert(providerRoute.includes("requirePermission('billing:settings')"), 'Activación sin permiso fiscal.');
+  ok('Producción revalida cuenta, empresa, rangos, correo, permiso y concurrencia');
 
-  assert(activation.includes('ACTIVATION_LOCK_MS'), 'Activación no tiene lock temporal.');
-  assert(activation.includes('assertMailReady'), 'Activación no valida correo.');
-  assert(activation.includes('testFactusConnectionWithIdentity'), 'Activación no revalida empresa.');
-  assert(activation.includes('saveFactusNumberingRangeSelection'), 'Activación no revalida rangos.');
-  assert(activation.includes('readyForProduction'), 'Activación no confirma readiness final.');
-  assert(settingsRoute.includes('assertDedicatedFirstProductionActivation'), 'Guardar general puede saltarse el asistente productivo.');
-  assert(providerRoute.includes('productionActivationLimiter'), 'Activación no tiene rate limit propio.');
-  assert(providerRoute.includes("requirePermission('billing:settings')"), 'Activación no exige permiso fiscal.');
-
-  ok('Producción exige asistente dedicado, lock, permiso, rate limit, empresa, rangos y correo');
-
-  const updatePosition = activation.indexOf('updateBillingConfigurationWithReadiness(candidate');
-  const successPosition = activation.indexOf('const state = await markSuccess');
-  if (updatePosition >= 0 && successPosition > updatePosition) {
-    risk(
-      'CRÍTICO',
-      'La activación productiva no es atómica',
-      'La configuración puede quedar en Producción antes de registrar activation=active. Si el proceso cae entre ambas escrituras, SiteSettings y BillingActivationState quedan contradictorios.'
-    );
-  }
-}
-
-async function testPersistenceFailureWindows() {
-  const finalLoss = buildService({
-    invoiceOptions: { nullOnFinalPersistence: true },
-  });
-  const finalResult = await finalLoss.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
   if (
-    finalLoss.providerCalls === 1 &&
-    finalResult.inProgress === true &&
-    finalResult.invoice?.status === 'processing'
+    source.indexOf('updateBillingConfigurationWithReadiness(candidate') >= 0 &&
+    source.indexOf('const state = await markSuccess') >
+      source.indexOf('updateBillingConfigurationWithReadiness(candidate')
   ) {
     risk(
       'CRÍTICO',
-      'Factus puede emitir y MongoDB conservar la factura en processing',
-      'Si la escritura final no encuentra el lock después del éxito remoto, el servicio devuelve una factura local todavía en processing. Falta conciliación inmediata por reference_code antes de responder.'
-    );
-  } else {
-    ok('La pérdida del lock después del éxito remoto se reconcilia correctamente');
-  }
-
-  const failureLoss = buildService({
-    invoiceOptions: { throwOnFailurePersistence: true },
-    providerResponse: { success: false, status: 503, error: 'provider down' },
-  });
-  let failureError = null;
-  try {
-    await failureLoss.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
-  } catch (error) {
-    failureError = error;
-  }
-  assert(failureError, 'Se esperaba fallo de persistencia de error.');
-  if (failureLoss.invoice.state?.status === 'processing') {
-    risk(
-      'CRÍTICO',
-      'Una caída de MongoDB al guardar el rechazo deja el lock en processing',
-      'El proveedor falla, pero si MongoDB también falla en ese instante, el documento reservado no cambia a failed y queda bloqueado sin expiración.'
-    );
-  }
-
-  const hardFailure = buildService({
-    invoiceOptions: { throwOnFinalPersistence: true },
-  });
-  await expectCode(
-    () => hardFailure.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }),
-    undefined
-  ).catch(() => null);
-  if (hardFailure.invoice.state?.status === 'processing') {
-    risk(
-      'CRÍTICO',
-      'Una excepción de MongoDB después del éxito de Factus no tiene cola de recuperación',
-      'La respuesta remota ya puede ser válida, pero la excepción de persistencia se propaga sin guardar un evento de reconciliación pendiente.'
+      'Activación productiva no atómica',
+      'SiteSettings puede quedar en Producción antes de registrar activation=active. Una caída entre ambas escrituras deja estados contradictorios.'
     );
   }
 }
 
-async function testLegacyAndDataQualityWeaknesses() {
-  const negativeOrder = baseOrder({
+async function persistenceWindows() {
+  const lostFinal = serviceHarness({ invoice: { nullFinalWrite: true } });
+  const result = await lostFinal.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
+  if (lostFinal.providerCalls === 1 && result.inProgress && result.invoice?.status === 'processing') {
+    risk(
+      'CRÍTICO',
+      'Éxito en Factus con factura local todavía processing',
+      'Si se pierde el lock antes de la escritura final, falta consultar inmediatamente Factus por reference_code y reconciliar antes de responder.'
+    );
+  }
+
+  const failedWrite = serviceHarness({
+    invoice: { throwFailureWrite: true },
+    provider: { success: false, status: 503, error: 'provider down' },
+  });
+  await expectCode(() => failedWrite.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }));
+  if (failedWrite.invoice.state?.status === 'processing') {
+    risk(
+      'CRÍTICO',
+      'Fallo simultáneo de Factus y MongoDB deja lock processing',
+      'No existe expiración del lock ni cola duradera para registrar el rechazo cuando falla la escritura de estado failed.'
+    );
+  }
+
+  const finalWrite = serviceHarness({ invoice: { throwFinalWrite: true } });
+  await expectCode(() => finalWrite.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID }));
+  if (finalWrite.invoice.state?.status === 'processing') {
+    risk(
+      'CRÍTICO',
+      'MongoDB cae después de emisión remota sin recuperación duradera',
+      'La respuesta oficial puede existir, pero no se guarda un trabajo pendiente de conciliación para recuperar número y CUFE.'
+    );
+  }
+}
+
+async function dataQuality() {
+  const negativeOrder = validOrder({
     items: [{ productId: 'NEG', quantity: -1, price: 100 }],
     subtotal: -100,
     total: -100,
     pricing: { version: 1 },
-    taxes: { iva: { enabled: false, percent: 0, amount: 0 } },
+    taxes: { iva: { enabled: false, amount: 0, percent: 0 } },
     payment: { amount: -100 },
   });
-  const negativeTotals = calculateTotals(negativeOrder, internalSettings());
-  let negativeAccepted = true;
+  const totals = calculateTotals(negativeOrder, internalSettings());
+  let accepted = true;
   try {
-    assertTotalsReconciled(negativeOrder, negativeTotals);
+    assertTotalsReconciled(negativeOrder, totals);
   } catch {
-    negativeAccepted = false;
+    accepted = false;
   }
-  if (negativeAccepted && negativeTotals.total < 0) {
+  if (accepted && totals.total < 0) {
     risk(
       'ALTO',
-      'Órdenes históricas version<2 aceptan cantidades y totales negativos',
-      'assertTotalsReconciled omite toda conciliación para pricing.version menor que 2. Un registro corrupto puede avanzar hasta el proveedor.'
+      'Órdenes históricas version<2 aceptan totales negativos',
+      'La conciliación se omite por completo para pricing.version menor que 2; un registro corrupto puede llegar al proveedor.'
     );
   }
 
@@ -797,66 +678,65 @@ async function testLegacyAndDataQualityWeaknesses() {
   ) {
     risk(
       'MEDIO',
-      'Datos faltantes del comprador se sustituyen silenciosamente',
-      'La emisión construye un consumidor genérico sin exigir una decisión explícita de “consumidor final”; puede ocultar datos fiscales incompletos.'
+      'Consumidor genérico aplicado silenciosamente',
+      'Datos fiscales faltantes se sustituyen sin exigir que la orden esté marcada explícitamente como consumidor final.'
     );
   }
 
-  const xmlFailure = buildService({
+  const brokenXml = serviceHarness({
     settings: internalSettings(),
-    generateInvoiceXML: () => {
-      throw new Error('XML generator crashed');
+    xml: () => {
+      throw new Error('XML crash');
     },
   });
-  const xmlResult = await xmlFailure.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
+  const xmlResult = await brokenXml.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
   if (xmlResult.invoice?.status === 'generated' && xmlResult.invoice?.xmlContent === '') {
     risk(
       'ALTO',
-      'El comprobante interno se marca generado aunque falle el XML',
-      'La excepción del generador XML se ignora y se guarda xmlContent vacío. Falta distinguir documento incompleto de documento generado correctamente.'
+      'Comprobante interno generado con XML vacío',
+      'La excepción del generador XML se ignora y el documento queda marcado como generado correctamente.'
     );
   }
 }
 
-async function testSensitiveRawPersistence() {
-  const secret = 'token-super-secreto-resilience';
-  const harness = buildService({
-    providerResponse: successfulProviderResponse({
-      diagnostic: { access_token: secret, client_secret: secret },
-    }),
+async function rawSecrets() {
+  const secret = 'secret-resilience-token';
+  const harness = serviceHarness({
+    provider: successResponse({ diagnostic: { access_token: secret, client_secret: secret } }),
   });
   const result = await harness.service.issueElectronicInvoiceForOrder({ orderId: VALID_ID });
-  const serialized = JSON.stringify(result.invoice || {});
-  if (serialized.includes(secret)) {
+  if (JSON.stringify(result.invoice || {}).includes(secret)) {
     risk(
       'ALTO',
-      'La respuesta cruda del proveedor puede persistir secretos inesperados',
-      'provider.raw y dianResponse.raw almacenan providerResponse sin una sanitización profunda. Un proveedor o proxy que incluya tokens podría dejarlos en MongoDB y respuestas administrativas.'
+      'Respuesta cruda del proveedor puede persistir secretos inesperados',
+      'provider.raw y dianResponse.raw guardan providerResponse sin sanitización profunda de access_token, client_secret o password.'
     );
   } else {
-    ok('La persistencia fiscal elimina secretos inesperados de respuestas externas');
+    ok('Respuestas externas se sanitizan antes de persistir');
   }
 }
 
-async function testTimeoutsSecurityAndBuildControls() {
-  const provider = read('backend/lib/dian/providers/factusRangeAwareProvider.js');
+async function infrastructureControls() {
+  const rangeProvider = read('backend/lib/dian/providers/factusRangeAwareProvider.js');
   const factus = read('backend/lib/dian/providers/factusProvider.js');
   const route = read('backend/routes/dianProviderTest.js');
   const security = read('backend/lib/billing/billingConfigurationSecurity.js');
   const vite = read('frontend/vite.config.js');
   const app = read('frontend/src/App.jsx');
 
-  assert(provider.includes('AbortController'), 'Proveedor de rangos no tiene cancelación.');
-  assert(provider.includes('timeoutMs = 20000'), 'Proveedor de rangos no limita tiempo de espera.');
-  assert(factus.includes('AbortController'), 'Proveedor Factus base no tiene cancelación.');
-  assert(route.includes('connectionTestLimiter'), 'Prueba de conexión no limita abuso.');
-  assert(route.includes('numberingRangeLimiter'), 'Consulta de rangos no limita abuso.');
-  assert(security.includes('AES-256-GCM') || security.includes('aes-256-gcm'), 'Credenciales no usan cifrado autenticado.');
-  assert(security.includes('sanitize') || security.includes('redact') || security.includes('SECRET'), 'No existe tratamiento explícito de secretos.');
-  assert(vite.includes('manualChunks'), 'Build no separa dependencias principales.');
-  assert(app.includes('React.lazy'), 'Rutas no se cargan bajo demanda.');
-
-  ok('Timeouts, rate limits, cifrado y división del build reducen bloqueos y exposición');
+  assert(rangeProvider.includes('AbortController'), 'Proveedor rango sin cancelación.');
+  assert(rangeProvider.includes('timeoutMs = 20000'), 'Proveedor rango sin timeout.');
+  assert(factus.includes('AbortController'), 'Proveedor Factus sin cancelación.');
+  assert(route.includes('connectionTestLimiter'), 'Conexión sin rate limit.');
+  assert(route.includes('numberingRangeLimiter'), 'Rangos sin rate limit.');
+  assert(security.includes('aes-256-gcm'), 'Credenciales sin cifrado autenticado.');
+  assert(security.includes('sanitizeProvider'), 'Configuración sin saneamiento de proveedor.');
+  assert(vite.includes('manualChunks'), 'Build sin separación manual.');
+  assert(
+    app.includes('lazy(() => import(') || app.includes('React.lazy'),
+    'Rutas sin carga diferida.'
+  );
+  ok('Timeouts, rate limits, cifrado y code splitting reducen caídas y exposición');
 }
 
 async function runCase(title, action) {
@@ -867,64 +747,56 @@ async function runCase(title, action) {
   }
 }
 
-function printRiskSummary() {
-  const order = ['CRÍTICO', 'ALTO', 'MEDIO', 'BAJO'];
-  const counts = Object.fromEntries(order.map((severity) => [severity, 0]));
+function riskCounts() {
+  const counts = { CRÍTICO: 0, ALTO: 0, MEDIO: 0, BAJO: 0 };
   results.risks.forEach((item) => {
     counts[item.severity] = (counts[item.severity] || 0) + 1;
   });
-
-  console.log('\nDEBILIDADES DETECTADAS');
-  if (!results.risks.length) {
-    console.log('Ninguna debilidad reproducible en esta ejecución.');
-    return counts;
-  }
-
-  results.risks.forEach((item, index) => {
-    console.log(`${index + 1}. [${item.severity}] ${item.title}`);
-    console.log(`   ${item.detail}`);
-  });
-
   return counts;
 }
 
 async function main() {
   console.log('\nAUDITORÍA AVANZADA DE RESILIENCIA DEL MÓDULO DE FACTURACIÓN');
   console.log('No usa Factus real, no emite documentos, no envía correos y no modifica MongoDB.');
-  console.log('Inyecta fallos de red, concurrencia, persistencia, datos corruptos y respuestas incompletas.\n');
+  console.log('Inyecta caídas de red, carreras, fallos de persistencia, datos corruptos y respuestas incompletas.\n');
 
   const cases = [
-    ['Barreras de entrada y conciliación económica', testInputAndEconomicBarriers],
-    ['Idempotencia, carreras y locks', testIdempotencyAndConcurrency],
-    ['Caídas y respuestas anómalas del proveedor', testProviderFailuresAndMalformedResponses],
-    ['Aislamiento del correo', testEmailIsolation],
-    ['Modo interno y rangos ausentes', testInactiveModeAndMissingRanges],
-    ['Barreras de notas crédito', testCreditNoteBarriers],
-    ['Activación productiva', testProductionActivationBarriers],
-    ['Ventanas de pérdida de persistencia', testPersistenceFailureWindows],
-    ['Datos históricos y calidad fiscal', testLegacyAndDataQualityWeaknesses],
-    ['Persistencia de respuestas sensibles', testSensitiveRawPersistence],
-    ['Timeouts, seguridad y build', testTimeoutsSecurityAndBuildControls],
+    ['Barreras económicas y de entrada', barriers],
+    ['Idempotencia y concurrencia', concurrency],
+    ['Proveedor externo', providerFailures],
+    ['Correo, modo y rangos', emailAndRanges],
+    ['Notas crédito', creditNotes],
+    ['Activación productiva', activation],
+    ['Ventanas de persistencia', persistenceWindows],
+    ['Calidad de datos', dataQuality],
+    ['Persistencia sensible', rawSecrets],
+    ['Controles de infraestructura', infrastructureControls],
   ];
 
-  for (const [title, action] of cases) {
-    await runCase(title, action);
-  }
+  for (const [title, action] of cases) await runCase(title, action);
 
-  const counts = printRiskSummary();
+  const counts = riskCounts();
+  console.log('\nDEBILIDADES DETECTADAS');
+  if (!results.risks.length) console.log('Ninguna debilidad reproducible.');
+  results.risks.forEach((item, index) => {
+    console.log(`${index + 1}. [${item.severity}] ${item.title}`);
+    console.log(`   ${item.detail}`);
+  });
 
   console.log('\nRESUMEN');
   console.log(`OK: ${results.ok}`);
-  console.log(`RIESGOS: ${results.risks.length} (críticos ${counts.CRÍTICO || 0}, altos ${counts.ALTO || 0}, medios ${counts.MEDIO || 0}, bajos ${counts.BAJO || 0})`);
+  console.log(
+    `RIESGOS: ${results.risks.length} (críticos ${counts.CRÍTICO}, altos ${counts.ALTO}, medios ${counts.MEDIO}, bajos ${counts.BAJO})`
+  );
   console.log(`FALLOS DE LA SUITE: ${results.fail.length}`);
 
-  if (results.fail.length > 0) process.exit(1);
-  if (STRICT && ((counts.CRÍTICO || 0) > 0 || (counts.ALTO || 0) > 0)) {
-    console.error('\nMODO ESTRICTO: el cierre queda bloqueado por riesgos críticos o altos.');
+  if (results.fail.length) process.exit(1);
+  if (STRICT && (counts.CRÍTICO > 0 || counts.ALTO > 0)) {
+    console.error('\nMODO ESTRICTO: cierre bloqueado por riesgos críticos o altos.');
     process.exit(2);
   }
 
-  console.log('\nAuditoría completada. Los RIESGOS son debilidades reales a corregir; no son falsos fallos del test.');
+  console.log('\nLos RIESGOS son debilidades reproducibles a corregir, no falsos errores de la prueba.');
 }
 
 main().catch((error) => {
