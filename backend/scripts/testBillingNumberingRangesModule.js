@@ -11,6 +11,8 @@ process.env.BILLING_ENCRYPTION_KEY =
 const {
   FACTUS_RANGE_DOCUMENTS,
   extractRangeList,
+  isoDate,
+  mergeCandidateBilling,
   normalizeFactusRange,
   publicRange,
 } = require('../services/billingNumberingRangeService');
@@ -43,8 +45,10 @@ function testDocumentCodesAndPayloadExtraction() {
     },
   });
   assert(list.length === 2, 'No reconoce la lista paginada de Factus.');
+  assert(isoDate('2099-12-31') === '2099-12-31', 'No conserva fecha ISO.');
+  assert(isoDate('31-12-2099') === '2099-12-31', 'No normaliza fecha DD-MM-AAAA.');
 
-  ok('Códigos documentales y respuesta paginada de Factus se interpretan correctamente');
+  ok('Códigos documentales, paginación y fechas de Factus se interpretan correctamente');
 }
 
 function testEligibleRanges() {
@@ -58,8 +62,8 @@ function testEligibleRanges() {
       to: 5000,
       current: 25,
       resolution_number: '18760000001',
-      start_date: '2026-01-01',
-      end_date: '2099-12-31',
+      start_date: '01-01-2026',
+      end_date: '31-12-2099',
       technical_key: 'secreto-fiscal',
       is_active: 1,
       is_expired: 0,
@@ -69,7 +73,7 @@ function testEligibleRanges() {
   const credit = normalizeFactusRange(
     {
       id: 202,
-      document_code: '22',
+      document_name: 'Nota crédito',
       prefix: 'NC',
       from: 1,
       to: 1000,
@@ -85,6 +89,7 @@ function testEligibleRanges() {
   assert(credit.eligible === true, 'Rechazó un rango vigente de nota crédito.');
   assert(invoice.document === '21', 'Alteró el tipo de factura.');
   assert(credit.document === '22', 'Alteró el tipo de nota crédito.');
+  assert(invoice.startDate === '2026-01-01', 'No normalizó la fecha inicial.');
 
   ok('Rangos vigentes de factura y nota crédito quedan disponibles por separado');
 }
@@ -113,6 +118,46 @@ function testUnsafeRangesAreRejected() {
   ok('Rangos inactivos, vencidos, agotados o de otro documento quedan bloqueados');
 }
 
+function testCandidateUsesStoredSecretsAndTrustedMetadata() {
+  const stored = {
+    dian: { mode: 'habilitacion' },
+    electronicProvider: {
+      provider: 'factus',
+      apiUrl: 'https://api-sandbox.factus.com.co',
+      clientId: 'stored-client',
+      clientSecret: 'stored-secret',
+      username: 'stored-user',
+      password: 'stored-password',
+      lastConnectionStatus: 'success',
+      lastConnectionFingerprint: 'trusted-fingerprint',
+      numberingRangesFingerprint: 'trusted-ranges',
+    },
+  };
+  const candidate = mergeCandidateBilling(stored, {
+    billing: {
+      dian: { mode: 'production' },
+      electronicProvider: {
+        apiUrl: 'https://api.factus.com.co',
+        clientId: 'production-client',
+        clientSecret: '',
+        username: 'production-user',
+        password: '',
+        lastConnectionStatus: 'browser-forged',
+        lastConnectionFingerprint: 'browser-forged',
+      },
+    },
+  });
+
+  assert(candidate.dian.mode === 'production', 'No usa el ambiente candidato.');
+  assert(candidate.electronicProvider.clientId === 'production-client', 'No usa Client ID candidato.');
+  assert(candidate.electronicProvider.clientSecret === 'stored-secret', 'Perdió secreto protegido almacenado.');
+  assert(candidate.electronicProvider.password === 'stored-password', 'Perdió contraseña protegida almacenada.');
+  assert(candidate.electronicProvider.lastConnectionStatus === 'success', 'Confió en metadata del navegador.');
+  assert(candidate.electronicProvider.lastConnectionFingerprint === 'trusted-fingerprint', 'Aceptó huella manipulada.');
+
+  ok('Candidato conserva secretos protegidos y no puede falsificar la verificación');
+}
+
 function testTechnicalKeyNeverLeavesBackend() {
   const safe = publicRange({
     id: 10,
@@ -131,7 +176,11 @@ function testTechnicalKeyNeverLeavesBackend() {
 
 function testOfficialLookupAndSelectionControls() {
   const service = read('backend/services/billingNumberingRangeService.js');
+  const persistence = read(
+    'backend/services/billingNumberingRangePersistenceService.js'
+  );
   const route = read('backend/routes/dianProviderTest.js');
+  const settingsRoute = read('backend/routes/billingSettingsProtection.js');
 
   assert(
     service.includes('/v2/numbering-ranges') &&
@@ -155,6 +204,7 @@ function testOfficialLookupAndSelectionControls() {
   );
   assert(
     route.includes("router.get('/numbering-ranges'") &&
+      route.includes("'/numbering-ranges/query'") &&
       route.includes("router.put('/numbering-ranges'") &&
       route.includes("requirePermission('billing:settings')"),
     'Las rutas de rangos no están completas o protegidas.'
@@ -163,8 +213,14 @@ function testOfficialLookupAndSelectionControls() {
     route.includes('numberingRangeLimiter') && route.includes('max: 20'),
     'Falta límite específico para consultas de rangos.'
   );
+  assert(
+    persistence.includes('assertProductionNumberingRangesReady') &&
+      persistence.includes('BILLING_PRODUCTION_NUMBERING_RANGES_NOT_READY') &&
+      settingsRoute.includes('assertProductionNumberingRangesReady'),
+    'Producción no exige rangos vinculados a la conexión actual.'
+  );
 
-  ok('Consulta y guardado requieren conexión, permiso, ambiente y validación en vivo');
+  ok('Consulta y Producción exigen permiso, conexión, ambiente y huellas verificadas');
 }
 
 function testFrontendHasNoManualFiscalRangeFields() {
@@ -174,14 +230,24 @@ function testFrontendHasNoManualFiscalRangeFields() {
   const resolution = read(
     'frontend/src/admin/configuracion/sections/facturacion/DianResolutionBlock.jsx'
   );
+  const section = read(
+    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
+  );
 
   assert(block.includes('Consultar rangos oficiales'), 'Falta consulta desde el panel.');
   assert(block.includes('Guardar rangos seleccionados'), 'Falta guardar la selección.');
   assert(block.includes('eligibleInvoiceRanges'), 'No filtra rangos de facturas.');
   assert(block.includes('eligibleCreditNoteRanges'), 'No filtra rangos de notas crédito.');
+  assert(block.includes('/numbering-ranges/query'), 'No consulta con el candidato verificado actual.');
+  assert(block.includes('{ billing }'), 'No envía el candidato actual al backend.');
   assert(
-    resolution.includes('FactusNumberingRangesBlock'),
-    'El paso Resolución no usa el selector oficial.'
+    resolution.includes('FactusNumberingRangesBlock') &&
+      resolution.includes('billing={billing}'),
+    'El paso Resolución no usa el candidato completo.'
+  );
+  assert(
+    section.includes('billing={billing}'),
+    'El asistente no entrega el candidato al selector de rangos.'
   );
   [
     'Número de resolución DIAN',
@@ -193,7 +259,7 @@ function testFrontendHasNoManualFiscalRangeFields() {
     assert(!resolution.includes(manualLabel), `Sigue editable manualmente: ${manualLabel}.`);
   });
 
-  ok('Panel reemplaza la digitación manual por selección oficial separada');
+  ok('Panel reemplaza digitación manual por selección oficial del candidato verificado');
 }
 
 function testEmissionUsesStoredSelections() {
@@ -230,7 +296,8 @@ function testEmissionUsesStoredSelections() {
     'La nota crédito no se enruta al proveedor con rango sincronizado.'
   );
   assert(
-    index.indexOf('electronicCreditNoteRangeService') < index.indexOf("tryRequire('./routes/payments')"),
+    index.indexOf('electronicCreditNoteRangeService') <
+      index.indexOf("tryRequire('./routes/payments')"),
     'El proveedor de notas se inicializa después de las rutas heredadas.'
   );
 
@@ -260,6 +327,7 @@ function main() {
     testDocumentCodesAndPayloadExtraction,
     testEligibleRanges,
     testUnsafeRangesAreRejected,
+    testCandidateUsesStoredSecretsAndTrustedMetadata,
     testTechnicalKeyNeverLeavesBackend,
     testOfficialLookupAndSelectionControls,
     testFrontendHasNoManualFiscalRangeFields,
