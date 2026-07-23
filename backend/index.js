@@ -73,6 +73,10 @@ app.use(globalLimiter);
 app.use(adminAccessGate);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// Debe cargarse antes de las rutas heredadas que importan el motor de notas
+// crédito, para que toda emisión use exclusivamente el rango sincronizado.
+tryRequire('./services/electronicCreditNoteRangeService');
+
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
