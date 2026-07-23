@@ -25,4 +25,20 @@ export default defineConfig({
       'legged-hacker-unworldly.ngrok-free.dev',
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': [
+            'keen-slider',
+            'lucide-react',
+            'react-range',
+            'react-toastify',
+          ],
+          'vendor-http': ['axios'],
+        },
+      },
+    },
+  },
 })
