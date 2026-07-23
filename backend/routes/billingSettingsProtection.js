@@ -12,6 +12,10 @@ const {
   hydrateBillingConfiguration,
 } = require('../services/billingFiscalCompatibilityService');
 const {
+  readNumberingRangeSnapshot,
+  reconcileNumberingRangeSnapshot,
+} = require('../services/billingNumberingRangePersistenceService');
+const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
 
@@ -120,15 +124,15 @@ router.put('/', (req, res, next) => {
           );
         }
 
+        const rangeSnapshot = await readNumberingRangeSnapshot();
         const hydratedBilling = await hydrateBillingConfiguration(
           preserveSynchronizedRangeIds(body.billing)
         );
-        const settings = await updateBillingConfigurationWithReadiness(
-          hydratedBilling,
-          {
-            adminUser: currentAdmin(req),
-          }
-        );
+        await updateBillingConfigurationWithReadiness(hydratedBilling, {
+          adminUser: currentAdmin(req),
+        });
+        await reconcileNumberingRangeSnapshot(rangeSnapshot);
+        const settings = await getAdminSettingsWithBillingReadiness();
 
         return res.json(settings);
       } catch (error) {
