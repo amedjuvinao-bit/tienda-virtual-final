@@ -37,15 +37,18 @@ const InvoiceEmissionSchema = new mongoose.Schema(
   {
     state: {
       type: String,
-      enum: ['processing', 'completed', 'failed'],
+      enum: ['processing', 'reconciliation_pending', 'completed', 'failed'],
       default: 'processing',
     },
     source: { type: String, default: '' },
     initiatedBy: { type: String, default: 'system' },
     lockToken: { type: String, default: '', select: false },
+    lockExpiresAt: { type: Date, default: null },
     attempts: { type: Number, default: 1 },
     firstAttemptAt: { type: Date, default: null },
     lastAttemptAt: { type: Date, default: null },
+    reconciliationRequestedAt: { type: Date, default: null },
+    reconciledAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     failedAt: { type: Date, default: null },
   },
@@ -257,6 +260,7 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       enum: [
         'pending',
         'processing',
+        'reconciliation_pending',
         'generated',
         'sent',
         'accepted',
@@ -400,6 +404,7 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
 );
 
 ElectronicInvoiceSchema.index({ status: 1, createdAt: -1 });
+ElectronicInvoiceSchema.index({ 'emission.state': 1, 'emission.lastAttemptAt': 1 });
 ElectronicInvoiceSchema.index(
   { idempotencyKey: 1 },
   {
