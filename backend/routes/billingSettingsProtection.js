@@ -45,6 +45,41 @@ function sendConfigurationError(res, error) {
   });
 }
 
+function preserveSynchronizedRangeIds(billing = {}) {
+  const source = billing && typeof billing === 'object' ? billing : {};
+  const resolution =
+    source.dianResolution && typeof source.dianResolution === 'object'
+      ? source.dianResolution
+      : {};
+  const provider =
+    source.electronicProvider && typeof source.electronicProvider === 'object'
+      ? source.electronicProvider
+      : {};
+  const invoiceRangeId = Number(
+    provider.numberingRangeId || resolution.numberingRangeId || 0
+  );
+  const creditNoteRangeId = Number(
+    provider.creditNoteNumberingRangeId ||
+      resolution.creditNoteNumberingRangeId ||
+      0
+  );
+
+  return {
+    ...source,
+    electronicProvider: {
+      ...provider,
+      numberingRangeId:
+        Number.isInteger(invoiceRangeId) && invoiceRangeId > 0
+          ? invoiceRangeId
+          : 0,
+      creditNoteNumberingRangeId:
+        Number.isInteger(creditNoteRangeId) && creditNoteRangeId > 0
+          ? creditNoteRangeId
+          : 0,
+    },
+  };
+}
+
 // Intercepta la lectura administrativa antes del router genérico para migrar
 // credenciales antiguas, normalizar datos fiscales históricos, ocultar secretos
 // y calcular el estado real de producción.
@@ -85,7 +120,9 @@ router.put('/', (req, res, next) => {
           );
         }
 
-        const hydratedBilling = await hydrateBillingConfiguration(body.billing);
+        const hydratedBilling = await hydrateBillingConfiguration(
+          preserveSynchronizedRangeIds(body.billing)
+        );
         const settings = await updateBillingConfigurationWithReadiness(
           hydratedBilling,
           {
