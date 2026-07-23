@@ -139,8 +139,19 @@ function isPendingDocument(document = {}) {
   );
 }
 
-async function findExactPendingInvoice({ credentials, tokenResult, expectedReference }) {
-  const query = encodeURIComponent(expectedReference);
+async function listInvoicesByExactReference({ credentials, tokenResult, expectedReference }) {
+  const expected = cleanText(expectedReference, 180);
+  if (!expected) {
+    return {
+      success: false,
+      status: 400,
+      code: 'FACTUS_REFERENCE_REQUIRED',
+      error: 'La conciliación requiere una referencia exacta de la factura.',
+      documents: [],
+    };
+  }
+
+  const query = encodeURIComponent(expected);
   const { response, data } = await fetchJsonWithTimeout(
     `${credentials.apiUrl}/v2/bills?filter[reference_code]=${query}&per_page=100`,
     {
@@ -157,21 +168,102 @@ async function findExactPendingInvoice({ credentials, tokenResult, expectedRefer
     return {
       success: false,
       status: response.status,
+      code: 'FACTUS_RECONCILIATION_LOOKUP_FAILED',
       error: data?.message || data?.error || `HTTP ${response.status}`,
+      documents: [],
     };
   }
 
-  const expected = cleanText(expectedReference, 180);
-  const pending = extractList(data).find(
-    (document) =>
-      referenceCode(document) === expected && isPendingDocument(document)
+  const documents = extractList(data).filter(
+    (document) => referenceCode(document) === expected
   );
 
   return {
     success: true,
     status: response.status,
-    pending: pending || null,
+    documents,
+    data,
   };
+}
+
+async function findExactPendingInvoice({ credentials, tokenResult, expectedReference }) {
+  const listed = await listInvoicesByExactReference({
+    credentials,
+    tokenResult,
+    expectedReference,
+  });
+
+  if (!listed.success) return listed;
+
+  return {
+    success: true,
+    status: listed.status,
+    pending: listed.documents.find(isPendingDocument) || null,
+  };
+}
+
+async function findInvoiceByReferenceFromFactus(data = {}) {
+  try {
+    const providerConfig = runtimeProviderConfig(data);
+    const credentials = validateProviderCredentials(providerConfig);
+    const tokenResult = await getFactusAccessToken(credentials);
+
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'reconciliation_auth',
+        ...tokenResult,
+      };
+    }
+
+    const listed = await listInvoicesByExactReference({
+      credentials,
+      tokenResult,
+      expectedReference: data.referenceCode,
+    });
+
+    if (!listed.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'reconciliation_lookup',
+        status: listed.status,
+        code: listed.code,
+        error: listed.error,
+      };
+    }
+
+    if (listed.documents.length > 1) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'reconciliation_ambiguous',
+        status: 409,
+        code: 'FACTUS_RECONCILIATION_AMBIGUOUS',
+        error:
+          'Factus devolvió más de una factura con la misma referencia. Se requiere revisión manual para evitar asociar el documento equivocado.',
+      };
+    }
+
+    return {
+      success: true,
+      provider: 'factus',
+      stage: 'reconciliation_lookup',
+      status: listed.status,
+      found: listed.documents.length === 1,
+      document: listed.documents[0] || null,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      stage: 'reconciliation_exception',
+      status: Number(error?.status || 503),
+      code: error?.code || 'FACTUS_RECONCILIATION_ERROR',
+      error: error?.message || 'No fue posible conciliar la factura con Factus.',
+    };
+  }
 }
 
 async function sendInvoiceToFactus(invoiceData = {}) {
@@ -367,6 +459,7 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
 }
 
 module.exports = {
+  findInvoiceByReferenceFromFactus,
   sendCreditNoteToFactus,
   sendInvoiceToFactus,
 };
