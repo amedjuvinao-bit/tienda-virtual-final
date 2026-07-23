@@ -2,12 +2,15 @@
 
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const issuanceService = require('./electronicInvoiceIssuanceService');
+const recoveryService = require('./billingInvoiceRecoveryService');
+const recoveryWorkerService = require('./billingInvoiceRecoveryWorkerService');
+
 const {
   isInvoiceInRecovery,
   isInvoiceLockExpired,
   markInvoiceForReconciliation,
   reconcileInvoiceByReference,
-} = require('./billingInvoiceRecoveryService');
+} = recoveryService;
 
 const baseIssueElectronicInvoiceForOrder =
   issuanceService.issueElectronicInvoiceForOrder;
@@ -67,9 +70,31 @@ async function reconcileExisting(invoice, source, reason, lastError = '') {
   return reconciliationResponse(result, marked.invoice || invoice);
 }
 
+function pendingReconciliationError({ invoice, originalError, recoveryError = '' }) {
+  return Object.assign(
+    new Error(
+      'La emisión tuvo un resultado incierto y quedó registrada para conciliación automática. El sistema no volverá a emitir la factura hasta confirmar el resultado en Factus.'
+    ),
+    {
+      status: 503,
+      code: 'BILLING_RECONCILIATION_PENDING',
+      invoice: invoice || null,
+      causeCode: originalError?.code || '',
+      recoveryError: cleanText(recoveryError, 500),
+    }
+  );
+}
+
 async function issueElectronicInvoiceForOrderResilient(args = {}) {
   const source = cleanText(args.source || 'system', 80) || 'system';
-  const existingBefore = await findInvoiceForOrder(args.orderId);
+  let existingBefore = null;
+
+  try {
+    existingBefore = await findInvoiceForOrder(args.orderId);
+  } catch {
+    // El motor base responderá el error real. Si ya existe una reserva, el
+    // scanner duradero la recuperará cuando MongoDB vuelva a estar disponible.
+  }
 
   if (existingBefore && isInvoiceInRecovery(existingBefore)) {
     if (
@@ -111,7 +136,19 @@ async function issueElectronicInvoiceForOrderResilient(args = {}) {
 
     return result;
   } catch (error) {
-    const invoice = error?.invoice || (await findInvoiceForOrder(args.orderId));
+    let invoice = error?.invoice || null;
+
+    if (!invoice) {
+      try {
+        invoice = await findInvoiceForOrder(args.orderId);
+      } catch (lookupError) {
+        throw pendingReconciliationError({
+          invoice: null,
+          originalError: error,
+          recoveryError: lookupError?.message || '',
+        });
+      }
+    }
 
     if (!invoice || !isInvoiceInRecovery(invoice)) throw error;
 
@@ -125,41 +162,32 @@ async function issueElectronicInvoiceForOrderResilient(args = {}) {
 
       if (recovered.reconciled) return recovered;
 
-      const pendingError = Object.assign(
-        new Error(
-          'La emisión quedó pendiente de conciliación automática con Factus. El sistema no volverá a emitir la factura hasta resolver el resultado remoto.'
-        ),
-        {
-          status: 503,
-          code: 'BILLING_RECONCILIATION_PENDING',
-          invoice: recovered.invoice || invoice,
-          causeCode: error?.code || '',
-        }
-      );
-      throw pendingError;
+      throw pendingReconciliationError({
+        invoice: recovered.invoice || invoice,
+        originalError: error,
+      });
     } catch (recoveryError) {
       if (recoveryError?.code === 'BILLING_RECONCILIATION_PENDING') {
         throw recoveryError;
       }
 
-      throw Object.assign(
-        new Error(
-          'La emisión tuvo un resultado incierto y no fue posible completar la conciliación inmediata. Quedó registrada para recuperación automática.'
-        ),
-        {
-          status: 503,
-          code: 'BILLING_RECONCILIATION_PENDING',
-          invoice,
-          causeCode: error?.code || '',
-          recoveryError: cleanText(recoveryError?.message, 500),
-        }
-      );
+      throw pendingReconciliationError({
+        invoice,
+        originalError: error,
+        recoveryError: recoveryError?.message || '',
+      });
     }
   }
 }
 
 issuanceService.issueElectronicInvoiceForOrder =
   issueElectronicInvoiceForOrderResilient;
+
+// El index requiere el mismo objeto de módulo después de este bootstrap. Al
+// sustituir únicamente el scanner evitamos que una factura ya pendiente reinicie
+// su backoff cada minuto.
+recoveryService.scanStaleProcessingInvoices =
+  recoveryWorkerService.scanStaleProcessingInvoices;
 
 module.exports = {
   issueElectronicInvoiceForOrder: issueElectronicInvoiceForOrderResilient,
