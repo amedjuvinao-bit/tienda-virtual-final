@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
+
+  // Tailwind detectaba el fragmento `[-:T]` de una expresión regular usada
+  // para fechas como si fuera una propiedad arbitraria y generaba CSS inválido
+  // (`-: T;`). No es una clase de la interfaz y debe excluirse del build.
+  blocklist: ['[-:T]'],
+
   theme: {
     extend: {
       fontFamily: {
