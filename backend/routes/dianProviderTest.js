@@ -16,6 +16,9 @@ const {
   saveFactusNumberingRangeSelection,
 } = require('../services/billingNumberingRangeService');
 const {
+  activateClientFactusProduction,
+} = require('../services/billingClientActivationService');
+const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
 
@@ -40,6 +43,17 @@ const numberingRangeLimiter = rateLimit({
     ok: false,
     error: 'FACTUS_NUMBERING_RANGE_RATE_LIMIT',
     message: 'Se alcanzó el límite temporal de consultas de rangos en Factus.',
+  },
+});
+const productionActivationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_PRODUCTION_ACTIVATION_RATE_LIMIT',
+    message: 'Se alcanzó el límite temporal de intentos de activación de Producción.',
   },
 });
 
@@ -204,5 +218,34 @@ router.put('/numbering-ranges', numberingRangeLimiter, async (req, res) => {
     );
   }
 });
+
+router.post(
+  '/activate-production',
+  productionActivationLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload({
+        billing: req.body?.billing || {},
+      });
+      const result = await activateClientFactusProduction(
+        hydratedPayload.billing,
+        {
+          invoiceRangeId: req.body?.invoiceRangeId,
+          creditNoteRangeId: req.body?.creditNoteRangeId,
+        },
+        { adminUser: currentAdmin(req) }
+      );
+
+      return res.json(result);
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_PRODUCTION_ACTIVATION_ERROR',
+        'No fue posible activar Factus en Producción.'
+      );
+    }
+  }
+);
 
 module.exports = router;
