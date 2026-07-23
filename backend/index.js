@@ -73,9 +73,10 @@ app.use(globalLimiter);
 app.use(adminAccessGate);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// Debe cargarse antes de las rutas heredadas que importan el motor de notas
-// crédito, para que toda emisión use exclusivamente el rango sincronizado.
+// Estos adaptadores deben cargarse antes de las rutas heredadas para que las
+// emisiones usen rangos sincronizados y recuperación de resultados inciertos.
 tryRequire('./services/electronicCreditNoteRangeService');
+tryRequire('./services/electronicInvoiceRecoveryBootstrapService');
 
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
@@ -93,6 +94,7 @@ const OrderModel = tryRequire('./models/Order');
 const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
 const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
+const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
@@ -204,9 +206,12 @@ if (pageRoutes) app.use('/api/pages', pageRoutes);
 const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enabled;
 const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
 const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
+const BILLING_RECOVERY_INTERVAL_MS = 60 * 1000;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
+let billingRecoveryTimer = null;
+let billingRecoveryRunning = false;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -252,11 +257,51 @@ function startInventoryReservationExpirationJob() {
   console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
+function startBillingInvoiceRecoveryJob() {
+  const scan = billingInvoiceRecoveryService?.scanStaleProcessingInvoices;
+  const processPending = billingInvoiceRecoveryService?.processPendingInvoiceRecoveries;
+
+  if (typeof scan !== 'function' || typeof processPending !== 'function') {
+    console.warn('No se inició el job de recuperación fiscal: servicio no disponible.');
+    return;
+  }
+
+  if (billingRecoveryTimer) return;
+
+  const runRecovery = async () => {
+    if (billingRecoveryRunning || mongoose.connection.readyState !== 1) return;
+    billingRecoveryRunning = true;
+    try {
+      const scanned = await scan({ limit: 25 });
+      const processed = await processPending({ limit: 10 });
+      if (scanned.scheduled > 0 || processed.processed > 0) {
+        console.log('Recuperación fiscal ejecutada:', {
+          scheduled: scanned.scheduled,
+          processed: processed.processed,
+          resolved: processed.resolved,
+          pending: processed.pending,
+          failed: processed.failed,
+        });
+      }
+    } catch (error) {
+      console.error('Error en job de recuperación fiscal:', error.message);
+    } finally {
+      billingRecoveryRunning = false;
+    }
+  };
+
+  billingRecoveryTimer = setInterval(runRecovery, BILLING_RECOVERY_INTERVAL_MS);
+  billingRecoveryTimer.unref?.();
+  runRecovery().catch(() => null);
+  console.log(`Job de recuperación fiscal iniciado cada ${BILLING_RECOVERY_INTERVAL_MS}ms.`);
+}
+
 mongoose
   .connect(env.mongoUri)
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
+    startBillingInvoiceRecoveryJob();
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });
