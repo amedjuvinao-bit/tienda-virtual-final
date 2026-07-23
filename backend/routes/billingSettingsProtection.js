@@ -8,6 +8,10 @@ const {
   updateBillingConfigurationWithReadiness,
 } = require('../services/billingConnectionOrchestrationService');
 const {
+  ensureStoredFiscalInfoCompatibility,
+  hydrateBillingConfiguration,
+} = require('../services/billingFiscalCompatibilityService');
+const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
 
@@ -42,13 +46,15 @@ function sendConfigurationError(res, error) {
 }
 
 // Intercepta la lectura administrativa antes del router genérico para migrar
-// credenciales antiguas, ocultar secretos y calcular el estado real de producción.
+// credenciales antiguas, normalizar datos fiscales históricos, ocultar secretos
+// y calcular el estado real de producción.
 router.get(
   '/admin',
   requireAdmin,
   requirePermission('settings:view'),
   async (_req, res) => {
     try {
+      await ensureStoredFiscalInfoCompatibility();
       const settings = await getAdminSettingsWithBillingReadiness();
       return res.json(settings);
     } catch (error) {
@@ -79,8 +85,9 @@ router.put('/', (req, res, next) => {
           );
         }
 
+        const hydratedBilling = await hydrateBillingConfiguration(body.billing);
         const settings = await updateBillingConfigurationWithReadiness(
-          body.billing,
+          hydratedBilling,
           {
             adminUser: currentAdmin(req),
           }
