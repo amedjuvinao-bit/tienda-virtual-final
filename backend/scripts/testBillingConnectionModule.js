@@ -13,6 +13,9 @@ const {
   buildBillingReadinessSnapshot,
   normalizeCompanySnapshot,
 } = require('../services/billingConnectionOrchestrationService');
+const {
+  buildFactusConnectionRuntimeConfig,
+} = require('../services/billingConfigurationService');
 
 const ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, fail: 0 };
@@ -127,6 +130,34 @@ function testCompanyMustMatchFiscalIdentity() {
   ok('Producción rechaza credenciales vinculadas a un NIT diferente');
 }
 
+function testConnectionIsIndependentFromNumberingConfiguration() {
+  const runtime = buildFactusConnectionRuntimeConfig(
+    {
+      dian: { mode: 'habilitacion' },
+      dianResolution: {
+        rangeFrom: 100,
+        rangeTo: 200,
+        currentNumber: 999,
+      },
+      electronicProvider: {
+        provider: 'factus',
+        apiUrl: 'https://api-sandbox.factus.com.co',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        username: 'sandbox@tienda.test',
+        password: 'password-seguro',
+      },
+    },
+    {}
+  );
+
+  assert(runtime.provider === 'factus', 'No construyó el runtime de Factus.');
+  assert(runtime.environment === 'habilitacion', 'No conservó el ambiente de conexión.');
+  assert(runtime.clientId === 'client-id', 'No conservó las credenciales de conexión.');
+
+  ok('Prueba de conexión no queda bloqueada por consecutivos o rangos históricos');
+}
+
 function testReadinessRequiresEveryProductionControl() {
   const mailReady = {
     enabled: true,
@@ -177,6 +208,10 @@ function testOfficialFactusFlowAndRateLimit() {
 
   assert(baseService.includes('/oauth/token'), 'Falta autenticación OAuth real.');
   assert(baseService.includes('/v2/companies'), 'Falta consulta oficial de empresa.');
+  assert(
+    baseService.includes('buildFactusConnectionRuntimeConfig'),
+    'La prueba real no tiene un runtime independiente.'
+  );
   assert(
     orchestration.includes('FACTUS_COMPANY_NIT_MISMATCH'),
     'La conexión no valida identidad fiscal.'
@@ -250,6 +285,7 @@ function main() {
   const tests = [
     testCompanyIdentityNormalization,
     testCompanyMustMatchFiscalIdentity,
+    testConnectionIsIndependentFromNumberingConfiguration,
     testReadinessRequiresEveryProductionControl,
     testOfficialFactusFlowAndRateLimit,
     testFrontendUsesRealConnectionState,
