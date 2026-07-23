@@ -1,6 +1,8 @@
 // backend/lib/dian/providerAdapter.js
 
-const { sendInvoiceToFactus } = require('./providers/factusProvider');
+const {
+  sendInvoiceToFactus,
+} = require('./providers/factusRangeAwareProvider');
 const {
   BillingConfigurationError,
   buildRuntimeFactusConfig,
