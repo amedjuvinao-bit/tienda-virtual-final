@@ -87,7 +87,11 @@ function RangeSelector({ label, ranges, selectedId, onChange }) {
   );
 }
 
-export default function FactusNumberingRangesBlock({ value = {}, onChange }) {
+export default function FactusNumberingRangesBlock({
+  value = {},
+  billing = {},
+  onChange,
+}) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -106,7 +110,10 @@ export default function FactusNumberingRangesBlock({ value = {}, onChange }) {
     try {
       setLoading(true);
       setFeedback(null);
-      const { data } = await api.get('/api/dian-provider/numbering-ranges');
+      const { data } = await api.post(
+        '/api/dian-provider/numbering-ranges/query',
+        { billing }
+      );
       const invoices = Array.isArray(data.eligibleInvoiceRanges)
         ? data.eligibleInvoiceRanges
         : [];
@@ -177,6 +184,7 @@ export default function FactusNumberingRangesBlock({ value = {}, onChange }) {
       const { data } = await api.put('/api/dian-provider/numbering-ranges', {
         invoiceRangeId,
         creditNoteRangeId,
+        billing,
       });
 
       if (typeof onChange === 'function' && data.dianResolution) {
