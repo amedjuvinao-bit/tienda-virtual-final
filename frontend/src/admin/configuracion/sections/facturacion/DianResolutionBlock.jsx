@@ -5,6 +5,7 @@ export default function DianResolutionBlock({
   value = {},
   billing = {},
   onChange,
+  onActivated,
   credentialStatus = {},
 }) {
   void credentialStatus;
@@ -15,6 +16,7 @@ export default function DianResolutionBlock({
         value={value}
         billing={billing}
         onChange={onChange}
+        onActivated={onActivated}
       />
 
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
