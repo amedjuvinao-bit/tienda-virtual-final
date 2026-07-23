@@ -43,7 +43,6 @@ const EMPTY_BILLING = {
 
 function normalizeMode(value) {
   const mode = String(value || '').trim().toLowerCase();
-
   if (['habilitation', 'habilitacion', 'sandbox', 'test'].includes(mode)) {
     return 'habilitacion';
   }
@@ -54,7 +53,6 @@ function normalizeMode(value) {
 function getApiError(error, fallback) {
   const response = error?.response?.data || {};
   const details = Array.isArray(response.details) ? response.details : [];
-
   return {
     message: response.message || error?.message || fallback,
     details,
@@ -136,7 +134,6 @@ export default function FacturacionSection() {
   const mode = normalizeMode(billing.dian?.mode);
   const isDianActive = mode !== 'internal';
   const provider = isDianActive ? 'factus' : 'mock';
-
   const providerLabel = useMemo(
     () => (provider === 'factus' ? 'Factus' : 'Comprobante interno'),
     [provider]
@@ -208,13 +205,11 @@ export default function FacturacionSection() {
       handleDianModeChange('internal');
       return;
     }
-
     handleDianModeChange(mode === 'internal' ? 'habilitacion' : mode);
   };
 
   const handleDianResolutionChange = (nextResolution) => {
     const environment = mode === 'production' ? '1' : '2';
-
     setBilling((previous) => ({
       ...previous,
       dianResolution: {
@@ -283,7 +278,6 @@ export default function FacturacionSection() {
         error,
         'No fue posible verificar la conexión real con Factus.'
       );
-
       setConnectionFeedback({
         status: 'error',
         message: parsed.message,
@@ -311,7 +305,6 @@ export default function FacturacionSection() {
     try {
       setSaving(true);
       setSaveFeedback(null);
-
       const { data } = await api.put('/api/site-settings', {
         billing: {
           ...billing,
@@ -340,10 +333,7 @@ export default function FacturacionSection() {
         error,
         'No fue posible guardar la configuración de facturación.'
       );
-      setSaveFeedback({
-        type: 'error',
-        ...parsed,
-      });
+      setSaveFeedback({ type: 'error', ...parsed });
     } finally {
       setSaving(false);
     }
@@ -435,13 +425,10 @@ export default function FacturacionSection() {
                 </button>
               ))}
             </div>
-
             <div className="h-2 overflow-hidden rounded-full bg-white">
               <div
                 className="h-full rounded-full bg-pink-500 transition-all"
-                style={{
-                  width: `${((currentStep + 1) / STEPS.length) * 100}%`,
-                }}
+                style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
               />
             </div>
           </div>
@@ -468,7 +455,6 @@ export default function FacturacionSection() {
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-gray-700">
                   Factus es el único proveedor externo habilitado. La prueba autentica las credenciales y confirma que la empresa vinculada coincida con el NIT fiscal configurado.
                 </div>
-
                 <ElectronicProviderBlock
                   value={billing.electronicProvider}
                   credentialStatus={credentialStatus}
@@ -498,7 +484,6 @@ export default function FacturacionSection() {
                       Activar facturación electrónica
                     </span>
                   </label>
-
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       Ambiente de emisión
@@ -517,7 +502,6 @@ export default function FacturacionSection() {
                       <option value="production">Producción</option>
                     </select>
                   </div>
-
                   <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-gray-700 md:col-span-2">
                     <strong className="mb-1 block text-gray-900">
                       Selección actual:
@@ -529,7 +513,6 @@ export default function FacturacionSection() {
                         : `Habilitación seleccionada con proveedor: ${providerLabel}.`}
                   </div>
                 </div>
-
                 <BillingProductionReadiness
                   readiness={readiness}
                   connectionChanged={connectionChanged}
@@ -541,6 +524,7 @@ export default function FacturacionSection() {
               (isDianActive ? (
                 <DianResolutionBlock
                   value={billing.dianResolution}
+                  billing={billing}
                   credentialStatus={credentialStatus}
                   onChange={handleDianResolutionChange}
                 />
@@ -583,7 +567,6 @@ export default function FacturacionSection() {
                   <strong className="block text-gray-900">Proveedor:</strong>
                   {providerLabel}
                 </div>
-
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <strong className="block text-gray-900">
                     Tipo de emisión:
@@ -594,7 +577,6 @@ export default function FacturacionSection() {
                       ? 'Facturación electrónica en producción'
                       : 'Facturación electrónica en pruebas / habilitación'}
                 </div>
-
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <strong className="block text-gray-900">Ambiente:</strong>
                   {mode === 'internal'
@@ -603,13 +585,10 @@ export default function FacturacionSection() {
                       ? 'Producción'
                       : 'Pruebas / habilitación'}
                 </div>
-
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <strong className="block text-gray-900">Resolución:</strong>
-                  {billing.dianResolution?.resolutionNumber ||
-                    'No configurada'}
+                  {billing.dianResolution?.resolutionNumber || 'No configurada'}
                 </div>
-
                 <BillingProductionReadiness
                   readiness={readiness}
                   connectionChanged={connectionChanged}
@@ -627,7 +606,6 @@ export default function FacturacionSection() {
             >
               Anterior
             </button>
-
             {currentStep < STEPS.length - 1 ? (
               <button
                 type="button"
