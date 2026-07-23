@@ -17,7 +17,8 @@ const {
 } = require('../services/billingNumberingRangeService');
 const {
   activateClientFactusProduction,
-} = require('../services/billingClientActivationService');
+  getClientActivationState,
+} = require('../services/billingClientActivationOrchestrator');
 const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
@@ -215,6 +216,19 @@ router.put('/numbering-ranges', numberingRangeLimiter, async (req, res) => {
       error,
       'FACTUS_NUMBERING_RANGE_SAVE_ERROR',
       'No fue posible guardar los rangos oficiales de Factus.'
+    );
+  }
+});
+
+router.get('/activation-status', async (_req, res) => {
+  try {
+    return res.json({ ok: true, activation: await getClientActivationState() });
+  } catch (error) {
+    return sendFactusError(
+      res,
+      error,
+      'FACTUS_ACTIVATION_STATUS_ERROR',
+      'No fue posible consultar el estado de activación.'
     );
   }
 });
