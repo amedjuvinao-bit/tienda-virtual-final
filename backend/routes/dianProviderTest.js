@@ -7,6 +7,9 @@ const {
   testFactusConnectionWithIdentity,
 } = require('../services/billingConnectionOrchestrationService');
 const {
+  hydrateBillingPayload,
+} = require('../services/billingFiscalCompatibilityService');
+const {
   BillingConfigurationError,
 } = require('../lib/billing/billingConfigurationSecurity');
 
@@ -38,7 +41,8 @@ function currentAdmin(req) {
 
 router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
-    const result = await testFactusConnectionWithIdentity(req.body || {}, {
+    const hydratedPayload = await hydrateBillingPayload(req.body || {});
+    const result = await testFactusConnectionWithIdentity(hydratedPayload, {
       adminUser: currentAdmin(req),
     });
 
