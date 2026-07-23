@@ -12,6 +12,7 @@ const {
   hydrateBillingConfiguration,
 } = require('../services/billingFiscalCompatibilityService');
 const {
+  assertProductionNumberingRangesReady,
   readNumberingRangeSnapshot,
   reconcileNumberingRangeSnapshot,
 } = require('../services/billingNumberingRangePersistenceService');
@@ -128,6 +129,7 @@ router.put('/', (req, res, next) => {
         const hydratedBilling = await hydrateBillingConfiguration(
           preserveSynchronizedRangeIds(body.billing)
         );
+        await assertProductionNumberingRangesReady(hydratedBilling);
         await updateBillingConfigurationWithReadiness(hydratedBilling, {
           adminUser: currentAdmin(req),
         });
