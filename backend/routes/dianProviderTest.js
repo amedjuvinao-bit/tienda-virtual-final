@@ -80,6 +80,22 @@ function sendFactusError(res, error, fallbackCode, fallbackMessage) {
   });
 }
 
+function safeResolution(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const {
+    technicalKey,
+    softwarePin,
+    certificatePath,
+    certificatePassword,
+    ...safe
+  } = source;
+  void technicalKey;
+  void softwarePin;
+  void certificatePath;
+  void certificatePassword;
+  return safe;
+}
+
 router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
     const hydratedPayload = await hydrateBillingPayload(req.body || {});
@@ -146,7 +162,11 @@ router.put('/numbering-ranges', numberingRangeLimiter, async (req, res) => {
     return res.json({
       ok: true,
       message: 'Rangos oficiales de Factus guardados correctamente.',
-      ...result,
+      environment: result.environment,
+      syncedAt: result.syncedAt,
+      invoiceRange: result.invoiceRange,
+      creditNoteRange: result.creditNoteRange,
+      dianResolution: safeResolution(result.dianResolution),
       settings,
     });
   } catch (error) {
