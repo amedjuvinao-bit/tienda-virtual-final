@@ -96,6 +96,19 @@ function safeResolution(value = {}) {
   return safe;
 }
 
+function sendNumberingRanges(res, result) {
+  return res.json({
+    ok: true,
+    environment: result.environment,
+    syncedAt: result.syncedAt,
+    selected: result.selected,
+    invoiceRanges: result.invoiceRanges,
+    creditNoteRanges: result.creditNoteRanges,
+    eligibleInvoiceRanges: result.eligibleInvoiceRanges,
+    eligibleCreditNoteRanges: result.eligibleCreditNoteRanges,
+  });
+}
+
 router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
     const hydratedPayload = await hydrateBillingPayload(req.body || {});
@@ -127,17 +140,7 @@ router.post('/test-provider', connectionTestLimiter, async (req, res) => {
 router.get('/numbering-ranges', numberingRangeLimiter, async (_req, res) => {
   try {
     const result = await listFactusNumberingRanges();
-
-    return res.json({
-      ok: true,
-      environment: result.environment,
-      syncedAt: result.syncedAt,
-      selected: result.selected,
-      invoiceRanges: result.invoiceRanges,
-      creditNoteRanges: result.creditNoteRanges,
-      eligibleInvoiceRanges: result.eligibleInvoiceRanges,
-      eligibleCreditNoteRanges: result.eligibleCreditNoteRanges,
-    });
+    return sendNumberingRanges(res, result);
   } catch (error) {
     return sendFactusError(
       res,
@@ -148,14 +151,37 @@ router.get('/numbering-ranges', numberingRangeLimiter, async (_req, res) => {
   }
 });
 
+router.post(
+  '/numbering-ranges/query',
+  numberingRangeLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload(req.body || {});
+      const result = await listFactusNumberingRanges(hydratedPayload);
+      return sendNumberingRanges(res, result);
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_NUMBERING_RANGE_LOOKUP_ERROR',
+        'No fue posible consultar los rangos oficiales de Factus.'
+      );
+    }
+  }
+);
+
 router.put('/numbering-ranges', numberingRangeLimiter, async (req, res) => {
   try {
+    const hydratedPayload = await hydrateBillingPayload({
+      billing: req.body?.billing || {},
+    });
     const result = await saveFactusNumberingRangeSelection(
       {
         invoiceRangeId: req.body?.invoiceRangeId,
         creditNoteRangeId: req.body?.creditNoteRangeId,
       },
-      currentAdmin(req)
+      currentAdmin(req),
+      hydratedPayload
     );
     const settings = await getAdminSettingsWithBillingReadiness();
 
