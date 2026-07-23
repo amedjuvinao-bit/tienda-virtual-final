@@ -25,6 +25,7 @@ const BILLING_TESTS = [
   ['Totales, IVA y cupones', 'testBillingTotalsModule.js'],
   ['Datos fiscales del checkout', 'testBillingFiscalCheckoutModule.js'],
   ['Motor único e idempotencia', 'testBillingIdempotencyModule.js'],
+  ['Recuperación y conciliación de facturas', 'testBillingInvoiceRecoveryModule.js'],
   ['Seguridad y permisos', 'testBillingSecurityModule.js'],
   ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
   ['Conexión real y readiness de Factus', 'testBillingConnectionModule.js'],
