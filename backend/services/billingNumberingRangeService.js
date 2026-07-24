@@ -19,6 +19,10 @@ const SECRET_FIELDS = Object.freeze([
   'softwarePin',
   'technicalKey',
 ]);
+const FACTUS_FINGERPRINT_SELECT = [
+  '+billing.electronicProvider.lastConnectionFingerprint',
+  '+billing.electronicProvider.numberingRangesFingerprint',
+].join(' ');
 const creditNoteRangeCreationLocks = new Set();
 
 function cleanText(value, max = 500) {
@@ -462,7 +466,9 @@ async function postCreditNoteRange(runtime, token, input) {
 }
 
 async function getCurrentContext(candidatePayload = {}) {
-  const settings = await SiteSettings.findOne();
+  const settings = await SiteSettings.findOne().select(
+    FACTUS_FINGERPRINT_SELECT
+  );
   if (!settings) {
     throw new BillingConfigurationError(
       'No existe una configuración de facturación para consultar rangos.',
@@ -502,7 +508,9 @@ async function getCurrentContext(candidatePayload = {}) {
 }
 
 async function invalidateNumberingRangesIfContextChanged(billingPayload = {}) {
-  const settings = await SiteSettings.findOne();
+  const settings = await SiteSettings.findOne().select(
+    FACTUS_FINGERPRINT_SELECT
+  );
   if (!settings?._id) return false;
 
   const storedBilling = settings?.billing?.toObject
