@@ -11,6 +11,7 @@ const {
   hydrateBillingPayload,
 } = require('../services/billingFiscalCompatibilityService');
 const {
+  createFactusCreditNoteNumberingRange,
   invalidateNumberingRangesIfContextChanged,
   listFactusNumberingRanges,
   saveFactusNumberingRangeSelection,
@@ -44,6 +45,18 @@ const numberingRangeLimiter = rateLimit({
     ok: false,
     error: 'FACTUS_NUMBERING_RANGE_RATE_LIMIT',
     message: 'Se alcanzó el límite temporal de consultas de rangos en Factus.',
+  },
+});
+const numberingRangeCreationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_NUMBERING_RANGE_CREATE_RATE_LIMIT',
+    message:
+      'Se alcanzó el límite temporal de creación de rangos en Factus.',
   },
 });
 const productionActivationLimiter = rateLimit({
@@ -180,6 +193,40 @@ router.post(
         error,
         'FACTUS_NUMBERING_RANGE_LOOKUP_ERROR',
         'No fue posible consultar los rangos oficiales de Factus.'
+      );
+    }
+  }
+);
+
+router.post(
+  '/numbering-ranges/credit-note',
+  numberingRangeCreationLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload({
+        billing: req.body?.billing || {},
+      });
+      const result = await createFactusCreditNoteNumberingRange(
+        {
+          prefix: req.body?.prefix,
+          current: req.body?.current,
+          confirmProduction: req.body?.confirmProduction === true,
+        },
+        hydratedPayload
+      );
+
+      return res.status(201).json({
+        ok: true,
+        message:
+          'Rango de nota crédito creado y verificado directamente en Factus.',
+        ...result,
+      });
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_CREDIT_NOTE_RANGE_CREATE_ERROR',
+        'No fue posible crear el rango de nota crédito en Factus.'
       );
     }
   }
