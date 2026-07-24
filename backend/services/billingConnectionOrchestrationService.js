@@ -127,6 +127,40 @@ function companyMatchesFiscal(company = {}, fiscalInfo = {}) {
   }
 }
 
+function resolveCompanyIdentityForEnvironment(
+  company = {},
+  fiscalInfo = {},
+  environment = 'internal'
+) {
+  const mode = normalizeMode(environment);
+
+  if (mode === PRODUCTION_MODE) {
+    return {
+      company: assertVerifiedCompanyMatchesFiscal(company, fiscalInfo),
+      matchesFiscal: true,
+      warning: '',
+    };
+  }
+
+  const normalized = normalizeCompanySnapshot(company, fiscalInfo);
+
+  try {
+    return {
+      company: assertVerifiedCompanyMatchesFiscal(normalized, fiscalInfo),
+      matchesFiscal: true,
+      warning: '',
+    };
+  } catch (error) {
+    return {
+      company: normalized,
+      matchesFiscal: false,
+      warning:
+        'La empresa de prueba de Factus no coincide con el NIT fiscal real. Esto es permitido únicamente en habilitación y no autoriza Producción.',
+      mismatchCode: error?.code || 'FACTUS_COMPANY_IDENTITY_MISMATCH',
+    };
+  }
+}
+
 async function readMailReadiness() {
   const mail = await MailSettings.findOne({ key: 'main' })
     .select('+smtpPasswordEncrypted')
@@ -299,10 +333,14 @@ async function testFactusConnectionWithIdentity(body = {}, options = {}) {
     settings?.billing?.fiscalInfo,
     body?.billing?.fiscalInfo
   );
-  let company;
+  let identity;
 
   try {
-    company = assertVerifiedCompanyMatchesFiscal(result.company, fiscalInfo);
+    identity = resolveCompanyIdentityForEnvironment(
+      result.company,
+      fiscalInfo,
+      result.environment
+    );
   } catch (error) {
     if (settings?._id) {
       await persistCompanyVerification(
@@ -320,14 +358,16 @@ async function testFactusConnectionWithIdentity(body = {}, options = {}) {
   }
 
   if (settings?._id) {
-    await persistCompanyVerification(settings._id, company);
+    await persistCompanyVerification(settings._id, identity.company);
   }
 
   const safeSettings = await getAdminSettingsWithBillingReadiness();
 
   return {
     ...result,
-    company,
+    company: identity.company,
+    identityMatchesFiscal: identity.matchesFiscal,
+    identityWarning: identity.warning,
     readiness: safeSettings._billingReadiness,
   };
 }
@@ -367,10 +407,7 @@ async function updateBillingConfigurationWithReadiness(
     assertVerifiedCompanyMatchesFiscal(storedCompany, fiscalInfo);
   }
 
-  const updatedSafe = await updateBillingConfiguration(
-    incomingBilling,
-    options
-  );
+  await updateBillingConfiguration(incomingBilling, options);
   const updatedSettings = await SiteSettings.findOne().lean();
   const updatedProvider = updatedSettings?.billing?.electronicProvider || {};
 
@@ -389,15 +426,16 @@ async function updateBillingConfigurationWithReadiness(
     updatedProvider.lastConnectionFingerprint &&
     storedCompany
   ) {
-    await persistCompanyVerification(
-      updatedSettings._id,
-      assertVerifiedCompanyMatchesFiscal(storedCompany, fiscalInfo)
+    const identity = resolveCompanyIdentityForEnvironment(
+      storedCompany,
+      fiscalInfo,
+      mode
     );
+    await persistCompanyVerification(updatedSettings._id, identity.company);
   } else {
     await persistCompanyVerification(updatedSettings._id, null);
   }
 
-  void updatedSafe;
   return getAdminSettingsWithBillingReadiness();
 }
 
@@ -406,6 +444,7 @@ module.exports = {
   buildBillingReadinessSnapshot,
   getAdminSettingsWithBillingReadiness,
   normalizeCompanySnapshot,
+  resolveCompanyIdentityForEnvironment,
   testFactusConnectionWithIdentity,
   updateBillingConfigurationWithReadiness,
 };
