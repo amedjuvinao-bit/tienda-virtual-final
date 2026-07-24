@@ -28,6 +28,10 @@ const LEGACY_SECRET_PATHS = Object.freeze([
   'billing.dianResolution.technicalKey',
 ]);
 const BILLING_HISTORY_LIMIT = 25;
+const FACTUS_FINGERPRINT_SELECT = [
+  '+billing.electronicProvider.lastConnectionFingerprint',
+  '+billing.electronicProvider.numberingRangesFingerprint',
+].join(' ');
 
 function cleanText(value, max = 500) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -58,7 +62,9 @@ function getNested(object, path) {
 }
 
 async function getOrCreateSettingsDocument() {
-  let settings = await SiteSettings.findOne();
+  let settings = await SiteSettings.findOne().select(
+    FACTUS_FINGERPRINT_SELECT
+  );
   if (!settings) {
     settings = await SiteSettings.create({ billing: {}, updatedBy: 'system' });
   }
