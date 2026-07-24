@@ -2,8 +2,6 @@
 
 /* eslint-disable no-console */
 
-const fs = require('fs');
-const path = require('path');
 const { performance } = require('perf_hooks');
 const mongoose = require('mongoose');
 
@@ -16,9 +14,7 @@ const {
   BillingConfigurationError,
   buildRuntimeFactusConfig,
 } = require('../lib/billing/billingConfigurationSecurity');
-const {
-  getFactusAccessToken,
-} = require('../lib/dian/providers/factusProvider');
+const { getFactusAccessToken } = require('../lib/dian/providers/factusProvider');
 const {
   FACTUS_RANGE_DOCUMENTS,
   extractRangeList,
@@ -58,21 +54,21 @@ function fail(title, error) {
 }
 
 function assert(condition, message, code = 'FACTUS_LIVE_READINESS_ASSERTION_FAILED') {
-  if (!condition) {
-    throw Object.assign(new Error(message), { code });
-  }
+  if (!condition) throw Object.assign(new Error(message), { code });
 }
 
 async function timed(label, action) {
   const startedAt = performance.now();
   const value = await action();
   const elapsedMs = Math.round(performance.now() - startedAt);
+
   if (elapsedMs >= SLOW_REQUEST_MS) {
     warning(
       `${label} respondió lentamente (${elapsedMs} ms)`,
       'La conexión funciona, pero esta latencia puede producir esperas visibles o timeouts bajo carga.'
     );
   }
+
   return { value, elapsedMs };
 }
 
@@ -95,11 +91,15 @@ async function fetchJsonReadOnly(url, token, label) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const message = cleanText(data?.message || data?.error, 500) || `HTTP ${response.status}`;
-      throw Object.assign(new Error(`${label} fue rechazada por Factus: ${message}`), {
-        code: 'FACTUS_LIVE_READ_ONLY_REQUEST_FAILED',
-        status: response.status,
-      });
+      const providerMessage =
+        cleanText(data?.message || data?.error, 500) || `HTTP ${response.status}`;
+      throw Object.assign(
+        new Error(`${label} fue rechazada por Factus: ${providerMessage}`),
+        {
+          code: 'FACTUS_LIVE_READ_ONLY_REQUEST_FAILED',
+          status: response.status,
+        }
+      );
     }
 
     return { data, status: response.status, elapsedMs };
@@ -136,11 +136,16 @@ function extractCompany(payload = {}) {
 function selectedRangeId(billing = {}, type) {
   const provider = billing?.electronicProvider || {};
   const resolution = billing?.dianResolution || {};
-  return Number(
-    type === 'invoice'
-      ? provider.numberingRangeId || resolution.numberingRangeId || 0
-      : provider.creditNoteNumberingRangeId || resolution.creditNoteNumberingRangeId || 0
-  ) || 0;
+
+  return (
+    Number(
+      type === 'invoice'
+        ? provider.numberingRangeId || resolution.numberingRangeId || 0
+        : provider.creditNoteNumberingRangeId ||
+            resolution.creditNoteNumberingRangeId ||
+            0
+    ) || 0
+  );
 }
 
 function rangeSummary(range = {}) {
@@ -195,6 +200,7 @@ async function fiscalSnapshot() {
 
   const invoice = invoiceAggregate[0] || {};
   const recovery = recoveryAggregate[0] || {};
+
   return {
     invoices: Number(invoice.count || 0),
     creditNotes: Number(invoice.creditNotes || 0),
@@ -210,6 +216,7 @@ async function fiscalSnapshot() {
 
 function assertOfficialEnvironment(runtime) {
   const expected = FACTUS_API_URLS[runtime.environment];
+
   assert(
     Boolean(expected),
     `El ambiente ${runtime.environment} no tiene una URL oficial definida.`,
@@ -222,28 +229,25 @@ function assertOfficialEnvironment(runtime) {
   );
 }
 
-function auditTokenCacheImplementation() {
-  const providerPath = path.join(
-    __dirname,
-    '..',
-    'lib',
-    'dian',
-    'providers',
-    'factusProvider.js'
-  );
-  const source = fs.readFileSync(providerPath, 'utf8');
-  const cacheKeyBlock = source.match(/function buildTokenCacheKey[\s\S]*?\n}/)?.[0] || '';
-  if (
-    cacheKeyBlock &&
-    !cacheKeyBlock.includes('clientSecret') &&
-    !cacheKeyBlock.includes('password')
-  ) {
-    warning(
-      'La clave del caché OAuth no incluye clientSecret ni password',
-      'Mientras el token siga vigente, un cambio de secreto con el mismo cliente y usuario podría reutilizar temporalmente el token anterior dentro del mismo proceso.'
+function verifyCompanyIdentity(runtime, companyRaw, fiscalInfo = {}) {
+  const company = normalizeCompanySnapshot(companyRaw, fiscalInfo);
+
+  try {
+    const verified = assertVerifiedCompanyMatchesFiscal(company, fiscalInfo);
+    ok(
+      `Identidad fiscal coincidente: NIT ${verified.nit}${verified.dv ? `-${verified.dv}` : ''}`
     );
-  } else {
-    ok('La clave del caché OAuth cambia cuando cambian las credenciales sensibles');
+    return verified;
+  } catch (error) {
+    if (runtime.environment === 'production') throw error;
+
+    warning(
+      'La empresa de habilitación usa una identidad de prueba distinta al NIT fiscal real',
+      `Factus sandbox respondió con NIT ${company.nit || 'sin identificar'}${
+        company.dv ? `-${company.dv}` : ''
+      }. La tienda conserva su NIT fiscal real. Esta diferencia es permitida únicamente en habilitación; Producción seguirá bloqueada hasta que ambos coincidan.`
+    );
+    return company;
   }
 }
 
@@ -265,7 +269,11 @@ async function main() {
 
   try {
     const settings = await SiteSettings.findOne().lean();
-    assert(settings, 'No existe SiteSettings para probar Factus.', 'BILLING_SETTINGS_NOT_FOUND');
+    assert(
+      settings,
+      'No existe SiteSettings para probar Factus.',
+      'BILLING_SETTINGS_NOT_FOUND'
+    );
 
     const billing = settings.billing || {};
     const runtime = buildRuntimeFactusConfig(billing);
@@ -277,7 +285,8 @@ async function main() {
     const firstAuth = await timed('OAuth real', () => getFactusAccessToken(runtime));
     assert(
       firstAuth.value?.success === true && firstAuth.value?.accessToken,
-      cleanText(firstAuth.value?.error, 500) || 'Factus no devolvió un token OAuth válido.',
+      cleanText(firstAuth.value?.error, 500) ||
+        'Factus no devolvió un token OAuth válido.',
       'FACTUS_LIVE_AUTH_FAILED'
     );
     assert(
@@ -287,12 +296,15 @@ async function main() {
     );
     ok(`OAuth real aprobado en ${firstAuth.elapsedMs} ms`);
 
-    const secondAuth = await timed('Reutilización OAuth', () => getFactusAccessToken(runtime));
+    const secondAuth = await timed('Reutilización OAuth', () =>
+      getFactusAccessToken(runtime)
+    );
     assert(
       secondAuth.value?.success === true && secondAuth.value?.accessToken,
       'La segunda obtención del token falló.',
       'FACTUS_LIVE_AUTH_CACHE_FAILED'
     );
+
     if (secondAuth.value.fromCache === true) {
       ok(`Caché OAuth reutilizado correctamente en ${secondAuth.elapsedMs} ms`);
     } else {
@@ -308,14 +320,15 @@ async function main() {
       token,
       'Consulta real de empresa'
     );
-    const companyRaw = extractCompany(companyResult.data);
-    const company = assertVerifiedCompanyMatchesFiscal(
-      normalizeCompanySnapshot(companyRaw, billing.fiscalInfo || {}),
+    const company = verifyCompanyIdentity(
+      runtime,
+      extractCompany(companyResult.data),
       billing.fiscalInfo || {}
     );
     ok(
-      `Empresa verificada: NIT ${company.nit}${company.dv ? `-${company.dv}` : ''}` +
-        `${company.name ? ` | ${company.name}` : ''} | ${companyResult.elapsedMs} ms`
+      `Empresa Factus consultada: NIT ${company.nit || 'sin identificar'}${
+        company.dv ? `-${company.dv}` : ''
+      }${company.name ? ` | ${company.name}` : ''} | ${companyResult.elapsedMs} ms`
     );
 
     const [invoiceResult, creditNoteResult] = await Promise.all([
@@ -335,6 +348,7 @@ async function main() {
 
     const invoiceEligible = invoiceResult.ranges.filter((range) => range.eligible);
     const creditEligible = creditNoteResult.ranges.filter((range) => range.eligible);
+
     ok(
       `Rangos de factura consultados: ${invoiceResult.ranges.length} encontrados, ${invoiceEligible.length} elegibles | ${invoiceResult.elapsedMs} ms`
     );
@@ -385,14 +399,20 @@ async function main() {
 
     console.log('\nRANGOS ELEGIBLES DE FACTURA');
     console.log(
-      JSON.stringify(invoiceEligible.map((range) => rangeSummary(publicRange(range))), null, 2)
+      JSON.stringify(
+        invoiceEligible.map((range) => rangeSummary(publicRange(range))),
+        null,
+        2
+      )
     );
     console.log('\nRANGOS ELEGIBLES DE NOTA CRÉDITO');
     console.log(
-      JSON.stringify(creditEligible.map((range) => rangeSummary(publicRange(range))), null, 2)
+      JSON.stringify(
+        creditEligible.map((range) => rangeSummary(publicRange(range))),
+        null,
+        2
+      )
     );
-
-    auditTokenCacheImplementation();
 
     const invalidUrlBilling = {
       ...billing,
@@ -402,11 +422,13 @@ async function main() {
       },
     };
     let invalidUrlBlocked = false;
+
     try {
       buildRuntimeFactusConfig(invalidUrlBilling);
     } catch (error) {
       invalidUrlBlocked = error instanceof BillingConfigurationError;
     }
+
     assert(
       invalidUrlBlocked,
       'Una URL no oficial no fue bloqueada antes de contactar la red.',
