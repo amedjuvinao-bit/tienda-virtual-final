@@ -12,6 +12,11 @@ const {
   mergeCandidateBilling,
 } = require('./billingNumberingRangeService');
 
+const FACTUS_FINGERPRINT_SELECT = [
+  '+billing.electronicProvider.lastConnectionFingerprint',
+  '+billing.electronicProvider.numberingRangesFingerprint',
+].join(' ');
+
 function positiveInteger(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
@@ -36,7 +41,9 @@ function selectedRangeIds(billing = {}) {
 }
 
 async function readNumberingRangeSnapshot() {
-  const settings = await SiteSettings.findOne().lean();
+  const settings = await SiteSettings.findOne()
+    .select(FACTUS_FINGERPRINT_SELECT)
+    .lean();
   const provider = settings?.billing?.electronicProvider || {};
   const ids = selectedRangeIds(settings?.billing || {});
 
@@ -52,7 +59,9 @@ async function assertProductionNumberingRangesReady(incomingBilling = {}) {
   const mode = normalizeMode(incomingBilling?.dian?.mode);
   if (mode !== PRODUCTION_MODE) return true;
 
-  const settings = await SiteSettings.findOne().lean();
+  const settings = await SiteSettings.findOne()
+    .select(FACTUS_FINGERPRINT_SELECT)
+    .lean();
   if (!settings?._id) {
     throw new BillingConfigurationError(
       'No existe configuración persistida para verificar los rangos de Producción.',
@@ -114,7 +123,9 @@ async function assertProductionNumberingRangesReady(incomingBilling = {}) {
 }
 
 async function reconcileNumberingRangeSnapshot(snapshot = {}) {
-  const settings = await SiteSettings.findOne();
+  const settings = await SiteSettings.findOne().select(
+    FACTUS_FINGERPRINT_SELECT
+  );
   if (!settings?._id) return false;
 
   const billing = settings?.billing?.toObject
