@@ -19,6 +19,7 @@ const SECRET_FIELDS = Object.freeze([
   'softwarePin',
   'technicalKey',
 ]);
+const creditNoteRangeCreationLocks = new Set();
 
 function cleanText(value, max = 500) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -32,6 +33,45 @@ function toInteger(value, fallback = 0) {
 function positiveInteger(value) {
   const parsed = toInteger(value, 0);
   return parsed > 0 ? parsed : 0;
+}
+
+function normalizeCreditNoteRangeInput(input = {}) {
+  const prefix = cleanText(input?.prefix, 20).toUpperCase();
+  const rawCurrent = cleanText(input?.current, 30);
+
+  if (!/^[A-Z0-9]{1,4}$/.test(prefix)) {
+    throw new BillingConfigurationError(
+      'El prefijo del rango debe tener entre 1 y 4 caracteres alfanuméricos.',
+      'FACTUS_CREDIT_NOTE_RANGE_PREFIX_INVALID',
+      422,
+      ['prefix']
+    );
+  }
+
+  if (!/^\d+$/.test(rawCurrent)) {
+    throw new BillingConfigurationError(
+      'El consecutivo del rango debe ser un número entero positivo.',
+      'FACTUS_CREDIT_NOTE_RANGE_CURRENT_INVALID',
+      422,
+      ['current']
+    );
+  }
+
+  const current = positiveInteger(rawCurrent);
+  if (!(current > 0) || !Number.isSafeInteger(current)) {
+    throw new BillingConfigurationError(
+      'El consecutivo del rango debe ser un número entero positivo válido.',
+      'FACTUS_CREDIT_NOTE_RANGE_CURRENT_INVALID',
+      422,
+      ['current']
+    );
+  }
+
+  return {
+    document: FACTUS_RANGE_DOCUMENTS.creditNote,
+    prefix,
+    current,
+  };
 }
 
 function toBoolean(value, fallback = false) {
@@ -342,6 +382,85 @@ async function fetchRangesByDocument(runtime, token, documentCode) {
   }
 }
 
+function extractCreatedRange(payload = {}) {
+  const candidates = [
+    payload?.data?.data,
+    payload?.data?.numbering_range,
+    payload?.data?.numberingRange,
+    payload?.data,
+    payload?.numbering_range,
+    payload?.numberingRange,
+    payload,
+  ];
+
+  return (
+    candidates.find(
+      (candidate) =>
+        candidate &&
+        typeof candidate === 'object' &&
+        !Array.isArray(candidate) &&
+        positiveInteger(candidate?.id || candidate?.numbering_range_id) > 0
+    ) || {}
+  );
+}
+
+async function postCreditNoteRange(runtime, token, input) {
+  try {
+    const { response, data } = await fetchJsonWithTimeout(
+      `${runtime.apiUrl}/v2/numbering-ranges`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `${token.tokenType} ${token.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      }
+    );
+
+    if (!response.ok) {
+      throw new BillingConfigurationError(
+        'Factus rechazó la creación del rango de nota crédito. Revisa el prefijo, el consecutivo y el estado de la cuenta.',
+        'FACTUS_CREDIT_NOTE_RANGE_CREATE_REJECTED',
+        response.status >= 400 && response.status < 500 ? 422 : 502
+      );
+    }
+
+    const created = normalizeFactusRange(
+      extractCreatedRange(data),
+      FACTUS_RANGE_DOCUMENTS.creditNote
+    );
+
+    if (
+      !(created.id > 0) ||
+      created.document !== FACTUS_RANGE_DOCUMENTS.creditNote
+    ) {
+      throw new BillingConfigurationError(
+        'Factus creó el rango, pero no devolvió una identificación verificable. Consulta nuevamente los rangos antes de repetir la acción.',
+        'FACTUS_CREDIT_NOTE_RANGE_CREATE_UNCONFIRMED',
+        502
+      );
+    }
+
+    return created;
+  } catch (error) {
+    if (error instanceof BillingConfigurationError) throw error;
+    if (error?.name === 'AbortError') {
+      throw new BillingConfigurationError(
+        'La creación del rango de nota crédito superó el tiempo de espera. Consulta los rangos antes de intentarlo nuevamente.',
+        'FACTUS_CREDIT_NOTE_RANGE_CREATE_TIMEOUT',
+        504
+      );
+    }
+    throw new BillingConfigurationError(
+      'No fue posible crear el rango de nota crédito en Factus.',
+      'FACTUS_CREDIT_NOTE_RANGE_CREATE_ERROR',
+      502
+    );
+  }
+}
+
 async function getCurrentContext(candidatePayload = {}) {
   const settings = await SiteSettings.findOne();
   if (!settings) {
@@ -469,6 +588,115 @@ async function listFactusNumberingRanges(candidatePayload = {}) {
   };
 }
 
+async function createFactusCreditNoteNumberingRange(
+  input = {},
+  candidatePayload = {}
+) {
+  const context = await getCurrentContext(candidatePayload);
+  const rangeInput = normalizeCreditNoteRangeInput(input);
+  const lockKey = `${context.runtime.environment}:${context.fingerprint}`;
+
+  if (
+    context.runtime.environment === 'production' &&
+    input?.confirmProduction !== true
+  ) {
+    throw new BillingConfigurationError(
+      'Debes confirmar expresamente la creación del rango en Producción.',
+      'FACTUS_CREDIT_NOTE_RANGE_PRODUCTION_CONFIRMATION_REQUIRED',
+      409,
+      ['confirmProduction']
+    );
+  }
+
+  if (creditNoteRangeCreationLocks.has(lockKey)) {
+    throw new BillingConfigurationError(
+      'Ya se está creando un rango de nota crédito para esta cuenta. Espera la respuesta antes de intentarlo nuevamente.',
+      'FACTUS_CREDIT_NOTE_RANGE_CREATE_IN_PROGRESS',
+      409
+    );
+  }
+
+  creditNoteRangeCreationLocks.add(lockKey);
+
+  try {
+    const token = await authenticateFactus(context.runtime);
+    const currentCreditNoteRanges = await fetchRangesByDocument(
+      context.runtime,
+      token,
+      FACTUS_RANGE_DOCUMENTS.creditNote
+    );
+    const existingEligible = currentCreditNoteRanges.find(
+      (range) => range.eligible === true
+    );
+
+    if (existingEligible) {
+      throw new BillingConfigurationError(
+        'La cuenta ya tiene un rango de nota crédito vigente y disponible. Selecciónalo en lugar de crear otro.',
+        'FACTUS_CREDIT_NOTE_RANGE_ALREADY_AVAILABLE',
+        409,
+        [String(existingEligible.id)]
+      );
+    }
+
+    const created = await postCreditNoteRange(
+      context.runtime,
+      token,
+      rangeInput
+    );
+    const [invoiceRanges, creditNoteRanges] = await Promise.all([
+      fetchRangesByDocument(
+        context.runtime,
+        token,
+        FACTUS_RANGE_DOCUMENTS.invoice
+      ),
+      fetchRangesByDocument(
+        context.runtime,
+        token,
+        FACTUS_RANGE_DOCUMENTS.creditNote
+      ),
+    ]);
+    const verifiedCreated =
+      creditNoteRanges.find(
+        (range) => range.id === created.id && range.eligible === true
+      ) ||
+      creditNoteRanges.find(
+        (range) =>
+          range.prefix === rangeInput.prefix &&
+          range.eligible === true
+      );
+
+    if (!verifiedCreated) {
+      throw new BillingConfigurationError(
+        'Factus recibió la creación, pero el nuevo rango todavía no aparece activo. Consulta nuevamente los rangos antes de repetir la acción.',
+        'FACTUS_CREDIT_NOTE_RANGE_NOT_ACTIVE_AFTER_CREATE',
+        409
+      );
+    }
+
+    return {
+      environment: context.runtime.environment,
+      syncedAt: new Date().toISOString(),
+      selected: {
+        invoiceRangeId:
+          positiveInteger(context.provider.numberingRangeId) || null,
+        creditNoteRangeId:
+          positiveInteger(context.provider.creditNoteNumberingRangeId) || null,
+      },
+      invoiceRanges: invoiceRanges.map(publicRange),
+      creditNoteRanges: creditNoteRanges.map(publicRange),
+      eligibleInvoiceRanges: invoiceRanges
+        .filter((range) => range.eligible)
+        .map(publicRange),
+      eligibleCreditNoteRanges: creditNoteRanges
+        .filter((range) => range.eligible)
+        .map(publicRange),
+      createdCreditNoteRange: publicRange(verifiedCreated),
+    };
+  } finally {
+    creditNoteRangeCreationLocks.delete(lockKey);
+  }
+}
+
 function requireEligibleRange(ranges, id, label) {
   const selectedId = positiveInteger(id);
   const selected = ranges.find(
@@ -564,11 +792,13 @@ async function saveFactusNumberingRangeSelection(
 
 module.exports = {
   FACTUS_RANGE_DOCUMENTS,
+  createFactusCreditNoteNumberingRange,
   extractRangeList,
   invalidateNumberingRangesIfContextChanged,
   isoDate,
   listFactusNumberingRanges,
   mergeCandidateBilling,
+  normalizeCreditNoteRangeInput,
   normalizeFactusRange,
   publicRange,
   saveFactusNumberingRangeSelection,
