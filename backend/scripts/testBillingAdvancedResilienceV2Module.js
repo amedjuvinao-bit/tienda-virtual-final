@@ -13,6 +13,7 @@ const {
   assertTotalsReconciled,
   buildCustomerSnapshot,
   calculateTotals,
+  sanitizeProviderPayload,
 } = require('../services/electronicInvoiceIssuanceService');
 const {
   normalizePartialItems,
@@ -326,12 +327,24 @@ async function testActivationAndResidualRisks() {
     'updateBillingConfigurationWithReadiness(candidate'
   );
   const successPosition = activation.indexOf('const state = await markSuccess');
-  if (updatePosition >= 0 && successPosition > updatePosition) {
+  const issuance = read(
+    'backend/services/electronicInvoiceIssuanceService.js'
+  );
+  const productionFailClosed =
+    activation.includes('assertClientActivationReady') &&
+    issuance.includes('await assertProductionActivation(billing)');
+  if (
+    updatePosition >= 0 &&
+    successPosition > updatePosition &&
+    !productionFailClosed
+  ) {
     risk(
       'CRÍTICO',
       'Activación productiva no atómica',
       'SiteSettings puede quedar en Producción antes de registrar activation=active. Una caída entre ambas escrituras deja estados contradictorios.'
     );
+  } else {
+    ok('Producción permanece cerrada hasta confirmar configuración y activación');
   }
 
   const negativeOrder = validOrder({
@@ -357,23 +370,30 @@ async function testActivationAndResidualRisks() {
     );
   }
 
-  const anonymous = buildCustomerSnapshot({});
+  let anonymousError = null;
+  try {
+    buildCustomerSnapshot({});
+  } catch (error) {
+    anonymousError = error;
+  }
+  const explicitFinalConsumer = buildCustomerSnapshot({
+    source: 'pos',
+    pos: { customerMode: 'guest', quickSale: true },
+  });
   if (
-    anonymous.documentNumber === '222222222222' &&
-    !anonymous.email &&
-    !anonymous.address &&
-    !anonymous.municipalityCode
+    anonymousError?.code !== 'BILLING_CUSTOMER_IDENTITY_REQUIRED' ||
+    explicitFinalConsumer.documentNumber !== '222222222222' ||
+    explicitFinalConsumer.isFinalConsumer !== true
   ) {
     risk(
       'MEDIO',
       'Consumidor genérico aplicado silenciosamente',
       'Datos fiscales faltantes se sustituyen sin exigir que la orden esté marcada explícitamente como consumidor final.'
     );
+  } else {
+    ok('Consumidor final requiere una selección explícita y verificable');
   }
 
-  const issuance = read(
-    'backend/services/electronicInvoiceIssuanceService.js'
-  );
   if (
     issuance.includes('xmlContent = createXml') &&
     issuance.includes("catch {\n      xmlContent = '';")
@@ -383,17 +403,35 @@ async function testActivationAndResidualRisks() {
       'Comprobante interno puede quedar generado con XML vacío',
       'La excepción del generador XML se ignora y el flujo puede continuar con xmlContent vacío.'
     );
+  } else if (!issuance.includes('BILLING_XML_GENERATION_FAILED')) {
+    risk(
+      'ALTO',
+      'Comprobante interno no acredita XML obligatorio',
+      'No existe una barrera explícita cuando falla el generador XML.'
+    );
+  } else {
+    ok('Comprobante interno no puede completarse sin XML');
   }
 
+  const sanitized = sanitizeProviderPayload({
+    data: {
+      number: 'FE-1',
+      access_token: 'token-no-persistir',
+      nested: { client_secret: 'secreto', status: 'validated' },
+    },
+  });
   if (
-    issuance.includes('providerResponse,') &&
-    issuance.includes('raw: {\n              ...providerDocument')
+    sanitized?.data?.access_token ||
+    sanitized?.data?.nested?.client_secret ||
+    sanitized?.data?.number !== 'FE-1'
   ) {
     risk(
       'ALTO',
       'Respuesta cruda del proveedor puede persistir secretos inesperados',
       'provider.raw y dianResponse.raw guardan respuestas externas sin una sanitización profunda garantizada.'
     );
+  } else {
+    ok('Respuestas externas se sanitizan profundamente antes de persistir');
   }
 }
 

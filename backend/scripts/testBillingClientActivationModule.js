@@ -9,6 +9,7 @@ process.env.BILLING_ENCRYPTION_KEY =
   'billing-client-activation-test-key-32-characters-minimum';
 
 const {
+  assertClientActivationReady,
   buildActivationFingerprint,
   requireProductionCandidate,
 } = require('../services/billingClientActivationOrchestrator');
@@ -142,6 +143,57 @@ function testActivationFingerprintIsClientSpecific() {
   ok('Cada cliente queda vinculado a credenciales, NIT, rangos y correo propios');
 }
 
+async function testEmissionRequiresMatchingActiveState() {
+  const billing = productionBilling();
+  const runtime = {
+    apiUrl: billing.electronicProvider.apiUrl,
+    clientId: billing.electronicProvider.clientId,
+    username: billing.electronicProvider.username,
+    clientSecret: billing.electronicProvider.clientSecret,
+    password: billing.electronicProvider.password,
+  };
+  const state = {
+    status: 'active',
+    provider: 'factus',
+    environment: 'production',
+    companyNit: billing.fiscalInfo.nit,
+    invoiceRangeId: 101,
+    creditNoteRangeId: 202,
+    mailFrom: 'facturacion@cliente.test',
+  };
+  state.activationFingerprint = buildActivationFingerprint({
+    runtime,
+    companyNit: state.companyNit,
+    invoiceRangeId: state.invoiceRangeId,
+    creditNoteRangeId: state.creditNoteRangeId,
+    mailFrom: state.mailFrom,
+  });
+
+  await assertClientActivationReady(billing, state);
+
+  let captured = null;
+  try {
+    await assertClientActivationReady(
+      {
+        ...billing,
+        electronicProvider: {
+          ...billing.electronicProvider,
+          numberingRangeId: 999,
+        },
+      },
+      state
+    );
+  } catch (error) {
+    captured = error;
+  }
+  assert(
+    captured?.code === 'BILLING_CLIENT_ACTIVATION_REQUIRED',
+    'La emisión aceptó un rango diferente al activado.'
+  );
+
+  ok('Emisión productiva exige estado activo y huella vigente del cliente');
+}
+
 function testIndependentLockAndAuditState() {
   const model = read('backend/models/BillingActivationState.js');
   const service = read(
@@ -154,6 +206,11 @@ function testIndependentLockAndAuditState() {
   assert(service.includes('ACTIVATION_LOCK_MS'), 'No existe bloqueo temporal.');
   assert(service.includes('BILLING_CLIENT_ACTIVATION_IN_PROGRESS'), 'No bloquea activaciones simultáneas.');
   assert(service.includes('markFailure') && service.includes('markSuccess'), 'No audita resultado final.');
+  assert(
+    service.includes('assertClientActivationReady') &&
+      service.includes('BILLING_CLIENT_ACTIVATION_REQUIRED'),
+    'La emisión no queda cerrada mientras la activación final está incompleta.'
+  );
 
   ok('Activación concurrente queda bloqueada y auditada fuera de SiteSettings');
 }
@@ -237,26 +294,27 @@ function testRegistration() {
   ok('Prueba de activación registrada en el cierre integral');
 }
 
-function main() {
+async function main() {
   console.log('\nValidando activación productiva por cliente...');
 
-  [
+  for (const test of [
     testActivationRequiresCompleteProductionAccount,
     testActivationFingerprintIsClientSpecific,
+    testEmissionRequiresMatchingActiveState,
     testIndependentLockAndAuditState,
     testFinalActivationRevalidatesEverything,
     testRouteIsProtectedAndRateLimited,
     testFrontendProvidesNoCodeActivation,
     testRegistration,
-  ].forEach((test) => {
+  ]) {
     try {
-      test();
+      await test();
     } catch (error) {
       results.fail += 1;
       console.error(`FAIL ${test.name}`);
       console.error(`     ${error.message}`);
     }
-  });
+  }
 
   console.log(
     `\nResumen activación por cliente -> OK: ${results.ok} FAIL: ${results.fail}`
@@ -264,4 +322,7 @@ function main() {
   if (results.fail > 0) process.exit(1);
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

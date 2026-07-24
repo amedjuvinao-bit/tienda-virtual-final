@@ -181,6 +181,76 @@ function testProductionFailClosed() {
   ok('Producción queda bloqueada sin conexión y rangos verificados');
 }
 
+function testCredentialRotationAndRevocation() {
+  const current = prepareBillingConfigurationForStorage(validBilling(), {});
+  const cleared = prepareBillingConfigurationForStorage(
+    {
+      ...validBilling(),
+      dian: { enabled: false, mode: 'internal', environment: '2' },
+      electronicProvider: {
+        provider: 'mock',
+        clearCredentials: true,
+      },
+    },
+    current
+  );
+
+  assert(!cleared.electronicProvider.clientSecret, 'Client Secret no fue eliminado.');
+  assert(!cleared.electronicProvider.password, 'Contraseña no fue eliminada.');
+  assert(cleared.electronicProvider.numberingRangeId === 0, 'Rango sobrevivió a la revocación.');
+  assert(cleared.dianResolution.technicalKey === '', 'Clave técnica sobrevivió a la revocación.');
+
+  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  assert(provider.includes('clearFactusTokenCache'), 'No existe invalidación explícita del token.');
+  assert(provider.includes('credentials.clientSecret'), 'La caché no depende del Client Secret.');
+  assert(provider.includes('credentials.password'), 'La caché no depende de la contraseña.');
+  ok('Credenciales pueden rotarse o eliminarse e invalidan el token anterior');
+}
+
+function testConcurrencyAndHistory() {
+  const model = read('backend/models/SiteSettings.js');
+  const service = read('backend/services/billingConfigurationService.js');
+  const route = read('backend/routes/billingSettingsProtection.js');
+  const frontend = read(
+    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
+  );
+
+  assert(model.includes('billingRevision'), 'El modelo no versiona la configuración.');
+  assert(model.includes('billingHistory'), 'El modelo no conserva historial.');
+  assert(service.includes('BILLING_CONFIGURATION_CONFLICT'), 'No bloquea escrituras obsoletas.');
+  assert(service.includes('$slice: -BILLING_HISTORY_LIMIT'), 'El historial no tiene límite.');
+  assert(route.includes("'/billing-history'"), 'No existe consulta de historial.');
+  assert(route.includes("'/billing-history/:historyId/restore'"), 'No existe restauración.');
+  assert(frontend.includes('billingRevision'), 'El navegador no envía la revisión editada.');
+  assert(frontend.includes('beforeunload'), 'No advierte cambios sin guardar.');
+  assert(frontend.includes('Confirmar restauración'), 'Restauración no exige confirmación.');
+  ok('Edición concurrente, historial, restauración y cambios sin guardar quedan controlados');
+}
+
+function testPanelThemeAndSupportedOptions() {
+  const section = read(
+    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
+  );
+  const provider = read(
+    'frontend/src/admin/configuracion/sections/facturacion/ElectronicProviderBlock.jsx'
+  );
+  const taxes = read(
+    'frontend/src/admin/configuracion/sections/facturacion/TaxConfigBlock.jsx'
+  );
+  const theme = read(
+    'frontend/src/admin/configuracion/sections/facturacion/billingTheme.js'
+  );
+  const combined = `${section}\n${provider}\n${taxes}`;
+
+  assert(theme.includes('var(--admin-primary)'), 'No reutiliza el tema del panel.');
+  ['pink-', 'gray-', 'blue-', 'yellow-', 'emerald-', 'bg-white'].forEach((token) => {
+    assert(!combined.includes(token), `Permanece una paleta fija: ${token}.`);
+  });
+  assert(!taxes.includes('04 - INC') && !taxes.includes('03 - ICA'), 'Ofrece impuestos sin payload.');
+  assert(!provider.includes('<option value="siigo"'), 'Ofrece un proveedor no implementado.');
+  ok('Asistente conserva su estructura y usa únicamente el tema y opciones soportadas');
+}
+
 function testDedicatedRouteAndPermissions() {
   expectCode(
     () => stripProtectedWriteFields({ 'billing.electronicProvider.provider': 'factus' }),
@@ -226,6 +296,9 @@ function main() {
     testEncryptionAndRedaction,
     testAuthoritativeValidation,
     testProductionFailClosed,
+    testCredentialRotationAndRevocation,
+    testConcurrencyAndHistory,
+    testPanelThemeAndSupportedOptions,
     testDedicatedRouteAndPermissions,
     testRealConnectionAndRuntime,
     testRegistration,

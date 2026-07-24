@@ -1,4 +1,8 @@
 import React from 'react';
+import {
+  billingMessageStyle,
+  billingSoftPanelStyle,
+} from './billingTheme';
 
 function formatDate(value) {
   if (!value) return 'Sin verificar';
@@ -15,7 +19,10 @@ export default function BillingProductionReadiness({
 }) {
   if (!readiness) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+      <div
+        className="rounded-xl border px-4 py-3 text-sm"
+        style={billingSoftPanelStyle}
+      >
         El estado de preparación para producción se calculará con la configuración guardada.
       </div>
     );
@@ -30,13 +37,10 @@ export default function BillingProductionReadiness({
 
   return (
     <div
-      className={`rounded-xl border px-4 py-3 text-sm ${
-        ready
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : 'border-amber-200 bg-amber-50 text-amber-900'
-      }`}
+      className="rounded-xl border px-4 py-3 text-sm"
+      style={billingMessageStyle(ready ? 'success' : 'warning')}
     >
-      <strong className="block text-gray-900">
+      <strong className="block">
         {ready
           ? 'Configuración técnica lista para activar producción'
           : 'Producción permanece bloqueada'}

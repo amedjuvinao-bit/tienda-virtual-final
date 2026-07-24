@@ -317,6 +317,9 @@ function sanitizeResolution(incoming = {}, previous = {}, mode = INTERNAL_MODE) 
 function sanitizeProvider(incoming = {}, previous = {}, mode = INTERNAL_MODE) {
   const input = incoming && typeof incoming === 'object' ? incoming : {};
   const old = previous && typeof previous === 'object' ? previous : {};
+  const clearCredentials =
+    input.clearCredentials === true ||
+    clean(input.credentialAction, 30).toLowerCase() === 'clear';
   const requested = clean(
     input.provider ?? old.provider ?? (mode === INTERNAL_MODE ? 'mock' : 'factus'),
     40
@@ -342,24 +345,56 @@ function sanitizeProvider(incoming = {}, previous = {}, mode = INTERNAL_MODE) {
   const result = {
     provider,
     apiUrl,
-    clientId: clean(input.clientId ?? old.clientId, 300),
-    clientSecret: mergeSecret(input.clientSecret, old.clientSecret),
-    username: clean(input.username ?? old.username, 300),
-    password: mergeSecret(input.password, old.password),
-    softwareId: clean(input.softwareId ?? old.softwareId, 300),
-    softwarePin: mergeSecret(input.softwarePin, old.softwarePin),
-    technicalKey: mergeSecret(input.technicalKey, old.technicalKey),
-    numberingRangeId: integer(input.numberingRangeId ?? old.numberingRangeId, 0, 0),
+    clientId: clearCredentials ? '' : clean(input.clientId ?? old.clientId, 300),
+    clientSecret: clearCredentials
+      ? ''
+      : mergeSecret(input.clientSecret, old.clientSecret),
+    username: clearCredentials ? '' : clean(input.username ?? old.username, 300),
+    password: clearCredentials
+      ? ''
+      : mergeSecret(input.password, old.password),
+    softwareId: clearCredentials ? '' : clean(input.softwareId ?? old.softwareId, 300),
+    softwarePin: clearCredentials
+      ? ''
+      : mergeSecret(input.softwarePin, old.softwarePin),
+    technicalKey: clearCredentials
+      ? ''
+      : mergeSecret(input.technicalKey, old.technicalKey),
+    numberingRangeId: clearCredentials
+      ? 0
+      : integer(input.numberingRangeId ?? old.numberingRangeId, 0, 0),
     creditNoteNumberingRangeId: integer(
-      input.creditNoteNumberingRangeId ?? old.creditNoteNumberingRangeId,
+      clearCredentials
+        ? 0
+        : input.creditNoteNumberingRangeId ?? old.creditNoteNumberingRangeId,
       0,
       0
     ),
-    lastConnectionStatus: clean(old.lastConnectionStatus, 40),
-    lastConnectionMessage: clean(old.lastConnectionMessage, 500),
-    lastConnectionAt: old.lastConnectionAt || null,
-    lastConnectionEnvironment: clean(old.lastConnectionEnvironment, 40),
-    lastConnectionFingerprint: clean(old.lastConnectionFingerprint, 128),
+    lastConnectionStatus: clearCredentials
+      ? 'none'
+      : clean(old.lastConnectionStatus, 40),
+    lastConnectionMessage: clearCredentials
+      ? ''
+      : clean(old.lastConnectionMessage, 500),
+    lastConnectionAt: clearCredentials ? null : old.lastConnectionAt || null,
+    lastConnectionEnvironment: clearCredentials
+      ? ''
+      : clean(old.lastConnectionEnvironment, 40),
+    lastConnectionFingerprint: clearCredentials
+      ? ''
+      : clean(old.lastConnectionFingerprint, 128),
+    lastConnectionCompany: clearCredentials
+      ? null
+      : clone(old.lastConnectionCompany || null),
+    numberingRangesEnvironment: clearCredentials
+      ? ''
+      : clean(old.numberingRangesEnvironment, 40),
+    numberingRangesFingerprint: clearCredentials
+      ? ''
+      : clean(old.numberingRangesFingerprint, 128),
+    numberingRangesSyncedAt: clearCredentials
+      ? null
+      : old.numberingRangesSyncedAt || null,
   };
 
   if (mode !== INTERNAL_MODE) {
@@ -481,6 +516,10 @@ function prepareBillingConfigurationForStorage(incoming = {}, current = {}, opti
     : {};
   const mode = normalizeMode(incomingDian.mode ?? old?.dian?.mode);
   const external = mode !== INTERNAL_MODE;
+  const clearCredentials =
+    incoming?.electronicProvider?.clearCredentials === true ||
+    clean(incoming?.electronicProvider?.credentialAction, 30).toLowerCase() ===
+      'clear';
   const provider = sanitizeProvider(incoming.electronicProvider, old.electronicProvider, mode);
 
   const result = {
@@ -521,6 +560,28 @@ function prepareBillingConfigurationForStorage(incoming = {}, current = {}, opti
     legalTexts: sanitizeLegalTexts(incoming.legalTexts, old.legalTexts),
     taxes: sanitizeTaxes(incoming.taxes, old.taxes),
   };
+
+  if (clearCredentials) {
+    Object.assign(result.dian, {
+      softwarePin: '',
+      softwareSecurityCode: '',
+      certificateFileName: '',
+      certificatePath: '',
+      certificatePassword: '',
+      certificateUploadedAt: null,
+      lastTestStatus: '',
+      lastTestMessage: '',
+      lastTestAt: null,
+      lastSyncStatus: '',
+      lastSyncMessage: '',
+      lastSyncAt: null,
+    });
+    Object.assign(result.dianResolution, {
+      technicalKey: '',
+      numberingRangeId: 0,
+      creditNoteNumberingRangeId: 0,
+    });
+  }
 
   if (external) {
     const runtime = buildRuntimeFactusConfig(result);

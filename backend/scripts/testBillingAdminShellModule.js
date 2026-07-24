@@ -57,7 +57,11 @@ function validateUnifiedBillingPage() {
 function validateRoutes() {
   const app = readProjectFile('frontend/src/App.jsx');
 
-  assertIncludes(app, "import AdminBillingPage from './admin/billing/AdminBillingPage';", 'App.jsx no importa AdminBillingPage');
+  assert(
+    app.includes("import AdminBillingPage from './admin/billing/AdminBillingPage';") ||
+      app.includes("lazy(() => import('./admin/billing/AdminBillingPage'))"),
+    'App.jsx no carga AdminBillingPage'
+  );
   assertIncludes(app, 'path="facturacion"', 'App.jsx no registra /admin/facturacion');
   assertIncludes(app, 'path="facturacion/:tab"', 'App.jsx no registra /admin/facturacion/:tab');
   assertIncludes(
@@ -76,7 +80,7 @@ function validateMenuAndPermissions() {
   assertIncludes(layout, "path: '/admin/facturacion'", 'AdminLayout.js no agrega Facturación al menú');
   assertIncludes(layout, "label: 'Facturación'", 'AdminLayout.js no muestra etiqueta Facturación');
   assertIncludes(layout, "slotAfter: '/admin/ordenes'", 'Facturación no queda cerca de órdenes');
-  assertIncludes(permissions, "facturacion: ['settings:billing']", 'Permisos de /admin/facturacion no están definidos');
+  assertIncludes(permissions, "facturacion: ['billing:view', 'billing:settings']", 'Permisos de /admin/facturacion no están definidos');
   assertIncludes(permissions, "path.startsWith('facturacion/')", 'Subrutas de facturación no heredan permisos');
 
   ok('Menú y permisos de facturación unificada están configurados');

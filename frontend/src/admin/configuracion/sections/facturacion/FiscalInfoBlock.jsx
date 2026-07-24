@@ -1,5 +1,6 @@
 import React from 'react';
 import BillingField from './BillingField';
+import { billingFieldClass, billingFieldStyle } from './billingTheme';
 
 export default function FiscalInfoBlock({ value = {}, onChange }) {
   const updateField = (field, newValue) => {
@@ -17,7 +18,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
         <input
           value={value.businessName || ''}
           onChange={(e) => updateField('businessName', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Razón social registrada en el RUT"
         />
       </BillingField>
@@ -26,7 +28,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
         <input
           value={value.nit || ''}
           onChange={(e) => updateField('nit', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Ej: 900123456"
         />
       </BillingField>
@@ -37,7 +40,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
           onChange={(e) => updateField('dv', e.target.value)}
           maxLength={1}
           inputMode="numeric"
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Ej: 7"
         />
       </BillingField>
@@ -46,7 +50,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
         <input
           value={value.taxRegime || ''}
           onChange={(e) => updateField('taxRegime', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Ej: Responsable de IVA"
         />
       </BillingField>
@@ -55,7 +60,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
         <input
           value={value.legalRepresentative || ''}
           onChange={(e) => updateField('legalRepresentative', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Nombre del representante"
         />
       </BillingField>
@@ -65,7 +71,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
           type="email"
           value={value.billingEmail || ''}
           onChange={(e) => updateField('billingEmail', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="facturacion@mitienda.com"
         />
       </BillingField>
@@ -74,7 +81,8 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
         <input
           value={value.address || ''}
           onChange={(e) => updateField('address', e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Dirección registrada en el RUT"
         />
       </BillingField>
@@ -86,10 +94,14 @@ export default function FiscalInfoBlock({ value = {}, onChange }) {
             updateField('municipalityCode', e.target.value);
           }}
           inputMode="numeric"
-          className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className={billingFieldClass}
+          style={billingFieldStyle}
           placeholder="Ej: 47980"
         />
-        <span className="mt-1 block text-xs text-gray-500">
+        <span
+          className="mt-1 block text-xs"
+          style={{ color: 'var(--admin-card-muted-text)' }}
+        >
           Se reutiliza automáticamente el código de ciudad guardado anteriormente cuando existe.
         </span>
       </BillingField>

@@ -1,5 +1,11 @@
 // backend/lib/dian/providers/factusProvider.js
 
+const crypto = require('crypto');
+const {
+  FACTUS_API_URLS,
+  decryptBillingSecret,
+} = require('../../billing/billingConfigurationSecurity');
+
 let factusTokenCache = {
   key: '',
   accessToken: '',
@@ -42,9 +48,20 @@ function toMoney(value) {
 function resolveFactusBaseUrl(providerConfig = {}) {
   const fromPanel = trimSafe(providerConfig.apiUrl, 300);
   const fromEnv = trimSafe(process.env.FACTUS_API_URL, 300);
+  const requested = (fromPanel || fromEnv).replace(/\/+$/, '');
+  const environment = trimSafe(
+    providerConfig.environment || providerConfig.mode,
+    40
+  ).toLowerCase();
 
-  const base = fromPanel || fromEnv || 'https://api-sandbox.factus.com.co';
-  return base.replace(/\/+$/, '');
+  if (requested === FACTUS_API_URLS.production) return FACTUS_API_URLS.production;
+  if (requested === FACTUS_API_URLS.habilitacion) {
+    return FACTUS_API_URLS.habilitacion;
+  }
+
+  return environment === 'production' || environment === '1'
+    ? FACTUS_API_URLS.production
+    : FACTUS_API_URLS.habilitacion;
 }
 
 function getFactusCredentials(invoiceData = {}) {
@@ -53,9 +70,19 @@ function getFactusCredentials(invoiceData = {}) {
   return {
     apiUrl: resolveFactusBaseUrl(providerConfig),
     clientId: trimSafe(providerConfig.clientId || process.env.FACTUS_CLIENT_ID, 300),
-    clientSecret: trimSafe(providerConfig.clientSecret || process.env.FACTUS_CLIENT_SECRET, 500),
+    clientSecret: trimSafe(
+      decryptBillingSecret(
+        providerConfig.clientSecret || process.env.FACTUS_CLIENT_SECRET
+      ),
+      500
+    ),
     username: trimSafe(providerConfig.username || process.env.FACTUS_USERNAME, 300),
-    password: trimSafe(providerConfig.password || process.env.FACTUS_PASSWORD, 500),
+    password: trimSafe(
+      decryptBillingSecret(
+        providerConfig.password || process.env.FACTUS_PASSWORD
+      ),
+      500
+    ),
   };
 }
 
@@ -72,11 +99,27 @@ function validateCredentials(credentials) {
 }
 
 function buildTokenCacheKey(credentials) {
-  return [
-    credentials.apiUrl,
-    credentials.clientId,
-    credentials.username,
-  ].join('|');
+  return crypto
+    .createHash('sha256')
+    .update(
+      [
+        credentials.apiUrl,
+        credentials.clientId,
+        credentials.clientSecret,
+        credentials.username,
+        credentials.password,
+      ].join('|')
+    )
+    .digest('hex');
+}
+
+function clearFactusTokenCache() {
+  factusTokenCache = {
+    key: '',
+    accessToken: '',
+    tokenType: 'Bearer',
+    expiresAt: 0,
+  };
 }
 
 function getCachedFactusToken(credentials) {
@@ -1409,10 +1452,10 @@ async function sendInvoiceToFactus(invoiceData) {
     }
 
     if (!result.ok) {
-      console.log(
-        '❌ FACTUS VALIDATION FULL:',
-        JSON.stringify(result.data, null, 2)
-      );
+      console.warn('FACTUS rechazó la validación de la factura.', {
+        status: result.status,
+        message: trimSafe(result?.data?.message || result?.data?.error, 500),
+      });
 
       return {
         success: false,
@@ -1462,6 +1505,7 @@ module.exports = {
   deleteFactusBillByReference,
   getFactusCredentials,
   getFactusAccessToken,
+  clearFactusTokenCache,
   downloadInvoiceDocumentFromFactus,
   downloadCreditNoteDocumentFromFactus,
   extractFactusDownloadPayload,

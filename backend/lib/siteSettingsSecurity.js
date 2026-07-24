@@ -15,6 +15,11 @@ const SENSITIVE_KEYS = new Set([
   'softwarepin',
   'softwaresecuritycode',
   'technicalkey',
+  'credentialfingerprint',
+  'connectionfingerprint',
+  'lastconnectionfingerprint',
+  'numberingrangesfingerprint',
+  'activationfingerprint',
 ]);
 
 function clone(value) {

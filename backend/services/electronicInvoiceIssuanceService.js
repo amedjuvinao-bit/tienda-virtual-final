@@ -12,6 +12,8 @@ const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
+const SENSITIVE_PROVIDER_KEY =
+  /(authorization|password|passwd|secret|token|credential|cookie|softwarepin|technicalkey|certificate|privatekey|apikey|clientsecret|refresh)/i;
 
 function cleanText(value, max = 180) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -91,7 +93,37 @@ function extractProviderErrors(providerResponse = {}, providerDocument = {}) {
     {}
   );
 
-  return errors && typeof errors === 'object' && !Array.isArray(errors) ? errors : {};
+  return errors && typeof errors === 'object' && !Array.isArray(errors)
+    ? sanitizeProviderPayload(errors)
+    : {};
+}
+
+function sanitizeProviderPayload(value, depth = 0, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return value.slice(0, 5000);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'object' || depth >= 8) return undefined;
+  if (seen.has(value)) return undefined;
+
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 100)
+      .map((item) => sanitizeProviderPayload(item, depth + 1, seen))
+      .filter((item) => item !== undefined);
+  }
+
+  const result = {};
+  Object.entries(value)
+    .slice(0, 200)
+    .forEach(([key, item]) => {
+      const normalizedKey = String(key).replace(/[^a-z0-9]/gi, '');
+      if (SENSITIVE_PROVIDER_KEY.test(normalizedKey)) return;
+      const safeValue = sanitizeProviderPayload(item, depth + 1, seen);
+      if (safeValue !== undefined) result[String(key).slice(0, 120)] = safeValue;
+    });
+  return result;
 }
 
 function toPlain(document) {
@@ -121,18 +153,36 @@ function buildCustomerSnapshot(order = {}) {
     billing.lastName || billing.lastname,
   ].filter(Boolean).join(' ').trim();
 
+  const explicitFinalConsumer =
+    order?.billing?.isFinalConsumer === true ||
+    order?.customer?.isFinalConsumer === true ||
+    order?.pos?.customerMode === 'guest' ||
+    (order?.source === 'pos' && order?.pos?.quickSale === true);
+  const documentNumber = cleanText(
+    firstValue(
+      billing.documentNumber,
+      billing.identification,
+      billing.id,
+      customer.documentNumber,
+      customer.document,
+      customer.cedula,
+      customer.identification,
+      customer.id
+    ),
+    60
+  );
+
+  if (!documentNumber && !explicitFinalConsumer) {
+    throw createBillingError(
+      'La orden no tiene identificación fiscal del comprador ni está marcada explícitamente como consumidor final.',
+      422,
+      'BILLING_CUSTOMER_IDENTITY_REQUIRED'
+    );
+  }
+
   return {
     documentType: billing.documentType || customer.documentType || customer.tipoDocumento || 'CC',
-    documentNumber:
-      billing.documentNumber ||
-      billing.identification ||
-      billing.id ||
-      customer.documentNumber ||
-      customer.document ||
-      customer.cedula ||
-      customer.identification ||
-      customer.id ||
-      '222222222222',
+    documentNumber: documentNumber || '222222222222',
     dv: billing.dv || customer.dv || '',
     personType: billing.personType || customer.personType || 'natural',
     firstName: billing.firstName || billing.name || customer.name || '',
@@ -153,6 +203,7 @@ function buildCustomerSnapshot(order = {}) {
     country: billing.country || customer.country || 'Colombia',
     countryCode: billing.countryCode || customer.countryCode || 'CO',
     tributeCode: billing.tributeCode || customer.tributeCode || 'ZZ',
+    isFinalConsumer: explicitFinalConsumer,
   };
 }
 
@@ -229,6 +280,45 @@ function calculateTotals(order = {}, settings = {}) {
 }
 
 function assertTotalsReconciled(order = {}, totals = {}) {
+  const invalidTotal = [
+    totals.subtotal,
+    totals.productDiscount,
+    totals.subtotalAfterDiscount,
+    totals.originalShipping,
+    totals.shippingDiscount,
+    totals.shipping,
+    totals.totalDiscount,
+    totals.taxableBase,
+    totals.taxAmount,
+    totals.total,
+    order?.payment?.amount,
+  ].find(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      (!Number.isFinite(Number(value)) || Number(value) < 0)
+  );
+  const invalidLine = getItems(order).find((item) => {
+    const quantity = Number(item.quantity ?? item.qty);
+    const price = Number(
+      item.price ?? item.unitPrice ?? item.priceNumber ?? item?.product?.price
+    );
+    return (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(price) ||
+      price < 0
+    );
+  });
+
+  if (invalidTotal !== undefined || invalidLine) {
+    throw createBillingError(
+      'La orden contiene cantidades o valores económicos inválidos y no puede facturarse.',
+      422,
+      'BILLING_ECONOMIC_VALUES_INVALID'
+    );
+  }
+
   if (Number(order?.pricing?.version || 0) < 2) return;
 
   const expectedTotal = money(
@@ -407,6 +497,15 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     typeof overrides.sendValidatedInvoiceEmail === 'function'
       ? overrides.sendValidatedInvoiceEmail
       : null;
+  const assertProductionActivation =
+    typeof overrides.assertProductionActivation === 'function'
+      ? overrides.assertProductionActivation
+      : async (billing) => {
+          const {
+            assertClientActivationReady,
+          } = require('./billingClientActivationOrchestrator');
+          return assertClientActivationReady(billing);
+        };
 
   async function findExistingInvoice(orderId, idempotencyKey) {
     return lean(InvoiceModel.findOne({
@@ -490,6 +589,10 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       providerMode !== 'internal' &&
       providerName !== 'mock';
 
+    if (isExternalProvider && providerMode === 'production') {
+      await assertProductionActivation(billing);
+    }
+
     if (skipWhenElectronicBillingIsInactive && !isExternalProvider) {
       return {
         created: false,
@@ -540,8 +643,15 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
     let xmlContent = '';
     try {
       xmlContent = createXml({ order, settings: settingsForInvoice, cufeData });
-    } catch {
-      xmlContent = '';
+    } catch (error) {
+      if (!isExternalProvider) {
+        throw createBillingError(
+          'No fue posible generar el XML del comprobante interno.',
+          500,
+          'BILLING_XML_GENERATION_FAILED',
+          { cause: cleanText(error?.message, 300) }
+        );
+      }
     }
 
     let claimedInvoice = null;
@@ -767,7 +877,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
               cufe: remoteCufe,
               isValidated: false,
               links: providerDocument?.links || {},
-              raw: providerDocument || {},
+              raw: sanitizeProviderPayload(providerDocument || {}),
             },
             dianResponse: {
               stage: 'provider_failed',
@@ -788,7 +898,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
                 taxableBase,
                 taxAmount,
                 total,
-                providerResponse,
+                providerResponse: sanitizeProviderPayload(providerResponse),
               },
             },
             'emission.state': 'failed',
@@ -853,10 +963,10 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
             validatedAt: providerDocument?.validated_at || providerDocument?.validatedAt || '',
             links: officialLinks,
             raw: {
-              ...providerDocument,
+              ...sanitizeProviderPayload(providerDocument),
               mode: providerMode,
               source: normalizedSource,
-              response: providerResponse,
+              response: sanitizeProviderPayload(providerResponse),
             },
           },
           dianResponse: {
@@ -887,7 +997,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
               taxableBase,
               taxAmount,
               total,
-              providerResponse,
+              providerResponse: sanitizeProviderPayload(providerResponse),
             },
           },
           providerErrors: {},
@@ -984,6 +1094,7 @@ module.exports = {
   calculateTotals,
   createElectronicInvoiceIssuanceService,
   extractProviderDocument,
+  sanitizeProviderPayload,
   issueElectronicInvoiceForOrder: defaultService.issueElectronicInvoiceForOrder,
   isBillableOrder,
 };

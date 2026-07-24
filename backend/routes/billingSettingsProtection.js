@@ -9,6 +9,10 @@ const {
   updateBillingConfigurationWithReadiness,
 } = require('../services/billingConnectionOrchestrationService');
 const {
+  listBillingConfigurationHistory,
+  restoreBillingConfigurationVersion,
+} = require('../services/billingConfigurationService');
+const {
   ensureStoredFiscalInfoCompatibility,
   hydrateBillingConfiguration,
 } = require('../services/billingFiscalCompatibilityService');
@@ -125,6 +129,49 @@ router.get(
   }
 );
 
+router.get(
+  '/billing-history',
+  requireAdmin,
+  requirePermission('billing:settings'),
+  async (_req, res) => {
+    try {
+      return res.json(await listBillingConfigurationHistory());
+    } catch (error) {
+      return sendConfigurationError(res, error);
+    }
+  }
+);
+
+router.post(
+  '/billing-history/:historyId/restore',
+  requireAdmin,
+  requirePermission('billing:settings'),
+  async (req, res) => {
+    try {
+      if (
+        !Number.isInteger(Number(req.body?.billingRevision)) ||
+        Number(req.body.billingRevision) < 0
+      ) {
+        throw new BillingConfigurationError(
+          'Recarga el historial antes de restaurar una versión.',
+          'BILLING_CONFIGURATION_REVISION_REQUIRED',
+          409
+        );
+      }
+      const settings = await restoreBillingConfigurationVersion(
+        req.params.historyId,
+        {
+          adminUser: currentAdmin(req),
+          expectedRevision: req.body?.billingRevision,
+        }
+      );
+      return res.json(settings);
+    } catch (error) {
+      return sendConfigurationError(res, error);
+    }
+  }
+);
+
 // Esta ruta se monta antes de siteSettings. Solo intercepta actualizaciones que
 // contienen billing; las demás configuraciones continúan hacia el router general.
 router.put('/', (req, res, next) => {
@@ -135,7 +182,7 @@ router.put('/', (req, res, next) => {
     requirePermission('billing:settings')(req, res, async () => {
       try {
         const extraKeys = Object.keys(body).filter(
-          (key) => !['billing'].includes(key)
+          (key) => !['billing', 'billingRevision'].includes(key)
         );
 
         if (extraKeys.length) {
@@ -147,6 +194,17 @@ router.put('/', (req, res, next) => {
           );
         }
 
+        if (
+          !Number.isInteger(Number(body.billingRevision)) ||
+          Number(body.billingRevision) < 0
+        ) {
+          throw new BillingConfigurationError(
+            'Recarga la configuración antes de guardarla para confirmar que estás editando la versión vigente.',
+            'BILLING_CONFIGURATION_REVISION_REQUIRED',
+            409
+          );
+        }
+
         await assertDedicatedFirstProductionActivation(body.billing);
         const rangeSnapshot = await readNumberingRangeSnapshot();
         const hydratedBilling = await hydrateBillingConfiguration(
@@ -155,6 +213,8 @@ router.put('/', (req, res, next) => {
         await assertProductionNumberingRangesReady(hydratedBilling);
         await updateBillingConfigurationWithReadiness(hydratedBilling, {
           adminUser: currentAdmin(req),
+          expectedRevision: body.billingRevision,
+          reason: 'admin-update',
         });
         await reconcileNumberingRangeSnapshot(rangeSnapshot);
         const settings = await getAdminSettingsWithBillingReadiness();

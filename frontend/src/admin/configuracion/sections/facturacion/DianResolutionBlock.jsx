@@ -1,5 +1,6 @@
 import React from 'react';
 import FactusNumberingRangesBlock from './FactusNumberingRangesBlock';
+import { billingSoftPanelStyle } from './billingTheme';
 
 export default function DianResolutionBlock({
   value = {},
@@ -19,8 +20,11 @@ export default function DianResolutionBlock({
         onActivated={onActivated}
       />
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-        <strong className="block text-gray-900">Ambiente fiscal</strong>
+      <div
+        className="rounded-xl border px-4 py-3 text-sm"
+        style={billingSoftPanelStyle}
+      >
+        <strong className="block">Ambiente fiscal</strong>
         {value.environment === '1' ? 'Producción' : 'Pruebas / habilitación'}.
         El ambiente se controla únicamente desde el paso Tipo de emisión y los
         rangos seleccionados deben pertenecer exactamente a ese ambiente.

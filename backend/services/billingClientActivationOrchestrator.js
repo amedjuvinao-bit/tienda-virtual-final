@@ -238,6 +238,72 @@ function buildActivationFingerprint({
     .digest('hex');
 }
 
+function fingerprintsMatch(left, right) {
+  const a = Buffer.from(cleanText(left, 128));
+  const b = Buffer.from(cleanText(right, 128));
+  return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+}
+
+async function assertClientActivationReady(billing = {}, stateOverride = null) {
+  const state =
+    stateOverride ||
+    (await BillingActivationState.findOne({ key: 'main' })
+      .select('+activationFingerprint')
+      .lean());
+  const provider = billing?.electronicProvider || {};
+  const invoiceRangeId = positiveInteger(
+    provider.numberingRangeId ||
+      billing?.dianResolution?.numberingRangeId
+  );
+  const creditNoteRangeId = positiveInteger(
+    provider.creditNoteNumberingRangeId ||
+      billing?.dianResolution?.creditNoteNumberingRangeId
+  );
+  const blockers = [];
+
+  if (state?.status !== 'active') blockers.push('activación final pendiente');
+  if (state?.provider !== 'factus' || state?.environment !== 'production') {
+    blockers.push('activación no corresponde a Factus Producción');
+  }
+  if (positiveInteger(state?.invoiceRangeId) !== invoiceRangeId) {
+    blockers.push('rango de facturas cambió después de la activación');
+  }
+  if (positiveInteger(state?.creditNoteRangeId) !== creditNoteRangeId) {
+    blockers.push('rango de notas crédito cambió después de la activación');
+  }
+
+  let expectedFingerprint = '';
+  try {
+    expectedFingerprint = buildActivationFingerprint({
+      runtime: buildRuntimeFactusConfig(billing),
+      companyNit: state?.companyNit,
+      invoiceRangeId,
+      creditNoteRangeId,
+      mailFrom: state?.mailFrom,
+    });
+  } catch {
+    blockers.push('credenciales productivas no disponibles');
+  }
+
+  if (
+    expectedFingerprint &&
+    !fingerprintsMatch(state?.activationFingerprint, expectedFingerprint)
+  ) {
+    blockers.push('credenciales o requisitos cambiaron después de la activación');
+  }
+
+  if (blockers.length) {
+    throw fail(
+      `La emisión productiva permanece bloqueada. Falta: ${blockers.join(', ')}.`,
+      'BILLING_CLIENT_ACTIVATION_REQUIRED',
+      409,
+      blockers
+    );
+  }
+
+  return true;
+}
+
 async function activateClientFactusProduction(
   billing = {},
   input = {},
@@ -367,6 +433,7 @@ async function getClientActivationState() {
 
 module.exports = {
   activateClientFactusProduction,
+  assertClientActivationReady,
   buildActivationFingerprint,
   getClientActivationState,
   requireProductionCandidate,

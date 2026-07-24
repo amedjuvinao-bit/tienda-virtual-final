@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import api from '../../../../lib/api';
+import {
+  billingFieldClass,
+  billingFieldStyle,
+  billingMessageStyle,
+  billingPanelStyle,
+  billingPrimaryButtonStyle,
+  billingSecondaryButtonStyle,
+  billingSoftPanelStyle,
+} from './billingTheme';
 
 function apiError(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback;
@@ -24,37 +33,40 @@ function RangeDetails({ range }) {
   if (!range) return null;
 
   return (
-    <div className="grid gap-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 md:grid-cols-2">
+    <div
+      className="grid gap-1 rounded-xl border px-4 py-3 text-xs md:grid-cols-2"
+      style={billingSoftPanelStyle}
+    >
       <span>
-        <strong className="text-gray-800">Documento:</strong>{' '}
+        <strong>Documento:</strong>{' '}
         {range.documentName}
       </span>
       <span>
-        <strong className="text-gray-800">ID Factus:</strong> {range.id}
+        <strong>ID Factus:</strong> {range.id}
       </span>
       <span>
-        <strong className="text-gray-800">Resolución:</strong>{' '}
+        <strong>Resolución:</strong>{' '}
         {range.resolutionNumber || 'No informada'}
       </span>
       <span>
-        <strong className="text-gray-800">Prefijo:</strong>{' '}
+        <strong>Prefijo:</strong>{' '}
         {range.prefix || 'Sin prefijo'}
       </span>
       <span>
-        <strong className="text-gray-800">Rango:</strong>{' '}
+        <strong>Rango:</strong>{' '}
         {Number(range.from || 0).toLocaleString('es-CO')} –{' '}
         {Number(range.to || 0).toLocaleString('es-CO')}
       </span>
       <span>
-        <strong className="text-gray-800">Siguiente consecutivo:</strong>{' '}
+        <strong>Siguiente consecutivo:</strong>{' '}
         {Number(range.current || 0).toLocaleString('es-CO')}
       </span>
       <span>
-        <strong className="text-gray-800">Inicio:</strong>{' '}
+        <strong>Inicio:</strong>{' '}
         {formatDate(range.startDate)}
       </span>
       <span>
-        <strong className="text-gray-800">Vencimiento:</strong>{' '}
+        <strong>Vencimiento:</strong>{' '}
         {formatDate(range.endDate)}
       </span>
     </div>
@@ -69,11 +81,17 @@ function RangeSelector({ label, ranges, selectedId, onChange }) {
 
   return (
     <div className="grid gap-2">
-      <label className="text-sm font-semibold text-gray-800">{label}</label>
+      <label
+        className="text-sm font-semibold"
+        style={{ color: 'var(--admin-card-text)' }}
+      >
+        {label}
+      </label>
       <select
         value={selectedId || ''}
         onChange={(event) => onChange(Number(event.target.value || 0))}
-        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+        className={billingFieldClass}
+        style={billingFieldStyle}
       >
         <option value="">Selecciona un rango activo</option>
         {ranges.map((range) => (
@@ -304,13 +322,19 @@ export default function FactusNumberingRangesBlock({
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+      <div
+        className="rounded-xl border px-4 py-3 text-sm"
+        style={billingMessageStyle('info')}
+      >
         Los rangos se consultan directamente en Factus. No se permiten IDs,
         consecutivos, prefijos, fechas ni claves técnicas escritos manualmente.
       </div>
 
       {(storedInvoiceId > 0 || storedCreditId > 0) && !loaded ? (
-        <div className="grid gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div
+          className="grid gap-1 rounded-xl border px-4 py-3 text-sm"
+          style={billingMessageStyle('success')}
+        >
           <strong>Selección guardada</strong>
           <span>Rango de facturas: {storedInvoiceId || 'Pendiente'}</span>
           <span>Rango de notas crédito: {storedCreditId || 'Pendiente'}</span>
@@ -321,16 +345,23 @@ export default function FactusNumberingRangesBlock({
         type="button"
         onClick={queryRanges}
         disabled={busy}
-        className="rounded-xl border border-pink-300 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        style={billingSecondaryButtonStyle}
       >
         {loading ? 'Consultando Factus...' : 'Consultar rangos oficiales'}
       </button>
 
       {loaded ? (
-        <div className="grid gap-5 rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-sm text-gray-600">
+        <div
+          className="grid gap-5 rounded-2xl border p-4"
+          style={billingPanelStyle}
+        >
+          <div
+            className="text-sm"
+            style={{ color: 'var(--admin-card-muted-text)' }}
+          >
             Ambiente consultado:{' '}
-            <strong className="text-gray-900">
+            <strong style={{ color: 'var(--admin-card-text)' }}>
               {environment === 'production' ? 'Producción' : 'Habilitación'}
             </strong>
           </div>
@@ -365,15 +396,19 @@ export default function FactusNumberingRangesBlock({
               !(invoiceRangeId > 0) ||
               !(creditNoteRangeId > 0)
             }
-            className="rounded-xl bg-pink-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+            style={billingPrimaryButtonStyle}
           >
             {saving ? 'Validando y guardando...' : 'Guardar rangos seleccionados'}
           </button>
 
           {environment === 'production' ? (
-            <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+            <div
+              className="grid gap-3 rounded-xl border px-4 py-4 text-sm"
+              style={billingMessageStyle('success')}
+            >
               <div>
-                <strong className="block text-gray-900">
+                <strong className="block">
                   Activación final del cliente
                 </strong>
                 <p className="mt-1">
@@ -391,7 +426,8 @@ export default function FactusNumberingRangesBlock({
                   !(invoiceRangeId > 0) ||
                   !(creditNoteRangeId > 0)
                 }
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border px-4 py-2.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={billingPrimaryButtonStyle}
               >
                 {activating
                   ? 'Validando y activando...'
@@ -399,7 +435,10 @@ export default function FactusNumberingRangesBlock({
               </button>
             </div>
           ) : (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div
+              className="rounded-xl border px-4 py-3 text-sm"
+              style={billingMessageStyle('warning')}
+            >
               La habilitación sirve para probar el módulo. La activación final
               aparecerá cuando el propietario conecte su cuenta de Producción y
               Factus devuelva los dos rangos oficiales.
@@ -410,11 +449,8 @@ export default function FactusNumberingRangesBlock({
 
       {feedback ? (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            feedback.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-red-200 bg-red-50 text-red-800'
-          }`}
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={billingMessageStyle(feedback.type)}
         >
           {feedback.message}
         </div>

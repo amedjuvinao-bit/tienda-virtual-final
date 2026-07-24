@@ -10,6 +10,15 @@ import DianResolutionBlock from './facturacion/DianResolutionBlock';
 import TaxConfigBlock from './facturacion/TaxConfigBlock';
 import ElectronicProviderBlock from './facturacion/ElectronicProviderBlock';
 import BillingProductionReadiness from './facturacion/BillingProductionReadiness';
+import {
+  billingDangerButtonStyle,
+  billingFieldStyle,
+  billingMessageStyle,
+  billingPanelStyle,
+  billingPrimaryButtonStyle,
+  billingSecondaryButtonStyle,
+  billingSoftPanelStyle,
+} from './facturacion/billingTheme';
 
 const STEPS = [
   { id: 'fiscal', label: 'Datos fiscales' },
@@ -71,6 +80,17 @@ export default function FacturacionSection() {
   const [connectionFeedback, setConnectionFeedback] = useState(null);
   const [connectionChanged, setConnectionChanged] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
+  const [billingRevision, setBillingRevision] = useState(0);
+  const [savedSnapshot, setSavedSnapshot] = useState(
+    JSON.stringify(EMPTY_BILLING)
+  );
+  const [history, setHistory] = useState([]);
+  const [historyMeta, setHistoryMeta] = useState({
+    updatedAt: null,
+    updatedBy: '',
+  });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [restoreCandidate, setRestoreCandidate] = useState('');
 
   const applySettings = (data = {}) => {
     setCredentialStatus(data?._credentialStatus || {});
@@ -78,6 +98,8 @@ export default function FacturacionSection() {
 
     if (!data?.billing) {
       setBilling(EMPTY_BILLING);
+      setBillingRevision(Number(data?._billingRevision || 0));
+      setSavedSnapshot(JSON.stringify(EMPTY_BILLING));
       return;
     }
 
@@ -85,7 +107,7 @@ export default function FacturacionSection() {
     const loadedEnvironment = loadedMode === 'production' ? '1' : '2';
     const external = loadedMode !== 'internal';
 
-    setBilling({
+    const nextBilling = {
       fiscalInfo: data.billing.fiscalInfo || {},
       dianResolution: {
         ...(data.billing.dianResolution || {}),
@@ -104,10 +126,32 @@ export default function FacturacionSection() {
       },
       legalTexts: data.billing.legalTexts || {},
       taxes: data.billing.taxes || {},
-    });
+    };
+
+    setBilling(nextBilling);
+    setBillingRevision(Number(data?._billingRevision || 0));
+    setSavedSnapshot(JSON.stringify(nextBilling));
 
     setConnectionFeedback(null);
     setConnectionChanged(false);
+  };
+
+  const loadHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const { data } = await api.get('/api/site-settings/billing-history');
+      setHistory(Array.isArray(data?.versions) ? data.versions : []);
+      setHistoryMeta({
+        updatedAt: data?.updatedAt || null,
+        updatedBy: data?.updatedBy || '',
+      });
+      setRestoreCandidate('');
+    } catch {
+      setHistory([]);
+      setHistoryMeta({ updatedAt: null, updatedBy: '' });
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const loadSettings = async () => {
@@ -116,6 +160,7 @@ export default function FacturacionSection() {
       setLoadError('');
       const { data } = await api.get('/api/site-settings/admin');
       applySettings(data);
+      await loadHistory();
     } catch (error) {
       const parsed = getApiError(
         error,
@@ -138,6 +183,18 @@ export default function FacturacionSection() {
     () => (provider === 'factus' ? 'Factus' : 'Comprobante interno'),
     [provider]
   );
+  const hasUnsavedChanges =
+    JSON.stringify(billing) !== savedSnapshot;
+
+  useEffect(() => {
+    const warnUnsavedChanges = (event) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnUnsavedChanges);
+    return () => window.removeEventListener('beforeunload', warnUnsavedChanges);
+  }, [hasUnsavedChanges]);
 
   const markConnectionChanged = () => {
     setConnectionChanged(true);
@@ -206,6 +263,46 @@ export default function FacturacionSection() {
       return;
     }
     handleDianModeChange(mode === 'internal' ? 'habilitacion' : mode);
+  };
+
+  const handleClearCredentials = () => {
+    setBilling((previous) => ({
+      ...previous,
+      dian: {
+        ...(previous.dian || {}),
+        enabled: false,
+        mode: 'internal',
+        environment: '2',
+      },
+      dianResolution: {
+        ...(previous.dianResolution || {}),
+        environment: '2',
+        numberingRangeId: 0,
+        creditNoteNumberingRangeId: 0,
+        technicalKey: '',
+      },
+      electronicProvider: {
+        provider: 'mock',
+        apiUrl: '',
+        clientId: '',
+        clientSecret: '',
+        username: '',
+        password: '',
+        numberingRangeId: 0,
+        creditNoteNumberingRangeId: 0,
+        clearCredentials: true,
+      },
+    }));
+    setCredentialStatus({});
+    setReadiness(null);
+    setConnectionFeedback(null);
+    setConnectionChanged(true);
+    setSaveFeedback({
+      type: 'warning',
+      message:
+        'Las credenciales se eliminarán cuando guardes. Factus quedó desactivado en este borrador.',
+      details: [],
+    });
   };
 
   const handleDianResolutionChange = (nextResolution) => {
@@ -306,6 +403,7 @@ export default function FacturacionSection() {
       setSaving(true);
       setSaveFeedback(null);
       const { data } = await api.put('/api/site-settings', {
+        billingRevision,
         billing: {
           ...billing,
           dian: {
@@ -323,6 +421,7 @@ export default function FacturacionSection() {
       });
 
       applySettings(data);
+      await loadHistory();
       setSaveFeedback({
         type: 'success',
         message: 'Configuración de facturación guardada correctamente.',
@@ -339,6 +438,56 @@ export default function FacturacionSection() {
     }
   };
 
+  const handleRestoreVersion = async (version) => {
+    const historyId = String(version?.id || '');
+    if (!historyId) return;
+    if (restoreCandidate !== historyId) {
+      setRestoreCandidate(historyId);
+      setSaveFeedback({
+        type: 'warning',
+        message: `Pulsa nuevamente “Restaurar” para confirmar la versión ${version.revision}. Una configuración histórica de Producción volverá en Habilitación y deberá verificarse otra vez.`,
+        details: [],
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setSaveFeedback(null);
+      const { data } = await api.post(
+        `/api/site-settings/billing-history/${encodeURIComponent(historyId)}/restore`,
+        { billingRevision }
+      );
+      applySettings(data);
+      await loadHistory();
+      setSaveFeedback({
+        type: 'success',
+        message:
+          'Versión restaurada de forma segura. Revisa los datos antes de volver a activar Producción.',
+        details: [],
+      });
+    } catch (error) {
+      const parsed = getApiError(
+        error,
+        'No fue posible restaurar la versión seleccionada.'
+      );
+      setSaveFeedback({ type: 'error', ...parsed });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProductionActivated = async (settings) => {
+    applySettings(settings);
+    await loadHistory();
+    setSaveFeedback({
+      type: 'success',
+      message:
+        'Factus quedó validado y activado en Producción con los rangos oficiales seleccionados.',
+      details: [],
+    });
+  };
+
   const goPrev = () => {
     setCurrentStep((previous) => Math.max(0, previous - 1));
   };
@@ -348,7 +497,14 @@ export default function FacturacionSection() {
   };
 
   if (loading) {
-    return <div className="text-sm text-gray-500">Cargando configuración...</div>;
+    return (
+      <div
+        className="text-sm"
+        style={{ color: 'var(--admin-card-muted-text)' }}
+      >
+        Cargando configuración...
+      </div>
+    );
   }
 
   if (loadError) {
@@ -358,13 +514,17 @@ export default function FacturacionSection() {
         description="El formulario permanece bloqueado para evitar sobrescribir datos fiscales con valores vacíos."
       >
         <div className="grid gap-3">
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div
+            className="rounded-xl border px-4 py-3 text-sm"
+            style={billingMessageStyle('error')}
+          >
             {loadError}
           </div>
           <button
             type="button"
             onClick={loadSettings}
-            className="w-fit rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="w-fit rounded-xl border px-4 py-2 text-sm font-semibold"
+            style={billingSecondaryButtonStyle}
           >
             Reintentar carga
           </button>
@@ -384,11 +544,8 @@ export default function FacturacionSection() {
         <div className="grid gap-6">
           {saveFeedback ? (
             <div
-              className={`rounded-xl border px-4 py-3 text-sm ${
-                saveFeedback.type === 'success'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-red-200 bg-red-50 text-red-800'
-              }`}
+              className="rounded-xl border px-4 py-3 text-sm"
+              style={billingMessageStyle(saveFeedback.type)}
             >
               <strong className="block">
                 {saveFeedback.type === 'success'
@@ -406,39 +563,61 @@ export default function FacturacionSection() {
             </div>
           ) : null}
 
-          <div className="rounded-2xl border border-pink-100 bg-pink-50/40 p-4">
+          <div
+            className="rounded-2xl border p-4"
+            style={billingSoftPanelStyle}
+          >
             <div className="mb-4 flex flex-wrap gap-2">
               {STEPS.map((item, index) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setCurrentStep(index)}
-                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                  className="rounded-full border px-3 py-2 text-xs font-semibold transition"
+                  style={
                     index === currentStep
-                      ? 'bg-pink-500 text-white shadow-sm'
+                      ? billingPrimaryButtonStyle
                       : index < currentStep
-                        ? 'bg-white text-pink-600 ring-1 ring-pink-200'
-                        : 'bg-white text-gray-500 ring-1 ring-gray-200'
-                  }`}
+                        ? {
+                            ...billingSecondaryButtonStyle,
+                            color: 'var(--admin-primary)',
+                          }
+                        : billingSecondaryButtonStyle
+                  }
                 >
                   {index + 1}. {item.label}
                 </button>
               ))}
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white">
+            <div
+              className="h-2 overflow-hidden rounded-full"
+              style={{ background: 'var(--admin-card-bg)' }}
+            >
               <div
-                className="h-full rounded-full bg-pink-500 transition-all"
-                style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${((currentStep + 1) / STEPS.length) * 100}%`,
+                  background: 'var(--admin-primary)',
+                }}
               />
             </div>
           </div>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <section
+            className="rounded-2xl border p-5"
+            style={billingPanelStyle}
+          >
             <div className="mb-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-pink-500">
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--admin-primary)' }}
+              >
                 Paso {currentStep + 1} de {STEPS.length}
               </p>
-              <h3 className="mt-1 text-lg font-semibold text-gray-900">
+              <h3
+                className="mt-1 text-lg font-semibold"
+                style={{ color: 'var(--admin-card-text)' }}
+              >
                 {step.label}
               </h3>
             </div>
@@ -452,7 +631,10 @@ export default function FacturacionSection() {
 
             {step.id === 'provider' && (
               <div className="grid gap-4">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-gray-700">
+                <div
+                  className="rounded-xl border px-4 py-3 text-sm"
+                  style={billingMessageStyle('info')}
+                >
                   Factus es el único proveedor externo habilitado. La prueba autentica las credenciales y confirma que la empresa vinculada coincida con el NIT fiscal configurado.
                 </div>
                 <ElectronicProviderBlock
@@ -463,6 +645,7 @@ export default function FacturacionSection() {
                   connectionFeedback={connectionFeedback}
                   connectionChanged={connectionChanged}
                   onTestConnection={handleTestConnection}
+                  onClearCredentials={handleClearCredentials}
                   onChange={handleProviderChange}
                 />
               </div>
@@ -470,8 +653,14 @@ export default function FacturacionSection() {
 
             {step.id === 'control' && (
               <div className="grid gap-4">
-                <div className="grid gap-4 rounded-2xl border border-pink-100 bg-pink-50/40 p-4 md:grid-cols-2">
-                  <label className="flex items-center gap-3 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
+                <div
+                  className="grid gap-4 rounded-2xl border p-4 md:grid-cols-2"
+                  style={billingSoftPanelStyle}
+                >
+                  <label
+                    className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+                    style={billingPanelStyle}
+                  >
                     <input
                       type="checkbox"
                       checked={isDianActive}
@@ -480,12 +669,18 @@ export default function FacturacionSection() {
                       }
                       className="h-4 w-4"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span
+                      className="text-sm"
+                      style={{ color: 'var(--admin-card-text)' }}
+                    >
                       Activar facturación electrónica
                     </span>
                   </label>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label
+                      className="mb-1 block text-sm font-medium"
+                      style={{ color: 'var(--admin-card-text)' }}
+                    >
                       Ambiente de emisión
                     </label>
                     <select
@@ -493,7 +688,8 @@ export default function FacturacionSection() {
                       onChange={(event) =>
                         handleDianModeChange(event.target.value)
                       }
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2"
+                      style={billingFieldStyle}
                     >
                       <option value="internal">Solo comprobante interno</option>
                       <option value="habilitacion">
@@ -502,8 +698,11 @@ export default function FacturacionSection() {
                       <option value="production">Producción</option>
                     </select>
                   </div>
-                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-gray-700 md:col-span-2">
-                    <strong className="mb-1 block text-gray-900">
+                  <div
+                    className="rounded-xl border px-4 py-3 text-sm md:col-span-2"
+                    style={billingMessageStyle('warning')}
+                  >
+                    <strong className="mb-1 block">
                       Selección actual:
                     </strong>
                     {mode === 'internal'
@@ -527,6 +726,7 @@ export default function FacturacionSection() {
                   billing={billing}
                   credentialStatus={credentialStatus}
                   onChange={handleDianResolutionChange}
+                  onActivated={handleProductionActivated}
                 />
               ) : (
                 <EmptyHint
@@ -562,13 +762,16 @@ export default function FacturacionSection() {
             )}
 
             {step.id === 'summary' && (
-              <div className="grid gap-3 text-sm text-gray-700">
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <strong className="block text-gray-900">Proveedor:</strong>
+              <div
+                className="grid gap-3 text-sm"
+                style={{ color: 'var(--admin-card-text)' }}
+              >
+                <div className="rounded-xl border p-4" style={billingSoftPanelStyle}>
+                  <strong className="block">Proveedor:</strong>
                   {providerLabel}
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <strong className="block text-gray-900">
+                <div className="rounded-xl border p-4" style={billingSoftPanelStyle}>
+                  <strong className="block">
                     Tipo de emisión:
                   </strong>
                   {mode === 'internal'
@@ -577,32 +780,129 @@ export default function FacturacionSection() {
                       ? 'Facturación electrónica en producción'
                       : 'Facturación electrónica en pruebas / habilitación'}
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <strong className="block text-gray-900">Ambiente:</strong>
+                <div className="rounded-xl border p-4" style={billingSoftPanelStyle}>
+                  <strong className="block">Ambiente:</strong>
                   {mode === 'internal'
                     ? 'Interno'
                     : mode === 'production'
                       ? 'Producción'
                       : 'Pruebas / habilitación'}
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <strong className="block text-gray-900">Resolución:</strong>
+                <div className="rounded-xl border p-4" style={billingSoftPanelStyle}>
+                  <strong className="block">Resolución:</strong>
                   {billing.dianResolution?.resolutionNumber || 'No configurada'}
                 </div>
                 <BillingProductionReadiness
                   readiness={readiness}
                   connectionChanged={connectionChanged}
                 />
+                <div
+                  className="rounded-xl border p-4"
+                  style={billingPanelStyle}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <strong className="block">Historial protegido</strong>
+                      <span
+                        className="text-xs"
+                        style={{ color: 'var(--admin-card-muted-text)' }}
+                      >
+                        Revisión actual {billingRevision}. Se conservan hasta 25
+                        versiones cifradas.
+                      </span>
+                      {historyMeta.updatedAt ? (
+                        <span
+                          className="mt-1 block text-xs"
+                          style={{ color: 'var(--admin-card-muted-text)' }}
+                        >
+                          Último cambio:{' '}
+                          {new Date(historyMeta.updatedAt).toLocaleString(
+                            'es-CO'
+                          )}
+                          {historyMeta.updatedBy
+                            ? ` · ${historyMeta.updatedBy}`
+                            : ''}
+                        </span>
+                      ) : null}
+                    </div>
+                    {historyLoading ? (
+                      <span
+                        className="text-xs"
+                        style={{ color: 'var(--admin-card-muted-text)' }}
+                      >
+                        Cargando...
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {history.slice(0, 5).map((version) => (
+                      <div
+                        key={version.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+                        style={billingSoftPanelStyle}
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold">
+                            Revisión {version.revision} · {version.mode}
+                          </p>
+                          <p
+                            className="text-xs"
+                            style={{ color: 'var(--admin-card-muted-text)' }}
+                          >
+                            {version.changedBy || 'sistema'}
+                            {version.changedAt
+                              ? ` · ${new Date(version.changedAt).toLocaleString('es-CO')}`
+                              : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreVersion(version)}
+                          disabled={saving}
+                          className="rounded-xl border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                          style={
+                            restoreCandidate === version.id
+                              ? billingDangerButtonStyle
+                              : billingSecondaryButtonStyle
+                          }
+                        >
+                          {restoreCandidate === version.id
+                            ? 'Confirmar restauración'
+                            : 'Restaurar'}
+                        </button>
+                      </div>
+                    ))}
+                    {!historyLoading && history.length === 0 ? (
+                      <p
+                        className="text-xs"
+                        style={{ color: 'var(--admin-card-muted-text)' }}
+                      >
+                        El historial aparecerá después del primer cambio
+                        guardado.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             )}
           </section>
+
+          {hasUnsavedChanges ? (
+            <div
+              className="rounded-xl border px-4 py-3 text-sm"
+              style={billingMessageStyle('warning')}
+            >
+              Tienes cambios sin guardar.
+            </div>
+          ) : null}
 
           <div className="flex items-center justify-between gap-3 pt-2">
             <button
               type="button"
               onClick={goPrev}
               disabled={currentStep === 0}
-              className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl border px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+              style={billingSecondaryButtonStyle}
             >
               Anterior
             </button>
@@ -610,7 +910,8 @@ export default function FacturacionSection() {
               <button
                 type="button"
                 onClick={goNext}
-                className="rounded-xl bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-600"
+                className="rounded-xl border px-5 py-2.5 text-sm font-semibold"
+                style={billingPrimaryButtonStyle}
               >
                 Siguiente
               </button>
@@ -618,8 +919,11 @@ export default function FacturacionSection() {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || testingConnection}
-                className="rounded-xl bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  saving || testingConnection || !hasUnsavedChanges
+                }
+                className="rounded-xl border px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={billingPrimaryButtonStyle}
               >
                 {saving ? 'Guardando...' : 'Guardar configuración'}
               </button>
@@ -629,8 +933,16 @@ export default function FacturacionSection() {
       </InfoCard>
 
       <EmptyHint
-        title="Estado del módulo"
-        text="La activación de producción permanece bloqueada hasta completar y verificar todos los requisitos técnicos y fiscales."
+        title={
+          readiness?.readyForProduction
+            ? 'Configuración verificada'
+            : 'Producción protegida'
+        }
+        text={
+          readiness?.readyForProduction
+            ? 'La cuenta, la empresa, los rangos y el correo cumplen los requisitos de producción.'
+            : 'La emisión productiva permanece bloqueada hasta completar y verificar todos los requisitos técnicos y fiscales.'
+        }
       />
     </div>
   );

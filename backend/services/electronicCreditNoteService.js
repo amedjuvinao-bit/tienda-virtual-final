@@ -13,6 +13,9 @@ const {
 const {
   addCreditNoteCreatedEvent,
 } = require('../lib/orders/orderTimeline');
+const {
+  sanitizeProviderPayload,
+} = require('./electronicInvoiceIssuanceService');
 
 const CREDIT_NOTE_REASONS = Object.freeze({
   '1': 'Devolución parcial de los bienes y/o no aceptación parcial del servicio',
@@ -663,8 +666,11 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
             cude: fiscalKey,
             isValidated: validated,
             validatedAt: cleanText(remote.validated_at || remote.validatedAt, 120),
-            links: remote.links || {},
-            raw: { ...remote, response: result.data },
+            links: sanitizeProviderPayload(remote.links || {}),
+            raw: {
+              ...sanitizeProviderPayload(remote),
+              response: sanitizeProviderPayload(result.data),
+            },
           },
           'creditNotes.$.providerErrors': {},
           'creditNotes.$.errorMessage': '',

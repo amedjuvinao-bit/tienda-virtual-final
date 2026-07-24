@@ -1,4 +1,13 @@
 import React from 'react';
+import {
+  billingDangerButtonStyle,
+  billingFieldClass,
+  billingFieldStyle,
+  billingMessageStyle,
+  billingPanelStyle,
+  billingSecondaryButtonStyle,
+  billingSoftPanelStyle,
+} from './billingTheme';
 
 const FACTUS_API_URLS = {
   habilitacion: 'https://api-sandbox.factus.com.co',
@@ -24,7 +33,14 @@ function formatDate(value) {
 
 function FieldError({ show, text }) {
   if (!show) return null;
-  return <p className="text-xs font-medium text-red-500">{text}</p>;
+  return (
+    <p
+      className="text-xs font-medium"
+      style={{ color: 'var(--admin-danger-text, var(--admin-card-text))' }}
+    >
+      {text}
+    </p>
+  );
 }
 
 function ProviderInput({
@@ -51,13 +67,13 @@ function ProviderInput({
         readOnly={readOnly}
         autoComplete={type === 'password' ? 'new-password' : 'off'}
         spellCheck={false}
-        className={`rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 ${
-          readOnly
-            ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-600'
-            : hasError
-              ? 'border-red-300 bg-red-50 focus:ring-red-100'
-              : 'border-gray-300 bg-white focus:border-pink-300 focus:ring-pink-100'
+        className={`${billingFieldClass} ${
+          readOnly ? 'cursor-not-allowed opacity-75' : ''
         }`}
+        style={{
+          ...billingFieldStyle,
+          ...(hasError ? billingMessageStyle('error') : {}),
+        }}
       />
 
       <FieldError
@@ -66,7 +82,10 @@ function ProviderInput({
       />
 
       {configured && isEmpty(value) ? (
-        <p className="text-xs font-medium text-emerald-600">
+        <p
+          className="text-xs font-medium"
+          style={{ color: 'var(--admin-success-text, var(--admin-card-text))' }}
+        >
           Credencial configurada y protegida.
         </p>
       ) : null}
@@ -83,6 +102,7 @@ export default function ElectronicProviderBlock({
   connectionFeedback = null,
   connectionChanged = false,
   onTestConnection,
+  onClearCredentials,
 }) {
   const normalizedMode = mode === 'production' ? 'production' : 'habilitacion';
   const isExternal = mode !== 'internal';
@@ -127,45 +147,67 @@ export default function ElectronicProviderBlock({
     value?.lastConnectionEnvironment ||
     '';
 
-  const statusClass =
+  const statusStyle =
     status === 'success'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      ? billingMessageStyle('success')
       : status === 'error'
-        ? 'border-red-200 bg-red-50 text-red-800'
-        : 'border-amber-200 bg-amber-50 text-amber-900';
+        ? billingMessageStyle('error')
+        : billingMessageStyle('warning');
+  const hasStoredCredentials =
+    REQUIRED_FIELDS.some((field) => isConfigured(field.key)) ||
+    REQUIRED_FIELDS.some((field) => !isEmpty(value?.[field.key]));
 
   return (
     <div className="grid gap-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label
+          className="mb-1 block text-sm font-medium"
+          style={{ color: 'var(--admin-card-text)' }}
+        >
           Proveedor de facturación electrónica
         </label>
 
         <select
           value={provider}
           disabled
-          className="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-3 py-2.5 text-gray-700"
+          className={`${billingFieldClass} cursor-not-allowed opacity-75`}
+          style={billingFieldStyle}
         >
           <option value="mock">Comprobante interno</option>
           <option value="factus">Factus</option>
         </select>
 
-        <p className="mt-1 text-xs text-gray-500">
+        <p
+          className="mt-1 text-xs"
+          style={{ color: 'var(--admin-card-muted-text)' }}
+        >
           Factus es el único proveedor externo habilitado. El backend determina el proveedor según el tipo de emisión.
         </p>
       </div>
 
       {!isExternal ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={billingMessageStyle('info')}
+        >
           El modo interno no envía documentos fiscales a Factus.
         </div>
       ) : (
-        <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4">
+        <div
+          className="grid gap-3 rounded-xl border p-4"
+          style={billingPanelStyle}
+        >
           <div>
-            <h4 className="text-sm font-semibold text-gray-800">
+            <h4
+              className="text-sm font-semibold"
+              style={{ color: 'var(--admin-card-text)' }}
+            >
               Configuración Factus (OAuth2)
             </h4>
-            <p className="mt-1 text-xs leading-5 text-gray-500">
+            <p
+              className="mt-1 text-xs leading-5"
+              style={{ color: 'var(--admin-card-muted-text)' }}
+            >
               La URL se asigna automáticamente según el ambiente. Las credenciales secretas se almacenan cifradas y nunca vuelven al navegador.
             </p>
           </div>
@@ -212,25 +254,53 @@ export default function ElectronicProviderBlock({
           />
 
           {missingFields.length > 0 ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <strong className="block text-red-800">
+            <div
+              className="rounded-xl border px-4 py-3 text-sm"
+              style={billingMessageStyle('error')}
+            >
+              <strong className="block">
                 Faltan datos obligatorios
               </strong>
               Completa: {missingFields.map((field) => field.label).join(', ')}.
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={onTestConnection}
-            disabled={testing || missingFields.length > 0}
-            className="rounded-xl border border-pink-300 bg-white px-4 py-2.5 text-sm font-semibold text-pink-600 hover:bg-pink-50 disabled:cursor-not-allowed disabled:opacity-50"
+          <div
+            className="grid gap-2 rounded-xl border p-3 sm:grid-cols-2"
+            style={billingSoftPanelStyle}
           >
-            {testing ? 'Verificando con Factus...' : 'Probar conexión real'}
-          </button>
+            <button
+              type="button"
+              onClick={onTestConnection}
+              disabled={testing || missingFields.length > 0}
+              className="rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              style={billingSecondaryButtonStyle}
+            >
+              {testing ? 'Verificando con Factus...' : 'Probar conexión real'}
+            </button>
+            <button
+              type="button"
+              onClick={onClearCredentials}
+              disabled={testing || !hasStoredCredentials}
+              className="rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              style={billingDangerButtonStyle}
+            >
+              Eliminar credenciales
+            </button>
+          </div>
+          <p
+            className="text-xs leading-5"
+            style={{ color: 'var(--admin-card-muted-text)' }}
+          >
+            Eliminar credenciales desactiva Factus, borra rangos y exige una
+            nueva verificación antes de volver a Producción.
+          </p>
 
-          <div className={`rounded-xl border px-4 py-3 text-sm ${statusClass}`}>
-            <strong className="block text-gray-900">
+          <div
+            className="rounded-xl border px-4 py-3 text-sm"
+            style={statusStyle}
+          >
+            <strong className="block">
               {status === 'success'
                 ? 'Conexión verificada'
                 : status === 'error'

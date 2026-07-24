@@ -167,6 +167,7 @@ function validateProviderResponseNormalization() {
 
 async function validateFactusQueries() {
   const {
+    clearFactusTokenCache,
     getCreditNoteFromFactus,
     getInvoiceFromFactus,
   } = require('../lib/dian/providers/factusProvider');
@@ -204,9 +205,10 @@ async function validateFactusQueries() {
 
     assert(invoiceResult.success, 'La consulta simulada de factura debe ser exitosa.');
     assert(noteResult.success, 'La consulta simulada de nota crédito debe ser exitosa.');
-    assert(calls.some((call) => call.url === 'https://factus.test/v2/bills/SETP%20990001'), 'Factura no consultó GET /v2/bills/:number.');
-    assert(calls.some((call) => call.url === 'https://factus.test/v2/credit-notes/NC%20990001'), 'Nota crédito no consultó GET /v2/credit-notes/:number.');
+    assert(calls.some((call) => call.url === 'https://api-sandbox.factus.com.co/v2/bills/SETP%20990001'), 'Factura no consultó GET /v2/bills/:number.');
+    assert(calls.some((call) => call.url === 'https://api-sandbox.factus.com.co/v2/credit-notes/NC%20990001'), 'Nota crédito no consultó GET /v2/credit-notes/:number.');
 
+    clearFactusTokenCache();
     global.fetch = async () => {
       const error = new Error('The operation was aborted');
       error.name = 'AbortError';

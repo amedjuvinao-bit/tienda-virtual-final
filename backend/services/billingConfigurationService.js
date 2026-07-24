@@ -4,7 +4,11 @@ const SiteSettings = require('../models/SiteSettings');
 const MailSettings = require('../models/MailSettings');
 const { buildAdminSiteSettings } = require('../lib/siteSettingsSecurity');
 const {
+  clearFactusTokenCache,
+} = require('../lib/dian/providers/factusProvider');
+const {
   BillingConfigurationError,
+  FACTUS_API_URLS,
   buildFactusCredentialFingerprint,
   buildRuntimeFactusConfig,
   encryptBillingSecret,
@@ -23,6 +27,7 @@ const LEGACY_SECRET_PATHS = Object.freeze([
   'billing.dian.certificatePassword',
   'billing.dianResolution.technicalKey',
 ]);
+const BILLING_HISTORY_LIMIT = 25;
 
 function cleanText(value, max = 500) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -30,6 +35,19 @@ function cleanText(value, max = 500) {
 
 function createServiceError(message, code, status = 500, details = []) {
   return new BillingConfigurationError(message, code, status, details);
+}
+
+function revisionNumber(value) {
+  const revision = Number(value);
+  return Number.isInteger(revision) && revision >= 0 ? revision : 0;
+}
+
+function configurationConflict() {
+  return createServiceError(
+    'La configuración cambió mientras la estabas editando. Recarga los datos antes de volver a guardar.',
+    'BILLING_CONFIGURATION_CONFLICT',
+    409
+  );
 }
 
 function getNested(object, path) {
@@ -74,7 +92,9 @@ async function migrateLegacyBillingSecrets(settings) {
 async function getAdminSettingsWithEncryptedBilling() {
   const settings = await getOrCreateSettingsDocument();
   const migrated = await migrateLegacyBillingSecrets(settings);
-  return buildAdminSiteSettings(migrated.toObject());
+  const safe = buildAdminSiteSettings(migrated.toObject());
+  safe._billingRevision = revisionNumber(migrated.billingRevision);
+  return safe;
 }
 
 async function assertProductionMailReady() {
@@ -116,26 +136,60 @@ async function updateBillingConfiguration(incomingBilling, options = {}) {
   }
 
   try {
-    const updated = await SiteSettings.findByIdAndUpdate(
-      settings._id,
+    const currentRevision = revisionNumber(settings.billingRevision);
+    if (
+      options.expectedRevision !== undefined &&
+      revisionNumber(options.expectedRevision) !== currentRevision
+    ) {
+      throw configurationConflict();
+    }
+
+    const changedAt = new Date();
+    const adminUser =
+      cleanText(options.adminUser || 'admin', 180) || 'admin';
+    const revisionQuery =
+      currentRevision === 0
+        ? {
+            $or: [
+              { billingRevision: 0 },
+              { billingRevision: { $exists: false } },
+            ],
+          }
+        : { billingRevision: currentRevision };
+    const updated = await SiteSettings.findOneAndUpdate(
+      { _id: settings._id, ...revisionQuery },
       {
         $set: {
           billing: preparedBilling,
-          updatedBy: cleanText(options.adminUser || 'admin', 180) || 'admin',
+          updatedBy: adminUser,
+        },
+        $inc: { billingRevision: 1 },
+        $push: {
+          billingHistory: {
+            $each: [
+              {
+                revision: currentRevision,
+                snapshot: currentBilling,
+                changedAt,
+                changedBy: cleanText(settings.updatedBy || 'system', 180),
+                reason: cleanText(options.reason || 'update', 80),
+              },
+            ],
+            $slice: -BILLING_HISTORY_LIMIT,
+          },
         },
       },
       { new: true, runValidators: true, strict: false }
     );
 
     if (!updated) {
-      throw createServiceError(
-        'No se encontró la configuración que debía actualizarse.',
-        'BILLING_CONFIGURATION_NOT_FOUND',
-        404
-      );
+      throw configurationConflict();
     }
 
-    return buildAdminSiteSettings(updated.toObject());
+    clearFactusTokenCache();
+    const safe = buildAdminSiteSettings(updated.toObject());
+    safe._billingRevision = revisionNumber(updated.billingRevision);
+    return safe;
   } catch (error) {
     if (error instanceof BillingConfigurationError) throw error;
     if (error?.name === 'ValidationError') {
@@ -151,6 +205,106 @@ async function updateBillingConfiguration(incomingBilling, options = {}) {
     }
     throw error;
   }
+}
+
+async function listBillingConfigurationHistory() {
+  const settings = await SiteSettings.findOne()
+    .select('+billingHistory billingRevision updatedAt updatedBy')
+    .lean();
+  const history = Array.isArray(settings?.billingHistory)
+    ? settings.billingHistory
+    : [];
+
+  return {
+    revision: revisionNumber(settings?.billingRevision),
+    updatedAt: settings?.updatedAt || null,
+    updatedBy: cleanText(settings?.updatedBy || '', 180),
+    versions: history
+      .slice()
+      .reverse()
+      .map((entry) => ({
+        id: String(entry?._id || ''),
+        revision: revisionNumber(entry?.revision),
+        changedAt: entry?.changedAt || null,
+        changedBy: cleanText(entry?.changedBy || '', 180),
+        reason: cleanText(entry?.reason || 'update', 80),
+        mode: cleanText(entry?.snapshot?.dian?.mode || 'internal', 40),
+        provider: cleanText(
+          entry?.snapshot?.electronicProvider?.provider || 'mock',
+          40
+        ),
+      })),
+  };
+}
+
+async function restoreBillingConfigurationVersion(
+  historyId,
+  options = {}
+) {
+  const settings = await SiteSettings.findOne()
+    .select('+billingHistory billing billingRevision updatedBy')
+    .lean();
+
+  if (!settings?._id) {
+    throw createServiceError(
+      'No existe configuración de facturación para restaurar.',
+      'BILLING_CONFIGURATION_NOT_FOUND',
+      404
+    );
+  }
+
+  const currentRevision = revisionNumber(settings.billingRevision);
+  if (revisionNumber(options.expectedRevision) !== currentRevision) {
+    throw configurationConflict();
+  }
+
+  const entry = (settings.billingHistory || []).find(
+    (item) => String(item?._id || '') === String(historyId || '')
+  );
+  if (!entry?.snapshot) {
+    throw createServiceError(
+      'La versión solicitada ya no está disponible.',
+      'BILLING_CONFIGURATION_VERSION_NOT_FOUND',
+      404
+    );
+  }
+
+  const restoredSource = JSON.parse(JSON.stringify(entry.snapshot));
+  if (restoredSource?.dian?.mode === 'production') {
+    restoredSource.dian = {
+      ...(restoredSource.dian || {}),
+      enabled: true,
+      mode: 'habilitacion',
+      environment: '2',
+    };
+    restoredSource.dianResolution = {
+      ...(restoredSource.dianResolution || {}),
+      environment: '2',
+      numberingRangeId: 0,
+      creditNoteNumberingRangeId: 0,
+    };
+    restoredSource.electronicProvider = {
+      ...(restoredSource.electronicProvider || {}),
+      apiUrl: FACTUS_API_URLS.habilitacion,
+      numberingRangeId: 0,
+      creditNoteNumberingRangeId: 0,
+      lastConnectionStatus: 'none',
+      lastConnectionMessage: '',
+      lastConnectionAt: null,
+      lastConnectionEnvironment: '',
+      lastConnectionFingerprint: '',
+      lastConnectionCompany: null,
+      numberingRangesEnvironment: '',
+      numberingRangesFingerprint: '',
+      numberingRangesSyncedAt: null,
+    };
+  }
+
+  return updateBillingConfiguration(restoredSource, {
+    adminUser: options.adminUser,
+    expectedRevision: currentRevision,
+    reason: `restore:${revisionNumber(entry.revision)}`,
+  });
 }
 
 function mergeConnectionCandidate(currentBilling = {}, body = {}) {
@@ -409,6 +563,8 @@ async function testFactusConnection(body = {}, options = {}) {
 module.exports = {
   buildFactusConnectionRuntimeConfig,
   getAdminSettingsWithEncryptedBilling,
+  listBillingConfigurationHistory,
+  restoreBillingConfigurationVersion,
   testFactusConnection,
   updateBillingConfiguration,
 };
