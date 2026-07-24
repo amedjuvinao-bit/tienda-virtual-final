@@ -13,6 +13,11 @@ const {
   updateBillingConfiguration,
 } = require('./billingConfigurationService');
 
+const FACTUS_FINGERPRINT_SELECT = [
+  '+billing.electronicProvider.lastConnectionFingerprint',
+  '+billing.electronicProvider.numberingRangesFingerprint',
+].join(' ');
+
 function cleanText(value, max = 500) {
   return String(value ?? '')
     .trim()
@@ -408,7 +413,9 @@ async function updateBillingConfigurationWithReadiness(
   }
 
   await updateBillingConfiguration(incomingBilling, options);
-  const updatedSettings = await SiteSettings.findOne().lean();
+  const updatedSettings = await SiteSettings.findOne()
+    .select(FACTUS_FINGERPRINT_SELECT)
+    .lean();
   const updatedProvider = updatedSettings?.billing?.electronicProvider || {};
 
   if (!updatedSettings?._id) {
