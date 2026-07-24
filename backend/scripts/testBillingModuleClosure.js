@@ -7,7 +7,12 @@ const { spawnSync } = require('child_process');
 
 const BACKEND_ROOT = path.join(__dirname, '..');
 const PROJECT_ROOT = path.join(BACKEND_ROOT, '..');
-const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const NPM_EXEC_PATH = String(process.env.npm_execpath || '').trim();
+const NPM_COMMAND = NPM_EXEC_PATH
+  ? process.execPath
+  : process.platform === 'win32'
+    ? 'npm.cmd'
+    : 'npm';
 
 const BILLING_TESTS = [
   ['Estructura del panel administrativo', 'testBillingAdminShellModule.js'],
@@ -84,9 +89,16 @@ function runBillingTests() {
 }
 
 function runFrontendBuild() {
+  const npmArgs = [
+    '--prefix',
+    path.join(PROJECT_ROOT, 'frontend'),
+    'run',
+    'build',
+  ];
+
   run(
     NPM_COMMAND,
-    ['--prefix', path.join(PROJECT_ROOT, 'frontend'), 'run', 'build'],
+    NPM_EXEC_PATH ? [NPM_EXEC_PATH, ...npmArgs] : npmArgs,
     'Compilación de producción del frontend',
     PROJECT_ROOT
   );
