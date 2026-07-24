@@ -269,6 +269,37 @@ function testOfficialLookupAndSelectionControls() {
   ok('Consulta y Producción exigen permiso, conexión, ambiente y huellas verificadas');
 }
 
+function testHiddenFingerprintsAreSelectedExplicitly() {
+  const services = [
+    [
+      'consulta de rangos',
+      read('backend/services/billingNumberingRangeService.js'),
+    ],
+    [
+      'persistencia de rangos',
+      read('backend/services/billingNumberingRangePersistenceService.js'),
+    ],
+    [
+      'guardado de configuración',
+      read('backend/services/billingConfigurationService.js'),
+    ],
+    [
+      'orquestación de conexión',
+      read('backend/services/billingConnectionOrchestrationService.js'),
+    ],
+  ];
+
+  services.forEach(([label, source]) => {
+    assert(
+      source.includes('FACTUS_FINGERPRINT_SELECT') &&
+        /\.select\(\s*FACTUS_FINGERPRINT_SELECT\s*\)/.test(source),
+      `La ${label} no solicita las huellas ocultas de MongoDB.`
+    );
+  });
+
+  ok('Servicios internos solicitan las huellas ocultas sin exponerlas al navegador');
+}
+
 function testFrontendHasNoManualFiscalRangeFields() {
   const block = read(
     'frontend/src/admin/configuracion/sections/facturacion/FactusNumberingRangesBlock.jsx'
@@ -402,6 +433,7 @@ function main() {
     testCandidateUsesStoredSecretsAndTrustedMetadata,
     testTechnicalKeyNeverLeavesBackend,
     testOfficialLookupAndSelectionControls,
+    testHiddenFingerprintsAreSelectedExplicitly,
     testFrontendHasNoManualFiscalRangeFields,
     testCreditNoteRangeCreationIsAudited,
     testEmissionUsesStoredSelections,
