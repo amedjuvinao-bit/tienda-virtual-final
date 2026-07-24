@@ -13,6 +13,7 @@ const {
   extractRangeList,
   isoDate,
   mergeCandidateBilling,
+  normalizeCreditNoteRangeInput,
   normalizeFactusRange,
   publicRange,
 } = require('../services/billingNumberingRangeService');
@@ -92,6 +93,36 @@ function testEligibleRanges() {
   assert(invoice.startDate === '2026-01-01', 'No normalizó la fecha inicial.');
 
   ok('Rangos vigentes de factura y nota crédito quedan disponibles por separado');
+}
+
+function testCreditNoteRangeCreationInput() {
+  const normalized = normalizeCreditNoteRangeInput({
+    prefix: ' nc1 ',
+    current: '1',
+    document: '21',
+  });
+
+  assert(normalized.document === '22', 'El navegador puede alterar el documento 22.');
+  assert(normalized.prefix === 'NC1', 'No normaliza el prefijo alfanumérico.');
+  assert(normalized.current === 1, 'No normaliza el consecutivo positivo.');
+
+  [
+    { prefix: '', current: 1 },
+    { prefix: 'ABCDE', current: 1 },
+    { prefix: 'N-C', current: 1 },
+    { prefix: 'NC', current: 0 },
+    { prefix: 'NC', current: '1.5' },
+  ].forEach((input) => {
+    let rejected = false;
+    try {
+      normalizeCreditNoteRangeInput(input);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, `Aceptó datos inseguros: ${JSON.stringify(input)}`);
+  });
+
+  ok('Creación fija documento 22 y valida prefijo y consecutivo en el backend');
 }
 
 function testUnsafeRangesAreRejected() {
@@ -205,13 +236,28 @@ function testOfficialLookupAndSelectionControls() {
   assert(
     route.includes("router.get('/numbering-ranges'") &&
       route.includes("'/numbering-ranges/query'") &&
+      route.includes("'/numbering-ranges/credit-note'") &&
       route.includes("router.put('/numbering-ranges'") &&
       route.includes("requirePermission('billing:settings')"),
     'Las rutas de rangos no están completas o protegidas.'
   );
   assert(
-    route.includes('numberingRangeLimiter') && route.includes('max: 20'),
-    'Falta límite específico para consultas de rangos.'
+    route.includes('numberingRangeLimiter') &&
+      route.includes('numberingRangeCreationLimiter') &&
+      route.includes('max: 20') &&
+      route.includes('max: 5'),
+    'Faltan límites específicos para consultar o crear rangos.'
+  );
+  assert(
+    service.includes("method: 'POST'") &&
+      service.includes('document: FACTUS_RANGE_DOCUMENTS.creditNote') &&
+      service.includes('FACTUS_CREDIT_NOTE_RANGE_ALREADY_AVAILABLE') &&
+      service.includes('FACTUS_CREDIT_NOTE_RANGE_CREATE_IN_PROGRESS') &&
+      service.includes('creditNoteRangeCreationLocks') &&
+      service.includes(
+        'FACTUS_CREDIT_NOTE_RANGE_PRODUCTION_CONFIRMATION_REQUIRED'
+      ),
+    'La creación del rango no está protegida contra documento alterado, duplicados, concurrencia o Producción sin confirmar.'
   );
   assert(
     persistence.includes('assertProductionNumberingRangesReady') &&
@@ -239,6 +285,13 @@ function testFrontendHasNoManualFiscalRangeFields() {
   assert(block.includes('eligibleInvoiceRanges'), 'No filtra rangos de facturas.');
   assert(block.includes('eligibleCreditNoteRanges'), 'No filtra rangos de notas crédito.');
   assert(block.includes('/numbering-ranges/query'), 'No consulta con el candidato verificado actual.');
+  assert(
+    block.includes('/numbering-ranges/credit-note') &&
+      block.includes('Crear rango de nota crédito') &&
+      block.includes('Confirmar creación en Factus') &&
+      block.includes('applyRangeResponse(data, createdId)'),
+    'El panel no crea, confirma y vuelve a cargar el rango de nota crédito.'
+  );
   assert(block.includes('{ billing }'), 'No envía el candidato actual al backend.');
   assert(
     resolution.includes('FactusNumberingRangesBlock') &&
@@ -260,6 +313,24 @@ function testFrontendHasNoManualFiscalRangeFields() {
   });
 
   ok('Panel reemplaza digitación manual por selección oficial del candidato verificado');
+}
+
+function testCreditNoteRangeCreationIsAudited() {
+  const permissionMap = read('backend/security/adminRoutePermissionMap.js');
+  const routeIndex = permissionMap.indexOf(
+    "path: '/api/dian-provider/numbering-ranges/credit-note'"
+  );
+
+  assert(routeIndex >= 0, 'La creación del rango no está en el mapa de permisos.');
+  const routeBlock = permissionMap.slice(routeIndex, routeIndex + 420);
+  assert(
+    routeBlock.includes("permission: 'billing:settings'") &&
+      routeBlock.includes('audit: true') &&
+      routeBlock.includes('danger: true'),
+    'La creación del rango no exige permiso sensible ni registra auditoría.'
+  );
+
+  ok('Creación exige permiso, confirmación y queda registrada en auditoría');
 }
 
 function testEmissionUsesStoredSelections() {
@@ -326,11 +397,13 @@ function main() {
   [
     testDocumentCodesAndPayloadExtraction,
     testEligibleRanges,
+    testCreditNoteRangeCreationInput,
     testUnsafeRangesAreRejected,
     testCandidateUsesStoredSecretsAndTrustedMetadata,
     testTechnicalKeyNeverLeavesBackend,
     testOfficialLookupAndSelectionControls,
     testFrontendHasNoManualFiscalRangeFields,
+    testCreditNoteRangeCreationIsAudited,
     testEmissionUsesStoredSelections,
     testRegistration,
   ].forEach((test) => {
