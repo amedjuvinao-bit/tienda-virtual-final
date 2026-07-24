@@ -435,6 +435,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'POST',
+    path: '/api/dian-provider/numbering-ranges/credit-note',
+    permission: 'billing:settings',
+    description: 'Crear un rango oficial de notas crédito en Factus.',
+    audit: true,
+    danger: true,
+  },
+  {
     method: 'GET',
     path: '/api/dian-provider-test/:id/pdf',
     permission: 'billing:download',
