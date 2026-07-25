@@ -375,6 +375,23 @@ function testFrontendHasNoManualFiscalRangeFields() {
   ok('Panel reemplaza digitación manual por selección oficial del candidato verificado');
 }
 
+function testFrontendShowsUnavailableRangeDiagnostics() {
+  const block = read(
+    'frontend/src/admin/configuracion/sections/facturacion/FactusNumberingRangesBlock.jsx'
+  );
+
+  assert(
+    block.includes('Rangos de nota crédito devueltos por Factus') &&
+      block.includes('Código documental:') &&
+      block.includes('Activo en Factus:') &&
+      block.includes('Motivo de no disponibilidad:') &&
+      block.includes('unavailableRangeReasons(range).join'),
+    'El panel no muestra los datos y el motivo de descarte de cada rango devuelto por Factus.'
+  );
+
+  ok('Panel muestra cada rango no disponible y explica por qué fue descartado');
+}
+
 function testCreditNoteRangeCreationIsAudited() {
   const permissionMap = read('backend/security/adminRoutePermissionMap.js');
   const routeIndex = permissionMap.indexOf(
@@ -465,6 +482,7 @@ function main() {
     testOfficialLookupAndSelectionControls,
     testHiddenFingerprintsAreSelectedExplicitly,
     testFrontendHasNoManualFiscalRangeFields,
+    testFrontendShowsUnavailableRangeDiagnostics,
     testCreditNoteRangeCreationIsAudited,
     testEmissionUsesStoredSelections,
     testRegistration,
