@@ -47,7 +47,15 @@ function unavailableCreditNoteRangeMessage(ranges = []) {
     : 'Factus devolvió rangos de nota crédito, pero ninguno está vigente y disponible.';
 }
 
-function RangeDetails({ range }) {
+function unavailableRangeReasons(range = {}) {
+  const reasons = [];
+  if (range.active === false) reasons.push('Inactivo');
+  if (range.expired === true) reasons.push('Vencido');
+  if (range.exhausted === true) reasons.push('Agotado');
+  return reasons.length ? reasons : ['No disponible para selección'];
+}
+
+function RangeDetails({ range, statusMessage = '' }) {
   if (!range) return null;
 
   return (
@@ -58,6 +66,10 @@ function RangeDetails({ range }) {
       <span>
         <strong>Documento:</strong>{' '}
         {range.documentName}
+      </span>
+      <span>
+        <strong>Código documental:</strong>{' '}
+        {range.document || 'No informado'}
       </span>
       <span>
         <strong>ID Factus:</strong> {range.id}
@@ -87,6 +99,16 @@ function RangeDetails({ range }) {
         <strong>Vencimiento:</strong>{' '}
         {formatDate(range.endDate)}
       </span>
+      <span>
+        <strong>Activo en Factus:</strong>{' '}
+        {range.active === false ? 'No' : 'Sí'}
+      </span>
+      {statusMessage ? (
+        <span className="md:col-span-2">
+          <strong>Motivo de no disponibilidad:</strong>{' '}
+          {statusMessage}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -618,6 +640,19 @@ export default function FactusNumberingRangesBlock({
                   {unavailableCreditNoteRangeMessage(allCreditNoteRanges)}
                 </p>
               </div>
+
+              {allCreditNoteRanges.length ? (
+                <div className="grid gap-2">
+                  <strong>Rangos de nota crédito devueltos por Factus</strong>
+                  {allCreditNoteRanges.map((range) => (
+                    <RangeDetails
+                      key={range.id}
+                      range={range}
+                      statusMessage={unavailableRangeReasons(range).join(', ')}
+                    />
+                  ))}
+                </div>
+              ) : null}
 
               {!showCreditNoteRangeForm ? (
                 <button
