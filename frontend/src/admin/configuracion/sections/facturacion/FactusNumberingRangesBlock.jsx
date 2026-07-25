@@ -27,6 +27,15 @@ function rangeLabel(range = {}) {
   const prefix = range.prefix || 'Sin prefijo';
   const current = Number(range.current || 0).toLocaleString('es-CO');
   const to = Number(range.to || 0).toLocaleString('es-CO');
+  const isOpenCreditNoteRange =
+    String(range.document || '') === '22' &&
+    Number(range.from || 0) === 0 &&
+    Number(range.to || 0) === 0;
+
+  if (isOpenCreditNoteRange) {
+    return `${prefix} · siguiente ${current} · rango administrado por Factus`;
+  }
+
   return `${prefix} · actual ${current} de ${to} · vence ${formatDate(range.endDate)}`;
 }
 
@@ -58,6 +67,12 @@ function unavailableRangeReasons(range = {}) {
 function RangeDetails({ range, statusMessage = '' }) {
   if (!range) return null;
 
+  const isOpenCreditNoteRange =
+    String(range.document || '') === '22' &&
+    Number(range.from || 0) === 0 &&
+    Number(range.to || 0) === 0;
+  const notApplicable = 'No aplica para este rango de nota crédito';
+
   return (
     <div
       className="grid gap-1 rounded-xl border px-4 py-3 text-xs md:grid-cols-2"
@@ -76,7 +91,9 @@ function RangeDetails({ range, statusMessage = '' }) {
       </span>
       <span>
         <strong>Resolución:</strong>{' '}
-        {range.resolutionNumber || 'No informada'}
+        {isOpenCreditNoteRange
+          ? notApplicable
+          : range.resolutionNumber || 'No informada'}
       </span>
       <span>
         <strong>Prefijo:</strong>{' '}
@@ -84,8 +101,14 @@ function RangeDetails({ range, statusMessage = '' }) {
       </span>
       <span>
         <strong>Rango:</strong>{' '}
-        {Number(range.from || 0).toLocaleString('es-CO')} –{' '}
-        {Number(range.to || 0).toLocaleString('es-CO')}
+        {isOpenCreditNoteRange ? (
+          'Administrado por Factus'
+        ) : (
+          <>
+            {Number(range.from || 0).toLocaleString('es-CO')} –{' '}
+            {Number(range.to || 0).toLocaleString('es-CO')}
+          </>
+        )}
       </span>
       <span>
         <strong>Siguiente consecutivo:</strong>{' '}
@@ -93,11 +116,11 @@ function RangeDetails({ range, statusMessage = '' }) {
       </span>
       <span>
         <strong>Inicio:</strong>{' '}
-        {formatDate(range.startDate)}
+        {isOpenCreditNoteRange ? notApplicable : formatDate(range.startDate)}
       </span>
       <span>
         <strong>Vencimiento:</strong>{' '}
-        {formatDate(range.endDate)}
+        {isOpenCreditNoteRange ? notApplicable : formatDate(range.endDate)}
       </span>
       <span>
         <strong>Activo en Factus:</strong>{' '}
