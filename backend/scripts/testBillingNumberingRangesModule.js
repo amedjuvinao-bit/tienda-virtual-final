@@ -114,14 +114,39 @@ function testEligibleRanges() {
     },
     '22'
   );
+  const sandboxCreditWithoutResolution = normalizeFactusRange(
+    {
+      id: 390,
+      document: '22',
+      document_name: 'Nota Crédito',
+      prefix: 'NC',
+      from: 0,
+      to: 0,
+      current: 455,
+      resolution_number: '',
+      start_date: '',
+      end_date: '',
+      is_active: 1,
+      is_expired: 0,
+    },
+    '22'
+  );
 
   assert(invoice.eligible === true, 'Rechazó un rango vigente de factura.');
   assert(credit.eligible === true, 'Rechazó un rango vigente de nota crédito.');
+  assert(
+    sandboxCreditWithoutResolution.eligible === true,
+    'Rechazó un rango activo de nota crédito sin resolución DIAN.'
+  );
+  assert(
+    sandboxCreditWithoutResolution.exhausted === false,
+    'Interpretó el rango abierto 0–0 de nota crédito como agotado.'
+  );
   assert(invoice.document === '21', 'Alteró el tipo de factura.');
   assert(credit.document === '22', 'Alteró el tipo de nota crédito.');
   assert(invoice.startDate === '2026-01-01', 'No normalizó la fecha inicial.');
 
-  ok('Rangos vigentes de factura y nota crédito quedan disponibles por separado');
+  ok('Rangos de factura y rangos abiertos de nota crédito se interpretan según Factus');
 }
 
 function testCreditNoteRangeCreationInput() {
@@ -169,11 +194,45 @@ function testUnsafeRangesAreRejected() {
   const expired = normalizeFactusRange({ ...base, is_expired: 1 }, '21');
   const exhausted = normalizeFactusRange({ ...base, current: 101 }, '21');
   const wrongDocument = normalizeFactusRange({ ...base, document: '22' }, '21');
+  const inactiveOpenCredit = normalizeFactusRange(
+    {
+      id: 390,
+      document: '22',
+      prefix: 'NC',
+      from: 0,
+      to: 0,
+      current: 455,
+      is_active: 0,
+      is_expired: 0,
+    },
+    '22'
+  );
+  const creditWithoutSequence = normalizeFactusRange(
+    {
+      id: 390,
+      document: '22',
+      prefix: 'NC',
+      from: 0,
+      to: 0,
+      current: 0,
+      is_active: 1,
+      is_expired: 0,
+    },
+    '22'
+  );
 
   assert(inactive.eligible === false, 'Aceptó un rango inactivo.');
   assert(expired.eligible === false, 'Aceptó un rango vencido.');
   assert(exhausted.eligible === false, 'Aceptó un rango agotado.');
   assert(wrongDocument.eligible === false, 'Mezcló rangos de documentos distintos.');
+  assert(
+    inactiveOpenCredit.eligible === false,
+    'Aceptó un rango abierto de nota crédito inactivo.'
+  );
+  assert(
+    creditWithoutSequence.eligible === false,
+    'Aceptó un rango de nota crédito sin siguiente consecutivo.'
+  );
 
   ok('Rangos inactivos, vencidos, agotados o de otro documento quedan bloqueados');
 }
