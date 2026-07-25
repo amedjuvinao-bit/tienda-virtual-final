@@ -219,8 +219,12 @@ function normalizeFactusRange(range = {}, expectedDocument = '') {
   const active = toBoolean(range?.is_active, true);
   const expiredByFlag = toBoolean(range?.is_expired, false);
   const expiredByDate = Boolean(endDate && endDate < todayIso());
-  const exhausted = Boolean(to > 0 && current > to);
-  const validBounds = from > 0 && to >= from && current >= from;
+  const isCreditNote = document === FACTUS_RANGE_DOCUMENTS.creditNote;
+  const exhausted = Boolean(!isCreditNote && to > 0 && current > to);
+  const validInvoiceBounds = from > 0 && to >= from && current >= from;
+  const validNumbering = isCreditNote
+    ? current > 0
+    : validInvoiceBounds;
   const correctDocument = !expectedDocument || document === expectedDocument;
   const eligible = Boolean(
     id > 0 &&
@@ -228,7 +232,7 @@ function normalizeFactusRange(range = {}, expectedDocument = '') {
       !expiredByFlag &&
       !expiredByDate &&
       !exhausted &&
-      validBounds &&
+      validNumbering &&
       correctDocument
   );
 
