@@ -111,6 +111,53 @@ function extractRangeList(payload = {}) {
   return candidates.find(Array.isArray) || [];
 }
 
+function collectFactusErrorText(value, output = [], depth = 0) {
+  if (depth > 3 || value === undefined || value === null) return output;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = cleanText(value, 500)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(
+        /\b(authorization|bearer|access[_ -]?token|client[_ -]?secret|password|technical[_ -]?key|software[_ -]?pin)\b\s*[:=]\s*[^\s,;]+/gi,
+        '$1: [dato protegido]'
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text && !output.includes(text)) output.push(text);
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectFactusErrorText(item, output, depth + 1));
+    return output;
+  }
+
+  if (typeof value === 'object') {
+    Object.values(value).forEach((item) =>
+      collectFactusErrorText(item, output, depth + 1)
+    );
+  }
+
+  return output;
+}
+
+function extractFactusErrorMessage(payload = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return '';
+  }
+
+  const messages = [];
+  [
+    payload?.errors,
+    payload?.data?.errors,
+    payload?.error,
+    payload?.data?.message,
+    payload?.message,
+  ].forEach((candidate) => collectFactusErrorText(candidate, messages));
+
+  return cleanText(messages.join(' '), 700);
+}
+
 function normalizeDocumentCode(value, expectedDocument = '') {
   const raw = cleanText(value, 160);
   const normalized = raw.toLowerCase();
@@ -424,8 +471,11 @@ async function postCreditNoteRange(runtime, token, input) {
     );
 
     if (!response.ok) {
+      const providerMessage = extractFactusErrorMessage(data);
       throw new BillingConfigurationError(
-        'Factus rechazó la creación del rango de nota crédito. Revisa el prefijo, el consecutivo y el estado de la cuenta.',
+        providerMessage
+          ? `Factus rechazó la creación del rango de nota crédito. Motivo informado por Factus: ${providerMessage}`
+          : 'Factus rechazó la creación del rango de nota crédito, pero no informó un motivo específico.',
         'FACTUS_CREDIT_NOTE_RANGE_CREATE_REJECTED',
         response.status >= 400 && response.status < 500 ? 422 : 502
       );
@@ -801,6 +851,7 @@ async function saveFactusNumberingRangeSelection(
 module.exports = {
   FACTUS_RANGE_DOCUMENTS,
   createFactusCreditNoteNumberingRange,
+  extractFactusErrorMessage,
   extractRangeList,
   invalidateNumberingRangesIfContextChanged,
   isoDate,
