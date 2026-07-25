@@ -10,6 +10,7 @@ process.env.BILLING_ENCRYPTION_KEY =
 
 const {
   FACTUS_RANGE_DOCUMENTS,
+  extractFactusErrorMessage,
   extractRangeList,
   isoDate,
   mergeCandidateBilling,
@@ -50,6 +51,34 @@ function testDocumentCodesAndPayloadExtraction() {
   assert(isoDate('31-12-2099') === '2099-12-31', 'No normaliza fecha DD-MM-AAAA.');
 
   ok('Códigos documentales, paginación y fechas de Factus se interpretan correctamente');
+}
+
+function testFactusCreationErrorIsUsefulAndSafe() {
+  const message = extractFactusErrorMessage({
+    message: 'The given data was invalid.',
+    errors: {
+      prefix: ['El prefijo NC ya está registrado.'],
+      current: ['El consecutivo debe ser menor o igual a 9999.'],
+    },
+    data: {
+      message: 'Authorization: secreto-no-debe-salir',
+    },
+  });
+
+  assert(
+    message.includes('El prefijo NC ya está registrado.'),
+    'Ocultó el motivo específico enviado por Factus.'
+  );
+  assert(
+    message.includes('El consecutivo debe ser menor o igual a 9999.'),
+    'Perdió una validación adicional enviada por Factus.'
+  );
+  assert(
+    !message.includes('secreto-no-debe-salir'),
+    'Expuso un dato sensible incluido en el error del proveedor.'
+  );
+
+  ok('Rechazos de creación muestran el motivo de Factus sin exponer datos sensibles');
 }
 
 function testEligibleRanges() {
@@ -427,6 +456,7 @@ function main() {
 
   [
     testDocumentCodesAndPayloadExtraction,
+    testFactusCreationErrorIsUsefulAndSafe,
     testEligibleRanges,
     testCreditNoteRangeCreationInput,
     testUnsafeRangesAreRejected,
