@@ -227,6 +227,44 @@ function testConcurrencyAndHistory() {
   ok('Edición concurrente, historial, restauración y cambios sin guardar quedan controlados');
 }
 
+function testSuccessfulSaveClearsUnsavedChanges() {
+  const frontend = read(
+    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
+  );
+  const applySettingsStart = frontend.indexOf('const applySettings');
+  const loadHistoryStart = frontend.indexOf('const loadHistory');
+  const handleSaveStart = frontend.indexOf('const handleSave');
+  const handleRestoreStart = frontend.indexOf('const handleRestoreVersion');
+  const applySettingsBlock = frontend.slice(applySettingsStart, loadHistoryStart);
+  const handleSaveBlock = frontend.slice(handleSaveStart, handleRestoreStart);
+
+  assert(
+    frontend.includes(
+      'const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)'
+    ),
+    'El formulario no conserva un estado explícito de cambios pendientes.'
+  );
+  assert(
+    !frontend.includes('savedSnapshot'),
+    'El formulario todavía depende de una instantánea que puede quedar desactualizada.'
+  );
+  assert(
+    applySettingsBlock.includes('setHasUnsavedChanges(false)'),
+    'Aplicar la respuesta confirmada por el backend no limpia el estado pendiente.'
+  );
+  assert(
+    frontend.includes('const markFormChanged') &&
+      frontend.includes('setHasUnsavedChanges(true)'),
+    'Editar el formulario no activa el estado pendiente.'
+  );
+  assert(
+    handleSaveBlock.includes('applySettings(data)'),
+    'Guardar no aplica la configuración confirmada por el backend.'
+  );
+
+  ok('Editar activa el aviso y guardar correctamente lo elimina');
+}
+
 function testPanelThemeAndSupportedOptions() {
   const section = read(
     'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
@@ -298,6 +336,7 @@ function main() {
     testProductionFailClosed,
     testCredentialRotationAndRevocation,
     testConcurrencyAndHistory,
+    testSuccessfulSaveClearsUnsavedChanges,
     testPanelThemeAndSupportedOptions,
     testDedicatedRouteAndPermissions,
     testRealConnectionAndRuntime,
