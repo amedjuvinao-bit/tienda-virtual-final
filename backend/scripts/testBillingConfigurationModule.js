@@ -262,7 +262,23 @@ function testSuccessfulSaveClearsUnsavedChanges() {
     'Guardar no aplica la configuración confirmada por el backend.'
   );
 
-  ok('Editar activa el aviso y guardar correctamente lo elimina');
+  const applySettingsIndex = handleSaveBlock.indexOf('applySettings(data)');
+  const loadHistoryIndex = handleSaveBlock.indexOf(
+    'await loadHistory()',
+    applySettingsIndex
+  );
+  const finalCleanIndex = handleSaveBlock.indexOf(
+    'setHasUnsavedChanges(false)',
+    loadHistoryIndex
+  );
+  assert(
+    applySettingsIndex >= 0 &&
+      loadHistoryIndex > applySettingsIndex &&
+      finalCleanIndex > loadHistoryIndex,
+    'El aviso se limpia antes de terminar la recarga posterior al guardado.'
+  );
+
+  ok('Editar activa el aviso y guardar correctamente lo elimina al final');
 }
 
 function testPanelThemeAndSupportedOptions() {
