@@ -430,6 +430,12 @@ export default function FacturacionSection() {
 
       applySettings(data);
       await loadHistory();
+
+      // La operación solo queda limpia cuando también terminó la recarga
+      // posterior al guardado. Así, ningún render intermedio puede dejar
+      // nuevamente activa la advertencia después de una respuesta exitosa.
+      setHasUnsavedChanges(false);
+      setConnectionChanged(false);
       setSaveFeedback({
         type: 'success',
         message: 'Configuración de facturación guardada correctamente.',
