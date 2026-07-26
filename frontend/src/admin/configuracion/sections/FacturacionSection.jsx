@@ -81,9 +81,7 @@ export default function FacturacionSection() {
   const [connectionChanged, setConnectionChanged] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
   const [billingRevision, setBillingRevision] = useState(0);
-  const [savedSnapshot, setSavedSnapshot] = useState(
-    JSON.stringify(EMPTY_BILLING)
-  );
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyMeta, setHistoryMeta] = useState({
     updatedAt: null,
@@ -99,7 +97,7 @@ export default function FacturacionSection() {
     if (!data?.billing) {
       setBilling(EMPTY_BILLING);
       setBillingRevision(Number(data?._billingRevision || 0));
-      setSavedSnapshot(JSON.stringify(EMPTY_BILLING));
+      setHasUnsavedChanges(false);
       return;
     }
 
@@ -130,7 +128,7 @@ export default function FacturacionSection() {
 
     setBilling(nextBilling);
     setBillingRevision(Number(data?._billingRevision || 0));
-    setSavedSnapshot(JSON.stringify(nextBilling));
+    setHasUnsavedChanges(false);
 
     setConnectionFeedback(null);
     setConnectionChanged(false);
@@ -183,8 +181,6 @@ export default function FacturacionSection() {
     () => (provider === 'factus' ? 'Factus' : 'Comprobante interno'),
     [provider]
   );
-  const hasUnsavedChanges =
-    JSON.stringify(billing) !== savedSnapshot;
 
   useEffect(() => {
     const warnUnsavedChanges = (event) => {
@@ -196,10 +192,15 @@ export default function FacturacionSection() {
     return () => window.removeEventListener('beforeunload', warnUnsavedChanges);
   }, [hasUnsavedChanges]);
 
+  const markFormChanged = () => {
+    setHasUnsavedChanges(true);
+    setSaveFeedback(null);
+  };
+
   const markConnectionChanged = () => {
+    markFormChanged();
     setConnectionChanged(true);
     setConnectionFeedback(null);
-    setSaveFeedback(null);
   };
 
   const handleFiscalInfoChange = (nextFiscalInfo) => {
@@ -212,9 +213,11 @@ export default function FacturacionSection() {
       ...previous,
       fiscalInfo: nextFiscalInfo,
     }));
+    markFormChanged();
 
     if (previousNit !== nextNit || previousDv !== nextDv) {
-      markConnectionChanged();
+      setConnectionChanged(true);
+      setConnectionFeedback(null);
     }
   };
 
@@ -254,7 +257,11 @@ export default function FacturacionSection() {
       },
     }));
 
-    if (nextMode !== mode) markConnectionChanged();
+    if (nextMode !== mode) {
+      markConnectionChanged();
+    } else {
+      markFormChanged();
+    }
   };
 
   const handleDianEnabledChange = (checked) => {
@@ -297,6 +304,7 @@ export default function FacturacionSection() {
     setReadiness(null);
     setConnectionFeedback(null);
     setConnectionChanged(true);
+    setHasUnsavedChanges(true);
     setSaveFeedback({
       type: 'warning',
       message:
@@ -318,7 +326,7 @@ export default function FacturacionSection() {
         environment,
       },
     }));
-    setSaveFeedback(null);
+    markFormChanged();
   };
 
   const handleTestConnection = async () => {
@@ -749,7 +757,7 @@ export default function FacturacionSection() {
                     ...previous,
                     taxes: nextTaxes,
                   }));
-                  setSaveFeedback(null);
+                  markFormChanged();
                 }}
               />
             )}
@@ -762,7 +770,7 @@ export default function FacturacionSection() {
                     ...previous,
                     legalTexts: nextLegalTexts,
                   }));
-                  setSaveFeedback(null);
+                  markFormChanged();
                 }}
               />
             )}
