@@ -488,6 +488,11 @@ export default function FacturacionSection() {
     });
   };
 
+  const handleNumberingRangesSaved = (settings) => {
+    applySettings(settings);
+    setSaveFeedback(null);
+  };
+
   const goPrev = () => {
     setCurrentStep((previous) => Math.max(0, previous - 1));
   };
@@ -726,6 +731,7 @@ export default function FacturacionSection() {
                   billing={billing}
                   credentialStatus={credentialStatus}
                   onChange={handleDianResolutionChange}
+                  onSaved={handleNumberingRangesSaved}
                   onActivated={handleProductionActivated}
                 />
               ) : (

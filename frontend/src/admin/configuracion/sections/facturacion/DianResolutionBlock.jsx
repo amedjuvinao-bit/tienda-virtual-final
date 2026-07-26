@@ -6,6 +6,7 @@ export default function DianResolutionBlock({
   value = {},
   billing = {},
   onChange,
+  onSaved,
   onActivated,
   credentialStatus = {},
 }) {
@@ -17,6 +18,7 @@ export default function DianResolutionBlock({
         value={value}
         billing={billing}
         onChange={onChange}
+        onSaved={onSaved}
         onActivated={onActivated}
       />
 

@@ -451,6 +451,35 @@ function testFrontendShowsUnavailableRangeDiagnostics() {
   ok('Panel muestra cada rango no disponible y explica por qué fue descartado');
 }
 
+function testSavedRangesRefreshThePersistedSnapshot() {
+  const block = read(
+    'frontend/src/admin/configuracion/sections/facturacion/FactusNumberingRangesBlock.jsx'
+  );
+  const resolution = read(
+    'frontend/src/admin/configuracion/sections/facturacion/DianResolutionBlock.jsx'
+  );
+  const section = read(
+    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
+  );
+  const route = read('backend/routes/dianProviderTest.js');
+
+  assert(
+    route.includes('settings,') &&
+      block.includes("typeof onSaved === 'function' && data.settings") &&
+      block.includes('await onSaved(data.settings)'),
+    'El guardado de rangos no entrega al formulario la configuración confirmada por el backend.'
+  );
+  assert(
+    resolution.includes('onSaved={onSaved}') &&
+      section.includes('handleNumberingRangesSaved') &&
+      section.includes('onSaved={handleNumberingRangesSaved}') &&
+      section.includes('applySettings(settings)'),
+    'El asistente no actualiza su copia guardada después de persistir los rangos.'
+  );
+
+  ok('Guardar rangos actualiza la copia persistida y elimina la alerta falsa de cambios');
+}
+
 function testCreditNoteRangeCreationIsAudited() {
   const permissionMap = read('backend/security/adminRoutePermissionMap.js');
   const routeIndex = permissionMap.indexOf(
@@ -542,6 +571,7 @@ function main() {
     testHiddenFingerprintsAreSelectedExplicitly,
     testFrontendHasNoManualFiscalRangeFields,
     testFrontendShowsUnavailableRangeDiagnostics,
+    testSavedRangesRefreshThePersistedSnapshot,
     testCreditNoteRangeCreationIsAudited,
     testEmissionUsesStoredSelections,
     testRegistration,

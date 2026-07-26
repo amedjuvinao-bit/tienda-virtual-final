@@ -273,6 +273,7 @@ export default function FactusNumberingRangesBlock({
   value = {},
   billing = {},
   onChange,
+  onSaved,
   onActivated,
 }) {
   const [loading, setLoading] = useState(false);
@@ -479,7 +480,9 @@ export default function FactusNumberingRangesBlock({
         billing,
       });
 
-      if (typeof onChange === 'function' && data.dianResolution) {
+      if (typeof onSaved === 'function' && data.settings) {
+        await onSaved(data.settings);
+      } else if (typeof onChange === 'function' && data.dianResolution) {
         onChange(data.dianResolution);
       }
       setSelectionSaved(true);
