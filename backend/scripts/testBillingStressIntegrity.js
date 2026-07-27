@@ -18,11 +18,16 @@ process.env.BILLING_ENCRYPTION_KEY =
 const mongoose = require('mongoose');
 
 const ProductionElectronicInvoice = require('../models/ElectronicInvoice');
+const ProductionBillingInvoiceRecoveryTask = require('../models/BillingInvoiceRecoveryTask');
 const ProductionOrder = require('../models/Order');
 const ProductionSiteSettings = require('../models/SiteSettings');
 const {
   createElectronicInvoiceIssuanceService,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  INVOICE_LOCK_MS,
+  createBillingInvoiceRecoveryService,
+} = require('../services/billingInvoiceRecoveryService');
 
 const ORDER_COUNT = 500;
 const REQUESTS_PER_ORDER = 8;
@@ -125,7 +130,9 @@ function expectedInitialErrorCode(scenario) {
 
 function expectedStatus(scenario, stage) {
   if (!BILLABLE_SCENARIOS.has(scenario)) return null;
-  if (scenario === 'post_provider_crash') return 'processing';
+  if (scenario === 'post_provider_crash' && stage !== 'recovered') {
+    return 'processing';
+  }
   if (stage === 'initial' && RETRYABLE_PROVIDER_SCENARIOS.has(scenario)) {
     return 'failed';
   }
@@ -506,11 +513,25 @@ function compileIsolatedModels(connection) {
     ProductionSiteSettings.schema.clone(),
     ProductionSiteSettings.collection.name
   );
+  const BillingInvoiceRecoveryTask = connection.model(
+    'BillingInvoiceRecoveryTask',
+    ProductionBillingInvoiceRecoveryTask.schema.clone(),
+    ProductionBillingInvoiceRecoveryTask.collection.name
+  );
 
-  return { Order, ElectronicInvoice, SiteSettings };
+  return {
+    Order,
+    ElectronicInvoice,
+    SiteSettings,
+    BillingInvoiceRecoveryTask,
+  };
 }
 
-function createProviderSimulator({ scenarioByOrderId, metrics }) {
+function createProviderSimulator({
+  scenarioByOrderId,
+  metrics,
+  remoteDocumentsByReference,
+}) {
   return async ({ provider, invoiceData } = {}) => {
     assert(provider === 'factus', `Proveedor inesperado: ${provider}.`);
     const order = invoiceData?.order || {};
@@ -572,6 +593,19 @@ function createProviderSimulator({ scenarioByOrderId, metrics }) {
       .createHash('sha256')
       .update(`official-stress-cufe:${orderId}`)
       .digest('hex');
+    const remoteDocument = {
+      id: Number(String(order.orderNumber || '').replace(/\D/g, '')),
+      reference_code: order.orderNumber,
+      number,
+      cufe,
+      is_validated: true,
+      validated_at: new Date().toISOString(),
+      links: {
+        pdf_url: `https://simulator.invalid/${number}.pdf`,
+        xml_url: `https://simulator.invalid/${number}.xml`,
+      },
+    };
+    remoteDocumentsByReference.set(order.orderNumber, remoteDocument);
 
     return {
       success: true,
@@ -580,15 +614,7 @@ function createProviderSimulator({ scenarioByOrderId, metrics }) {
         status: 'Created',
         message: 'Documento validado por el simulador de choque.',
         data: {
-          reference_code: order.orderNumber,
-          number,
-          cufe,
-          is_validated: true,
-          validated_at: new Date().toISOString(),
-          links: {
-            pdf_url: `https://simulator.invalid/${number}.pdf`,
-            xml_url: `https://simulator.invalid/${number}.xml`,
-          },
+          ...remoteDocument,
           access_token: 'stress-token-must-not-persist',
           nested: {
             client_secret: 'stress-client-secret-must-not-persist',
@@ -596,6 +622,33 @@ function createProviderSimulator({ scenarioByOrderId, metrics }) {
           },
         },
       },
+    };
+  };
+}
+
+function createRecoveryLookupSimulator({
+  metrics,
+  remoteDocumentsByReference,
+}) {
+  return async ({ settings, referenceCode } = {}) => {
+    assert(
+      settings?.billing?.electronicProvider?.provider === 'factus',
+      'La conciliación no cargó la configuración aislada de Factus.'
+    );
+
+    const normalizedReference = String(referenceCode || '').trim();
+    metrics.recoveryLookupCalls += 1;
+    metrics.recoveryLookupCallsByReference.set(
+      normalizedReference,
+      Number(metrics.recoveryLookupCallsByReference.get(normalizedReference) || 0) + 1
+    );
+    await delay(10);
+
+    const document = remoteDocumentsByReference.get(normalizedReference) || null;
+    return {
+      success: true,
+      found: Boolean(document),
+      document,
     };
   };
 }
@@ -1009,6 +1062,22 @@ async function auditDatabaseIntegrity({
       }
     }
 
+    if (scenario === 'post_provider_crash' && stage === 'recovered') {
+      if (
+        !invoice.pdfUrl ||
+        !invoice.xmlUrl ||
+        invoice?.dianResponse?.stage !== 'provider_reconciled_validated' ||
+        invoice?.provider?.raw?.recoveredBy !== 'recovery-worker'
+      ) {
+        findings.push({
+          code: 'RECOVERY_OFFICIAL_DATA_INCOMPLETE',
+          detail:
+            `${order.orderNumber} fue conciliada sin número, CUFE, PDF, XML ` +
+            'o trazabilidad completa del worker.',
+        });
+      }
+    }
+
     if (invoice.status === 'failed') {
       if (
         invoice?.emission?.state !== 'failed' ||
@@ -1151,6 +1220,112 @@ async function verifyMongoUniqueConstraint(ElectronicInvoice) {
   );
 }
 
+async function auditRecoveryTasks({
+  BillingInvoiceRecoveryTask,
+  ElectronicInvoice,
+  metrics,
+  providerCallsBeforeRecovery,
+}) {
+  const findings = [];
+  const [tasks, recoveredInvoices] = await Promise.all([
+    BillingInvoiceRecoveryTask.find().sort({ createdAt: 1 }).lean(),
+    ElectronicInvoice.find({
+      'provider.raw.recoveredBy': 'recovery-worker',
+    }).lean(),
+  ]);
+
+  if (tasks.length !== 10) {
+    findings.push({
+      code: 'RECOVERY_TASK_COUNT',
+      detail: `MongoDB contiene ${tasks.length} tareas de conciliación; se esperaban 10.`,
+    });
+  }
+  if (recoveredInvoices.length !== 10) {
+    findings.push({
+      code: 'RECOVERED_INVOICE_COUNT',
+      detail:
+        `MongoDB contiene ${recoveredInvoices.length} facturas recuperadas; ` +
+        'se esperaban 10.',
+    });
+  }
+  if (metrics.providerCalls !== providerCallsBeforeRecovery) {
+    findings.push({
+      code: 'RECOVERY_REISSUED_INVOICE',
+      detail:
+        `La conciliación aumentó las emisiones de ${providerCallsBeforeRecovery} ` +
+        `a ${metrics.providerCalls}.`,
+    });
+  }
+  if (metrics.recoveryLookupCalls !== 10) {
+    findings.push({
+      code: 'RECOVERY_LOOKUP_COUNT',
+      detail:
+        `La conciliación consultó ${metrics.recoveryLookupCalls} referencias; ` +
+        'se esperaban exactamente 10.',
+    });
+  }
+
+  const invoicesById = new Map(
+    recoveredInvoices.map((invoice) => [String(invoice._id), invoice])
+  );
+  for (const task of tasks) {
+    const invoice = invoicesById.get(String(task.invoiceId));
+    const referenceCode = String(task.referenceCode || '');
+    const lookupCalls = Number(
+      metrics.recoveryLookupCallsByReference.get(referenceCode) || 0
+    );
+
+    if (
+      task.status !== 'resolved' ||
+      Number(task.attempts || 0) !== 1 ||
+      !task.resolvedAt ||
+      !task.providerNumber ||
+      !task.providerCufe
+    ) {
+      findings.push({
+        code: 'RECOVERY_TASK_NOT_RESOLVED',
+        detail:
+          `${referenceCode || task._id} no terminó resuelta en un solo intento ` +
+          'con número y CUFE oficiales.',
+      });
+    }
+    if (lookupCalls !== 1) {
+      findings.push({
+        code: 'RECOVERY_REFERENCE_LOOKUP_REPEATED',
+        detail:
+          `${referenceCode || task._id} fue consultada ${lookupCalls} veces; ` +
+          'se esperaba una sola consulta exacta.',
+      });
+    }
+    if (
+      !invoice ||
+      invoice.status !== 'accepted' ||
+      invoice.invoiceNumber !== task.providerNumber ||
+      invoice.cufe !== task.providerCufe ||
+      !invoice.pdfUrl ||
+      !invoice.xmlUrl
+    ) {
+      findings.push({
+        code: 'RECOVERY_TASK_INVOICE_MISMATCH',
+        detail:
+          `${referenceCode || task._id} no coincide con una factura aceptada ` +
+          'que conserve número, CUFE, PDF y XML.',
+      });
+    }
+  }
+
+  return {
+    findings,
+    summary: {
+      tasks: tasks.length,
+      resolved: tasks.filter((task) => task.status === 'resolved').length,
+      recoveredInvoices: recoveredInvoices.length,
+      lookups: metrics.recoveryLookupCalls,
+      reissued: metrics.providerCalls - providerCallsBeforeRecovery,
+    },
+  };
+}
+
 async function proveAuditorDetectsCorruption({
   ElectronicInvoice,
   audit,
@@ -1226,10 +1401,13 @@ async function runStressTest() {
   const metrics = {
     providerCalls: 0,
     providerCallsByOrder: new Map(),
+    recoveryLookupCalls: 0,
+    recoveryLookupCallsByReference: new Map(),
     emailCalls: 0,
     emailFailures: 0,
     crashedInvoiceIds: new Set(),
   };
+  const remoteDocumentsByReference = new Map();
   let connection = null;
   let primaryError = null;
   let cleanupError = null;
@@ -1266,6 +1444,7 @@ async function runStressTest() {
       models.Order.init(),
       models.ElectronicInvoice.init(),
       models.SiteSettings.init(),
+      models.BillingInvoiceRecoveryTask.init(),
     ]);
     await models.SiteSettings.create(buildBillingSettings());
 
@@ -1286,6 +1465,7 @@ async function runStressTest() {
     const provider = createProviderSimulator({
       scenarioByOrderId,
       metrics,
+      remoteDocumentsByReference,
     });
     const invoiceModel = createCrashAwareInvoiceModel({
       ElectronicInvoice: models.ElectronicInvoice,
@@ -1372,7 +1552,74 @@ async function runStressTest() {
     );
     await verifyMongoUniqueConstraint(models.ElectronicInvoice);
 
-    console.log('\nETAPA 3 — autoprueba del auditor con corrupción controlada');
+    console.log('\nETAPA 3 — conciliación de resultados inciertos sin reemisión');
+    const providerCallsBeforeRecovery = metrics.providerCalls;
+    const recoveryNow = new Date(Date.now() + INVOICE_LOCK_MS + 1_000);
+    const recoveryService = createBillingInvoiceRecoveryService({
+      ElectronicInvoice: models.ElectronicInvoice,
+      BillingInvoiceRecoveryTask: models.BillingInvoiceRecoveryTask,
+      SiteSettings: models.SiteSettings,
+      findInvoiceByReferenceFromFactus: createRecoveryLookupSimulator({
+        metrics,
+        remoteDocumentsByReference,
+      }),
+      now: () => new Date(recoveryNow),
+    });
+
+    const scheduled = await recoveryService.scanStaleProcessingInvoices({
+      limit: 25,
+    });
+    assert(
+      scheduled.scanned === 10 && scheduled.scheduled === 10,
+      `El scanner encontró ${scheduled.scanned} y programó ${scheduled.scheduled}; ` +
+        'se esperaban exactamente 10 documentos inciertos.',
+      'BILLING_STRESS_RECOVERY_SCHEDULING_FAILED'
+    );
+
+    const recoverySummary =
+      await recoveryService.processPendingInvoiceRecoveries({ limit: 10 });
+    assert(
+      recoverySummary.processed === 10 &&
+        recoverySummary.resolved === 10 &&
+        recoverySummary.pending === 0 &&
+        recoverySummary.failed === 0,
+      `El worker produjo ${JSON.stringify(recoverySummary)}; ` +
+        'se esperaban 10 conciliaciones resueltas.',
+      'BILLING_STRESS_RECOVERY_WORKER_FAILED'
+    );
+
+    const drainedRecoverySummary =
+      await recoveryService.processPendingInvoiceRecoveries({ limit: 10 });
+    assert(
+      drainedRecoverySummary.processed === 0,
+      `El worker volvió a procesar ${drainedRecoverySummary.processed} tareas ya resueltas.`,
+      'BILLING_STRESS_RECOVERY_REPLAYED_RESOLVED_TASK'
+    );
+
+    const recoveredAudit = await auditDatabaseIntegrity({
+      ...models,
+      metrics,
+      scenarioByOrderId,
+      stage: 'recovered',
+    });
+    printStageSummary('AUDITORÍA DESPUÉS DE LA CONCILIACIÓN', recoveredAudit);
+    assertNoFindings('Auditoría posterior a conciliación', recoveredAudit.findings);
+
+    const recoveryAudit = await auditRecoveryTasks({
+      ...models,
+      metrics,
+      providerCallsBeforeRecovery,
+    });
+    assertNoFindings(
+      'Auditoría de tareas de conciliación',
+      recoveryAudit.findings
+    );
+    console.log(`  Tareas resueltas: ${recoveryAudit.summary.resolved}`);
+    console.log(`  Facturas recuperadas: ${recoveryAudit.summary.recoveredInvoices}`);
+    console.log(`  Consultas exactas al simulador: ${recoveryAudit.summary.lookups}`);
+    console.log(`  Facturas reemitidas: ${recoveryAudit.summary.reissued}`);
+
+    console.log('\nETAPA 4 — autoprueba del auditor con corrupción controlada');
     const corruptionFindings = await proveAuditorDetectsCorruption({
       ElectronicInvoice: models.ElectronicInvoice,
       audit: () =>
@@ -1380,7 +1627,7 @@ async function runStressTest() {
           ...models,
           metrics,
           scenarioByOrderId,
-          stage: 'final',
+          stage: 'recovered',
         }),
     });
     console.log(
@@ -1392,7 +1639,7 @@ async function runStressTest() {
       ...models,
       metrics,
       scenarioByOrderId,
-      stage: 'final',
+      stage: 'recovered',
     });
     assertNoFindings(
       'Auditoría después de restaurar la corrupción',
@@ -1416,6 +1663,8 @@ async function runStressTest() {
     );
     console.log(`  Fallos SMTP simulados y aislados: ${metrics.emailFailures}`);
     console.log(`  Cortes posproveedor bloqueados: ${metrics.crashedInvoiceIds.size}`);
+    console.log(`  Documentos inciertos recuperados: ${metrics.recoveryLookupCalls}`);
+    console.log('  Reemisiones durante conciliación: 0');
     completedSuccessfully = true;
   } catch (error) {
     primaryError = error;
@@ -1450,7 +1699,7 @@ async function runStressTest() {
   assert(completedSuccessfully, 'La prueba terminó sin producir un dictamen.');
   console.log('\nDICTAMEN: APROBADO');
   console.log(
-    'El motor mantuvo idempotencia, integridad económica, aislamiento fiscal y detección de corrupción.'
+    'El motor mantuvo idempotencia, integridad económica, recuperación sin reemisión, aislamiento fiscal y detección de corrupción.'
   );
 }
 
