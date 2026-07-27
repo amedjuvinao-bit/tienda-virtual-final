@@ -217,6 +217,31 @@ describe('FacturacionSection', () => {
         'Revisión final completada. La configuración de facturación quedó guardada.'
       )
     ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Configuración finalizada correctamente.'
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Todos los datos fueron validados y guardados.'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Configuración finalizada ✓' })
+    ).toBeInTheDocument();
     expect(api.put).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole('button', { name: '6. Textos legales' })
+    );
+    await user.type(
+      screen.getByLabelText('Texto legal para factura'),
+      ' actualizado'
+    );
+    await user.click(
+      screen.getByRole('button', { name: '7. Resumen' })
+    );
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Finalizar configuración' })
+    ).toBeInTheDocument();
   });
 });
