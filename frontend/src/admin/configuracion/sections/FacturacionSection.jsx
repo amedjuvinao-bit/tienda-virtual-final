@@ -367,6 +367,7 @@ export default function FacturacionSection() {
   const [connectionFeedback, setConnectionFeedback] = useState(null);
   const [connectionChanged, setConnectionChanged] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
+  const [configurationFinalized, setConfigurationFinalized] = useState(false);
   const [billingRevision, setBillingRevision] = useState(0);
   const savedBillingSnapshotRef = useRef(JSON.stringify(EMPTY_BILLING));
   const [history, setHistory] = useState([]);
@@ -378,6 +379,7 @@ export default function FacturacionSection() {
   const [restoreCandidate, setRestoreCandidate] = useState('');
 
   const applySettings = (data = {}) => {
+    setConfigurationFinalized(false);
     setCredentialStatus(data?._credentialStatus || {});
     setReadiness(data?._billingReadiness || null);
 
@@ -482,6 +484,7 @@ export default function FacturacionSection() {
   }, [hasUnsavedChanges]);
 
   const markFormChanged = () => {
+    setConfigurationFinalized(false);
     setSaveFeedback(null);
   };
 
@@ -886,6 +889,7 @@ export default function FacturacionSection() {
         'Revisión final completada. La configuración de facturación quedó guardada.',
       details: [],
     });
+    setConfigurationFinalized(true);
   };
 
   if (loading) {
@@ -1343,17 +1347,36 @@ export default function FacturacionSection() {
                   {saving ? 'Validando y guardando...' : 'Siguiente'}
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleFinish}
-                  disabled={saving || testingConnection}
-                  className="rounded-xl border px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                  style={billingPrimaryButtonStyle}
-                >
-                  {saving
-                    ? 'Validando y guardando...'
-                    : 'Finalizar configuración'}
-                </button>
+                <>
+                  {configurationFinalized ? (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="max-w-xl rounded-xl border px-4 py-3 text-sm"
+                      style={billingMessageStyle('success')}
+                    >
+                      <strong className="block">
+                        Configuración finalizada correctamente.
+                      </strong>
+                      <span>
+                        Todos los datos fueron validados y guardados.
+                      </span>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleFinish}
+                    disabled={saving || testingConnection}
+                    className="rounded-xl border px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                    style={billingPrimaryButtonStyle}
+                  >
+                    {saving
+                      ? 'Validando y guardando...'
+                      : configurationFinalized
+                        ? 'Configuración finalizada ✓'
+                        : 'Finalizar configuración'}
+                  </button>
+                </>
               )}
             </div>
           </div>
