@@ -240,45 +240,37 @@ function testSuccessfulSaveClearsUnsavedChanges() {
 
   assert(
     frontend.includes(
-      'const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)'
+      'const savedBillingSnapshotRef = useRef(JSON.stringify(EMPTY_BILLING))'
     ),
-    'El formulario no conserva un estado explícito de cambios pendientes.'
+    'El formulario no conserva la referencia de la configuración confirmada.'
   );
   assert(
-    !frontend.includes('savedSnapshot'),
-    'El formulario todavía depende de una instantánea que puede quedar desactualizada.'
+    frontend.includes(
+      'JSON.stringify(billing) !== savedBillingSnapshotRef.current'
+    ),
+    'El aviso no se calcula contra la última configuración confirmada.'
   );
   assert(
-    applySettingsBlock.includes('setHasUnsavedChanges(false)'),
-    'Aplicar la respuesta confirmada por el backend no limpia el estado pendiente.'
+    applySettingsBlock.includes(
+      'savedBillingSnapshotRef.current = JSON.stringify(nextBilling)'
+    ),
+    'Aplicar la respuesta del backend no actualiza la referencia guardada.'
   );
   assert(
     frontend.includes('const markFormChanged') &&
-      frontend.includes('setHasUnsavedChanges(true)'),
-    'Editar el formulario no activa el estado pendiente.'
+      !frontend.includes('setHasUnsavedChanges('),
+    'El aviso todavía depende de activaciones manuales que pueden quedar desincronizadas.'
   );
   assert(
     handleSaveBlock.includes('applySettings(data)'),
     'Guardar no aplica la configuración confirmada por el backend.'
   );
-
-  const applySettingsIndex = handleSaveBlock.indexOf('applySettings(data)');
-  const loadHistoryIndex = handleSaveBlock.indexOf(
-    'await loadHistory()',
-    applySettingsIndex
-  );
-  const finalCleanIndex = handleSaveBlock.indexOf(
-    'setHasUnsavedChanges(false)',
-    loadHistoryIndex
-  );
   assert(
-    applySettingsIndex >= 0 &&
-      loadHistoryIndex > applySettingsIndex &&
-      finalCleanIndex > loadHistoryIndex,
-    'El aviso se limpia antes de terminar la recarga posterior al guardado.'
+    !handleSaveBlock.includes('setHasUnsavedChanges(false)'),
+    'Guardar todavía fuerza el aviso sin sincronizar la referencia persistida.'
   );
 
-  ok('Editar activa el aviso y guardar correctamente lo elimina al final');
+  ok('El aviso compara el borrador con la respuesta realmente guardada');
 }
 
 function testPanelThemeAndSupportedOptions() {
