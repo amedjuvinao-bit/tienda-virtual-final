@@ -122,6 +122,7 @@ router.get(
     try {
       await ensureStoredFiscalInfoCompatibility();
       const settings = await getAdminSettingsWithBillingReadiness();
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       return res.json(settings);
     } catch (error) {
       return sendConfigurationError(res, error);
@@ -219,6 +220,7 @@ router.put('/', (req, res, next) => {
         await reconcileNumberingRangeSnapshot(rangeSnapshot);
         const settings = await getAdminSettingsWithBillingReadiness();
 
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         return res.json(settings);
       } catch (error) {
         return sendConfigurationError(res, error);
