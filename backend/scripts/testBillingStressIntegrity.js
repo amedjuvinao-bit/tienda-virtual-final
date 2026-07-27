@@ -59,6 +59,8 @@ const RETRYABLE_PROVIDER_SCENARIOS = new Set([
   'provider_incomplete',
   'provider_network_error',
 ]);
+const PRE_RECOVERY_STAGES = new Set(['initial', 'final']);
+const POST_RETRY_STAGES = new Set(['final', 'recovered']);
 const BILLABLE_SCENARIOS = new Set(
   SCENARIOS.filter((item) => item.billable).map((item) => item.key)
 );
@@ -130,7 +132,10 @@ function expectedInitialErrorCode(scenario) {
 
 function expectedStatus(scenario, stage) {
   if (!BILLABLE_SCENARIOS.has(scenario)) return null;
-  if (scenario === 'post_provider_crash' && stage !== 'recovered') {
+  if (
+    scenario === 'post_provider_crash' &&
+    PRE_RECOVERY_STAGES.has(stage)
+  ) {
     return 'processing';
   }
   if (stage === 'initial' && RETRYABLE_PROVIDER_SCENARIOS.has(scenario)) {
@@ -141,7 +146,10 @@ function expectedStatus(scenario, stage) {
 
 function expectedAttempts(scenario, stage) {
   if (!BILLABLE_SCENARIOS.has(scenario)) return 0;
-  if (stage === 'final' && RETRYABLE_PROVIDER_SCENARIOS.has(scenario)) {
+  if (
+    POST_RETRY_STAGES.has(stage) &&
+    RETRYABLE_PROVIDER_SCENARIOS.has(scenario)
+  ) {
     return 2;
   }
   return 1;
@@ -149,7 +157,10 @@ function expectedAttempts(scenario, stage) {
 
 function expectedProviderCalls(scenario, stage) {
   if (!BILLABLE_SCENARIOS.has(scenario)) return 0;
-  if (stage === 'final' && RETRYABLE_PROVIDER_SCENARIOS.has(scenario)) {
+  if (
+    POST_RETRY_STAGES.has(stage) &&
+    RETRYABLE_PROVIDER_SCENARIOS.has(scenario)
+  ) {
     return 2;
   }
   return 1;
@@ -430,6 +441,21 @@ function validatePlan() {
   assert(INITIAL_REQUEST_COUNT === 4_000, 'El choque inicial no suma 4.000 solicitudes.');
   assert(billableOrders === 400, 'El plan debe contener 400 órdenes facturables.');
   assert(retryableOrders === 50, 'El plan debe contener 50 fallos reintentables.');
+  assert(
+    expectedAttempts('provider_rejected', 'final') === 2 &&
+      expectedAttempts('provider_rejected', 'recovered') === 2,
+    'El auditor perdió los dos intentos después de la conciliación.'
+  );
+  assert(
+    expectedProviderCalls('provider_rejected', 'final') === 2 &&
+      expectedProviderCalls('provider_rejected', 'recovered') === 2,
+    'El auditor perdió las dos llamadas al proveedor después de la conciliación.'
+  );
+  assert(
+    expectedStatus('post_provider_crash', 'final') === 'processing' &&
+      expectedStatus('post_provider_crash', 'recovered') === 'accepted',
+    'El auditor no reconoce la transición de resultado incierto a factura aceptada.'
+  );
 
   const payloads = Array.from({ length: ORDER_COUNT }, (_, index) => {
     const scenario = scenarioForIndex(index);
@@ -1093,6 +1119,7 @@ async function auditDatabaseIntegrity({
 
     if (
       scenario === 'post_provider_crash' &&
+      PRE_RECOVERY_STAGES.has(stage) &&
       (invoice.status !== 'processing' ||
         invoice?.emission?.state !== 'processing' ||
         invoice.invoiceNumber ||
