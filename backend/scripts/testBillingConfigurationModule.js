@@ -233,10 +233,13 @@ function testSuccessfulSaveClearsUnsavedChanges() {
   );
   const applySettingsStart = frontend.indexOf('const applySettings');
   const loadHistoryStart = frontend.indexOf('const loadHistory');
-  const handleSaveStart = frontend.indexOf('const handleSave');
+  const persistBillingStart = frontend.indexOf('const persistBilling');
   const handleRestoreStart = frontend.indexOf('const handleRestoreVersion');
   const applySettingsBlock = frontend.slice(applySettingsStart, loadHistoryStart);
-  const handleSaveBlock = frontend.slice(handleSaveStart, handleRestoreStart);
+  const persistBillingBlock = frontend.slice(
+    persistBillingStart,
+    handleRestoreStart
+  );
 
   assert(
     frontend.includes(
@@ -262,22 +265,22 @@ function testSuccessfulSaveClearsUnsavedChanges() {
     'El aviso todavía depende de activaciones manuales que pueden quedar desincronizadas.'
   );
   assert(
-    handleSaveBlock.includes(
+    persistBillingBlock.includes(
       '`/api/site-settings/admin?refresh=${Date.now()}`'
     ),
-    'Guardar no vuelve a consultar el servidor para confirmar la persistencia.'
+    'Siguiente no vuelve a consultar el servidor para confirmar la persistencia.'
   );
   assert(
-    handleSaveBlock.includes('legalTextsWerePersisted('),
-    'Guardar no verifica que los textos legales hayan quedado persistidos.'
+    persistBillingBlock.includes('billingStepWasPersisted('),
+    'Siguiente no verifica que la etapa actual haya quedado persistida.'
   );
   assert(
-    handleSaveBlock.includes('applySettings(persistedSettings)'),
-    'Guardar no aplica la configuración recargada desde el servidor.'
+    persistBillingBlock.includes('applySettings(persistedSettings)'),
+    'Siguiente no aplica la configuración recargada desde el servidor.'
   );
   assert(
-    !handleSaveBlock.includes('setHasUnsavedChanges(false)'),
-    'Guardar todavía fuerza el aviso sin sincronizar la referencia persistida.'
+    !persistBillingBlock.includes('setHasUnsavedChanges(false)'),
+    'Siguiente todavía fuerza el aviso sin sincronizar la referencia persistida.'
   );
 
   ok('El aviso compara el borrador con la respuesta realmente guardada');
