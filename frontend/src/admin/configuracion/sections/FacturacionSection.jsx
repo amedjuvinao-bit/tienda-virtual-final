@@ -1,5 +1,5 @@
 // src/admin/configuracion/sections/FacturacionSection.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import InfoCard from '../components/InfoCard';
 import EmptyHint from '../components/EmptyHint';
 import api from '../../../lib/api';
@@ -81,7 +81,7 @@ export default function FacturacionSection() {
   const [connectionChanged, setConnectionChanged] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(null);
   const [billingRevision, setBillingRevision] = useState(0);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const savedBillingSnapshotRef = useRef(JSON.stringify(EMPTY_BILLING));
   const [history, setHistory] = useState([]);
   const [historyMeta, setHistoryMeta] = useState({
     updatedAt: null,
@@ -95,9 +95,9 @@ export default function FacturacionSection() {
     setReadiness(data?._billingReadiness || null);
 
     if (!data?.billing) {
+      savedBillingSnapshotRef.current = JSON.stringify(EMPTY_BILLING);
       setBilling(EMPTY_BILLING);
       setBillingRevision(Number(data?._billingRevision || 0));
-      setHasUnsavedChanges(false);
       return;
     }
 
@@ -126,9 +126,9 @@ export default function FacturacionSection() {
       taxes: data.billing.taxes || {},
     };
 
+    savedBillingSnapshotRef.current = JSON.stringify(nextBilling);
     setBilling(nextBilling);
     setBillingRevision(Number(data?._billingRevision || 0));
-    setHasUnsavedChanges(false);
 
     setConnectionFeedback(null);
     setConnectionChanged(false);
@@ -181,6 +181,8 @@ export default function FacturacionSection() {
     () => (provider === 'factus' ? 'Factus' : 'Comprobante interno'),
     [provider]
   );
+  const hasUnsavedChanges =
+    JSON.stringify(billing) !== savedBillingSnapshotRef.current;
 
   useEffect(() => {
     const warnUnsavedChanges = (event) => {
@@ -193,7 +195,6 @@ export default function FacturacionSection() {
   }, [hasUnsavedChanges]);
 
   const markFormChanged = () => {
-    setHasUnsavedChanges(true);
     setSaveFeedback(null);
   };
 
@@ -304,7 +305,6 @@ export default function FacturacionSection() {
     setReadiness(null);
     setConnectionFeedback(null);
     setConnectionChanged(true);
-    setHasUnsavedChanges(true);
     setSaveFeedback({
       type: 'warning',
       message:
@@ -430,12 +430,6 @@ export default function FacturacionSection() {
 
       applySettings(data);
       await loadHistory();
-
-      // La operación solo queda limpia cuando también terminó la recarga
-      // posterior al guardado. Así, ningún render intermedio puede dejar
-      // nuevamente activa la advertencia después de una respuesta exitosa.
-      setHasUnsavedChanges(false);
-      setConnectionChanged(false);
       setSaveFeedback({
         type: 'success',
         message: 'Configuración de facturación guardada correctamente.',
