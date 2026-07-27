@@ -50,6 +50,7 @@
     "test:billing-module": "node scripts/testBillingModuleClosure.js",
     "test:billing-stress": "node scripts/testBillingStressIntegrity.js",
     "billing:factus-live-readiness": "node scripts/factusLiveReadiness.js",
+    "billing:factus-live-transaction": "node scripts/factusLiveTransaction.js --confirm-habilitacion",
     "billing:sync:live": "node scripts/syncFactusLive.js",
     "seed:test-coupon": "node scripts/seedTestCoupon.js",
     "seed:universal-products": "node scripts/seedUniversalProducts.js",
