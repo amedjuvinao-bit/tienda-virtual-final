@@ -68,6 +68,22 @@ function getApiError(error, fallback) {
   };
 }
 
+function normalizePersistedLegalText(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 2000);
+}
+
+function legalTextsWerePersisted(requested = {}, persisted = {}) {
+  return (
+    normalizePersistedLegalText(requested.invoiceLegalText) ===
+      normalizePersistedLegalText(persisted.invoiceLegalText) &&
+    normalizePersistedLegalText(requested.internalReceiptNote) ===
+      normalizePersistedLegalText(persisted.internalReceiptNote)
+  );
+}
+
 export default function FacturacionSection() {
   const [billing, setBilling] = useState(EMPTY_BILLING);
   const [currentStep, setCurrentStep] = useState(0);
@@ -410,25 +426,42 @@ export default function FacturacionSection() {
     try {
       setSaving(true);
       setSaveFeedback(null);
-      const { data } = await api.put('/api/site-settings', {
-        billingRevision,
-        billing: {
-          ...billing,
-          dian: {
-            ...(billing.dian || {}),
-            enabled: mode !== 'internal',
-            mode,
-            environment: mode === 'production' ? '1' : '2',
-          },
-          electronicProvider: {
-            ...(billing.electronicProvider || {}),
-            provider: mode === 'internal' ? 'mock' : 'factus',
-            apiUrl: mode === 'internal' ? '' : FACTUS_API_URLS[mode],
-          },
+      const requestedBilling = {
+        ...billing,
+        dian: {
+          ...(billing.dian || {}),
+          enabled: mode !== 'internal',
+          mode,
+          environment: mode === 'production' ? '1' : '2',
         },
+        electronicProvider: {
+          ...(billing.electronicProvider || {}),
+          provider: mode === 'internal' ? 'mock' : 'factus',
+          apiUrl: mode === 'internal' ? '' : FACTUS_API_URLS[mode],
+        },
+      };
+
+      await api.put('/api/site-settings', {
+        billingRevision,
+        billing: requestedBilling,
       });
 
-      applySettings(data);
+      const { data: persistedSettings } = await api.get(
+        `/api/site-settings/admin?refresh=${Date.now()}`
+      );
+
+      if (
+        !legalTextsWerePersisted(
+          requestedBilling.legalTexts,
+          persistedSettings?.billing?.legalTexts
+        )
+      ) {
+        throw new Error(
+          'El servidor respondió al guardado, pero no confirmó los textos legales. Los cambios siguen pendientes.'
+        );
+      }
+
+      applySettings(persistedSettings);
       await loadHistory();
       setSaveFeedback({
         type: 'success',
@@ -910,7 +943,7 @@ export default function FacturacionSection() {
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <button
               type="button"
               onClick={goPrev}
@@ -920,16 +953,7 @@ export default function FacturacionSection() {
             >
               Anterior
             </button>
-            {currentStep < STEPS.length - 1 ? (
-              <button
-                type="button"
-                onClick={goNext}
-                className="rounded-xl border px-5 py-2.5 text-sm font-semibold"
-                style={billingPrimaryButtonStyle}
-              >
-                Siguiente
-              </button>
-            ) : (
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={handleSave}
@@ -939,9 +963,23 @@ export default function FacturacionSection() {
                 className="rounded-xl border px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 style={billingPrimaryButtonStyle}
               >
-                {saving ? 'Guardando...' : 'Guardar configuración'}
+                {saving
+                  ? 'Guardando...'
+                  : currentStep < STEPS.length - 1
+                    ? 'Guardar cambios'
+                    : 'Guardar configuración'}
               </button>
-            )}
+              {currentStep < STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                className="rounded-xl border px-5 py-2.5 text-sm font-semibold"
+                style={billingSecondaryButtonStyle}
+              >
+                Siguiente
+              </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </InfoCard>
