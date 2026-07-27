@@ -262,8 +262,18 @@ function testSuccessfulSaveClearsUnsavedChanges() {
     'El aviso todavía depende de activaciones manuales que pueden quedar desincronizadas.'
   );
   assert(
-    handleSaveBlock.includes('applySettings(data)'),
-    'Guardar no aplica la configuración confirmada por el backend.'
+    handleSaveBlock.includes(
+      '`/api/site-settings/admin?refresh=${Date.now()}`'
+    ),
+    'Guardar no vuelve a consultar el servidor para confirmar la persistencia.'
+  );
+  assert(
+    handleSaveBlock.includes('legalTextsWerePersisted('),
+    'Guardar no verifica que los textos legales hayan quedado persistidos.'
+  );
+  assert(
+    handleSaveBlock.includes('applySettings(persistedSettings)'),
+    'Guardar no aplica la configuración recargada desde el servidor.'
   );
   assert(
     !handleSaveBlock.includes('setHasUnsavedChanges(false)'),
@@ -271,6 +281,46 @@ function testSuccessfulSaveClearsUnsavedChanges() {
   );
 
   ok('El aviso compara el borrador con la respuesta realmente guardada');
+}
+
+function testLegalTextsPersistAcrossUpdates() {
+  const first = prepareBillingConfigurationForStorage(
+    validBilling({
+      legalTexts: {
+        invoiceLegalText: 'Texto legal anterior',
+        internalReceiptNote: 'Nota interna anterior',
+      },
+    }),
+    {}
+  );
+  const updated = prepareBillingConfigurationForStorage(
+    validBilling({
+      legalTexts: {
+        invoiceLegalText: 'Texto legal actualizado',
+        internalReceiptNote: 'Nota interna actualizada',
+      },
+    }),
+    first
+  );
+
+  assert(
+    updated.legalTexts.invoiceLegalText === 'Texto legal actualizado',
+    'El backend conservó el texto legal anterior.'
+  );
+  assert(
+    updated.legalTexts.internalReceiptNote === 'Nota interna actualizada',
+    'El backend conservó la nota interna anterior.'
+  );
+
+  const route = read('backend/routes/billingSettingsProtection.js');
+  assert(
+    route.includes(
+      "res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')"
+    ),
+    'La lectura administrativa permite reutilizar una respuesta anterior.'
+  );
+
+  ok('Los textos legales se actualizan y la recarga exige datos frescos');
 }
 
 function testPanelThemeAndSupportedOptions() {
@@ -345,6 +395,7 @@ function main() {
     testCredentialRotationAndRevocation,
     testConcurrencyAndHistory,
     testSuccessfulSaveClearsUnsavedChanges,
+    testLegalTextsPersistAcrossUpdates,
     testPanelThemeAndSupportedOptions,
     testDedicatedRouteAndPermissions,
     testRealConnectionAndRuntime,
