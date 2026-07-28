@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -148,7 +149,7 @@ function validateSyncIdentity() {
 
 function validateFrontend() {
   const api = read('frontend/src/admin/billing/api/adminBillingApi.js');
-  const page = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const page = readBillingFrontendSource();
   const modal = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
   includes(api, 'createBillingCreditNote', 'Creación no usa API unificada.');
   includes(api, 'downloadBillingCreditNotePdf', 'Falta descarga PDF.');
