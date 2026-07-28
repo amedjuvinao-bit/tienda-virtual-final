@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -43,7 +44,7 @@ function assertNotIncludes(content, expected, message) {
 }
 
 function validateSummaryFrontend() {
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
 
   [
     'BillingSummaryPanel',
