@@ -87,12 +87,9 @@ function buildRunId() {
 }
 
 function safeSettingsCopy(settings) {
-  const copy = clone(settings);
-  delete copy._id;
-  delete copy.__v;
-  delete copy.createdAt;
-  delete copy.updatedAt;
-  return copy;
+  return {
+    billing: clone(settings?.billing || {}),
+  };
 }
 
 function assertHabilitationSafety(settings) {
