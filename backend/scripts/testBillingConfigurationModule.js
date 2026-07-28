@@ -6,6 +6,9 @@ const path = require('path');
 const {
   readBillingConfigurationFrontendSource,
 } = require('./lib/readBillingConfigurationFrontendSource');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 process.env.BILLING_ENCRYPTION_KEY =
   process.env.BILLING_ENCRYPTION_KEY ||
@@ -203,7 +206,7 @@ function testCredentialRotationAndRevocation() {
   assert(cleared.electronicProvider.numberingRangeId === 0, 'Rango sobrevivió a la revocación.');
   assert(cleared.dianResolution.technicalKey === '', 'Clave técnica sobrevivió a la revocación.');
 
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
   assert(provider.includes('clearFactusTokenCache'), 'No existe invalidación explícita del token.');
   assert(provider.includes('credentials.clientSecret'), 'La caché no depende del Client Secret.');
   assert(provider.includes('credentials.password'), 'La caché no depende de la contraseña.');

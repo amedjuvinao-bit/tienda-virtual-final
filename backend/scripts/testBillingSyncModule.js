@@ -8,6 +8,9 @@ const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource')
 const {
   readElectronicInvoiceModalFrontendSource,
 } = require('./lib/readElectronicInvoiceModalFrontendSource');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -48,7 +51,7 @@ function assertNotIncludes(content, expected, message) {
 
 function validateBackendSyncService() {
   const serviceFile = read('backend/services/adminBillingSyncService.js');
-  const providerFile = read('backend/lib/dian/providers/factusProvider.js');
+  const providerFile = readFactusProviderSource();
   const modelFile = read('backend/models/ElectronicInvoice.js');
 
   [

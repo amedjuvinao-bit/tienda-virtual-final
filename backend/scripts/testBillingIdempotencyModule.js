@@ -3,6 +3,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 const {
   createElectronicInvoiceIssuanceService,
@@ -339,7 +342,7 @@ function validateUnifiedEntryPoints() {
 
 function validateFailureLifecycle() {
   const service = read('backend/services/electronicInvoiceIssuanceService.js');
-  const factusProvider = read('backend/lib/dian/providers/factusProvider.js');
+  const factusProvider = readFactusProviderSource();
   assert(service.includes("status: 'failed'"), 'Los errores del proveedor deben quedar en failed.');
   assert(service.includes("'emission.state': 'failed'"), 'La reserva debe registrar que el intento falló.');
   assert(service.includes('providerErrors'), 'Deben conservarse los errores estructurados del proveedor.');

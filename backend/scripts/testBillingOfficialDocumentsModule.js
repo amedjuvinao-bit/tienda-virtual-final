@@ -5,6 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -152,7 +155,7 @@ async function validateFactusDownloads() {
 }
 
 function validateNoEagerDownloads() {
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
 
   assertNotIncludes(
     provider,

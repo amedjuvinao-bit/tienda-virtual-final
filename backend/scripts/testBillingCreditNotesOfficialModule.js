@@ -8,6 +8,9 @@ const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource')
 const {
   readElectronicInvoiceModalFrontendSource,
 } = require('./lib/readElectronicInvoiceModalFrontendSource');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -38,7 +41,7 @@ function includes(content, expected, message) {
 }
 
 function validateOfficialPayload() {
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
   includes(provider, 'bill_id: Number(billId || 0)', 'La nota no usa bill_id oficial.');
   includes(provider, 'reference_code: trimSafe(referenceCode, 100)', 'La referencia no es estable.');
   assert(!provider.includes('bill_number: invoiceNumber'), 'No se debe relacionar con bill_number.');
@@ -107,7 +110,7 @@ function validateIdempotencyAndLock() {
 
 function validateServerSideAmounts() {
   const service = read('backend/services/electronicCreditNoteService.js');
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
   includes(service, 'normalizePartialItems(order, request.selectedItems)', 'Confía en precios enviados por el navegador.');
   includes(service, 'itemPrice(original.item)', 'El precio parcial no sale de la orden.');
   includes(service, 'BILLING_CREDIT_NOTE_QUANTITY_EXCEEDED', 'No controla cantidades ya acreditadas.');
@@ -116,7 +119,7 @@ function validateServerSideAmounts() {
 }
 
 function validateOfficialDocuments() {
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
   const service = read('backend/services/electronicCreditNoteDocumentService.js');
   const routes = read('backend/routes/adminBilling.js');
   includes(provider, "resource: 'credit-notes'", 'No usa endpoints de documentos de notas crédito.');
@@ -130,7 +133,7 @@ function validateOfficialDocuments() {
 function validateSecurityAndPermissions() {
   const routes = read('backend/routes/adminBilling.js');
   const payments = read('backend/routes/payments.js');
-  const provider = read('backend/lib/dian/providers/factusProvider.js');
+  const provider = readFactusProviderSource();
   includes(routes, "requirePermission('billing:credit_note')", 'Creación sin permiso específico.');
   includes(routes, "requirePermission('billing:download')", 'Descarga sin permiso específico.');
   includes(payments, 'createOfficialCreditNote', 'La ruta heredada no comparte el motor seguro.');

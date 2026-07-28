@@ -4,6 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const {
+  readFactusProviderSource,
+} = require('./lib/readFactusProviderSource');
 
 process.env.BILLING_ENCRYPTION_KEY =
   process.env.BILLING_ENCRYPTION_KEY ||
@@ -439,7 +442,7 @@ function testInfrastructureControls() {
   const rangeProvider = read(
     'backend/lib/dian/providers/factusRangeAwareProvider.js'
   );
-  const factus = read('backend/lib/dian/providers/factusProvider.js');
+  const factus = readFactusProviderSource();
   const route = read('backend/routes/dianProviderTest.js');
   const security = read(
     'backend/lib/billing/billingConfigurationSecurity.js'
