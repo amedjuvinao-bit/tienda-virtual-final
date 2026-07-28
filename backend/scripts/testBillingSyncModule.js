@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -264,7 +265,7 @@ function validateBackendRoutes() {
 
 function validateFrontendSync() {
   const apiFile = read('frontend/src/admin/billing/api/adminBillingApi.js');
-  const billingPageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const billingPageFile = readBillingFrontendSource();
   const invoiceModalFile = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
   const mainFile = read('frontend/src/main.jsx');
 
