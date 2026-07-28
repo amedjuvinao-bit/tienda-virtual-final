@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -39,7 +40,7 @@ function assertIncludes(content, expected, message) {
 }
 
 function validateUnifiedBillingPage() {
-  const page = readProjectFile('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const page = readBillingFrontendSource();
 
   [
     'FacturacionSection',
