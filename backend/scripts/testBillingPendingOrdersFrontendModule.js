@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -52,7 +53,7 @@ function validateFrontendApi() {
 }
 
 function validatePendingOrdersPage() {
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
 
   [
     'BillingPendingOrdersPanel',
