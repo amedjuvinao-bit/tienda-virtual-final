@@ -3,6 +3,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readBillingConfigurationFrontendSource,
+} = require('./lib/readBillingConfigurationFrontendSource');
 
 process.env.BILLING_ENCRYPTION_KEY =
   process.env.BILLING_ENCRYPTION_KEY ||
@@ -229,9 +232,7 @@ function testOfficialFactusFlowAndRateLimit() {
 }
 
 function testFrontendUsesRealConnectionState() {
-  const section = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const section = readBillingConfigurationFrontendSource();
   const provider = read(
     'frontend/src/admin/configuracion/sections/facturacion/ElectronicProviderBlock.jsx'
   );
