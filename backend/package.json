@@ -47,6 +47,7 @@
     "test:billing-email-documents": "node scripts/testBillingEmailDocumentsModule.js",
     "test:billing-credit-notes-official": "node scripts/testBillingCreditNotesOfficialModule.js",
     "test:billing-reports": "node scripts/testBillingReportsModule.js",
+    "test:billing-scalability": "node scripts/testBillingScalabilityModule.js",
     "test:billing-module": "node scripts/testBillingModuleClosure.js",
     "test:billing-stress": "node scripts/testBillingStressIntegrity.js",
     "test:cloudinary-storage": "node scripts/testCloudinaryMulterStorage.js",

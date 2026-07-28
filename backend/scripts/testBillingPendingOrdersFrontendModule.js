@@ -96,14 +96,17 @@ function validatePendingOrdersPage() {
 function validateBackendPendingOrders() {
   const routeFile = read('backend/routes/adminBilling.js');
   const serviceFile = read('backend/services/adminBillingService.js');
+  const aggregationFile = read('backend/services/adminBillingAggregationService.js');
 
   assertIncludes(routeFile, '/pending-orders', 'adminBilling.js debe conservar endpoint /pending-orders.');
   assertIncludes(serviceFile, 'listPendingBillableOrders', 'adminBillingService debe exponer listPendingBillableOrders.');
-  assertIncludes(serviceFile, "ElectronicInvoice.distinct('orderId'", 'El servicio debe excluir órdenes que ya tienen ElectronicInvoice.');
+  assertIncludes(serviceFile, 'buildPendingOrdersPaginationPipeline', 'El servicio debe paginar pendientes en MongoDB.');
+  assertIncludes(aggregationFile, '$lookup', 'El servicio debe excluir con $lookup las órdenes que ya tienen ElectronicInvoice.');
+  assertNotIncludes(serviceFile, "ElectronicInvoice.distinct('orderId'", 'No debe cargar todos los orderId facturados en memoria.');
   assertIncludes(serviceFile, 'serializePendingOrder', 'El servicio debe serializar órdenes pendientes.');
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
 
-  ok('Backend de órdenes por facturar usa Order y ElectronicInvoice sin modelo paralelo');
+  ok('Backend pagina Order y excluye ElectronicInvoice dentro de MongoDB');
 }
 
 function main() {

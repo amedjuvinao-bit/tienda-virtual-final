@@ -95,14 +95,19 @@ function validateBackendSummaryStillElectronicInvoice() {
     'getBillingSummary',
     "require('../models/ElectronicInvoice')",
     "require('../models/Order')",
-    'ElectronicInvoice.find({}).lean()',
-    'Order.countDocuments',
+    'buildInvoiceSummaryPipeline()',
+    'buildPendingOrdersCountPipeline({',
   ].forEach((needle) => {
     assertIncludes(serviceFile, needle, `Backend de resumen no conserva fuente oficial: falta ${needle}`);
   });
 
+  assertNotIncludes(
+    serviceFile,
+    'ElectronicInvoice.find({}).lean()',
+    'El resumen no debe cargar todas las facturas en memoria.'
+  );
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
-  ok('Backend de resumen sigue usando ElectronicInvoice y Order');
+  ok('Backend de resumen usa ElectronicInvoice y Order mediante agregaciones');
 }
 
 function validateScriptRegistered() {

@@ -15,6 +15,14 @@ const {
   extractProviderDocument,
   issueElectronicInvoiceForOrder,
 } = require('./electronicInvoiceIssuanceService');
+const {
+  buildCreditNotesPaginationPipeline,
+  buildInvoiceSummaryPipeline,
+  buildPendingOrdersCountPipeline,
+  buildPendingOrdersPaginationPipeline,
+  runBillingAggregation,
+  unpackPaginationFacet,
+} = require('./adminBillingAggregationService');
 
 let extractFactusLinks = null;
 try {
@@ -64,13 +72,6 @@ function isValidatedInvoice(invoice = {}) {
     invoice?.provider?.isValidated === true ||
     Boolean(invoice?.provider?.validatedAt || invoice?.acceptedAt)
   );
-}
-
-function isRejectedOrFailed(invoice = {}) {
-  const status = cleanText(invoice.status, 60).toLowerCase();
-  const providerStatus = getProviderStatus(invoice);
-
-  return ['rejected', 'failed', 'error'].includes(status) || ['rejected', 'failed', 'error'].includes(providerStatus);
 }
 
 function getInvoiceLinks(invoice = {}) {
@@ -217,7 +218,11 @@ function serializeElectronicInvoice(invoice = {}) {
     errorMessage: invoice.errorMessage || '',
     providerErrors: invoice.providerErrors || {},
     sync: serializeSync(invoice.sync),
-    creditNotesCount: Array.isArray(invoice.creditNotes) ? invoice.creditNotes.length : 0,
+    creditNotesCount: Number.isFinite(Number(invoice._billingCreditNotesCount))
+      ? Number(invoice._billingCreditNotesCount)
+      : Array.isArray(invoice.creditNotes)
+        ? invoice.creditNotes.length
+        : 0,
     generatedAt: invoice.generatedAt || null,
     sentAt: invoice.sentAt || null,
     acceptedAt: invoice.acceptedAt || null,
@@ -321,9 +326,8 @@ function serializePendingOrder(order = {}) {
   };
 }
 
-function buildBillableOrderFilter(orderIdsWithInvoice = [], params = {}) {
+function buildBillableOrderFilter(params = {}) {
   const filter = {
-    _id: { $nin: orderIdsWithInvoice },
     $or: [
       { status: { $in: BILLABLE_ORDER_STATUSES } },
       { 'payment.status': { $in: PAID_PAYMENT_STATUSES } },
@@ -458,27 +462,26 @@ async function listCreditNotes(params = {}) {
     ];
   }
 
-  const invoices = await ElectronicInvoice.find(invoiceFilter).sort({ updatedAt: -1, createdAt: -1 }).lean();
   const status = cleanText(params.status, 50).toLowerCase();
   const type = cleanText(params.type, 50).toLowerCase();
-
-  const flattened = [];
-  invoices.forEach((invoice) => {
-    (Array.isArray(invoice.creditNotes) ? invoice.creditNotes : []).forEach((note, index) => {
-      const row = serializeCreditNote(invoice, note, index);
-      const rowStatus = cleanText(row.status, 50).toLowerCase();
-      const rowType = cleanText(row.type, 50).toLowerCase();
-
-      if (status && status !== 'all' && rowStatus !== status) return;
-      if (type && type !== 'all' && rowType !== type) return;
-      flattened.push(row);
-    });
+  const pipeline = buildCreditNotesPaginationPipeline({
+    invoiceFilter,
+    status,
+    type,
+    skip,
+    limit,
   });
-
-  flattened.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-  const total = flattened.length;
-  const rows = flattened.slice(skip, skip + limit);
+  const facet = unpackPaginationFacet(
+    await runBillingAggregation(ElectronicInvoice, pipeline)
+  );
+  const total = facet.total;
+  const rows = facet.rows.map((invoice) =>
+    serializeCreditNote(
+      invoice,
+      invoice.creditNotes || {},
+      Number(invoice._billingCreditNoteIndex || 0)
+    )
+  );
 
   return {
     rows,
@@ -491,42 +494,54 @@ async function listCreditNotes(params = {}) {
 
 async function listPendingBillableOrders(params = {}) {
   const { page, limit, skip } = normalizePage(params);
-  const orderIdsWithInvoice = await ElectronicInvoice.distinct('orderId', {});
-  const filter = buildBillableOrderFilter(orderIdsWithInvoice, params);
-
-  const [total, rows] = await Promise.all([
-    Order.countDocuments(filter),
-    Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-  ]);
+  const filter = buildBillableOrderFilter(params);
+  const pipeline = buildPendingOrdersPaginationPipeline({
+    orderFilter: filter,
+    invoiceCollectionName: ElectronicInvoice.collection.name,
+    skip,
+    limit,
+  });
+  const facet = unpackPaginationFacet(
+    await runBillingAggregation(Order, pipeline)
+  );
 
   return {
-    rows: rows.map(serializePendingOrder),
-    total,
+    rows: facet.rows.map(serializePendingOrder),
+    total: facet.total,
     page,
     limit,
-    pages: Math.max(1, Math.ceil(total / limit)),
+    pages: Math.max(1, Math.ceil(facet.total / limit)),
   };
 }
 
 async function getBillingSummary() {
-  const [settings, invoices, ordersWithInvoice, billableTotal] = await Promise.all([
+  const billableOrderFilter = buildBillableOrderFilter();
+  const [
+    settings,
+    invoiceSummaryRows,
+    pendingSummaryRows,
+  ] = await Promise.all([
     getBillingSettingsSnapshot(),
-    ElectronicInvoice.find({}).lean(),
-    ElectronicInvoice.distinct('orderId', {}),
-    Order.countDocuments({
-      $or: [
-        { status: { $in: BILLABLE_ORDER_STATUSES } },
-        { 'payment.status': { $in: PAID_PAYMENT_STATUSES } },
-        { source: 'pos', total: { $gt: 0 } },
-      ],
-    }),
+    runBillingAggregation(
+      ElectronicInvoice,
+      buildInvoiceSummaryPipeline()
+    ),
+    runBillingAggregation(
+      Order,
+      buildPendingOrdersCountPipeline({
+        orderFilter: billableOrderFilter,
+        invoiceCollectionName: ElectronicInvoice.collection.name,
+      })
+    ),
   ]);
 
-  const emitted = invoices.length;
-  const validated = invoices.filter(isValidatedInvoice).length;
-  const errors = invoices.filter(isRejectedOrFailed).length;
-  const pending = Math.max(0, Number(billableTotal || 0) - ordersWithInvoice.length);
-  const creditNotes = invoices.reduce((acc, invoice) => acc + (Array.isArray(invoice.creditNotes) ? invoice.creditNotes.length : 0), 0);
+  const invoiceSummary = invoiceSummaryRows[0] || {};
+  const pendingSummary = pendingSummaryRows[0] || {};
+  const emitted = Math.max(0, Number(invoiceSummary.emitted || 0));
+  const validated = Math.max(0, Number(invoiceSummary.validated || 0));
+  const errors = Math.max(0, Number(invoiceSummary.errors || 0));
+  const pending = Math.max(0, Number(pendingSummary.pending || 0));
+  const creditNotes = Math.max(0, Number(invoiceSummary.creditNotes || 0));
 
   return {
     emitted,

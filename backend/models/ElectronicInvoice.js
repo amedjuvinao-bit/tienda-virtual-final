@@ -418,6 +418,14 @@ ElectronicInvoiceSchema.index({ cufe: 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.referenceCode': 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.idempotencyKey': 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.status': 1 });
+ElectronicInvoiceSchema.index(
+  {
+    'creditNotes.status': 1,
+    'creditNotes.type': 1,
+    'creditNotes.createdAt': -1,
+  },
+  { name: 'billing_credit_notes_status_type_date' }
+);
 
 module.exports =
   mongoose.models.ElectronicInvoice ||

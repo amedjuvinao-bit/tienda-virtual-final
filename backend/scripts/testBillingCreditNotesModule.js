@@ -45,24 +45,32 @@ function assertNotIncludes(content, expected, message) {
 
 function validateBackendCreditNotes() {
   const serviceFile = read('backend/services/adminBillingService.js');
+  const aggregationFile = read('backend/services/adminBillingAggregationService.js');
   const routeFile = read('backend/routes/adminBilling.js');
 
   [
     'function serializeCreditNote',
     'async function listCreditNotes',
     "'creditNotes.0': { $exists: true }",
-    'ElectronicInvoice.find(invoiceFilter)',
-    'serializeCreditNote(invoice, note, index)',
+    'buildCreditNotesPaginationPipeline',
+    'serializeCreditNote(',
     'listCreditNotes',
   ].forEach((needle) => {
     assertIncludes(serviceFile, needle, `Servicio de facturación no expone notas crédito: falta ${needle}`);
   });
 
+  assertIncludes(aggregationFile, '$unwind', 'La paginación de notas crédito debe ejecutarse en MongoDB.');
+  assertIncludes(aggregationFile, '$facet', 'Notas crédito deben obtener filas y total sin carga masiva.');
+  assertNotIncludes(
+    serviceFile,
+    'ElectronicInvoice.find(invoiceFilter)',
+    'No debe cargar todas las facturas con notas crédito en memoria.'
+  );
   assertIncludes(routeFile, '/credit-notes', 'Ruta admin de notas crédito no está montada.');
   assertIncludes(routeFile, 'billingService.listCreditNotes', 'Ruta de notas crédito no usa el servicio oficial.');
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
 
-  ok('Backend lista notas crédito desde ElectronicInvoice.creditNotes');
+  ok('Backend pagina ElectronicInvoice.creditNotes dentro de MongoDB');
 }
 
 function validateFrontendCreditNotesApi() {
