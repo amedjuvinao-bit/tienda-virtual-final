@@ -5,6 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 const {
+  readElectronicInvoiceModalFrontendSource,
+} = require('./lib/readElectronicInvoiceModalFrontendSource');
+const {
   readBillingConfigurationFrontendSource,
 } = require('./lib/readBillingConfigurationFrontendSource');
 
@@ -208,7 +211,7 @@ function validateNoCredentialLeaksInPaymentResponses() {
 
 function validateFrontendPermissionAwareness() {
   const page = readBillingFrontendSource();
-  const modal = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
+  const modal = readElectronicInvoiceModalFrontendSource();
   const settings = readBillingConfigurationFrontendSource();
   const provider = read('frontend/src/admin/configuracion/sections/facturacion/ElectronicProviderBlock.jsx');
 

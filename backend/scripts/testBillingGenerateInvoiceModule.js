@@ -5,6 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
+const {
+  readElectronicInvoiceModalFrontendSource,
+} = require('./lib/readElectronicInvoiceModalFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -152,7 +155,7 @@ function validateFrontendGeneration() {
 }
 
 function validateGeneratedIsNotValidated() {
-  const modalFile = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
+  const modalFile = readElectronicInvoiceModalFrontendSource();
   const statusFile = read('frontend/src/admin/orders/electronicInvoice/invoiceStatusUtils.js');
   const serviceFile = read('backend/services/adminBillingService.js');
 

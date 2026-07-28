@@ -5,6 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
+const {
+  readElectronicInvoiceModalFrontendSource,
+} = require('./lib/readElectronicInvoiceModalFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -80,7 +83,7 @@ function validatePayloadMath() {
 
 function validateDianReasons() {
   const service = read('backend/services/electronicCreditNoteService.js');
-  const modal = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
+  const modal = readElectronicInvoiceModalFrontendSource();
   ['\'1\'', '\'2\'', '\'3\'', '\'4\'', '\'5\'', '\'6\''].forEach((code) => {
     includes(service, code, 'Falta motivo DIAN ' + code);
   });
@@ -150,7 +153,7 @@ function validateSyncIdentity() {
 function validateFrontend() {
   const api = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const page = readBillingFrontendSource();
-  const modal = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
+  const modal = readElectronicInvoiceModalFrontendSource();
   includes(api, 'createBillingCreditNote', 'Creación no usa API unificada.');
   includes(api, 'downloadBillingCreditNotePdf', 'Falta descarga PDF.');
   includes(api, 'downloadBillingCreditNoteXml', 'Falta descarga XML.');
