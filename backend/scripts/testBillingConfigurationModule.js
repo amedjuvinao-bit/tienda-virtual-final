@@ -3,6 +3,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readBillingConfigurationFrontendSource,
+} = require('./lib/readBillingConfigurationFrontendSource');
 
 process.env.BILLING_ENCRYPTION_KEY =
   process.env.BILLING_ENCRYPTION_KEY ||
@@ -211,9 +214,7 @@ function testConcurrencyAndHistory() {
   const model = read('backend/models/SiteSettings.js');
   const service = read('backend/services/billingConfigurationService.js');
   const route = read('backend/routes/billingSettingsProtection.js');
-  const frontend = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const frontend = readBillingConfigurationFrontendSource();
 
   assert(model.includes('billingRevision'), 'El modelo no versiona la configuración.');
   assert(model.includes('billingHistory'), 'El modelo no conserva historial.');
@@ -228,9 +229,7 @@ function testConcurrencyAndHistory() {
 }
 
 function testSuccessfulSaveClearsUnsavedChanges() {
-  const frontend = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const frontend = readBillingConfigurationFrontendSource();
   const applySettingsStart = frontend.indexOf('const applySettings');
   const loadHistoryStart = frontend.indexOf('const loadHistory');
   const persistBillingStart = frontend.indexOf('const persistBilling');
@@ -327,9 +326,7 @@ function testLegalTextsPersistAcrossUpdates() {
 }
 
 function testPanelThemeAndSupportedOptions() {
-  const section = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const section = readBillingConfigurationFrontendSource();
   const provider = read(
     'frontend/src/admin/configuracion/sections/facturacion/ElectronicProviderBlock.jsx'
   );
