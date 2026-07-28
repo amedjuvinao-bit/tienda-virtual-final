@@ -36,7 +36,7 @@ const {
 } = require('../services/billingInvoiceRecoveryService');
 
 const CONFIRMATION_FLAG = '--confirm-habilitacion';
-const DATABASE_PREFIX = 'billing_factus_live_';
+const DATABASE_PREFIX = 'bfl_';
 const NORMAL_CONCURRENCY = 32;
 const LOST_RESPONSE_CONCURRENCY = 32;
 const REPLAY_CONCURRENCY = 16;
