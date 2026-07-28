@@ -679,6 +679,35 @@ function createRecoveryLookupSimulator({
   };
 }
 
+function createRecoveryDetailSimulator({ remoteDocumentsByReference }) {
+  return async ({ providerConfig, invoiceNumber } = {}) => {
+    assert(
+      providerConfig?.apiUrl === 'https://api-sandbox.factus.com.co',
+      'La recuperación no construyó la configuración segura de Factus.'
+    );
+
+    const document =
+      [...remoteDocumentsByReference.values()].find(
+        (item) => item.number === invoiceNumber
+      ) || null;
+
+    return document
+      ? {
+          success: true,
+          data: {
+            data: {
+              bill: document,
+            },
+          },
+        }
+      : {
+          success: false,
+          status: 404,
+          error: 'Factura simulada no encontrada por número.',
+        };
+  };
+}
+
 function createCrashAwareInvoiceModel({
   ElectronicInvoice,
   scenarioByOrderId,
@@ -1588,6 +1617,9 @@ async function runStressTest() {
       SiteSettings: models.SiteSettings,
       findInvoiceByReferenceFromFactus: createRecoveryLookupSimulator({
         metrics,
+        remoteDocumentsByReference,
+      }),
+      getInvoiceFromFactus: createRecoveryDetailSimulator({
         remoteDocumentsByReference,
       }),
       now: () => new Date(recoveryNow),

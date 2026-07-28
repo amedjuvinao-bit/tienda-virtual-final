@@ -68,7 +68,7 @@ function applyUpdate(target, update = {}) {
   return target;
 }
 
-function createHarness({ lookup } = {}) {
+function createHarness({ lookup, detail } = {}) {
   const invoice = {
     _id: '507f1f77bcf86cd799439011',
     orderId: '507f1f77bcf86cd799439012',
@@ -91,6 +91,7 @@ function createHarness({ lookup } = {}) {
   let task = null;
   let now = new Date('2026-07-23T12:00:00.000Z');
   let sequence = 0;
+  const detailCalls = [];
 
   const InvoiceModel = {
     findById(id) {
@@ -187,15 +188,31 @@ function createHarness({ lookup } = {}) {
           id: 55,
           number: 'SETP990000055',
           reference_code: 'ORD-RECOVERY-001',
-          cufe: 'cufe-recovered',
-          is_validated: true,
-          validated_at: '2026-07-23T12:01:00Z',
-          links: {
-            pdf_url: 'https://factus.test/factura.pdf',
-            xml_url: 'https://factus.test/factura.xml',
-          },
+          status: 1,
         },
       })),
+    getInvoiceFromFactus: async (input) => {
+      detailCalls.push(input);
+      if (detail) return detail(input);
+      return {
+        success: true,
+        data: {
+          data: {
+            bill: {
+              id: 55,
+              number: 'SETP990000055',
+              reference_code: 'ORD-RECOVERY-001',
+              cufe: 'cufe-recovered',
+              status: 1,
+              links: {
+                pdf_url: 'https://factus.test/factura.pdf',
+                xml_url: 'https://factus.test/factura.xml',
+              },
+            },
+          },
+        },
+      };
+    },
     now: () => new Date(now),
     randomUUID: () => 'recovery-lock-token',
   });
@@ -206,6 +223,7 @@ function createHarness({ lookup } = {}) {
     get task() {
       return task;
     },
+    detailCalls,
     advance(milliseconds) {
       now = new Date(now.getTime() + milliseconds);
       if (task) task.nextAttemptAt = new Date(now.getTime() - 1);
@@ -260,7 +278,53 @@ async function testSuccessfulReconciliation() {
   assert(harness.invoice.invoiceNumber === 'SETP990000055', 'No recuperó número oficial.');
   assert(harness.invoice.cufe === 'cufe-recovered', 'No recuperó CUFE oficial.');
   assert(harness.task.status === 'resolved', 'No cerró el trabajo duradero.');
-  ok('Éxito remoto perdido se recupera por reference_code sin volver a emitir');
+  assert(
+    harness.detailCalls.length === 1 &&
+      harness.detailCalls[0].invoiceNumber === 'SETP990000055' &&
+      harness.detailCalls[0].providerConfig?.apiUrl ===
+        'https://api-sandbox.factus.com.co',
+    'No consultó una sola vez la factura completa usando el número localizado.'
+  );
+  ok('Listado resumido se completa por número antes de recuperar CUFE y aceptación');
+}
+
+async function testIncompleteDetailKeepsPending() {
+  const harness = createHarness({
+    detail: async () => ({
+      success: true,
+      data: {
+        data: {
+          bill: {
+            id: 55,
+            number: 'SETP990000055',
+            reference_code: 'ORD-RECOVERY-001',
+            cufe: '',
+            is_validated: false,
+          },
+        },
+      },
+    }),
+  });
+  const marked = await harness.service.markInvoiceForReconciliation({
+    invoice: harness.invoice,
+    reason: 'real_list_response_incomplete',
+  });
+  const result = await harness.service.reconcileInvoiceByReference({
+    invoiceId: harness.invoice._id,
+    taskId: marked.task._id,
+  });
+
+  assert(
+    result.pending === true &&
+      result.reason === 'remote_detail_incomplete',
+    'Cerró la recuperación aunque el detalle no tenía CUFE y aceptación.'
+  );
+  assert(
+    harness.invoice.status === 'reconciliation_pending' &&
+      harness.task.status === 'pending',
+    'Liberó la factura o resolvió la tarea con datos fiscales incompletos.'
+  );
+  ok('Detalle sin CUFE o aceptación permanece pendiente y bloquea la reemisión');
 }
 
 async function testProviderUnavailableKeepsPending() {
@@ -355,7 +419,9 @@ function testIntegrationAndNoReissueControls() {
   );
   assert(
     recovery.includes('MAX_NOT_FOUND_CONFIRMATIONS = 3') &&
-      recovery.includes('BILLING_RECONCILIATION_REMOTE_NOT_FOUND'),
+      recovery.includes('BILLING_RECONCILIATION_REMOTE_NOT_FOUND') &&
+      recovery.includes('getInvoiceFromFactus') &&
+      recovery.includes('remote_detail_incomplete'),
     'Puede reemitir sin confirmar primero la ausencia remota.'
   );
   assert(
@@ -373,6 +439,7 @@ async function main() {
   const tests = [
     testLockExpiry,
     testSuccessfulReconciliation,
+    testIncompleteDetailKeepsPending,
     testProviderUnavailableKeepsPending,
     testThreeExactNotFoundConfirmationsAllowRetry,
     testIntegrationAndNoReissueControls,

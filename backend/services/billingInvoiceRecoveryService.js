@@ -8,6 +8,12 @@ const SiteSettings = require('../models/SiteSettings');
 const {
   findInvoiceByReferenceFromFactus,
 } = require('../lib/dian/providers/factusRangeAwareProvider');
+const {
+  getInvoiceFromFactus,
+} = require('../lib/dian/providers/factusProvider');
+const {
+  buildRuntimeFactusConfig,
+} = require('../lib/billing/billingConfigurationSecurity');
 
 const INVOICE_LOCK_MS = 5 * 60 * 1000;
 const RECOVERY_LOCK_MS = 2 * 60 * 1000;
@@ -83,15 +89,40 @@ function normalizeRemoteInvoice(document = {}) {
   const links = document?.links && typeof document.links === 'object'
     ? document.links
     : {};
+  const cufe = cleanText(document?.cufe, 220);
+  const statusText = cleanText(
+    document?.validation_status ||
+      document?.validationStatus ||
+      document?.document_status ||
+      document?.documentStatus ||
+      document?.dian_status ||
+      document?.dianStatus ||
+      document?.status,
+    80
+  ).toLowerCase();
+  const hasPendingFlag =
+    document?.is_validated === false ||
+    document?.validated === false;
+  const rejectedOrFailed =
+    ['rejected', 'rechazada', 'rechazado', 'failed', 'fallida', 'fallido', 'error']
+      .some((value) => statusText.includes(value));
   const validated =
-    document?.is_validated === true ||
-    document?.validated === true ||
-    Boolean(document?.validated_at || document?.validatedAt);
+    !hasPendingFlag &&
+    !rejectedOrFailed &&
+    (
+      document?.is_validated === true ||
+      document?.validated === true ||
+      Number(document?.status) === 1 ||
+      Boolean(cufe) ||
+      Boolean(document?.validated_at || document?.validatedAt) ||
+      ['validated', 'accepted', 'validada', 'validado', 'aprobada', 'aprobado']
+        .some((value) => statusText.includes(value))
+    );
 
   return {
     id: Number(document?.id || 0) || null,
     number: cleanText(document?.number || document?.invoiceNumber, 160),
-    cufe: cleanText(document?.cufe, 220),
+    cufe,
     referenceCode: cleanText(
       document?.reference_code || document?.referenceCode,
       180
@@ -105,6 +136,34 @@ function normalizeRemoteInvoice(document = {}) {
   };
 }
 
+function findDetailedRemoteInvoice(value, expectedNumber) {
+  const targetNumber = cleanText(expectedNumber, 160);
+  const seen = new WeakSet();
+  let fallback = null;
+
+  function visit(current, depth = 0) {
+    if (!current || typeof current !== 'object' || depth > 8) return null;
+    if (seen.has(current)) return null;
+    seen.add(current);
+
+    if (!Array.isArray(current)) {
+      const normalized = normalizeRemoteInvoice(current);
+      if (normalized.number && normalized.number === targetNumber) {
+        if (normalized.cufe && normalized.validated) return current;
+        fallback = fallback || current;
+      }
+    }
+
+    for (const item of Object.values(current)) {
+      const found = visit(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  return visit(value) || fallback;
+}
+
 function createBillingInvoiceRecoveryService(overrides = {}) {
   const InvoiceModel = overrides.ElectronicInvoice || ElectronicInvoice;
   const TaskModel = overrides.BillingInvoiceRecoveryTask || BillingInvoiceRecoveryTask;
@@ -112,6 +171,9 @@ function createBillingInvoiceRecoveryService(overrides = {}) {
   const lookupInvoice =
     overrides.findInvoiceByReferenceFromFactus ||
     findInvoiceByReferenceFromFactus;
+  const fetchInvoiceDetail =
+    overrides.getInvoiceFromFactus ||
+    getInvoiceFromFactus;
   const nowFactory = overrides.now || (() => new Date());
   const tokenFactory = overrides.randomUUID || (() => crypto.randomUUID());
 
@@ -379,8 +441,8 @@ function createBillingInvoiceRecoveryService(overrides = {}) {
       return { resolved: false, pending: true, found: false, confirmations };
     }
 
-    const remote = normalizeRemoteInvoice(lookup.document);
-    if (!remote.number) {
+    const listedRemote = normalizeRemoteInvoice(lookup.document);
+    if (!listedRemote.number) {
       await releaseTask(task, lockToken, {
         status: 'pending',
         nextAttemptAt: new Date(nowFactory().getTime() + recoveryDelay(task.attempts)),
@@ -389,13 +451,71 @@ function createBillingInvoiceRecoveryService(overrides = {}) {
       return { resolved: false, pending: true, reason: 'remote_number_missing' };
     }
 
+    let detail;
+    try {
+      detail = await fetchInvoiceDetail({
+        providerConfig: buildRuntimeFactusConfig(settings?.billing || {}),
+        invoiceNumber: listedRemote.number,
+      });
+    } catch (error) {
+      detail = {
+        success: false,
+        error: error?.message || 'No fue posible consultar el detalle de la factura.',
+      };
+    }
+
+    if (!detail?.success) {
+      await releaseTask(task, lockToken, {
+        status: 'pending',
+        nextAttemptAt: new Date(nowFactory().getTime() + recoveryDelay(task.attempts)),
+        lastError: cleanText(
+          detail?.error ||
+            'Factus localizó la referencia, pero no permitió consultar la factura completa.',
+          500
+        ),
+      });
+      return {
+        resolved: false,
+        pending: true,
+        reason: 'remote_detail_unavailable',
+      };
+    }
+
+    const detailedDocument = findDetailedRemoteInvoice(
+      detail.data,
+      listedRemote.number
+    );
+    const remote = normalizeRemoteInvoice(detailedDocument || {});
+    const referenceMismatch =
+      remote.referenceCode &&
+      remote.referenceCode !== referenceCode;
+
+    if (
+      !detailedDocument ||
+      remote.number !== listedRemote.number ||
+      referenceMismatch ||
+      !remote.cufe ||
+      !remote.validated
+    ) {
+      await releaseTask(task, lockToken, {
+        status: 'pending',
+        nextAttemptAt: new Date(nowFactory().getTime() + recoveryDelay(task.attempts)),
+        lastError:
+          'Factus localizó la referencia, pero el detalle todavía no confirma número, CUFE y validación.',
+      });
+      return {
+        resolved: false,
+        pending: true,
+        reason: 'remote_detail_incomplete',
+      };
+    }
+
     const completedAt = nowFactory();
-    const nextStatus = remote.validated ? 'accepted' : 'sent';
     const updated = await InvoiceModel.findByIdAndUpdate(
       invoice._id,
       {
         $set: {
-          status: nextStatus,
+          status: 'accepted',
           invoiceNumber: remote.number,
           cufe: remote.cufe,
           qrUrl: remote.links.qr || remote.links.qr_url || '',
@@ -408,7 +528,7 @@ function createBillingInvoiceRecoveryService(overrides = {}) {
           provider: {
             name: 'factus',
             id: remote.id,
-            status: remote.validated ? 'validated' : 'sent',
+            status: 'validated',
             referenceCode: remote.referenceCode || referenceCode,
             number: remote.number,
             cufe: remote.cufe,
@@ -433,14 +553,12 @@ function createBillingInvoiceRecoveryService(overrides = {}) {
           'emission.lastAttemptAt': completedAt,
           'emission.lockExpiresAt': null,
           'emission.reconciledAt': completedAt,
-          'dianResponse.stage': remote.validated
-            ? 'provider_reconciled_validated'
-            : 'provider_reconciled_sent',
+          'dianResponse.stage': 'provider_reconciled_validated',
           'dianResponse.message':
             'Resultado fiscal recuperado mediante referencia exacta en Factus.',
-          'dianResponse.code': remote.validated ? 'VALIDATED' : 'SENT',
+          'dianResponse.code': 'VALIDATED',
           sentAt: completedAt,
-          acceptedAt: remote.validated ? completedAt : null,
+          acceptedAt: completedAt,
           failedAt: null,
         },
       },
