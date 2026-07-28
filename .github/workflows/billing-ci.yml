@@ -1,0 +1,106 @@
+name: Facturacion CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/facturacion-comprobantes
+  pull_request:
+    branches:
+      - main
+      - feature/facturacion-comprobantes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: facturacion-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-security:
+    name: Seguridad de dependencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Auditar backend
+        run: node .github/scripts/audit-production-dependencies.cjs backend
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Auditar frontend
+        run: node .github/scripts/audit-production-dependencies.cjs frontend
+
+  billing-module:
+    name: Motor de facturacion
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend y frontend
+        run: |
+          npm --prefix backend ci
+          npm --prefix frontend ci
+
+      - name: Validar almacenamiento Cloudinary
+        run: npm --prefix backend run test:cloudinary-storage
+
+      - name: Validar resiliencia estricta
+        run: npm --prefix backend run test:billing-resilience:strict
+
+      - name: Validar cierre integral
+        run: npm --prefix backend run test:billing-module
+
+  billing-ui:
+    name: Interfaz de facturacion
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Probar configuracion visual
+        run: npm --prefix frontend run test:billing-configuration-ui
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
