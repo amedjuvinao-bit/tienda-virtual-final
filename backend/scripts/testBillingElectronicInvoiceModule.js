@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -151,7 +152,7 @@ function validateUnifiedBillingAdminApi() {
 
 function validateFrontendShellRemainsUnified() {
   const appFile = read('frontend/src/App.jsx');
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
 
   assertIncludes(appFile, 'AdminBillingPage', 'App.jsx debe conservar el módulo unificado de facturación.');
   assertIncludes(appFile, 'facturacion', 'App.jsx debe registrar /admin/facturacion.');
