@@ -16,6 +16,11 @@ const {
   buildPendingOrdersCountPipeline,
   buildPendingOrdersPaginationPipeline,
 } = require('../services/adminBillingAggregationService');
+const {
+  buildBillingReportCountPipeline,
+  buildBillingReportPipeline,
+  buildBillingReportRowsPipeline,
+} = require('../services/adminBillingReportAggregationService');
 
 const results = { ok: 0, fail: 0 };
 
@@ -126,6 +131,120 @@ function validateSummaryPipeline() {
   );
 
   ok('Resumen calcula documentos, validaciones, errores y notas con $group');
+}
+
+function reportFilters() {
+  return {
+    from: '2026-07-01',
+    to: '2026-07-31',
+    fromDate: new Date('2026-07-01T05:00:00.000Z'),
+    toExclusive: new Date('2026-08-01T05:00:00.000Z'),
+    type: 'all',
+    status: 'all',
+  };
+}
+
+function validateReportAggregationPipeline() {
+  const args = {
+    filters: reportFilters(),
+    orderCollectionName: 'orders',
+  };
+  const report = buildBillingReportPipeline({ ...args, rowLimit: 30 });
+  const count = buildBillingReportCountPipeline(args);
+  const rows = buildBillingReportRowsPipeline(args);
+  const lookup = findStage(report, '$lookup')?.$lookup;
+  const facet = findStage(report, '$facet')?.$facet;
+
+  assert(lookup?.from === 'orders', 'Reportes no unen órdenes dentro de MongoDB.');
+  assert(
+    lookup.pipeline?.some((stage) => stage.$limit === 1),
+    'El $lookup de reportes no limita la orden relacionada.'
+  );
+  assert(
+    report.some((stage) => stage.$unwind === '$_billingDocuments'),
+    'Facturas y notas crédito no se normalizan con $unwind.'
+  );
+  ['metrics', 'statuses', 'paymentMethods', 'channels', 'daily', 'rows'].forEach((key) => {
+    assert(facet?.[key], `El $facet del reporte no calcula ${key}.`);
+  });
+  assert(
+    facet.rows.some((stage) => stage.$limit === 30),
+    'La pantalla no limita sus filas dentro de MongoDB.'
+  );
+  assert(
+    findStage(count, '$count')?.$count === 'totalRows',
+    'La exportación no cuenta sus filas dentro de MongoDB.'
+  );
+  assert(
+    findStage(rows, '$sort') && findStage(rows, '$project'),
+    'El cursor CSV no recibe filas ordenadas y proyectadas por MongoDB.'
+  );
+
+  ok('Reportes calculan métricas, desgloses, límite y conteo con agregaciones');
+}
+
+function validateReportStreamingSource() {
+  const service = read('backend/services/adminBillingReportService.js');
+  const aggregation = read('backend/services/adminBillingReportAggregationService.js');
+  const expressions = read('backend/services/billingReports/reportAggregationExpressions.js');
+  const stages = read('backend/services/billingReports/reportAggregationStages.js');
+  const routes = read('backend/routes/adminBilling.js');
+  const model = read('backend/models/ElectronicInvoice.js');
+  const exportStart = routes.indexOf("'/reports/export'");
+  const exportEnd = routes.indexOf('router.post(', exportStart);
+  const exportRoute = routes.slice(exportStart, exportEnd);
+
+  [
+    'ElectronicInvoice.find(',
+    'Order.find(',
+    'Buffer.from(',
+    'buildBillingReport(params, { allRows: true })',
+  ].forEach((unsafePattern) => {
+    assert(
+      !service.includes(unsafePattern),
+      `Regresó una carga completa en reportes: ${unsafePattern}`
+    );
+  });
+  [
+    'REPORT_CSV_BATCH_SIZE',
+    'createReportRowsCursor',
+    'for await (const rawRow of cursor)',
+    "once(writable, 'drain')",
+    'allowDiskUse(true)',
+    'maxTimeMS',
+  ].forEach((expected) => {
+    assert(
+      `${service}\n${aggregation}`.includes(expected),
+      `Falta control de reporte escalable: ${expected}`
+    );
+  });
+  assert(
+    !exportRoute.includes("'Content-Length'") &&
+      exportRoute.includes('await result.streamTo(res)'),
+    'La ruta CSV volvió a exigir un búfer completo.'
+  );
+  [
+    'billing_report_generated_at',
+    'billing_report_accepted_at',
+    'billing_report_provider_validated_at',
+    'billing_report_credit_note_created_at',
+    'billing_report_credit_note_validated_at',
+  ].forEach((indexName) => {
+    assert(model.includes(indexName), `Falta índice fiscal ${indexName}.`);
+  });
+  [
+    ['servicio', service],
+    ['composición', aggregation],
+    ['expresiones', expressions],
+    ['etapas', stages],
+  ].forEach(([label, source]) => {
+    assert(
+      source.split(/\r?\n/).length <= 500,
+      `El módulo de ${label} volvió a ser monolítico.`
+    );
+  });
+
+  ok('CSV usa módulos pequeños, lotes e índices dedicados de fechas fiscales');
 }
 
 function validateNoMassCollectionLoads() {
@@ -295,6 +414,8 @@ async function main() {
     validateCreditNotePipeline,
     validatePendingOrdersPipeline,
     validateSummaryPipeline,
+    validateReportAggregationPipeline,
+    validateReportStreamingSource,
     validateNoMassCollectionLoads,
   ].forEach((step) => {
     try {

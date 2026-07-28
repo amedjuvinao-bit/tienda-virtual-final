@@ -95,15 +95,20 @@ router.get(
   requirePermission('billing:download'),
   async (req, res) => {
     try {
-      const result = await billingReportService.buildBillingReportCsv(req.query || {});
+      const result = await billingReportService.prepareBillingReportCsv(req.query || {});
       res.setHeader('Content-Type', result.contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
-      res.setHeader('Content-Length', String(result.buffer.length));
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Billing-Report-Rows', String(result.totalRows));
-      return res.send(result.buffer);
+      await result.streamTo(res);
+      if (!res.writableEnded && !res.destroyed) res.end();
+      return undefined;
     } catch (error) {
+      if (res.headersSent) {
+        if (!res.destroyed) res.destroy(error);
+        return undefined;
+      }
       return sendError(res, error, 'Error exportando el reporte de facturación.');
     }
   }

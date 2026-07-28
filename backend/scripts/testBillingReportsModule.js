@@ -4,12 +4,34 @@
 
 const fs = require('fs');
 const path = require('path');
+const { Writable } = require('stream');
 const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const BACKEND_ROOT = path.join(__dirname, '..');
 const PROJECT_ROOT = path.join(BACKEND_ROOT, '..');
 const serviceFile = fs.readFileSync(path.join(BACKEND_ROOT, 'services', 'adminBillingReportService.js'), 'utf8');
+const aggregationFile = fs.readFileSync(
+  path.join(BACKEND_ROOT, 'services', 'adminBillingReportAggregationService.js'),
+  'utf8'
+);
+const aggregationExpressionsFile = fs.readFileSync(
+  path.join(BACKEND_ROOT, 'services', 'billingReports', 'reportAggregationExpressions.js'),
+  'utf8'
+);
+const aggregationStagesFile = fs.readFileSync(
+  path.join(BACKEND_ROOT, 'services', 'billingReports', 'reportAggregationStages.js'),
+  'utf8'
+);
+const reportBackendSource = [
+  serviceFile,
+  aggregationFile,
+  aggregationExpressionsFile,
+  aggregationStagesFile,
+].join('\n');
 const routesFile = fs.readFileSync(path.join(BACKEND_ROOT, 'routes', 'adminBilling.js'), 'utf8');
+const reportExportStart = routesFile.indexOf("'/reports/export'");
+const reportExportEnd = routesFile.indexOf('router.post(', reportExportStart);
+const reportExportRouteFile = routesFile.slice(reportExportStart, reportExportEnd);
 const apiFile = fs.readFileSync(path.join(PROJECT_ROOT, 'frontend', 'src', 'admin', 'billing', 'api', 'adminBillingApi.js'), 'utf8');
 const pageFile = readBillingFrontendSource();
 const packageFile = fs.readFileSync(path.join(BACKEND_ROOT, 'package.json'), 'utf8');
@@ -52,43 +74,49 @@ function assertNotIncludes(content, needles, message) {
 
 function validateSources() {
   assertIncludes(
-    serviceFile,
+    reportBackendSource,
     [
       "require('../models/ElectronicInvoice')",
       "require('../models/Order')",
-      'ElectronicInvoice.find(candidateDateFilter(filters))',
-      "select('orderNumber source channel saleType payment subtotal shipping total taxes discount pricing')",
+      'ElectronicInvoice.aggregate(pipeline)',
+      '$lookup',
+      "orderCollectionName: Order.collection?.name || 'orders'",
     ],
-    'Reportes reutiliza ElectronicInvoice y Order como fuentes únicas'
+    'Reportes reutiliza ElectronicInvoice y Order mediante agregaciones'
+  );
+  assertNotIncludes(
+    reportBackendSource,
+    ['mongoose.Schema', "model('BillingReport'", 'new BillingReport'],
+    'Reportes no crea modelos ni duplica documentos fiscales'
   );
   assertNotIncludes(
     serviceFile,
-    ['mongoose.Schema', "model('BillingReport'", 'new BillingReport'],
-    'Reportes no crea modelos ni duplica documentos fiscales'
+    ['ElectronicInvoice.find(', 'Order.find(', 'buildBillingReport(params, { allRows: true })'],
+    'Reportes no carga facturas, órdenes ni CSV completos en memoria'
   );
 }
 
 function validatePeriodsAndTotals() {
   assertIncludes(
-    serviceFile,
+    reportBackendSource,
     [
       "REPORT_TIME_ZONE = 'America/Bogota'",
       'MAX_REPORT_DAYS = 366',
-      'getInvoiceDate(invoice)',
-      'getCreditNoteDate(note)',
-      'isInRange(getCreditNoteDate(note), filters)',
+      "timezone: 'America/Bogota'",
+      "to: 'date'",
+      'creditNotes.provider.validatedAt',
     ],
-    'Períodos son válidos para Colombia y ubican cada nota en su fecha real'
+    'Períodos se convierten y filtran en MongoDB con zona horaria de Colombia'
   );
   assertIncludes(
-    serviceFile,
+    aggregationFile,
     [
-      'validInvoices.map((row) => row.total)',
-      'validCreditNotes.map((row) => row.total)',
-      'net: money(invoiced - credited)',
-      'netTax: money(invoiceTax - creditedTax)',
+      "metricGroupStage()",
+      "$subtract: ['$invoiced', '$credited']",
+      "$subtract: ['$invoiceTax', '$creditedTax']",
+      "validCreditNote",
     ],
-    'Totales fiscales suman validados y descuentan notas crédito e IVA'
+    'MongoDB suma documentos validados y descuenta notas crédito e IVA'
   );
 }
 
@@ -96,12 +124,16 @@ function validateExport() {
   assertIncludes(
     serviceFile,
     [
-      'buildBillingReport(params, { allRows: true })',
-      "Buffer.from(`\\uFEFF${lines.join('\\r\\n')}`, 'utf8')",
+      'prepareBillingReportCsv',
+      'createReportRowsCursor',
+      'REPORT_CSV_BATCH_SIZE',
+      'for await (const rawRow of cursor)',
+      "once(writable, 'drain')",
+      '`\\uFEFF${CSV_HEADERS.map(csvCell).join(\';\')}`',
       "replace('.', ',')",
       "return /^[=+\\-@]/.test(text) ? `'${text}` : text",
     ],
-    'CSV respeta filtros, abre en Excel y bloquea fórmulas inyectadas'
+    'CSV usa cursor, lotes, backpressure, BOM y protección de fórmulas'
   );
   assertIncludes(
     routesFile,
@@ -111,8 +143,14 @@ function validateExport() {
       "'/reports/export'",
       "requirePermission('billing:download')",
       "'X-Billing-Report-Rows'",
+      'await result.streamTo(res)',
     ],
     'Rutas de consulta y exportación están autenticadas por permisos existentes'
+  );
+  assertNotIncludes(
+    reportExportRouteFile,
+    ["'Content-Length'", 'res.send(result.buffer)'],
+    'Ruta CSV transmite por partes sin exigir un búfer completo'
   );
 }
 
@@ -193,78 +231,198 @@ function validateRegistration() {
 }
 
 async function validateCalculatedReport() {
+  const originalInvoiceAggregate = ElectronicInvoice.aggregate;
   const originalInvoiceFind = ElectronicInvoice.find;
   const originalOrderFind = Order.find;
-  const invoices = [
+  const controls = {
+    allowDiskUse: 0,
+    maxTimeMS: [],
+    batchSizes: [],
+    cursorClosed: 0,
+  };
+  const rows = [
     {
-      _id: 'invoice-1',
-      orderId: 'order-1',
+      id: 'invoice-3',
+      documentType: 'invoice',
+      date: new Date('2026-07-18T05:00:00.000Z'),
+      dateKey: '2026-07-18',
+      number: 'FE1003',
       orderNumber: '1001',
-      status: 'accepted',
-      acceptedAt: new Date('2026-07-10T15:00:00.000Z'),
-      totals: {
-        subtotal: 110,
-        productDiscount: 10,
-        totalDiscount: 10,
-        taxableBase: 100,
-        taxAmount: 19,
-        total: 119,
-      },
-      customer: { businessName: 'Cliente prueba', documentNumber: '123', email: 'cliente@example.com' },
-      provider: { name: 'factus', number: 'FE1001', isValidated: true },
-      creditNotes: [
-        {
-          _id: 'note-1',
-          status: 'validated',
-          validatedAt: new Date('2026-07-12T15:00:00.000Z'),
-          subtotal: 50,
-          taxAmount: 9.5,
-          totalAmount: 59.5,
-          provider: { number: 'NC1', isValidated: true },
-        },
-      ],
+      status: 'validated',
+      validated: true,
+      customer: { businessName: 'Cliente histórico' },
+      channelKey: 'online',
+      channel: 'Tienda web',
+      paymentMethodKey: 'payu',
+      paymentMethod: 'PayU',
+      subtotal: 50,
+      productDiscount: 0,
+      shippingDiscount: 0,
+      totalDiscount: 0,
+      shipping: 0,
+      taxableBase: 50,
+      taxAmount: 9.5,
+      total: 59.5,
     },
     {
-      _id: 'invoice-2',
-      orderId: 'order-2',
+      id: 'invoice-2',
+      documentType: 'invoice',
+      date: new Date('2026-07-15T15:00:00.000Z'),
+      dateKey: '2026-07-15',
+      number: 'Sin número',
       orderNumber: '1002',
       status: 'failed',
-      createdAt: new Date('2026-07-15T15:00:00.000Z'),
-      totals: { taxableBase: 200, taxAmount: 38, total: 238 },
+      validated: false,
       customer: { businessName: 'Cliente fallido' },
-      provider: { name: 'factus' },
-      creditNotes: [],
+      channelKey: 'pos',
+      channel: 'POS',
+      paymentMethodKey: 'cash',
+      paymentMethod: 'Efectivo',
+      subtotal: 200,
+      productDiscount: 0,
+      shippingDiscount: 0,
+      totalDiscount: 0,
+      shipping: 0,
+      taxableBase: 200,
+      taxAmount: 38,
+      total: 238,
     },
     {
-      _id: 'invoice-3',
-      orderId: 'order-3',
-      orderNumber: '1003',
-      status: 'accepted',
-      createdAt: new Date('2026-06-18T15:00:00.000Z'),
-      customer: { businessName: 'Cliente histórico' },
-      provider: { name: 'factus', number: 'FE1003', isValidated: true, validatedAt: '2026-07-18' },
-      creditNotes: [],
-    },
-  ];
-  const orders = [
-    { _id: 'order-1', orderNumber: '1001', source: 'online', payment: { provider: 'wompi' } },
-    { _id: 'order-2', orderNumber: '1002', source: 'pos', payment: { method: 'cash' } },
-    {
-      _id: 'order-3',
-      orderNumber: '1003',
-      source: 'online',
-      payment: { provider: 'payu' },
+      id: 'note-1',
+      documentType: 'credit_note',
+      date: new Date('2026-07-12T15:00:00.000Z'),
+      dateKey: '2026-07-12',
+      number: 'NC1',
+      referenceNumber: 'FE1001',
+      orderNumber: '1001',
+      status: 'validated',
+      validated: true,
+      customer: { businessName: '=Cliente prueba', documentNumber: '123', email: 'cliente@example.com' },
+      channelKey: 'online',
+      channel: 'Tienda web',
+      paymentMethodKey: 'wompi',
+      paymentMethod: 'Wompi',
       subtotal: 50,
+      productDiscount: 0,
+      shippingDiscount: 0,
+      totalDiscount: 0,
+      shipping: 0,
+      taxableBase: 50,
+      taxAmount: 9.5,
       total: 59.5,
-      pricing: { subtotal: 50, taxableBase: 50, taxAmount: 9.5, total: 59.5 },
+    },
+    {
+      id: 'invoice-1',
+      documentType: 'invoice',
+      date: new Date('2026-07-10T15:00:00.000Z'),
+      dateKey: '2026-07-10',
+      number: 'FE1001',
+      orderNumber: '1001',
+      status: 'validated',
+      validated: true,
+      customer: { businessName: '=Cliente prueba', documentNumber: '123', email: 'cliente@example.com' },
+      channelKey: 'online',
+      channel: 'Tienda web',
+      paymentMethodKey: 'wompi',
+      paymentMethod: 'Wompi',
+      subtotal: 110,
+      productDiscount: 10,
+      shippingDiscount: 0,
+      totalDiscount: 10,
+      shipping: 0,
+      taxableBase: 100,
+      taxAmount: 19,
+      total: 119,
     },
   ];
 
-  ElectronicInvoice.find = () => ({ lean: async () => invoices });
-  Order.find = () => ({
-    select() { return this; },
-    lean: async () => orders,
-  });
+  function calculateMetrics(selectedRows) {
+    const invoices = selectedRows.filter((row) => row.documentType === 'invoice');
+    const creditNotes = selectedRows.filter((row) => row.documentType === 'credit_note');
+    const validInvoices = invoices.filter((row) => row.validated);
+    const validCreditNotes = creditNotes.filter((row) => row.validated);
+    const sum = (values) => values.reduce((total, value) => total + Number(value || 0), 0);
+    const invoiced = sum(validInvoices.map((row) => row.total));
+    const credited = sum(validCreditNotes.map((row) => row.total));
+    const invoiceTax = sum(validInvoices.map((row) => row.taxAmount));
+    const creditedTax = sum(validCreditNotes.map((row) => row.taxAmount));
+    const invoiceBase = sum(validInvoices.map((row) => row.taxableBase));
+    const creditedBase = sum(validCreditNotes.map((row) => row.taxableBase));
+
+    return {
+      documents: selectedRows.length,
+      invoices: invoices.length,
+      validatedInvoices: validInvoices.length,
+      creditNotes: creditNotes.length,
+      validatedCreditNotes: validCreditNotes.length,
+      errors: selectedRows.filter((row) => ['rejected', 'failed', 'error'].includes(row.status)).length,
+      invoiced,
+      credited,
+      net: invoiced - credited,
+      discounts: sum(validInvoices.map((row) => row.totalDiscount)),
+      shipping: sum(validInvoices.map((row) => row.shipping)),
+      taxableBase: invoiceBase - creditedBase,
+      invoiceTax,
+      creditedTax,
+      netTax: invoiceTax - creditedTax,
+    };
+  }
+
+  function aggregateResult(pipeline) {
+    const statusMatch = pipeline.find((stage) => stage?.$match?._billingStatus);
+    const selectedRows = statusMatch
+      ? rows.filter((row) => row.status === statusMatch.$match._billingStatus)
+      : rows;
+    const hasFacet = pipeline.some((stage) => stage.$facet);
+    const hasCount = pipeline.some((stage) => stage.$count === 'totalRows');
+
+    if (hasFacet) {
+      return [{
+        metrics: [calculateMetrics(selectedRows)],
+        statuses: [],
+        paymentMethods: [],
+        channels: [],
+        daily: [],
+        rows: selectedRows.slice(0, 30),
+      }];
+    }
+    if (hasCount) return [{ totalRows: selectedRows.length }];
+    return selectedRows;
+  }
+
+  ElectronicInvoice.find = () => {
+    throw new Error('El reporte no debe usar ElectronicInvoice.find.');
+  };
+  Order.find = () => {
+    throw new Error('El reporte no debe usar Order.find.');
+  };
+  ElectronicInvoice.aggregate = (pipeline) => {
+    const result = aggregateResult(pipeline);
+    return {
+      allowDiskUse(value) {
+        if (value === true) controls.allowDiskUse += 1;
+        return this;
+      },
+      option(options) {
+        controls.maxTimeMS.push(options?.maxTimeMS);
+        return this;
+      },
+      async exec() {
+        return result;
+      },
+      cursor(options) {
+        controls.batchSizes.push(options?.batchSize);
+        return {
+          async *[Symbol.asyncIterator]() {
+            for (const row of result) yield row;
+          },
+          async close() {
+            controls.cursorClosed += 1;
+          },
+        };
+      },
+    };
+  };
 
   try {
     const report = await reportService.buildBillingReport({
@@ -285,9 +443,9 @@ async function validateCalculatedReport() {
     };
     const mismatches = Object.entries(expected).filter(([key, value]) => report?.metrics?.[key] !== value);
     if (mismatches.length) {
-      fail(`Cálculo controlado del reporte no concilia: ${JSON.stringify(mismatches)}`);
+      fail(`Cálculo agregado del reporte no concilia: ${JSON.stringify(mismatches)}`);
     } else {
-      ok('Cálculo controlado concilia facturas, errores, notas crédito, neto e IVA');
+      ok('Cálculo agregado concilia facturas, errores, notas crédito, neto e IVA');
     }
 
     const filtered = await reportService.buildBillingReport({
@@ -299,22 +457,49 @@ async function validateCalculatedReport() {
     if (filtered.totalRows !== 3 || filtered.rows.some((row) => row.status !== 'validated')) {
       fail('Filtro validado no conserva exactamente las facturas y la nota crédito validadas');
     } else {
-      ok('Filtros de estado se aplican por igual a facturas y notas crédito');
+      ok('Filtros de estado se aplican dentro de MongoDB a facturas y notas crédito');
     }
 
-    const csv = await reportService.buildBillingReportCsv({
+    const csv = await reportService.prepareBillingReportCsv({
       from: '2026-07-01',
       to: '2026-07-31',
       type: 'all',
       status: 'all',
     });
-    const csvText = csv.buffer.toString('utf8');
-    if (!csvText.startsWith('\uFEFFFecha;') || !csvText.includes('Nota crédito') || csv.totalRows !== 4) {
-      fail('Exportación CSV controlada no contiene todos los documentos filtrados');
+    let csvText = '';
+    const destination = new Writable({
+      write(chunk, encoding, callback) {
+        csvText += chunk.toString('utf8');
+        callback();
+      },
+    });
+    const written = await csv.streamTo(destination);
+    destination.end();
+
+    if (
+      !csvText.startsWith('\uFEFFFecha;') ||
+      !csvText.includes('Nota crédito') ||
+      !csvText.includes("'=Cliente prueba") ||
+      csv.totalRows !== 4 ||
+      written !== 4
+    ) {
+      fail('Exportación CSV por cursor no contiene todos los documentos filtrados');
     } else {
-      ok('Exportación controlada incluye BOM, factura y nota crédito sin recortes');
+      ok('Exportación por cursor incluye BOM, protección Excel y todos los documentos');
+    }
+
+    if (
+      controls.allowDiskUse < 4 ||
+      controls.maxTimeMS.some((value) => value !== 30_000) ||
+      controls.batchSizes[0] !== 250 ||
+      controls.cursorClosed !== 1
+    ) {
+      fail(`Controles de consulta o cursor incompletos: ${JSON.stringify(controls)}`);
+    } else {
+      ok('Agregaciones usan disco, timeout, lotes y cierre explícito del cursor');
     }
   } finally {
+    ElectronicInvoice.aggregate = originalInvoiceAggregate;
     ElectronicInvoice.find = originalInvoiceFind;
     Order.find = originalOrderFind;
   }

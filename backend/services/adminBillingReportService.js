@@ -5,10 +5,18 @@
 
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
+const { once } = require('events');
+const {
+  buildBillingReportCountPipeline,
+  buildBillingReportPipeline,
+  buildBillingReportRowsPipeline,
+} = require('./adminBillingReportAggregationService');
 
 const REPORT_TIME_ZONE = 'America/Bogota';
 const REPORT_OFFSET = '-05:00';
 const MAX_REPORT_DAYS = 366;
+const REPORT_QUERY_TIMEOUT_MS = 30_000;
+const REPORT_CSV_BATCH_SIZE = 250;
 const REPORT_TYPES = new Set(['all', 'invoice', 'credit_note']);
 const REPORT_STATUSES = new Set([
   'all',
@@ -31,10 +39,6 @@ function cleanText(value, max = 180) {
 function money(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : 0;
-}
-
-function sumMoney(values = []) {
-  return money(values.reduce((total, value) => total + money(value), 0));
 }
 
 function reportError(message, code = 'BILLING_REPORT_INVALID_FILTER', status = 400) {
@@ -123,90 +127,6 @@ function normalizeReportFilters(params = {}) {
   };
 }
 
-function parseReportDate(value) {
-  if (!value) return null;
-  const text = String(value);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(text)
-    ? startOfBogotaDay(text)
-    : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function dateInBogota(value) {
-  const date = parseReportDate(value);
-  if (!date) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: REPORT_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function isInRange(value, filters) {
-  const date = parseReportDate(value);
-  return Boolean(
-    date && date >= filters.fromDate && date < filters.toExclusive
-  );
-}
-
-function getInvoiceDate(invoice = {}) {
-  return (
-    invoice.generatedAt ||
-    invoice.acceptedAt ||
-    invoice?.provider?.validatedAt ||
-    invoice?.dianResponse?.issueDate ||
-    invoice.createdAt ||
-    null
-  );
-}
-
-function getCreditNoteDate(note = {}) {
-  return note.validatedAt || note?.provider?.validatedAt || note.createdAt || null;
-}
-
-function invoiceIsValidated(invoice = {}) {
-  const status = cleanText(invoice.status, 40).toLowerCase();
-  const providerStatus = cleanText(
-    invoice?.provider?.status || invoice?.dianResponse?.code,
-    40
-  ).toLowerCase();
-  return (
-    ['accepted', 'validated', 'validada', 'validado'].includes(status) ||
-    ['accepted', 'validated', 'validada', 'validado'].includes(providerStatus) ||
-    invoice?.provider?.isValidated === true ||
-    Boolean(invoice?.provider?.validatedAt || invoice?.acceptedAt)
-  );
-}
-
-function creditNoteIsValidated(note = {}) {
-  const status = cleanText(note.status, 40).toLowerCase();
-  const providerStatus = cleanText(note?.provider?.status, 40).toLowerCase();
-  return (
-    ['accepted', 'validated', 'validada', 'validado'].includes(status) ||
-    ['accepted', 'validated', 'validada', 'validado'].includes(providerStatus) ||
-    note?.provider?.isValidated === true ||
-    Boolean(note?.provider?.validatedAt || note?.validatedAt)
-  );
-}
-
-function normalizeDocumentStatus(document = {}, type = 'invoice') {
-  const validated = type === 'credit_note'
-    ? creditNoteIsValidated(document)
-    : invoiceIsValidated(document);
-  if (validated) return 'validated';
-
-  const value = cleanText(
-    document.status || document?.provider?.status || 'pending',
-    40
-  ).toLowerCase();
-  if (value === 'accepted' || value === 'validada' || value === 'validado') return 'validated';
-  if (REPORT_STATUSES.has(value) && value !== 'all') return value;
-  return 'pending';
-}
-
 function statusLabel(status) {
   const labels = {
     pending: 'Pendiente',
@@ -238,280 +158,167 @@ function customerName(customer = {}) {
   );
 }
 
-function normalizeChannel(order = {}) {
-  const source = cleanText(order.source || order.channel, 50).toLowerCase();
-  if (source === 'pos' || source === 'physical_store') return { key: 'pos', label: 'POS' };
-  if (['online', 'web', 'storefront'].includes(source)) return { key: 'online', label: 'Tienda web' };
-  if (['manual', 'admin'].includes(source)) return { key: 'manual', label: 'Manual' };
-  return { key: source || 'unknown', label: source || 'Sin canal' };
-}
-
-function paymentMethod(order = {}) {
-  const payment = order.payment || {};
-  if (Array.isArray(payment.splitPayments) && payment.splitPayments.length > 1) {
-    return { key: 'split', label: 'Pago dividido' };
+function configureReportAggregation(aggregation) {
+  if (aggregation && typeof aggregation.allowDiskUse === 'function') {
+    aggregation.allowDiskUse(true);
   }
-
-  const key = cleanText(payment.method || payment.provider || 'unknown', 60).toLowerCase();
-  const commonLabels = {
-    cash: 'Efectivo',
-    efectivo: 'Efectivo',
-    card: 'Tarjeta',
-    tarjeta: 'Tarjeta',
-    transfer: 'Transferencia',
-    transferencia: 'Transferencia',
-    wompi: 'Wompi',
-    payu: 'PayU',
-    pos: 'POS',
-    manual: 'Manual',
-    unknown: 'Sin medio de pago',
-  };
-  return {
-    key,
-    label: cleanText(payment.methodLabel || payment.providerLabel, 100) || commonLabels[key] || key,
-  };
+  if (aggregation && typeof aggregation.option === 'function') {
+    aggregation.option({ maxTimeMS: REPORT_QUERY_TIMEOUT_MS });
+  }
+  return aggregation;
 }
 
-function buildInvoiceRow(invoice = {}, order = {}) {
-  const hasInvoiceTotals = invoice.totals && typeof invoice.totals === 'object';
-  const totals = hasInvoiceTotals ? invoice.totals : (order.pricing || {});
-  const subtotal = money(totals.subtotal ?? order.subtotal);
-  const productDiscount = money(totals.productDiscount ?? order?.discount?.amount);
-  const shippingDiscount = money(totals.shippingDiscount);
-  const totalDiscount = money(totals.totalDiscount ?? (productDiscount + shippingDiscount));
-  const shipping = money(totals.shipping ?? order.shipping);
-  const taxableBase = money(totals.taxableBase ?? order?.taxes?.iva?.taxableBase ?? (subtotal - productDiscount));
-  const taxAmount = money(totals.taxAmount ?? order?.taxes?.iva?.amount);
-  const status = normalizeDocumentStatus(invoice, 'invoice');
-  const validated = invoiceIsValidated(invoice);
-  const total = money(totals.total ?? order.total);
-  const date = getInvoiceDate(invoice);
-  const channel = normalizeChannel(order);
-  const payment = paymentMethod(order);
-
-  return {
-    id: String(invoice._id || ''),
-    documentType: 'invoice',
-    documentTypeLabel: documentTypeLabel('invoice'),
-    date: date || null,
-    dateKey: dateInBogota(date),
-    number: invoice.invoiceNumber || invoice?.provider?.number || 'Sin número',
-    referenceNumber: '',
-    orderNumber: invoice.orderNumber || order.orderNumber || '',
-    status,
-    statusLabel: statusLabel(status),
-    validated,
-    customerName: customerName(invoice.customer),
-    customerDocument: cleanText(invoice?.customer?.documentNumber, 80),
-    customerEmail: cleanText(invoice?.customer?.email, 180),
-    channelKey: channel.key,
-    channel: channel.label,
-    paymentMethodKey: payment.key,
-    paymentMethod: payment.label,
-    subtotal,
-    productDiscount,
-    shippingDiscount,
-    totalDiscount,
-    shipping,
-    taxableBase,
-    taxAmount,
-    total,
-    fiscalImpact: validated ? total : 0,
-  };
+async function executeReportAggregation(pipeline) {
+  const aggregation = configureReportAggregation(
+    ElectronicInvoice.aggregate(pipeline)
+  );
+  if (aggregation && typeof aggregation.exec === 'function') {
+    return aggregation.exec();
+  }
+  return aggregation;
 }
 
-function buildCreditNoteRow(invoice = {}, note = {}, index = 0, order = {}) {
-  const status = normalizeDocumentStatus(note, 'credit_note');
-  const validated = creditNoteIsValidated(note);
-  const total = money(note.totalAmount || note.total || note.amount);
-  const date = getCreditNoteDate(note);
-  const channel = normalizeChannel(order);
-  const payment = paymentMethod(order);
+function createReportRowsCursor(pipeline) {
+  const aggregation = configureReportAggregation(
+    ElectronicInvoice.aggregate(pipeline)
+  );
+  if (!aggregation || typeof aggregation.cursor !== 'function') {
+    throw reportError(
+      'No fue posible iniciar la exportación por lotes.',
+      'BILLING_REPORT_CURSOR_UNAVAILABLE',
+      503
+    );
+  }
+  return aggregation.cursor({ batchSize: REPORT_CSV_BATCH_SIZE });
+}
 
+function emptyMetrics() {
   return {
-    id: String(note._id || `${invoice._id || 'invoice'}-${index}`),
-    documentType: 'credit_note',
-    documentTypeLabel: documentTypeLabel('credit_note'),
-    date: date || null,
-    dateKey: dateInBogota(date),
-    number: note?.provider?.number || note.number || note.referenceCode || 'Sin número',
-    referenceNumber: invoice.invoiceNumber || invoice?.provider?.number || note.billNumber || '',
-    orderNumber: invoice.orderNumber || order.orderNumber || '',
-    status,
-    statusLabel: statusLabel(status),
-    validated,
-    customerName: customerName(invoice.customer),
-    customerDocument: cleanText(invoice?.customer?.documentNumber, 80),
-    customerEmail: cleanText(invoice?.customer?.email, 180),
-    channelKey: channel.key,
-    channel: channel.label,
-    paymentMethodKey: payment.key,
-    paymentMethod: payment.label,
-    subtotal: money(note.subtotal),
-    productDiscount: 0,
-    shippingDiscount: 0,
-    totalDiscount: 0,
+    documents: 0,
+    invoices: 0,
+    validatedInvoices: 0,
+    creditNotes: 0,
+    validatedCreditNotes: 0,
+    errors: 0,
+    invoiced: 0,
+    credited: 0,
+    net: 0,
+    discounts: 0,
     shipping: 0,
-    taxableBase: money(note.subtotal),
-    taxAmount: money(note.taxAmount),
+    taxableBase: 0,
+    invoiceTax: 0,
+    creditedTax: 0,
+    netTax: 0,
+  };
+}
+
+function normalizeMetrics(value = {}) {
+  const normalized = emptyMetrics();
+  Object.keys(normalized).forEach((key) => {
+    normalized[key] = key === 'documents' ||
+      key === 'invoices' ||
+      key === 'validatedInvoices' ||
+      key === 'creditNotes' ||
+      key === 'validatedCreditNotes' ||
+      key === 'errors'
+      ? Math.max(0, Math.floor(Number(value[key] || 0)))
+      : money(value[key]);
+  });
+  return normalized;
+}
+
+function normalizeBreakdownRows(rows = [], kind = '') {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    key: cleanText(row?.key || 'unknown', 80),
+    label: kind === 'status'
+      ? statusLabel(cleanText(row?.key || 'pending', 40))
+      : cleanText(row?.label || row?.key || 'Sin dato', 120),
+    documents: Math.max(0, Math.floor(Number(row?.documents || 0))),
+    invoices: Math.max(0, Math.floor(Number(row?.invoices || 0))),
+    creditNotes: Math.max(0, Math.floor(Number(row?.creditNotes || 0))),
+    invoiced: money(row?.invoiced),
+    credited: money(row?.credited),
+    net: money(row?.net),
+  }));
+}
+
+function normalizeAggregatedRow(row = {}) {
+  const documentType = row.documentType === 'credit_note'
+    ? 'credit_note'
+    : 'invoice';
+  const status = cleanText(row.status || 'pending', 40).toLowerCase();
+  const validated = row.validated === true;
+  const total = money(row.total);
+  const customer = row.customer || {};
+
+  return {
+    id: String(row.id || ''),
+    documentType,
+    documentTypeLabel: documentTypeLabel(documentType),
+    date: row.date || null,
+    dateKey: cleanText(row.dateKey, 10),
+    number: row.number || 'Sin número',
+    referenceNumber: row.referenceNumber || '',
+    orderNumber: row.orderNumber || '',
+    status,
+    statusLabel: statusLabel(status),
+    validated,
+    customerName: customerName(customer),
+    customerDocument: cleanText(customer.documentNumber, 80),
+    customerEmail: cleanText(customer.email, 180),
+    channelKey: cleanText(row.channelKey || 'unknown', 60),
+    channel: cleanText(row.channel || 'Sin canal', 100),
+    paymentMethodKey: cleanText(row.paymentMethodKey || 'unknown', 60),
+    paymentMethod: cleanText(row.paymentMethod || 'Sin medio de pago', 100),
+    subtotal: money(row.subtotal),
+    productDiscount: money(row.productDiscount),
+    shippingDiscount: money(row.shippingDiscount),
+    totalDiscount: money(row.totalDiscount),
+    shipping: money(row.shipping),
+    taxableBase: money(row.taxableBase),
+    taxAmount: money(row.taxAmount),
     total,
-    fiscalImpact: validated ? money(-total) : 0,
+    fiscalImpact: validated
+      ? money(documentType === 'credit_note' ? -total : total)
+      : 0,
   };
 }
 
-function candidateDateFilter(filters) {
-  const range = { $gte: filters.fromDate, $lt: filters.toExclusive };
-  const clauses = [];
-  if (filters.type !== 'credit_note') {
-    clauses.push(
-      { createdAt: range },
-      { generatedAt: range },
-      { acceptedAt: range },
-      { 'provider.validatedAt': { $gte: filters.from, $lte: `${filters.to}T23:59:59` } },
-      { 'dianResponse.issueDate': { $gte: filters.from, $lte: filters.to } }
-    );
-  }
-  if (filters.type !== 'invoice') {
-    clauses.push(
-      { 'creditNotes.createdAt': range },
-      { 'creditNotes.validatedAt': range },
-      { 'creditNotes.provider.validatedAt': { $gte: filters.from, $lte: `${filters.to}T23:59:59` } }
-    );
-  }
-  return { $or: clauses };
-}
-
-function addBreakdownValue(map, key, label, row) {
-  if (!map.has(key)) {
-    map.set(key, {
-      key,
-      label,
-      documents: 0,
-      invoices: 0,
-      creditNotes: 0,
-      invoiced: 0,
-      credited: 0,
-      net: 0,
-    });
-  }
-  const entry = map.get(key);
-  entry.documents += 1;
-  if (row.documentType === 'credit_note') {
-    entry.creditNotes += 1;
-    if (row.validated) entry.credited = money(entry.credited + row.total);
-  } else {
-    entry.invoices += 1;
-    if (row.validated) entry.invoiced = money(entry.invoiced + row.total);
-  }
-  entry.net = money(entry.invoiced - entry.credited);
-}
-
-function buildBreakdowns(rows = []) {
-  const statuses = new Map();
-  const paymentMethods = new Map();
-  const channels = new Map();
-  const daily = new Map();
-
-  rows.forEach((row) => {
-    addBreakdownValue(statuses, row.status, row.statusLabel, row);
-    addBreakdownValue(paymentMethods, row.paymentMethodKey, row.paymentMethod, row);
-    addBreakdownValue(channels, row.channelKey, row.channel, row);
-    addBreakdownValue(daily, row.dateKey || 'sin-fecha', row.dateKey || 'Sin fecha', row);
-  });
-
-  const byDocuments = (a, b) => b.documents - a.documents || a.label.localeCompare(b.label, 'es');
+function publicFilters(filters) {
   return {
-    statuses: [...statuses.values()].sort(byDocuments),
-    paymentMethods: [...paymentMethods.values()].sort((a, b) => b.net - a.net || byDocuments(a, b)),
-    channels: [...channels.values()].sort((a, b) => b.net - a.net || byDocuments(a, b)),
-    daily: [...daily.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    from: filters.from,
+    to: filters.to,
+    days: filters.days,
+    type: filters.type,
+    status: filters.status,
+    timeZone: filters.timeZone,
   };
 }
 
-function buildMetrics(rows = []) {
-  const invoices = rows.filter((row) => row.documentType === 'invoice');
-  const creditNotes = rows.filter((row) => row.documentType === 'credit_note');
-  const validInvoices = invoices.filter((row) => row.validated);
-  const validCreditNotes = creditNotes.filter((row) => row.validated);
-  const errorStatuses = new Set(['rejected', 'failed', 'error']);
-
-  const invoiced = sumMoney(validInvoices.map((row) => row.total));
-  const credited = sumMoney(validCreditNotes.map((row) => row.total));
-  const invoiceTax = sumMoney(validInvoices.map((row) => row.taxAmount));
-  const creditedTax = sumMoney(validCreditNotes.map((row) => row.taxAmount));
-  const invoiceTaxableBase = sumMoney(validInvoices.map((row) => row.taxableBase));
-  const creditedTaxableBase = sumMoney(validCreditNotes.map((row) => row.taxableBase));
-
-  return {
-    documents: rows.length,
-    invoices: invoices.length,
-    validatedInvoices: validInvoices.length,
-    creditNotes: creditNotes.length,
-    validatedCreditNotes: validCreditNotes.length,
-    errors: rows.filter((row) => errorStatuses.has(row.status)).length,
-    invoiced,
-    credited,
-    net: money(invoiced - credited),
-    discounts: sumMoney(validInvoices.map((row) => row.totalDiscount)),
-    shipping: sumMoney(validInvoices.map((row) => row.shipping)),
-    taxableBase: money(invoiceTaxableBase - creditedTaxableBase),
-    invoiceTax,
-    creditedTax,
-    netTax: money(invoiceTax - creditedTax),
-  };
-}
-
-async function loadReportRows(filters) {
-  const invoices = await ElectronicInvoice.find(candidateDateFilter(filters)).lean();
-  const orderIds = [...new Set(invoices.map((invoice) => String(invoice.orderId || '')).filter(Boolean))];
-  const orders = orderIds.length
-    ? await Order.find({ _id: { $in: orderIds } })
-        .select('orderNumber source channel saleType payment subtotal shipping total taxes discount pricing')
-        .lean()
-    : [];
-  const orderById = new Map(orders.map((order) => [String(order._id), order]));
-  const rows = [];
-
-  invoices.forEach((invoice) => {
-    const order = orderById.get(String(invoice.orderId || '')) || {};
-    if (filters.type !== 'credit_note' && isInRange(getInvoiceDate(invoice), filters)) {
-      rows.push(buildInvoiceRow(invoice, order));
-    }
-
-    if (filters.type !== 'invoice') {
-      (Array.isArray(invoice.creditNotes) ? invoice.creditNotes : []).forEach((note, index) => {
-        if (isInRange(getCreditNoteDate(note), filters)) {
-          rows.push(buildCreditNoteRow(invoice, note, index, order));
-        }
-      });
-    }
-  });
-
-  const filtered = filters.status === 'all'
-    ? rows
-    : rows.filter((row) => row.status === filters.status);
-
-  return filtered.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-}
-
-async function buildBillingReport(params = {}, options = {}) {
+async function buildBillingReport(params = {}) {
   const filters = normalizeReportFilters(params);
-  const rows = await loadReportRows(filters);
-  const rowLimit = options.allRows === true ? rows.length : 30;
+  const pipeline = buildBillingReportPipeline({
+    filters,
+    orderCollectionName: Order.collection?.name || 'orders',
+    rowLimit: 30,
+  });
+  const [result = {}] = await executeReportAggregation(pipeline);
+  const metrics = normalizeMetrics(
+    Array.isArray(result.metrics) ? result.metrics[0] : null
+  );
 
   return {
-    filters: {
-      from: filters.from,
-      to: filters.to,
-      days: filters.days,
-      type: filters.type,
-      status: filters.status,
-      timeZone: filters.timeZone,
+    filters: publicFilters(filters),
+    metrics,
+    breakdowns: {
+      statuses: normalizeBreakdownRows(result.statuses, 'status'),
+      paymentMethods: normalizeBreakdownRows(result.paymentMethods),
+      channels: normalizeBreakdownRows(result.channels),
+      daily: normalizeBreakdownRows(result.daily),
     },
-    metrics: buildMetrics(rows),
-    breakdowns: buildBreakdowns(rows),
-    rows: rows.slice(0, rowLimit),
-    totalRows: rows.length,
+    rows: (Array.isArray(result.rows) ? result.rows : [])
+      .map(normalizeAggregatedRow),
+    totalRows: metrics.documents,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -531,75 +338,113 @@ function csvMoney(value) {
   return money(value).toFixed(2).replace('.', ',');
 }
 
-async function buildBillingReportCsv(params = {}) {
-  const report = await buildBillingReport(params, { allRows: true });
-  const headers = [
-    'Fecha',
-    'Tipo documento',
-    'Número',
-    'Factura relacionada',
-    'Estado',
-    'Validado',
-    'Orden',
-    'Cliente',
-    'Documento cliente',
-    'Correo cliente',
-    'Canal',
-    'Medio de pago',
-    'Subtotal',
-    'Descuento productos',
-    'Descuento envío',
-    'Descuento total',
-    'Envío',
-    'Base gravable',
-    'IVA',
-    'Total documento',
-    'Impacto fiscal neto',
-  ];
-  const lines = [headers.map(csvCell).join(';')];
+const CSV_HEADERS = [
+  'Fecha',
+  'Tipo documento',
+  'Número',
+  'Factura relacionada',
+  'Estado',
+  'Validado',
+  'Orden',
+  'Cliente',
+  'Documento cliente',
+  'Correo cliente',
+  'Canal',
+  'Medio de pago',
+  'Subtotal',
+  'Descuento productos',
+  'Descuento envío',
+  'Descuento total',
+  'Envío',
+  'Base gravable',
+  'IVA',
+  'Total documento',
+  'Impacto fiscal neto',
+];
 
-  report.rows.forEach((row) => {
-    const identity = [
-      row.dateKey,
-      row.documentTypeLabel,
-      row.number,
-      row.referenceNumber,
-      row.statusLabel,
-      row.validated ? 'Sí' : 'No',
-      row.orderNumber,
-      row.customerName,
-      row.customerDocument,
-      row.customerEmail,
-      row.channel,
-      row.paymentMethod,
-    ].map(csvCell);
-    const amounts = [
-      csvMoney(row.subtotal),
-      csvMoney(row.productDiscount),
-      csvMoney(row.shippingDiscount),
-      csvMoney(row.totalDiscount),
-      csvMoney(row.shipping),
-      csvMoney(row.taxableBase),
-      csvMoney(row.taxAmount),
-      csvMoney(row.total),
-      csvMoney(row.fiscalImpact),
-    ].map((value) => csvCell(value, false));
-    lines.push([...identity, ...amounts].join(';'));
+function buildCsvLine(row) {
+  const identity = [
+    row.dateKey,
+    row.documentTypeLabel,
+    row.number,
+    row.referenceNumber,
+    row.statusLabel,
+    row.validated ? 'Sí' : 'No',
+    row.orderNumber,
+    row.customerName,
+    row.customerDocument,
+    row.customerEmail,
+    row.channel,
+    row.paymentMethod,
+  ].map(csvCell);
+  const amounts = [
+    csvMoney(row.subtotal),
+    csvMoney(row.productDiscount),
+    csvMoney(row.shippingDiscount),
+    csvMoney(row.totalDiscount),
+    csvMoney(row.shipping),
+    csvMoney(row.taxableBase),
+    csvMoney(row.taxAmount),
+    csvMoney(row.total),
+    csvMoney(row.fiscalImpact),
+  ].map((value) => csvCell(value, false));
+  return [...identity, ...amounts].join(';');
+}
+
+async function writeCsvChunk(writable, chunk) {
+  if (writable.destroyed || writable.writableEnded) return false;
+  if (writable.write(chunk)) return true;
+  await once(writable, 'drain');
+  return !(writable.destroyed || writable.writableEnded);
+}
+
+async function prepareBillingReportCsv(params = {}) {
+  const filters = normalizeReportFilters(params);
+  const orderCollectionName = Order.collection?.name || 'orders';
+  const countPipeline = buildBillingReportCountPipeline({
+    filters,
+    orderCollectionName,
   });
+  const [count = {}] = await executeReportAggregation(countPipeline);
+  const totalRows = Math.max(0, Math.floor(Number(count.totalRows || 0)));
 
   return {
-    buffer: Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8'),
-    fileName: `reporte-facturacion-${report.filters.from}-a-${report.filters.to}.csv`,
+    fileName: `reporte-facturacion-${filters.from}-a-${filters.to}.csv`,
     contentType: 'text/csv; charset=utf-8',
-    totalRows: report.totalRows,
+    totalRows,
+    async streamTo(writable) {
+      const rowsPipeline = buildBillingReportRowsPipeline({
+        filters,
+        orderCollectionName,
+      });
+      const cursor = createReportRowsCursor(rowsPipeline);
+      let rowsWritten = 0;
+
+      try {
+        const header = `\uFEFF${CSV_HEADERS.map(csvCell).join(';')}`;
+        if (!(await writeCsvChunk(writable, header))) return rowsWritten;
+
+        for await (const rawRow of cursor) {
+          const row = normalizeAggregatedRow(rawRow);
+          if (!(await writeCsvChunk(writable, `\r\n${buildCsvLine(row)}`))) {
+            break;
+          }
+          rowsWritten += 1;
+        }
+      } finally {
+        if (cursor && typeof cursor.close === 'function') {
+          await cursor.close().catch(() => {});
+        }
+      }
+
+      return rowsWritten;
+    },
   };
 }
 
 module.exports = {
   REPORT_TIME_ZONE,
   buildBillingReport,
-  buildBillingReportCsv,
-  buildCreditNoteRow,
-  buildInvoiceRow,
   normalizeReportFilters,
+  prepareBillingReportCsv,
 };

@@ -419,6 +419,34 @@ ElectronicInvoiceSchema.index({ 'creditNotes.referenceCode': 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.idempotencyKey': 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.status': 1 });
 ElectronicInvoiceSchema.index(
+  { generatedAt: -1 },
+  { name: 'billing_report_generated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { acceptedAt: -1 },
+  { name: 'billing_report_accepted_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'provider.validatedAt': -1 },
+  { name: 'billing_report_provider_validated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'dianResponse.issueDate': -1 },
+  { name: 'billing_report_dian_issue_date' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.createdAt': -1 },
+  { name: 'billing_report_credit_note_created_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.validatedAt': -1 },
+  { name: 'billing_report_credit_note_validated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.provider.validatedAt': -1 },
+  { name: 'billing_report_credit_note_provider_validated_at' }
+);
+ElectronicInvoiceSchema.index(
   {
     'creditNotes.status': 1,
     'creditNotes.type': 1,
