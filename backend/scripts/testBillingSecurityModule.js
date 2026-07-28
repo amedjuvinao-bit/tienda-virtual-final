@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const {
   buildAdminSiteSettings,
@@ -203,7 +204,7 @@ function validateNoCredentialLeaksInPaymentResponses() {
 }
 
 function validateFrontendPermissionAwareness() {
-  const page = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const page = readBillingFrontendSource();
   const modal = read('frontend/src/admin/orders/electronicInvoice/ElectronicInvoiceModal.jsx');
   const settings = read('frontend/src/admin/configuracion/sections/FacturacionSection.jsx');
   const provider = read('frontend/src/admin/configuracion/sections/facturacion/ElectronicProviderBlock.jsx');
