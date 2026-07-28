@@ -4,13 +4,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const BACKEND_ROOT = path.join(__dirname, '..');
 const PROJECT_ROOT = path.join(BACKEND_ROOT, '..');
 const serviceFile = fs.readFileSync(path.join(BACKEND_ROOT, 'services', 'adminBillingReportService.js'), 'utf8');
 const routesFile = fs.readFileSync(path.join(BACKEND_ROOT, 'routes', 'adminBilling.js'), 'utf8');
 const apiFile = fs.readFileSync(path.join(PROJECT_ROOT, 'frontend', 'src', 'admin', 'billing', 'api', 'adminBillingApi.js'), 'utf8');
-const pageFile = fs.readFileSync(path.join(PROJECT_ROOT, 'frontend', 'src', 'admin', 'billing', 'AdminBillingPage.jsx'), 'utf8');
+const pageFile = readBillingFrontendSource();
 const packageFile = fs.readFileSync(path.join(BACKEND_ROOT, 'package.json'), 'utf8');
 const closureFile = fs.readFileSync(path.join(BACKEND_ROOT, 'scripts', 'testBillingModuleClosure.js'), 'utf8');
 const ElectronicInvoice = require(path.join(BACKEND_ROOT, 'models', 'ElectronicInvoice'));
