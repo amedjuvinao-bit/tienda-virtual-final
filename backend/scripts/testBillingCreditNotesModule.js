@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -74,7 +75,7 @@ function validateFrontendCreditNotesApi() {
 }
 
 function validateFrontendCreditNotesTab() {
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
 
   [
     "id: 'notas-credito'",
@@ -99,7 +100,7 @@ function validateCreditNotesTableLayout() {
   const legacyCss = read('frontend/src/admin/billing/billingDocumentsLayout.css');
   const stabilityCss = read('frontend/src/admin/billing/billingLayoutStability.css');
   const mainFile = read('frontend/src/main.jsx');
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
 
   [
     'Tabla interna de Notas crédito: evita columna derecha mocha.',
@@ -133,7 +134,7 @@ function validateCreditNotesTableLayout() {
 }
 
 function validateSummaryIncludesCreditNotes() {
-  const pageFile = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const pageFile = readBillingFrontendSource();
   const serviceFile = read('backend/services/adminBillingService.js');
 
   assertIncludes(serviceFile, 'creditNotes,', 'Resumen backend no devuelve conteo de notas crédito.');
