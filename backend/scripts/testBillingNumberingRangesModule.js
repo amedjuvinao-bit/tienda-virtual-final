@@ -3,6 +3,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readBillingConfigurationFrontendSource,
+} = require('./lib/readBillingConfigurationFrontendSource');
 
 process.env.BILLING_ENCRYPTION_KEY =
   process.env.BILLING_ENCRYPTION_KEY ||
@@ -395,9 +398,7 @@ function testFrontendHasNoManualFiscalRangeFields() {
   const resolution = read(
     'frontend/src/admin/configuracion/sections/facturacion/DianResolutionBlock.jsx'
   );
-  const section = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const section = readBillingConfigurationFrontendSource();
 
   assert(block.includes('Consultar rangos oficiales'), 'Falta consulta desde el panel.');
   assert(block.includes('Guardar rangos seleccionados'), 'Falta guardar la selección.');
@@ -458,9 +459,7 @@ function testSavedRangesRefreshThePersistedSnapshot() {
   const resolution = read(
     'frontend/src/admin/configuracion/sections/facturacion/DianResolutionBlock.jsx'
   );
-  const section = read(
-    'frontend/src/admin/configuracion/sections/FacturacionSection.jsx'
-  );
+  const section = readBillingConfigurationFrontendSource();
   const route = read('backend/routes/dianProviderTest.js');
 
   assert(
