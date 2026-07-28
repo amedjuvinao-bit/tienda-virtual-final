@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readBillingFrontendSource } = require('./lib/readBillingFrontendSource');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -100,7 +101,7 @@ function validateProtectedManualResend() {
 
 function validateFrontend() {
   const api = read('frontend/src/admin/billing/api/adminBillingApi.js');
-  const page = read('frontend/src/admin/billing/AdminBillingPage.jsx');
+  const page = readBillingFrontendSource();
 
   includes(api, 'sendBillingDocumentEmail', 'El frontend no conecta el envío.');
   includes(page, 'Correo: {getEmailStatusLabel', 'No muestra el estado del correo.');
