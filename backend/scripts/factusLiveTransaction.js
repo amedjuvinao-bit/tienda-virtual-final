@@ -268,7 +268,7 @@ function buildOrderPayload({ orderNumber, tampered = false }) {
     },
     payment: {
       active: true,
-      provider: 'cash',
+      provider: 'pos',
       providerLabel: 'Efectivo',
       mode: 'sandbox',
       currency: 'COP',
