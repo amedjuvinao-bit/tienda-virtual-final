@@ -186,8 +186,8 @@ async function run() {
         variants: [
           {
             variantKey: 'unica__negro',
-            label: 'Única / Negro',
-            size: 'Única',
+            label: 'Unica / Negro',
+            size: 'Unica',
             color: 'Negro',
             sku: `${PREFIX}-CMP-UN-NE`,
             initialStock: 0,
@@ -220,7 +220,7 @@ async function run() {
             title: component.title,
             sku: `${PREFIX}-CMP-UN-NE`,
             productType: 'physical',
-            size: 'Única',
+            size: 'Unica',
             color: 'Negro',
             trackInventory: true,
             allowBackorder: false,
@@ -284,7 +284,7 @@ async function run() {
         product: component._id,
         variantKey: 'unica__negro',
         variant: {
-          size: 'Única',
+          size: 'Unica',
           color: 'Negro',
           sku: `${PREFIX}-CMP-UN-NE`,
         },
