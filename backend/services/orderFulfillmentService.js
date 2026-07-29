@@ -365,7 +365,7 @@ async function processOrderFulfillmentAfterPayment(
     _id: { $in: productIds },
   })
     .select(
-      'title productType digitalDelivery serviceDelivery +digitalDelivery.assetUrl +digitalDelivery.customerMessage +serviceDelivery.bookingUrl +serviceDelivery.internalInstructions'
+      'title productType digitalDelivery.deliveryMode digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions +digitalDelivery.assetUrl +digitalDelivery.customerMessage +serviceDelivery.bookingUrl +serviceDelivery.internalInstructions'
     )
     .lean();
   const productMap = new Map(
