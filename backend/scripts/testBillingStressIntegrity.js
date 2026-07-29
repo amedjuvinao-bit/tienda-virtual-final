@@ -28,6 +28,10 @@ const {
   INVOICE_LOCK_MS,
   createBillingInvoiceRecoveryService,
 } = require('../services/billingInvoiceRecoveryService');
+const {
+  buildRuntimeFactusConfig,
+  encryptBillingSecret,
+} = require('../lib/billing/billingConfigurationSecurity');
 
 const ORDER_COUNT = 500;
 const REQUESTS_PER_ORDER = 8;
@@ -402,7 +406,11 @@ function buildBillingSettings() {
       },
       electronicProvider: {
         provider: 'factus',
-        apiUrl: 'https://simulator.invalid',
+        apiUrl: 'https://api-sandbox.factus.com.co',
+        clientId: 'billing-stress-client',
+        clientSecret: encryptBillingSecret('billing-stress-client-secret'),
+        username: 'billing-stress@example.invalid',
+        password: encryptBillingSecret('billing-stress-password'),
         numberingRangeId: 1,
       },
       legalTexts: {
@@ -422,6 +430,9 @@ function buildBillingSettings() {
 }
 
 function validatePlan() {
+  const runtimeProvider = buildRuntimeFactusConfig(
+    buildBillingSettings().billing
+  );
   const declaredOrders = SCENARIOS.reduce((sum, item) => sum + item.count, 0);
   const billableOrders = SCENARIOS.filter((item) => item.billable).reduce(
     (sum, item) => sum + item.count,
@@ -455,6 +466,15 @@ function validatePlan() {
     expectedStatus('post_provider_crash', 'final') === 'processing' &&
       expectedStatus('post_provider_crash', 'recovered') === 'accepted',
     'El auditor no reconoce la transición de resultado incierto a factura aceptada.'
+  );
+  assert(
+    runtimeProvider.apiUrl === 'https://api-sandbox.factus.com.co' &&
+      runtimeProvider.environment === 'habilitacion' &&
+      runtimeProvider.clientId === 'billing-stress-client' &&
+      runtimeProvider.clientSecret === 'billing-stress-client-secret' &&
+      runtimeProvider.username === 'billing-stress@example.invalid' &&
+      runtimeProvider.password === 'billing-stress-password',
+    'La prueba de choque no construye una configuración aislada válida de Factus.'
   );
 
   const payloads = Array.from({ length: ORDER_COUNT }, (_, index) => {
