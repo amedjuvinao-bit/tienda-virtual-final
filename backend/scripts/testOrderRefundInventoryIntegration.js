@@ -298,6 +298,7 @@ async function run() {
 
     const order = await Order.create({
       orderNumber: `${PREFIX}-001`,
+      sessionId: `${PREFIX}-SESSION`,
       status: 'paid',
       total: 400000,
       subtotal: 400000,
