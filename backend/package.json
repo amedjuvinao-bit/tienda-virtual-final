@@ -26,6 +26,7 @@
     "test:product-taxonomy": "node scripts/testProductTaxonomyIntegration.js",
     "test:product-archive": "node scripts/testProductArchiveIntegrity.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",
+    "test:products-final-closure": "node scripts/testProductsFinalClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",
     "test:finance-module": "node scripts/testFinanceModuleClosure.js",
     "test:coupons-backend": "node scripts/testCouponsBackendModule.js",

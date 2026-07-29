@@ -3,6 +3,7 @@ name: Productos CI
 on:
   push:
     branches:
+      - main
       - feature/productos-comercial-avanzado
   pull_request:
     branches:
@@ -17,6 +18,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-security:
+    name: Seguridad de dependencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Auditar backend
+        run: node .github/scripts/audit-production-dependencies.cjs backend
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Auditar frontend
+        run: node .github/scripts/audit-production-dependencies.cjs frontend
+
   products-integrity:
     name: Integridad de productos
     runs-on: ubuntu-latest
@@ -51,6 +81,9 @@ jobs:
 
       - name: Validar digitales, servicios y combos
         run: npm --prefix backend run test:products-fulfillment
+
+      - name: Validar contrato de cierre
+        run: npm --prefix backend run test:products-final-closure
 
   products-mongodb:
     name: Productos e inventario
