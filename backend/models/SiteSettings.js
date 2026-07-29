@@ -371,6 +371,8 @@ const BillingSettingsSchema = new Schema(
       // ✅ Campos necesarios para preparar cálculo CUFE / ambiente DIAN
       technicalKey: { type: String, default: "" },
       environment: { type: String, enum: ["1", "2"], default: "2" },
+      numberingRangeId: { type: Number, min: 0, default: 0 },
+      creditNoteNumberingRangeId: { type: Number, min: 0, default: 0 },
     },
 
     // ✅ Configuración DIAN administrable por usuario
@@ -426,7 +428,7 @@ const BillingSettingsSchema = new Schema(
     electronicProvider: {
       provider: {
         type: String,
-        enum: ["mock", "dian", "factus", "carvajal", "siigo", "alegra", ""],
+        enum: ["mock", "factus", ""],
         default: "mock",
       },
 
@@ -445,6 +447,14 @@ const BillingSettingsSchema = new Schema(
       lastConnectionStatus: { type: String, default: "" },
       lastConnectionMessage: { type: String, default: "" },
       lastConnectionAt: { type: Date, default: null },
+      lastConnectionEnvironment: { type: String, default: "" },
+      lastConnectionFingerprint: { type: String, default: "", select: false },
+      lastConnectionCompany: { type: Schema.Types.Mixed, default: null },
+      numberingRangeId: { type: Number, min: 0, default: 0 },
+      creditNoteNumberingRangeId: { type: Number, min: 0, default: 0 },
+      numberingRangesEnvironment: { type: String, default: "" },
+      numberingRangesFingerprint: { type: String, default: "", select: false },
+      numberingRangesSyncedAt: { type: Date, default: null },
     },
 
     legalTexts: {
@@ -462,6 +472,17 @@ const BillingSettingsSchema = new Schema(
     },
   },
   { _id: false, strict: false }
+);
+
+const BillingHistoryEntrySchema = new Schema(
+  {
+    revision: { type: Number, required: true, min: 0 },
+    snapshot: { type: Schema.Types.Mixed, required: true },
+    changedAt: { type: Date, required: true, default: Date.now },
+    changedBy: { type: String, default: "admin" },
+    reason: { type: String, default: "update" },
+  },
+  { _id: true }
 );
 
 /* ========== SiteSettings ========== */
@@ -490,6 +511,12 @@ const SiteSettingsSchema = new Schema(
     billing: {
       type: BillingSettingsSchema,
       default: () => ({}),
+    },
+    billingRevision: { type: Number, min: 0, default: 0 },
+    billingHistory: {
+      type: [BillingHistoryEntrySchema],
+      default: [],
+      select: false,
     },
 
     menus: {

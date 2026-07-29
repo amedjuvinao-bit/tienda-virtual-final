@@ -4,6 +4,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+  },
   server: {
     host: 'localhost',
     port: 5173,
@@ -24,5 +28,21 @@ export default defineConfig({
     allowedHosts: [
       'legged-hacker-unworldly.ngrok-free.dev',
     ],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': [
+            'keen-slider',
+            'lucide-react',
+            'react-range',
+            'react-toastify',
+          ],
+          'vendor-http': ['axios'],
+        },
+      },
+    },
   },
 })

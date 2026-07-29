@@ -2,7 +2,9 @@
 const express = require('express');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const {
+  CloudinaryMulterStorage,
+} = require('../lib/uploads/cloudinaryMulterStorage');
 const { env } = require('../config/env');
 
 const router = express.Router();
@@ -23,7 +25,7 @@ if (!cloudinaryReady) {
   console.warn('Cloudinary backend no esta completamente configurado. La subida de archivos respondera 503 hasta configurar CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.');
 }
 
-const storage = new CloudinaryStorage({
+const storage = new CloudinaryMulterStorage({
   cloudinary,
   params: async (req, file) => {
     return {

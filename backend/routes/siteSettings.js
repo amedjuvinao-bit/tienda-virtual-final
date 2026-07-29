@@ -4,6 +4,12 @@ const router = express.Router();
 
 const SiteSettings = require("../models/SiteSettings");
 const requireAdmin = require("../middleware/requireAdmin");
+const requirePermission = require("../middleware/requirePermission");
+const {
+  buildAdminSiteSettings,
+  buildPublicSiteSettings,
+  stripProtectedWriteFields,
+} = require("../lib/siteSettingsSecurity");
 
 /**
  * 🔎 Ping de diagnóstico
@@ -374,16 +380,51 @@ async function ensureStoreExists() {
  * Devuelve el documento (crea uno por defecto si no existe)
  * ✅ Autocorrige theme.sections si el documento es viejo
  */
+async function loadSettingsDocument() {
+  await ensureSingletonId();
+  await ensureThemeSectionsExists();
+  await ensureAdminAppearanceExists();
+  await ensureBillingExists();
+  await ensureStoreExists();
+
+  return SiteSettings.findOne().lean();
+}
+
+function requireSensitiveSettingsPermissions(req, res, next) {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const requiredPermissions = [];
+
+  if (body.billing && typeof body.billing === "object") {
+    requiredPermissions.push("billing:settings");
+  }
+
+  if (body?.theme?.global?.payments) {
+    requiredPermissions.push("settings:payments");
+  }
+
+  if (!requiredPermissions.length) return next();
+
+  return requirePermission(requiredPermissions)(req, res, next);
+}
+
+router.get(
+  "/admin",
+  requireAdmin,
+  requirePermission("settings:view"),
+  async (_req, res, next) => {
+    try {
+      const doc = await loadSettingsDocument();
+      res.json(buildAdminSiteSettings(doc));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.get("/", async (_req, res, next) => {
   try {
-    await ensureSingletonId();
-    await ensureThemeSectionsExists();
-    await ensureAdminAppearanceExists();
-    await ensureBillingExists();
-    await ensureStoreExists();
-
-    const doc = await SiteSettings.findOne().lean();
-    res.json(doc);
+    const doc = await loadSettingsDocument();
+    res.json(buildPublicSiteSettings(doc));
   } catch (err) {
     next(err);
   }
@@ -394,7 +435,7 @@ router.get("/", async (_req, res, next) => {
  * Guarda cambios de theme, menus, admin, loginAdmin, billing y/o store (solo admin)
  * body: { theme?, menus?, admin?, loginAdmin?, billing?, store?, updatedBy? }
  */
-router.put("/", requireAdmin, async (req, res, next) => {
+router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
     const { theme, menus, admin, loginAdmin, billing, store } = req.body || {};
 
@@ -453,7 +494,7 @@ router.put("/", requireAdmin, async (req, res, next) => {
 
     if (billing) {
       const flatBilling = flattenForSet(billing, "billing");
-      Object.assign($set, flatBilling);
+      Object.assign($set, stripProtectedWriteFields(flatBilling));
     }
 
     if (store) {
@@ -461,9 +502,11 @@ router.put("/", requireAdmin, async (req, res, next) => {
       Object.assign($set, flatStore);
     }
 
+    const protectedSet = stripProtectedWriteFields($set);
+
     const updated = await SiteSettings.findByIdAndUpdate(
       id,
-      { $set },
+      { $set: protectedSet },
       {
         new: true,
         strict: false,
@@ -471,7 +514,7 @@ router.put("/", requireAdmin, async (req, res, next) => {
       }
     ).lean();
 
-    res.json(updated);
+    res.json(buildAdminSiteSettings(updated));
   } catch (err) {
     next(err);
   }

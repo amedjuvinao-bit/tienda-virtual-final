@@ -74,6 +74,21 @@ export default function OrderDetailCustomerBilling({ order }) {
     billing.legal_id,
     customerDocument
   );
+  const billingDocumentType = firstValidText(
+    billing.documentType,
+    customer.documentType
+  );
+  const billingPersonType = String(billing.personType || '').trim().toLowerCase();
+  const billingPersonLabel =
+    billingPersonType === 'juridica'
+      ? 'Persona jurídica'
+      : billingPersonType === 'natural'
+        ? 'Persona natural'
+        : '—';
+  const billingDocumentWithDv =
+    billingDocumentType === 'NIT' && billing.dv
+      ? `${billingDocument}-${billing.dv}`
+      : billingDocument;
 
   const customerAddress = firstValidText(
     customer.address,
@@ -108,6 +123,10 @@ export default function OrderDetailCustomerBilling({ order }) {
   );
 
   const customerEmail = getEmailFromCustomer(customer, order);
+  const billingEmail = firstValidText(
+    billing.email,
+    customerEmail
+  );
 
   const customerPhone = firstValidText(
     customer.phone,
@@ -189,8 +208,17 @@ export default function OrderDetailCustomerBilling({ order }) {
             gap: 11,
           }}
         >
-          <InfoLine label="Nombre:" value={billingName} strong />
-          <InfoLine label="Documento:" value={cleanText(billingDocument)} />
+          <InfoLine
+            label={billingPersonType === 'juridica' ? 'Razón social:' : 'Nombre:'}
+            value={billingName}
+            strong
+          />
+          <InfoLine label="Tipo de persona:" value={billingPersonLabel} />
+          <InfoLine
+            label="Documento:"
+            value={cleanText(`${billingDocumentType !== '—' ? `${billingDocumentType} ` : ''}${billingDocumentWithDv}`)}
+          />
+          <InfoLine label="Correo fiscal:" value={cleanText(billingEmail)} />
           <InfoLine label="Dirección:" value={cleanText(billingAddress)} />
           <InfoLine label="Ciudad:" value={cleanText(billingCity)} />
           <InfoLine

@@ -90,7 +90,11 @@ export function getBillingName(order) {
   const billing = order?.billing || {};
 
   return (
-    [billing.name, billing.lastname].filter(Boolean).join(' ').trim() ||
+    billing.businessName ||
+    [billing.firstName || billing.name, billing.lastName || billing.lastname]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
     getCustomerName(order)
   );
 }

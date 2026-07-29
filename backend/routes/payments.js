@@ -10,21 +10,25 @@ const SiteSettings = require('../models/SiteSettings');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 
 const {
   confirmInventoryReservation,
   releaseInventoryReservation,
 } = require('../services/inventoryReservationService');
+const {
+  generateElectronicInvoiceAfterPayment,
+} = require('../services/electronicInvoiceAfterPaymentService');
+const {
+  issueElectronicInvoiceForOrder,
+} = require('../services/electronicInvoiceIssuanceService');
 
 const WOMPI_ENVIRONMENTS = {
   sandbox: 'https://sandbox.wompi.co/v1',
   production: 'https://production.wompi.co/v1',
 };
 
-const { generateCUFE } = require('../lib/dian/cufe');
-const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
-const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
 const {
   deleteFactusBillByReference,
   getFactusCredentials,
@@ -32,11 +36,10 @@ const {
 } = require('../lib/dian/providers/factusProvider');
 
 const {
-  sendCreditNoteToFactus,
-} = require('../lib/dian/providers/factusProvider');
+  createOfficialCreditNote,
+} = require('../services/electronicCreditNoteService');
 
 const {
-  addCreditNoteCreatedEvent,
   addInvoiceGeneratedEvent,
   addInvoiceValidatedEvent,
   addInvoiceFailedEvent,
@@ -786,232 +789,6 @@ function extractAcceptanceInfo(merchantData) {
   };
 }
 
-async function generateElectronicInvoiceAfterPayment({ orderId, transaction, payments }) {
-  try {
-    const order = await Order.findById(orderId).lean();
-
-    if (!order) {
-      console.warn('⚠️ DIAN omitida: orden no encontrada después del pago.', {
-        orderId: String(orderId || ''),
-      });
-      return;
-    }
-
-    if (order.payment?.status !== 'paid') {
-      console.log('ℹ️ DIAN omitida: la orden no está pagada.', {
-        orderNumber: order.orderNumber,
-        paymentStatus: order.payment?.status || '',
-      });
-      return;
-    }
-
-    const settingsDoc = await getSiteSettingsDoc();
-
-    const billingConfig = settingsDoc?.billing || {};
-    const dianConfig = billingConfig?.dian || {};
-    const electronicProvider = billingConfig?.electronicProvider || {};
-
-    const selectedProvider = String(electronicProvider?.provider || 'mock')
-      .trim()
-      .toLowerCase();
-
-    const isElectronicBillingActive =
-      dianConfig?.enabled === true &&
-      String(dianConfig?.mode || 'internal') !== 'internal';
-
-    if (!isElectronicBillingActive || selectedProvider === 'mock') {
-      console.log('ℹ️ Facturación electrónica omitida: modo interno/mock activo.', {
-        orderNumber: order.orderNumber,
-        provider: selectedProvider,
-        dianMode: dianConfig?.mode || 'internal',
-      });
-      return;
-    }
-
-    const existingInvoice = await ElectronicInvoice.findOne({ orderId: order._id }).lean();
-
-    if (existingInvoice?.status === 'generated' && existingInvoice?.cufe) {
-      console.log('ℹ️ DIAN omitida: factura ya generada.', {
-        orderNumber: order.orderNumber,
-        cufe: existingInvoice.cufe,
-      });
-      return;
-    }
-
-    const now = new Date();
-    const issueDate = now.toISOString().slice(0, 10);
-    const issueTime = now.toISOString().slice(11, 19);
-
-    const cufeData = generateCUFE({
-       invoiceNumber: order.orderNumber,
-      issueDate,
-      issueTime,
-      grossAmount: order.subtotal,
-      taxAmount: order.taxes?.iva?.amount || 0,
-      totalAmount: order.total,
-      companyNit: billingConfig?.fiscalInfo?.nit || '',
-      customerDocument: order.customer?.id || '',
-      technicalKey:
-        billingConfig?.dianResolution?.technicalKey ||
-        billingConfig?.dian?.technicalKey ||
-        '',
-      environment:
-        billingConfig?.dianResolution?.environment ||
-        billingConfig?.dian?.environment ||
-        '2',
-    });
-
-    const xml = generateInvoiceXML({
-      order,
-      settings: settingsDoc,
-      cufeData,
-    });
-
-    console.log(
-      '🧾 CUSTOMER FOR FACTUS:',
-      JSON.stringify(order.customer, null, 2)
-    );
-
-    const providerInvoiceData = {
-      order: {
-        ...order,
-        payment: {
-          ...(order.payment || {}),
-          methodType:
-            order.payment?.methodType ||
-            transaction?.payment_method_type ||
-            '',
-          method:
-            order.payment?.method ||
-            transaction?.payment_method?.type ||
-            transaction?.payment_method_type ||
-            '',
-          methodLabel:
-            order.payment?.methodLabel ||
-            transaction?.payment_method_type ||
-            transaction?.payment_method?.type ||
-            '',
-          rawMethod:
-            order.payment?.rawMethod ||
-            transaction?.payment_method ||
-            {},
-        },
-      },
-      settings: settingsDoc,
-      cufeData,
-      xmlContent: xml,
-      provider: selectedProvider,
-      providerConfig: electronicProvider,
-    };
-
-    let providerResponse = null;
-    let providerData = null;
-    let providerInvoiceNumber = order.orderNumber;
-    let providerCufe = cufeData.cufe;
-
-    try {
-      providerResponse = await sendElectronicInvoiceToProvider({
-        provider: selectedProvider,
-        invoiceData: providerInvoiceData,
-      });
-
-      console.log(
-        '📡 RESPUESTA PROVIDER DIAN FULL:',
-        JSON.stringify(providerResponse, null, 2)
-      );
-    } catch (err) {
-      console.error('❌ ERROR EN ENVÍO A PROVIDER DIAN:', err.message);
-    }
-
-    if (providerResponse?.success === true) {
-      providerData = providerResponse?.data?.data || providerResponse?.data || null;
-      providerInvoiceNumber = providerData?.number || order.orderNumber;
-      providerCufe = providerData?.cufe || cufeData.cufe;
-    }
-
-    await ElectronicInvoice.findOneAndUpdate(
-      { orderId: order._id },
-      {
-        $set: {
-          orderId: order._id,
-          orderNumber: order.orderNumber,
-          invoiceNumber: providerInvoiceNumber,
-          required: true,
-          status:
-            providerResponse?.success === true
-              ? 'generated'
-              : 'provider_error',
-          customer: order.customer || {},
-          fiscalInfo: billingConfig?.fiscalInfo || {},
-          dianResolution: billingConfig?.dianResolution || {},
-          legalTexts: billingConfig?.legalTexts || {},
-          cufe: providerCufe,
-          xmlContent: xml,
-          qrUrl: cufeData.qrUrl,
-
-          pdfUrl:
-            providerData?.links?.pdf ||
-            providerData?.links?.pdf_url ||
-            '',
-
-          xmlUrl:
-            providerData?.links?.xml ||
-            providerData?.links?.xml_url ||
-            '',
-
-          provider: {
-            name: selectedProvider,
-            status: providerResponse?.data?.status || '',
-            referenceCode: providerData?.reference_code || order.orderNumber,
-            number: providerData?.number || providerInvoiceNumber,
-            cufe: providerData?.cufe || providerCufe,
-            isValidated: providerData?.is_validated === true,
-            validatedAt: providerData?.validated_at || '',
-            links: providerData?.links || {},
-            raw: providerData || {},
-          },
-          generatedAt: now,
-          dianResponse: {
-            stage: 'generated_after_payment_approved_provider_ready',
-            paymentProvider: 'wompi',
-            transactionId: trimSafe(transaction?.id, 120),
-            environment:
-              billingConfig?.dianResolution?.environment ||
-              billingConfig?.dian?.environment ||
-              '2',
-            issueDate,
-            issueTime,
-            paymentMode: payments?.mode || '',
-            providerPrepared: selectedProvider,
-            providerResponse: providerResponse || null,
-          },
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-      }
-    );
-
-    if (providerResponse?.success === true) {
-      console.log('✅ FACTURA ELECTRÓNICA GENERADA', {
-        orderNumber: order.orderNumber,
-        cufe: providerCufe,
-        provider: selectedProvider,
-      });
-    } else {
-      console.log('⚠️ FACTURA ELECTRÓNICA PENDIENTE / ERROR PROVIDER', {
-        orderNumber: order.orderNumber,
-        cufe: cufeData.cufe,
-        provider: selectedProvider,
-        providerStatus: providerResponse?.status || null,
-        providerError: providerResponse?.error || null,
-      });
-    }
-  } catch (err) {
-    console.error('❌ ERROR GENERANDO FACTURA ELECTRÓNICA FUERA DEL WEBHOOK CRÍTICO', err);
-  }
-}
 router.get('/public-config', async (_req, res) => {
   try {
     const payments = await getActivePaymentsConfig();
@@ -1108,15 +885,6 @@ router.post('/wompi/checkout-data', async (req, res) => {
           'Wompi no devolvió el acceptance token. Revisa la public key configurada.',
       });
     }
-
-    console.log('WOMPI SIGN DEBUG', {
-      reference,
-      amountInCents,
-      currency,
-      integrityKey: wompi.integrityKey,
-      integrityKeyLength: String(wompi.integrityKey || '').length,
-      signature,
-    });
 
     return res.json({
       ok: true,
@@ -1277,13 +1045,6 @@ router.post('/admin/wompi/test-merchant', requireAdmin, async (req, res) => {
 });
 
 router.post('/wompi/webhook', async (req, res) => {
-  console.log('🔥 WOMPI WEBHOOK HIT', new Date().toISOString());
-  console.log('📦 BODY WEBHOOK:', JSON.stringify(req.body, null, 2));
-  console.log(
-    '🔐 HEADER CHECKSUM:',
-    req.get('x-event-checksum') || req.get('X-Event-Checksum')
-  );
-
   let shouldGenerateDian = false;
   let dianOrderId = null;
   let dianTransaction = null;
@@ -1307,10 +1068,6 @@ router.post('/wompi/webhook', async (req, res) => {
       payload,
       wompi.webhookSecret
     ).toLowerCase();
-
-    console.log('CHECKSUM Wompi');
-    console.log('PROVIDED:', providedChecksum);
-    console.log('CALCULATED:', calculatedChecksum);
 
     if (!providedChecksum || providedChecksum !== calculatedChecksum) {
       return res.status(400).json({
@@ -1361,6 +1118,35 @@ router.post('/wompi/webhook', async (req, res) => {
         ok: false,
         error: 'ORDER_NOT_FOUND',
         message: `No se encontró la orden ${orderNumber}.`,
+      });
+    }
+
+    const transactionAmountInCents = Math.round(Number(transaction.amount_in_cents || 0));
+    const expectedAmountInCents = amountToCents(existingOrder.total);
+
+    if (
+      transactionAmountInCents <= 0 ||
+      expectedAmountInCents <= 0 ||
+      transactionAmountInCents !== expectedAmountInCents
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error: 'WOMPI_AMOUNT_MISMATCH',
+        message: 'El valor confirmado por Wompi no coincide con el total de la orden.',
+      });
+    }
+
+    const transactionCurrency = trimSafe(transaction.currency, 12).toUpperCase();
+    const expectedCurrency = trimSafe(
+      existingOrder.payment?.currency || payments.currency || 'COP',
+      12
+    ).toUpperCase();
+
+    if (transactionCurrency && transactionCurrency !== expectedCurrency) {
+      return res.status(409).json({
+        ok: false,
+        error: 'WOMPI_CURRENCY_MISMATCH',
+        message: 'La moneda confirmada por Wompi no coincide con la orden.',
       });
     }
 
@@ -1512,6 +1298,7 @@ router.post('/wompi/webhook', async (req, res) => {
           orderId: dianOrderId,
           transaction: dianTransaction,
           payments: dianPayments,
+          paymentProvider: 'wompi',
         });
       }
 
@@ -1600,11 +1387,16 @@ router.post('/payu/checkout-data', async (req, res) => {
       payu: {
         merchantId: payu.merchantId,
         accountId: payu.accountId,
-        apiLogin: payu.apiLogin,
-        apiKey: payu.apiKey,
         referenceCode,
         description: `Pago orden ${order.orderNumber || referenceCode}`,
         amount,
+        tax: Number(order.taxes?.iva?.amount || 0),
+        taxReturnBase: Number(
+          order.pricing?.taxableBase ??
+            order.pricing?.subtotalAfterDiscount ??
+            order.subtotal ??
+            amount
+        ),
         currency,
         redirectUrl,
         confirmationUrl,
@@ -1756,6 +1548,7 @@ router.post(
 router.post(
   '/admin/delete-factus-invoice/:orderId',
   requireAdmin,
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const orderId = trimSafe(req.params.orderId, 100);
@@ -1895,276 +1688,34 @@ router.post(
 router.post(
   '/admin/create-credit-note/:orderId',
   requireAdmin,
+  requirePermission('billing:credit_note'),
   async (req, res) => {
     try {
-      const { orderId } = req.params;
-
-      const {
-        reason = '',
-        reasonCode = '1',
-        type = 'total',
-        selectedItems = [],
-        items = [],
-      } = req.body || {};
-
-      const creditNoteItems =
-        Array.isArray(selectedItems) && selectedItems.length
-          ? selectedItems
-          : Array.isArray(items)
-            ? items
-            : [];
-
-      const cleanReason = trimSafe(
-        reason || 'Nota crédito generada desde el panel administrativo.',
-        500
-      );
-      const order = await Order.findById(orderId);
-
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          error: 'Orden no encontrada.',
-        });
-      }
-
-      const invoice = await ElectronicInvoice.findOne({
-        orderId,
-      });
-
-      
-
+      const invoice = await ElectronicInvoice.findOne({ orderId: req.params.orderId });
       if (!invoice) {
         return res.status(404).json({
           success: false,
-          error: 'Factura electrónica no encontrada.',
+          error: 'BILLING_INVOICE_NOT_FOUND',
+          message: 'Factura electrónica no encontrada.',
         });
       }
 
-      const existingTotalCreditNote =
-        Array.isArray(invoice.creditNotes) &&
-        invoice.creditNotes.some(
-          (note) =>
-            note.type === 'total' &&
-            ['validated', 'sent'].includes(note.status)
-        );
-
-      if (type === 'total' && existingTotalCreditNote) {
-        return res.status(409).json({
-          success: false,
-          error:
-            'Esta factura ya tiene una nota crédito total registrada.',
-        });
-      }
-      const invoiceTotalAmount =
-        Number(invoice?.provider?.raw?.totals?.total || 0) ||
-        Number(order?.total || 0);
-
-      const currentValidatedCreditTotal = Array.isArray(invoice.creditNotes)
-        ? invoice.creditNotes
-            .filter(
-              (note) =>
-                note.type === 'partial' &&
-                ['validated', 'sent'].includes(note.status)
-            )
-            .reduce(
-              (sum, note) => sum + Number(note.totalAmount || 0),
-              0
-            )
-        : 0;
-
-      const requestedPartialTotal =
-        type === 'partial'
-          ? creditNoteItems.reduce(
-              (sum, item) =>
-                sum +
-                Number(item.price || 0) *
-                  Number(item.quantity || 0),
-              0
-            )
-          : 0;
-
-      if (
-        type === 'partial' &&
-        invoiceTotalAmount > 0 &&
-        currentValidatedCreditTotal + requestedPartialTotal >
-          invoiceTotalAmount
-      ) {
-        return res.status(409).json({
-          success: false,
-          error:
-            'El valor acumulado de las notas crédito supera el total de la factura.',
-        });
-      }
-
-      const billNumber =
-        invoice?.provider?.number ||
-        invoice?.invoiceNumber ||
-        invoice?.provider?.raw?.number ||
-        '';
-
-      if (!billNumber) {
-        return res.status(400).json({
-          success: false,
-          error: 'La factura no tiene número Factus.',
-        });
-      }
-
-      const settings = await SiteSettings.findOne();
-      const electronicProvider =
-        settings?.billing?.electronicProvider || {};
-
-
-      
-      const creditNoteResult = await sendCreditNoteToFactus({
-        electronicInvoice: invoice,
-        invoice,
-        order,
-        settings,
-        type,
-        reasonCode,
-        reasonText: cleanReason,
-        selectedItems: creditNoteItems,
-        billNumber,
-        providerConfig: electronicProvider,
+      const result = await createOfficialCreditNote(invoice._id, req.body || {}, {
+        adminUser: req.headers['x-admin-user'] || 'admin',
       });
 
-      if (!creditNoteResult.success) {
-        return res.status(400).json({
-          success: false,
-          error:
-            creditNoteResult.error ||
-            'No se pudo crear la nota crédito.',
-          code: creditNoteResult.code || 'CREDIT_NOTE_ERROR',
-          canRetry: creditNoteResult.canRetry !== false,
-          requiresSync: creditNoteResult.requiresSync === true,
-          raw: creditNoteResult.raw || null,
-          payload: creditNoteResult.payload || null,
-        });
-      }
-
-      if (!Array.isArray(invoice.creditNotes)) {
-        invoice.creditNotes = [];
-      }
-
-      const creditNoteData =
-        creditNoteResult?.data?.data ||
-        creditNoteResult?.data ||
-        {};
-
-      invoice.creditNotes.push({
-        createdAt: new Date(),
-
-        type,
-
-        reasonCode,
-        reasonText: cleanReason,
-
-        referenceCode:
-          creditNoteData?.reference_code || '',
-
-        billNumber:
-          creditNoteData?.bill?.number ||
-          billNumber ||
-          '',
-
-        subtotal:
-          Number(creditNoteData?.totals?.gross_amount || 0),
-
-        taxAmount:
-          Number(creditNoteData?.totals?.tax_amount || 0),
-
-        totalAmount:
-          Number(creditNoteData?.totals?.total || 0),
-
-        status:
-          creditNoteData?.is_validated === true
-            ? 'validated'
-            : 'sent',
-
-        provider: {
-          name: 'factus',
-
-          status:
-            creditNoteResult?.data?.status ||
-            creditNoteData?.status ||
-            '',
-
-          number:
-            creditNoteData?.number || '',
-
-          cufe:
-            creditNoteData?.cude ||
-            creditNoteData?.cufe ||
-            '',
-
-          isValidated:
-            creditNoteData?.is_validated === true,
-
-          validatedAt:
-            creditNoteData?.validated_at || '',
-
-          links:
-            creditNoteData?.links || {},
-
-          raw:
-            creditNoteResult?.data || {},
-        },
-
-        items:
-          Array.isArray(creditNoteData?.items)
-            ? creditNoteData.items.map((item) => ({
-                productId: String(item?.code_reference || ''),
-                codeReference: String(item?.code_reference || ''),
-                name: String(item?.name || ''),
-                quantity: Number(item?.quantity || 0),
-                price: Number(item?.price || 0),
-                taxRate: String(
-                  item?.taxes?.[0]?.rates?.[0]?.rate || '0.00'
-                ),
-                isExcluded:
-                  item?.taxes?.[0]?.is_excluded === true,
-                raw: item,
-              }))
-            : [],
-      });
-
-      await invoice.save();
-
-      await addCreditNoteCreatedEvent({
-        order,
-        creditNoteData,
-        by: req.headers['x-admin-user'] || 'admin',
-      });
-      await OrderEvent.create({
-        orderId,
-        type: 'credit_note_created',
-        message: `Nota crédito ${type} creada en Factus.`,
-        meta: {
-          type,
-          reason,
-          creditNoteNumber:
-            creditNoteResult?.data?.number || '',
-        },
-        by: req.headers['x-admin-user'] || 'admin',
-      });
-
-      return res.json({
+      return res.status(result.created ? 201 : 200).json({
         success: true,
-        message: 'Nota crédito creada correctamente.',
-        data: creditNoteResult.data,
-        invoice,
+        created: result.created,
+        reused: result.reused,
+        message: result.message,
+        invoice: result.invoice,
       });
     } catch (error) {
-      console.error(
-        '❌ ERROR CREANDO NOTA CRÉDITO:',
-        error
-      );
-
-      return res.status(500).json({
+      return res.status(Number(error?.status || 500)).json({
         success: false,
-        error:
-          error.message ||
-          'Error interno creando nota crédito.',
+        error: error?.code || 'BILLING_CREDIT_NOTE_ERROR',
+        message: error?.message || 'Error interno creando nota crédito.',
       });
     }
   }
@@ -2173,6 +1724,7 @@ router.post(
 router.post(
   '/admin/retry-electronic-invoice/:orderId',
   requireAdmin,
+  requirePermission('billing:retry'),
   async (req, res) => {
     try {
       const orderId = trimSafe(req.params.orderId, 100);
@@ -2184,194 +1736,39 @@ router.post(
         });
       }
 
-      const order = await Order.findById(orderId).lean();
+      const result = await issueElectronicInvoiceForOrder({
+        orderId,
+        source: 'admin-retry',
+        initiatedBy: req.headers['x-admin-user'] || 'admin',
+        skipWhenElectronicBillingIsInactive: true,
+        allowRetry: true,
+      });
 
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          error: 'ORDER_NOT_FOUND',
-        });
-      }
-
-      const settingsDoc = await getSiteSettingsDoc();
-
-      const billingConfig = settingsDoc?.billing || {};
-      const dianConfig = billingConfig?.dian || {};
-      const electronicProvider = billingConfig?.electronicProvider || {};
-
-      const selectedProvider = String(electronicProvider?.provider || 'mock')
-        .trim()
-        .toLowerCase();
-
-      if (dianConfig?.enabled !== true || selectedProvider === 'mock') {
+      if (!result.retried) {
         return res.status(409).json({
           success: false,
-          error: 'DIAN_DISABLED',
+          error: result.inProgress
+            ? 'BILLING_EMISSION_IN_PROGRESS'
+            : 'BILLING_RETRY_NOT_ALLOWED',
+          message: result.message,
+          invoice: result.invoice || null,
         });
       }
 
-      const now = new Date();
-      const issueDate = now.toISOString().slice(0, 10);
-      const issueTime = now.toISOString().slice(11, 19);
-
-      const cufeData = generateCUFE({
-        invoiceNumber: order.orderNumber,
-        issueDate,
-        issueTime,
-        grossAmount: order.subtotal,
-        taxAmount: order.taxes?.iva?.amount || 0,
-        totalAmount: order.total,
-        companyNit: billingConfig?.fiscalInfo?.nit || '',
-        customerDocument: order.customer?.id || '',
-        technicalKey:
-          billingConfig?.dianResolution?.technicalKey ||
-          billingConfig?.dian?.technicalKey ||
-          '',
-        environment:
-          billingConfig?.dianResolution?.environment ||
-          billingConfig?.dian?.environment ||
-          '2',
-      });
-
-      const xml = generateInvoiceXML({
-        order,
-        settings: settingsDoc,
-        cufeData,
-      });
-
-      const providerResponse = await sendElectronicInvoiceToProvider({
-        provider: selectedProvider,
-        invoiceData: {
-          order,
-          settings: settingsDoc,
-          cufeData,
-          xmlContent: xml,
-          provider: selectedProvider,
-          providerConfig: electronicProvider,
-        },
-      });
-
-      const providerData =
-        providerResponse?.data?.data ||
-        providerResponse?.data ||
-        null;
-
+      const updatedInvoice = result.invoice;
+      const nextStatus = updatedInvoice?.status || 'sent';
       const providerInvoiceNumber =
-        providerData?.number ||
-        order.orderNumber;
-
-      const providerCufe =
-        providerData?.cufe ||
-        cufeData.cufe;
-
-      const isProviderSuccess = providerResponse?.success === true;
-      const isValidated = providerData?.is_validated === true;
-
-      const providerErrors =
-        providerData?.errors ||
-        providerResponse?.data?.errors ||
-        providerResponse?.data?.data?.errors ||
-        providerResponse?.raw?.errors ||
-        providerResponse?.raw?.data?.errors ||
-        providerResponse?.raw?.data?.data?.errors ||
-        {};
-
-      const hasProviderErrors =
-        providerErrors &&
-        typeof providerErrors === 'object' &&
-        Object.keys(providerErrors).length > 0;
-
-      let nextStatus = 'pending';
-
-      if (isProviderSuccess && isValidated) {
-        nextStatus = 'accepted';
-      } else if (isProviderSuccess) {
-        nextStatus = 'sent';
-      } else if (hasProviderErrors) {
-        nextStatus = 'rejected';
-      } else {
-        nextStatus = 'failed';
-      }
-
-      const updatedInvoice = await ElectronicInvoice.findOneAndUpdate(
-        { orderId: order._id },
-        {
-          $set: {
-            orderId: order._id,
-            orderNumber: order.orderNumber,
-            invoiceNumber: providerInvoiceNumber,
-            required: true,
-            status: nextStatus,
-            providerErrors,
-            customer: order.customer || {},
-            fiscalInfo: billingConfig?.fiscalInfo || {},
-            dianResolution: billingConfig?.dianResolution || {},
-            legalTexts: billingConfig?.legalTexts || {},
-            cufe: providerCufe,
-            xmlContent: xml,
-            qrUrl: cufeData.qrUrl,
-
-            pdfUrl:
-              providerData?.links?.pdf ||
-              providerData?.links?.pdf_url ||
-              '',
-
-            xmlUrl:
-              providerData?.links?.xml ||
-              providerData?.links?.xml_url ||
-              '',
-
-            provider: {
-              name: selectedProvider,
-              status: providerResponse?.data?.status || providerResponse?.status || '',
-              referenceCode: providerData?.reference_code || order.orderNumber,
-              number: providerData?.number || providerInvoiceNumber,
-              cufe: providerData?.cufe || providerCufe,
-              isValidated,
-              validatedAt: providerData?.validated_at || '',
-              links: providerData?.links || {},
-              raw: providerData || {},
-            },
-
-            dianResponse: {
-              stage: 'manual_retry_from_admin',
-              environment:
-                billingConfig?.dianResolution?.environment ||
-                billingConfig?.dian?.environment ||
-                '2',
-              issueDate,
-              issueTime,
-              message: providerResponse?.error || '',
-              code: String(providerResponse?.status || ''),
-              raw: providerResponse || {},
-            },
-
-            errorMessage: isProviderSuccess
-              ? ''
-              : String(providerResponse?.error || 'Error reenviando factura.'),
-
-            generatedAt: now,
-            sentAt: now,
-            acceptedAt: isValidated ? now : null,
-            failedAt: isProviderSuccess ? null : now,
-          },
-        },
-        {
-          new: true,
-          upsert: true,
-        }
-      );
+        updatedInvoice?.provider?.number || updatedInvoice?.invoiceNumber || '';
+      const providerCufe = updatedInvoice?.provider?.cufe || updatedInvoice?.cufe || '';
 
       await OrderEvent.create({
-        orderId: order._id,
+        orderId,
         type: 'electronic_invoice_retry',
-        message: isProviderSuccess
-          ? 'Factura electrónica reenviada al proveedor desde el panel admin.'
-          : 'Reintento de factura electrónica falló desde el panel admin.',
+        message: 'Factura electrónica reenviada al proveedor desde el panel admin.',
         meta: {
-          provider: selectedProvider,
+          provider: updatedInvoice?.provider?.name || '',
           status: nextStatus,
-          providerSuccess: isProviderSuccess,
+          providerSuccess: true,
           invoiceNumber: providerInvoiceNumber,
           cufe: providerCufe,
           by: req.headers['x-admin-user'] || 'admin',
@@ -2379,17 +1776,19 @@ router.post(
       });
 
       return res.json({
-        success: isProviderSuccess,
+        success: true,
         status: nextStatus,
         invoice: updatedInvoice,
-        providerResponse,
+        message: result.message,
       });
     } catch (error) {
       console.error('❌ RETRY ELECTRONIC INVOICE ERROR:', error);
 
-      return res.status(500).json({
+      return res.status(Number(error.status || 500)).json({
         success: false,
         error: error.message,
+        code: error.code || 'BILLING_RETRY_ERROR',
+        invoice: error.invoice || null,
       });
     }
   }

@@ -5,7 +5,10 @@ import App from './App';
 import './index.css';
 import './admin/productFormContrast.css';
 import './admin/finance/financeLayoutFix.css';
-import './checkout/checkoutCouponBridge';
+import './admin/billing/billingDocumentsLayout.css';
+import './admin/billing/billingLayoutStability.css';
+import './admin/orders/electronicInvoice/electronicInvoiceModalFix.css';
+import './admin/billing/billingGenerateConfirmBridge';
 
 // Toastify (estilos y contenedor global)
 import 'react-toastify/dist/ReactToastify.css';

@@ -14,6 +14,9 @@ import ModalPrivacidad from '../components/ModalPrivacidad';
 import ModalTerminos from '../components/ModalTerminos';
 import ModalContacto from '../components/ModalContacto';
 import { redirectToPayU } from '../lib/payuRedirect';
+import CheckoutDianCustomerFields from '../checkout/dian/CheckoutDianCustomerFields';
+import { dianCustomerDefaults } from '../checkout/dian/dianCustomerDefaults';
+import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
 
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -789,6 +792,11 @@ const GLOBAL_STYLES = `
 function CheckoutPage() {
   const [deliveryType, setDeliveryType] = useState('envio');
   const [discountCode, setDiscountCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [checkoutQuote, setCheckoutQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [sameAddress, setSameAddress] = useState(true);
   const [wantsNewsletter, setWantsNewsletter] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -818,6 +826,10 @@ function CheckoutPage() {
   const [selectedRegion, setSelectedRegion] = useState('');
   const [citiesList, setCitiesList] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
+  const [billingRegions, setBillingRegions] = useState([]);
+  const [billingRegionsLoading, setBillingRegionsLoading] = useState(false);
+  const [billingCities, setBillingCities] = useState([]);
+  const [billingCitiesLoading, setBillingCitiesLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState('');
   const [customerLastname, setCustomerLastname] = useState('');
@@ -829,18 +841,7 @@ function CheckoutPage() {
   const [customerPostalCode, setCustomerPostalCode] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [customerCountry, setCustomerCountry] = useState('Colombia');
-  
-
-  const [billingName, setBillingName] = useState('');
-  const [billingLastname, setBillingLastname] = useState('');
-  const [billingAddress, setBillingAddress] = useState('');
-  const [billingCity, setBillingCity] = useState('');
-  const [billingDepartment, setBillingDepartment] = useState('');
-  const [billingPostalCode, setBillingPostalCode] = useState('');
-  const [billingPhone, setBillingPhone] = useState('');
-  const [billingExtra, setBillingExtra] = useState('');
-  const [billingId, setBillingId] = useState('');
-  const [billingCountry, setBillingCountry] = useState('Colombia');
+  const [dianCustomer, setDianCustomer] = useState(dianCustomerDefaults);
 
   const { cart, clearCart } = useCart();
   const currentCart = cartView ?? cart;
@@ -934,9 +935,20 @@ function CheckoutPage() {
     return 20000;
   }, [deliveryType, shippingConfig, shippingConfigLoading, matchedZone, subtotal]);
 
+  const quotePricing = checkoutQuote?.pricing || null;
+  const quotedSubtotal = Number(quotePricing?.subtotal ?? subtotal);
+  const productDiscount = Number(quotePricing?.productDiscount || 0);
+  const shippingDiscount = Number(quotePricing?.shippingDiscount || 0);
+  const finalShipping = Number(quotePricing?.shipping ?? shipping);
+  const taxAmount = Number(quotePricing?.tax?.amount || 0);
+  const taxPercent = Number(quotePricing?.tax?.percent || 0);
+  const total = Number(
+    quotePricing?.total ?? quotedSubtotal - productDiscount + finalShipping + taxAmount
+  );
+
   const shippingEta = useMemo(() => {
     if (deliveryType === 'retiro') return 'Retiro disponible en tienda';
-    if (shipping === 0) {
+    if (finalShipping === 0) {
       return matchedZone?.eta || shippingConfig?.estimatedTime || shippingConfig?.fallback?.eta || 'Envío gratis aplicado';
     }
     return (
@@ -945,7 +957,7 @@ function CheckoutPage() {
       shippingConfig?.estimatedTime ||
       'Tiempo no configurado'
     );
-  }, [deliveryType, shipping, matchedZone, shippingConfig]);
+  }, [deliveryType, finalShipping, matchedZone, shippingConfig]);
 
   const shippingLabel = useMemo(() => {
     if (deliveryType === 'retiro') return 'Retiro en tienda';
@@ -953,8 +965,6 @@ function CheckoutPage() {
     if (customerCity) return `Envío a ${customerCity}`;
     return 'Envío configurado';
   }, [deliveryType, matchedZone, customerCity]);
-
-  const total = subtotal + shipping;
 
   const paymentProviderMeta = useMemo(
     () => getPaymentProviderMeta(paymentsConfig.provider),
@@ -992,6 +1002,106 @@ function CheckoutPage() {
 
   const navigate = useNavigate();
   const [isPlacing, setIsPlacing] = useState(false);
+
+  const buildQuoteRequestPayload = (couponCode = '') => ({
+    sessionId: getSessionId(),
+    items: (currentCart || []).map((item) => ({
+      productId: String(item.productId || item._id || item.id || item?.product?._id || ''),
+      title: item.title || item?.product?.title || '',
+      image: item.image || item?.product?.image || '',
+      color: item.color || '',
+      size: item.size || '',
+      variantId: item.variantId || item.variantKey || '',
+      quantity: getItemQuantity(item),
+      price: Number(item.price ?? item?.product?.price ?? 0),
+    })),
+    customer: {
+      deliveryType,
+      country: customerCountry,
+      countryCode: selectedCountry?.code || '',
+      department: selectedRegion,
+      departmentCode: selectedRegion,
+      city: customerCity,
+      email: String(customerEmailOrPhone || '').includes('@')
+        ? String(customerEmailOrPhone || '').trim()
+        : '',
+      emailOrPhone: customerEmailOrPhone,
+    },
+    couponCode,
+  });
+
+  const handleApplyCoupon = () => {
+    const code = String(discountCode || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    if (!code) {
+      setAppliedCoupon(null);
+      setCouponMessage('');
+      setCouponError('Ingresa un código de descuento.');
+      return;
+    }
+
+    setCouponError('');
+    setCouponMessage('Validando cupón...');
+    setAppliedCoupon({ code });
+  };
+
+  useEffect(() => {
+    if (!Array.isArray(currentCart) || currentCart.length === 0) {
+      setCheckoutQuote(null);
+      setQuoteLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const couponCode = appliedCoupon?.code || '';
+    const timer = window.setTimeout(async () => {
+      try {
+        setQuoteLoading(true);
+        const { data } = await api.post('/api/orders/quote', buildQuoteRequestPayload(couponCode));
+        if (cancelled) return;
+
+        setCheckoutQuote(data || null);
+
+        if (couponCode && data?.coupon) {
+          setCouponError('');
+          setAppliedCoupon(data.coupon);
+          setDiscountCode(data.coupon.code || couponCode);
+          setCouponMessage(data.coupon.message || 'Cupón aplicado correctamente.');
+        } else if (!couponCode) {
+          setCouponMessage('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        const response = error?.response?.data || {};
+        if (response.pricing) setCheckoutQuote({ pricing: response.pricing });
+
+        if (couponCode) {
+          setAppliedCoupon(null);
+          setCouponMessage('');
+          setCouponError(
+            response.message || error?.userMessage || 'No se pudo aplicar el cupón.'
+          );
+        }
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    currentCart,
+    deliveryType,
+    customerCountry,
+    selectedCountry?.code,
+    selectedRegion,
+    customerCity,
+    customerEmailOrPhone,
+    appliedCoupon?.code,
+  ]);
 
   useEffect(() => {
     let cancel = false;
@@ -1077,16 +1187,11 @@ function CheckoutPage() {
           const co = list.find(c => c.code === 'CO');
           setCustomerCountry(co ? co.name : '');
         }
-        const hasBilling = list.some(c => c.name?.toLowerCase() === String(billingCountry).toLowerCase());
-        if (!hasBilling) {
-          const co = list.find(c => c.code === 'CO');
-          setBillingCountry(co ? co.name : '');
-        }
       })
       .catch(() => setCountries([]))
       .finally(() => !cancel && setCountriesLoading(false));
     return () => { cancel = true; };
-  }, [customerCountry, billingCountry]);
+  }, []);
 
   useEffect(() => {
     if (!selectedCountry || selectedCountry.code !== 'CO') {
@@ -1118,6 +1223,112 @@ function CheckoutPage() {
     return () => { cancel = true; };
   }, [selectedCountry?.code, selectedRegion]);
 
+  useEffect(() => {
+    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+
+    if (sameAddress || countryCode !== 'CO') {
+      setBillingRegions([]);
+      setBillingCities([]);
+      return;
+    }
+
+    let cancel = false;
+    setBillingRegionsLoading(true);
+
+    api.get('/api/geo/regions', { params: { country: 'CO' } })
+      .then((res) => {
+        if (!cancel) setBillingRegions(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancel) setBillingRegions([]);
+      })
+      .finally(() => {
+        if (!cancel) setBillingRegionsLoading(false);
+      });
+
+    return () => { cancel = true; };
+  }, [sameAddress, dianCustomer.country]);
+
+  useEffect(() => {
+    const countryCode = String(dianCustomer.country || '').trim().toUpperCase();
+    const departmentCode = String(dianCustomer.departmentCode || '').trim();
+
+    if (sameAddress || countryCode !== 'CO' || !departmentCode) {
+      setBillingCities([]);
+      return;
+    }
+
+    let cancel = false;
+    setBillingCitiesLoading(true);
+
+    api.get('/api/geo/cities', {
+      params: { country: 'CO', region: departmentCode, limit: 10000 },
+    })
+      .then((res) => {
+        if (!cancel) setBillingCities(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancel) setBillingCities([]);
+      })
+      .finally(() => {
+        if (!cancel) setBillingCitiesLoading(false);
+      });
+
+    return () => { cancel = true; };
+  }, [sameAddress, dianCustomer.country, dianCustomer.departmentCode]);
+
+  const resolvedDianCustomer = useMemo(() => {
+    const emailFromContact = String(customerEmailOrPhone || '').includes('@')
+      ? String(customerEmailOrPhone || '').trim()
+      : '';
+    const countryCode = String(selectedCountry?.code || '').trim().toUpperCase();
+    const selectedDepartment = regions.find(
+      (region) => String(region?.code || '').trim() === String(selectedRegion || '').trim()
+    );
+
+    return {
+      ...dianCustomer,
+      personType: dianCustomer.personType || 'natural',
+      documentType: dianCustomer.documentType || 'CC',
+      documentNumber: String(dianCustomer.documentNumber || customerId || '').trim(),
+      firstName: dianCustomer.firstName || customerName,
+      lastName: dianCustomer.lastName || customerLastname,
+      email: dianCustomer.email || emailFromContact,
+      phone: dianCustomer.phone || customerPhone,
+      tributeCode: dianCustomer.tributeCode || 'ZZ',
+      ...(sameAddress
+        ? {
+            address: customerAddress,
+            extra: '',
+            city: customerCity,
+            cityCode: customerCityCode,
+            municipalityCode: customerCityCode,
+            department: selectedDepartment?.name || selectedRegion,
+            departmentCode: selectedRegion,
+            postalCode: customerPostalCode,
+            country: countryCode,
+            countryName: selectedCountry?.name || customerCountry,
+          }
+        : {}),
+    };
+  }, [
+    dianCustomer,
+    sameAddress,
+    customerId,
+    customerName,
+    customerLastname,
+    customerEmailOrPhone,
+    customerPhone,
+    customerAddress,
+    customerCity,
+    customerCityCode,
+    customerPostalCode,
+    customerCountry,
+    selectedCountry,
+    selectedRegion,
+    regions,
+  ]);
+
   const validateCheckout = () => {
     const errs = [];
     const isBlank = (v) => !v || String(v).trim() === '';
@@ -1138,7 +1349,15 @@ function CheckoutPage() {
       if (isBlank(customerCity)) errs.push('La ciudad es obligatoria.');
     }
 
+    if (checkoutConfig.showBillingSection) {
+      errs.push(...validateDianCustomer(resolvedDianCustomer));
+    }
+
     if (!currentCart || currentCart.length === 0 || itemCount === 0) errs.push('El carrito está vacío.');
+    if (quoteLoading) errs.push('Espera mientras verificamos IVA, descuentos y total.');
+    if (!quoteLoading && currentCart?.length > 0 && !quotePricing) {
+      errs.push('No fue posible verificar el total final con el servidor.');
+    }
     if (subtotal <= 0) errs.push('El subtotal debe ser mayor a 0.');
     if (total <= 0) errs.push('El total debe ser mayor a 0.');
 
@@ -1180,6 +1399,10 @@ function CheckoutPage() {
     orderId,
     orderNumber,
     orderSubtotal,
+    orderDiscount,
+    orderTax,
+    orderShipping,
+    orderTotal,
     lineItemCount,
   }) => {
     console.log('Entrando a openWompiCheckout');
@@ -1262,6 +1485,10 @@ function CheckoutPage() {
             orderNumber,
             customerName,
             subtotal: orderSubtotal,
+            discount: orderDiscount,
+            tax: orderTax,
+            shipping: orderShipping,
+            total: orderTotal,
             itemCount: lineItemCount,
             transactionId: tx?.id || '',
           },
@@ -1360,6 +1587,7 @@ function CheckoutPage() {
         image: it.image || it?.product?.image || '',
         color: it.color || '',
         size: it.size || '',
+        variantId: it.variantId || it.variantKey || '',
         quantity: Number(it.quantity ?? it.qty ?? 0) || 0,
         price: Number(it.price ?? it?.product?.price ?? 0) || 0,
       }))
@@ -1379,24 +1607,39 @@ function CheckoutPage() {
       city: customerCity,
       postalCode: customerPostalCode,
       country: customerCountry,
+      countryCode: selectedCountry?.code || '',
       municipalityId: customerCityCode,
       department: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
+      departmentCode: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
       deliveryType,
       wantsNewsletter
     };
 
     const billing = {
       useSameAddress: sameAddress,
-      name: billingName,
-      lastname: billingLastname,
-      id: String(billingId || '').trim() || undefined,
-      address: billingAddress,
-      extra: billingExtra,
-      city: billingCity,
-      department: billingDepartment,
-      postalCode: billingPostalCode,
-      phone: billingPhone,
-      country: billingCountry
+      personType: resolvedDianCustomer.personType,
+      documentType: resolvedDianCustomer.documentType,
+      documentNumber: resolvedDianCustomer.documentNumber,
+      id: resolvedDianCustomer.documentNumber,
+      dv: resolvedDianCustomer.documentType === 'NIT' ? resolvedDianCustomer.dv : '',
+      firstName: resolvedDianCustomer.firstName,
+      lastName: resolvedDianCustomer.lastName,
+      name: resolvedDianCustomer.firstName,
+      lastname: resolvedDianCustomer.lastName,
+      businessName: resolvedDianCustomer.businessName,
+      email: resolvedDianCustomer.email,
+      phone: resolvedDianCustomer.phone,
+      address: resolvedDianCustomer.address,
+      extra: resolvedDianCustomer.extra,
+      city: resolvedDianCustomer.city,
+      cityCode: resolvedDianCustomer.cityCode,
+      municipalityCode: resolvedDianCustomer.municipalityCode,
+      department: resolvedDianCustomer.department,
+      departmentCode: resolvedDianCustomer.departmentCode,
+      postalCode: resolvedDianCustomer.postalCode,
+      country: resolvedDianCustomer.countryName || resolvedDianCustomer.country,
+      countryCode: resolvedDianCustomer.country,
+      tributeCode: resolvedDianCustomer.tributeCode || 'ZZ',
     };
 
     const payment = {
@@ -1415,9 +1658,10 @@ function CheckoutPage() {
       cart: finalItems,
       subtotal: Number(finalSummary.subtotal || 0),
       shipping,
-      total: Number(finalSummary.subtotal || 0) + shipping,
+      total,
+      couponCode: appliedCoupon?.code || '',
       customer,
-      billing,
+      billing: checkoutConfig.showBillingSection ? billing : undefined,
       payment
     };
 
@@ -1435,6 +1679,14 @@ function CheckoutPage() {
 
       const createdOrderId = response.data?._id || response.data?.order?._id || '';
       const createdOrderNumber = response.data?.orderNumber || response.data?.order?.code || '';
+      const createdPricing = response.data?.pricing || {};
+      const createdSubtotal = Number(response.data?.subtotal ?? createdPricing.subtotal ?? order.subtotal);
+      const createdDiscount = Number(
+        createdPricing.totalDiscount ?? response.data?.coupon?.totalDiscountAmount ?? 0
+      );
+      const createdTax = Number(response.data?.taxes?.iva?.amount ?? createdPricing.taxAmount ?? 0);
+      const createdShipping = Number(response.data?.shipping ?? createdPricing.shipping ?? 0);
+      const createdTotal = Number(response.data?.total ?? createdPricing.total ?? order.total);
 
       if (!(response.status === 201 || response.status === 200) || !createdOrderId) {
         setErrors(['Ocurrió un problema al procesar tu orden. Intenta nuevamente.']);
@@ -1450,7 +1702,11 @@ function CheckoutPage() {
             orderId: createdOrderId,
             orderNumber: createdOrderNumber,
             customerName,
-            subtotal: order.subtotal,
+            subtotal: createdSubtotal,
+            discount: createdDiscount,
+            tax: createdTax,
+            shipping: createdShipping,
+            total: createdTotal,
             itemCount: finalItems.length,
           }
         });
@@ -1461,7 +1717,11 @@ function CheckoutPage() {
           await openWompiCheckout({
             orderId: createdOrderId,
             orderNumber: createdOrderNumber,
-            orderSubtotal: order.subtotal,
+            orderSubtotal: createdSubtotal,
+            orderDiscount: createdDiscount,
+            orderTax: createdTax,
+            orderShipping: createdShipping,
+            orderTotal: createdTotal,
             lineItemCount: finalItems.length,
           });
           return;
@@ -1555,6 +1815,8 @@ function CheckoutPage() {
   let disableReason = '';
   if (!paymentCanProceed) disableReason = 'No hay un método de pago activo o configurado.';
   else if (!currentCart || currentCart.length === 0 || itemCount === 0) disableReason = 'El carrito está vacío.';
+  else if (quoteLoading) disableReason = 'Verificando IVA, descuentos y total...';
+  else if (!quotePricing) disableReason = 'No se pudo verificar el total final.';
   else if (subtotal <= 0) disableReason = 'El subtotal debe ser mayor a 0.';
   else if (total <= 0) disableReason = 'El total debe ser mayor a 0.';
 
@@ -1874,7 +2136,7 @@ function CheckoutPage() {
                       </div>
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: checkoutConfig.style.accentColor }}>
-                      {shipping === 0 ? 'Gratis' : `$ ${shipping.toLocaleString('es-CO')}`}
+                      {finalShipping === 0 ? 'Gratis' : `$ ${finalShipping.toLocaleString('es-CO')}`}
                     </div>
                   </div>
                 </div>
@@ -1924,87 +2186,25 @@ function CheckoutPage() {
               </div>
 
               {checkoutConfig.showBillingSection && (
-                <div className="co-card">
-                  <h2 className="co-card-title">{checkoutConfig.billingSectionTitle}</h2>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: sameAddress ? '0' : '20px' }}>
-                    <label className="co-radio-option">
-                      <input type="radio" name="billing" checked={sameAddress} onChange={() => setSameAddress(true)} />
-                      <span>La misma dirección de envío</span>
-                    </label>
-                    <label className="co-radio-option">
-                      <input type="radio" name="billing" checked={!sameAddress} onChange={() => setSameAddress(false)} />
-                      <span>{checkoutConfig.billingToggleText}</span>
-                    </label>
-                  </div>
-
-                  {!sameAddress && (
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div>
-                        <label className="co-field-label">País</label>
-                        <select
-                          className="co-input"
-                          value={billingCountry}
-                          onChange={(e) => { setBillingCountry(e.target.value); setBillingCity(''); }}
-                          disabled={countriesLoading}
-                          name="billingCountry"
-                          autoComplete="country-name"
-                        >
-                          <option value="">{countriesLoading ? 'Cargando países...' : 'Selecciona país'}</option>
-                          {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
-                        </select>
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.nameLabelText}</label>
-                          <input type="text" className="co-input" placeholder="María" value={billingName} onChange={(e) => setBillingName(e.target.value)} name="billingFirstName" autoComplete="given-name" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">Apellidos</label>
-                          <input type="text" className="co-input" placeholder="García" value={billingLastname} onChange={(e) => setBillingLastname(e.target.value)} name="billingLastName" autoComplete="family-name" />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">{checkoutConfig.documentLabelText} (opcional)</label>
-                        <input type="text" className="co-input" placeholder="12345678" value={billingId} onChange={(e) => setBillingId(e.target.value)} name="billingId" />
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">{checkoutConfig.addressLabelText}</label>
-                        <input type="text" className="co-input" placeholder="Calle 10 # 20-30" value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} name="billingAddress" autoComplete="address-line1" />
-                      </div>
-
-                      <div>
-                        <label className="co-field-label">Casa, apartamento, etc. (opcional)</label>
-                        <input type="text" className="co-input" placeholder="Apto 5" value={billingExtra} onChange={(e) => setBillingExtra(e.target.value)} name="billingExtra" />
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.cityLabelText}</label>
-                          <input type="text" className="co-input" placeholder="Bogotá" value={billingCity} onChange={(e) => setBillingCity(e.target.value)} name="billingCity" autoComplete="address-level2" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">Provincia / Estado</label>
-                          <input type="text" className="co-input" placeholder="Cundinamarca" value={billingDepartment} onChange={(e) => setBillingDepartment(e.target.value)} name="billingDepartment" />
-                        </div>
-                      </div>
-
-                      <div className="co-grid-2">
-                        <div>
-                          <label className="co-field-label">Código postal (opcional)</label>
-                          <input type="text" className="co-input" placeholder="110111" value={billingPostalCode} onChange={(e) => setBillingPostalCode(e.target.value)} name="billingPostalCode" autoComplete="postal-code" />
-                        </div>
-                        <div>
-                          <label className="co-field-label">{checkoutConfig.phoneLabelText} (opcional)</label>
-                          <input type="tel" className="co-input" placeholder="+57 300..." value={billingPhone} onChange={(e) => setBillingPhone(e.target.value)} name="billingPhone" autoComplete="tel" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <CheckoutDianCustomerFields
+                  value={resolvedDianCustomer}
+                  onChange={(nextValue, changedFields) => {
+                    setDianCustomer((current) => ({
+                      ...current,
+                      ...(changedFields || nextValue),
+                    }));
+                  }}
+                  useSameAddress={sameAddress}
+                  onUseSameAddressChange={setSameAddress}
+                  countries={countries}
+                  countriesLoading={countriesLoading}
+                  regions={billingRegions}
+                  regionsLoading={billingRegionsLoading}
+                  cities={billingCities}
+                  citiesLoading={billingCitiesLoading}
+                  title={checkoutConfig.billingSectionTitle || 'Datos para facturación electrónica'}
+                  differentAddressLabel={checkoutConfig.billingToggleText}
+                />
               )}
 
               {checkoutConfig.showConfirmButton && (
@@ -2022,6 +2222,8 @@ function CheckoutPage() {
                     !currentCart ||
                     currentCart.length === 0 ||
                     itemCount === 0 ||
+                    quoteLoading ||
+                    !quotePricing ||
                     subtotal <= 0 ||
                     total <= 0 ||
                     !paymentCanProceed
@@ -2120,12 +2322,44 @@ function CheckoutPage() {
                         className="co-input"
                         placeholder="Código de descuento"
                         value={discountCode}
-                        onChange={(e) => setDiscountCode(e.target.value)}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setDiscountCode(nextValue);
+                          setCouponError('');
+                          if (
+                            appliedCoupon?.code &&
+                            String(nextValue || '').trim().toUpperCase().replace(/\s+/g, '') !== appliedCoupon.code
+                          ) {
+                            setAppliedCoupon(null);
+                            setCouponMessage('');
+                          }
+                        }}
                         autoComplete="off"
                         name="discountCode"
                       />
-                      <button className="co-btn-secondary" type="button">Aplicar</button>
+                      <button
+                        className="co-btn-secondary"
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={quoteLoading}
+                      >
+                        {quoteLoading && appliedCoupon?.code ? 'Validando...' : 'Aplicar'}
+                      </button>
                     </div>
+
+                    {(couponMessage || couponError) && (
+                      <div
+                        role={couponError ? 'alert' : 'status'}
+                        style={{
+                          marginTop: '8px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: couponError ? '#be123c' : '#047857',
+                        }}
+                      >
+                        {couponError || couponMessage}
+                      </div>
+                    )}
 
                     <hr className="co-totals-divider" style={{ marginTop: '20px' }} />
                     <div className="co-totals">
@@ -2134,15 +2368,41 @@ function CheckoutPage() {
                           {checkoutConfig.subtotalLabelText}
                         </span>
                         <span style={{ color: checkoutConfig.style.subtotalValueColor, fontWeight: 500 }}>
-                          ${subtotal.toLocaleString('es-CO')}
+                          ${quotedSubtotal.toLocaleString('es-CO')}
                         </span>
                       </div>
+                      {productDiscount > 0 && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#047857' }}>
+                            Descuento{appliedCoupon?.code ? ` · ${appliedCoupon.code}` : ''}
+                          </span>
+                          <span style={{ fontWeight: 600, color: '#047857' }}>
+                            -${productDiscount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
+                      {(taxPercent > 0 || taxAmount > 0) && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#6b7280' }}>IVA ({taxPercent}%)</span>
+                          <span style={{ fontWeight: 500 }}>
+                            ${taxAmount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
                       <div className="co-totals-row">
                         <span style={{ color: '#6b7280' }}>Envío</span>
                         <span style={{ fontWeight: 500 }}>
                           {shipping === 0 ? 'Gratis' : `$${shipping.toLocaleString('es-CO')}`}
                         </span>
                       </div>
+                      {shippingDiscount > 0 && (
+                        <div className="co-totals-row">
+                          <span style={{ color: '#047857' }}>Descuento de envío</span>
+                          <span style={{ fontWeight: 600, color: '#047857' }}>
+                            -${shippingDiscount.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                      )}
                       <hr className="co-totals-divider" />
                       <div className="co-totals-row co-totals-total">
                         <span style={{ color: checkoutConfig.style.totalTextColor }}>

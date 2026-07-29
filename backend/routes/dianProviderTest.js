@@ -1,101 +1,312 @@
 // backend/routes/dianProviderTest.js
 const express = require('express');
+const rateLimit = require('express-rate-limit');
+const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
+const {
+  getAdminSettingsWithBillingReadiness,
+  testFactusConnectionWithIdentity,
+} = require('../services/billingConnectionOrchestrationService');
+const {
+  hydrateBillingPayload,
+} = require('../services/billingFiscalCompatibilityService');
+const {
+  createFactusCreditNoteNumberingRange,
+  invalidateNumberingRangesIfContextChanged,
+  listFactusNumberingRanges,
+  saveFactusNumberingRangeSelection,
+} = require('../services/billingNumberingRangeService');
+const {
+  activateClientFactusProduction,
+  getClientActivationState,
+} = require('../services/billingClientActivationOrchestrator');
+const {
+  BillingConfigurationError,
+} = require('../lib/billing/billingConfigurationSecurity');
 
 const router = express.Router();
+const connectionTestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_CONNECTION_TEST_RATE_LIMIT',
+    message: 'Se alcanzó el límite temporal de pruebas de conexión con Factus.',
+  },
+});
+const numberingRangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_NUMBERING_RANGE_RATE_LIMIT',
+    message: 'Se alcanzó el límite temporal de consultas de rangos en Factus.',
+  },
+});
+const numberingRangeCreationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_NUMBERING_RANGE_CREATE_RATE_LIMIT',
+    message:
+      'Se alcanzó el límite temporal de creación de rangos en Factus.',
+  },
+});
+const productionActivationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: 'FACTUS_PRODUCTION_ACTIVATION_RATE_LIMIT',
+    message: 'Se alcanzó el límite temporal de intentos de activación de Producción.',
+  },
+});
 
-function trimSafe(value, max = 300) {
-  return String(value || '').trim().slice(0, max);
+router.use(requireAdmin);
+router.use(requirePermission('billing:settings'));
+
+function currentAdmin(req) {
+  return (
+    req.adminUsername ||
+    req.user?.username ||
+    req.user?.email ||
+    req.adminUserId ||
+    'admin'
+  );
 }
 
-router.post('/test-provider', async (req, res) => {
+function sendFactusError(res, error, fallbackCode, fallbackMessage) {
+  const status = Number(error?.status || error?.statusCode || 500);
+  const safeStatus = status >= 400 && status <= 599 ? status : 500;
+
+  console.error('[dianProviderTest][Factus]', {
+    code: error?.code || fallbackCode,
+    status: safeStatus,
+    message: error?.message || 'Error no identificado',
+  });
+
+  return res.status(safeStatus).json({
+    ok: false,
+    error: error?.code || fallbackCode,
+    message:
+      error instanceof BillingConfigurationError
+        ? error.message
+        : fallbackMessage,
+    details:
+      error instanceof BillingConfigurationError && Array.isArray(error.details)
+        ? error.details
+        : [],
+  });
+}
+
+function safeResolution(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const {
+    technicalKey,
+    softwarePin,
+    certificatePath,
+    certificatePassword,
+    ...safe
+  } = source;
+  void technicalKey;
+  void softwarePin;
+  void certificatePath;
+  void certificatePassword;
+  return safe;
+}
+
+function sendNumberingRanges(res, result) {
+  return res.json({
+    ok: true,
+    environment: result.environment,
+    syncedAt: result.syncedAt,
+    selected: result.selected,
+    invoiceRanges: result.invoiceRanges,
+    creditNoteRanges: result.creditNoteRanges,
+    eligibleInvoiceRanges: result.eligibleInvoiceRanges,
+    eligibleCreditNoteRanges: result.eligibleCreditNoteRanges,
+  });
+}
+
+router.post('/test-provider', connectionTestLimiter, async (req, res) => {
   try {
-    const providerConfig =
-      req.body?.providerConfig && typeof req.body.providerConfig === 'object'
-        ? req.body.providerConfig
-        : {};
+    const hydratedPayload = await hydrateBillingPayload(req.body || {});
+    await invalidateNumberingRangesIfContextChanged(hydratedPayload);
+    const result = await testFactusConnectionWithIdentity(hydratedPayload, {
+      adminUser: currentAdmin(req),
+    });
 
-    const provider = trimSafe(providerConfig.provider || req.body?.provider, 80).toLowerCase();
-
-    if (!provider) {
-      return res.status(400).json({
-        ok: false,
-        error: 'PROVIDER_REQUIRED',
-        message: 'Debes seleccionar un proveedor de facturación electrónica.',
-      });
-    }
-
-    if (provider === 'mock') {
-      return res.json({
-        ok: true,
-        provider,
-        status: 'mock_ready',
-        message: 'Modo pruebas activo. No se requiere conexión externa.',
-      });
-    }
-
-    if (provider === 'factus') {
-      const required = ['apiUrl', 'clientId', 'clientSecret', 'username', 'password'];
-
-      const missing = required.filter((field) => !trimSafe(providerConfig[field], 500));
-
-      if (missing.length) {
-        return res.status(422).json({
-          ok: false,
-          provider,
-          error: 'FACTUS_CONFIG_INCOMPLETE',
-          message: `Faltan campos obligatorios para Factus: ${missing.join(', ')}.`,
-          missing,
-        });
-      }
-
-      return res.json({
-        ok: true,
-        provider,
-        status: 'config_ready',
-        message:
-          'Configuración Factus completa a nivel de campos. La autenticación real se conectará en el siguiente paso.',
-      });
-    }
-
-    if (provider === 'dian') {
-      const required = ['softwareId', 'softwarePin', 'technicalKey'];
-
-      const missing = required.filter((field) => !trimSafe(providerConfig[field], 500));
-
-      if (missing.length) {
-        return res.status(422).json({
-          ok: false,
-          provider,
-          error: 'DIAN_DIRECT_CONFIG_INCOMPLETE',
-          message: `Faltan campos obligatorios para DIAN directa: ${missing.join(', ')}.`,
-          missing,
-        });
-      }
-
-      return res.json({
-        ok: true,
-        provider,
-        status: 'config_ready',
-        message:
-          'Configuración DIAN directa completa a nivel de campos. La conexión real directa se implementará después.',
-      });
-    }
-
-    return res.status(501).json({
-      ok: false,
-      provider,
-      error: 'PROVIDER_TEST_NOT_IMPLEMENTED',
-      message: `La prueba de conexión para ${provider} todavía no está implementada.`,
+    return res.json({
+      ok: true,
+      provider: result.provider,
+      environment: result.environment,
+      status: result.status,
+      message: result.message,
+      company: result.company,
+      verifiedAt: result.verifiedAt,
+      readiness: result.readiness,
     });
   } catch (error) {
-    console.error('POST /dian-provider/test-provider', error);
-
-    return res.status(500).json({
-      ok: false,
-      error: 'DIAN_PROVIDER_TEST_ERROR',
-      message: error.message || 'No se pudo probar el proveedor.',
-    });
+    return sendFactusError(
+      res,
+      error,
+      'FACTUS_CONNECTION_TEST_ERROR',
+      'No fue posible verificar la conexión con Factus.'
+    );
   }
 });
+
+router.get('/numbering-ranges', numberingRangeLimiter, async (_req, res) => {
+  try {
+    const result = await listFactusNumberingRanges();
+    return sendNumberingRanges(res, result);
+  } catch (error) {
+    return sendFactusError(
+      res,
+      error,
+      'FACTUS_NUMBERING_RANGE_LOOKUP_ERROR',
+      'No fue posible consultar los rangos oficiales de Factus.'
+    );
+  }
+});
+
+router.post(
+  '/numbering-ranges/query',
+  numberingRangeLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload(req.body || {});
+      const result = await listFactusNumberingRanges(hydratedPayload);
+      return sendNumberingRanges(res, result);
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_NUMBERING_RANGE_LOOKUP_ERROR',
+        'No fue posible consultar los rangos oficiales de Factus.'
+      );
+    }
+  }
+);
+
+router.post(
+  '/numbering-ranges/credit-note',
+  numberingRangeCreationLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload({
+        billing: req.body?.billing || {},
+      });
+      const result = await createFactusCreditNoteNumberingRange(
+        {
+          prefix: req.body?.prefix,
+          current: req.body?.current,
+          confirmProduction: req.body?.confirmProduction === true,
+        },
+        hydratedPayload
+      );
+
+      return res.status(201).json({
+        ok: true,
+        message:
+          'Rango de nota crédito creado y verificado directamente en Factus.',
+        ...result,
+      });
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_CREDIT_NOTE_RANGE_CREATE_ERROR',
+        'No fue posible crear el rango de nota crédito en Factus.'
+      );
+    }
+  }
+);
+
+router.put('/numbering-ranges', numberingRangeLimiter, async (req, res) => {
+  try {
+    const hydratedPayload = await hydrateBillingPayload({
+      billing: req.body?.billing || {},
+    });
+    const result = await saveFactusNumberingRangeSelection(
+      {
+        invoiceRangeId: req.body?.invoiceRangeId,
+        creditNoteRangeId: req.body?.creditNoteRangeId,
+      },
+      currentAdmin(req),
+      hydratedPayload
+    );
+    const settings = await getAdminSettingsWithBillingReadiness();
+
+    return res.json({
+      ok: true,
+      message: 'Rangos oficiales de Factus guardados correctamente.',
+      environment: result.environment,
+      syncedAt: result.syncedAt,
+      invoiceRange: result.invoiceRange,
+      creditNoteRange: result.creditNoteRange,
+      dianResolution: safeResolution(result.dianResolution),
+      settings,
+    });
+  } catch (error) {
+    return sendFactusError(
+      res,
+      error,
+      'FACTUS_NUMBERING_RANGE_SAVE_ERROR',
+      'No fue posible guardar los rangos oficiales de Factus.'
+    );
+  }
+});
+
+router.get('/activation-status', async (_req, res) => {
+  try {
+    return res.json({ ok: true, activation: await getClientActivationState() });
+  } catch (error) {
+    return sendFactusError(
+      res,
+      error,
+      'FACTUS_ACTIVATION_STATUS_ERROR',
+      'No fue posible consultar el estado de activación.'
+    );
+  }
+});
+
+router.post(
+  '/activate-production',
+  productionActivationLimiter,
+  async (req, res) => {
+    try {
+      const hydratedPayload = await hydrateBillingPayload({
+        billing: req.body?.billing || {},
+      });
+      const result = await activateClientFactusProduction(
+        hydratedPayload.billing,
+        {
+          invoiceRangeId: req.body?.invoiceRangeId,
+          creditNoteRangeId: req.body?.creditNoteRangeId,
+        },
+        { adminUser: currentAdmin(req) }
+      );
+
+      return res.json(result);
+    } catch (error) {
+      return sendFactusError(
+        res,
+        error,
+        'FACTUS_PRODUCTION_ACTIVATION_ERROR',
+        'No fue posible activar Factus en Producción.'
+      );
+    }
+  }
+);
 
 module.exports = router;

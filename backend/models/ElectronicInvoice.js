@@ -15,8 +15,138 @@ const CreditNoteItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const BillingSyncSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['never', 'success', 'failed'],
+      default: 'never',
+    },
+    provider: { type: String, default: '' },
+    providerStatus: { type: String, default: '' },
+    message: { type: String, default: '' },
+    httpStatus: { type: Number, default: null },
+    adminUser: { type: String, default: '' },
+    lastAttemptAt: { type: Date, default: null },
+    lastSuccessAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const InvoiceEmissionSchema = new mongoose.Schema(
+  {
+    state: {
+      type: String,
+      enum: ['processing', 'reconciliation_pending', 'completed', 'failed'],
+      default: 'processing',
+    },
+    source: { type: String, default: '' },
+    initiatedBy: { type: String, default: 'system' },
+    lockToken: { type: String, default: '', select: false },
+    lockExpiresAt: { type: Date, default: null },
+    attempts: { type: Number, default: 1 },
+    firstAttemptAt: { type: Date, default: null },
+    lastAttemptAt: { type: Date, default: null },
+    reconciliationRequestedAt: { type: Date, default: null },
+    reconciledAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    failedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const InvoiceTotalsSchema = new mongoose.Schema(
+  {
+    currency: { type: String, default: 'COP' },
+    subtotal: { type: Number, default: 0 },
+    productDiscount: { type: Number, default: 0 },
+    subtotalAfterDiscount: { type: Number, default: 0 },
+    originalShipping: { type: Number, default: 0 },
+    shippingDiscount: { type: Number, default: 0 },
+    shipping: { type: Number, default: 0 },
+    totalDiscount: { type: Number, default: 0 },
+    taxableBase: { type: Number, default: 0 },
+    taxAmount: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const OfficialDocumentFileSchema = new mongoose.Schema(
+  {
+    available: { type: Boolean, default: false },
+    provider: { type: String, default: '' },
+    invoiceNumber: { type: String, default: '' },
+    cufe: { type: String, default: '' },
+    cude: { type: String, default: '' },
+    fileName: { type: String, default: '' },
+    contentType: { type: String, default: '' },
+    byteLength: { type: Number, default: 0 },
+    sha256: { type: String, default: '' },
+    lastDownloadedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const OfficialDocumentsSchema = new mongoose.Schema(
+  {
+    pdf: { type: OfficialDocumentFileSchema, default: undefined },
+    xml: { type: OfficialDocumentFileSchema, default: undefined },
+  },
+  { _id: false }
+);
+
+const InvoiceEmailAttachmentSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['pdf', 'xml'], required: true },
+    fileName: { type: String, default: '' },
+    contentType: { type: String, default: '' },
+    byteLength: { type: Number, default: 0 },
+    sha256: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
+const InvoiceEmailAttemptSchema = new mongoose.Schema(
+  {
+    status: { type: String, enum: ['sent', 'error'], required: true },
+    recipient: { type: String, default: '' },
+    source: { type: String, enum: ['automatic', 'manual'], default: 'manual' },
+    initiatedBy: { type: String, default: '' },
+    messageId: { type: String, default: '' },
+    errorMessage: { type: String, default: '' },
+    attemptedAt: { type: Date, default: Date.now },
+    attachments: { type: [InvoiceEmailAttachmentSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const InvoiceEmailDeliverySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['pending', 'sending', 'sent', 'error'],
+      default: 'pending',
+    },
+    recipient: { type: String, default: '' },
+    source: { type: String, enum: ['automatic', 'manual'], default: 'automatic' },
+    initiatedBy: { type: String, default: '' },
+    attempts: { type: Number, default: 0 },
+    messageId: { type: String, default: '' },
+    lastError: { type: String, default: '' },
+    lastAttemptAt: { type: Date, default: null },
+    lastSentAt: { type: Date, default: null },
+    attachments: { type: [InvoiceEmailAttachmentSchema], default: [] },
+    history: { type: [InvoiceEmailAttemptSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const CreditNoteSchema = new mongoose.Schema(
   {
+    idempotencyKey: { type: String, default: '' },
+    requestFingerprint: { type: String, default: '' },
+
     type: {
       type: String,
       enum: ['total', 'partial'],
@@ -27,6 +157,7 @@ const CreditNoteSchema = new mongoose.Schema(
       type: String,
       enum: [
         'pending',
+        'processing',
         'sent',
         'validated',
         'rejected',
@@ -42,6 +173,11 @@ const CreditNoteSchema = new mongoose.Schema(
     referenceCode: { type: String, default: '' },
     billNumber: { type: String, default: '' },
 
+    emission: {
+      type: InvoiceEmissionSchema,
+      default: undefined,
+    },
+
     totalAmount: { type: Number, default: 0 },
     subtotal: { type: Number, default: 0 },
     taxAmount: { type: Number, default: 0 },
@@ -53,9 +189,11 @@ const CreditNoteSchema = new mongoose.Schema(
 
     provider: {
       name: { type: String, default: 'factus' },
+      id: { type: Number, default: null },
       status: { type: String, default: '' },
       number: { type: String, default: '' },
       cufe: { type: String, default: '' },
+      cude: { type: String, default: '' },
       isValidated: { type: Boolean, default: false },
       validatedAt: { type: String, default: '' },
       links: { type: Object, default: {} },
@@ -68,6 +206,16 @@ const CreditNoteSchema = new mongoose.Schema(
     },
 
     errorMessage: { type: String, default: '' },
+
+    sync: {
+      type: BillingSyncSchema,
+      default: () => ({}),
+    },
+
+    officialDocuments: {
+      type: OfficialDocumentsSchema,
+      default: undefined,
+    },
 
     createdBy: { type: String, default: 'admin' },
     createdAt: { type: Date, default: Date.now },
@@ -95,6 +243,13 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Una clave estable por orden reserva la emisión antes de llamar al proveedor.
+    // El índice parcial permite conservar documentos históricos que aún no la tienen.
+    idempotencyKey: {
+      type: String,
+      trim: true,
+    },
+
     required: {
       type: Boolean,
       default: false,
@@ -104,6 +259,8 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       type: String,
       enum: [
         'pending',
+        'processing',
+        'reconciliation_pending',
         'generated',
         'sent',
         'accepted',
@@ -115,18 +272,34 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       index: true,
     },
 
+    emission: {
+      type: InvoiceEmissionSchema,
+      default: undefined,
+    },
+
+    totals: {
+      type: InvoiceTotalsSchema,
+      default: undefined,
+    },
+
     customer: {
       documentType: String,
       documentNumber: String,
       dv: String,
       personType: String,
+      firstName: String,
+      lastName: String,
       businessName: String,
       email: String,
       phone: String,
       address: String,
       city: String,
+      municipalityCode: String,
       department: String,
+      departmentCode: String,
       country: String,
+      countryCode: String,
+      tributeCode: String,
     },
 
     fiscalInfo: {
@@ -160,8 +333,19 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
     xmlContent: String,
     qrUrl: String,
 
+    officialDocuments: {
+      type: OfficialDocumentsSchema,
+      default: undefined,
+    },
+
+    emailDelivery: {
+      type: InvoiceEmailDeliverySchema,
+      default: () => ({}),
+    },
+
     provider: {
       name: { type: String, default: '' },
+      id: { type: Number, default: null },
       status: { type: String, default: '' },
       referenceCode: { type: String, default: '' },
       number: { type: String, default: '' },
@@ -189,9 +373,25 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
       default: {},
     },
 
+    sync: {
+      type: BillingSyncSchema,
+      default: () => ({}),
+    },
+
     creditNotes: {
       type: [CreditNoteSchema],
       default: [],
+    },
+
+    creditNoteControl: {
+      state: {
+        type: String,
+        enum: ['idle', 'processing'],
+        default: 'idle',
+      },
+      lockToken: { type: String, default: '', select: false },
+      requestKey: { type: String, default: '' },
+      lockedAt: { type: Date, default: null },
     },
 
     generatedAt: Date,
@@ -204,10 +404,67 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
 );
 
 ElectronicInvoiceSchema.index({ status: 1, createdAt: -1 });
+ElectronicInvoiceSchema.index({ 'emission.state': 1, 'emission.lastAttemptAt': 1 });
+ElectronicInvoiceSchema.index(
+  { 'emailDelivery.status': 1, 'emailDelivery.lastAttemptAt': 1 },
+  { name: 'billing_operations_email_delivery' }
+);
+ElectronicInvoiceSchema.index(
+  {
+    'creditNotes.status': 1,
+    'creditNotes.emission.lastAttemptAt': 1,
+  },
+  { name: 'billing_operations_credit_note_emission' }
+);
+ElectronicInvoiceSchema.index(
+  { idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: 'string' } },
+    name: 'uniq_electronic_invoice_idempotency_key',
+  }
+);
 ElectronicInvoiceSchema.index({ invoiceNumber: 1 });
 ElectronicInvoiceSchema.index({ cufe: 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.referenceCode': 1 });
+ElectronicInvoiceSchema.index({ 'creditNotes.idempotencyKey': 1 });
 ElectronicInvoiceSchema.index({ 'creditNotes.status': 1 });
+ElectronicInvoiceSchema.index(
+  { generatedAt: -1 },
+  { name: 'billing_report_generated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { acceptedAt: -1 },
+  { name: 'billing_report_accepted_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'provider.validatedAt': -1 },
+  { name: 'billing_report_provider_validated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'dianResponse.issueDate': -1 },
+  { name: 'billing_report_dian_issue_date' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.createdAt': -1 },
+  { name: 'billing_report_credit_note_created_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.validatedAt': -1 },
+  { name: 'billing_report_credit_note_validated_at' }
+);
+ElectronicInvoiceSchema.index(
+  { 'creditNotes.provider.validatedAt': -1 },
+  { name: 'billing_report_credit_note_provider_validated_at' }
+);
+ElectronicInvoiceSchema.index(
+  {
+    'creditNotes.status': 1,
+    'creditNotes.type': 1,
+    'creditNotes.createdAt': -1,
+  },
+  { name: 'billing_credit_notes_status_type_date' }
+);
 
 module.exports =
   mongoose.models.ElectronicInvoice ||

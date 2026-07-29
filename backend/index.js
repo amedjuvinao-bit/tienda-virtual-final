@@ -73,12 +73,17 @@ app.use(globalLimiter);
 app.use(adminAccessGate);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// Estos adaptadores deben cargarse antes de las rutas heredadas para que las
+// emisiones usen rangos sincronizados y recuperación de resultados inciertos.
+tryRequire('./services/electronicCreditNoteRangeService');
+tryRequire('./services/electronicInvoiceRecoveryBootstrapService');
+
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
-const orderCouponCheckoutRoutes = tryRequire('./routes/orderCouponCheckout');
+const orderQuoteRoutes = tryRequire('./routes/orderQuote');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
@@ -89,6 +94,9 @@ const OrderModel = tryRequire('./models/Order');
 const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
 const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
+const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
+const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
+const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
@@ -101,12 +109,14 @@ const adminPosReceiptRoutes = tryRequire('./routes/adminPosReceipt');
 const adminCashSessionsRoutes = tryRequire('./routes/adminCashSessions');
 const adminFinanceRoutes = tryRequire('./routes/adminFinance');
 const adminCouponsRoutes = tryRequire('./routes/adminCoupons');
+const adminBillingRoutes = tryRequire('./routes/adminBilling');
 const adminCustomersRoutes = tryRequire('./routes/adminCustomers');
 const adminCustomerFollowUpsRoutes = tryRequire('./routes/adminCustomerFollowUps');
 const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
+const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
 
@@ -165,7 +175,7 @@ if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
-if (orderCouponCheckoutRoutes) app.use('/api/orders', orderCouponCheckoutRoutes);
+if (orderQuoteRoutes) app.use('/api/orders', orderQuoteRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
@@ -184,21 +194,26 @@ if (adminPosReceiptRoutes) app.use('/api/admin/pos', adminPosReceiptRoutes);
 if (adminCashSessionsRoutes) app.use('/api/admin/cash-sessions', adminCashSessionsRoutes);
 if (adminFinanceRoutes) app.use('/api/admin/finance', adminFinanceRoutes);
 if (adminCouponsRoutes) app.use('/api/admin/coupons', adminCouponsRoutes);
+if (adminBillingRoutes) app.use('/api/admin/billing', adminBillingRoutes);
 if (adminCustomersRoutes) app.use('/api/admin/customers', adminCustomersRoutes);
 if (adminCustomerFollowUpsRoutes) app.use('/api/admin/customer-follow-ups', adminCustomerFollowUpsRoutes);
 if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+if (billingSettingsProtectionRoutes) app.use('/api/site-settings', billingSettingsProtectionRoutes);
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);
 
 const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enabled;
 const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
 const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
+const BILLING_RECOVERY_INTERVAL_MS = 60 * 1000;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
+let billingRecoveryTimer = null;
+let billingRecoveryRunning = false;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -244,11 +259,79 @@ function startInventoryReservationExpirationJob() {
   console.log(`Job de expiracion de reservas iniciado cada ${INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS}ms.`);
 }
 
+function startBillingInvoiceRecoveryJob() {
+  const scan = billingInvoiceRecoveryService?.scanStaleProcessingInvoices;
+  const processPending = billingInvoiceRecoveryService?.processPendingInvoiceRecoveries;
+
+  if (typeof scan !== 'function' || typeof processPending !== 'function') {
+    console.warn('No se inició el job de recuperación fiscal: servicio no disponible.');
+    billingOperationalLogger?.error?.('billing_recovery_worker_unavailable', {
+      scanAvailable: typeof scan === 'function',
+      processPendingAvailable: typeof processPending === 'function',
+    });
+    return;
+  }
+
+  if (billingRecoveryTimer) return;
+
+  const runRecovery = async () => {
+    if (billingRecoveryRunning) return;
+    if (mongoose.connection.readyState !== 1) {
+      billingOperationalRuntime?.markWorkerCycleSkipped?.(
+        'mongodb_disconnected'
+      );
+      billingOperationalLogger?.warn?.('billing_recovery_cycle_skipped', {
+        reason: 'mongodb_disconnected',
+        mongoReadyState: mongoose.connection.readyState,
+      });
+      return;
+    }
+    billingRecoveryRunning = true;
+    billingOperationalRuntime?.markWorkerCycleStarted?.();
+    try {
+      const scanned = await scan({ limit: 25 });
+      const processed = await processPending({ limit: 10 });
+      const summary = {
+        scanned: Number(scanned.scanned || 0),
+        scheduled: Number(scanned.scheduled || 0),
+        processed: Number(processed.processed || 0),
+        resolved: Number(processed.resolved || 0),
+        pending: Number(processed.pending || 0),
+        failed: Number(processed.failed || 0),
+      };
+      billingOperationalRuntime?.markWorkerCycleSucceeded?.(summary);
+      billingOperationalLogger?.[
+        summary.failed > 0 ? 'warn' : 'info'
+      ]?.('billing_recovery_cycle_completed', summary);
+    } catch (error) {
+      billingOperationalRuntime?.markWorkerCycleFailed?.(error);
+      billingOperationalLogger?.error?.('billing_recovery_cycle_failed', {
+        error,
+      });
+    } finally {
+      billingRecoveryRunning = false;
+    }
+  };
+
+  billingOperationalRuntime?.markWorkerStarted?.({
+    intervalMs: BILLING_RECOVERY_INTERVAL_MS,
+  });
+  billingRecoveryTimer = setInterval(runRecovery, BILLING_RECOVERY_INTERVAL_MS);
+  billingRecoveryTimer.unref?.();
+  runRecovery().catch(() => null);
+  billingOperationalLogger?.info?.('billing_recovery_worker_started', {
+    intervalMs: BILLING_RECOVERY_INTERVAL_MS,
+    scanLimit: 25,
+    processLimit: 10,
+  });
+}
+
 mongoose
   .connect(env.mongoUri)
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
+    startBillingInvoiceRecoveryJob();
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });

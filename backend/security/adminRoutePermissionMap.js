@@ -321,6 +321,50 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
    * ======================================================= */
   {
     method: 'GET',
+    path: '/api/admin/billing/summary',
+    permission: 'billing:view',
+    description: 'Consultar resumen de facturación electrónica.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/operations/health',
+    permission: 'billing:view',
+    description: 'Consultar monitoreo operativo de facturación electrónica.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/documents',
+    permission: 'billing:view',
+    description: 'Listar documentos de facturación electrónica.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/credit-notes',
+    permission: 'billing:view',
+    description: 'Listar notas crédito electrónicas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/pending-orders',
+    permission: 'billing:view',
+    description: 'Listar órdenes pendientes por facturar.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/billing/orders/:orderId/generate',
+    permission: 'billing:create',
+    description: 'Generar factura electrónica desde una orden.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/billing/settings',
+    permission: 'billing:settings',
+    description: 'Consultar configuración técnica de facturación.',
+  },
+  {
+    method: 'GET',
     path: '/api/dian-provider-test',
     permission: 'billing:view',
     description: 'Consultar estado de proveedor de facturación electrónica.',
@@ -355,9 +399,53 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
-    path: '/api/dian-provider-test/credit-note',
+    path: '/api/admin/billing/documents/:invoiceId/sync',
+    permission: 'billing:retry',
+    description: 'Consultar y actualizar el estado de una factura en el proveedor.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/billing/credit-notes/:invoiceId/:noteId/sync',
+    permission: 'billing:retry',
+    description: 'Consultar y actualizar el estado de una nota crédito en el proveedor.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/delete-factus-invoice/:orderId',
+    permission: 'billing:retry',
+    description: 'Eliminar en Factus una factura todavía no validada.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/create-credit-note/:orderId',
     permission: 'billing:credit_note',
-    description: 'Crear nota crédito electrónica.',
+    description: 'Crear una nota crédito electrónica desde una factura.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/retry-electronic-invoice/:orderId',
+    permission: 'billing:retry',
+    description: 'Reintentar la emisión de una factura electrónica.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/dian-provider/test-provider',
+    permission: 'billing:settings',
+    description: 'Validar la configuración del proveedor electrónico.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/dian-provider/numbering-ranges/credit-note',
+    permission: 'billing:settings',
+    description: 'Crear un rango oficial de notas crédito en Factus.',
     audit: true,
     danger: true,
   },
@@ -445,6 +533,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
    * CONFIGURACIÓN / APARIENCIA / SITE SETTINGS
    * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/site-settings/admin',
+    permission: 'settings:view',
+    description: 'Consultar configuración administrativa sin exponer secretos.',
+  },
   {
     method: 'PUT',
     path: '/api/site-settings',

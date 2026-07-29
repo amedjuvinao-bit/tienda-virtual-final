@@ -626,7 +626,12 @@ router.post('/payu/checkout-data', async (req, res) => {
         description: `Pago orden ${order.orderNumber || referenceCode}`,
         amount,
         tax: Number(order.taxes?.iva?.amount || 0),
-        taxReturnBase: Number(order.subtotal || amount),
+        taxReturnBase: Number(
+          order.pricing?.taxableBase ??
+            order.pricing?.subtotalAfterDiscount ??
+            order.subtotal ??
+            amount
+        ),
         currency,
         signature: signatureData.signature,
         algorithmSignature: signatureData.algorithm,

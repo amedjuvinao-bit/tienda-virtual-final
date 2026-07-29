@@ -11,8 +11,7 @@ export function getInvoiceStatusInfo(invoice) {
     invoice?.providerStatus === 201 ||
     status === 'validated' ||
     status === 'success' ||
-    status === 'accepted' ||
-    status === 'generated';
+    status === 'accepted';
 
   const sent = status === 'sent';
 

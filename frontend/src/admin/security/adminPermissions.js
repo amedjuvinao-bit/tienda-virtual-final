@@ -13,6 +13,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   carritos: ['carts:view'],
   favoritos: ['favorites:view'],
   ordenes: ['orders:view'],
+  facturacion: ['billing:view', 'billing:settings'],
   clientes: ['customers:view'],
   pos: ['pos:view'],
   caja: ['pos:view'],
@@ -176,6 +177,10 @@ export function getRequiredPermissionsForAdminPath(pathname) {
     return ADMIN_ROUTE_PERMISSIONS[path];
   }
 
+  if (path.startsWith('facturacion/')) {
+    return ADMIN_ROUTE_PERMISSIONS.facturacion;
+  }
+
   if (path.startsWith('productos/editar/')) {
     return ADMIN_ROUTE_PERMISSIONS['productos/editar'];
   }
@@ -218,17 +223,9 @@ export function getRequiredPermissionsForAdminPath(pathname) {
     return ADMIN_ROUTE_PERMISSIONS['notfound-page'];
   }
 
-  return [];
+  return ADMIN_ROUTE_PERMISSIONS.dashboard;
 }
 
 export function canAccessAdminPath(user, pathname) {
-  if (!user) return false;
-
-  if (isPrivilegedAdmin(user)) {
-    return true;
-  }
-
-  const requiredPermissions = getRequiredPermissionsForAdminPath(pathname);
-
-  return hasAnyAdminPermission(user, requiredPermissions);
+  return hasAnyAdminPermission(user, getRequiredPermissionsForAdminPath(pathname));
 }

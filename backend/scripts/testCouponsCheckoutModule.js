@@ -40,49 +40,54 @@ function assertIncludes(content, expected, message) {
 
 function validateFilesExist() {
   [
-    'backend/routes/orderCouponCheckout.js',
-    'frontend/src/checkout/checkoutCouponBridge.js',
+    'backend/routes/orderQuote.js',
+    'backend/services/orderPricingService.js',
+    'frontend/src/pages/CheckoutPage.jsx',
   ].forEach((file) => {
     readProjectFile(file);
     ok(`${file} existe`);
   });
 }
 
-function validateBackendOrderCouponMiddleware() {
-  const middleware = readProjectFile('backend/routes/orderCouponCheckout.js');
+function validateBackendOrderCouponFlow() {
+  const quoteRoute = readProjectFile('backend/routes/orderQuote.js');
+  const pricing = readProjectFile('backend/services/orderPricingService.js');
+  const orders = readProjectFile('backend/routes/orders.js');
   const indexFile = readProjectFile('backend/index.js');
 
   [
-    "require('../services/couponService')",
-    'validateIncomingCoupon',
-    'applyCouponToCreatedOrder',
-    'recordCouponRedemption',
-    'coupon_applied',
-    'COUPON_INVALID',
-    'Order.collection.updateOne',
-  ].forEach((needle) => assertIncludes(middleware, needle, `orderCouponCheckout.js no contiene ${needle}`));
+    "router.post('/quote'",
+    'buildOrderQuote',
+    'pricing',
+  ].forEach((needle) => assertIncludes(quoteRoute, needle, `orderQuote.js no contiene ${needle}`));
 
-  assertIncludes(indexFile, "./routes/orderCouponCheckout", 'index.js no carga orderCouponCheckout.');
-  assertIncludes(indexFile, "app.use('/api/orders', orderCouponCheckoutRoutes)", 'index.js no monta middleware de cupones antes de órdenes.');
-  ok('Backend aplica y registra cupones al crear órdenes de checkout');
+  ['calculateOrderPricing', 'resolveAuthoritativeItems', 'resolveShippingAmount']
+    .forEach((needle) => assertIncludes(pricing, needle, `orderPricingService.js no contiene ${needle}`));
+
+  ['recordCouponRedemption', 'coupon_applied', 'couponCode', 'pricing: pricingSnapshot']
+    .forEach((needle) => assertIncludes(orders, needle, `orders.js no contiene ${needle}`));
+
+  assertIncludes(indexFile, "./routes/orderQuote", 'index.js no carga orderQuote.');
+  assertIncludes(indexFile, "app.use('/api/orders', orderQuoteRoutes)", 'index.js no monta la cotización de órdenes.');
+  ok('Backend cotiza y registra el cupón dentro de la creación atómica de la orden');
 }
 
-function validateFrontendCheckoutCouponBridge() {
-  const bridge = readProjectFile('frontend/src/checkout/checkoutCouponBridge.js');
+function validateFrontendCheckoutCouponFlow() {
+  const checkout = readProjectFile('frontend/src/pages/CheckoutPage.jsx');
   const mainFile = readProjectFile('frontend/src/main.jsx');
 
   [
-    '/api/coupons/validate',
-    'co-discount-row',
-    'co-btn-secondary',
-    'rb_checkout_coupon_applied',
-    'api.interceptors.request.use',
+    '/api/orders/quote',
+    'handleApplyCoupon',
+    'appliedCoupon',
     'couponCode',
-    'renderCouponTotals',
-  ].forEach((needle) => assertIncludes(bridge, needle, `checkoutCouponBridge.js no contiene ${needle}`));
+    'productDiscount',
+    'shippingDiscount',
+    'taxAmount',
+  ].forEach((needle) => assertIncludes(checkout, needle, `CheckoutPage.jsx no contiene ${needle}`));
 
-  assertIncludes(mainFile, "./checkout/checkoutCouponBridge", 'main.jsx no activa checkoutCouponBridge.');
-  ok('Frontend valida cupones, actualiza resumen y adjunta cupón a la orden');
+  assert(!mainFile.includes('checkoutCouponBridge'), 'main.jsx todavía activa el bridge antiguo de cupones.');
+  ok('Frontend cotiza IVA y cupón con React sin manipular el DOM');
 }
 
 function validatePackageScript() {
@@ -96,8 +101,8 @@ function main() {
 
   [
     validateFilesExist,
-    validateBackendOrderCouponMiddleware,
-    validateFrontendCheckoutCouponBridge,
+    validateBackendOrderCouponFlow,
+    validateFrontendCheckoutCouponFlow,
     validatePackageScript,
   ].forEach((step) => {
     try {

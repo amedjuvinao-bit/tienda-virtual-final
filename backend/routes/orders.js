@@ -28,6 +28,11 @@ const {
   createInventoryReservation,
   expireInventoryReservations,
 } = require('../services/inventoryReservationService');
+const couponService = require('../services/couponService');
+const { buildOrderQuote } = require('../services/orderPricingService');
+const {
+  downloadOfficialInvoiceDocument,
+} = require('../services/electronicInvoiceDocumentService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -126,6 +131,85 @@ function calcSummaryFromItems(items) {
   return { totalItems, subtotal };
 }
 
+function getOrderCustomerEmail(orderData = {}) {
+  return String(
+    orderData?.billing?.email ||
+      orderData?.customer?.email ||
+      orderData?.customer?.emailOrPhone ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function buildOrderCouponSnapshot(quote = {}) {
+  const validation = quote.couponValidation;
+  if (!validation?.valid) return undefined;
+
+  const coupon = validation.coupon || {};
+  const pricing = quote.pricing || {};
+
+  return {
+    coupon: coupon._id || coupon.id || null,
+    redemption: null,
+    code: coupon.code || quote.couponCode || '',
+    type: coupon.type || '',
+    value: Number(coupon.value || 0),
+    name: coupon.name || '',
+    discountAmount: Number(pricing.productDiscount || 0),
+    shippingDiscountAmount: Number(pricing.shippingDiscount || 0),
+    totalDiscountAmount: Number(pricing.totalDiscount || 0),
+    originalShippingAmount: Number(pricing.originalShipping || 0),
+    finalShippingAmount: Number(pricing.shipping || 0),
+    status: 'applied',
+    message: validation.message || 'Cupón aplicado correctamente.',
+    appliedAt: new Date(),
+  };
+}
+
+function buildOrderDiscountSnapshot(quote = {}) {
+  const validation = quote.couponValidation;
+  const pricing = quote.pricing || {};
+  const coupon = validation?.coupon || {};
+  const amount = Number(pricing.productDiscount || 0);
+
+  if (!validation?.valid || Number(pricing.totalDiscount || 0) <= 0) {
+    return {
+      type: 'none',
+      value: 0,
+      amount: 0,
+      reason: '',
+    };
+  }
+
+  return {
+    type: coupon.type === 'percentage' ? 'percent' : 'amount',
+    value: Number(coupon.value || 0),
+    amount,
+    reason:
+      Number(pricing.shippingDiscount || 0) > 0 && amount <= 0
+        ? `Cupón ${coupon.code || quote.couponCode || ''} - envío gratis`
+        : `Cupón ${coupon.code || quote.couponCode || ''}`,
+  };
+}
+
+function buildPricingSnapshot(pricing = {}) {
+  return {
+    version: Number(pricing.version || 2),
+    currency: pricing.currency || 'COP',
+    subtotal: Number(pricing.subtotal || 0),
+    productDiscount: Number(pricing.productDiscount || 0),
+    subtotalAfterDiscount: Number(pricing.subtotalAfterDiscount || 0),
+    originalShipping: Number(pricing.originalShipping || 0),
+    shippingDiscount: Number(pricing.shippingDiscount || 0),
+    shipping: Number(pricing.shipping || 0),
+    totalDiscount: Number(pricing.totalDiscount || 0),
+    taxableBase: Number(pricing.tax?.taxableBase || pricing.subtotalAfterDiscount || 0),
+    taxAmount: Number(pricing.tax?.amount || 0),
+    total: Number(pricing.total || 0),
+  };
+}
+
 function normalizeTags(arr) {
   return (Array.isArray(arr) ? arr : String(arr || '')
     .split(',')
@@ -219,35 +303,22 @@ async function syncExistingOrderForRetry(orderId, cleaned, { session } = {}) {
     return order.toObject();
   }
 
-  const summary = calcSummaryFromItems(cleaned.cart);
-  const nextSubtotal = Number(cleaned.subtotal ?? summary.subtotal ?? 0);
-  const nextShipping = Number(cleaned.shipping ?? 0);
-  const nextTotal = Number(cleaned.total ?? nextSubtotal + nextShipping);
-
+  // Una orden ya creada conserva su fotografía económica. Reintentar el mismo
+  // request no puede recalcular precios, retirar un cupón ni cambiar el IVA.
   order.sessionId = cleaned.sessionId;
   order.customer = cleaned.customer;
   order.billing = cleaned.billing;
 
   if (cleaned.payment && typeof cleaned.payment === 'object') {
-    order.payment = cleaned.payment;
+    if (!order.payment || typeof order.payment !== 'object') order.payment = {};
+    order.payment.active = cleaned.payment.active;
+    order.payment.provider = cleaned.payment.provider;
+    order.payment.providerLabel = cleaned.payment.providerLabel;
+    order.payment.mode = cleaned.payment.mode;
+    order.payment.currency = cleaned.payment.currency;
+    order.payment.checkoutLabel = cleaned.payment.checkoutLabel;
+    order.payment.enableWebhook = cleaned.payment.enableWebhook;
   }
-
-  if (Array.isArray(cleaned.cart)) {
-    order.cart = cleaned.cart;
-    if (Array.isArray(order.items)) {
-      order.items = cleaned.cart;
-    }
-  }
-
-  order.summary = {
-    ...(order.summary && typeof order.summary === 'object' ? order.summary : {}),
-    ...summary,
-  };
-
-  order.subtotal = nextSubtotal;
-  order.shipping = nextShipping;
-  order.total = nextTotal;
-  order.tags = Array.isArray(cleaned.tags) ? cleaned.tags : [];
 
   await order.save({ session });
 
@@ -260,7 +331,8 @@ async function syncExistingOrderForRetry(orderId, cleaned, { session } = {}) {
         meta: {
           by: 'system_retry',
           sessionId: cleaned.sessionId || null,
-          total: nextTotal,
+          total: Number(order.total || 0),
+          pricingVersion: Number(order.pricing?.version || 0),
         },
       },
     ],
@@ -763,6 +835,7 @@ function deriveIdempotencyKey(cleaned) {
     subtotal: Number(cleaned.subtotal || 0),
     shipping: Number(cleaned.shipping || 0),
     total: Number(cleaned.total || 0),
+    couponCode: String(cleaned.couponCode || ''),
     customerEmail: String(cleaned.customer?.emailOrPhone || cleaned.customer?.email || ''),
     createdAtDay: new Date().toISOString().slice(0, 10),
   };
@@ -1744,6 +1817,13 @@ router.post('/', rateLimit, async (req, res) => {
           return res.status(200).json({
             _id: existingOrder._id,
             orderNumber: existingOrder.orderNumber,
+            subtotal: Number(existingOrder.subtotal || 0),
+            discount: existingOrder.discount || null,
+            coupon: existingOrder.coupon || null,
+            pricing: existingOrder.pricing || null,
+            taxes: existingOrder.taxes || null,
+            shipping: Number(existingOrder.shipping || 0),
+            total: Number(existingOrder.total || 0),
             idempotent: true,
             reused: true,
           });
@@ -1755,6 +1835,13 @@ router.post('/', rateLimit, async (req, res) => {
           return res.status(200).json({
             _id: syncedOrder._id,
             orderNumber: syncedOrder.orderNumber,
+            subtotal: Number(syncedOrder.subtotal || 0),
+            discount: syncedOrder.discount || null,
+            coupon: syncedOrder.coupon || null,
+            pricing: syncedOrder.pricing || null,
+            taxes: syncedOrder.taxes || null,
+            shipping: Number(syncedOrder.shipping || 0),
+            total: Number(syncedOrder.total || 0),
             idempotent: true,
             reused: true,
           });
@@ -1846,6 +1933,37 @@ router.post('/', rateLimit, async (req, res) => {
       const settings = await SiteSettings.findOne().session(session).lean();
       const billingMode = getBillingMode(settings);
 
+      const quote = await buildOrderQuote(
+        {
+          items: cleaned.cart,
+          customer: cleaned.customer,
+          billing: cleaned.billing,
+          couponCode: cleaned.couponCode,
+          customerEmail: getOrderCustomerEmail(cleaned),
+          sessionId: cleaned.sessionId,
+        },
+        { session, settings }
+      );
+
+      if (quote.couponCode && !quote.couponValidation?.valid) {
+        throw Object.assign(
+          new Error(quote.couponValidation?.message || 'El cupón no es válido.'),
+          {
+            code: quote.couponValidation?.code || 'COUPON_INVALID',
+            statusCode: 422,
+            details: {
+              code: quote.couponValidation?.code || 'COUPON_INVALID',
+            },
+          }
+        );
+      }
+
+      const pricing = quote.pricing;
+      const pricingSnapshot = buildPricingSnapshot(pricing);
+      const couponSnapshot = buildOrderCouponSnapshot(quote);
+      const discountSnapshot = buildOrderDiscountSnapshot(quote);
+      const summary = calcSummaryFromItems(pricing.items);
+
       const orderBranchData = await resolveOrderBranchData(req.body || {}, cleaned, {
         session,
       });
@@ -1861,70 +1979,39 @@ router.post('/', rateLimit, async (req, res) => {
         isInternalMode: billingMode.isInternalMode,
       });
 
-      const dianConfig = settings?.billing?.dian || {};
-      const dian = settings?.billing?.dianResolution || {};
-
-      const effectiveDianEnvironment =
-        billingMode.dianMode === 'production'
-          ? '1'
-          : dianConfig.environment || dian.environment || '2';
-
-      const settingsForInvoice = {
-        ...(settings || {}),
-        billing: {
-          ...(settings?.billing || {}),
-          dianResolution: {
-            ...(dian || {}),
-            environment: effectiveDianEnvironment,
-          },
-        },
-      };
-
-      const prefix = dian.prefix || 'ORD';
-      const currentNumber = Number(dian.currentNumber || 1);
-      const invoiceNumber = `${prefix}-${String(currentNumber).padStart(6, '0')}`;
-
-      const now = new Date();
-      const issueDate = now.toISOString().slice(0, 10);
-      const issueTime = now.toISOString().slice(11, 19);
-
-      const customerDocument =
-        cleaned.customer?.document ||
-        cleaned.customer?.cedula ||
-        cleaned.customer?.identification ||
-        '222222222222';
-
-      const ivaConfig = settings?.billing?.taxes?.iva || {};
-      const ivaEnabled = ivaConfig.enabled !== false;
-      const ivaPercent = Number(ivaConfig.percent || 0);
-      const ivaCode = ivaConfig.code || '01';
-      const ivaName = ivaConfig.name || 'IVA';
-
-      const grossAmount = Number(cleaned.subtotal || 0);
-      const shippingAmount = Number(cleaned.shipping || 0);
-      const taxAmount = ivaEnabled
-        ? Number(((grossAmount * ivaPercent) / 100).toFixed(2))
-        : 0;
-
-      const totalAmount = Number((grossAmount + taxAmount + shippingAmount).toFixed(2));
-
       const taxesSnapshot = {
         iva: {
-          enabled: ivaEnabled,
-          percent: ivaPercent,
-          code: ivaCode,
-          name: ivaName,
-          amount: taxAmount,
+          enabled: pricing.tax.enabled,
+          percent: pricing.tax.percent,
+          code: pricing.tax.code,
+          name: pricing.tax.name,
+          taxableBase: pricing.tax.taxableBase,
+          amount: pricing.tax.amount,
         },
       };
 
       const base = {
         ...cleaned,
         orderNumber,
-        subtotal: grossAmount,
-        shipping: shippingAmount,
-        total: totalAmount,
+        cart: pricing.items,
+        items: pricing.items,
+        summary: {
+          itemsCount: pricing.items.length,
+          totalItems: summary.totalItems,
+          subtotal: pricing.subtotal,
+        },
+        subtotal: pricing.subtotal,
+        shipping: pricing.shipping,
+        total: pricing.total,
+        discount: discountSnapshot,
+        coupon: couponSnapshot,
+        pricing: pricingSnapshot,
         taxes: taxesSnapshot,
+        payment: {
+          ...(cleaned.payment || {}),
+          amount: pricing.total,
+          amountInCents: Math.round(pricing.total * 100),
+        },
 
         branch: orderBranchData.branchId,
         branchSnapshot: orderBranchData.branchSnapshot,
@@ -1961,7 +2048,7 @@ router.post('/', rateLimit, async (req, res) => {
             req.body?.payment?.transactionId ||
             '',
           source: 'checkout',
-          items: cleaned.cart,
+          items: pricing.items,
           branchPriorityIds: orderBranchData.branchId
             ? [String(orderBranchData.branchId)]
             : [],
@@ -1979,6 +2066,55 @@ router.post('/', rateLimit, async (req, res) => {
         },
         { session }
       );
+
+      if (quote.couponValidation?.valid && created.coupon?.coupon) {
+        const redemption = await couponService.recordCouponRedemption(
+          {
+            couponId: created.coupon.coupon,
+            code: created.coupon.code,
+            orderId: created._id,
+            orderNumber: created.orderNumber,
+            customerEmail: getOrderCustomerEmail(cleaned),
+            sessionId: cleaned.sessionId,
+            source: 'checkout',
+            subtotal: pricing.subtotal,
+            shippingAmount: pricing.originalShipping,
+            discount: {
+              eligibleSubtotal: quote.couponValidation?.discount?.eligibleSubtotal || 0,
+              discountAmount: pricing.productDiscount,
+              shippingDiscountAmount: pricing.shippingDiscount,
+              totalDiscountAmount: pricing.totalDiscount,
+            },
+          },
+          { session }
+        );
+
+        created.coupon.redemption = redemption?._id || null;
+        await created.save({ session });
+
+        await OrderEvent.create(
+          [
+            {
+              orderId: created._id,
+              type: 'coupon_applied',
+              message: `Cupón aplicado: ${created.coupon.code}`,
+              meta: {
+                coupon: created.coupon.toObject ? created.coupon.toObject() : created.coupon,
+                redemptionId: redemption?._id || null,
+                subtotal: pricing.subtotal,
+                productDiscount: pricing.productDiscount,
+                originalShipping: pricing.originalShipping,
+                shippingDiscount: pricing.shippingDiscount,
+                finalShipping: pricing.shipping,
+                taxableBase: pricing.subtotalAfterDiscount,
+                taxAmount: pricing.tax.amount,
+                finalTotal: pricing.total,
+              },
+            },
+          ],
+          { session }
+        );
+      }
 
       await OrderEvent.create(
         [
@@ -2028,7 +2164,11 @@ router.post('/', rateLimit, async (req, res) => {
                 orderNumber: created.orderNumber,
                 reservationId: inventoryReservation?._id || null,
                 reservationCode: inventoryReservation?.reservationCode || '',
-                
+                subtotal: pricing.subtotal,
+                discount: pricing.totalDiscount,
+                tax: pricing.tax.amount,
+                shipping: pricing.shipping,
+                total: pricing.total,
               },
               completedAt: new Date(),
             },
@@ -2044,6 +2184,13 @@ router.post('/', rateLimit, async (req, res) => {
       return res.status(statusCode).json({
         _id: created._id,
         orderNumber: created.orderNumber,
+        subtotal: Number(created.subtotal || 0),
+        discount: created.discount || null,
+        coupon: created.coupon || null,
+        pricing: created.pricing || null,
+        taxes: created.taxes || null,
+        shipping: Number(created.shipping || 0),
+        total: Number(created.total || 0),
         reservationId: inventoryReservation?._id || null,
         reservationCode: inventoryReservation?.reservationCode || '',
         reservationStatus: inventoryReservation?.status || '',
@@ -2063,6 +2210,13 @@ router.post('/', rateLimit, async (req, res) => {
         return res.status(200).json({
           _id: prev._id,
           orderNumber: prev.orderNumber,
+          subtotal: Number(prev.subtotal || 0),
+          discount: prev.discount || null,
+          coupon: prev.coupon || null,
+          pricing: prev.pricing || null,
+          taxes: prev.taxes || null,
+          shipping: Number(prev.shipping || 0),
+          total: Number(prev.total || 0),
           idempotent: true,
           reused: true,
         });
@@ -2113,12 +2267,24 @@ router.post('/', rateLimit, async (req, res) => {
         'MISSING_SIZE',
         'MISSING_COLOR',
         'INVALID_QUANTITY',
+        'PRODUCT_NOT_AVAILABLE',
+        'PRODUCT_PRICE_INVALID',
       ].includes(code)
     ) {
       return res.status(error.statusCode || 400).json({
         error: error.message || 'Datos inválidos para reservar inventario.',
         code,
         details: error.details || {},
+      });
+    }
+
+    if (code.startsWith('COUPON_')) {
+      return res.status(error.statusCode || error.status || 422).json({
+        ok: false,
+        error: code,
+        code,
+        message: error.message || 'El cupón no pudo aplicarse a la orden.',
+        details: error.details || null,
       });
     }
 
@@ -2358,84 +2524,180 @@ router.post('/:id/email', requireAdmin, async (req, res) => {
  * XML FACTURA ELECTRÓNICA
  * GET /api/orders/:id/invoice-xml
  * ======================================================= */
-router.get('/:id/invoice-xml', requireAdmin, async (req, res) => {
-  try {
-    const orderId = req.params.id;
+function safeInvoiceDownloadName(value, fallback, extension) {
+  const name = String(value || fallback || 'factura')
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^[_\.]+|[_\.]+$/g, '') || 'factura';
 
-    const invoice = await ElectronicInvoice.findOne({ orderId }).lean();
+  return name.toLowerCase().endsWith(extension)
+    ? name
+    : `${name}${extension}`;
+}
 
-    if (!invoice) {
-      return res.status(404).json({
-        error: 'INVOICE_NOT_FOUND',
-        message: 'No se encontró factura electrónica para esta orden.',
+function sendOfficialInvoiceDocument(res, documentResult) {
+  const extension = documentResult.type === 'pdf' ? '.pdf' : '.xml';
+  const fallback = `factura-${documentResult.invoiceNumber || 'factus'}`;
+  const fileName = safeInvoiceDownloadName(
+    documentResult.fileName,
+    fallback,
+    extension
+  );
+
+  res.setHeader('Content-Type', documentResult.contentType);
+  res.setHeader('Content-Length', String(documentResult.buffer.length));
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Invoice-Document-Source', 'factus');
+  res.setHeader('X-Invoice-Number', documentResult.invoiceNumber || '');
+  res.setHeader(
+    'Access-Control-Expose-Headers',
+    'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+  );
+  return res.status(200).send(documentResult.buffer);
+}
+
+function sendInvoiceDocumentError(res, error, fallback) {
+  const candidate = Number(error?.status || error?.statusCode || 500);
+  const status = Number.isInteger(candidate) && candidate >= 400 && candidate <= 599
+    ? candidate
+    : 500;
+  return res.status(status).json({
+    error: error?.code || 'INVOICE_DOCUMENT_DOWNLOAD_ERROR',
+    message: error?.message || fallback,
+  });
+}
+
+router.get(
+  '/:id/invoice-xml',
+  requireAdmin,
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const orderId = req.params.id;
+
+      const documentResult = await downloadOfficialInvoiceDocument({
+        orderId,
+        type: 'xml',
       });
+
+      if (documentResult.official) {
+        return sendOfficialInvoiceDocument(res, documentResult);
+      }
+
+      const invoice = documentResult.invoice?.toObject
+        ? documentResult.invoice.toObject()
+        : documentResult.invoice;
+
+      if (!invoice) {
+        return res.status(404).json({
+          error: 'INVOICE_NOT_FOUND',
+          message: 'No se encontró factura electrónica para esta orden.',
+        });
+      }
+
+      const xmlContent = String(invoice.xmlContent || '').trim();
+
+      if (!xmlContent) {
+        return res.status(404).json({
+          error: 'XML_NOT_FOUND',
+          message: 'La factura electrónica no tiene XML guardado.',
+        });
+      }
+
+      const invoiceNumber =
+        invoice.invoiceNumber ||
+        invoice?.provider?.number ||
+        invoice?.provider?.raw?.number ||
+        orderId;
+
+      const safeFileName = safeInvoiceDownloadName(
+        `factura-${invoiceNumber || orderId}`,
+        `factura-${orderId}`,
+        '.xml'
+      );
+
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Invoice-Document-Source', 'internal');
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${safeFileName}"`
+      );
+
+      return res.status(200).send(xmlContent);
+    } catch (error) {
+      console.error('GET /orders/:id/invoice-xml', error);
+
+      return sendInvoiceDocumentError(
+        res,
+        error,
+        'No se pudo descargar el XML de la factura.'
+      );
     }
-
-    const xmlContent = String(invoice.xmlContent || '').trim();
-
-    if (!xmlContent) {
-      return res.status(404).json({
-        error: 'XML_NOT_FOUND',
-        message: 'La factura electrónica no tiene XML guardado.',
-      });
-    }
-
-    const invoiceNumber =
-      invoice.invoiceNumber ||
-      invoice?.provider?.number ||
-      invoice?.provider?.raw?.number ||
-      orderId;
-
-    const safeFileName = String(invoiceNumber)
-      .replace(/[^\w.-]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-
-    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="factura-${safeFileName || orderId}.xml"`
-    );
-
-    return res.status(200).send(xmlContent);
-  } catch (error) {
-    console.error('GET /orders/:id/invoice-xml', error);
-
-    return res.status(500).json({
-      error: 'XML_DOWNLOAD_ERROR',
-      message: 'No se pudo descargar el XML de la factura.',
-    });
   }
-});
+);
 /* =========================================================
  * PDF
  * ======================================================= */
-router.get('/:id/pdf', requireAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
+router.get(
+  '/:id/pdf',
+  requireAdmin,
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const id = req.params.id;
 
-    const order = await Order.findById(id)
-      .populate({ path: 'items.product', select: 'title sku price image slug' })
-      .lean();
+      const order = await Order.findById(id)
+        .populate({ path: 'items.product', select: 'title sku price image slug' })
+        .lean();
 
-    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+      if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const invoice = await ElectronicInvoice.findOne({
-      orderId: order._id,
-    }).lean();
+      const invoice = await ElectronicInvoice.findOne({
+        orderId: order._id,
+      }).lean();
 
-    const settings = await SiteSettings.findOne().lean();
+      if (invoice) {
+        const documentResult = await downloadOfficialInvoiceDocument({
+          orderId: order._id,
+          type: 'pdf',
+        });
 
-    await generateOrderPdf({
-      order,
-      invoice,
-      settings,
-      res,
-    });
-  } catch (e) {
-    console.error('GET /orders/:id/pdf', e);
-    res.status(500).json({ error: 'No se pudo generar el PDF' });
+        if (documentResult.official) {
+          return sendOfficialInvoiceDocument(res, documentResult);
+        }
+      }
+
+      const settings = await SiteSettings.findOne().lean();
+
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+      );
+
+      await generateOrderPdf({
+        order,
+        invoice,
+        settings,
+        res,
+      });
+    } catch (e) {
+      console.error('GET /orders/:id/pdf', e);
+      return sendInvoiceDocumentError(
+        res,
+        e,
+        'No se pudo descargar el PDF de la factura.'
+      );
+    }
   }
-});
+);
 
 /* =========================================================
  * Reembolso

@@ -2,9 +2,9 @@
 // Este objeto será la base para el estado del checkout
 
 export const dianCustomerDefaults = {
-  personType: '', // natural | juridica | consumidor_final
+  personType: 'natural', // natural | juridica
 
-  documentType: '', // CC | NIT | CE | TI | PPT
+  documentType: 'CC', // CC | NIT | CE | TI | PP | PPT | RC
   documentNumber: '',
   dv: '', // solo aplica si es NIT
 
@@ -22,5 +22,8 @@ export const dianCustomerDefaults = {
   department: '',
   departmentCode: '',
 
-  country: 'CO', // Colombia por defecto
+  country: 'CO', // código ISO del país
+  countryName: 'Colombia',
+  postalCode: '',
+  tributeCode: 'ZZ',
 };
