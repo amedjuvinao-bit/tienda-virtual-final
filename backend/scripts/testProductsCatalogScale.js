@@ -228,7 +228,7 @@ async function run() {
     });
     ok('Activación, publicación y ocultamiento masivos con validación');
 
-    const archivedIds = productIds.slice(0, 2).map(String);
+    const archivedIds = productIds.slice(1, 3).map(String);
     const archived = await archiveProductsSafely({
       ids: archivedIds,
     });
