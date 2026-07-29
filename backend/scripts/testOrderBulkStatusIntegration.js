@@ -501,7 +501,13 @@ async function run() {
       [physicalOrder._id, virtualOrder._id],
       'paid'
     );
-    assert.strictEqual(paidResult.modified, 2);
+    assert.strictEqual(
+      paidResult.modified,
+      2,
+      `Resultado inesperado del pago masivo: ${JSON.stringify(
+        paidResult
+      )}`
+    );
     assert.strictEqual(paidResult.failed, 0);
     assert.deepStrictEqual(
       await getStock(physical._id, 'm__azul', branch._id),
