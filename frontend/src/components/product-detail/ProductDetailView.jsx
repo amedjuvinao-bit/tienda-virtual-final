@@ -800,7 +800,12 @@ export default function ProductDetailView({
 
   useEffect(() => {
     setMainImage(images[0] || "");
-  }, [images]);
+  }, [images, product?.selectedVariantKey]);
+
+  const displayedMainImage =
+    mainImage && images.includes(mainImage)
+      ? mainImage
+      : images[0] || product?.image || "";
 
   const safeColors = Array.isArray(product?.colors) ? product.colors : [];
   const safeSizes = Array.isArray(product?.sizes) ? product.sizes : [];
@@ -1116,7 +1121,7 @@ export default function ProductDetailView({
     showThumbnails && thumbnailPosition === "left" && images.length > 1 ? (
       <div className="pd-thumbs-left" style={{ gap: `${thumbGapPx}px` }}>
         {desktopThumbs.map((img, index) => {
-          const active = mainImage === img;
+          const active = displayedMainImage === img;
           return (
             <button
               key={`${img}-${index}`}
@@ -1149,7 +1154,7 @@ export default function ProductDetailView({
     showThumbnails && thumbnailPosition === "bottom" && images.length > 1 ? (
       <div className="pd-thumbs-bottom" style={{ gap: `${thumbGapPx}px` }}>
         {desktopThumbs.map((img, index) => {
-          const active = mainImage === img;
+          const active = displayedMainImage === img;
           return (
             <button
               key={`${img}-bottom-${index}`}
@@ -1204,7 +1209,7 @@ export default function ProductDetailView({
       )}
 
       <img
-        src={mainImage || product?.image}
+        src={displayedMainImage}
         alt={visibleTitle}
         className={`pd-main-img ${imageHoverZoom ? "pd-main-img-zoom" : ""}`}
         style={{
@@ -1329,7 +1334,7 @@ export default function ProductDetailView({
                       style={{ gap: `${Math.min(thumbGapPx, 10)}px` }}
                     >
                       {mobileThumbs.map((img, index) => {
-                        const active = mainImage === img;
+                        const active = displayedMainImage === img;
                         return (
                           <button
                             key={`${img}-mobile-${index}`}

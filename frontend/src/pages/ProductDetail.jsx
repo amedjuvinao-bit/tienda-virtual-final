@@ -170,6 +170,47 @@ function findSelectedVariant(product, selectedSize, selectedColor) {
     || null;
 }
 
+function findVariantForChangedOption(
+  product,
+  changedOption,
+  nextValue,
+  currentOtherValue
+) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  if (!variants.length) return null;
+
+  const nextKey = cleanLower(nextValue);
+  const otherKey = cleanLower(currentOtherValue);
+
+  if (changedOption === "color") {
+    const exact = variants.find(
+      (variant) =>
+        cleanLower(variant.colorLabel || variant.color) === nextKey &&
+        (!otherKey || cleanLower(variant.size) === otherKey)
+    );
+
+    return exact
+      || variants.find(
+        (variant) =>
+          cleanLower(variant.colorLabel || variant.color) === nextKey
+      )
+      || null;
+  }
+
+  const exact = variants.find(
+    (variant) =>
+      cleanLower(variant.size) === nextKey &&
+      (!otherKey ||
+        cleanLower(variant.colorLabel || variant.color) === otherKey)
+  );
+
+  return exact
+    || variants.find(
+      (variant) => cleanLower(variant.size) === nextKey
+    )
+    || null;
+}
+
 function buildVariantAwareProduct(product, selectedVariant) {
   if (!product) return product;
   if (!selectedVariant) return product;
@@ -241,17 +282,26 @@ export default function ProductDetail() {
         const res = await api.get(`/api/products/${productKey}`);
         const data = res.data?.product || res.data?.data || res.data;
         const decorated = decorateProductForPublic(data);
+        const initialVariant = decorated?.variants?.[0] || null;
 
         setProduct(data);
 
-        if (decorated?.sizes?.length) {
-          setSelectedSize(decorated.sizes[0]);
+        if (initialVariant?.size || decorated?.sizes?.length) {
+          setSelectedSize(initialVariant?.size || decorated.sizes[0]);
         } else {
           setSelectedSize("");
         }
 
-        if (decorated?.colors?.length) {
-          setSelectedColor(decorated.colors[0]);
+        if (
+          initialVariant?.colorLabel ||
+          initialVariant?.color ||
+          decorated?.colors?.length
+        ) {
+          setSelectedColor(
+            initialVariant?.colorLabel ||
+            initialVariant?.color ||
+            decorated.colors[0]
+          );
         } else {
           setSelectedColor("");
         }
@@ -321,6 +371,42 @@ export default function ProductDetail() {
 
     return applyProductSeo(variantAwareProduct);
   }, [variantAwareProduct]);
+
+  const handleSizeChange = (nextSize) => {
+    const matchingVariant = findVariantForChangedOption(
+      publicProduct,
+      "size",
+      nextSize,
+      selectedColor
+    );
+
+    setSelectedSize(matchingVariant?.size || nextSize);
+
+    if (matchingVariant?.colorLabel || matchingVariant?.color) {
+      setSelectedColor(
+        matchingVariant.colorLabel || matchingVariant.color
+      );
+    }
+  };
+
+  const handleColorChange = (nextColor) => {
+    const matchingVariant = findVariantForChangedOption(
+      publicProduct,
+      "color",
+      nextColor,
+      selectedSize
+    );
+
+    setSelectedColor(
+      matchingVariant?.colorLabel ||
+      matchingVariant?.color ||
+      nextColor
+    );
+
+    if (matchingVariant?.size) {
+      setSelectedSize(matchingVariant.size);
+    }
+  };
 
   const handleAddToCart = () => {
     if (!variantAwareProduct) return;
@@ -411,10 +497,10 @@ export default function ProductDetail() {
       isFavorite={isFavorite(variantAwareProduct)}
       onToggleFavorite={handleFavorite}
       onAddToCart={handleAddToCart}
-      selectedSize={selectedVariant?.size || selectedSize}
-      setSelectedSize={setSelectedSize}
-      selectedColor={selectedVariant?.colorLabel || selectedColor}
-      setSelectedColor={setSelectedColor}
+      selectedSize={selectedSize}
+      setSelectedSize={handleSizeChange}
+      selectedColor={selectedColor}
+      setSelectedColor={handleColorChange}
       quantity={quantity}
       setQuantity={setQuantity}
       reviewName={reviewName}

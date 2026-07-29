@@ -76,14 +76,60 @@ function money(value) {
   });
 }
 
-function imageUrl(photoId, width = 1200, version = 1) {
-  return `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=${width}&q=82&v=${version}`;
+function imageUrl(
+  photoId,
+  width = 1200,
+  version = 1,
+  adjustments = {}
+) {
+  const params = new URLSearchParams({
+    auto: 'format',
+    fit: 'crop',
+    w: String(width),
+    q: '82',
+    v: String(version),
+  });
+
+  Object.entries(adjustments).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      params.set(key, String(value));
+    }
+  });
+
+  return `https://images.unsplash.com/${photoId}?${params.toString()}`;
 }
 
 function gallery(photoId) {
   return [
     imageUrl(photoId, 1200, 1),
     imageUrl(photoId, 900, 2),
+  ];
+}
+
+function variantImageProfile(index = 0) {
+  const profiles = [
+    { hue: 0, sat: -12, con: 3, exp: 0 },
+    { hue: 35, sat: 18, con: 7, exp: 2 },
+    { hue: 95, sat: 32, con: 10, exp: -2 },
+    { hue: 180, sat: -45, con: 12, exp: 4 },
+    { hue: 250, sat: 45, con: 5, exp: -4 },
+    { hue: 315, sat: 6, con: 15, exp: 3 },
+  ];
+
+  return profiles[index % profiles.length];
+}
+
+function variantGallery(photoId, index) {
+  const profile = variantImageProfile(index);
+  const alternateProfile = {
+    ...profile,
+    hue: (profile.hue + 12) % 360,
+    exp: Math.max(-100, Math.min(100, profile.exp + 2)),
+  };
+
+  return [
+    imageUrl(photoId, 1200, index + 30, profile),
+    imageUrl(photoId, 900, index + 50, alternateProfile),
   ];
 }
 
@@ -149,6 +195,7 @@ function makePhysical({
 }) {
   const normalizedVariants = variants.map((row, index) => {
     const variantPhoto = row.photoId || photoId;
+    const imageProfile = variantImageProfile(index);
     return {
       size: row.size,
       color: row.color,
@@ -173,8 +220,13 @@ function makePhysical({
         originalPrice && row.price < originalPrice
           ? originalPrice
           : null,
-      image: imageUrl(variantPhoto, 1000, index + 10),
-      images: gallery(variantPhoto),
+      image: imageUrl(
+        variantPhoto,
+        1000,
+        index + 10,
+        imageProfile
+      ),
+      images: variantGallery(variantPhoto, index),
       active: true,
       sortOrder: index,
       initialStock: row.stock,
@@ -1491,6 +1543,31 @@ async function validateProducts({
     'Un producto físico no expone variantes comerciales completas'
   );
   ok('Los 18 físicos exponen variantes con SKU, código, foto, precio y costo');
+
+  const repeatedVariantVisuals = physical.filter((item) => {
+    const visualProfiles = item.variants.map((row) => {
+      const url = new URL(row.image);
+      return [
+        url.pathname,
+        url.searchParams.get('hue'),
+        url.searchParams.get('sat'),
+        url.searchParams.get('con'),
+        url.searchParams.get('exp'),
+      ].join('|');
+    });
+
+    return (
+      visualProfiles.some((profile) => profile.includes('null')) ||
+      new Set(visualProfiles).size !== visualProfiles.length
+    );
+  });
+  assert(
+    repeatedVariantVisuals.length === 0,
+    `Hay variantes sin cambio fotográfico visible: ${repeatedVariantVisuals
+      .map((item) => item.sku)
+      .join(', ')}`
+  );
+  ok('Cada variante física tiene una fotografía visualmente diferenciada');
 
   const stocks = await InventoryStock.find({
     product: {
