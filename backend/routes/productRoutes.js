@@ -7,7 +7,6 @@ const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
-  PRODUCT_TYPE_VALUES,
   UNIT_OF_MEASURE_VALUES,
   normalizeProductType,
   normalizeUnitOfMeasure,
@@ -25,7 +24,14 @@ const {
 } = require('../lib/products/productVariantLegacy');
 const {
   archiveProductSafely,
+  archiveProductsSafely,
 } = require('../services/productArchiveService');
+const {
+  ProductCatalogInputError,
+  listAdminProducts,
+  normalizeProductIds,
+  updateProductsInBulk,
+} = require('../services/adminProductCatalogService');
 
 // ✅ Normaliza arrays de strings (trim + de-dup + quita vacíos)
 function sanitizeStrArray(arr) {
@@ -172,6 +178,7 @@ function serializeAdminProduct(product, inventorySummaryMap = new Map()) {
   const productId = String(plain?._id || '');
   const inventorySummary =
     inventorySummaryMap.get(productId) ||
+    plain.inventorySummary ||
     {
       stock: Number(plain.stock || 0),
       reservedStock: 0,
@@ -297,80 +304,175 @@ router.get('/admin/reviews', requireAdmin, async (req, res) => {
 
 // ✅ GET /api/products/admin/list
 //    Vista administrativa enriquecida con inventario real y resumen financiero.
-router.get('/admin/list', requireAdmin, async (req, res) => {
-  try {
-    const { all = '1', q = '', productType = 'all' } = req.query;
-    const filter = {
-      archivedAt: null,
-      ...(all === '1' ? {} : { active: true }),
-    };
+router.get(
+  '/admin/list',
+  requireAdmin,
+  requirePermission('products:view'),
+  async (req, res) => {
+    try {
+      const result = await listAdminProducts(req.query);
+      const inventorySummaryMap = new Map(
+        result.data.map((product) => [
+          String(product._id),
+          product.inventorySummary,
+        ])
+      );
 
-    const cleanQ = String(q || '').trim();
-    if (cleanQ) {
-      const regex = new RegExp(cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      filter.$or = [
-        { title: regex },
-        { description: regex },
-        { sku: regex },
-        { category: regex },
-        { categories: regex },
-        { barcode: regex },
-      ];
+      res.json({
+        ok: true,
+        total: result.pagination.total,
+        data: result.data.map((product) =>
+          serializeAdminProduct(product, inventorySummaryMap)
+        ),
+        pagination: result.pagination,
+        summary: result.summary,
+        filters: result.filters,
+      });
+    } catch (error) {
+      console.error(
+        '❌ Error al obtener productos admin:',
+        error.message
+      );
+      res.status(500).json({
+        ok: false,
+        message: 'Error al obtener productos administrativos',
+      });
     }
-
-    const normalizedType = normalizeProductType(productType);
-    if (productType !== 'all' && PRODUCT_TYPE_VALUES.includes(normalizedType)) {
-      filter.productType = normalizedType;
-    }
-
-    const products = await Product.find(filter).sort({ createdAt: -1, title: 1 });
-    const inventorySummaryMap = await buildInventorySummaryMap(products);
-
-    res.json({
-      ok: true,
-      total: products.length,
-      data: products.map((product) => serializeAdminProduct(product, inventorySummaryMap)),
-    });
-  } catch (error) {
-    console.error('❌ Error al obtener productos admin:', error.message);
-    res.status(500).json({ ok: false, message: 'Error al obtener productos administrativos' });
   }
-});
+);
+
+// ✅ POST /api/products/admin/bulk/update
+//    Activa, desactiva, publica u oculta hasta 100 productos.
+router.post(
+  '/admin/bulk/update',
+  requireAdmin,
+  requirePermission('products:update'),
+  async (req, res) => {
+    try {
+      const result = await updateProductsInBulk({
+        ids: req.body?.ids,
+        action: req.body?.action,
+      });
+
+      return res.json({
+        ok: true,
+        message: 'Productos actualizados correctamente.',
+        ...result,
+      });
+    } catch (error) {
+      if (error instanceof ProductCatalogInputError) {
+        return res.status(error.status || 400).json({
+          ok: false,
+          message: error.message,
+        });
+      }
+
+      console.error(
+        '❌ Error en actualización masiva de productos:',
+        error.message
+      );
+
+      return res.status(500).json({
+        ok: false,
+        message: 'No fue posible actualizar los productos seleccionados.',
+      });
+    }
+  }
+);
+
+// ✅ POST /api/products/admin/bulk/archive
+//    Retiro lógico individualmente transaccional y con resultado por producto.
+router.post(
+  '/admin/bulk/archive',
+  requireAdmin,
+  requirePermission('products:delete'),
+  async (req, res) => {
+    try {
+      const ids = normalizeProductIds(req.body?.ids).map(String);
+      const result = await archiveProductsSafely({
+        ids,
+        adminId: req.adminUserId || null,
+      });
+      const status = result.failedCount > 0 ? 207 : 200;
+
+      return res.status(status).json({
+        ok: result.failedCount === 0,
+        message:
+          result.failedCount === 0
+            ? 'Productos retirados correctamente.'
+            : 'Algunos productos no pudieron retirarse.',
+        ...result,
+      });
+    } catch (error) {
+      if (error instanceof ProductCatalogInputError) {
+        return res.status(error.status || 400).json({
+          ok: false,
+          message: error.message,
+        });
+      }
+
+      console.error(
+        '❌ Error en retiro masivo de productos:',
+        error.message
+      );
+
+      return res.status(500).json({
+        ok: false,
+        message: 'No fue posible retirar los productos seleccionados.',
+      });
+    }
+  }
+);
 
 // ✅ GET /api/products/admin/:id
 //    Detalle administrativo completo, incluso para productos inactivos.
-router.get('/admin/:id', requireAdmin, async (req, res) => {
-  try {
-    const value = String(req.params.id || '').trim();
+router.get(
+  '/admin/:id',
+  requireAdmin,
+  requirePermission('products:view'),
+  async (req, res) => {
+    try {
+      const value = String(req.params.id || '').trim();
 
-    if (!value) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
+      if (!value) {
+        return res.status(404).json({
+          message: 'Producto no encontrado',
+        });
+      }
+
+      const isValidObjectId =
+        value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
+      const identityFilter = isValidObjectId
+        ? { $or: [{ _id: value }, { slug: value }] }
+        : { slug: value };
+
+      const product = await Product.findOne({
+        ...identityFilter,
+        archivedAt: null,
+      });
+
+      if (!product) {
+        return res.status(404).json({
+          message: 'Producto no encontrado',
+        });
+      }
+
+      const inventorySummaryMap =
+        await buildInventorySummaryMap([product]);
+      return res.json(
+        serializeAdminProduct(product, inventorySummaryMap)
+      );
+    } catch (error) {
+      console.error(
+        '❌ Error al obtener producto admin:',
+        error.message
+      );
+      return res.status(500).json({
+        message: 'Error al obtener el producto administrativo',
+      });
     }
-
-    const isValidObjectId =
-      value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
-    const identityFilter = isValidObjectId
-      ? { $or: [{ _id: value }, { slug: value }] }
-      : { slug: value };
-
-    const product = await Product.findOne({
-      ...identityFilter,
-      archivedAt: null,
-    });
-
-    if (!product) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    const inventorySummaryMap = await buildInventorySummaryMap([product]);
-    return res.json(serializeAdminProduct(product, inventorySummaryMap));
-  } catch (error) {
-    console.error('❌ Error al obtener producto admin:', error.message);
-    return res.status(500).json({
-      message: 'Error al obtener el producto administrativo',
-    });
   }
-});
+);
 
 // ✅ POST /api/products (crear)
 //    PROTEGIDO: solo admin con permiso products:create

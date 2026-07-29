@@ -40,9 +40,36 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
    * ======================================================= */
   {
     method: 'GET',
+    path: '/api/products/admin/list',
+    permission: 'products:view',
+    description: 'Listar productos con paginación administrativa.',
+  },
+  {
+    method: 'POST',
+    path: '/api/products/admin/bulk/update',
+    permission: 'products:update',
+    description: 'Actualizar productos seleccionados en bloque.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/products/admin/bulk/archive',
+    permission: 'products:delete',
+    description: 'Retirar productos seleccionados en bloque.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/products/admin/reviews',
     permission: 'products:reviews',
     description: 'Ver reseñas administrativas de productos.',
+  },
+  {
+    method: 'GET',
+    path: '/api/products/admin/:id',
+    permission: 'products:view',
+    description: 'Ver detalle administrativo de un producto.',
   },
   {
     method: 'PATCH',

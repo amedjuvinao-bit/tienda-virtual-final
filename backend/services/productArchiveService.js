@@ -131,6 +131,70 @@ async function archiveProductSafely({
   }
 }
 
+async function archiveProductsSafely({
+  ids = [],
+  adminId = null,
+}) {
+  const uniqueIds = [
+    ...new Set(
+      ids
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    ),
+  ];
+  const results = [];
+
+  for (const id of uniqueIds) {
+    try {
+      const result = await archiveProductSafely({
+        id,
+        adminId,
+      });
+
+      if (!result?.archivedProduct) {
+        results.push({
+          id,
+          ok: false,
+          reason: 'not_found',
+        });
+        continue;
+      }
+
+      results.push({
+        id,
+        ok: true,
+        archivedAt: result.archivedProduct.archivedAt,
+        inventoryRowsArchived: Number(
+          result.inventoryRowsArchived || 0
+        ),
+      });
+    } catch (error) {
+      results.push({
+        id,
+        ok: false,
+        reason: 'archive_failed',
+        message: String(error?.message || ''),
+      });
+    }
+  }
+
+  const archived = results.filter((result) => result.ok);
+  const failed = results.filter((result) => !result.ok);
+
+  return {
+    requested: uniqueIds.length,
+    archivedCount: archived.length,
+    failedCount: failed.length,
+    inventoryRowsArchived: archived.reduce(
+      (total, result) =>
+        total + Number(result.inventoryRowsArchived || 0),
+      0
+    ),
+    results,
+  };
+}
+
 module.exports = {
   archiveProductSafely,
+  archiveProductsSafely,
 };

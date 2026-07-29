@@ -43,6 +43,9 @@ jobs:
       - name: Validar privacidad pública
         run: npm --prefix backend run test:products-public-security
 
+      - name: Validar paginación y operaciones masivas
+        run: npm --prefix backend run test:products-catalog-operations
+
   products-mongodb:
     name: Productos e inventario
     runs-on: ubuntu-latest
@@ -93,6 +96,11 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
         run: npm --prefix backend run test:product-archive
+
+      - name: Validar catálogo con volumen
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:products-catalog-scale
 
   products-ui:
     name: Interfaz de productos

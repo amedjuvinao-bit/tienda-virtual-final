@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Copy,
   Filter,
@@ -54,22 +56,6 @@ function getInventorySummary(product) {
     lowStockCount: 0,
     source: 'Product.stock',
   };
-}
-
-function getSearchText(product) {
-  return [
-    product?.title,
-    product?.description,
-    product?._id,
-    product?.sku,
-    product?.barcode,
-    product?.category,
-    product?.productType,
-    ...(Array.isArray(product?.categories) ? product.categories : []),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
 }
 
 function getMarginSummary(product) {
@@ -281,6 +267,17 @@ const styles = {
   },
 };
 
+const EMPTY_SUMMARY = {
+  total: 0,
+  active: 0,
+  tracked: 0,
+  stock: 0,
+  available: 0,
+  reserved: 0,
+  costValue: 0,
+  saleValue: 0,
+};
+
 export default function ProductosAdmin() {
   const { can } = useAdminPermissions();
 
@@ -292,13 +289,61 @@ export default function ProductosAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
+  const [serverQ, setServerQ] = useState('');
   const [productTypeFilter, setProductTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [inventoryFilter, setInventoryFilter] = useState('all');
+  const [sort, setSort] = useState('-createdAt');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 1,
+    from: 0,
+    to: 0,
+  });
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkAction, setBulkAction] = useState('publish');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
+  const [archiveSelection, setArchiveSelection] = useState([]);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setServerQ(q.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    serverQ,
+    productTypeFilter,
+    statusFilter,
+    inventoryFilter,
+    sort,
+    limit,
+  ]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [
+    page,
+    limit,
+    serverQ,
+    productTypeFilter,
+    statusFilter,
+    inventoryFilter,
+    sort,
+  ]);
 
   useEffect(() => {
     let cancel = false;
@@ -310,8 +355,13 @@ export default function ProductosAdmin() {
       try {
         const res = await api.get('/api/products/admin/list', {
           params: {
-            all: 1,
+            page,
+            limit,
+            q: serverQ,
             productType: productTypeFilter,
+            status: statusFilter,
+            inventory: inventoryFilter,
+            sort,
           },
         });
 
@@ -324,6 +374,30 @@ export default function ProductosAdmin() {
             : [];
 
         setProducts(list);
+        setPagination({
+          page: Number(res.data?.pagination?.page || 1),
+          limit: Number(res.data?.pagination?.limit || limit),
+          total: Number(
+            res.data?.pagination?.total ?? res.data?.total ?? 0
+          ),
+          pages: Math.max(
+            1,
+            Number(res.data?.pagination?.pages || 1)
+          ),
+          from: Number(res.data?.pagination?.from || 0),
+          to: Number(res.data?.pagination?.to || 0),
+        });
+        setSummary({
+          ...EMPTY_SUMMARY,
+          ...(res.data?.summary || {}),
+        });
+
+        const resolvedPage = Number(
+          res.data?.pagination?.page || page
+        );
+        if (resolvedPage !== page) {
+          setPage(resolvedPage);
+        }
       } catch (err) {
         if (cancel) return;
 
@@ -339,72 +413,71 @@ export default function ProductosAdmin() {
     return () => {
       cancel = true;
     };
-  }, [productTypeFilter]);
+  }, [
+    page,
+    limit,
+    serverQ,
+    productTypeFilter,
+    statusFilter,
+    inventoryFilter,
+    sort,
+    reloadToken,
+  ]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-
-    return products.filter((product) => {
-      const inventory = getInventorySummary(product);
-      const matchesText = !needle || getSearchText(product).includes(needle);
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && product.active !== false) ||
-        (statusFilter === 'inactive' && product.active === false);
-      const matchesInventory =
-        inventoryFilter === 'all' ||
-        (inventoryFilter === 'tracked' && product.trackInventory === true) ||
-        (inventoryFilter === 'not_tracked' && product.trackInventory !== true) ||
-        (inventoryFilter === 'with_stock' && Number(inventory.stock || 0) > 0) ||
-        (inventoryFilter === 'without_stock' &&
-          product.trackInventory === true &&
-          Number(inventory.stock || 0) <= 0) ||
-        (inventoryFilter === 'low_stock' && Number(inventory.lowStockCount || 0) > 0);
-
-      return matchesText && matchesStatus && matchesInventory;
-    });
-  }, [products, q, statusFilter, inventoryFilter]);
-
-  const summary = useMemo(() => {
-    return products.reduce(
-      (acc, product) => {
-        const inv = getInventorySummary(product);
-        const margin = getMarginSummary(product);
-
-        acc.stock += Number(inv.stock || 0);
-        acc.available += Number(inv.availableStock || 0);
-        acc.reserved += Number(inv.reservedStock || 0);
-        acc.costValue += Number(margin.cost || 0) * Number(inv.stock || 0);
-        acc.saleValue += Number(margin.price || 0) * Number(inv.stock || 0);
-
-        if (product.trackInventory) acc.tracked += 1;
-        if (product.active !== false) acc.active += 1;
-
-        return acc;
-      },
-      {
-        stock: 0,
-        available: 0,
-        reserved: 0,
-        costValue: 0,
-        saleValue: 0,
-        tracked: 0,
-        active: 0,
-      }
-    );
-  }, [products]);
+  const currentPageIds = useMemo(
+    () => products.map((product) => String(product._id)),
+    [products]
+  );
+  const allPageSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedIds.has(id));
 
   const filtersActive =
     Boolean(q.trim()) ||
     productTypeFilter !== 'all' ||
     statusFilter !== 'all' ||
-    inventoryFilter !== 'all';
+    inventoryFilter !== 'all' ||
+    sort !== '-createdAt';
 
   const clearFilters = () => {
     setQ('');
+    setServerQ('');
     setProductTypeFilter('all');
     setStatusFilter('all');
     setInventoryFilter('all');
+    setSort('-createdAt');
+    setPage(1);
+  };
+
+  const toggleProduct = (productId) => {
+    const id = String(productId || '');
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+
+      return next;
+    });
+  };
+
+  const toggleCurrentPage = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (allPageSelected) {
+        currentPageIds.forEach((id) => next.delete(id));
+      } else {
+        currentPageIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  };
+
+  const reloadProducts = () => {
+    setReloadToken((value) => value + 1);
   };
 
   const copySku = async (sku) => {
@@ -418,26 +491,100 @@ export default function ProductosAdmin() {
     }
   };
 
-  const handleDelete = async () => {
+  const openArchiveConfirmation = (ids) => {
+    setArchiveSelection(
+      [...new Set(ids.map((id) => String(id || '')).filter(Boolean))]
+    );
+    setConfirmOpen(true);
+  };
+
+  const handleArchive = async () => {
+    if (bulkBusy) return;
+
     if (!canDeleteProduct) {
       toast.error('No tienes permiso para eliminar productos');
       setConfirmOpen(false);
-      setProductToDelete(null);
+      setArchiveSelection([]);
       return;
     }
 
-    if (!productToDelete) return;
+    if (!archiveSelection.length) return;
 
     try {
-      await api.delete(`/api/products/${productToDelete}`);
-      setProducts((prev) => prev.filter((product) => product._id !== productToDelete));
-      toast.success('Producto retirado del catálogo');
+      setBulkBusy(true);
+
+      if (archiveSelection.length === 1) {
+        await api.delete(`/api/products/${archiveSelection[0]}`);
+        toast.success('Producto retirado del catálogo');
+      } else {
+        const response = await api.post(
+          '/api/products/admin/bulk/archive',
+          {
+            ids: archiveSelection,
+          }
+        );
+        const archivedCount = Number(
+          response.data?.archivedCount || 0
+        );
+        const failedCount = Number(response.data?.failedCount || 0);
+
+        if (failedCount > 0) {
+          toast.warning(
+            `${archivedCount} retirados y ${failedCount} sin procesar`
+          );
+        } else {
+          toast.success(
+            `${archivedCount} productos retirados del catálogo`
+          );
+        }
+      }
+
+      setSelectedIds(new Set());
+      reloadProducts();
     } catch (err) {
       console.error(err);
-      toast.error('No se pudo retirar el producto');
+      toast.error(
+        err?.response?.data?.message ||
+          'No se pudieron retirar los productos'
+      );
     } finally {
+      setBulkBusy(false);
       setConfirmOpen(false);
-      setProductToDelete(null);
+      setArchiveSelection([]);
+    }
+  };
+
+  const runBulkUpdate = async () => {
+    const ids = [...selectedIds];
+
+    if (!canUpdateProduct || !ids.length) return;
+
+    try {
+      setBulkBusy(true);
+      const response = await api.post(
+        '/api/products/admin/bulk/update',
+        {
+          ids,
+          action: bulkAction,
+        }
+      );
+      const matched = Number(response.data?.matched || 0);
+
+      toast.success(
+        `${matched} producto${matched === 1 ? '' : 's'} actualizado${
+          matched === 1 ? '' : 's'
+        }`
+      );
+      setSelectedIds(new Set());
+      reloadProducts();
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err?.response?.data?.message ||
+          'No se pudo aplicar la acción masiva'
+      );
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -473,9 +620,9 @@ export default function ProductosAdmin() {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: 'Productos', value: products.length, sub: `${summary.active} activos`, icon: PackageSearch },
+              { label: 'Productos', value: formatNumber(summary.total), sub: `${formatNumber(summary.active)} activos`, icon: PackageSearch },
               { label: 'Stock real', value: formatNumber(summary.stock), sub: `${formatNumber(summary.reserved)} reservado`, icon: Boxes },
-              { label: 'Disponible', value: formatNumber(summary.available), sub: `${summary.tracked} con inventario`, icon: Warehouse },
+              { label: 'Disponible', value: formatNumber(summary.available), sub: `${formatNumber(summary.tracked)} con inventario`, icon: Warehouse },
               { label: 'Costo estimado', value: formatCurrency(summary.costValue), sub: `Venta ${formatCurrency(summary.saleValue)}`, icon: Layers3 },
             ].map((item) => {
               const Icon = item.icon;
@@ -544,6 +691,8 @@ export default function ProductosAdmin() {
               style={styles.input}
             >
               <option value="all">Estados</option>
+              <option value="published">Publicados</option>
+              <option value="hidden">Ocultos</option>
               <option value="active">Activos</option>
               <option value="inactive">Inactivos</option>
             </select>
@@ -574,12 +723,45 @@ export default function ProductosAdmin() {
             </button>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-bold" style={styles.muted}>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-bold" style={styles.muted}>
             <span className="inline-flex items-center gap-2">
               <Filter className="h-3.5 w-3.5" />
-              {loading ? 'Cargando productos…' : `${filtered.length} de ${products.length} productos visibles`}
+              {loading
+                ? 'Cargando productos…'
+                : `${formatNumber(pagination.total)} productos · Mostrando ${formatNumber(pagination.from)}–${formatNumber(pagination.to)}`}
             </span>
-            <span>Producto = ficha comercial · Inventario = existencias reales.</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+                className="h-9 px-3 text-xs font-bold"
+                style={styles.input}
+                aria-label="Ordenar productos"
+              >
+                <option value="-createdAt">Más recientes</option>
+                <option value="-updatedAt">Últimos actualizados</option>
+                <option value="title">Nombre A–Z</option>
+                <option value="-title">Nombre Z–A</option>
+                <option value="-price">Mayor precio</option>
+                <option value="price">Menor precio</option>
+                <option value="-stock">Mayor stock</option>
+                <option value="stock">Menor stock</option>
+              </select>
+
+              <select
+                value={limit}
+                onChange={(event) => setLimit(Number(event.target.value))}
+                className="h-9 px-3 text-xs font-bold"
+                style={styles.input}
+                aria-label="Productos por página"
+              >
+                {[10, 20, 50].map((value) => (
+                  <option key={value} value={value}>
+                    {value} por página
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -598,7 +780,99 @@ export default function ProductosAdmin() {
             </div>
           )}
 
-          {!loading && filtered.length === 0 && (
+          {canUseProductActions && products.length > 0 && (
+            <div
+              className="mb-4 flex flex-col gap-3 rounded-2xl border p-3 md:flex-row md:items-center md:justify-between"
+              style={{
+                borderColor: 'var(--admin-card-border)',
+                background: 'var(--admin-card-bg)',
+              }}
+            >
+              <label className="inline-flex items-center gap-3 text-sm font-black">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleCurrentPage}
+                  className="h-4 w-4"
+                  style={{ accentColor: 'var(--admin-primary)' }}
+                />
+                Seleccionar esta página
+              </label>
+
+              <span className="text-xs font-bold" style={styles.muted}>
+                {selectedIds.size
+                  ? `${selectedIds.size} seleccionado${selectedIds.size === 1 ? '' : 's'}`
+                  : 'Sin selección'}
+              </span>
+            </div>
+          )}
+
+          {selectedIds.size > 0 && (
+            <div
+              className="mb-4 flex flex-col gap-3 rounded-2xl border p-4 lg:flex-row lg:items-center lg:justify-between"
+              style={{
+                borderColor: 'var(--admin-primary-soft-border)',
+                background: 'var(--admin-primary-soft-bg)',
+              }}
+            >
+              <div>
+                <p className="text-sm font-black" style={{ color: 'var(--admin-primary-soft-text)' }}>
+                  Acción sobre {selectedIds.size} producto{selectedIds.size === 1 ? '' : 's'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="mt-1 text-xs font-bold underline"
+                  style={{ color: 'var(--admin-primary-soft-text)' }}
+                >
+                  Limpiar selección
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {canUpdateProduct && (
+                  <>
+                    <select
+                      value={bulkAction}
+                      onChange={(event) => setBulkAction(event.target.value)}
+                      disabled={bulkBusy}
+                      className="h-10 px-3 text-xs font-bold disabled:opacity-50"
+                      style={styles.input}
+                    >
+                      <option value="publish">Publicar</option>
+                      <option value="hide">Ocultar de la tienda</option>
+                      <option value="activate">Activar</option>
+                      <option value="deactivate">Desactivar</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={runBulkUpdate}
+                      disabled={bulkBusy}
+                      className="inline-flex h-10 items-center justify-center px-4 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50 !text-white"
+                      style={styles.primaryButton}
+                    >
+                      Aplicar
+                    </button>
+                  </>
+                )}
+
+                {canDeleteProduct && (
+                  <button
+                    type="button"
+                    onClick={() => openArchiveConfirmation([...selectedIds])}
+                    disabled={bulkBusy}
+                    className="inline-flex h-10 items-center justify-center gap-2 px-4 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50 !text-white"
+                    style={styles.dangerButton}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Retirar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!loading && products.length === 0 && (
             <div
               className="grid min-h-[240px] place-items-center rounded-3xl border border-dashed p-8 text-center"
               style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}
@@ -616,7 +890,7 @@ export default function ProductosAdmin() {
           )}
 
           <div className="grid gap-3">
-            {filtered.map((product) => {
+            {products.map((product) => {
               const inventory = getInventorySummary(product);
               const margin = getMarginSummary(product);
               const health = getInventoryHealth(product);
@@ -637,6 +911,25 @@ export default function ProductosAdmin() {
 
                   <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(170px,0.65fr)_minmax(210px,0.8fr)_150px] lg:items-center">
                     <div className="flex min-w-0 gap-4">
+                      {canUseProductActions && (
+                        <label
+                          className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border"
+                          style={{
+                            borderColor: 'var(--admin-card-border)',
+                            background: 'var(--admin-button-soft-bg)',
+                          }}
+                          title="Seleccionar producto"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(String(product._id))}
+                            onChange={() => toggleProduct(product._id)}
+                            className="h-4 w-4"
+                            style={{ accentColor: 'var(--admin-primary)' }}
+                            aria-label={`Seleccionar ${product.title || 'producto'}`}
+                          />
+                        </label>
+                      )}
                       <div
                         className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border text-sm font-black"
                         style={{
@@ -655,8 +948,20 @@ export default function ProductosAdmin() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span style={badgeStyle('primary')}>{formatProductTypeLabel(product.productType)}</span>
-                          <span style={badgeStyle(product.active === false ? 'neutral' : 'success')}>
-                            {product.active === false ? 'Inactivo' : 'Activo'}
+                          <span
+                            style={badgeStyle(
+                              product.active === false
+                                ? 'neutral'
+                                : product.visible === false
+                                  ? 'warning'
+                                  : 'success'
+                            )}
+                          >
+                            {product.active === false
+                              ? 'Inactivo'
+                              : product.visible === false
+                                ? 'Oculto'
+                                : 'Publicado'}
                           </span>
                         </div>
 
@@ -773,14 +1078,13 @@ export default function ProductosAdmin() {
                           <button
                             type="button"
                             onClick={() => {
-                              setProductToDelete(product._id);
-                              setConfirmOpen(true);
+                              openArchiveConfirmation([product._id]);
                             }}
                             className="inline-flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-black transition hover:scale-[1.02] lg:w-[138px] !text-white"
                             style={styles.dangerButton}
                           >
                             <Trash2 className="h-4 w-4" />
-                            Eliminar
+                            Retirar
                           </button>
                         </Can>
                       </div>
@@ -790,14 +1094,65 @@ export default function ProductosAdmin() {
               );
             })}
           </div>
+
+          {pagination.pages > 1 && (
+            <div
+              className="mt-5 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+              style={{
+                borderColor: 'var(--admin-card-border)',
+                background: 'var(--admin-card-bg)',
+              }}
+            >
+              <p className="text-xs font-bold" style={styles.muted}>
+                Página {formatNumber(pagination.page)} de {formatNumber(pagination.pages)}
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={loading || pagination.page <= 1}
+                  className="inline-flex h-10 items-center justify-center gap-2 px-4 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50"
+                  style={styles.softButton}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.min(pagination.pages, current + 1)
+                    )
+                  }
+                  disabled={
+                    loading || pagination.page >= pagination.pages
+                  }
+                  className="inline-flex h-10 items-center justify-center gap-2 px-4 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50"
+                  style={styles.softButton}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <ConfirmDialog
         show={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={handleDelete}
-        message="¿Seguro que deseas retirar este producto? Se conservarán su historial, inventario e imágenes."
+        onClose={() => {
+          if (bulkBusy) return;
+          setConfirmOpen(false);
+          setArchiveSelection([]);
+        }}
+        onConfirm={handleArchive}
+        message={
+          archiveSelection.length > 1
+            ? `¿Seguro que deseas retirar ${archiveSelection.length} productos? Se conservarán sus historiales, inventario e imágenes.`
+            : '¿Seguro que deseas retirar este producto? Se conservarán su historial, inventario e imágenes.'
+        }
       />
     </div>
   );

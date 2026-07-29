@@ -324,6 +324,21 @@ productSchema.index({ categories: 1 });
 productSchema.index({ productType: 1, active: 1 });
 productSchema.index({ trackInventory: 1, active: 1 });
 productSchema.index({ archivedAt: 1, active: 1 });
+productSchema.index({ archivedAt: 1, createdAt: -1 });
+productSchema.index({ archivedAt: 1, updatedAt: -1 });
+productSchema.index({ archivedAt: 1, title: 1 });
+productSchema.index({
+  archivedAt: 1,
+  productType: 1,
+  active: 1,
+  createdAt: -1,
+});
+productSchema.index({
+  archivedAt: 1,
+  active: 1,
+  visible: 1,
+  createdAt: -1,
+});
 productSchema.index({ 'variants.variantKey': 1 });
 productSchema.index({ 'variants.sku': 1 });
 productSchema.index({ 'variants.barcode': 1 });

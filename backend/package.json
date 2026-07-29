@@ -18,6 +18,8 @@
     "test:product-advanced-variants": "node scripts/testProductAdvancedVariantsModule.js",
     "test:products-public-security": "node scripts/testProductsPublicSecurity.js",
     "test:products-integrity": "node scripts/testProductsIntegrity.js",
+    "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",
+    "test:products-catalog-scale": "node scripts/testProductsCatalogScale.js",
     "test:product-archive": "node scripts/testProductArchiveIntegrity.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",

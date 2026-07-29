@@ -142,7 +142,9 @@ check('Todas las lecturas públicas usan filtro y serialización protegidos', ()
 
 check('El detalle administrativo permanece protegido y conserva datos completos', () => {
   assert(
-    /router\.get\('\/admin\/:id',\s*requireAdmin/.test(routeSource),
+    /router\.get\(\s*'\/admin\/:id',\s*requireAdmin,\s*requirePermission\('products:view'\)/s.test(
+      routeSource
+    ),
     'Falta protección requireAdmin en el detalle administrativo'
   );
   assert(
