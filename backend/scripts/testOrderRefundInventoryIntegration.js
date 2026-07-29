@@ -116,10 +116,11 @@ async function cleanup() {
   }
 }
 
-async function stockValue(product, variantKey) {
+async function stockValue(product, variantKey, branch) {
   const row = await InventoryStock.findOne({
     product,
     variantKey,
+    branch,
     deletedAt: null,
   }).lean();
   return {
@@ -406,11 +407,11 @@ async function run() {
     );
 
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul'),
+      await stockValue(physical._id, 'm__azul', branch._id),
       { stock: 7, availableStock: 7 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro'),
+      await stockValue(component._id, 'unica__negro', branch._id),
       { stock: 16, availableStock: 16 }
     );
     ok('La venta confirmó la variante y cuatro componentes del combo');
@@ -443,15 +444,15 @@ async function run() {
     assert.strictEqual(first.refund.totalReturnedUnits, 3);
     assert.strictEqual(first.refund.totalRestockedUnits, 3);
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul'),
+      await stockValue(physical._id, 'm__azul', branch._id),
       { stock: 8, availableStock: 8 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro'),
+      await stockValue(component._id, 'unica__negro', branch._id),
       { stock: 18, availableStock: 18 }
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'l__rojo'),
+      await stockValue(physical._id, 'l__rojo', branch._id),
       { stock: 6, availableStock: 6 }
     );
     ok('Reembolso parcial repuso variante y componentes en su sede original');
@@ -478,7 +479,7 @@ async function run() {
       2
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul'),
+      await stockValue(physical._id, 'm__azul', branch._id),
       { stock: 8, availableStock: 8 }
     );
     ok('Reintento idempotente no duplicó stock ni movimientos');
@@ -507,11 +508,11 @@ async function run() {
     );
     assert.strictEqual(second.idempotent, false);
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul'),
+      await stockValue(physical._id, 'm__azul', branch._id),
       { stock: 10, availableStock: 10 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro'),
+      await stockValue(component._id, 'unica__negro', branch._id),
       { stock: 20, availableStock: 20 }
     );
     ok('Segundo reembolso parcial completó la reposición exacta');
@@ -559,7 +560,7 @@ async function run() {
         'REFUND_QUANTITY_EXCEEDS_PURCHASED'
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul'),
+      await stockValue(physical._id, 'm__azul', branch._id),
       { stock: 10, availableStock: 10 }
     );
     ok('Cantidad ya devuelta no puede reponerse otra vez');
