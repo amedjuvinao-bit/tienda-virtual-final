@@ -95,6 +95,8 @@ const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
 const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
+const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
+const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
@@ -263,37 +265,65 @@ function startBillingInvoiceRecoveryJob() {
 
   if (typeof scan !== 'function' || typeof processPending !== 'function') {
     console.warn('No se inició el job de recuperación fiscal: servicio no disponible.');
+    billingOperationalLogger?.error?.('billing_recovery_worker_unavailable', {
+      scanAvailable: typeof scan === 'function',
+      processPendingAvailable: typeof processPending === 'function',
+    });
     return;
   }
 
   if (billingRecoveryTimer) return;
 
   const runRecovery = async () => {
-    if (billingRecoveryRunning || mongoose.connection.readyState !== 1) return;
+    if (billingRecoveryRunning) return;
+    if (mongoose.connection.readyState !== 1) {
+      billingOperationalRuntime?.markWorkerCycleSkipped?.(
+        'mongodb_disconnected'
+      );
+      billingOperationalLogger?.warn?.('billing_recovery_cycle_skipped', {
+        reason: 'mongodb_disconnected',
+        mongoReadyState: mongoose.connection.readyState,
+      });
+      return;
+    }
     billingRecoveryRunning = true;
+    billingOperationalRuntime?.markWorkerCycleStarted?.();
     try {
       const scanned = await scan({ limit: 25 });
       const processed = await processPending({ limit: 10 });
-      if (scanned.scheduled > 0 || processed.processed > 0) {
-        console.log('Recuperación fiscal ejecutada:', {
-          scheduled: scanned.scheduled,
-          processed: processed.processed,
-          resolved: processed.resolved,
-          pending: processed.pending,
-          failed: processed.failed,
-        });
-      }
+      const summary = {
+        scanned: Number(scanned.scanned || 0),
+        scheduled: Number(scanned.scheduled || 0),
+        processed: Number(processed.processed || 0),
+        resolved: Number(processed.resolved || 0),
+        pending: Number(processed.pending || 0),
+        failed: Number(processed.failed || 0),
+      };
+      billingOperationalRuntime?.markWorkerCycleSucceeded?.(summary);
+      billingOperationalLogger?.[
+        summary.failed > 0 ? 'warn' : 'info'
+      ]?.('billing_recovery_cycle_completed', summary);
     } catch (error) {
-      console.error('Error en job de recuperación fiscal:', error.message);
+      billingOperationalRuntime?.markWorkerCycleFailed?.(error);
+      billingOperationalLogger?.error?.('billing_recovery_cycle_failed', {
+        error,
+      });
     } finally {
       billingRecoveryRunning = false;
     }
   };
 
+  billingOperationalRuntime?.markWorkerStarted?.({
+    intervalMs: BILLING_RECOVERY_INTERVAL_MS,
+  });
   billingRecoveryTimer = setInterval(runRecovery, BILLING_RECOVERY_INTERVAL_MS);
   billingRecoveryTimer.unref?.();
   runRecovery().catch(() => null);
-  console.log(`Job de recuperación fiscal iniciado cada ${BILLING_RECOVERY_INTERVAL_MS}ms.`);
+  billingOperationalLogger?.info?.('billing_recovery_worker_started', {
+    intervalMs: BILLING_RECOVERY_INTERVAL_MS,
+    scanLimit: 25,
+    processLimit: 10,
+  });
 }
 
 mongoose

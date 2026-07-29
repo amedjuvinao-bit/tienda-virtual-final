@@ -406,6 +406,17 @@ const ElectronicInvoiceSchema = new mongoose.Schema(
 ElectronicInvoiceSchema.index({ status: 1, createdAt: -1 });
 ElectronicInvoiceSchema.index({ 'emission.state': 1, 'emission.lastAttemptAt': 1 });
 ElectronicInvoiceSchema.index(
+  { 'emailDelivery.status': 1, 'emailDelivery.lastAttemptAt': 1 },
+  { name: 'billing_operations_email_delivery' }
+);
+ElectronicInvoiceSchema.index(
+  {
+    'creditNotes.status': 1,
+    'creditNotes.emission.lastAttemptAt': 1,
+  },
+  { name: 'billing_operations_credit_note_emission' }
+);
+ElectronicInvoiceSchema.index(
   { idempotencyKey: 1 },
   {
     unique: true,

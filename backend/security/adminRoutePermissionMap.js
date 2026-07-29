@@ -327,6 +327,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/billing/operations/health',
+    permission: 'billing:view',
+    description: 'Consultar monitoreo operativo de facturación electrónica.',
+    audit: true,
+  },
+  {
+    method: 'GET',
     path: '/api/admin/billing/documents',
     permission: 'billing:view',
     description: 'Listar documentos de facturación electrónica.',

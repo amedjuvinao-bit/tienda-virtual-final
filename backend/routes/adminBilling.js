@@ -10,6 +10,9 @@ const requirePermission = require('../middleware/requirePermission');
 const billingService = require('../services/adminBillingService');
 const billingReportService = require('../services/adminBillingReportService');
 const billingSyncService = require('../services/adminBillingSyncService');
+const billingOperationalMonitoringService = require(
+  '../services/billingOperationalMonitoringService'
+);
 const {
   sendValidatedInvoiceEmail,
 } = require('../services/electronicInvoiceEmailService');
@@ -60,6 +63,25 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo resumen de facturación.');
+    }
+  }
+);
+
+router.get(
+  '/operations/health',
+  requirePermission('billing:view'),
+  async (_req, res) => {
+    try {
+      const data =
+        await billingOperationalMonitoringService.getOperationalHealth();
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(
+        res,
+        error,
+        'Error obteniendo el estado operativo de facturación.'
+      );
     }
   }
 );
