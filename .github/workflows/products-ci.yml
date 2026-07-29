@@ -93,24 +93,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    services:
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --replSet rs0
-          --bind_ip_all
-          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Iniciar MongoDB transaccional
+        run: |
+          docker run --detach \
+            --name productos-mongodb \
+            --publish 27017:27017 \
+            mongo:7 \
+            --replSet rs0 \
+            --bind_ip_all
+
+          for attempt in {1..30}; do
+            if docker exec productos-mongodb mongosh --quiet --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs productos-mongodb
+          exit 1
 
       - name: Configurar Node.js
         uses: actions/setup-node@v7
@@ -170,6 +176,10 @@ jobs:
         env:
           MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
         run: npm --prefix backend run test:products-demo-catalog
+
+      - name: Detener MongoDB
+        if: always()
+        run: docker rm --force productos-mongodb
 
   products-ui:
     name: Interfaz de productos

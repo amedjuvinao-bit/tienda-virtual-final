@@ -117,7 +117,8 @@ function run() {
   assertIncludes(
     workflow,
     [
-      'image: mongo:7',
+      '--name productos-mongodb',
+      '--replSet rs0',
       'PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci',
       'DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret',
       'PUBLIC_BACKEND_URL: https://backend.example',
