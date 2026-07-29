@@ -39,6 +39,9 @@ const { buildOrderQuote } = require('../services/orderPricingService');
 const {
   downloadOfficialInvoiceDocument,
 } = require('../services/electronicInvoiceDocumentService');
+const {
+  processOrderRefund,
+} = require('../services/orderRefundService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -2958,58 +2961,58 @@ router.get(
  * ======================================================= */
 router.options('/:id/refund', (_req, res) => res.sendStatus(204));
 
-router.post('/:id/refund', requireAdmin, async (req, res) => {
-  const session = await mongoose.startSession();
-
+router.post(
+  '/:id/refund',
+  requireAdmin,
+  requirePermission('orders:refund'),
+  async (req, res) => {
   try {
-    const id = req.params.id;
-    const amount = Number(req.body?.amount || 0);
-    const reason = String(req.body?.reason || '').trim();
-    const items = Array.isArray(req.body?.items) ? req.body.items : [];
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        error: 'AMOUNT_INVALID',
-        message: 'Monto inválido.',
-      });
-    }
-
-    const order = await Order.findById(id).lean();
-
-    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    await session.withTransaction(async () => {
-      if (items.length) {
-        await incrementStock(items, { session });
+    const result = await processOrderRefund(
+      {
+        orderId: req.params.id,
+        amount: req.body?.amount,
+        reason: req.body?.reason,
+        items: req.body?.items,
+        idempotencyKey:
+          req.headers['x-idempotency-key'] ||
+          req.body?.idempotencyKey ||
+          '',
+        adminId:
+          req.adminUserId ||
+          req.user?._id ||
+          req.user?.id ||
+          null,
+        adminLabel:
+          req.adminDisplayName ||
+          req.adminUsername ||
+          req.user?.displayName ||
+          req.user?.username ||
+          req.headers['x-admin-user'] ||
+          'admin',
+      },
+      {
+        OrderEventModel: OrderEvent,
       }
+    );
 
-      await OrderEvent.create(
-        [
-          {
-            orderId: order._id,
-            type: 'refund_created',
-            message: `Reembolso por ${moneyCOP(amount)}${reason ? ` · ${reason}` : ''}`,
-            meta: {
-              amount,
-              currency: 'COP',
-              reason,
-              items,
-              by: req.headers['x-admin-user'] || 'admin',
-            },
-          },
-        ],
-        { session }
-      );
+    return res.status(result.idempotent ? 200 : 201).json({
+      ok: true,
+      idempotent: result.idempotent,
+      refund: result.refund,
     });
-
-    return res.json({ ok: true });
   } catch (e) {
     console.error('POST /orders/:id/refund', e);
-    return res.status(500).json({ error: 'No se pudo procesar el reembolso' });
-  } finally {
-    session.endSession();
+    return res.status(Number(e.statusCode || 500)).json({
+      error: e.code || 'ORDER_REFUND_FAILED',
+      message:
+        e.statusCode && e.message
+          ? e.message
+          : 'No se pudo procesar el reembolso.',
+      details: e.details || undefined,
+    });
   }
-});
+  }
+);
 
 /* =========================================================
  * POST /api/orders/admin/bulk

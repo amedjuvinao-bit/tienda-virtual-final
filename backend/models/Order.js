@@ -817,6 +817,39 @@ const OrderSchema = new mongoose.Schema(
       restockedOnFailure: { type: Boolean, default: false },
       restockedAt: { type: Date, default: null },
     },
+
+    refundControl: {
+      totalAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+        set: cleanMoney,
+      },
+      transactionCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      returnedUnits: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      restockedUnits: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastRefundAt: {
+        type: Date,
+        default: null,
+      },
+      lastRefund: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'OrderRefund',
+        default: null,
+      },
+    },
   },
   { timestamps: true }
 );
