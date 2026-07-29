@@ -122,8 +122,8 @@ async function run() {
         variants: [
           {
             variantKey: 'unica__azul',
-            label: 'Única / Azul',
-            size: 'Única',
+            label: 'Unica / Azul',
+            size: 'Unica',
             color: 'Azul',
             sku: `${PREFIX}-PHY-AZ`,
             initialStock: 0,
@@ -180,8 +180,11 @@ async function run() {
       branch: branch._id,
       product: physical._id,
       variantKey: 'unica__azul',
-      size: 'Única',
-      color: 'Azul',
+      variant: {
+        size: 'Unica',
+        color: 'Azul',
+        sku: `${PREFIX}-PHY-AZ`,
+      },
       stock: 8,
       reservedStock: 0,
       availableStock: 8,
