@@ -16,6 +16,7 @@
     "test:products-universal": "node scripts/seedUniversalProducts.js",
     "test:product-inventory-sync": "node scripts/testProductInventorySyncModule.js",
     "test:product-advanced-variants": "node scripts/testProductAdvancedVariantsModule.js",
+    "test:products-public-security": "node scripts/testProductsPublicSecurity.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",
     "test:finance-module": "node scripts/testFinanceModuleClosure.js",

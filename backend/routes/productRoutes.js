@@ -16,6 +16,11 @@ const {
   normalizeVariantAxes,
   shouldTrackInventory,
 } = require('../lib/products/productUniversalConfig');
+const {
+  PUBLIC_PRODUCT_PROJECTION,
+  buildPublicProductFilter,
+  serializePublicProduct,
+} = require('../lib/products/productPublicView');
 
 // ✅ Cloudinary (usa tus variables del .env)
 cloudinary.config({
@@ -216,13 +221,14 @@ function serializeAdminProduct(product, inventorySummaryMap = new Map()) {
   };
 }
 
-// GET /api/products (activos por defecto)
+// GET /api/products (catálogo público: siempre activos y visibles)
 router.get('/', async (req, res) => {
   try {
-    const { all } = req.query;
-    const filter = all === '1' ? {} : { active: true };
-    const products = await Product.find(filter);
-    res.json(products);
+    const products = await Product.find(buildPublicProductFilter())
+      .select(PUBLIC_PRODUCT_PROJECTION)
+      .lean();
+
+    res.json(products.map(serializePublicProduct));
   } catch (error) {
     console.error('❌ Error al obtener productos:', error.message);
     res.status(500).json({ message: 'Error al obtener productos' });
@@ -239,9 +245,14 @@ router.get('/slug/:slug', async (req, res) => {
     if (!slug || typeof slug !== 'string' || !slug.trim()) {
       return res.status(400).json({ message: 'slug inválido' });
     }
-    const product = await Product.findOne({ slug: String(slug).trim() });
+    const product = await Product.findOne(
+      buildPublicProductFilter({ slug: String(slug).trim() })
+    )
+      .select(PUBLIC_PRODUCT_PROJECTION)
+      .lean();
+
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    res.json(product);
+    res.json(serializePublicProduct(product));
   } catch (error) {
     console.error('❌ Error al obtener producto por slug:', error.message);
     res.status(500).json({ message: 'Error al obtener el producto' });
@@ -336,6 +347,38 @@ router.get('/admin/list', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al obtener productos admin:', error.message);
     res.status(500).json({ ok: false, message: 'Error al obtener productos administrativos' });
+  }
+});
+
+// ✅ GET /api/products/admin/:id
+//    Detalle administrativo completo, incluso para productos inactivos.
+router.get('/admin/:id', requireAdmin, async (req, res) => {
+  try {
+    const value = String(req.params.id || '').trim();
+
+    if (!value) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const isValidObjectId =
+      value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
+    const identityFilter = isValidObjectId
+      ? { $or: [{ _id: value }, { slug: value }] }
+      : { slug: value };
+
+    const product = await Product.findOne(identityFilter);
+
+    if (!product) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const inventorySummaryMap = await buildInventorySummaryMap([product]);
+    return res.json(serializeAdminProduct(product, inventorySummaryMap));
+  } catch (error) {
+    console.error('❌ Error al obtener producto admin:', error.message);
+    return res.status(500).json({
+      message: 'Error al obtener el producto administrativo',
+    });
   }
 });
 
@@ -528,15 +571,13 @@ router.post('/:id/reviews', async (req, res) => {
     const isValidObjectId =
       value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
 
-    let product = null;
+    const identityFilter = isValidObjectId
+      ? { $or: [{ _id: value }, { slug: value }] }
+      : { slug: value };
 
-    if (isValidObjectId) {
-      product = await Product.findById(value);
-    }
-
-    if (!product) {
-      product = await Product.findOne({ slug: value });
-    }
+    const product = await Product.findOne(
+      buildPublicProductFilter(identityFilter)
+    );
 
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
@@ -637,21 +678,21 @@ router.get('/:id', async (req, res) => {
     const isValidObjectId =
       value.length === 24 && /^[0-9a-fA-F]+$/.test(value);
 
-    let product = null;
+    const identityFilter = isValidObjectId
+      ? { $or: [{ _id: value }, { slug: value }] }
+      : { slug: value };
 
-    if (isValidObjectId) {
-      product = await Product.findById(value);
-    }
-
-    if (!product) {
-      product = await Product.findOne({ slug: value });
-    }
+    const product = await Product.findOne(
+      buildPublicProductFilter(identityFilter)
+    )
+      .select(PUBLIC_PRODUCT_PROJECTION)
+      .lean();
 
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    res.json(product);
+    res.json(serializePublicProduct(product));
   } catch (error) {
     console.error('❌ Error al obtener producto por ID/slug:', error.message);
     res.status(500).json({ message: 'Error al obtener el producto' });

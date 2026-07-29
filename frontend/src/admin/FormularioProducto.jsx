@@ -339,7 +339,7 @@ export default function FormularioProducto() {
   useEffect(() => {
     if (!id) return;
 
-    api.get(`/api/products/${id}`)
+    api.get(`/api/products/admin/${id}`)
       .then(({ data }) => {
         const p = data || {};
         const loadedProductType = p.productType || 'physical';
