@@ -305,7 +305,10 @@ function buildOrderSnapshot(order) {
 
 async function createEvents(OrderEventModel, events, session) {
   if (!OrderEventModel || !events.length) return;
-  await OrderEventModel.create(events, { session });
+  await OrderEventModel.create(events, {
+    session,
+    ordered: true,
+  });
 }
 
 async function runInTransaction(work, externalSession = null) {

@@ -42,6 +42,7 @@ function run() {
   ok('Pago, liberación y cumplimiento usan un único servicio');
 
   assert(service.includes('session.withTransaction'));
+  assert(service.includes('ordered: true'));
   assert(service.includes("targetStatus === 'paid'"));
   assert(
     service.includes("['cancelled', 'failed'].includes(targetStatus)")
