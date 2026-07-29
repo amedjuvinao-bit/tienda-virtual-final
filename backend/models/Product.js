@@ -273,6 +273,14 @@ const productSchema = new mongoose.Schema(
     // Se mantiene 'active' para compatibilidad con otras partes
     active: { type: Boolean, default: true },
 
+    // Archivo lógico: conserva historial, códigos, imágenes y relaciones.
+    archivedAt: { type: Date, default: null, index: true },
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
     // campos opcionales
     reorderPoint: { type: Number, default: 0, min: 0 },
     reorderQty: { type: Number, default: 0, min: 0 },
@@ -315,6 +323,7 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ categories: 1 });
 productSchema.index({ productType: 1, active: 1 });
 productSchema.index({ trackInventory: 1, active: 1 });
+productSchema.index({ archivedAt: 1, active: 1 });
 productSchema.index({ 'variants.variantKey': 1 });
 productSchema.index({ 'variants.sku': 1 });
 productSchema.index({ 'variants.barcode': 1 });
@@ -346,6 +355,19 @@ function normalizeUniqueStringArray(arr) {
     }
   }
   return out;
+}
+
+function findDuplicateCode(values = [], normalize = (value) => value) {
+  const seen = new Set();
+
+  for (const value of values) {
+    const normalized = normalize(value);
+    if (!normalized) continue;
+    if (seen.has(normalized)) return normalized;
+    seen.add(normalized);
+  }
+
+  return '';
 }
 
 // ===== Helpers para SKU =====
@@ -439,26 +461,48 @@ productSchema.pre('validate', async function (next) {
       this.variantAxes = normalizeVariantAxes(this.variantAxes, this.variantPreset);
     }
 
-    this.variants = normalizeProductVariants(this.variants || [], {
-      _id: this._id,
-      title: this.title,
-      sku: this.sku,
-      price: this.price,
-      cost: this.cost,
-      averageCost: this.averageCost,
-      image: this.image,
-      images: this.images,
-      stock: this.stock,
-      sizes: this.sizes,
-      colors: this.colors,
-      inventory: this.inventory,
-      trackInventory: this.trackInventory,
-    }).map((variant) => ({
-      ...variant,
-      price: variant.price == null ? null : cleanMoney(variant.price, this.price || 0),
-      cost: variant.cost == null ? null : cleanMoney(variant.cost, this.cost || this.averageCost || 0),
-      originalPrice: variant.originalPrice == null ? null : cleanMoney(variant.originalPrice, 0),
-    }));
+    const shouldValidateCommercialCodes =
+      this.isNew ||
+      this.isModified('sku') ||
+      this.isModified('barcode') ||
+      this.isModified('variants');
+    const rawVariantRows = Array.isArray(this.variants)
+      ? this.variants
+      : [];
+    const duplicateVariantKey = shouldValidateCommercialCodes
+      ? findDuplicateCode(
+          rawVariantRows.map((variant) =>
+            buildVariantKey(variant?.size, variant?.color)
+          ),
+          (value) => cleanText(value, 180).toLowerCase()
+        )
+      : '';
+
+    const variantsAreExplicitlyEmpty =
+      this.$locals?.variantsAuthoritative === true &&
+      (!Array.isArray(this.variants) || this.variants.length === 0);
+    this.variants = variantsAreExplicitlyEmpty
+      ? []
+      : normalizeProductVariants(this.variants || [], {
+          _id: this._id,
+          title: this.title,
+          sku: this.sku,
+          price: this.price,
+          cost: this.cost,
+          averageCost: this.averageCost,
+          image: this.image,
+          images: this.images,
+          stock: this.stock,
+          sizes: this.sizes,
+          colors: this.colors,
+          inventory: this.inventory,
+          trackInventory: this.trackInventory,
+        }).map((variant) => ({
+          ...variant,
+          price: variant.price == null ? null : cleanMoney(variant.price, this.price || 0),
+          cost: variant.cost == null ? null : cleanMoney(variant.cost, this.cost || this.averageCost || 0),
+          originalPrice: variant.originalPrice == null ? null : cleanMoney(variant.originalPrice, 0),
+        }));
 
     if (!this.sku) {
       const prefix = pickPrefix(this);
@@ -467,6 +511,90 @@ productSchema.pre('validate', async function (next) {
       const counterKey = `sku-${prefix}-${yyyymm}`;
       const seq = await nextSeq(counterKey);
       this.sku = `${prefix}-${yyyymm}-${String(seq).padStart(4, '0')}`;
+    }
+
+    const variantRows = Array.isArray(this.variants) ? this.variants : [];
+    const skuValues = shouldValidateCommercialCodes
+      ? [
+          cleanUpper(this.sku, 100),
+          ...variantRows.map((variant) => cleanUpper(variant?.sku, 100)),
+        ].filter(Boolean)
+      : [];
+    const barcodeValues = shouldValidateCommercialCodes
+      ? [
+          cleanText(this.barcode, 120),
+          ...variantRows.map((variant) => cleanText(variant?.barcode, 120)),
+        ].filter(Boolean)
+      : [];
+
+    const duplicateSku = findDuplicateCode(
+      skuValues,
+      (value) => cleanUpper(value, 100)
+    );
+    const duplicateBarcode = findDuplicateCode(
+      barcodeValues,
+      (value) => cleanText(value, 120).toLowerCase()
+    );
+
+    if (duplicateVariantKey) {
+      this.invalidate(
+        'variants',
+        `Combinación de variante duplicada: ${duplicateVariantKey}`
+      );
+    }
+
+    if (duplicateSku) {
+      this.invalidate(
+        'variants',
+        `SKU duplicado dentro del producto: ${duplicateSku}`
+      );
+    }
+
+    if (duplicateBarcode) {
+      this.invalidate(
+        'variants',
+        `Código de barras duplicado dentro del producto: ${duplicateBarcode}`
+      );
+    }
+
+    if (!duplicateVariantKey && !duplicateSku && skuValues.length) {
+      const skuConflict = await this.constructor
+        .findOne({
+          _id: { $ne: this._id },
+          $or: [
+            { sku: { $in: skuValues } },
+            { 'variants.sku': { $in: skuValues } },
+          ],
+        })
+        .select('_id')
+        .lean();
+
+      if (skuConflict) {
+        this.invalidate(
+          'variants',
+          'Uno de los SKU ya pertenece a otro producto o variante.'
+        );
+      }
+    }
+
+    if (!duplicateVariantKey && !duplicateBarcode && barcodeValues.length) {
+      const barcodeConflict = await this.constructor
+        .findOne({
+          _id: { $ne: this._id },
+          $or: [
+            { barcode: { $in: barcodeValues } },
+            { 'variants.barcode': { $in: barcodeValues } },
+          ],
+        })
+        .select('_id')
+        .lean();
+
+      if (barcodeConflict) {
+        this.invalidate(
+          'variants',
+          'Uno de los códigos de barras ya pertenece a otro producto o variante.'
+        );
+      }
     }
 
     // Si no han seteado 'visible' explícitamente, refleja 'active'
@@ -569,8 +697,19 @@ productSchema.post('save', async function syncProductInventoryAfterSave(doc) {
 
   try {
     const { syncProductInventoryFromProduct } = require('../services/productInventorySyncService');
-    await syncProductInventoryFromProduct(doc);
+    doc.$locals.inventorySyncResult = await syncProductInventoryFromProduct(
+      doc,
+      {
+        adminId: doc.$locals.adminId || null,
+        variantsAuthoritative:
+          doc.$locals.variantsAuthoritative === true,
+      }
+    );
   } catch (error) {
+    doc.$locals.inventorySyncResult = {
+      ok: false,
+      message: error.message,
+    };
     console.error('[Product] No se pudo sincronizar InventoryStock:', error.message);
   }
 });

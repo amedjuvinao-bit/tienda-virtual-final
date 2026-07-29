@@ -431,10 +431,10 @@ export default function ProductosAdmin() {
     try {
       await api.delete(`/api/products/${productToDelete}`);
       setProducts((prev) => prev.filter((product) => product._id !== productToDelete));
-      toast.success('Producto eliminado');
+      toast.success('Producto retirado del catálogo');
     } catch (err) {
       console.error(err);
-      toast.error('No se pudo eliminar el producto');
+      toast.error('No se pudo retirar el producto');
     } finally {
       setConfirmOpen(false);
       setProductToDelete(null);
@@ -797,7 +797,7 @@ export default function ProductosAdmin() {
         show={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDelete}
-        message="¿Seguro que deseas eliminar este producto?"
+        message="¿Seguro que deseas retirar este producto? Se conservarán su historial, inventario e imágenes."
       />
     </div>
   );

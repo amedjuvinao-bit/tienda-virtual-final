@@ -237,6 +237,40 @@ async function main() {
     const blueStockAfterEdit = rows.find((row) => row.variantKey === blueKey);
     assert(Number(blueStockAfterEdit.stock || 0) === 3, 'Editar variante sobrescribio el stock real existente.');
     ok('Editar variante no sobrescribe stock real existente');
+
+    product = await Product.findById(product._id);
+    product.variants = product.variants.map((variant) => {
+      const plain = variant.toObject ? variant.toObject() : variant;
+      return plain.variantKey === redKey
+        ? { ...plain, active: false }
+        : plain;
+    });
+    product.inventory = product.inventory.filter(
+      (row) => buildVariantKey(row.size, row.color) !== redKey
+    );
+    product.$locals = product.$locals || {};
+    product.$locals.variantsAuthoritative = true;
+
+    await product.save();
+    await waitForHook();
+
+    rows = await InventoryStock.find({
+      product: product._id,
+      deletedAt: null,
+    }).lean();
+    const redStockAfterRetire = rows.find(
+      (row) => row.variantKey === redKey
+    );
+    assert(redStockAfterRetire, 'Retirar variante borro su existencia.');
+    assert(
+      redStockAfterRetire.active === false,
+      'Retirar variante dejo activa su existencia.'
+    );
+    assert(
+      Number(redStockAfterRetire.stock || 0) === 2,
+      'Retirar variante altero su stock historico.'
+    );
+    ok('Retirar variante desactiva venta y conserva existencia historica');
   } catch (error) {
     fail('Error inesperado en prueba Variantes Avanzadas', error);
   } finally {

@@ -358,7 +358,10 @@ function normalizeProductVariants(variants = [], product = {}) {
 
 function findProductVariant(product = {}, selector = {}) {
   const plainProduct = toPlainObject(product) || {};
-  const variants = normalizeProductVariants(plainProduct.variants || [], plainProduct);
+  const variants = normalizeProductVariants(
+    plainProduct.variants || [],
+    plainProduct
+  ).filter((variant) => variant.active !== false);
   if (!variants.length) return null;
 
   const desiredKey = cleanLower(selector.variantKey || '', 180);

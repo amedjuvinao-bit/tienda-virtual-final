@@ -33,6 +33,7 @@ check('El filtro público exige producto activo y visible', () => {
   assert.deepStrictEqual(buildPublicProductFilter(), {
     active: true,
     visible: { $ne: false },
+    archivedAt: null,
   });
 });
 
@@ -42,6 +43,7 @@ check('Un criterio externo no puede habilitar productos inactivos', () => {
     {
       active: true,
       visible: { $ne: false },
+      archivedAt: null,
       slug: 'privado',
     }
   );
@@ -80,6 +82,13 @@ const privateProduct = {
       cost: 72000,
       active: true,
     },
+    {
+      variantKey: 'rojo__l',
+      label: 'Rojo / L',
+      price: 130000,
+      cost: 75000,
+      active: false,
+    },
   ],
 };
 
@@ -107,6 +116,11 @@ check('La respuesta pública elimina datos internos y financieros', () => {
       field
     );
   }
+});
+
+check('La respuesta pública excluye variantes inactivas', () => {
+  assert.strictEqual(publicProduct.variants.length, 1);
+  assert.strictEqual(publicProduct.variants[0].variantKey, 'azul__m');
 });
 
 check('La serialización no modifica el documento original', () => {

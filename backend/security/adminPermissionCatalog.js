@@ -38,7 +38,7 @@ const ADMIN_PERMISSION_MODULES = [
       permission('products:view', 'Ver productos', 'Permite ver listado y detalle administrativo de productos.'),
       permission('products:create', 'Crear productos', 'Permite registrar nuevos productos.', { audit: true, sensitive: true }),
       permission('products:update', 'Editar productos', 'Permite modificar datos comerciales, precios, imágenes, variantes y estado del producto.', { audit: true, sensitive: true }),
-      permission('products:delete', 'Eliminar productos', 'Permite eliminar productos y sus imágenes asociadas.', { audit: true, sensitive: true, danger: true }),
+      permission('products:delete', 'Retirar productos', 'Permite archivar productos sin borrar su historial, inventario ni imágenes.', { audit: true, sensitive: true, danger: true }),
       permission('products:reviews', 'Moderar reseñas', 'Permite ver, aprobar, rechazar o eliminar reseñas de productos.', { audit: true, sensitive: true }),
       permission('products:export', 'Exportar productos', 'Permite descargar reportes o listados del catálogo.', { audit: true }),
     ],

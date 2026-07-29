@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
-const cloudinary = require('cloudinary').v2;
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
@@ -21,27 +20,12 @@ const {
   buildPublicProductFilter,
   serializePublicProduct,
 } = require('../lib/products/productPublicView');
-
-// ✅ Cloudinary (usa tus variables del .env)
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// Helper Cloudinary
-function getPublicIdFromUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  const marker = '/upload/';
-  const i = url.indexOf(marker);
-  if (i === -1) return null;
-  let rest = url.slice(i + marker.length);
-  rest = rest.replace(/^v\d+\//, '');
-  rest = rest.split(/[?#]/)[0];
-  const lastDot = rest.lastIndexOf('.');
-  if (lastDot > -1) rest = rest.slice(0, lastDot);
-  return rest;
-}
+const {
+  buildLegacyFromVariants,
+} = require('../lib/products/productVariantLegacy');
+const {
+  archiveProductSafely,
+} = require('../services/productArchiveService');
 
 // ✅ Normaliza arrays de strings (trim + de-dup + quita vacíos)
 function sanitizeStrArray(arr) {
@@ -316,7 +300,10 @@ router.get('/admin/reviews', requireAdmin, async (req, res) => {
 router.get('/admin/list', requireAdmin, async (req, res) => {
   try {
     const { all = '1', q = '', productType = 'all' } = req.query;
-    const filter = all === '1' ? {} : { active: true };
+    const filter = {
+      archivedAt: null,
+      ...(all === '1' ? {} : { active: true }),
+    };
 
     const cleanQ = String(q || '').trim();
     if (cleanQ) {
@@ -366,7 +353,10 @@ router.get('/admin/:id', requireAdmin, async (req, res) => {
       ? { $or: [{ _id: value }, { slug: value }] }
       : { slug: value };
 
-    const product = await Product.findOne(identityFilter);
+    const product = await Product.findOne({
+      ...identityFilter,
+      archivedAt: null,
+    });
 
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
@@ -408,6 +398,7 @@ router.post(
         // inventario heredado
         sizes,
         inventory,
+        variants,
 
         reorderPoint,
         reorderQty,
@@ -433,8 +424,32 @@ router.post(
 
       const productConfig = buildProductConfigPayload(req.body);
       const preInv = productConfig.trackInventory ? sanitizeInventory(inventory) : [];
+      const variantsProvided =
+        productConfig.trackInventory &&
+        Array.isArray(variants) &&
+        variants.length > 0;
+      const variantLegacy = variantsProvided
+        ? buildLegacyFromVariants(variants, {
+            title,
+            sku,
+            price,
+            cost,
+            averageCost,
+            image,
+            images,
+            inventory: preInv,
+            sizes,
+            colors,
+            stock,
+            trackInventory: productConfig.trackInventory,
+          })
+        : null;
 
-      if (hasInventoryDuplicates(preInv)) {
+      const effectiveInventory = variantsProvided
+        ? variantLegacy.inventory
+        : preInv;
+
+      if (hasInventoryDuplicates(effectiveInventory)) {
         return res.status(400).json({
           message: 'Inventory tiene combinaciones duplicadas (color+size)',
         });
@@ -450,19 +465,28 @@ router.post(
         stock:
           productConfig.trackInventory && stock != null
             ? Math.max(0, Number(stock))
-            : productConfig.trackInventory && preInv.length
-              ? totalStockFromInventory(preInv)
+            : productConfig.trackInventory && effectiveInventory.length
+              ? totalStockFromInventory(effectiveInventory)
               : 0,
         active: typeof active === 'boolean' ? active : true,
         originalPrice:
           originalPrice != null ? Math.max(0, Number(originalPrice)) : undefined,
         features: Array.isArray(features) ? features : [],
-        colors: Array.isArray(colors) ? colors.slice(0, 10) : [],
+        colors: variantsProvided
+          ? variantLegacy.colors
+          : Array.isArray(colors)
+            ? colors.slice(0, 10)
+            : [],
         category: category ?? undefined,
         categories: sanitizeStrArray(categories),
 
-        sizes: productConfig.trackInventory && Array.isArray(sizes) ? sizes : [],
-        inventory: preInv,
+        sizes: variantsProvided
+          ? variantLegacy.sizes
+          : productConfig.trackInventory && Array.isArray(sizes)
+            ? sizes
+            : [],
+        inventory: effectiveInventory,
+        variants: variantsProvided ? variantLegacy.variants : [],
 
         productType: productConfig.productType,
         unitOfMeasure: productConfig.unitOfMeasure,
@@ -510,6 +534,10 @@ router.post(
         notes: notes ?? '',
       });
 
+      doc.$locals = doc.$locals || {};
+      doc.$locals.adminId = req.adminUserId || null;
+      doc.$locals.variantsAuthoritative = variantsProvided;
+
       const saved = await doc.save();
 
       return res.status(201).json(saved);
@@ -534,6 +562,12 @@ router.post(
             message: 'Barcode duplicado.',
           });
         }
+      }
+
+      if (error?.name === 'ValidationError') {
+        return res.status(400).json({
+          message: error.message,
+        });
       }
 
       res.status(500).json({ message: 'Error al crear producto' });
@@ -719,7 +753,10 @@ router.put(
         });
       }
 
-      const prod = await Product.findById(id);
+      const prod = await Product.findOne({
+        _id: id,
+        archivedAt: null,
+      });
 
       if (!prod) {
         return res.status(404).json({
@@ -738,6 +775,7 @@ router.put(
         colors,
         sizes,
         inventory,
+        variants,
         stock,
         active,
         category,
@@ -760,12 +798,16 @@ router.put(
         notes,
       } = req.body;
 
+      const hasField = (key) =>
+        Object.prototype.hasOwnProperty.call(req.body || {}, key);
       const provided = (v) =>
         v !== undefined &&
         v !== null &&
         !(typeof v === 'string' && v.trim() === '');
 
       const productConfig = buildProductConfigPayload(req.body, prod.productType || 'physical');
+      const hadConfiguredVariants =
+        Array.isArray(prod.variants) && prod.variants.length > 0;
 
       // Detectar cambio de categoría
       const incomingCategory = provided(category) ? String(category) : undefined;
@@ -775,9 +817,17 @@ router.put(
         String(prod.category || '') !== incomingCategory;
 
       // ✅ Lista blanca y normalizaciones
-      if (provided(title)) prod.title = String(title).trim();
+      if (hasField('title')) {
+        const cleanTitle = String(title || '').trim();
+        if (!cleanTitle) {
+          return res.status(400).json({
+            message: 'title es requerido',
+          });
+        }
+        prod.title = cleanTitle;
+      }
 
-      if (provided(price)) {
+      if (hasField('price')) {
         const n = Number(price);
 
         if (Number.isNaN(n)) {
@@ -789,8 +839,12 @@ router.put(
         prod.price = Math.max(0, n);
       }
 
-      if (provided(originalPrice)) {
-        const n = Number(originalPrice);
+      if (hasField('originalPrice')) {
+        const clearOriginalPrice =
+          originalPrice === '' ||
+          originalPrice === null ||
+          originalPrice === undefined;
+        const n = clearOriginalPrice ? 0 : Number(originalPrice);
 
         if (Number.isNaN(n)) {
           return res.status(400).json({
@@ -798,19 +852,32 @@ router.put(
           });
         }
 
-        prod.originalPrice = Math.max(0, n);
+        prod.originalPrice = clearOriginalPrice
+          ? undefined
+          : Math.max(0, n);
       }
 
-      if (provided(description)) prod.description = description;
-      if (provided(image)) prod.image = image;
-      if (Array.isArray(images)) prod.images = images.slice(0, 5);
+      if (hasField('description')) prod.description = String(description || '');
+      if (hasField('image')) prod.image = String(image || '');
+      if (hasField('images')) {
+        prod.images = Array.isArray(images) ? images.slice(0, 5) : [];
+      }
 
-      if (provided(category)) prod.category = category;
-      if (Array.isArray(categories)) prod.categories = sanitizeStrArray(categories);
+      if (hasField('category')) prod.category = String(category || '').trim();
+      if (hasField('categories')) {
+        prod.categories = sanitizeStrArray(categories);
+      }
 
-      if (Array.isArray(features)) prod.features = features;
-      if (Array.isArray(colors)) prod.colors = colors.slice(0, 10);
-      if (Array.isArray(sizes)) prod.sizes = productConfig.trackInventory ? sizes : [];
+      if (hasField('features')) {
+        prod.features = Array.isArray(features) ? features : [];
+      }
+      if (hasField('colors')) {
+        prod.colors = Array.isArray(colors) ? colors.slice(0, 10) : [];
+      }
+      if (hasField('sizes')) {
+        prod.sizes =
+          productConfig.trackInventory && Array.isArray(sizes) ? sizes : [];
+      }
 
       prod.productType = productConfig.productType;
       prod.unitOfMeasure = productConfig.unitOfMeasure;
@@ -835,61 +902,65 @@ router.put(
         prod.stock = 0;
         prod.inventory = [];
         prod.sizes = [];
+        prod.colors = [];
+        prod.variants = [];
       }
 
       if (typeof active === 'boolean') prod.active = active;
 
       // inventario / contabilidad
-      if (provided(reorderPoint)) {
+      if (hasField('reorderPoint')) {
         prod.reorderPoint = Math.max(0, Number(reorderPoint) || 0);
       }
 
-      if (provided(reorderQty)) {
+      if (hasField('reorderQty')) {
         prod.reorderQty = Math.max(0, Number(reorderQty) || 0);
       }
 
-      if (provided(warehouseLocation)) prod.warehouseLocation = warehouseLocation;
+      if (hasField('warehouseLocation')) {
+        prod.warehouseLocation = String(warehouseLocation || '');
+      }
 
-      if (provided(weightGrams)) {
+      if (hasField('weightGrams')) {
         prod.weightGrams = Math.max(0, Number(weightGrams) || 0);
       }
 
-      if (
-        dimensionsCm &&
-        (Number(dimensionsCm?.l) ||
-          Number(dimensionsCm?.w) ||
-          Number(dimensionsCm?.h))
-      ) {
+      if (hasField('dimensionsCm')) {
         prod.dimensionsCm = {
-          l: Math.max(0, Number(dimensionsCm.l || 0)),
-          w: Math.max(0, Number(dimensionsCm.w || 0)),
-          h: Math.max(0, Number(dimensionsCm.h || 0)),
+          l: Math.max(0, Number(dimensionsCm?.l || 0)),
+          w: Math.max(0, Number(dimensionsCm?.w || 0)),
+          h: Math.max(0, Number(dimensionsCm?.h || 0)),
         };
       }
 
-      if (provided(cost)) prod.cost = Math.max(0, Number(cost) || 0);
+      if (hasField('cost')) {
+        prod.cost = Math.max(0, Number(cost) || 0);
+      }
 
-      if (provided(averageCost)) {
+      if (hasField('averageCost')) {
         prod.averageCost = Math.max(0, Number(averageCost) || 0);
       }
 
-      if (provided(taxRate)) {
+      if (hasField('taxRate')) {
         prod.taxRate = Math.min(100, Math.max(0, Number(taxRate) || 0));
       }
 
       if (typeof taxIncluded === 'boolean') prod.taxIncluded = taxIncluded;
 
-      if (provided(brand)) prod.brand = brand;
-      if (provided(season)) prod.season = season;
+      if (hasField('brand')) prod.brand = String(brand || '');
+      if (hasField('season')) prod.season = String(season || '');
 
-      if (supplier && typeof supplier === 'object') {
+      if (hasField('supplier')) {
         prod.supplier = {
-          name: String(supplier.name || '').trim(),
+          name:
+            supplier && typeof supplier === 'object'
+              ? String(supplier.name || '').trim()
+              : '',
         };
       }
 
-      if (provided(barcode)) prod.barcode = barcode;
-      if (provided(notes)) prod.notes = notes;
+      if (hasField('barcode')) prod.barcode = String(barcode || '');
+      if (hasField('notes')) prod.notes = String(notes || '');
 
       // ✅ INVENTARIO: replace (por defecto) o merge
       if (productConfig.trackInventory && Array.isArray(inventory)) {
@@ -928,6 +999,35 @@ router.put(
           prod.stock = totalStockFromInventory(prod.inventory);
         }
       }
+
+      if (Array.isArray(variants)) {
+        const variantLegacy = buildLegacyFromVariants(variants, {
+          ...(prod.toObject ? prod.toObject() : prod),
+          trackInventory: productConfig.trackInventory,
+        });
+        const variantsAuthoritative =
+          variants.length > 0 || hadConfiguredVariants;
+
+        prod.variants = productConfig.trackInventory
+          ? variantLegacy.variants
+          : [];
+
+        if (productConfig.trackInventory && variantsAuthoritative) {
+          prod.sizes = variantLegacy.sizes;
+          prod.colors = variantLegacy.colors;
+          prod.inventory = variantLegacy.inventory;
+
+          if (!provided(stock)) {
+            prod.stock = totalStockFromInventory(variantLegacy.inventory);
+          }
+        }
+
+        prod.$locals = prod.$locals || {};
+        prod.$locals.variantsAuthoritative = variantsAuthoritative;
+      }
+
+      prod.$locals = prod.$locals || {};
+      prod.$locals.adminId = req.adminUserId || null;
 
       // ✅ Regenerar SKU: usa el hook del modelo (Counter) para coherencia
       if (categoryChanged || regenSku) {
@@ -976,7 +1076,7 @@ router.put(
   }
 );
 
-// ✅ DELETE /api/products/:id (borra producto + imágenes de Cloudinary)
+// ✅ DELETE /api/products/:id (archivo lógico, conserva historial e imágenes)
 //    PROTEGIDO: solo admin con permiso products:delete
 router.delete(
   '/:id',
@@ -984,39 +1084,38 @@ router.delete(
   requirePermission('products:delete'),
   async (req, res) => {
     try {
-      const prod = await Product.findById(req.params.id);
+      const id = String(req.params.id || '').trim();
+      const isValid =
+        id.length === 24 && /^[0-9a-fA-F]+$/.test(id);
 
-      if (!prod) {
+      if (!isValid) {
         return res.status(404).json({
           message: 'Producto no encontrado',
         });
       }
 
-      const urls = [
-        ...(prod.image ? [prod.image] : []),
-        ...(Array.isArray(prod.images) ? prod.images : []),
-      ];
+      const archiveResult = await archiveProductSafely({
+        id,
+        adminId: req.adminUserId || null,
+      });
 
-      const publicIds = urls.map(getPublicIdFromUrl).filter(Boolean);
-
-      if (publicIds.length) {
-        await Promise.all(
-          publicIds.map((pid) =>
-            cloudinary.uploader.destroy(pid).catch(() => null)
-          )
-        );
+      if (!archiveResult?.archivedProduct) {
+        return res.status(404).json({
+          message: 'Producto no encontrado',
+        });
       }
 
-      await Product.findByIdAndDelete(req.params.id);
-
       res.json({
-        message: 'Producto e imágenes eliminados correctamente',
+        message: 'Producto archivado correctamente',
+        archivedAt: archiveResult.archivedProduct.archivedAt,
+        inventoryRowsArchived:
+          archiveResult.inventoryRowsArchived,
       });
     } catch (error) {
-      console.error('❌ Error al eliminar producto:', error.message);
+      console.error('❌ Error al archivar producto:', error.message);
 
       res.status(500).json({
-        message: 'Error al eliminar producto',
+        message: 'Error al archivar producto',
       });
     }
   }

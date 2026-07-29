@@ -58,7 +58,7 @@ function getLegacyInventoryStock(product = {}, size = '', color = '') {
   return positiveInt(match?.stock, 0);
 }
 
-function normalizeVariantRows(product = {}) {
+function normalizeVariantRows(product = {}, options = {}) {
   if (product.trackInventory === false) return [];
 
   const rows = [];
@@ -82,8 +82,14 @@ function normalizeVariantRows(product = {}) {
     });
   }
 
-  const advancedVariants = normalizeProductVariants(product.variants || [], product)
-    .filter((variant) => variant.active !== false);
+  const variantsAreExplicitlyEmpty =
+    options.variantsAuthoritative === true &&
+    (!Array.isArray(product.variants) || product.variants.length === 0);
+  const advancedVariants = (
+    variantsAreExplicitlyEmpty
+      ? []
+      : normalizeProductVariants(product.variants || [], product)
+  ).filter((variant) => variant.active !== false);
 
   advancedVariants.forEach((variant) => {
     const legacyStock = getLegacyInventoryStock(product, variant.size, variant.color);
@@ -95,6 +101,10 @@ function normalizeVariantRows(product = {}) {
       stock: positiveInt(variant.initialStock, legacyStock),
     });
   });
+
+  if (options.variantsAuthoritative === true) {
+    return rows;
+  }
 
   const inventory = Array.isArray(product.inventory) ? product.inventory : [];
   inventory.forEach((row) => addVariant(row));
@@ -224,6 +234,46 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     return { ok: true, action: 'inventory_disabled', stock };
   }
 
+  const desiredRows = normalizeVariantRows(product, options);
+  const existingRows = await InventoryStock.find({
+    product: productId,
+    deletedAt: null,
+  });
+
+  const hadExistingRows = existingRows.length > 0;
+  const desiredVariantKeys = new Set(
+    desiredRows.map((row) =>
+      InventoryStock.buildVariantKey(row.size, row.color)
+    )
+  );
+
+  if (!desiredRows.length) {
+    const deactivation = await InventoryStock.updateMany(
+      {
+        product: productId,
+        deletedAt: null,
+        active: true,
+      },
+      {
+        $set: {
+          active: false,
+          updatedBy: adminId,
+        },
+      }
+    );
+
+    const stock = await syncProductLegacyStock(productDoc, productId);
+    return {
+      ok: true,
+      action: 'variants_retired',
+      stock,
+      createdRows: 0,
+      reactivatedRows: 0,
+      deactivatedRows: Number(deactivation.modifiedCount || 0),
+      movementsCreated: 0,
+    };
+  }
+
   const branch = await findDefaultInventoryBranch();
   if (!branch?._id) {
     return {
@@ -232,13 +282,6 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     };
   }
 
-  const desiredRows = normalizeVariantRows(product);
-  const existingRows = await InventoryStock.find({
-    product: productId,
-    deletedAt: null,
-  });
-
-  const hadExistingRows = existingRows.length > 0;
   const branchId = branch._id;
   const existingByKey = new Map();
 
@@ -248,6 +291,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
 
   let createdRows = 0;
   let reactivatedRows = 0;
+  let deactivatedRows = 0;
   let movementsCreated = 0;
 
   for (const desired of desiredRows) {
@@ -312,6 +356,22 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     }
   }
 
+  const retiredRows = await InventoryStock.updateMany(
+    {
+      product: productId,
+      deletedAt: null,
+      active: true,
+      variantKey: { $nin: [...desiredVariantKeys] },
+    },
+    {
+      $set: {
+        active: false,
+        updatedBy: adminId,
+      },
+    }
+  );
+  deactivatedRows = Number(retiredRows.modifiedCount || 0);
+
   const stock = await syncProductLegacyStock(productDoc, productId);
 
   return {
@@ -320,10 +380,12 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     stock,
     createdRows,
     reactivatedRows,
+    deactivatedRows,
     movementsCreated,
   };
 }
 
 module.exports = {
+  normalizeVariantRows,
   syncProductInventoryFromProduct,
 };

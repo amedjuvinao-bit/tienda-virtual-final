@@ -600,15 +600,15 @@ export default function FormularioProducto() {
   const inventoryArray = useMemo(() => {
     if (!trackInventory) return [];
 
-    const rows = advancedVariants.length
-      ? advancedVariants.map((variant) => ({
+    if (advancedVariants.length) {
+      return advancedVariants
+        .filter((variant) => variant.active !== false)
+        .map((variant) => ({
           size: variant.size || '',
           color: variant.color || '',
           stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
-        }))
-      : [];
-
-    if (rows.length) return rows;
+        }));
+    }
 
     const out = [];
     sizes.forEach((size) => {
@@ -626,7 +626,7 @@ export default function FormularioProducto() {
   const variantPayload = useMemo(() => {
     if (!trackInventory) return [];
     return advancedVariants
-      .filter((variant) => variant.active !== false && (variant.size || variant.color || variant.label))
+      .filter((variant) => variant.size || variant.color || variant.label)
       .map((variant, index) => ({
         variantKey: variant.variantKey || buildVariantKey(variant.size, variant.color),
         label: variant.label || buildVariantLabel(variant.size, variant.color),
@@ -677,11 +677,12 @@ export default function FormularioProducto() {
       return;
     }
 
-    const dimensions = Number(dimL) || Number(dimW) || Number(dimH)
-      ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
-      : undefined;
-
-    const supplier = supplierName && supplierName.trim() ? { name: supplierName.trim() } : undefined;
+    const dimensions = {
+      l: Math.max(0, Number(dimL) || 0),
+      w: Math.max(0, Number(dimW) || 0),
+      h: Math.max(0, Number(dimH) || 0),
+    };
+    const supplier = { name: supplierName.trim() };
     const categoriesNormalized = normalizeStringArray(categoriesExtra);
 
     const data = {
@@ -708,6 +709,7 @@ export default function FormularioProducto() {
       colors: trackInventory ? finalColors : [],
       sizes: trackInventory ? normalizeStringArray(sizes) : [],
       inventory: trackInventory ? inventoryArray : [],
+      variants: trackInventory ? variantPayload : [],
       reorderPoint: trackInventory ? Math.max(0, Number(reorderPoint || 0)) : 0,
       reorderQty: trackInventory ? Math.max(0, Number(reorderQty || 0)) : 0,
       warehouseLocation: trackInventory ? warehouseLocation || '' : '',
@@ -734,22 +736,11 @@ export default function FormularioProducto() {
 
     setCargando(true);
     try {
-      let savedProduct = null;
       if (id) {
         const regen = originalCategoria && categoria && categoria !== originalCategoria ? '&regenSku=1' : '';
-        const { data: updated } = await api.put(`/api/products/${id}?mode=replace${regen}`, data);
-        savedProduct = updated;
+        await api.put(`/api/products/${id}?mode=replace${regen}`, data);
       } else {
-        const { data: created } = await api.post('/api/products', data);
-        savedProduct = created;
-      }
-
-      const productId = savedProduct?._id || savedProduct?.id || id;
-      if (trackInventory && productId && variantPayload.length) {
-        await api.put(`/api/admin/product-variants/${productId}`, {
-          variants: variantPayload,
-          syncLegacy: true,
-        });
+        await api.post('/api/products', data);
       }
 
       toast.success(id ? 'Producto actualizado' : 'Producto creado');

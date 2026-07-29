@@ -8,6 +8,8 @@ const PUBLIC_PRODUCT_PRIVATE_FIELDS = Object.freeze([
   'reorderPoint',
   'reorderQty',
   'warehouseLocation',
+  'archivedAt',
+  'archivedBy',
   '__v',
 ]);
 
@@ -33,6 +35,7 @@ function buildPublicProductFilter(criteria = {}) {
     ...safeCriteria,
     active: true,
     visible: { $ne: false },
+    archivedAt: null,
   };
 }
 
@@ -57,9 +60,11 @@ function serializePublicProduct(product) {
   );
 
   if (Array.isArray(plain.variants)) {
-    safeProduct.variants = plain.variants.map((variant) =>
-      removeFields({ ...variant }, PUBLIC_VARIANT_PRIVATE_FIELDS)
-    );
+    safeProduct.variants = plain.variants
+      .filter((variant) => variant?.active !== false)
+      .map((variant) =>
+        removeFields({ ...variant }, PUBLIC_VARIANT_PRIVATE_FIELDS)
+      );
   }
 
   return safeProduct;

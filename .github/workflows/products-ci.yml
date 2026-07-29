@@ -1,0 +1,118 @@
+name: Productos CI
+
+on:
+  push:
+    branches:
+      - feature/productos-comercial-avanzado
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: productos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  products-integrity:
+    name: Integridad de productos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar integridad comercial
+        run: npm --prefix backend run test:products-integrity
+
+      - name: Validar privacidad pública
+        run: npm --prefix backend run test:products-public-security
+
+  products-mongodb:
+    name: Productos e inventario
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Ejecutar cierre histórico de Productos
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:products-module
+
+      - name: Validar sincronización de inventario
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:product-inventory-sync
+
+      - name: Validar variantes avanzadas
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:product-advanced-variants
+
+      - name: Validar archivo lógico
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:product-archive
+
+  products-ui:
+    name: Interfaz de productos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
