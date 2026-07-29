@@ -19,6 +19,8 @@
     "test:product-advanced-variants": "node scripts/testProductAdvancedVariantsModule.js",
     "test:order-refund-contract": "node scripts/testOrderRefundContract.js",
     "test:order-refund-inventory": "node scripts/testOrderRefundInventoryIntegration.js",
+    "test:order-bulk-status-contract": "node scripts/testOrderBulkStatusContract.js",
+    "test:order-bulk-status-inventory": "node scripts/testOrderBulkStatusIntegration.js",
     "test:products-public-security": "node scripts/testProductsPublicSecurity.js",
     "test:products-integrity": "node scripts/testProductsIntegrity.js",
     "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",

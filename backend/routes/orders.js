@@ -26,14 +26,14 @@ const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const {
   createInventoryReservation,
-  confirmInventoryReservation,
-  releaseInventoryReservation,
   expandReservableItems,
   expireInventoryReservations,
 } = require('../services/inventoryReservationService');
 const {
-  processOrderFulfillmentAfterPayment,
-} = require('../services/orderFulfillmentService');
+  getAllowedOrderStatuses,
+  transitionOrderStatus,
+  processBulkOrderStatusTransitions,
+} = require('../services/orderStatusTransitionService');
 const couponService = require('../services/couponService');
 const { buildOrderQuote } = require('../services/orderPricingService');
 const {
@@ -1007,9 +1007,15 @@ router.get('/admin', async (req, res) => {
       ['pagado', 'paid'],
       ['pagada', 'paid'],
       ['paid', 'paid'],
+      ['fallido', 'failed'],
+      ['rechazado', 'failed'],
+      ['failed', 'failed'],
       ['enviado', 'shipped'],
       ['enviada', 'shipped'],
       ['shipped', 'shipped'],
+      ['entregado', 'delivered'],
+      ['entregada', 'delivered'],
+      ['delivered', 'delivered'],
       ['cancelado', 'cancelled'],
       ['cancelada', 'cancelled'],
       ['cancelled', 'cancelled'],
@@ -1019,7 +1025,16 @@ router.get('/admin', async (req, res) => {
       ['refunded', 'refunded'],
     ]);
 
-    const ALLOWED = ['pending', 'processing', 'paid', 'shipped', 'cancelled', 'refunded'];
+    const ALLOWED = [
+      'pending',
+      'processing',
+      'paid',
+      'failed',
+      'shipped',
+      'delivered',
+      'cancelled',
+      'refunded',
+    ];
 
     const rawStatus = String(req.query.status || '').trim();
 
@@ -1181,7 +1196,7 @@ router.get('/admin', async (req, res) => {
           totalSales: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['paid', 'shipped']] },
+                { $in: ['$status', ['paid', 'shipped', 'delivered']] },
                 { $ifNull: ['$total', 0] },
                 0,
               ],
@@ -1201,7 +1216,7 @@ router.get('/admin', async (req, res) => {
           paidOrders: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['paid', 'shipped']] },
+                { $in: ['$status', ['paid', 'shipped', 'delivered']] },
                 1,
                 0,
               ],
@@ -1704,117 +1719,45 @@ router.get(
  * ============================ */
 router.options('/:id/status', (_req, res) => res.sendStatus(204));
 
-router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), async (req, res) => {
+router.patch('/:id/status', requireAdmin, requirePermission('orders:status'), async (req, res) => {
   try {
-    const STATUS_MAP = new Map([
-      ['pendiente', 'pending'],
-      ['pending', 'pending'],
-      ['procesando', 'processing'],
-      ['processing', 'processing'],
-      ['pagado', 'paid'],
-      ['paid', 'paid'],
-      ['enviado', 'shipped'],
-      ['shipped', 'shipped'],
-      ['cancelado', 'cancelled'],
-      ['cancelada', 'cancelled'],
-      ['cancelled', 'cancelled'],
-      ['canceled', 'cancelled'],
-      ['reembolsado', 'refunded'],
-      ['reembolsada', 'refunded'],
-      ['refunded', 'refunded'],
-    ]);
-
-    const raw = String(req.body?.status || '').toLowerCase().trim();
-    const status = STATUS_MAP.get(raw);
-
-    if (!status) {
-      return res.status(400).json({
-        error: 'Estado inválido',
-        allowed: Array.from(new Set(STATUS_MAP.values())),
-        received: raw,
-      });
-    }
-
-    const before = await Order.findById(req.params.id)
-      .select('status orderNumber payment inventoryControl')
-      .lean();
-
-    if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    if (
-      status === 'paid' &&
-      before.inventoryControl?.reservationRequired === true &&
-      before.orderNumber
-    ) {
-      await confirmInventoryReservation(before.orderNumber, {
-        order: before._id,
-        orderNumber: before.orderNumber,
-        paymentReference: before.payment?.reference || '',
-        paymentTransactionId: before.payment?.transactionId || '',
-      });
-    }
-
-    if (
-      status === 'cancelled' &&
-      before.inventoryControl?.reservationRequired === true &&
-      before.orderNumber
-    ) {
-      await releaseInventoryReservation(before.orderNumber, {
-        status: 'cancelled',
-        releaseReason: 'Orden cancelada desde administración',
-      });
-    }
-
-    const statusUpdate = { status };
-    if (status === 'paid') {
-      statusUpdate['payment.status'] = 'paid';
-      statusUpdate['payment.paidAt'] = new Date();
-      statusUpdate['inventoryControl.discountedAtCheckout'] =
-        before.inventoryControl?.reservationRequired === true;
-    }
-
-    const upd = await Order.findByIdAndUpdate(
-      req.params.id,
-      { $set: statusUpdate },
-      { new: true }
-    ).lean();
-
-    await OrderEvent.create({
-      orderId: upd._id,
-      type: 'status_changed',
-      message: `Estado: ${before.status || '—'} -> ${status}`,
-      meta: {
-        from: before.status || null,
-        to: status,
-        ip: req.ip,
-        by: req.headers['x-admin-user'] || null,
+    const result = await transitionOrderStatus(
+      {
+        orderId: req.params.id,
+        status: req.body?.status,
+        actor: {
+          id: req.adminUserId || req.user?._id || req.user?.id || null,
+          label:
+            req.adminDisplayName ||
+            req.adminUsername ||
+            req.headers['x-admin-user'] ||
+            'admin',
+          source: 'admin',
+          ip: req.ip,
+        },
       },
-    });
-
-    if (status === 'paid') {
-      try {
-        await processOrderFulfillmentAfterPayment({
-          orderId: upd._id,
-        });
-      } catch (fulfillmentError) {
-        console.error(
-          'No fue posible completar la entrega posterior al pago manual:',
-          fulfillmentError.message
-        );
+      {
+        OrderEventModel: OrderEvent,
       }
-    }
+    );
 
-    const responseOrder =
-      status === 'paid'
-        ? await Order.findById(upd._id).lean()
-        : upd;
-    res.json({ ok: true, order: responseOrder });
+    res.json({
+      ok: true,
+      changed: result.changed,
+      order: result.order,
+      fulfillmentWarning: result.fulfillmentWarning,
+    });
   } catch (e) {
     console.error('PATCH /orders/:id/status', e);
     res.status(e.statusCode || e.status || 500).json({
-      error: 'No se pudo actualizar el estado',
+      error: e.code || 'ORDER_STATUS_TRANSITION_FAILED',
       message: e.message,
       code: e.code || '',
+      details: e.details || undefined,
+      allowed:
+        e.code === 'INVALID_ORDER_STATUS'
+          ? getAllowedOrderStatuses()
+          : undefined,
     });
   }
 });
@@ -3023,9 +2966,17 @@ router.post('/admin/bulk', async (req, res) => {
 
     if (ids.length === 0) return res.status(400).json({ error: 'IDS_REQUIRED' });
 
-    const objIds = ids.map(asObjectId).filter(Boolean);
+    const uniqueIds = Array.from(
+      new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))
+    );
+    const objIds = uniqueIds.map(asObjectId).filter(Boolean);
 
-    if (objIds.length === 0) return res.status(400).json({ error: 'INVALID_IDS' });
+    if (objIds.length !== uniqueIds.length) {
+      return res.status(400).json({
+        error: 'INVALID_IDS',
+        message: 'La selección contiene identificadores de orden inválidos.',
+      });
+    }
 
     const action = req.body?.action || {};
     const type = String(action.type || '').toLowerCase();
@@ -3033,53 +2984,32 @@ router.post('/admin/bulk', async (req, res) => {
     let modified = 0;
     const events = [];
 
-    const STATUS_MAP = new Map([
-      ['pendiente', 'pending'],
-      ['pending', 'pending'],
-      ['procesando', 'processing'],
-      ['processing', 'processing'],
-      ['pagado', 'paid'],
-      ['paid', 'paid'],
-      ['enviado', 'shipped'],
-      ['shipped', 'shipped'],
-      ['cancelado', 'cancelled'],
-      ['cancelada', 'cancelled'],
-      ['cancelled', 'cancelled'],
-      ['canceled', 'cancelled'],
-      ['reembolsado', 'refunded'],
-      ['reembolsada', 'refunded'],
-      ['refunded', 'refunded'],
-    ]);
-
     if (type === 'status') {
-      const raw = String(action.value || '').toLowerCase().trim();
-      const status = STATUS_MAP.get(raw);
-
-      if (!status) return res.status(400).json({ error: 'INVALID_STATUS' });
-
-      const orders = await Order.find({ _id: { $in: objIds } });
-
-      for (const o of orders) {
-        const prev = o.status;
-
-        if (prev === status) continue;
-
-        o.status = status;
-        await o.save();
-
-        modified++;
-
-        events.push({
-          orderId: o._id,
-          type: 'status_changed',
-          message: `Estado: ${prev || '—'} -> ${status}`,
-          meta: {
-            from: prev || null,
-            to: status,
-            by: 'admin_bulk',
+      const result = await processBulkOrderStatusTransitions(
+        {
+          orderIds: objIds,
+          status: action.value,
+          actor: {
+            id:
+              req.adminUserId ||
+              req.user?._id ||
+              req.user?.id ||
+              null,
+            label:
+              req.adminDisplayName ||
+              req.adminUsername ||
+              req.headers['x-admin-user'] ||
+              'admin',
+            source: 'admin_bulk',
+            ip: req.ip,
           },
-        });
-      }
+        },
+        {
+          OrderEventModel: OrderEvent,
+        }
+      );
+
+      return res.status(result.failed > 0 ? 207 : 200).json(result);
     } else if (type === 'tags_add') {
       const tags = normalizeTags(action.value || action.values || []);
 
@@ -3129,7 +3059,12 @@ router.post('/admin/bulk', async (req, res) => {
     res.json({ ok: true, modified });
   } catch (e) {
     console.error('POST /orders/admin/bulk', e);
-    res.status(500).json({ error: 'No se pudieron aplicar las acciones masivas' });
+    res.status(e.statusCode || e.status || 500).json({
+      error: e.code || 'ORDER_BULK_ACTION_FAILED',
+      message:
+        e.message || 'No se pudieron aplicar las acciones masivas',
+      details: e.details || undefined,
+    });
   }
 });
 

@@ -497,6 +497,7 @@ const OrderSchema = new mongoose.Schema(
         'processing',
         'paid',
         'shipped',
+        'delivered',
         'cancelled',
         'canceled',
         'refunded',

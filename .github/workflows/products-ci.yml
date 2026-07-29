@@ -85,6 +85,9 @@ jobs:
       - name: Validar contrato de reembolsos
         run: npm --prefix backend run test:order-refund-contract
 
+      - name: Validar contrato de estados masivos
+        run: npm --prefix backend run test:order-bulk-status-contract
+
       - name: Validar contrato de cierre
         run: npm --prefix backend run test:products-final-closure
 
@@ -149,6 +152,13 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
         run: npm --prefix backend run test:order-refund-inventory
+
+      - name: Validar estados masivos de órdenes
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:order-bulk-status-inventory
 
       - name: Validar archivo lógico
         env:

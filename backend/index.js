@@ -90,9 +90,6 @@ const paymentRoutes = tryRequire('./routes/payments');
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
 const geoRoutes = tryRequire('./routes/geo');
-const OrderModel = tryRequire('./models/Order');
-const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
-const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
@@ -127,55 +124,6 @@ if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
 if (digitalDeliveryRoutes) {
   app.use('/api/digital-deliveries', digitalDeliveryRoutes);
-}
-
-if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
-  app.patch(
-    '/api/orders/:id/status',
-    requireAdminMiddleware,
-    requirePermissionMiddleware('orders:update'),
-    async (req, res, next) => {
-      const rawStatus = String(req.body?.status || '').trim().toLowerCase();
-      const deliveredAliases = ['delivered', 'entregado', 'entregada'];
-
-      if (!deliveredAliases.includes(rawStatus)) {
-        return next();
-      }
-
-      try {
-        const before = await OrderModel.findById(req.params.id).select('status').lean();
-
-        if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
-
-        const updatedOrder = await OrderModel.findByIdAndUpdate(
-          req.params.id,
-          { $set: { status: 'delivered' } },
-          { new: true }
-        ).lean();
-
-        const OrderEventModel = mongoose.models.OrderEvent;
-
-        if (OrderEventModel) {
-          await OrderEventModel.create({
-            orderId: updatedOrder._id,
-            type: 'status_changed',
-            message: `Estado: ${before.status || '-'} -> delivered`,
-            meta: {
-              from: before.status || null,
-              to: 'delivered',
-              ip: req.ip,
-              by: req.headers['x-admin-user'] || null,
-            },
-          });
-        }
-
-        return res.json({ ok: true, order: updatedOrder });
-      } catch (error) {
-        console.error('PATCH /orders/:id/status delivered', error);
-        return res.status(500).json({ error: 'No se pudo actualizar el estado a entregada' });
-      }
-    }
-  );
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);

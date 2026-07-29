@@ -164,7 +164,7 @@ async function recalculateCashSession(sessionOrId, options = {}) {
   const ordersQuery = Order.find({
     source: 'pos',
     cashSession: session._id,
-    status: { $in: ['paid', 'processing', 'shipped'] },
+    status: { $in: ['paid', 'processing', 'shipped', 'delivered'] },
   }).lean();
 
   if (dbSession) ordersQuery.session(dbSession);

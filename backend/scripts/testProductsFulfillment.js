@@ -221,14 +221,24 @@ function run() {
   ok('POS vende virtuales, descuenta el combo y activa su cumplimiento');
 
   const orderRoutes = read('backend/routes/orders.js');
+  const orderStatusService = read(
+    'backend/services/orderStatusTransitionService.js'
+  );
   const permissionMap = read(
     'backend/security/adminRoutePermissionMap.js'
   );
   assert(orderRoutes.includes('reservationRequired'));
-  assert(orderRoutes.includes('confirmInventoryReservation'));
-  assert(orderRoutes.includes('processOrderFulfillmentAfterPayment'));
+  assert(orderRoutes.includes('transitionOrderStatus'));
+  assert(orderStatusService.includes('confirmInventoryReservation'));
+  assert(
+    orderStatusService.includes(
+      'processOrderFulfillmentAfterPayment'
+    )
+  );
   assert(orderRoutes.includes('FULFILLMENT_EMAIL_REQUIRED'));
-  ok('Las órdenes sin stock no reservan y el pago manual completa la entrega');
+  ok(
+    'Las órdenes sin stock no reservan y el pago manual usa la transición segura'
+  );
 
   const servicePanel = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailFulfillmentPanel.jsx'
