@@ -59,6 +59,46 @@ function serializePublicProduct(product) {
     PUBLIC_PRODUCT_PRIVATE_FIELDS
   );
 
+  const primaryCategory =
+    plain.primaryCategoryRef &&
+    typeof plain.primaryCategoryRef === 'object' &&
+    (plain.primaryCategoryRef.name ||
+      plain.primaryCategoryRef.slug)
+      ? plain.primaryCategoryRef
+      : null;
+  const categories = Array.isArray(plain.categoryRefs)
+    ? plain.categoryRefs.filter(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          (item.name || item.slug)
+      )
+    : [];
+  const collections = Array.isArray(plain.collectionRefs)
+    ? plain.collectionRefs.filter(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          (item.name || item.slug)
+      )
+    : [];
+
+  safeProduct.taxonomy = {
+    primaryCategory,
+    categories,
+    collections,
+  };
+  delete safeProduct.primaryCategoryRef;
+  delete safeProduct.categoryRefs;
+  delete safeProduct.collectionRefs;
+
+  if (Array.isArray(plain.commercialFields)) {
+    safeProduct.commercialFields =
+      plain.commercialFields.filter(
+        (field) => field?.public !== false
+      );
+  }
+
   if (Array.isArray(plain.variants)) {
     safeProduct.variants = plain.variants
       .filter((variant) => variant?.active !== false)

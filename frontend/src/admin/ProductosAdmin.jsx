@@ -293,6 +293,14 @@ export default function ProductosAdmin() {
   const [productTypeFilter, setProductTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [inventoryFilter, setInventoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [collectionFilter, setCollectionFilter] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [taxonomyOptions, setTaxonomyOptions] = useState({
+    categories: [],
+    collections: [],
+  });
   const [sort, setSort] = useState('-createdAt');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -317,10 +325,31 @@ export default function ProductosAdmin() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setServerQ(q.trim());
+      setTagFilter(tagInput.trim());
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [q]);
+  }, [q, tagInput]);
+
+  useEffect(() => {
+    api.get('/api/products/admin/taxonomy')
+      .then(({ data }) => {
+        setTaxonomyOptions({
+          categories: Array.isArray(data?.categories)
+            ? data.categories
+            : [],
+          collections: Array.isArray(data?.collections)
+            ? data.collections
+            : [],
+        });
+      })
+      .catch(() => {
+        setTaxonomyOptions({
+          categories: [],
+          collections: [],
+        });
+      });
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -329,6 +358,9 @@ export default function ProductosAdmin() {
     productTypeFilter,
     statusFilter,
     inventoryFilter,
+    categoryFilter,
+    collectionFilter,
+    tagFilter,
     sort,
     limit,
   ]);
@@ -342,6 +374,9 @@ export default function ProductosAdmin() {
     productTypeFilter,
     statusFilter,
     inventoryFilter,
+    categoryFilter,
+    collectionFilter,
+    tagFilter,
     sort,
   ]);
 
@@ -361,6 +396,9 @@ export default function ProductosAdmin() {
             productType: productTypeFilter,
             status: statusFilter,
             inventory: inventoryFilter,
+            categoryId: categoryFilter,
+            collectionId: collectionFilter,
+            tag: tagFilter,
             sort,
           },
         });
@@ -420,6 +458,9 @@ export default function ProductosAdmin() {
     productTypeFilter,
     statusFilter,
     inventoryFilter,
+    categoryFilter,
+    collectionFilter,
+    tagFilter,
     sort,
     reloadToken,
   ]);
@@ -437,6 +478,9 @@ export default function ProductosAdmin() {
     productTypeFilter !== 'all' ||
     statusFilter !== 'all' ||
     inventoryFilter !== 'all' ||
+    Boolean(categoryFilter) ||
+    Boolean(collectionFilter) ||
+    Boolean(tagInput.trim()) ||
     sort !== '-createdAt';
 
   const clearFilters = () => {
@@ -445,6 +489,10 @@ export default function ProductosAdmin() {
     setProductTypeFilter('all');
     setStatusFilter('all');
     setInventoryFilter('all');
+    setCategoryFilter('');
+    setCollectionFilter('');
+    setTagInput('');
+    setTagFilter('');
     setSort('-createdAt');
     setPage(1);
   };
@@ -721,6 +769,42 @@ export default function ProductosAdmin() {
               <X className="h-4 w-4" />
               Limpiar
             </button>
+          </div>
+
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="h-10 w-full px-4 text-xs font-bold"
+              style={styles.input}
+            >
+              <option value="">Todas las categorías</option>
+              {taxonomyOptions.categories.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.path || item.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={collectionFilter}
+              onChange={(event) => setCollectionFilter(event.target.value)}
+              className="h-10 w-full px-4 text-xs font-bold"
+              style={styles.input}
+            >
+              <option value="">Todas las colecciones</option>
+              {taxonomyOptions.collections.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <input
+              value={tagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              className="h-10 w-full px-4 text-xs font-bold"
+              style={styles.input}
+              placeholder="Filtrar por etiqueta exacta"
+            />
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-bold" style={styles.muted}>

@@ -7,6 +7,7 @@ import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
 import ProductDetailView from "../components/product-detail/ProductDetailView";
 import { getColorDisplayName, getColorVisualValue } from "../utils/colorDisplay";
+import { applyProductSeo } from "../lib/productSeo";
 
 function clean(value) {
   return String(value || "").trim();
@@ -314,6 +315,12 @@ export default function ProductDetail() {
       if (!exists) setSelectedColor(publicProduct.colors[0]);
     }
   }, [publicProduct, selectedSize, selectedColor]);
+
+  useEffect(() => {
+    if (!variantAwareProduct) return undefined;
+
+    return applyProductSeo(variantAwareProduct);
+  }, [variantAwareProduct]);
 
   const handleAddToCart = () => {
     if (!variantAwareProduct) return;

@@ -46,6 +46,9 @@ jobs:
       - name: Validar paginación y operaciones masivas
         run: npm --prefix backend run test:products-catalog-operations
 
+      - name: Validar clasificación, SEO y campos comerciales
+        run: npm --prefix backend run test:products-commercial-catalog
+
   products-mongodb:
     name: Productos e inventario
     runs-on: ubuntu-latest
@@ -101,6 +104,11 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
         run: npm --prefix backend run test:products-catalog-scale
+
+      - name: Validar taxonomía y colecciones
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+        run: npm --prefix backend run test:product-taxonomy
 
   products-ui:
     name: Interfaz de productos

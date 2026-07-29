@@ -20,6 +20,8 @@
     "test:products-integrity": "node scripts/testProductsIntegrity.js",
     "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",
     "test:products-catalog-scale": "node scripts/testProductsCatalogScale.js",
+    "test:products-commercial-catalog": "node scripts/testProductsCommercialCatalog.js",
+    "test:product-taxonomy": "node scripts/testProductTaxonomyIntegration.js",
     "test:product-archive": "node scripts/testProductArchiveIntegrity.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",

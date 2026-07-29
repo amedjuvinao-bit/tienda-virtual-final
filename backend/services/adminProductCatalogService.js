@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
+const ProductTaxonomy = require('../models/ProductTaxonomy');
 const {
   PRODUCT_TYPE_VALUES,
 } = require('../lib/products/productUniversalConfig');
@@ -91,6 +92,14 @@ function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function parseOptionalObjectId(value) {
+  const text = String(value || '').trim();
+
+  return mongoose.Types.ObjectId.isValid(text)
+    ? new mongoose.Types.ObjectId(text)
+    : null;
+}
+
 function parseAdminProductCatalogQuery(query = {}) {
   const rawProductType = String(query.productType || 'all')
     .trim()
@@ -115,6 +124,9 @@ function parseAdminProductCatalogQuery(query = {}) {
       query.inventory || query.inventoryFilter,
       INVENTORY_FILTER_VALUES
     ),
+    categoryId: parseOptionalObjectId(query.categoryId),
+    collectionId: parseOptionalObjectId(query.collectionId),
+    tag: String(query.tag || '').trim().slice(0, 80),
     sortKey,
     sort: SORT_OPTIONS[sortKey],
   };
@@ -146,6 +158,36 @@ function buildBaseMatch(options) {
     match.trackInventory = { $ne: true };
   }
 
+  if (options.categoryId) {
+    const categoryAlternatives = [
+      { categoryRefs: options.categoryId },
+      { primaryCategoryRef: options.categoryId },
+    ];
+
+    if (options.categoryName) {
+      categoryAlternatives.push(
+        { category: options.categoryName },
+        { categories: options.categoryName }
+      );
+    }
+
+    match.$and = match.$and || [];
+    match.$and.push({
+      $or: categoryAlternatives,
+    });
+  }
+
+  if (options.collectionId) {
+    match.collectionRefs = options.collectionId;
+  }
+
+  if (options.tag) {
+    match.tags = new RegExp(
+      `^${escapeRegex(options.tag)}$`,
+      'i'
+    );
+  }
+
   if (options.q) {
     const regex = new RegExp(escapeRegex(options.q), 'i');
     const textFilters = [
@@ -154,6 +196,9 @@ function buildBaseMatch(options) {
       { sku: regex },
       { category: regex },
       { categories: regex },
+      { tags: regex },
+      { 'commercialFields.label': regex },
+      { 'commercialFields.value': regex },
       { barcode: regex },
       { 'variants.sku': regex },
       { 'variants.barcode': regex },
@@ -165,7 +210,10 @@ function buildBaseMatch(options) {
       });
     }
 
-    match.$or = textFilters;
+    match.$and = match.$and || [];
+    match.$and.push({
+      $or: textFilters,
+    });
   }
 
   return match;
@@ -438,6 +486,10 @@ function buildDataProjectionStage() {
       productType: 1,
       category: 1,
       categories: 1,
+      primaryCategoryRef: 1,
+      categoryRefs: 1,
+      collectionRefs: 1,
+      tags: 1,
       image: 1,
       price: 1,
       cost: 1,
@@ -510,6 +562,17 @@ async function aggregateCatalog(options) {
 
 async function listAdminProducts(query = {}) {
   const requested = parseAdminProductCatalogQuery(query);
+  if (requested.categoryId) {
+    const category = await ProductTaxonomy.findOne({
+      _id: requested.categoryId,
+      kind: 'category',
+      archivedAt: null,
+    })
+      .select('name')
+      .lean();
+
+    requested.categoryName = category?.name || '';
+  }
   let page = requested.page;
   let result = await aggregateCatalog(requested);
   let pages = Math.max(
@@ -556,6 +619,13 @@ async function listAdminProducts(query = {}) {
       productType: requested.productType,
       status: requested.status,
       inventory: requested.inventory,
+      categoryId: requested.categoryId
+        ? String(requested.categoryId)
+        : '',
+      collectionId: requested.collectionId
+        ? String(requested.collectionId)
+        : '',
+      tag: requested.tag,
       sort: requested.sortKey,
     },
   };

@@ -58,6 +58,24 @@ function normalizeStringArray(arr, max = Infinity) {
   return out;
 }
 
+function getReferenceId(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return String(value._id || value.id || '');
+}
+
+function createCommercialFieldRow(index = 0) {
+  return {
+    key: '',
+    label: '',
+    group: 'General',
+    type: 'text',
+    value: '',
+    public: true,
+    sortOrder: index,
+  };
+}
+
 function toMoney(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.round(number)) : Math.max(0, Math.round(Number(fallback || 0)));
@@ -297,7 +315,18 @@ export default function FormularioProducto() {
   const [originalCategoria, setOriginalCategoria] = useState('');
   const [catOptions, setCatOptions] = useState([]);
   const [categoriesExtra, setCategoriesExtra] = useState([]);
-  const [catInput, setCatInput] = useState('');
+  const [taxonomy, setTaxonomy] = useState({
+    categories: [],
+    collections: [],
+    legacyCategories: [],
+  });
+  const [primaryCategoryId, setPrimaryCategoryId] = useState('');
+  const [categoryIds, setCategoryIds] = useState([]);
+  const [collectionIds, setCollectionIds] = useState([]);
+  const [taxonomyName, setTaxonomyName] = useState('');
+  const [taxonomyKind, setTaxonomyKind] = useState('category');
+  const [taxonomyParent, setTaxonomyParent] = useState('');
+  const [taxonomySaving, setTaxonomySaving] = useState(false);
 
   const [colorsArr, setColorsArr] = useState([]);
   const [colorsText, setColorsText] = useState('');
@@ -326,6 +355,16 @@ export default function FormularioProducto() {
   const [supplierName, setSupplierName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [notes, setNotes] = useState('');
+  const [tags, setTags] = useState([]);
+  const [tagsInput, setTagsInput] = useState('');
+  const [seoTitle, setSeoTitle] = useState('');
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState([]);
+  const [seoKeywordsInput, setSeoKeywordsInput] = useState('');
+  const [seoImage, setSeoImage] = useState('');
+  const [canonicalUrl, setCanonicalUrl] = useState('');
+  const [seoNoIndex, setSeoNoIndex] = useState(false);
+  const [commercialFields, setCommercialFields] = useState([]);
 
   const selectedType = useMemo(() => getProductTypeMeta(productType), [productType]);
   const selectedPreset = useMemo(() => getVariantPresetMeta(variantPreset), [variantPreset]);
@@ -360,6 +399,24 @@ export default function FormularioProducto() {
         setCategoria(p.category || '');
         setOriginalCategoria(p.category || '');
         setCategoriesExtra(normalizeStringArray(p.categories || []));
+        const loadedPrimaryCategoryId = getReferenceId(
+          p.primaryCategoryRef
+        );
+        const loadedCategoryIds = normalizeStringArray(
+          (p.categoryRefs || []).map(getReferenceId)
+        );
+        setPrimaryCategoryId(loadedPrimaryCategoryId);
+        setCategoryIds(
+          loadedPrimaryCategoryId &&
+          !loadedCategoryIds.includes(loadedPrimaryCategoryId)
+            ? [loadedPrimaryCategoryId, ...loadedCategoryIds]
+            : loadedCategoryIds
+        );
+        setCollectionIds(
+          normalizeStringArray(
+            (p.collectionRefs || []).map(getReferenceId)
+          )
+        );
 
         let normalizedColors = [];
         if (Array.isArray(p.colors) && p.colors.length) {
@@ -413,6 +470,28 @@ export default function FormularioProducto() {
         setSupplierName(p.supplier?.name || '');
         setBarcode(p.barcode || '');
         setNotes(p.notes || '');
+        setTags(normalizeStringArray(p.tags || [], 30));
+        setSeoTitle(p.seo?.title || '');
+        setSeoDescription(p.seo?.description || '');
+        setSeoKeywords(
+          normalizeStringArray(p.seo?.keywords || [], 15)
+        );
+        setSeoImage(p.seo?.image || '');
+        setCanonicalUrl(p.seo?.canonicalUrl || '');
+        setSeoNoIndex(p.seo?.noIndex === true);
+        setCommercialFields(
+          Array.isArray(p.commercialFields)
+            ? p.commercialFields.map((field, index) => ({
+                key: field?.key || '',
+                label: field?.label || '',
+                group: field?.group || 'General',
+                type: field?.type || 'text',
+                value: field?.value ?? '',
+                public: field?.public !== false,
+                sortOrder: index,
+              }))
+            : []
+        );
       })
       .catch((err) => {
         if (err?.response?.status === 404) {
@@ -424,20 +503,42 @@ export default function FormularioProducto() {
       });
   }, [id, navigate]);
 
+  const loadTaxonomy = async () => {
+    try {
+      const { data } = await api.get(
+        '/api/products/admin/taxonomy'
+      );
+      const next = {
+        categories: Array.isArray(data?.categories)
+          ? data.categories
+          : [],
+        collections: Array.isArray(data?.collections)
+          ? data.collections
+          : [],
+        legacyCategories: Array.isArray(data?.legacyCategories)
+          ? data.legacyCategories
+          : [],
+      };
+
+      setTaxonomy(next);
+      setCatOptions(
+        normalizeStringArray([
+          ...next.categories.map((item) => item.name),
+          ...next.legacyCategories,
+        ])
+      );
+      return next;
+    } catch (error) {
+      console.error(
+        'No fue posible cargar categorías y colecciones.',
+        error
+      );
+      return null;
+    }
+  };
+
   useEffect(() => {
-    api.get('/api/products', { params: { _: Date.now() } })
-      .then(({ data }) => {
-        const set = new Set();
-        (Array.isArray(data) ? data : []).forEach((p) => {
-          const cats = Array.isArray(p?.categories) && p.categories.length ? p.categories : p?.category ? [p.category] : [];
-          cats.forEach((cat) => {
-            const value = String(cat || '').trim();
-            if (value) set.add(value);
-          });
-        });
-        setCatOptions([...set]);
-      })
-      .catch(() => {});
+    loadTaxonomy();
   }, []);
 
   useEffect(() => {
@@ -552,22 +653,113 @@ export default function FormularioProducto() {
     setSizeInput('');
   };
 
-  const addCatChip = (value) => {
-    const clean = String(value || '').trim();
-    if (!clean) return;
-    setCategoriesExtra((prev) => normalizeStringArray([...prev, clean]));
-  };
-
   const removeCatChip = (value) => {
     setCategoriesExtra((prev) => prev.filter((item) => item.toLowerCase() !== String(value).toLowerCase()));
   };
 
-  const handleCatInputKey = (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addCatChip(catInput);
-      setCatInput('');
+  const selectPrimaryCategory = (value) => {
+    const categoryId = String(value || '');
+    setPrimaryCategoryId(categoryId);
+
+    if (!categoryId) return;
+
+    const selected = taxonomy.categories.find(
+      (item) => item._id === categoryId
+    );
+    if (selected) setCategoria(selected.name);
+    setCategoryIds((previous) =>
+      normalizeStringArray([categoryId, ...previous])
+    );
+  };
+
+  const toggleReference = (value, setter) => {
+    const idValue = String(value || '');
+    if (!idValue) return;
+
+    setter((previous) =>
+      previous.includes(idValue)
+        ? previous.filter((item) => item !== idValue)
+        : [...previous, idValue]
+    );
+  };
+
+  const createTaxonomy = async () => {
+    const name = taxonomyName.trim();
+    if (!name || taxonomySaving) return;
+
+    setTaxonomySaving(true);
+    try {
+      const { data } = await api.post(
+        '/api/products/admin/taxonomy',
+        {
+          kind: taxonomyKind,
+          name,
+          parent:
+            taxonomyKind === 'category'
+              ? taxonomyParent || null
+              : null,
+        }
+      );
+      const created = data?.item;
+      await loadTaxonomy();
+
+      if (created?._id && created.kind === 'category') {
+        setPrimaryCategoryId(created._id);
+        setCategoria(created.name || name);
+        setCategoryIds((previous) =>
+          normalizeStringArray([
+            created._id,
+            ...previous,
+          ])
+        );
+      } else if (created?._id) {
+        setCollectionIds((previous) =>
+          normalizeStringArray([
+            ...previous,
+            created._id,
+          ])
+        );
+      }
+
+      setTaxonomyName('');
+      setTaxonomyParent('');
+      toast.success(
+        taxonomyKind === 'category'
+          ? 'Categoría creada'
+          : 'Colección creada'
+      );
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message ||
+          'No fue posible crear la clasificación.'
+      );
+    } finally {
+      setTaxonomySaving(false);
     }
+  };
+
+  const addTokens = (rawValue, current, setter, maximum) => {
+    const values = String(rawValue || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    setter(normalizeStringArray([...current, ...values], maximum));
+  };
+
+  const updateCommercialField = (index, patch) => {
+    setCommercialFields((previous) =>
+      previous.map((field, fieldIndex) =>
+        fieldIndex === index
+          ? { ...field, ...patch }
+          : field
+      )
+    );
+  };
+
+  const removeCommercialField = (index) => {
+    setCommercialFields((previous) =>
+      previous.filter((_, fieldIndex) => fieldIndex !== index)
+    );
   };
 
   const setCell = (size, color, value) => {
@@ -695,6 +887,9 @@ export default function FormularioProducto() {
       active: activo,
       category: categoria.trim(),
       categories: categoriesNormalized,
+      primaryCategoryId: primaryCategoryId || null,
+      categoryIds: normalizeStringArray(categoryIds),
+      collectionIds: normalizeStringArray(collectionIds),
       productType,
       unitOfMeasure,
       trackInventory,
@@ -723,6 +918,26 @@ export default function FormularioProducto() {
       season: season || '',
       supplier,
       barcode: barcode || '',
+      tags: normalizeStringArray(tags, 30),
+      seo: {
+        title: seoTitle.trim(),
+        description: seoDescription.trim(),
+        keywords: normalizeStringArray(seoKeywords, 15),
+        image: seoImage.trim(),
+        canonicalUrl: canonicalUrl.trim(),
+        noIndex: Boolean(seoNoIndex),
+      },
+      commercialFields: commercialFields
+        .filter((field) => field.label?.trim())
+        .map((field, index) => ({
+          key: field.key || field.label,
+          label: field.label,
+          group: field.group || 'General',
+          type: field.type || 'text',
+          value: field.value ?? '',
+          public: field.public !== false,
+          sortOrder: index,
+        })),
       notes: notes || '',
     };
 
@@ -801,13 +1016,25 @@ export default function FormularioProducto() {
             </div>
 
             <div className="space-y-2">
-              <FieldLabel required>Categoría</FieldLabel>
-              <input list="categoriasOptions" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Tecnología, belleza, servicios" required />
-              <datalist id="categoriasOptions">
-                {[...new Set([...(catOptions || []), ...CATEGORY_SUGGESTIONS])].map((cat) => (
-                  <option key={cat} value={cat} />
+              <FieldLabel required>Categoría principal</FieldLabel>
+              <select value={primaryCategoryId} onChange={(e) => selectPrimaryCategory(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                <option value="">Seleccionar categoría</option>
+                {taxonomy.categories.map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.path || item.name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
+              {!primaryCategoryId && (
+                <>
+                  <input list="categoriasOptions" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Categoría existente sin migrar" required />
+                  <datalist id="categoriasOptions">
+                    {[...new Set([...(catOptions || []), ...CATEGORY_SUGGESTIONS])].map((cat) => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1154,15 +1381,195 @@ export default function FormularioProducto() {
             </div>
           </section>
 
-          <section className="grid gap-5 md:grid-cols-3">
-            <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2"><FieldLabel>Temporada / colección</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2 md:col-span-3">
-              <FieldLabel>Categorías adicionales</FieldLabel>
-              <div className="flex gap-2"><input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} /><button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button></div>
-              {categoriesExtra.length > 0 && (<div className="mt-2 flex flex-wrap gap-2">{categoriesExtra.map((cat) => (<span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>{cat}<button type="button" className="font-black" style={{ color: 'var(--admin-button-soft-text)' }} onClick={() => removeCatChip(cat)}>×</button></span>))}</div>)}
+          <section className="space-y-5 rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Clasificación comercial</h3>
+              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Organiza el producto en categorías jerárquicas, colecciones y etiquetas reutilizables.
+              </p>
             </div>
+
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="space-y-2"><FieldLabel>Temporada</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Primavera 2026" /></div>
+              <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="space-y-3">
+                <FieldLabel>Categorías asociadas</FieldLabel>
+                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  {taxonomy.categories.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Crea la primera categoría en el bloque inferior.</p>
+                  ) : (
+                    taxonomy.categories.map((item) => {
+                      const isPrimary = item._id === primaryCategoryId;
+                      const checked = categoryIds.includes(item._id);
+                      return (
+                        <label key={item._id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                          <span className="flex items-center gap-3">
+                            <input type="checkbox" checked={checked} disabled={isPrimary} onChange={() => toggleReference(item._id, setCategoryIds)} style={{ accentColor: 'var(--admin-primary)' }} />
+                            <span className="text-sm font-semibold">{item.path || item.name}</span>
+                          </span>
+                          {isPrimary && <span className="text-[10px] font-black uppercase" style={{ color: 'var(--admin-primary)' }}>Principal</span>}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <FieldLabel>Colecciones</FieldLabel>
+                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  {taxonomy.collections.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Todavía no hay colecciones creadas.</p>
+                  ) : (
+                    taxonomy.collections.map((item) => (
+                      <label key={item._id} className="flex items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                        <input type="checkbox" checked={collectionIds.includes(item._id)} onChange={() => toggleReference(item._id, setCollectionIds)} style={{ accentColor: 'var(--admin-primary)' }} />
+                        <span className="text-sm font-semibold">{item.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+              <div className="md:col-span-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-primary)' }}>Crear clasificación rápida</p>
+              </div>
+              <select value={taxonomyKind} onChange={(e) => { setTaxonomyKind(e.target.value); setTaxonomyParent(''); }} className="w-full px-3 py-2" style={inputStyle}>
+                <option value="category">Categoría</option>
+                <option value="collection">Colección</option>
+              </select>
+              <input value={taxonomyName} onChange={(e) => setTaxonomyName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Nombre" />
+              {taxonomyKind === 'category' ? (
+                <select value={taxonomyParent} onChange={(e) => setTaxonomyParent(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                  <option value="">Sin categoría superior</option>
+                  {taxonomy.categories.map((item) => <option key={item._id} value={item._id}>{item.path || item.name}</option>)}
+                </select>
+              ) : (
+                <div className="flex items-center px-3 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Las colecciones no dependen de una categoría.</div>
+              )}
+              <button type="button" disabled={taxonomySaving || !taxonomyName.trim()} onClick={createTaxonomy} className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>
+                {taxonomySaving ? 'Creando...' : 'Crear y seleccionar'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Etiquetas</FieldLabel>
+              <div className="flex gap-2">
+                <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ',') {
+                    event.preventDefault();
+                    addTokens(tagsInput, tags, setTags, 30);
+                    setTagsInput('');
+                  }
+                }} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Ej. regalo, destacado, nueva colección" />
+                <button type="button" onClick={() => { addTokens(tagsInput, tags, setTags, 30); setTagsInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>Añadir</button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {tag}
+                      <button type="button" onClick={() => setTags((previous) => previous.filter((item) => item !== tag))}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!primaryCategoryId && categoriesExtra.length > 0 && (
+              <div className="space-y-2">
+                <FieldLabel>Categorías heredadas</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {categoriesExtra.map((cat) => (
+                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {cat}
+                      <button type="button" onClick={() => removeCatChip(cat)}>×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="grid gap-6 rounded-2xl border p-5 lg:grid-cols-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>SEO del producto</h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Controla cómo aparece el producto en buscadores y al compartirlo.</p>
+              </div>
+              <div>
+                <FieldLabel helper={`${seoTitle.length}/70`}>Título SEO</FieldLabel>
+                <input maxLength={70} value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder={titulo || 'Título del producto'} />
+              </div>
+              <div>
+                <FieldLabel helper={`${seoDescription.length}/320`}>Metadescripción</FieldLabel>
+                <textarea maxLength={320} rows={4} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder={descripcion || 'Descripción breve para buscadores'} />
+              </div>
+              <div>
+                <FieldLabel>Palabras clave</FieldLabel>
+                <div className="flex gap-2">
+                  <input value={seoKeywordsInput} onChange={(e) => setSeoKeywordsInput(e.target.value)} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ',') {
+                      event.preventDefault();
+                      addTokens(seoKeywordsInput, seoKeywords, setSeoKeywords, 15);
+                      setSeoKeywordsInput('');
+                    }
+                  }} className="flex-1 px-3 py-2" style={inputStyle} placeholder="separadas por coma" />
+                  <button type="button" onClick={() => { addTokens(seoKeywordsInput, seoKeywords, setSeoKeywords, 15); setSeoKeywordsInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>Añadir</button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">{seoKeywords.map((keyword) => <span key={keyword} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={pillStyle}>{keyword}<button type="button" onClick={() => setSeoKeywords((previous) => previous.filter((item) => item !== keyword))}>×</button></span>)}</div>
+              </div>
+              <div><FieldLabel>Imagen social</FieldLabel><input value={seoImage} onChange={(e) => setSeoImage(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la portada del producto" /></div>
+              <div><FieldLabel>URL canónica</FieldLabel><input type="url" value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la URL actual" /></div>
+              <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                <input type="checkbox" checked={seoNoIndex} onChange={(e) => setSeoNoIndex(e.target.checked)} style={{ accentColor: 'var(--admin-primary)' }} />
+                <span className="text-sm font-semibold">Ocultar este producto de los buscadores</span>
+              </label>
+            </div>
+
+            <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+              <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-primary)' }}>Vista previa</p>
+              <p className="mt-5 text-xl font-semibold" style={{ color: '#1a0dab' }}>{seoTitle || titulo || 'Título del producto'}</p>
+              <p className="mt-1 text-sm" style={{ color: '#188038' }}>{canonicalUrl || `https://tu-tienda.com/producto/${id || 'nuevo-producto'}`}</p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>{seoDescription || descripcion || 'Agrega una descripción clara para mejorar la presentación en los resultados de búsqueda.'}</p>
+              <div className="mt-6 rounded-xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <p className="text-sm font-bold">Metadatos incluidos al publicar</p>
+                <p className="mt-2 text-xs leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Título, descripción, canonical, robots, Open Graph, Twitter Card y datos estructurados de Product.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Campos comerciales personalizados</h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Añade especificaciones propias sin modificar el modelo cada vez.</p>
+              </div>
+              <button type="button" onClick={() => setCommercialFields((previous) => [...previous, createCommercialFieldRow(previous.length)])} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir campo</button>
+            </div>
+
+            {commercialFields.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>Sin campos personalizados.</div>
+            ) : (
+              <div className="space-y-3">
+                {commercialFields.map((field, index) => (
+                  <article key={`${field.key}-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-6" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                    <div className="md:col-span-2"><FieldLabel>Nombre</FieldLabel><input value={field.label} onChange={(e) => updateCommercialField(index, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Material" /></div>
+                    <div><FieldLabel>Grupo</FieldLabel><input value={field.group} onChange={(e) => updateCommercialField(index, { group: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="General" /></div>
+                    <div><FieldLabel>Tipo</FieldLabel><select value={field.type} onChange={(e) => updateCommercialField(index, { type: e.target.value })} className="w-full px-3 py-2" style={inputStyle}><option value="text">Texto</option><option value="number">Número</option><option value="boolean">Sí / No</option><option value="date">Fecha</option><option value="url">Enlace</option></select></div>
+                    <div className="md:col-span-2"><FieldLabel>Valor</FieldLabel>{field.type === 'boolean' ? <select value={field.value} onChange={(e) => updateCommercialField(index, { value: e.target.value })} className="w-full px-3 py-2" style={inputStyle}><option value="true">Sí</option><option value="false">No</option></select> : <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'url' ? 'url' : 'text'} value={field.value} onChange={(e) => updateCommercialField(index, { value: e.target.value })} className="w-full px-3 py-2" style={inputStyle} />}</div>
+                    <div className="flex items-center gap-3 md:col-span-5"><input type="checkbox" checked={field.public !== false} onChange={(e) => updateCommercialField(index, { public: e.target.checked })} style={{ accentColor: 'var(--admin-primary)' }} /><span className="text-sm font-semibold">Visible en la ficha pública</span></div>
+                    <button type="button" onClick={() => removeCommercialField(index)} className="rounded-xl px-3 py-2 text-sm font-semibold" style={actionButtonStyle('danger')}>Quitar</button>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="grid gap-6 lg:grid-cols-2">

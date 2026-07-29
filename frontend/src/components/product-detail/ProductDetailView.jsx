@@ -802,6 +802,15 @@ export default function ProductDetailView({
   const safeColors = Array.isArray(product?.colors) ? product.colors : [];
   const safeSizes = Array.isArray(product?.sizes) ? product.sizes : [];
   const safeReviews = Array.isArray(product?.reviews) ? product.reviews : [];
+  const publicCommercialFields = Array.isArray(
+    product?.commercialFields
+  )
+    ? product.commercialFields.filter(
+        (field) =>
+          field?.public !== false &&
+          String(field?.label || '').trim()
+      )
+    : [];
 
   const styleCfg = cfg?.style || {};
   const visibleTitle = cfg.titleOverride?.trim() || product?.title || "Producto";
@@ -1771,6 +1780,84 @@ export default function ProductDetailView({
                 </div>
               ))}
             </div>
+          )}
+
+          {publicCommercialFields.length > 0 && (
+            <section
+              style={{
+                marginTop: 48,
+                borderRadius: radius,
+                border: `1.5px solid ${borderColor}`,
+                backgroundColor: cardBg,
+                padding: 24,
+              }}
+              className={shadowClass}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  color: textPrimary,
+                  fontSize: 20,
+                  fontWeight: 700,
+                }}
+              >
+                Especificaciones
+              </h2>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 12,
+                  marginTop: 18,
+                }}
+              >
+                {publicCommercialFields.map((field, index) => {
+                  const fieldValue =
+                    field.type === 'boolean'
+                      ? String(field.value) === 'true'
+                        ? 'Sí'
+                        : 'No'
+                      : field.value;
+
+                  return (
+                    <div
+                      key={`${field.group}-${field.key}-${index}`}
+                      style={{
+                        borderRadius: 12,
+                        border: `1px solid ${borderColor}`,
+                        padding: '12px 14px',
+                        backgroundColor: pageBg,
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          color: textSecondary,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                        }}
+                      >
+                        {field.group || 'General'}
+                      </p>
+                      <p
+                        style={{
+                          margin: '5px 0 0',
+                          color: textPrimary,
+                          fontSize: 14,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <strong>{field.label}:</strong>{' '}
+                        {fieldValue || '—'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           {showReviewsSection && (

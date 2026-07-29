@@ -20,6 +20,12 @@ const {
   normalizeProductVariants,
   normalizeStringArray,
 } = require('../lib/products/productVariantConfig');
+const {
+  COMMERCIAL_FIELD_TYPES,
+  normalizeCommercialFields,
+  normalizeSeo,
+  normalizeStringArray: normalizeCommercialStringArray,
+} = require('../lib/products/productCommercialConfig');
 
 // ==== Subesquemas opcionales ====
 const InventoryItemSchema = new mongoose.Schema(
@@ -129,6 +135,45 @@ const DimensionsSchema = new mongoose.Schema(
 
 const SupplierSchema = new mongoose.Schema(
   { name: { type: String, trim: true, default: '' } },
+  { _id: false }
+);
+
+const ProductSeoSchema = new mongoose.Schema(
+  {
+    title: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' },
+    keywords: {
+      type: [String],
+      default: [],
+      set: (values) =>
+        normalizeCommercialStringArray(values, 15, 60),
+    },
+    image: { type: String, trim: true, default: '' },
+    canonicalUrl: { type: String, trim: true, default: '' },
+    noIndex: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const ProductCommercialFieldSchema = new mongoose.Schema(
+  {
+    key: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      required: true,
+    },
+    label: { type: String, trim: true, required: true },
+    group: { type: String, trim: true, default: 'General' },
+    type: {
+      type: String,
+      enum: COMMERCIAL_FIELD_TYPES,
+      default: 'text',
+    },
+    value: { type: String, default: '' },
+    public: { type: Boolean, default: true },
+    sortOrder: { type: Number, default: 0, min: 0 },
+  },
   { _id: false }
 );
 
@@ -264,6 +309,50 @@ const productSchema = new mongoose.Schema(
       set: normalizeUniqueStringArray,
     },
 
+    // Taxonomía profesional. Los campos de texto anteriores se conservan
+    // como instantánea compatible para catálogo, cupones e informes.
+    primaryCategoryRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductTaxonomy',
+      default: null,
+      index: true,
+    },
+    categoryRefs: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'ProductTaxonomy',
+        },
+      ],
+      default: [],
+    },
+    collectionRefs: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'ProductTaxonomy',
+        },
+      ],
+      default: [],
+    },
+
+    tags: {
+      type: [String],
+      default: [],
+      set: (values) =>
+        normalizeCommercialStringArray(values, 30, 80),
+    },
+
+    seo: {
+      type: ProductSeoSchema,
+      default: () => ({}),
+    },
+
+    commercialFields: {
+      type: [ProductCommercialFieldSchema],
+      default: [],
+    },
+
     // inventario/estado heredado. La fuente profesional es InventoryStock.
     stock: { type: Number, default: 0, min: 0 },
 
@@ -321,6 +410,9 @@ const productSchema = new mongoose.Schema(
 
 // ===== Índices =====
 productSchema.index({ categories: 1 });
+productSchema.index({ categoryRefs: 1 });
+productSchema.index({ collectionRefs: 1 });
+productSchema.index({ tags: 1 });
 productSchema.index({ productType: 1, active: 1 });
 productSchema.index({ trackInventory: 1, active: 1 });
 productSchema.index({ archivedAt: 1, active: 1 });
@@ -465,6 +557,19 @@ productSchema.pre('validate', async function (next) {
     this.productType = normalizeProductType(this.productType);
     this.unitOfMeasure = normalizeUnitOfMeasure(this.unitOfMeasure);
     this.variantPreset = normalizeVariantPreset(this.variantPreset);
+    this.tags = normalizeCommercialStringArray(
+      this.tags,
+      30,
+      80
+    );
+    this.seo = normalizeSeo(this.seo, {
+      title: this.title,
+      description: this.description,
+      image: this.image,
+    });
+    this.commercialFields = normalizeCommercialFields(
+      this.commercialFields
+    );
 
     if (this.trackInventory === undefined || this.trackInventory === null) {
       this.trackInventory = shouldTrackInventory(this.productType);

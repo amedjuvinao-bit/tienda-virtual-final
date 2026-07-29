@@ -32,6 +32,35 @@ const {
   normalizeProductIds,
   updateProductsInBulk,
 } = require('../services/adminProductCatalogService');
+const {
+  ProductTaxonomyInputError,
+  archiveProductTaxonomy,
+  createProductTaxonomy,
+  listProductTaxonomies,
+  resolveProductTaxonomyPayload,
+  serializeTaxonomies,
+  updateProductTaxonomy,
+} = require('../services/productTaxonomyService');
+const {
+  normalizeCommercialFields,
+  normalizeSeo,
+  normalizeStringArray: normalizeCommercialStringArray,
+} = require('../lib/products/productCommercialConfig');
+
+const PUBLIC_TAXONOMY_POPULATE = [
+  {
+    path: 'primaryCategoryRef',
+    select: 'kind name slug description image parent',
+  },
+  {
+    path: 'categoryRefs',
+    select: 'kind name slug description image parent',
+  },
+  {
+    path: 'collectionRefs',
+    select: 'kind name slug description image',
+  },
+];
 
 // ✅ Normaliza arrays de strings (trim + de-dup + quita vacíos)
 function sanitizeStrArray(arr) {
@@ -217,6 +246,7 @@ router.get('/', async (req, res) => {
   try {
     const products = await Product.find(buildPublicProductFilter())
       .select(PUBLIC_PRODUCT_PROJECTION)
+      .populate(PUBLIC_TAXONOMY_POPULATE)
       .lean();
 
     res.json(products.map(serializePublicProduct));
@@ -240,6 +270,7 @@ router.get('/slug/:slug', async (req, res) => {
       buildPublicProductFilter({ slug: String(slug).trim() })
     )
       .select(PUBLIC_PRODUCT_PROJECTION)
+      .populate(PUBLIC_TAXONOMY_POPULATE)
       .lean();
 
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
@@ -249,6 +280,138 @@ router.get('/slug/:slug', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener el producto' });
   }
 });
+
+function sendTaxonomyError(res, error, fallbackMessage) {
+  if (error instanceof ProductTaxonomyInputError) {
+    return res.status(error.status || 400).json({
+      ok: false,
+      message: error.message,
+    });
+  }
+
+  if (error?.name === 'ValidationError') {
+    return res.status(400).json({
+      ok: false,
+      message: error.message,
+    });
+  }
+
+  console.error(fallbackMessage, error.message);
+  return res.status(500).json({
+    ok: false,
+    message: 'No fue posible procesar la clasificación.',
+  });
+}
+
+// GET /api/products/admin/taxonomy
+// Catálogo jerárquico usado por el formulario administrativo.
+router.get(
+  '/admin/taxonomy',
+  requireAdmin,
+  requirePermission('products:view'),
+  async (req, res) => {
+    try {
+      const result = await listProductTaxonomies({
+        includeInactive:
+          req.query.includeInactive === '1' ||
+          req.query.includeInactive === 'true',
+      });
+
+      return res.json({
+        ok: true,
+        ...result,
+      });
+    } catch (error) {
+      return sendTaxonomyError(
+        res,
+        error,
+        'Error al listar categorías y colecciones:'
+      );
+    }
+  }
+);
+
+// POST /api/products/admin/taxonomy
+// Crea categorías, subcategorías o colecciones sin salir del producto.
+router.post(
+  '/admin/taxonomy',
+  requireAdmin,
+  requirePermission('products:update'),
+  async (req, res) => {
+    try {
+      const created = await createProductTaxonomy(req.body || {});
+      const catalog = await listProductTaxonomies({
+        includeInactive: true,
+      });
+      const item = [
+        ...catalog.categories,
+        ...catalog.collections,
+      ].find((entry) => entry._id === String(created._id));
+
+      return res.status(201).json({
+        ok: true,
+        item:
+          item ||
+          serializeTaxonomies([created.toObject()])[0],
+      });
+    } catch (error) {
+      return sendTaxonomyError(
+        res,
+        error,
+        'Error al crear clasificación:'
+      );
+    }
+  }
+);
+
+router.put(
+  '/admin/taxonomy/:taxonomyId',
+  requireAdmin,
+  requirePermission('products:update'),
+  async (req, res) => {
+    try {
+      const updated = await updateProductTaxonomy(
+        req.params.taxonomyId,
+        req.body || {}
+      );
+
+      return res.json({
+        ok: true,
+        item: serializeTaxonomies([updated.toObject()])[0],
+      });
+    } catch (error) {
+      return sendTaxonomyError(
+        res,
+        error,
+        'Error al actualizar clasificación:'
+      );
+    }
+  }
+);
+
+router.delete(
+  '/admin/taxonomy/:taxonomyId',
+  requireAdmin,
+  requirePermission('products:update'),
+  async (req, res) => {
+    try {
+      const archived = await archiveProductTaxonomy(
+        req.params.taxonomyId
+      );
+
+      return res.json({
+        ok: true,
+        archivedAt: archived.archivedAt,
+      });
+    } catch (error) {
+      return sendTaxonomyError(
+        res,
+        error,
+        'Error al retirar clasificación:'
+      );
+    }
+  }
+);
 
 // ✅ GET /api/products/admin/reviews
 //    PROTEGIDO: solo admin
@@ -515,6 +678,9 @@ router.post(
         season,
         supplier,
         barcode,
+        tags,
+        seo,
+        commercialFields,
         notes,
       } = req.body;
 
@@ -525,6 +691,8 @@ router.post(
       }
 
       const productConfig = buildProductConfigPayload(req.body);
+      const taxonomyPayload =
+        await resolveProductTaxonomyPayload(req.body);
       const preInv = productConfig.trackInventory ? sanitizeInventory(inventory) : [];
       const variantsProvided =
         productConfig.trackInventory &&
@@ -579,8 +747,16 @@ router.post(
           : Array.isArray(colors)
             ? colors.slice(0, 10)
             : [],
-        category: category ?? undefined,
-        categories: sanitizeStrArray(categories),
+        category:
+          taxonomyPayload?.category ?? category ?? undefined,
+        categories:
+          taxonomyPayload?.categories ??
+          sanitizeStrArray(categories),
+        primaryCategoryRef:
+          taxonomyPayload?.primaryCategoryRef || null,
+        categoryRefs: taxonomyPayload?.categoryRefs || [],
+        collectionRefs:
+          taxonomyPayload?.collectionRefs || [],
 
         sizes: variantsProvided
           ? variantLegacy.sizes
@@ -633,6 +809,18 @@ router.post(
             ? { name: String(supplier.name || '').trim() }
             : undefined,
         barcode: barcode ?? '',
+        tags: normalizeCommercialStringArray(
+          tags,
+          30,
+          80
+        ),
+        seo: normalizeSeo(seo, {
+          title,
+          description,
+          image,
+        }),
+        commercialFields:
+          normalizeCommercialFields(commercialFields),
         notes: notes ?? '',
       });
 
@@ -822,6 +1010,7 @@ router.get('/:id', async (req, res) => {
       buildPublicProductFilter(identityFilter)
     )
       .select(PUBLIC_PRODUCT_PROJECTION)
+      .populate(PUBLIC_TAXONOMY_POPULATE)
       .lean();
 
     if (!product) {
@@ -897,6 +1086,9 @@ router.put(
         season,
         supplier,
         barcode,
+        tags,
+        seo,
+        commercialFields,
         notes,
       } = req.body;
 
@@ -908,6 +1100,8 @@ router.put(
         !(typeof v === 'string' && v.trim() === '');
 
       const productConfig = buildProductConfigPayload(req.body, prod.productType || 'physical');
+      const taxonomyPayload =
+        await resolveProductTaxonomyPayload(req.body, prod);
       const hadConfiguredVariants =
         Array.isArray(prod.variants) && prod.variants.length > 0;
 
@@ -965,9 +1159,21 @@ router.put(
         prod.images = Array.isArray(images) ? images.slice(0, 5) : [];
       }
 
-      if (hasField('category')) prod.category = String(category || '').trim();
-      if (hasField('categories')) {
-        prod.categories = sanitizeStrArray(categories);
+      if (taxonomyPayload) {
+        prod.primaryCategoryRef =
+          taxonomyPayload.primaryCategoryRef;
+        prod.categoryRefs = taxonomyPayload.categoryRefs;
+        prod.collectionRefs =
+          taxonomyPayload.collectionRefs;
+        prod.category = taxonomyPayload.category;
+        prod.categories = taxonomyPayload.categories;
+      } else {
+        if (hasField('category')) {
+          prod.category = String(category || '').trim();
+        }
+        if (hasField('categories')) {
+          prod.categories = sanitizeStrArray(categories);
+        }
       }
 
       if (hasField('features')) {
@@ -1062,6 +1268,24 @@ router.put(
       }
 
       if (hasField('barcode')) prod.barcode = String(barcode || '');
+      if (hasField('tags')) {
+        prod.tags = normalizeCommercialStringArray(
+          tags,
+          30,
+          80
+        );
+      }
+      if (hasField('seo')) {
+        prod.seo = normalizeSeo(seo, {
+          title: prod.title,
+          description: prod.description,
+          image: prod.image,
+        });
+      }
+      if (hasField('commercialFields')) {
+        prod.commercialFields =
+          normalizeCommercialFields(commercialFields);
+      }
       if (hasField('notes')) prod.notes = String(notes || '');
 
       // ✅ INVENTARIO: replace (por defecto) o merge
