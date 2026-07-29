@@ -26,8 +26,14 @@ const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const {
   createInventoryReservation,
+  confirmInventoryReservation,
+  releaseInventoryReservation,
+  expandReservableItems,
   expireInventoryReservations,
 } = require('../services/inventoryReservationService');
+const {
+  processOrderFulfillmentAfterPayment,
+} = require('../services/orderFulfillmentService');
 const couponService = require('../services/couponService');
 const { buildOrderQuote } = require('../services/orderPricingService');
 const {
@@ -140,6 +146,36 @@ function getOrderCustomerEmail(orderData = {}) {
   )
     .trim()
     .toLowerCase();
+}
+
+function isValidDeliveryEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    String(value || '').trim().toLowerCase()
+  );
+}
+
+function orderNeedsElectronicDelivery(items = []) {
+  return (Array.isArray(items) ? items : []).some((item) => {
+    const productType = String(
+      item?.productType || ''
+    ).trim().toLowerCase();
+
+    if (['digital', 'service'].includes(productType)) {
+      return true;
+    }
+
+    if (productType !== 'bundle') return false;
+
+    return (
+      item?.fulfillmentSnapshot?.bundle?.components || []
+    ).some((component) =>
+      ['digital', 'service'].includes(
+        String(component?.productType || '')
+          .trim()
+          .toLowerCase()
+      )
+    );
+  });
 }
 
 function buildOrderCouponSnapshot(quote = {}) {
@@ -1505,7 +1541,141 @@ router.get('/:id/thanks', async (req, res) => {
 /* ============================
  * GET /api/orders/:id
  * ============================ */
-router.get('/:id', async (req, res) => {
+router.patch(
+  '/:id/fulfillment/services/:serviceId',
+  requireAdmin,
+  requirePermission('orders:update'),
+  async (req, res) => {
+    try {
+      const allowedStatuses = new Set([
+        'awaiting_scheduling',
+        'scheduled',
+        'in_progress',
+        'completed',
+        'cancelled',
+      ]);
+      const status = String(req.body?.status || '')
+        .trim()
+        .toLowerCase();
+
+      if (!allowedStatuses.has(status)) {
+        return res.status(400).json({
+          message: 'Estado de servicio inválido.',
+          allowed: [...allowedStatuses],
+        });
+      }
+
+      const order = await Order.findById(req.params.id).select(
+        '+fulfillment.services.bookingUrl +fulfillment.services.internalInstructions'
+      );
+      if (!order) {
+        return res.status(404).json({
+          message: 'Orden no encontrada.',
+        });
+      }
+
+      const service = order.fulfillment?.services?.id(
+        req.params.serviceId
+      );
+      if (!service) {
+        return res.status(404).json({
+          message: 'Prestación de servicio no encontrada.',
+        });
+      }
+
+      let scheduledAt = service.scheduledAt || null;
+      if (req.body?.scheduledAt) {
+        const parsed = new Date(req.body.scheduledAt);
+        if (Number.isNaN(parsed.getTime())) {
+          return res.status(400).json({
+            message: 'La fecha programada no es válida.',
+          });
+        }
+        scheduledAt = parsed;
+      }
+
+      service.status = status;
+      service.scheduledAt =
+        ['scheduled', 'in_progress', 'completed'].includes(status)
+          ? scheduledAt || new Date()
+          : scheduledAt;
+      service.completedAt =
+        status === 'completed'
+          ? service.completedAt || new Date()
+          : null;
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'notes')) {
+        service.notes = String(req.body.notes || '')
+          .trim()
+          .slice(0, 2000);
+      }
+
+      const services = order.fulfillment?.services || [];
+      const completedServices = services.filter(
+        (item) => item.status === 'completed'
+      ).length;
+      const activeServices = services.filter(
+        (item) => item.status !== 'cancelled'
+      );
+      const allServicesCompleted =
+        activeServices.length > 0 &&
+        activeServices.every(
+          (item) => item.status === 'completed'
+        );
+      const hasShipment = (order.items || []).some(
+        (item) => item.requiresShipping !== false
+      );
+
+      if (allServicesCompleted && !hasShipment) {
+        order.fulfillment.status = 'delivered';
+        order.fulfillmentStatus = 'delivered';
+      } else if (completedServices > 0) {
+        order.fulfillment.status = 'partially_delivered';
+        order.fulfillmentStatus = 'partially_delivered';
+      } else {
+        order.fulfillment.status = 'action_required';
+        if (!hasShipment) order.fulfillmentStatus = 'processing';
+      }
+
+      await order.save();
+      await OrderEvent.create({
+        orderId: order._id,
+        type: 'system',
+        message: `Servicio ${service.title || service._id}: ${status}`,
+        meta: {
+          serviceId: String(service._id),
+          status,
+          scheduledAt: service.scheduledAt || null,
+          by: req.adminUserId || null,
+        },
+      });
+
+      return res.json({
+        ok: true,
+        fulfillmentStatus: order.fulfillmentStatus,
+        fulfillment: {
+          status: order.fulfillment.status,
+          notificationStatus:
+            order.fulfillment.notificationStatus,
+        },
+        service,
+      });
+    } catch (error) {
+      console.error(
+        'PATCH /orders/:id/fulfillment/services/:serviceId',
+        error
+      );
+      return res.status(500).json({
+        message: 'No fue posible actualizar el servicio.',
+      });
+    }
+  }
+);
+
+router.get(
+  '/:id',
+  requireAdmin,
+  requirePermission('orders:view'),
+  async (req, res) => {
   try {
     const o = await Order.findById(req.params.id).lean();
 
@@ -1523,7 +1693,8 @@ router.get('/:id', async (req, res) => {
   } catch {
     res.status(400).json({ error: 'ID inválido' });
   }
-});
+  }
+);
 
 /* ============================
  * PATCH /api/orders/:id/status
@@ -1561,13 +1732,47 @@ router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), as
       });
     }
 
-    const before = await Order.findById(req.params.id).select('status').lean();
+    const before = await Order.findById(req.params.id)
+      .select('status orderNumber payment inventoryControl')
+      .lean();
 
     if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
 
+    if (
+      status === 'paid' &&
+      before.inventoryControl?.reservationRequired === true &&
+      before.orderNumber
+    ) {
+      await confirmInventoryReservation(before.orderNumber, {
+        order: before._id,
+        orderNumber: before.orderNumber,
+        paymentReference: before.payment?.reference || '',
+        paymentTransactionId: before.payment?.transactionId || '',
+      });
+    }
+
+    if (
+      status === 'cancelled' &&
+      before.inventoryControl?.reservationRequired === true &&
+      before.orderNumber
+    ) {
+      await releaseInventoryReservation(before.orderNumber, {
+        status: 'cancelled',
+        releaseReason: 'Orden cancelada desde administración',
+      });
+    }
+
+    const statusUpdate = { status };
+    if (status === 'paid') {
+      statusUpdate['payment.status'] = 'paid';
+      statusUpdate['payment.paidAt'] = new Date();
+      statusUpdate['inventoryControl.discountedAtCheckout'] =
+        before.inventoryControl?.reservationRequired === true;
+    }
+
     const upd = await Order.findByIdAndUpdate(
       req.params.id,
-      { $set: { status } },
+      { $set: statusUpdate },
       { new: true }
     ).lean();
 
@@ -1583,10 +1788,31 @@ router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), as
       },
     });
 
-    res.json({ ok: true, order: upd });
+    if (status === 'paid') {
+      try {
+        await processOrderFulfillmentAfterPayment({
+          orderId: upd._id,
+        });
+      } catch (fulfillmentError) {
+        console.error(
+          'No fue posible completar la entrega posterior al pago manual:',
+          fulfillmentError.message
+        );
+      }
+    }
+
+    const responseOrder =
+      status === 'paid'
+        ? await Order.findById(upd._id).lean()
+        : upd;
+    res.json({ ok: true, order: responseOrder });
   } catch (e) {
     console.error('PATCH /orders/:id/status', e);
-    res.status(500).json({ error: 'No se pudo actualizar el estado' });
+    res.status(e.statusCode || e.status || 500).json({
+      error: 'No se pudo actualizar el estado',
+      message: e.message,
+      code: e.code || '',
+    });
   }
 });
 
@@ -1959,6 +2185,26 @@ router.post('/', rateLimit, async (req, res) => {
       }
 
       const pricing = quote.pricing;
+      if (
+        orderNeedsElectronicDelivery(pricing.items) &&
+        !isValidDeliveryEmail(getOrderCustomerEmail(cleaned))
+      ) {
+        throw Object.assign(
+          new Error(
+            'Los productos digitales y servicios necesitan un correo válido para completar la entrega.'
+          ),
+          {
+            code: 'FULFILLMENT_EMAIL_REQUIRED',
+            statusCode: 400,
+          }
+        );
+      }
+
+      const reservableItems = await expandReservableItems(
+        pricing.items,
+        { session }
+      );
+      const reservationRequired = reservableItems.length > 0;
       const pricingSnapshot = buildPricingSnapshot(pricing);
       const couponSnapshot = buildOrderCouponSnapshot(quote);
       const discountSnapshot = buildOrderDiscountSnapshot(quote);
@@ -2022,6 +2268,8 @@ router.post('/', rateLimit, async (req, res) => {
         source: orderSource,
 
         inventoryControl: {
+          reservationRequired,
+          reservationId: null,
           discountedAtCheckout: false,
           restockedOnFailure: false,
           restockedAt: null,
@@ -2033,8 +2281,9 @@ router.post('/', rateLimit, async (req, res) => {
       created = await Order.create([{ ...base }], { session });
       created = created[0];
 
-      inventoryReservation = await createInventoryReservation(
-        {
+      if (reservationRequired) {
+        inventoryReservation = await createInventoryReservation(
+          {
           sessionId: cleaned.sessionId,
           order: created._id,
           orderNumber: created.orderNumber,
@@ -2063,9 +2312,14 @@ router.post('/', rateLimit, async (req, res) => {
             orderBranchSnapshot: orderBranchData.branchSnapshot,
           },
           notes: 'Reserva automática creada al generar la orden online.',
-        },
-        { session }
-      );
+          },
+          { session }
+        );
+
+        created.inventoryControl.reservationId =
+          inventoryReservation?._id || null;
+        await created.save({ session });
+      }
 
       if (quote.couponValidation?.valid && created.coupon?.coupon) {
         const redemption = await couponService.recordCouponRedemption(

@@ -119,11 +119,15 @@ const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
+const digitalDeliveryRoutes = tryRequire('./routes/digitalDeliveries');
 
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
+if (digitalDeliveryRoutes) {
+  app.use('/api/digital-deliveries', digitalDeliveryRoutes);
+}
 
 if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
   app.patch(

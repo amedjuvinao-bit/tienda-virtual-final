@@ -223,6 +223,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'PATCH',
+    path: '/api/orders/:id/fulfillment/services/:serviceId',
+    permission: 'orders:update',
+    description: 'Actualizar la programación y estado de una prestación.',
+    audit: true,
+  },
+  {
+    method: 'PATCH',
     path: '/api/orders/:id/printed',
     permission: 'orders:mark_printed',
     description: 'Marcar o desmarcar orden como impresa.',

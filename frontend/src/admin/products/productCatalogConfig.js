@@ -22,8 +22,8 @@ export const PRODUCT_TYPES = [
   {
     value: 'bundle',
     label: 'Combo / kit',
-    description: 'Agrupa varios productos o unidades. Puede manejar inventario propio.',
-    defaultTrackInventory: true,
+    description: 'Agrupa productos existentes y descuenta automáticamente sus componentes.',
+    defaultTrackInventory: false,
   },
   {
     value: 'custom',
@@ -139,7 +139,9 @@ export function getVariantPresetMeta(value) {
 }
 
 export function shouldTrackInventoryByType(productType) {
-  return getProductTypeMeta(productType).defaultTrackInventory === true;
+  const type = getProductTypeMeta(productType);
+  return !['digital', 'service', 'bundle'].includes(type.value) &&
+    type.defaultTrackInventory === true;
 }
 
 export function formatProductTypeLabel(value) {

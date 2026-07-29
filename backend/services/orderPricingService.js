@@ -9,6 +9,12 @@ const {
   buildVariantKey,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
+const {
+  getPublicFulfillmentView,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  assertBundlePurchasable,
+} = require('./productBundleService');
 
 const MONEY_FACTOR = 100;
 
@@ -92,13 +98,17 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
   }
 
   let query = ProductModel.find({ _id: { $in: productIds } })
-    .select('title price image images sku barcode category categories variants visible active');
+    .select(
+      'title price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+    );
 
   if (session && typeof query.session === 'function') query = query.session(session);
   const products = await query.lean();
   const productMap = new Map(products.map((product) => [String(product._id), product]));
 
-  return sourceItems.map((item) => {
+  const resolvedItems = [];
+
+  for (const item of sourceItems) {
     const productId = readProductId(item);
     const product = productMap.get(productId);
 
@@ -142,8 +152,19 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       product.category,
       ...(Array.isArray(product.categories) ? product.categories : []),
     ]);
+    let bundleComponents = [];
 
-    return {
+    if (product.productType === 'bundle') {
+      bundleComponents = await assertBundlePurchasable(product, {
+        session,
+        ProductModel,
+      });
+      product.bundleComponents = bundleComponents;
+    }
+
+    const fulfillment = getPublicFulfillmentView(product);
+
+    resolvedItems.push({
       product: product._id,
       productId,
       title: clean(product.title || item.title, 160),
@@ -156,13 +177,19 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       variantBarcode: clean(commercial?.barcode || product.barcode, 120),
       category: categories[0] || '',
       categories,
+      productType: fulfillment.productType,
+      requiresShipping: fulfillment.requiresShipping,
+      fulfillmentKind: fulfillment.kind,
+      fulfillmentSnapshot: fulfillment,
       quantity,
       qty: quantity,
       price: unitPrice,
       unitPrice,
       priceNumber: unitPrice,
-    };
-  });
+    });
+  }
+
+  return resolvedItems;
 }
 
 function normalizeTaxConfig(raw = {}) {
@@ -180,7 +207,16 @@ function normalizeTaxConfig(raw = {}) {
   };
 }
 
-function resolveShippingAmount({ settings = {}, customer = {}, subtotal = 0 } = {}) {
+function resolveShippingAmount({
+  settings = {},
+  customer = {},
+  subtotal = 0,
+  items = [],
+} = {}) {
+  const requiresShipping = (Array.isArray(items) ? items : [])
+    .some((item) => item?.requiresShipping !== false);
+  if (!requiresShipping) return 0;
+
   const deliveryType = clean(customer.deliveryType || 'envio', 30).toLowerCase();
   if (deliveryType === 'retiro') return 0;
 
@@ -373,7 +409,12 @@ async function buildOrderQuote(input = {}, options = {}) {
     items.reduce((sum, item) => sum + item.quantity * item.price, 0)
   );
   const customer = input.customer || {};
-  const originalShipping = resolveShippingAmount({ settings, customer, subtotal });
+  const originalShipping = resolveShippingAmount({
+    settings,
+    customer,
+    subtotal,
+    items,
+  });
   const couponCode = couponService.normalizeCode(
     input.couponCode || input?.coupon?.code || input.discountCode || ''
   );

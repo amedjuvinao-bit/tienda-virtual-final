@@ -7,6 +7,9 @@ const Order = require('../models/Order');
 const { createPosSale, preparePosSalePreview, createPosError } = require('./adminPosService');
 const { recalculateCashSession } = require('./cashSessionService');
 const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
+const {
+  processOrderFulfillmentAfterPayment,
+} = require('./orderFulfillmentService');
 
 function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -141,6 +144,28 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
 
   if (!externalSession && result?.cashSession?._id) {
     result.cashSession = await recalculateCashSession(result.cashSession._id);
+  }
+
+  if (!externalSession) {
+    try {
+      await processOrderFulfillmentAfterPayment({
+        orderId: result.order._id,
+        paymentProvider: 'pos',
+        transaction: {
+          payment_method_type:
+            result.order.payment?.methodType || 'pos',
+          payment_method_name:
+            result.order.payment?.methodLabel || 'Venta física',
+          payment_method: result.order.payment?.method || 'pos',
+          rawMethod: result.order.payment?.rawMethod || {},
+        },
+      });
+    } catch (error) {
+      console.error(
+        '[posCashSaleService] Error preparando cumplimiento POS:',
+        error.message
+      );
+    }
   }
 
   if (generateElectronicInvoice) {

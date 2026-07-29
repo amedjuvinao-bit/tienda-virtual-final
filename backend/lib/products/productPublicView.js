@@ -10,6 +10,10 @@ const PUBLIC_PRODUCT_PRIVATE_FIELDS = Object.freeze([
   'warehouseLocation',
   'archivedAt',
   'archivedBy',
+  'digitalDelivery.assetUrl',
+  'digitalDelivery.customerMessage',
+  'serviceDelivery.bookingUrl',
+  'serviceDelivery.internalInstructions',
   '__v',
 ]);
 
@@ -39,9 +43,23 @@ function buildPublicProductFilter(criteria = {}) {
   };
 }
 
+const {
+  getPublicFulfillmentView,
+} = require('./productFulfillmentConfig');
+
 function removeFields(target, fields) {
   for (const field of fields) {
-    delete target[field];
+    const parts = String(field).split('.');
+    let current = target;
+
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      current = current?.[parts[index]];
+      if (!current || typeof current !== 'object') break;
+    }
+
+    if (current && typeof current === 'object') {
+      delete current[parts[parts.length - 1]];
+    }
   }
   return target;
 }
@@ -55,7 +73,19 @@ function serializePublicProduct(product) {
       : { ...product };
 
   const safeProduct = removeFields(
-    { ...plain },
+    {
+      ...plain,
+      digitalDelivery:
+        plain.digitalDelivery &&
+        typeof plain.digitalDelivery === 'object'
+          ? { ...plain.digitalDelivery }
+          : plain.digitalDelivery,
+      serviceDelivery:
+        plain.serviceDelivery &&
+        typeof plain.serviceDelivery === 'object'
+          ? { ...plain.serviceDelivery }
+          : plain.serviceDelivery,
+    },
     PUBLIC_PRODUCT_PRIVATE_FIELDS
   );
 
@@ -106,6 +136,14 @@ function serializePublicProduct(product) {
         removeFields({ ...variant }, PUBLIC_VARIANT_PRIVATE_FIELDS)
       );
   }
+
+  safeProduct.fulfillment =
+    getPublicFulfillmentView(safeProduct);
+  safeProduct.requiresShipping =
+    safeProduct.fulfillment.requiresShipping;
+  delete safeProduct.digitalDelivery;
+  delete safeProduct.serviceDelivery;
+  delete safeProduct.bundleComponents;
 
   return safeProduct;
 }

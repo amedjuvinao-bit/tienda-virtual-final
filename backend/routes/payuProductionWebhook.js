@@ -429,6 +429,16 @@ async function restockLegacyOrderIfNeeded(order, session) {
 async function syncReservationAfterPayU({ order, mapped, reference, transactionId, session }) {
   const paymentStatus = String(mapped.paymentStatus || '').trim().toLowerCase();
 
+  if (order.inventoryControl?.reservationRequired === false) {
+    order.inventoryControl = {
+      ...(order.inventoryControl || {}),
+      discountedAtCheckout: false,
+      restockedOnFailure: false,
+      restockedAt: null,
+    };
+    return null;
+  }
+
   try {
     if (paymentStatus === 'paid') {
       const reservation = await confirmInventoryReservation(

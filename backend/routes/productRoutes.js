@@ -46,6 +46,14 @@ const {
   normalizeSeo,
   normalizeStringArray: normalizeCommercialStringArray,
 } = require('../lib/products/productCommercialConfig');
+const {
+  normalizeDigitalDelivery,
+  normalizeServiceDelivery,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  ProductFulfillmentInputError,
+  resolveBundleComponents,
+} = require('../services/productBundleService');
 
 const PUBLIC_TAXONOMY_POPULATE = [
   {
@@ -131,6 +139,112 @@ function buildProductConfigPayload(body = {}, fallbackProductType = 'physical') 
     allowBackorder: parseBoolean(body.allowBackorder, false) === true,
     variantPreset,
     variantAxes: normalizeVariantAxes(body.variantAxes, variantPreset),
+  };
+}
+
+async function buildFulfillmentPayload(
+  body = {},
+  {
+    existingProduct = null,
+    excludeProductId = '',
+  } = {}
+) {
+  const productType = normalizeProductType(
+    body.productType || existingProduct?.productType || 'physical'
+  );
+  const active =
+    typeof body.active === 'boolean'
+      ? body.active
+      : existingProduct?.active !== false;
+  const rawDigital = Object.prototype.hasOwnProperty.call(
+    body,
+    'digitalDelivery'
+  )
+    ? body.digitalDelivery
+    : existingProduct?.digitalDelivery || {};
+  const rawService = Object.prototype.hasOwnProperty.call(
+    body,
+    'serviceDelivery'
+  )
+    ? body.serviceDelivery
+    : existingProduct?.serviceDelivery || {};
+  const rawBundle = Object.prototype.hasOwnProperty.call(
+    body,
+    'bundleComponents'
+  )
+    ? body.bundleComponents
+    : existingProduct?.bundleComponents || [];
+
+  const digitalDelivery = normalizeDigitalDelivery(rawDigital);
+  const serviceDelivery = normalizeServiceDelivery(rawService);
+  let bundleComponents = [];
+
+  if (productType === 'digital') {
+    if (
+      rawDigital?.assetUrl &&
+      !digitalDelivery.assetUrl
+    ) {
+      throw new ProductFulfillmentInputError(
+        'El enlace del archivo digital debe usar HTTPS o HTTP.',
+        400,
+        'DIGITAL_ASSET_URL_INVALID'
+      );
+    }
+
+    if (
+      active &&
+      digitalDelivery.deliveryMode === 'automatic' &&
+      !digitalDelivery.assetUrl
+    ) {
+      throw new ProductFulfillmentInputError(
+        'La entrega digital automática necesita el enlace privado del archivo.',
+        400,
+        'DIGITAL_ASSET_REQUIRED'
+      );
+    }
+  }
+
+  if (productType === 'service') {
+    if (
+      rawService?.bookingUrl &&
+      !serviceDelivery.bookingUrl
+    ) {
+      throw new ProductFulfillmentInputError(
+        'El enlace de agenda debe usar HTTPS o HTTP.',
+        400,
+        'SERVICE_BOOKING_URL_INVALID'
+      );
+    }
+
+    if (
+      active &&
+      serviceDelivery.fulfillmentMode === 'scheduled' &&
+      !serviceDelivery.bookingUrl
+    ) {
+      throw new ProductFulfillmentInputError(
+        'La agenda automática necesita un enlace de reserva.',
+        400,
+        'SERVICE_BOOKING_URL_REQUIRED'
+      );
+    }
+  }
+
+  if (productType === 'bundle') {
+    bundleComponents = await resolveBundleComponents(rawBundle, {
+      excludeProductId,
+    });
+  }
+
+  return {
+    digitalDelivery:
+      productType === 'digital'
+        ? digitalDelivery
+        : normalizeDigitalDelivery({}),
+    serviceDelivery:
+      productType === 'service'
+        ? serviceDelivery
+        : normalizeServiceDelivery({}),
+    bundleComponents,
   };
 }
 
@@ -612,7 +726,9 @@ router.get(
       const product = await Product.findOne({
         ...identityFilter,
         archivedAt: null,
-      });
+      }).select(
+        '+digitalDelivery.assetUrl +digitalDelivery.customerMessage +serviceDelivery.bookingUrl +serviceDelivery.internalInstructions'
+      );
 
       if (!product) {
         return res.status(404).json({
@@ -681,6 +797,9 @@ router.post(
         tags,
         seo,
         commercialFields,
+        digitalDelivery,
+        serviceDelivery,
+        bundleComponents,
         notes,
       } = req.body;
 
@@ -691,6 +810,9 @@ router.post(
       }
 
       const productConfig = buildProductConfigPayload(req.body);
+      const fulfillmentPayload = await buildFulfillmentPayload(
+        req.body
+      );
       const taxonomyPayload =
         await resolveProductTaxonomyPayload(req.body);
       const preInv = productConfig.trackInventory ? sanitizeInventory(inventory) : [];
@@ -821,6 +943,9 @@ router.post(
         }),
         commercialFields:
           normalizeCommercialFields(commercialFields),
+        digitalDelivery: fulfillmentPayload.digitalDelivery,
+        serviceDelivery: fulfillmentPayload.serviceDelivery,
+        bundleComponents: fulfillmentPayload.bundleComponents,
         notes: notes ?? '',
       });
 
@@ -857,6 +982,13 @@ router.post(
       if (error?.name === 'ValidationError') {
         return res.status(400).json({
           message: error.message,
+        });
+      }
+
+      if (error instanceof ProductFulfillmentInputError) {
+        return res.status(error.status || 400).json({
+          message: error.message,
+          code: error.code,
         });
       }
 
@@ -1047,7 +1179,9 @@ router.put(
       const prod = await Product.findOne({
         _id: id,
         archivedAt: null,
-      });
+      }).select(
+        '+digitalDelivery.assetUrl +digitalDelivery.customerMessage +serviceDelivery.bookingUrl +serviceDelivery.internalInstructions'
+      );
 
       if (!prod) {
         return res.status(404).json({
@@ -1089,6 +1223,9 @@ router.put(
         tags,
         seo,
         commercialFields,
+        digitalDelivery,
+        serviceDelivery,
+        bundleComponents,
         notes,
       } = req.body;
 
@@ -1100,6 +1237,13 @@ router.put(
         !(typeof v === 'string' && v.trim() === '');
 
       const productConfig = buildProductConfigPayload(req.body, prod.productType || 'physical');
+      const fulfillmentPayload = await buildFulfillmentPayload(
+        req.body,
+        {
+          existingProduct: prod,
+          excludeProductId: prod._id,
+        }
+      );
       const taxonomyPayload =
         await resolveProductTaxonomyPayload(req.body, prod);
       const hadConfiguredVariants =
@@ -1286,6 +1430,12 @@ router.put(
         prod.commercialFields =
           normalizeCommercialFields(commercialFields);
       }
+      prod.digitalDelivery =
+        fulfillmentPayload.digitalDelivery;
+      prod.serviceDelivery =
+        fulfillmentPayload.serviceDelivery;
+      prod.bundleComponents =
+        fulfillmentPayload.bundleComponents;
       if (hasField('notes')) prod.notes = String(notes || '');
 
       // ✅ INVENTARIO: replace (por defecto) o merge
@@ -1392,6 +1542,13 @@ router.put(
       if (error?.name === 'ValidationError') {
         return res.status(400).json({
           message: error.message,
+        });
+      }
+
+      if (error instanceof ProductFulfillmentInputError) {
+        return res.status(error.status || 400).json({
+          message: error.message,
+          code: error.code,
         });
       }
 

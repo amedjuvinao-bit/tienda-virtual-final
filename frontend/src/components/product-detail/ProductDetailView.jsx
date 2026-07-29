@@ -14,6 +14,9 @@ import {
   Flame,
   ThumbsUp,
   Package,
+  Download,
+  CalendarDays,
+  Boxes,
 } from "lucide-react";
 
 /* ─── Helpers (sin cambios) ─── */
@@ -907,7 +910,9 @@ export default function ProductDetailView({
   const showColors = cfg.showColors !== false;
   const showQuantity = cfg.showQuantity !== false;
   const showAddToCart = cfg.showAddToCart !== false;
-  const showPickup = cfg.showPickupBlock !== false;
+  const showPickup =
+    cfg.showPickupBlock !== false &&
+    product?.requiresShipping !== false;
   const showBenefits = cfg.showBenefits !== false;
   const showAccordionBlock = cfg.showAccordionBlock !== false;
 
@@ -937,6 +942,11 @@ export default function ProductDetailView({
   const pickupText = cfg.pickupText || "Normalmente está listo en 24 horas";
   const pickupLinkText =
     cfg.pickupLinkText || "Ver información de la tienda";
+  const fulfillment = product?.fulfillment || null;
+  const fulfillmentKind = fulfillment?.kind || "";
+  const digitalFulfillment = fulfillment?.digital || null;
+  const serviceFulfillment = fulfillment?.service || null;
+  const bundleFulfillment = fulfillment?.bundle || null;
 
   const accordionTitle1 =
     cfg.accordionTitle1 ||
@@ -1611,6 +1621,88 @@ export default function ProductDetailView({
                         {cfg.addToCartText || "Añadir al carrito"}
                       </button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "digital_delivery" && digitalFulfillment && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <Download style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Entrega digital después del pago
+                    </p>
+                    <p style={{ fontSize: "13px", color: textSecondary, margin: "4px 0 0", lineHeight: 1.5 }}>
+                      {digitalFulfillment.deliveryMode === "automatic"
+                        ? `Recibirás un enlace seguro con hasta ${Number(digitalFulfillment.downloadLimit || 1)} descargas durante ${Number(digitalFulfillment.accessDays || 1)} días.`
+                        : "El comercio coordinará contigo la entrega del contenido digital."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "service" && serviceFulfillment && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <CalendarDays style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Servicio de {Number(serviceFulfillment.durationMinutes || 60)} minutos
+                    </p>
+                    <p style={{ fontSize: "13px", color: textSecondary, margin: "4px 0 0", lineHeight: 1.5 }}>
+                      {serviceFulfillment.locationType === "online"
+                        ? "Prestación en línea."
+                        : serviceFulfillment.locationType === "store"
+                          ? "Prestación en el establecimiento."
+                          : "Prestación en la ubicación del cliente."}
+                      {serviceFulfillment.customerInstructions
+                        ? ` ${serviceFulfillment.customerInstructions}`
+                        : " Recibirás las instrucciones de coordinación después del pago."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "bundle" && Array.isArray(bundleFulfillment?.components) && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <Boxes style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Este combo incluye
+                    </p>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: textSecondary, fontSize: "13px", lineHeight: 1.6 }}>
+                      {bundleFulfillment.components.map((component, index) => (
+                        <li key={`${component.product || component.sku || "item"}-${index}`}>
+                          {Number(component.quantity || 1)} × {component.title || "Producto"}
+                          {component.variantLabel && component.variantLabel !== "Presentación general"
+                            ? ` · ${component.variantLabel}`
+                            : ""}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               )}

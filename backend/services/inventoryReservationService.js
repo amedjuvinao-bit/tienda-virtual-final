@@ -7,6 +7,9 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
+const {
+  buildVariantKey,
+} = require('../lib/products/productVariantConfig');
 
 const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
 
@@ -133,6 +136,12 @@ function normalizeCartItems(items = []) {
 
     const size = normalizeVariantValue(item.size || item.talla || item.variant?.size);
     const color = normalizeVariantValue(item.color || item.variant?.color);
+    const variantKey = cleanText(
+      item.variantKey ||
+        item.variantId ||
+        buildVariantKey(size, color) ||
+        'default__default'
+    ).toLowerCase();
     const quantity = toNumber(item.quantity || item.qty || item.cantidad, 0);
     const unitPrice = toNumber(item.unitPrice || item.price || item.precio, 0);
 
@@ -140,30 +149,6 @@ function normalizeCartItems(items = []) {
       throw createServiceError(
         `El producto de la posición ${index + 1} no tiene un ID válido.`,
         'INVALID_PRODUCT_ID',
-        {
-          index,
-          productId,
-        },
-        400
-      );
-    }
-
-    if (!size) {
-      throw createServiceError(
-        `El producto de la posición ${index + 1} no tiene talla definida.`,
-        'MISSING_SIZE',
-        {
-          index,
-          productId,
-        },
-        400
-      );
-    }
-
-    if (!color) {
-      throw createServiceError(
-        `El producto de la posición ${index + 1} no tiene color definido.`,
-        'MISSING_COLOR',
         {
           index,
           productId,
@@ -191,6 +176,7 @@ function normalizeCartItems(items = []) {
       productObjectId: toObjectId(productId, `items[${index}].productId`),
       size,
       color,
+      variantKey: variantKey || 'default__default',
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -198,16 +184,29 @@ function normalizeCartItems(items = []) {
       sku: cleanUpper(item.sku || ''),
       image: cleanText(item.image || ''),
       category: cleanText(item.category || ''),
+      bundleParentProduct:
+        getObjectIdValue(item.bundleParentProduct) || null,
+      bundleParentTitle: cleanText(item.bundleParentTitle || ''),
     };
   });
 }
 
 function buildStockVariantFilter(item) {
-  return {
+  const filter = {
     product: item.productObjectId,
     active: true,
     deletedAt: null,
-    $or: [
+  };
+
+  if (
+    item.variantKey &&
+    item.variantKey !== 'default__default'
+  ) {
+    filter.variantKey = item.variantKey;
+    return filter;
+  }
+
+  filter.$or = [
       {
         size: item.size,
         color: item.color,
@@ -216,8 +215,9 @@ function buildStockVariantFilter(item) {
         'variant.size': item.size,
         'variant.color': item.color,
       },
-    ],
-  };
+    ];
+
+  return filter;
 }
 
 function sortStocksByPriority(stocks = [], branchPriorityIds = []) {
@@ -271,11 +271,104 @@ async function loadProductMap(items, session) {
       $in: productIds.map((productId) => toObjectId(productId, 'productId')),
     },
   })
-    .select('title sku image images category')
+    .select(
+      'title sku image images category productType trackInventory allowBackorder bundleComponents active visible archivedAt'
+    )
     .session(session)
     .lean();
 
   return new Map(products.map((product) => [String(product._id), product]));
+}
+
+async function expandReservableItems(
+  items = [],
+  {
+    session = null,
+    ProductModel = Product,
+  } = {}
+) {
+  const sourceItems = Array.isArray(items) ? items : [];
+  if (!sourceItems.length) return [];
+
+  const productIds = Array.from(
+    new Set(
+      sourceItems
+        .map((item) =>
+          getObjectIdValue(
+            item.productId || item.product || item._id
+          )
+        )
+        .filter((id) => isValidObjectId(id))
+    )
+  );
+
+  let query = ProductModel.find({
+    _id: {
+      $in: productIds.map((id) => toObjectId(id, 'productId')),
+    },
+  }).select(
+    'title sku image productType trackInventory allowBackorder bundleComponents active visible archivedAt'
+  );
+
+  if (session && typeof query.session === 'function') {
+    query = query.session(session);
+  }
+
+  const products = await query.lean();
+  const productMap = new Map(
+    products.map((product) => [String(product._id), product])
+  );
+  const expanded = [];
+
+  for (const item of sourceItems) {
+    const productId = getObjectIdValue(
+      item.productId || item.product || item._id
+    );
+    const product = productMap.get(productId);
+
+    if (!product) continue;
+
+    if (product.productType === 'bundle') {
+      for (const component of product.bundleComponents || []) {
+        if (
+          component.trackInventory === false ||
+          component.allowBackorder === true
+        ) {
+          continue;
+        }
+
+        expanded.push({
+          productId: getObjectIdValue(component.product),
+          title: component.title || '',
+          image: component.image || '',
+          sku: component.sku || '',
+          size: component.size || '',
+          color: component.color || '',
+          variantKey:
+            component.variantKey || 'default__default',
+          quantity:
+            Math.max(1, Number(item.quantity || item.qty || 1)) *
+            Math.max(1, Number(component.quantity || 1)),
+          unitPrice: 0,
+          price: 0,
+          bundleParentProduct: product._id,
+          bundleParentTitle: product.title || item.title || '',
+        });
+      }
+      continue;
+    }
+
+    if (
+      product.trackInventory === false ||
+      product.allowBackorder === true
+    ) {
+      continue;
+    }
+
+    expanded.push(item);
+  }
+
+  return expanded;
 }
 
 async function loadBranchMap(branchIds, session) {
@@ -477,6 +570,10 @@ async function reserveFromStockRow({
     branchSnapshot: getBranchSnapshot(branch),
     size: item.size,
     color: item.color,
+    variantKey:
+      stock.variantKey || item.variantKey || 'default__default',
+    bundleParentProduct: item.bundleParentProduct || null,
+    bundleParentTitle: item.bundleParentTitle || '',
     quantity: quantityToReserve,
     unitPrice: item.unitPrice,
     lineTotal: quantityToReserve * item.unitPrice,
@@ -726,8 +823,16 @@ async function createInventoryReservation({
 
     const expiresAt = new Date(Date.now() + safeExpiresInMinutes * 60 * 1000);
 
+    const reservableItems = await expandReservableItems(items, {
+      session,
+    });
+
+    if (!reservableItems.length) {
+      return null;
+    }
+
     const { reservationItems, usedBranchIds } = await allocateReservationItems({
-      items,
+      items: reservableItems,
       branchPriorityIds,
       session,
     });
@@ -1086,6 +1191,7 @@ module.exports = {
   releaseInventoryReservation,
   expireInventoryReservations,
   allocateReservationItems,
+  expandReservableItems,
   releaseReservedItems,
   createServiceError,
 };

@@ -26,6 +26,14 @@ const {
   normalizeSeo,
   normalizeStringArray: normalizeCommercialStringArray,
 } = require('../lib/products/productCommercialConfig');
+const {
+  DIGITAL_DELIVERY_MODES,
+  SERVICE_FULFILLMENT_MODES,
+  SERVICE_LOCATION_TYPES,
+  normalizeDigitalDelivery,
+  normalizeServiceDelivery,
+  normalizeBundleComponents,
+} = require('../lib/products/productFulfillmentConfig');
 
 // ==== Subesquemas opcionales ====
 const InventoryItemSchema = new mongoose.Schema(
@@ -173,6 +181,93 @@ const ProductCommercialFieldSchema = new mongoose.Schema(
     value: { type: String, default: '' },
     public: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false }
+);
+
+const DigitalDeliverySchema = new mongoose.Schema(
+  {
+    deliveryMode: {
+      type: String,
+      enum: DIGITAL_DELIVERY_MODES,
+      default: 'manual',
+    },
+    assetUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    fileName: { type: String, trim: true, default: '' },
+    mimeType: { type: String, trim: true, default: '' },
+    fileSizeBytes: { type: Number, min: 0, default: 0 },
+    downloadLimit: { type: Number, min: 1, max: 100, default: 3 },
+    accessDays: { type: Number, min: 1, max: 3650, default: 30 },
+    customerMessage: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+  },
+  { _id: false }
+);
+
+const ServiceDeliverySchema = new mongoose.Schema(
+  {
+    fulfillmentMode: {
+      type: String,
+      enum: SERVICE_FULFILLMENT_MODES,
+      default: 'manual',
+    },
+    locationType: {
+      type: String,
+      enum: SERVICE_LOCATION_TYPES,
+      default: 'online',
+    },
+    durationMinutes: { type: Number, min: 5, max: 10080, default: 60 },
+    leadTimeHours: { type: Number, min: 0, max: 8760, default: 0 },
+    bookingUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    customerInstructions: { type: String, trim: true, default: '' },
+    internalInstructions: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+  },
+  { _id: false }
+);
+
+const BundleComponentSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'default__default',
+    },
+    quantity: { type: Number, min: 1, max: 9999, default: 1 },
+    title: { type: String, trim: true, default: '' },
+    sku: { type: String, trim: true, uppercase: true, default: '' },
+    image: { type: String, trim: true, default: '' },
+    productType: { type: String, trim: true, lowercase: true, default: '' },
+    size: { type: String, trim: true, default: '' },
+    color: { type: String, trim: true, default: '' },
+    variantLabel: { type: String, trim: true, default: '' },
+    trackInventory: { type: Boolean, default: true },
+    allowBackorder: { type: Boolean, default: false },
+    requiresShipping: { type: Boolean, default: true },
   },
   { _id: false }
 );
@@ -353,6 +448,21 @@ const productSchema = new mongoose.Schema(
       default: [],
     },
 
+    digitalDelivery: {
+      type: DigitalDeliverySchema,
+      default: () => ({}),
+    },
+
+    serviceDelivery: {
+      type: ServiceDeliverySchema,
+      default: () => ({}),
+    },
+
+    bundleComponents: {
+      type: [BundleComponentSchema],
+      default: [],
+    },
+
     // inventario/estado heredado. La fuente profesional es InventoryStock.
     stock: { type: Number, default: 0, min: 0 },
 
@@ -413,6 +523,7 @@ productSchema.index({ categories: 1 });
 productSchema.index({ categoryRefs: 1 });
 productSchema.index({ collectionRefs: 1 });
 productSchema.index({ tags: 1 });
+productSchema.index({ 'bundleComponents.product': 1 });
 productSchema.index({ productType: 1, active: 1 });
 productSchema.index({ trackInventory: 1, active: 1 });
 productSchema.index({ archivedAt: 1, active: 1 });
@@ -570,10 +681,46 @@ productSchema.pre('validate', async function (next) {
     this.commercialFields = normalizeCommercialFields(
       this.commercialFields
     );
+    this.digitalDelivery = normalizeDigitalDelivery(
+      this.digitalDelivery
+    );
+    this.serviceDelivery = normalizeServiceDelivery(
+      this.serviceDelivery
+    );
+    this.bundleComponents = normalizeBundleComponents(
+      this.bundleComponents
+    );
 
-    if (this.trackInventory === undefined || this.trackInventory === null) {
-      this.trackInventory = shouldTrackInventory(this.productType);
+    if (this.productType === 'bundle') {
+      const bundleIdentities = new Set();
+      for (const component of this.bundleComponents) {
+        const identity =
+          `${String(component.product)}:${component.variantKey}`;
+        if (bundleIdentities.has(identity)) {
+          throw new Error(
+            'El combo contiene el mismo producto y variante más de una vez.'
+          );
+        }
+        bundleIdentities.add(identity);
+      }
     }
+
+    if (this.productType !== 'digital') {
+      this.digitalDelivery = normalizeDigitalDelivery({});
+    }
+
+    if (this.productType !== 'service') {
+      this.serviceDelivery = normalizeServiceDelivery({});
+    }
+
+    if (this.productType !== 'bundle') {
+      this.bundleComponents = [];
+    }
+
+    this.trackInventory = shouldTrackInventory(
+      this.productType,
+      this.trackInventory
+    );
 
     if (!Array.isArray(this.variantAxes) || this.variantAxes.length === 0) {
       this.variantAxes = normalizeVariantAxes([], this.variantPreset);

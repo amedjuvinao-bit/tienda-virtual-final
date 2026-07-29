@@ -49,6 +49,9 @@ jobs:
       - name: Validar clasificación, SEO y campos comerciales
         run: npm --prefix backend run test:products-commercial-catalog
 
+      - name: Validar digitales, servicios y combos
+        run: npm --prefix backend run test:products-fulfillment
+
   products-mongodb:
     name: Productos e inventario
     runs-on: ubuntu-latest
@@ -109,6 +112,13 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
         run: npm --prefix backend run test:product-taxonomy
+
+      - name: Validar cumplimiento por tipo de producto
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:product-fulfillment-integration
 
   products-ui:
     name: Interfaz de productos

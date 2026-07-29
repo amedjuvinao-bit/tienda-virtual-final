@@ -576,6 +576,15 @@ async function handleInventoryReservationAfterPayment({
   session,
 }) {
   if (!order || !mapped) return null;
+  if (order.inventoryControl?.reservationRequired === false) {
+    order.inventoryControl = {
+      ...(order.inventoryControl || {}),
+      discountedAtCheckout: false,
+      restockedOnFailure: false,
+      restockedAt: null,
+    };
+    return null;
+  }
 
   const paymentStatus = String(mapped.paymentStatus || '').trim().toLowerCase();
   const orderNumber = String(order.orderNumber || '').trim();

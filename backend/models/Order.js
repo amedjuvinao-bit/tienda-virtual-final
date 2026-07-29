@@ -155,6 +155,23 @@ const OrderItemSchema = new mongoose.Schema(
     variantBarcode: { type: String, trim: true, default: '' },
     category: { type: String, trim: true, default: '' },
     categories: { type: [String], default: [] },
+    productType: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'physical',
+    },
+    requiresShipping: { type: Boolean, default: true },
+    fulfillmentKind: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'shipment',
+    },
+    fulfillmentSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
     lineSubtotal: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountRate: { type: Number, min: 0, max: 100, default: 0 },
@@ -316,6 +333,156 @@ const PosMetadataSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const DigitalDeliveryItemSchema = new mongoose.Schema(
+  {
+    orderItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    sourceKey: { type: String, trim: true, required: true },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    title: { type: String, trim: true, default: '' },
+    fileName: { type: String, trim: true, default: '' },
+    deliveryMode: {
+      type: String,
+      enum: ['automatic', 'manual'],
+      default: 'manual',
+    },
+    assetUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    accessTokenHash: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    accessUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'ready', 'manual', 'expired', 'blocked'],
+      default: 'pending',
+    },
+    downloadLimit: { type: Number, min: 1, default: 3 },
+    downloadCount: { type: Number, min: 0, default: 0 },
+    expiresAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    lastDownloadedAt: { type: Date, default: null },
+    customerMessage: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
+const ServiceFulfillmentItemSchema = new mongoose.Schema(
+  {
+    orderItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    sourceKey: { type: String, trim: true, required: true },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    title: { type: String, trim: true, default: '' },
+    quantity: { type: Number, min: 1, default: 1 },
+    fulfillmentMode: {
+      type: String,
+      enum: ['scheduled', 'manual'],
+      default: 'manual',
+    },
+    locationType: {
+      type: String,
+      enum: ['online', 'store', 'customer'],
+      default: 'online',
+    },
+    durationMinutes: { type: Number, min: 5, default: 60 },
+    leadTimeHours: { type: Number, min: 0, default: 0 },
+    bookingUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    customerInstructions: { type: String, trim: true, default: '' },
+    internalInstructions: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    status: {
+      type: String,
+      enum: [
+        'awaiting_scheduling',
+        'scheduled',
+        'in_progress',
+        'completed',
+        'cancelled',
+      ],
+      default: 'awaiting_scheduling',
+    },
+    scheduledAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    notes: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
+const OrderFulfillmentSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: [
+        'pending',
+        'processing',
+        'partially_delivered',
+        'delivered',
+        'action_required',
+        'failed',
+      ],
+      default: 'pending',
+    },
+    digitalDeliveries: {
+      type: [DigitalDeliveryItemSchema],
+      default: [],
+    },
+    services: {
+      type: [ServiceFulfillmentItemSchema],
+      default: [],
+    },
+    processedAt: { type: Date, default: null },
+    notifiedAt: { type: Date, default: null },
+    notificationStatus: {
+      type: String,
+      enum: [
+        'pending',
+        'sending',
+        'sent',
+        'failed',
+        'not_required',
+      ],
+      default: 'pending',
+    },
+    notificationClaimedAt: { type: Date, default: null },
+    notificationError: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 /* ========= Esquema principal ========= */
 const OrderSchema = new mongoose.Schema(
   {
@@ -344,6 +511,11 @@ const OrderSchema = new mongoose.Schema(
       enum: ORDER_FULFILLMENT_STATUSES,
       default: 'pending',
       index: true,
+    },
+
+    fulfillment: {
+      type: OrderFulfillmentSchema,
+      default: () => ({}),
     },
 
     /* ========= Sede operativa ========= */
@@ -635,6 +807,12 @@ const OrderSchema = new mongoose.Schema(
     },
 
     inventoryControl: {
+      reservationRequired: { type: Boolean, default: true },
+      reservationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InventoryReservation',
+        default: null,
+      },
       discountedAtCheckout: { type: Boolean, default: true },
       restockedOnFailure: { type: Boolean, default: false },
       restockedAt: { type: Date, default: null },

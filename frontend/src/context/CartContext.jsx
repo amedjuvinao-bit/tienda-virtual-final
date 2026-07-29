@@ -34,6 +34,10 @@ function toBackendItem(it) {
     size: it.size || '',
     variantId,
     price,
+    productType: it.productType || it?.product?.productType || 'physical',
+    requiresShipping:
+      it.requiresShipping ?? it?.product?.requiresShipping ?? true,
+    fulfillment: it.fulfillment || it?.product?.fulfillment || null,
   };
 }
 
@@ -41,7 +45,12 @@ function toBackendItem(it) {
  * Convierte un item que viene del backend al formato local.
  */
 function fromBackendItem(it) {
-  const p = typeof it.productId === 'object' ? it.productId : null;
+  const p =
+    it?.product && typeof it.product === 'object'
+      ? it.product
+      : typeof it.productId === 'object'
+        ? it.productId
+        : null;
   const _id = p?._id || it.productId || it._id || it.id;
   const qty = Number(it.qty ?? it.quantity ?? 0) || 0;
   const price = Number(it.price ?? p?.price ?? 0) || 0;
@@ -60,6 +69,10 @@ function fromBackendItem(it) {
     slug: p?.slug,
     sku: it.variantSku || p?.sku || p?.skun || '',
     barcode: it.variantBarcode || p?.barcode || '',
+    productType: it.productType || p?.productType || 'physical',
+    requiresShipping:
+      it.requiresShipping ?? p?.requiresShipping ?? true,
+    fulfillment: it.fulfillment || p?.fulfillment || null,
   };
 }
 
@@ -99,7 +112,11 @@ function itemsShallowEqual(a, b) {
       (x.size || '') !== (y.size || '') ||
       readVariantId(x) !== readVariantId(y) ||
       Number(x.quantity || 0) !== Number(y.quantity || 0) ||
-      Number(x.price || 0) !== Number(y.price || 0)
+      Number(x.price || 0) !== Number(y.price || 0) ||
+      (x.productType || 'physical') !==
+        (y.productType || 'physical') ||
+      (x.requiresShipping !== false) !==
+        (y.requiresShipping !== false)
     ) {
       return false;
     }
@@ -221,6 +238,9 @@ export function CartProvider({ children }) {
           variantLabel: product.variantLabel || product.selectedVariant?.label || '',
           variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
           variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
+          productType: product.productType || 'physical',
+          requiresShipping: product.requiresShipping !== false,
+          fulfillment: product.fulfillment || null,
           quantity: Math.max(1, inc),
           price: safePrice,
         },

@@ -126,10 +126,21 @@ function normalizeVariantAxes(input, fallbackPreset = 'none') {
 }
 
 function shouldTrackInventory(productType, explicitValue) {
+  const type = normalizeProductType(productType);
+
+  // Digitales, servicios y combos compuestos no manejan una existencia
+  // propia. En los combos se reservan sus componentes físicos.
+  if (
+    type === PRODUCT_TYPES.DIGITAL ||
+    type === PRODUCT_TYPES.SERVICE ||
+    type === PRODUCT_TYPES.BUNDLE
+  ) {
+    return false;
+  }
+
   if (typeof explicitValue === 'boolean') return explicitValue;
 
-  const type = normalizeProductType(productType);
-  return type === PRODUCT_TYPES.PHYSICAL || type === PRODUCT_TYPES.BUNDLE;
+  return type === PRODUCT_TYPES.PHYSICAL || type === PRODUCT_TYPES.CUSTOM;
 }
 
 function buildSkuPrefix(value) {

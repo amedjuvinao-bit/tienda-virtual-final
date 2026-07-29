@@ -82,13 +82,32 @@ const reservationItemSchema = new Schema(
     size: {
       type: String,
       trim: true,
-      required: true,
+      default: '',
     },
 
     color: {
       type: String,
       trim: true,
-      required: true,
+      default: '',
+    },
+
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'default__default',
+    },
+
+    bundleParentProduct: {
+      type: Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+    },
+
+    bundleParentTitle: {
+      type: String,
+      trim: true,
+      default: '',
     },
 
     quantity: {

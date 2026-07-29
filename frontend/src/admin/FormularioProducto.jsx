@@ -76,6 +76,14 @@ function createCommercialFieldRow(index = 0) {
   };
 }
 
+function createBundleComponentRow(value = {}) {
+  return {
+    product: getReferenceId(value.product || value.productId),
+    variantKey: cleanText(value.variantKey || '').toLowerCase(),
+    quantity: Math.max(1, Math.floor(Number(value.quantity || 1))),
+  };
+}
+
 function toMoney(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.round(number)) : Math.max(0, Math.round(Number(fallback || 0)));
@@ -365,6 +373,29 @@ export default function FormularioProducto() {
   const [canonicalUrl, setCanonicalUrl] = useState('');
   const [seoNoIndex, setSeoNoIndex] = useState(false);
   const [commercialFields, setCommercialFields] = useState([]);
+  const [digitalDelivery, setDigitalDelivery] = useState({
+    deliveryMode: 'automatic',
+    assetUrl: '',
+    fileName: '',
+    mimeType: '',
+    fileSizeBytes: 0,
+    downloadLimit: 3,
+    accessDays: 30,
+    customerMessage: '',
+  });
+  const [serviceDelivery, setServiceDelivery] = useState({
+    fulfillmentMode: 'scheduled',
+    locationType: 'online',
+    durationMinutes: 60,
+    leadTimeHours: 0,
+    bookingUrl: '',
+    customerInstructions: '',
+    internalInstructions: '',
+  });
+  const [bundleComponents, setBundleComponents] = useState([]);
+  const [bundleCandidates, setBundleCandidates] = useState([]);
+  const [bundleProductDetails, setBundleProductDetails] = useState({});
+  const [bundleCandidatesLoading, setBundleCandidatesLoading] = useState(false);
 
   const selectedType = useMemo(() => getProductTypeMeta(productType), [productType]);
   const selectedPreset = useMemo(() => getVariantPresetMeta(variantPreset), [variantPreset]);
@@ -492,6 +523,30 @@ export default function FormularioProducto() {
               }))
             : []
         );
+        setDigitalDelivery({
+          deliveryMode: p.digitalDelivery?.deliveryMode || 'automatic',
+          assetUrl: p.digitalDelivery?.assetUrl || '',
+          fileName: p.digitalDelivery?.fileName || '',
+          mimeType: p.digitalDelivery?.mimeType || '',
+          fileSizeBytes: Number(p.digitalDelivery?.fileSizeBytes || 0),
+          downloadLimit: Number(p.digitalDelivery?.downloadLimit || 3),
+          accessDays: Number(p.digitalDelivery?.accessDays || 30),
+          customerMessage: p.digitalDelivery?.customerMessage || '',
+        });
+        setServiceDelivery({
+          fulfillmentMode: p.serviceDelivery?.fulfillmentMode || 'scheduled',
+          locationType: p.serviceDelivery?.locationType || 'online',
+          durationMinutes: Number(p.serviceDelivery?.durationMinutes || 60),
+          leadTimeHours: Number(p.serviceDelivery?.leadTimeHours || 0),
+          bookingUrl: p.serviceDelivery?.bookingUrl || '',
+          customerInstructions: p.serviceDelivery?.customerInstructions || '',
+          internalInstructions: p.serviceDelivery?.internalInstructions || '',
+        });
+        setBundleComponents(
+          Array.isArray(p.bundleComponents)
+            ? p.bundleComponents.map(createBundleComponentRow)
+            : []
+        );
       })
       .catch((err) => {
         if (err?.response?.status === 404) {
@@ -558,13 +613,95 @@ export default function FormularioProducto() {
   }, [categoria, id, originalCategoria]);
 
   useEffect(() => {
+    if (['digital', 'service', 'bundle'].includes(productType)) {
+      setTrackInventory(false);
+      setAllowBackorder(false);
+      setVariantPreset('none');
+      return;
+    }
+
     if (!id) {
       setTrackInventory(shouldTrackInventoryByType(productType));
-      if (productType === 'digital' || productType === 'service') {
-        setVariantPreset('none');
-      }
     }
   }, [productType, id]);
+
+  useEffect(() => {
+    if (productType !== 'bundle') return undefined;
+
+    let cancelled = false;
+
+    const loadCandidates = async () => {
+      try {
+        setBundleCandidatesLoading(true);
+        const { data } = await api.get('/api/products/admin/list', {
+          params: {
+            page: 1,
+            limit: 100,
+            status: 'active',
+            sort: 'title_asc',
+          },
+        });
+        if (cancelled) return;
+        const list = Array.isArray(data?.data) ? data.data : [];
+        setBundleCandidates(
+          list.filter(
+            (product) =>
+              product.productType !== 'bundle' &&
+              String(product._id) !== String(id || '')
+          )
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setBundleCandidates([]);
+          toast.error('No fue posible cargar los productos para el combo.');
+        }
+      } finally {
+        if (!cancelled) setBundleCandidatesLoading(false);
+      }
+    };
+
+    loadCandidates();
+    return () => {
+      cancelled = true;
+    };
+  }, [productType, id]);
+
+  useEffect(() => {
+    if (productType !== 'bundle') return;
+
+    const missingIds = bundleComponents
+      .map((component) => component.product)
+      .filter(
+        (productId) =>
+          productId && !bundleProductDetails[productId]
+      );
+
+    if (!missingIds.length) return;
+
+    let cancelled = false;
+    Promise.all(
+      [...new Set(missingIds)].map(async (productId) => {
+        const { data } = await api.get(`/api/products/admin/${productId}`);
+        return [productId, data || {}];
+      })
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setBundleProductDetails((previous) => ({
+          ...previous,
+          ...Object.fromEntries(entries),
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error('No fue posible cargar una variante del combo.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productType, bundleComponents, bundleProductDetails]);
 
   useEffect(() => {
     if (!trackInventory) return;
@@ -778,6 +915,24 @@ export default function FormularioProducto() {
     )));
   };
 
+  const updateBundleComponent = (index, patch) => {
+    setBundleComponents((previous) =>
+      previous.map((component, componentIndex) =>
+        componentIndex === index
+          ? { ...component, ...patch }
+          : component
+      )
+    );
+  };
+
+  const removeBundleComponent = (index) => {
+    setBundleComponents((previous) =>
+      previous.filter(
+        (_, componentIndex) => componentIndex !== index
+      )
+    );
+  };
+
   const removeVariantImage = (variantKey, imageIndex) => {
     setAdvancedVariants((prev) => prev.map((variant) => {
       if (variant.variantKey !== variantKey) return variant;
@@ -855,6 +1010,71 @@ export default function FormularioProducto() {
     const price = Number(precio);
     if (!price || price <= 0 || Number.isNaN(price)) return toast.error('El precio debe ser mayor a 0');
     if (!categoria.trim()) return toast.error('La categoría es obligatoria');
+    if (
+      productType === 'digital' &&
+      digitalDelivery.deliveryMode === 'automatic' &&
+      !digitalDelivery.assetUrl.trim()
+    ) {
+      return toast.error('La entrega automática necesita el enlace privado del archivo.');
+    }
+    if (
+      productType === 'service' &&
+      serviceDelivery.fulfillmentMode === 'scheduled' &&
+      !serviceDelivery.bookingUrl.trim()
+    ) {
+      return toast.error('La agenda mediante enlace necesita una URL de reserva.');
+    }
+    if (productType === 'bundle' && bundleComponents.length === 0) {
+      return toast.error('Agrega al menos un producto al combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some((component) => !component.product)
+    ) {
+      return toast.error('Selecciona el producto de cada componente del combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some(
+        (component) => !bundleProductDetails[component.product]?._id
+      )
+    ) {
+      return toast.error('Espera mientras se cargan los componentes del combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some((component) => {
+        const variants = (
+          bundleProductDetails[component.product]?.variants || []
+        ).filter((variant) => variant.active !== false);
+        return (
+          variants.length > 1 &&
+          !variants.some(
+            (variant) =>
+              variant.variantKey === component.variantKey
+          )
+        );
+      })
+    ) {
+      return toast.error('Selecciona la variante de cada producto del combo.');
+    }
+
+    const bundleIdentities = new Set();
+    for (const component of bundleComponents) {
+      const variants = (
+        bundleProductDetails[component.product]?.variants || []
+      ).filter((variant) => variant.active !== false);
+      const variantKey =
+        component.variantKey ||
+        (variants.length === 1
+          ? variants[0].variantKey
+          : 'default__default');
+      const identity = `${component.product}:${variantKey}`;
+      if (bundleIdentities.has(identity)) {
+        return toast.error('El combo contiene el mismo producto y variante más de una vez.');
+      }
+      bundleIdentities.add(identity);
+    }
 
     let finalColors = Array.isArray(colorsArr) ? [...colorsArr] : [];
     if (colorsText && colorsText.trim()) {
@@ -938,6 +1158,56 @@ export default function FormularioProducto() {
           public: field.public !== false,
           sortOrder: index,
         })),
+      digitalDelivery:
+        productType === 'digital'
+          ? {
+              ...digitalDelivery,
+              fileSizeBytes: Math.max(
+                0,
+                Math.floor(Number(digitalDelivery.fileSizeBytes || 0))
+              ),
+              downloadLimit: Math.max(
+                1,
+                Math.floor(Number(digitalDelivery.downloadLimit || 1))
+              ),
+              accessDays: Math.max(
+                1,
+                Math.floor(Number(digitalDelivery.accessDays || 1))
+              ),
+            }
+          : {},
+      serviceDelivery:
+        productType === 'service'
+          ? {
+              ...serviceDelivery,
+              durationMinutes: Math.max(
+                5,
+                Math.floor(Number(serviceDelivery.durationMinutes || 60))
+              ),
+              leadTimeHours: Math.max(
+                0,
+                Math.floor(Number(serviceDelivery.leadTimeHours || 0))
+              ),
+            }
+          : {},
+      bundleComponents:
+        productType === 'bundle'
+          ? bundleComponents.map((component) => ({
+              product: component.product,
+              variantKey: component.variantKey || (() => {
+                const variants = (
+                  bundleProductDetails[component.product]?.variants || []
+                ).filter((variant) => variant.active !== false);
+                return variants.length === 1
+                  ? variants[0].variantKey
+                  : 'default__default';
+              })(),
+              quantity: Math.max(
+                1,
+                Math.floor(Number(component.quantity || 1))
+              ),
+            }))
+          : [],
       notes: notes || '',
     };
 
@@ -1067,6 +1337,430 @@ export default function FormularioProducto() {
             </div>
           </section>
 
+          {productType === 'digital' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                  Entrega digital
+                </h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  El enlace privado nunca se publica en el catálogo. Se habilita después de confirmar el pago.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                <div className="space-y-2">
+                  <FieldLabel required>Modalidad de entrega</FieldLabel>
+                  <select
+                    value={digitalDelivery.deliveryMode}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        deliveryMode: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="automatic">Automática después del pago</option>
+                    <option value="manual">Coordinada manualmente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel required={digitalDelivery.deliveryMode === 'automatic'}>
+                    Enlace privado del archivo
+                  </FieldLabel>
+                  <input
+                    type="url"
+                    value={digitalDelivery.assetUrl}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        assetUrl: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="https://almacen-privado.example/archivo.pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Nombre del archivo</FieldLabel>
+                  <input
+                    value={digitalDelivery.fileName}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        fileName: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="guia-profesional.pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Tipo MIME</FieldLabel>
+                  <input
+                    value={digitalDelivery.mimeType}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        mimeType: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="application/pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Tamaño en bytes</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    value={digitalDelivery.fileSizeBytes}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        fileSizeBytes: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Límite de descargas</FieldLabel>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={digitalDelivery.downloadLimit}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        downloadLimit: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Días de acceso</FieldLabel>
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={digitalDelivery.accessDays}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        accessDays: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <FieldLabel>Mensaje para el comprador</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={digitalDelivery.customerMessage}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        customerMessage: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="Instrucciones de uso o información complementaria."
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {productType === 'service' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                  Prestación del servicio
+                </h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  Define cómo se agenda, dónde se presta y qué instrucciones recibe el comprador al pagar.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                <div className="space-y-2">
+                  <FieldLabel required>Coordinación</FieldLabel>
+                  <select
+                    value={serviceDelivery.fulfillmentMode}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        fulfillmentMode: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="scheduled">Agenda mediante enlace</option>
+                    <option value="manual">Coordinación manual</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Lugar</FieldLabel>
+                  <select
+                    value={serviceDelivery.locationType}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        locationType: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="online">En línea</option>
+                    <option value="store">En el establecimiento</option>
+                    <option value="customer">En la ubicación del cliente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Duración en minutos</FieldLabel>
+                  <input
+                    type="number"
+                    min="5"
+                    value={serviceDelivery.durationMinutes}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        durationMinutes: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Anticipación mínima en horas</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    value={serviceDelivery.leadTimeHours}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        leadTimeHours: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel required={serviceDelivery.fulfillmentMode === 'scheduled'}>
+                    Enlace privado de agenda
+                  </FieldLabel>
+                  <input
+                    type="url"
+                    value={serviceDelivery.bookingUrl}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        bookingUrl: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="https://agenda.example/reservar"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel>Instrucciones para el comprador</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={serviceDelivery.customerInstructions}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        customerInstructions: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Notas internas</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={serviceDelivery.internalInstructions}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        internalInstructions: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {productType === 'bundle' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                    Componentes del combo
+                  </h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                    Al vender el combo se reservan y descuentan las existencias de cada componente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBundleComponents((previous) => [
+                      ...previous,
+                      createBundleComponentRow(),
+                    ])
+                  }
+                  className="rounded-xl px-4 py-2 text-sm font-bold"
+                  style={buttonStyle('soft')}
+                  disabled={bundleCandidatesLoading}
+                >
+                  Agregar componente
+                </button>
+              </div>
+
+              {bundleCandidatesLoading && (
+                <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  Cargando productos disponibles…
+                </p>
+              )}
+
+              {!bundleCandidatesLoading && bundleComponents.length === 0 && (
+                <p className="rounded-xl border p-4 text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                  Agrega al menos un producto para construir el combo.
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {bundleComponents.map((component, index) => {
+                  const detail = bundleProductDetails[component.product] || {};
+                  const variants = Array.isArray(detail.variants)
+                    ? detail.variants.filter((variant) => variant.active !== false)
+                    : [];
+
+                  return (
+                    <div key={`${component.product || 'new'}-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_120px_auto]" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                      <div className="space-y-2">
+                        <FieldLabel required>Producto</FieldLabel>
+                        <select
+                          value={component.product}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              product: event.target.value,
+                              variantKey: 'default__default',
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                        >
+                          <option value="">Seleccionar producto</option>
+                          {bundleCandidates.map((candidate) => (
+                            <option key={candidate._id} value={candidate._id}>
+                              {candidate.title} · {candidate.sku}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <FieldLabel>Variante</FieldLabel>
+                        <select
+                          value={component.variantKey}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              variantKey: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                          disabled={!component.product || !detail._id}
+                        >
+                          {variants.length === 0 ? (
+                            <option value="default__default">Presentación general</option>
+                          ) : (
+                            <>
+                              {variants.length > 1 && (
+                                <option value="">Seleccionar variante</option>
+                              )}
+                              {variants.map((variant) => (
+                                <option key={variant.variantKey} value={variant.variantKey}>
+                                  {variant.label || [variant.size, variant.color].filter(Boolean).join(' / ') || 'Presentación general'}
+                                </option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <FieldLabel required>Cantidad</FieldLabel>
+                        <input
+                          type="number"
+                          min="1"
+                          value={component.quantity}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              quantity: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => removeBundleComponent(index)}
+                          className="rounded-xl px-3 py-2 text-sm font-bold"
+                          style={buttonStyle('soft')}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={sectionStyle}>
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
@@ -1077,7 +1771,7 @@ export default function FormularioProducto() {
 
             <div className="grid gap-3">
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
+                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} disabled={['digital', 'service', 'bundle'].includes(productType)} />
                 <span className="text-sm font-semibold">Controlar inventario para este producto</span>
               </label>
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>

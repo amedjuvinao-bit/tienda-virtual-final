@@ -9,6 +9,12 @@ const {
   buildVariantKey,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
+const {
+  getPublicFulfillmentView,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  getBundleAvailableQuantity,
+} = require('../services/productBundleService');
 
 const { isValidObjectId } = mongoose;
 
@@ -159,12 +165,26 @@ async function safePopulateItems(items) {
     if (validIds.length === 0) return arr.map((it) => ({ ...it, product: null }));
 
     const products = await Product.find({ _id: { $in: validIds } })
-      .select('title price image images slug sku barcode category inventory stock visible active trackInventory allowBackorder variants')
+      .select(
+        'title price image images slug sku barcode category inventory stock visible active productType trackInventory allowBackorder variants digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+      )
       .populate({ path: 'category', select: 'name' })
       .lean()
       .exec();
 
-    const map = new Map(products.map((p) => [String(p._id), p]));
+    const map = new Map(
+      products.map((product) => {
+        const fulfillment = getPublicFulfillmentView(product);
+        return [
+          String(product._id),
+          {
+            ...product,
+            fulfillment,
+            requiresShipping: fulfillment.requiresShipping,
+          },
+        ];
+      })
+    );
     return arr.map((it) => {
       const rawId = it?._id;
       const idStr = rawId && typeof rawId === 'object' ? (rawId._id || rawId.id) : rawId;
@@ -227,6 +247,9 @@ function computeAvailableStockForVariant(p, color, size) {
 
 async function computeAvailableStockForCartItem(p, item) {
   if (!p) return Infinity;
+  if (p.productType === 'bundle') {
+    return getBundleAvailableQuantity(p);
+  }
   if (p.trackInventory === false || p.allowBackorder === true) return Infinity;
 
   const selector = getVariantSelector(item);
@@ -611,6 +634,11 @@ router.post('/validate', async (req, res) => {
         variantBarcode: commercial?.barcode || '',
         image: commercial?.image || it.image || p?.image || '',
         price: currentPrice,
+        productType: p?.productType || 'physical',
+        requiresShipping:
+          p?.requiresShipping !== false,
+        fulfillment:
+          p?.fulfillment || getPublicFulfillmentView(p || {}),
         qty: finalQty,
         quantity: finalQty,
       };
