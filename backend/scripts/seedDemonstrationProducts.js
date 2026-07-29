@@ -1650,7 +1650,7 @@ async function validateAdminEndpoint() {
   let response;
   try {
     response = await fetch(
-      `${BASE_URL}/api/products/admin/list?all=1&q=${DEMO_SKU_PREFIX}`,
+      `${BASE_URL}/api/products/admin/list?all=1&limit=100&q=${DEMO_SKU_PREFIX}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
