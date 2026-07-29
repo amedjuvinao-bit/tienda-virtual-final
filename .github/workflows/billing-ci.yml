@@ -104,3 +104,43 @@ jobs:
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
+
+  billing-stress:
+    name: Prueba de choque
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar plan de choque
+        run: npm --prefix backend run test:billing-stress -- --validate-plan
+
+      - name: Ejecutar choque e integridad
+        env:
+          BILLING_STRESS_MONGO_URI: mongodb://127.0.0.1:27017
+          BILLING_STRESS_MAX_DURATION_MS: 180000
+        run: npm --prefix backend run test:billing-stress
