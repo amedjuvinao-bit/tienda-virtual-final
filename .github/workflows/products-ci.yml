@@ -178,5 +178,8 @@ jobs:
       - name: Instalar frontend
         run: npm --prefix frontend ci
 
+      - name: Validar SEO de la ficha pública
+        run: npm --prefix frontend run test:product-seo
+
       - name: Compilar frontend
         run: npm --prefix frontend run build

@@ -36,9 +36,6 @@ function upsertCanonical(url) {
 
 function buildProductSchema(product, canonicalUrl) {
   const image = clean(product?.seo?.image || product?.image);
-  const keywords = Array.isArray(product?.seo?.keywords)
-    ? product.seo.keywords.map(clean).filter(Boolean).join(', ')
-    : '';
   const price = Number(product?.price || 0);
   const available =
     product?.trackInventory === false ||
@@ -84,6 +81,9 @@ export function applyProductSeo(product) {
     product?.seo?.description || product?.description
   ).slice(0, 320);
   const image = clean(product?.seo?.image || product?.image);
+  const keywords = Array.isArray(product?.seo?.keywords)
+    ? product.seo.keywords.map(clean).filter(Boolean).join(', ')
+    : '';
   const canonicalUrl = clean(product?.seo?.canonicalUrl)
     || window.location.href.split('#')[0];
   const robots = product?.seo?.noIndex === true
