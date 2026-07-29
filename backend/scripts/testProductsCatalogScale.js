@@ -90,7 +90,8 @@ async function seedCatalog() {
         active: true,
         deletedAt: null,
       };
-    });
+    })
+    .filter((row, index) => products[index].trackInventory === true);
 
   await InventoryStock.insertMany(stockRows);
 }
@@ -120,7 +121,7 @@ async function run() {
     assert.strictEqual(secondPage.pagination.pages, 4);
     assert.strictEqual(secondPage.data.length, 10);
     assert.strictEqual(secondPage.summary.total, PRODUCT_COUNT);
-    assert.strictEqual(secondPage.summary.stock, 78);
+    assert.strictEqual(secondPage.summary.stock, 60);
     assert.strictEqual(secondPage.data[0].sku, `${CATEGORY}-011`);
     ok('Paginación real y resumen global independientes de la página');
 
@@ -165,17 +166,17 @@ async function run() {
       limit: 100,
     });
 
-    assert.strictEqual(withStock.pagination.total, 12);
+    assert.strictEqual(withStock.pagination.total, 9);
     assert.strictEqual(
       withoutStock.pagination.total,
-      PRODUCT_COUNT - 12
+      20
     );
-    assert.strictEqual(lowStock.pagination.total, 3);
+    assert.strictEqual(lowStock.pagination.total, 2);
     assert.strictEqual(
       withStock.data[0].inventorySummary.stock,
       12
     );
-    ok('Filtros y orden por inventario real');
+    ok('Filtros de inventario excluyen servicios sin existencia propia');
 
     const selected = productIds.slice(20, 23).map(String);
     const deactivated = await updateProductsInBulk({
