@@ -24,6 +24,9 @@ const {
 const {
   processOrderRefund,
 } = require('../services/orderRefundService');
+const {
+  buildVariantKey,
+} = require('../lib/products/productVariantConfig');
 
 const MONGO_URI =
   process.env.PRODUCTS_TEST_MONGO_URI ||
@@ -35,8 +38,6 @@ const RUN_ID = Math.random()
   .slice(2, 9)
   .toUpperCase();
 const PREFIX = `MULTI-${RUN_ID}`;
-const VARIANT_KEY =
-  'capacidad:128gb__ram:8gb__color:azul__conectividad:5g';
 const VARIANT_ATTRIBUTES = [
   { key: 'capacidad', label: 'Capacidad', value: '128GB' },
   { key: 'ram', label: 'RAM', value: '8GB' },
@@ -47,6 +48,11 @@ const VARIANT_ATTRIBUTES = [
     value: '5G',
   },
 ];
+const VARIANT_KEY = buildVariantKey(
+  '',
+  'Azul',
+  VARIANT_ATTRIBUTES
+);
 
 const ids = {
   products: [],
