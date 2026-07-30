@@ -131,6 +131,12 @@ function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
 
+function normalizePaymentMode(value) {
+  return cleanText(value, 30).toLowerCase() === 'production'
+    ? 'production'
+    : 'sandbox';
+}
+
 function money(value) {
   return Number(value || 0).toLocaleString('es-CO', {
     style: 'currency',
@@ -268,6 +274,13 @@ function assertExecutionPlan() {
       DEMO_ORDER_TAGS.includes('factus habilitacion'),
     'Las ventas deben quedar identificadas por pasarela y ambiente fiscal.'
   );
+  assert(
+    normalizePaymentMode('sandbox') === 'sandbox' &&
+      normalizePaymentMode('test') === 'sandbox' &&
+      normalizePaymentMode('') === 'sandbox' &&
+      normalizePaymentMode('production') === 'production',
+    'El script y la pasarela deben interpretar del mismo modo el ambiente de pago.'
+  );
 
   console.log('\nPLAN DEMOSTRATIVO VALIDADO');
   console.log('  Productos permanentes: catálogo DEMO + smartphone de 4 atributos');
@@ -309,7 +322,7 @@ async function loadAndAssertSafeSettings() {
   const billing = settings?.billing || {};
   const runtime = buildRuntimeFactusConfig(billing);
   const paymentProvider = cleanText(payments.provider, 40).toLowerCase();
-  const paymentMode = cleanText(payments.mode, 30).toLowerCase();
+  const paymentMode = normalizePaymentMode(payments.mode);
   const billingMode = cleanText(billing?.dian?.mode, 40).toLowerCase();
   const billingProvider = cleanText(
     billing?.electronicProvider?.provider,
