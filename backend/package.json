@@ -28,6 +28,7 @@
     "test:complete-sale-contract": "node scripts/testCompleteSaleContract.js",
     "test:complete-sale-integration": "node scripts/testCompleteSaleIntegration.js",
     "test:demo-sales-plan": "node scripts/seedCompleteSalesShowcase.js --validate-plan --confirm-habilitacion",
+    "test:factus-pending-cleanup": "node scripts/testFactusPendingCleanup.js",
     "demo:sales-showcase": "node scripts/seedCompleteSalesShowcase.js",
     "test:products-public-security": "node scripts/testProductsPublicSecurity.js",
     "test:products-integrity": "node scripts/testProductsIntegrity.js",

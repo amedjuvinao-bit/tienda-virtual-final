@@ -12,7 +12,9 @@
  * - Nunca factura en producción: exige Factus + DIAN en habilitación y valida
  *   la URL oficial del sandbox antes de crear cualquier registro.
  * - Es idempotente: reutiliza las mismas sesiones, órdenes y facturas.
- * - No elimina registros al terminar.
+ * - No elimina registros locales al terminar.
+ * - Solo con --cleanup-pending-habilitacion puede retirar una única factura
+ *   no validada que esté bloqueando el sandbox de Factus.
  */
 
 const crypto = require('crypto');
@@ -54,9 +56,14 @@ const {
 const {
   createElectronicInvoiceIssuanceService,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  cleanupSinglePendingInvoiceInSandbox,
+} = require('../lib/dian/providers/factusRangeAwareProvider');
 
 const CONFIRMATION_FLAG = '--confirm-habilitacion';
+const PENDING_CLEANUP_FLAG = '--cleanup-pending-habilitacion';
 const VALIDATE_PLAN_ONLY = process.argv.includes('--validate-plan');
+const ALLOW_PENDING_CLEANUP = process.argv.includes(PENDING_CLEANUP_FLAG);
 const SEED_TAG = 'seed-complete-sales-showcase-v1';
 const DEMO_ORDER_TAGS = [
   'demo',
@@ -289,7 +296,11 @@ function assertExecutionPlan() {
   console.log('  Facturación: Factus habilitación únicamente');
   console.log('  Inventario: reserva multisede 2 + 1');
   console.log('  Cumplimiento: físico + digital + servicio + combo');
-  console.log('  Limpieza automática: desactivada');
+  console.log(
+    `  Retiro de pendiente no validada: ${
+      ALLOW_PENDING_CLEANUP ? 'confirmado' : 'desactivado'
+    }`
+  );
 }
 
 async function connectDatabase() {
@@ -377,6 +388,30 @@ async function loadAndAssertSafeSettings() {
     webhookSecret: cleanText(wompi.webhookSecret, 300),
     runtime,
   };
+}
+
+async function cleanupPendingFactusInvoice(runtime) {
+  if (!ALLOW_PENDING_CLEANUP) return;
+
+  const result = await cleanupSinglePendingInvoiceInSandbox({
+    providerConfig: runtime,
+    confirm: true,
+  });
+
+  assert(
+    result.success === true,
+    result.error ||
+      'No fue posible retirar de forma segura la factura pendiente de Factus habilitación.',
+    result.code || 'DEMO_SHOWCASE_FACTUS_PENDING_CLEANUP_FAILED'
+  );
+
+  if (result.cleaned) {
+    console.log(
+      `OK  Factus habilitación: pendiente no validada ${result.referenceCode} retirada`
+    );
+  } else {
+    console.log('OK  Factus habilitación: no había facturas pendientes');
+  }
 }
 
 function runPermanentCatalogSeed() {
@@ -1199,6 +1234,7 @@ async function run() {
 
   await connectDatabase();
   const safeConfig = await loadAndAssertSafeSettings();
+  await cleanupPendingFactusInvoice(safeConfig.runtime);
 
   console.log('\nETAPA 1 — catálogo demostrativo');
   runPermanentCatalogSeed();
