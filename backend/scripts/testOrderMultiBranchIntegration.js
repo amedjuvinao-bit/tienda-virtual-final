@@ -507,7 +507,7 @@ async function run() {
     ok('La sede secundaria puede localizar la orden compartida');
 
     console.log(
-      `\nÓrdenes multisede: ${passed}/10 verificaciones aprobadas.`
+      `\nÓrdenes multisede: ${passed}/11 verificaciones aprobadas.`
     );
   } finally {
     await cleanup();
