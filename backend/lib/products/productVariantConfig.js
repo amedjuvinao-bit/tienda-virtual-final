@@ -312,7 +312,10 @@ function buildVariantLabel(variant = {}) {
   const size = cleanText(plainVariant.size, 80);
   const colorLabel = getColorDisplayName(plainVariant.color);
 
-  const label = cleanText(plainVariant.label, 160);
+  const label = cleanText(plainVariant.label, 160).replace(
+    /#(?:[0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])/gi,
+    (value) => getColorDisplayName(value)
+  );
   if (label && label !== 'Variante general') return label;
 
   if (attributes.length) {
