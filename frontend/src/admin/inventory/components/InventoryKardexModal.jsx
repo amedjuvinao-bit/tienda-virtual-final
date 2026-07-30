@@ -259,6 +259,27 @@ function getVariantColor(row) {
   return row?.variant?.color || row?.color || '—';
 }
 
+function getVariantLabel(row) {
+  const explicit = String(
+    row?.variant?.label || row?.variantLabel || ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const attributes = Array.isArray(row?.variant?.attributes)
+    ? row.variant.attributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+
+  return (
+    attributes.join(' / ') ||
+    [getVariantSize(row), getVariantColor(row)]
+      .filter((value) => value && value !== '—')
+      .join(' / ') ||
+    'Presentación general'
+  );
+}
+
 function getMovementTypeLabel(type) {
   return MOVEMENT_TYPE_LABELS[type] || type || 'Movimiento';
 }
@@ -290,6 +311,7 @@ function buildKardexParams(stockRow) {
   return {
     productId: getProductId(stockRow),
     branchId: getBranchId(stockRow),
+    variantKey: stockRow?.variantKey || '',
     size: getVariantSize(stockRow),
     color: getVariantColor(stockRow),
   };
@@ -494,12 +516,10 @@ export default function InventoryKardexModal({ open, onClose, stockRow }) {
 
                         <span className="inline-flex items-center gap-2 px-3 py-2" style={styles.primaryBadge}>
                           <Layers size={14} />
-                          Talla {kardex?.variant?.size || getVariantSize(stockRow)}
-                        </span>
-
-                        <span className="inline-flex items-center gap-2 px-3 py-2" style={styles.primaryBadge}>
-                          <Boxes size={14} />
-                          Color {kardex?.variant?.color || getVariantColor(stockRow)}
+                          Variante {getVariantLabel({
+                            variant: kardex?.variant || stockRow?.variant,
+                            variantLabel: kardex?.variant?.label,
+                          })}
                         </span>
                       </div>
 

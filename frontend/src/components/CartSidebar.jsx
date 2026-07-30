@@ -44,6 +44,19 @@ function money(value) {
   return `$${Number(value || 0).toLocaleString('es-CO')}`;
 }
 
+function getVariantDisplay(item = {}) {
+  const explicitLabel = String(item.variantLabel || '').trim();
+  if (explicitLabel) return explicitLabel;
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+
+  return attributes.join(' / ') || [item.color, item.size].filter(Boolean).join(' / ');
+}
+
 function buildSafeCartSidebarConfig(raw) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
 
@@ -928,7 +941,7 @@ export default function CartSidebar({ isOpen, onClose }) {
               <div className="space-y-3">
                 {cart.map((item, index) => {
                   const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
-                  const itemKey = `${item._id}-${item.color}-${item.size}-${index}`;
+                  const itemKey = `${item._id}-${item.variantKey || item.variantId || `${item.color}-${item.size}`}-${index}`;
                   const isQtyAnimated = animatedQtyKey === itemKey;
 
                   return (
@@ -959,10 +972,7 @@ export default function CartSidebar({ isOpen, onClose }) {
 
                           <div className="cart-sidebar-meta mt-1" style={{ color: modal.textColor }}>
                             <p>
-                              {cartPageConfig.colorLabelText} {item.color || '—'}
-                            </p>
-                            <p>
-                              {cartPageConfig.sizeLabelText} {item.size || '—'}
+                              Variante: {getVariantDisplay(item) || 'Presentación general'}
                             </p>
                             <p>Precio: {money(item.price)}</p>
                           </div>
@@ -981,7 +991,7 @@ export default function CartSidebar({ isOpen, onClose }) {
                             >
                               <button
                                 onClick={() => {
-                                  decreaseQuantity(item._id, item.color, item.size);
+                                  decreaseQuantity(item._id, item.color, item.size, item.variantKey || item.variantId);
                                   handleQtyAnimation(itemKey);
                                 }}
                                 className="flex h-8 w-8 items-center justify-center transition hover:brightness-95 active:scale-95"
@@ -1003,7 +1013,7 @@ export default function CartSidebar({ isOpen, onClose }) {
 
                               <button
                                 onClick={() => {
-                                  increaseQuantity(item._id, item.color, item.size);
+                                  increaseQuantity(item._id, item.color, item.size, item.variantKey || item.variantId);
                                   handleQtyAnimation(itemKey);
                                 }}
                                 className="flex h-8 w-8 items-center justify-center transition hover:brightness-95 active:scale-95"
@@ -1019,7 +1029,7 @@ export default function CartSidebar({ isOpen, onClose }) {
 
                             <button
                               onClick={() =>
-                                removeFromCart(item._id, item.color, item.size)
+                                removeFromCart(item._id, item.color, item.size, item.variantKey || item.variantId)
                               }
                               className="text-xs sm:text-sm underline underline-offset-2 transition hover:text-red-500"
                               style={{ color: modal.removeLinkColor }}

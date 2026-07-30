@@ -7,6 +7,7 @@ const SiteSettings = require('../models/SiteSettings');
 const couponService = require('./couponService');
 const {
   buildVariantKey,
+  normalizeAttributes,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
 const {
@@ -61,12 +62,22 @@ function readQuantity(item = {}) {
 }
 
 function readVariantKey(item = {}) {
+  const variantAttributes = normalizeAttributes(
+    item.variantAttributes ||
+      item.attributes ||
+      item.selectedAttributes ||
+      []
+  );
   return clean(
     item.variantId ||
       item.variantKey ||
       item.selectedVariantId ||
       item.selectedVariantKey ||
-      buildVariantKey(item.size || '', item.color || ''),
+      buildVariantKey(
+        item.size || '',
+        item.color || '',
+        variantAttributes
+      ),
     180
   );
 }
@@ -132,10 +143,17 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
     }
 
     const variantKey = readVariantKey(item);
+    const requestedVariantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.selectedAttributes ||
+        []
+    );
     const commercial = resolveVariantCommercialSnapshot(product, {
       variantKey,
       size: item.size || '',
       color: item.color || '',
+      variantAttributes: requestedVariantAttributes,
     });
     const unitPrice = money(commercial?.price ?? product.price, 0);
 
@@ -173,6 +191,10 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       size: clean(item.size, 80),
       variantId: commercial?.variantKey || variantKey,
       variantKey: commercial?.variantKey || variantKey,
+      variantLabel:
+        clean(commercial?.variantLabel || item.variantLabel, 180),
+      variantAttributes:
+        commercial?.variantAttributes || requestedVariantAttributes,
       variantSku: clean(commercial?.sku || product.sku, 120),
       variantBarcode: clean(commercial?.barcode || product.barcode, 120),
       category: categories[0] || '',

@@ -1,5 +1,8 @@
 // backend/models/Order.js
 const mongoose = require('mongoose');
+const {
+  normalizeAttributes,
+} = require('../lib/products/productVariantConfig');
 
 /* ========= Helpers de normalización y validación de tags ========= */
 const MAX_TAGS = 8;
@@ -113,6 +116,15 @@ const AdminSnapshotSchema = new mongoose.Schema(
 );
 
 /* ========= Ítems (snapshot de producto) ========= */
+const OrderVariantAttributeSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const OrderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -151,6 +163,12 @@ const OrderItemSchema = new mongoose.Schema(
     },
     variantId: { type: String, trim: true, default: '' },
     variantKey: { type: String, trim: true, default: '' },
+    variantLabel: { type: String, trim: true, default: '' },
+    variantAttributes: {
+      type: [OrderVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
     variantSku: { type: String, trim: true, default: '' },
     variantBarcode: { type: String, trim: true, default: '' },
     category: { type: String, trim: true, default: '' },
@@ -686,6 +704,14 @@ const OrderSchema = new mongoose.Schema(
           image: String,
           color: String,
           size: String,
+          variantId: { type: String, trim: true, default: '' },
+          variantKey: { type: String, trim: true, default: '' },
+          variantLabel: { type: String, trim: true, default: '' },
+          variantAttributes: {
+            type: [OrderVariantAttributeSchema],
+            default: [],
+            set: normalizeAttributes,
+          },
           quantity: {
             type: Number,
             default: 0,
@@ -975,6 +1001,12 @@ OrderSchema.pre('validate', function (next) {
             image: it?.image,
             color: it?.color,
             size: it?.size,
+            variantId: it?.variantId || it?.variantKey || '',
+            variantKey: it?.variantKey || it?.variantId || '',
+            variantLabel: it?.variantLabel || '',
+            variantAttributes: normalizeAttributes(
+              it?.variantAttributes || []
+            ),
             quantity: qty,
             qty,
             price,

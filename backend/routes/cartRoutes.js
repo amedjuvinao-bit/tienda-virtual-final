@@ -7,6 +7,7 @@ const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const {
   buildVariantKey,
+  normalizeAttributes,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
 const {
@@ -85,11 +86,16 @@ function getVariantSelector(raw = {}) {
   const variantKey = cleanLower(readVariantId(raw));
   const size = clean(raw.size || raw.talla || '');
   const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
+  const variantAttributes = normalizeAttributes(
+    raw.variantAttributes || raw.attributes || raw.selectedAttributes || []
+  );
 
   return {
-    variantKey: variantKey || buildVariantKey(size, color),
+    variantKey:
+      variantKey || buildVariantKey(size, color, variantAttributes),
     size,
     color,
+    variantAttributes,
   };
 }
 
@@ -120,6 +126,17 @@ function sanitizeCartItems(items) {
     const color = String(raw?.color || '').trim();
     const size = String(raw?.size || '').trim();
     const variantId = readVariantId(raw);
+    const variantAttributes = normalizeAttributes(
+      raw?.variantAttributes ||
+        raw?.attributes ||
+        raw?.selectedAttributes ||
+        []
+    );
+    const variantKey =
+      variantId || buildVariantKey(size, color, variantAttributes);
+    const variantLabel = clean(
+      raw?.variantLabel || raw?.selectedVariant?.label || ''
+    ).slice(0, 180);
 
     const qtyNum = Number(raw?.qty ?? raw?.quantity ?? raw?.qtyNumber ?? 0);
     const qty = Number.isFinite(qtyNum) ? Math.max(0, Math.floor(qtyNum)) : 0;
@@ -129,7 +146,7 @@ function sanitizeCartItems(items) {
     if (!idStr) continue;
     if (qty <= 0) continue;
 
-    const dedupeKey = `${idStr}|||${color}|||${size}|||${variantId}`;
+    const dedupeKey = `${idStr}|||${variantKey}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
@@ -140,8 +157,10 @@ function sanitizeCartItems(items) {
       price,
       color,
       size,
-      variantId,
-      variantKey: variantId,
+      variantId: variantKey,
+      variantKey,
+      variantLabel,
+      variantAttributes,
       qty,
       quantity: qty, // compatibilidad
     });
@@ -286,6 +305,10 @@ function resolveCartCommercialSnapshot(p, item) {
       sku: '',
       barcode: '',
       variantKey: readVariantId(item),
+      variantLabel: clean(item.variantLabel || ''),
+      variantAttributes: normalizeAttributes(
+        item.variantAttributes || item.attributes || []
+      ),
     };
   }
 
@@ -630,6 +653,11 @@ router.post('/validate', async (req, res) => {
         ...it,
         variantId: readVariantId(it) || commercial?.variantKey || '',
         variantKey: readVariantId(it) || commercial?.variantKey || '',
+        variantLabel:
+          commercial?.variantLabel || it.variantLabel || '',
+        variantAttributes:
+          commercial?.variantAttributes ||
+          normalizeAttributes(it.variantAttributes || []),
         variantSku: commercial?.sku || '',
         variantBarcode: commercial?.barcode || '',
         image: commercial?.image || it.image || p?.image || '',

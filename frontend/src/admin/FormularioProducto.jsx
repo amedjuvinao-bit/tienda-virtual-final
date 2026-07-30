@@ -93,16 +93,129 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-function buildVariantKey(size = '', color = '') {
+function normalizeAttributeKey(value) {
+  return cleanText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function normalizeVariantAttributes(attributes = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const attribute of Array.isArray(attributes) ? attributes : []) {
+    const label = cleanText(
+      attribute?.label || attribute?.name || attribute?.key || ''
+    ).slice(0, 120);
+    const key = normalizeAttributeKey(
+      attribute?.key || attribute?.name || label
+    );
+    const value = cleanText(attribute?.value || '').slice(0, 160);
+    if (!key || !value || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label: label || key, value });
+    if (out.length >= 4) break;
+  }
+
+  return out;
+}
+
+function stableVariantHash(value) {
+  let first = 2166136261;
+  let second = 5381;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first ^= code;
+    first = Math.imul(first, 16777619);
+    second = Math.imul(second, 33) ^ code;
+  }
+
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0)
+    .toString(16)
+    .padStart(8, '0')}`;
+}
+
+function buildVariantKey(size = '', color = '', attributes = []) {
+  const normalizedAttributes = normalizeVariantAttributes(attributes);
+  if (normalizedAttributes.length) {
+    const pairs = [...normalizedAttributes]
+      .sort((left, right) => left.key.localeCompare(right.key, 'es'))
+      .map(
+      (attribute) =>
+        `${encodeURIComponent(attribute.key)}=${encodeURIComponent(
+          cleanText(attribute.value).toLowerCase()
+        )}`
+      );
+    const rawKey = `v2__${pairs.join('__')}`.toLowerCase();
+    return rawKey.length <= 180
+      ? rawKey
+      : `${rawKey.slice(0, 161)}__${stableVariantHash(rawKey)}`;
+  }
+
   const sizeKey = cleanText(size).toLowerCase();
   const colorKey = cleanText(color).toLowerCase();
   const key = `${sizeKey}__${colorKey}`;
   return !key || key === '__' ? 'default__default' : key;
 }
 
-function buildVariantLabel(size = '', color = '') {
-  const parts = [cleanText(size), cleanText(color)].filter(Boolean);
+function buildVariantLabel(size = '', color = '', attributes = []) {
+  const attributeValues = normalizeVariantAttributes(attributes)
+    .map((attribute) => attribute.value)
+    .filter(Boolean);
+  const parts = attributeValues.length
+    ? attributeValues
+    : [cleanText(size), cleanText(color)].filter(Boolean);
   return parts.join(' / ') || 'Variante general';
+}
+
+function normalizeVariantAxes(axes = [], preset = null) {
+  const source =
+    Array.isArray(axes) && axes.length
+      ? axes
+      : (preset?.axes || []).map((label) => ({ label, values: [] }));
+  const out = [];
+  const seen = new Set();
+
+  for (const axis of source) {
+    const label = cleanText(
+      typeof axis === 'string'
+        ? axis
+        : axis?.label || axis?.name || axis?.key || ''
+    ).slice(0, 40);
+    const key = normalizeAttributeKey(
+      typeof axis === 'string' ? label : axis?.key || label
+    );
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      key,
+      label: label || key,
+      values: normalizeStringArray(axis?.values || [], 40),
+    });
+    if (out.length >= 4) break;
+  }
+
+  return out;
+}
+
+function getLegacyVariantFields(attributes = []) {
+  const normalized = normalizeVariantAttributes(attributes);
+  const colorAttribute = normalized.find((attribute) =>
+    ['color', 'colour', 'tono'].includes(attribute.key)
+  );
+  const sizeAttribute = normalized.find(
+    (attribute) => !['color', 'colour', 'tono'].includes(attribute.key)
+  );
+
+  return {
+    size: sizeAttribute?.value || '',
+    color: colorAttribute?.value || '',
+  };
 }
 
 function getColorValue(color) {
@@ -129,12 +242,23 @@ function normalizeLoadedVariants(product = {}) {
     return product.variants.map((variant, index) => {
       const size = cleanText(variant.size || '');
       const color = cleanText(variant.color || '');
-      const key = cleanText(variant.variantKey || buildVariantKey(size, color)).toLowerCase();
+      const attributes = normalizeVariantAttributes(
+        variant.attributes || variant.variantAttributes || []
+      );
+      const key = cleanText(
+        attributes.length
+          ? buildVariantKey(size, color, attributes)
+          : variant.variantKey || buildVariantKey(size, color)
+      ).toLowerCase();
       return {
         variantKey: key,
-        label: cleanText(variant.label || buildVariantLabel(size, color)),
+        label: cleanText(
+          variant.label ||
+            buildVariantLabel(size, color, attributes)
+        ),
         size,
         color,
+        attributes,
         sku: cleanText(variant.sku || '').toUpperCase(),
         barcode: cleanText(variant.barcode || ''),
         price: variant.price ?? '',
@@ -160,6 +284,7 @@ function normalizeLoadedVariants(product = {}) {
         label: buildVariantLabel(size, color),
         size,
         color,
+        attributes: [],
         sku: '',
         barcode: '',
         price: '',
@@ -174,42 +299,80 @@ function normalizeLoadedVariants(product = {}) {
     });
 }
 
-function mergeAdvancedVariants({ previous = [], sizes = [], colors = [], stockMap = {}, basePrice = 0, baseCost = 0 }) {
-  const cleanSizes = normalizeStringArray(sizes);
-  const cleanColors = normalizeStringArray(colors.map(getColorValue).filter(Boolean), 10);
-  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
+function buildAxisCombinations(axes = [], maximum = 300) {
+  const configuredAxes = normalizeVariantAxes(axes)
+    .filter((axis) => axis.values.length > 0);
+  if (!configuredAxes.length) return [];
 
-  const axisValues = cleanSizes.length ? cleanSizes : [''];
-  const colorValues = cleanColors.length ? cleanColors : [''];
+  let combinations = [[]];
+  for (const axis of configuredAxes) {
+    const next = [];
+    for (const combination of combinations) {
+      for (const value of axis.values) {
+        next.push([
+          ...combination,
+          { key: axis.key, label: axis.label, value },
+        ]);
+        if (next.length >= maximum) break;
+      }
+      if (next.length >= maximum) break;
+    }
+    combinations = next;
+  }
+
+  return combinations;
+}
+
+function mergeAdvancedVariants({
+  previous = [],
+  axes = [],
+  basePrice = 0,
+  baseCost = 0,
+}) {
+  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
   const combos = [];
 
-  if (!cleanSizes.length && !cleanColors.length) return previous;
+  const combinations = buildAxisCombinations(axes);
+  if (!combinations.length) return previous;
+  const legacyIdentity =
+    previous.length > 0 &&
+    previous.every(
+      (variant) =>
+        normalizeVariantAttributes(variant.attributes).length === 0
+    ) &&
+    normalizeVariantAxes(axes).filter(
+      (axis) => axis.values.length > 0
+    ).length <= 2;
 
-  axisValues.forEach((size) => {
-    colorValues.forEach((color) => {
-      const key = buildVariantKey(size, color);
-      const existing = existingByKey.get(key);
-      const stockKey = `${size}|||${color}`;
-      const initialStock = Math.max(0, Math.floor(Number(stockMap[stockKey] ?? existing?.initialStock ?? 0)));
+  combinations.forEach((attributes) => {
+    const { size, color } = getLegacyVariantFields(attributes);
+    const storedAttributes = legacyIdentity ? [] : attributes;
+    const key = buildVariantKey(size, color, storedAttributes);
+    const existing = existingByKey.get(key);
 
-      combos.push({
-        variantKey: key,
-        label: existing?.label || buildVariantLabel(size, color),
-        size,
-        color,
-        sku: existing?.sku || '',
-        barcode: existing?.barcode || '',
-        price: existing?.price ?? '',
-        cost: existing?.cost ?? '',
-        originalPrice: existing?.originalPrice ?? '',
-        image: existing?.image || '',
-        images: normalizeStringArray(existing?.images || [], 8),
-        initialStock,
-        active: existing?.active !== false,
-        sortOrder: existing?.sortOrder ?? combos.length,
-        _basePrice: basePrice,
-        _baseCost: baseCost,
-      });
+    combos.push({
+      variantKey: key,
+      label:
+        existing?.label ||
+        buildVariantLabel(size, color, attributes),
+      size,
+      color,
+      attributes: storedAttributes,
+      sku: existing?.sku || '',
+      barcode: existing?.barcode || '',
+      price: existing?.price ?? '',
+      cost: existing?.cost ?? '',
+      originalPrice: existing?.originalPrice ?? '',
+      image: existing?.image || '',
+      images: normalizeStringArray(existing?.images || [], 8),
+      initialStock: Math.max(
+        0,
+        Math.floor(Number(existing?.initialStock || 0))
+      ),
+      active: existing?.active !== false,
+      sortOrder: existing?.sortOrder ?? combos.length,
+      _basePrice: basePrice,
+      _baseCost: baseCost,
     });
   });
 
@@ -318,6 +481,10 @@ export default function FormularioProducto() {
   const [unitOfMeasure, setUnitOfMeasure] = useState('unit');
   const [allowBackorder, setAllowBackorder] = useState(false);
   const [variantPreset, setVariantPreset] = useState('fashion');
+  const [variantAxes, setVariantAxes] = useState(() =>
+    normalizeVariantAxes([], getVariantPresetMeta('fashion'))
+  );
+  const [variantAxisDrafts, setVariantAxisDrafts] = useState({});
 
   const [categoria, setCategoria] = useState('');
   const [originalCategoria, setOriginalCategoria] = useState('');
@@ -340,7 +507,6 @@ export default function FormularioProducto() {
   const [colorsText, setColorsText] = useState('');
   const [stock, setStock] = useState(0);
   const [sizes, setSizes] = useState([]);
-  const [sizeInput, setSizeInput] = useState('');
   const [variantStock, setVariantStock] = useState({});
   const [advancedVariants, setAdvancedVariants] = useState([]);
   const [expandedVariant, setExpandedVariant] = useState('');
@@ -426,7 +592,18 @@ export default function FormularioProducto() {
         setTrackInventory(loadedTrackInventory);
         setUnitOfMeasure(p.unitOfMeasure || 'unit');
         setAllowBackorder(p.allowBackorder === true);
-        setVariantPreset(p.variantPreset || (Array.isArray(p.sizes) && p.sizes.length ? 'fashion' : 'none'));
+        const loadedVariantPreset =
+          p.variantPreset ||
+          (Array.isArray(p.sizes) && p.sizes.length
+            ? 'fashion'
+            : 'none');
+        setVariantPreset(loadedVariantPreset);
+        setVariantAxes(
+          normalizeVariantAxes(
+            p.variantAxes,
+            getVariantPresetMeta(loadedVariantPreset)
+          )
+        );
         setCategoria(p.category || '');
         setOriginalCategoria(p.category || '');
         setCategoriesExtra(normalizeStringArray(p.categories || []));
@@ -709,9 +886,7 @@ export default function FormularioProducto() {
     setAdvancedVariants((prev) => {
       const merged = mergeAdvancedVariants({
         previous: prev,
-        sizes,
-        colors: colorKeys,
-        stockMap: variantStock,
+        axes: variantAxes,
         basePrice: toMoney(precio, 0),
         baseCost: toMoney(cost || averageCost, 0),
       });
@@ -722,7 +897,42 @@ export default function FormularioProducto() {
 
       return merged;
     });
-  }, [trackInventory, sizes, colorKeys, variantStock, precio, cost, averageCost, expandedVariant]);
+  }, [trackInventory, variantAxes, precio, cost, averageCost, expandedVariant]);
+
+  useEffect(() => {
+    const configuredAxes = normalizeVariantAxes(variantAxes);
+    const colorAxis = configuredAxes.find((axis) =>
+      ['color', 'colour', 'tono'].includes(axis.key)
+    );
+    const primaryAxis = configuredAxes.find(
+      (axis) => !['color', 'colour', 'tono'].includes(axis.key)
+    );
+    const nextSizes = normalizeStringArray(primaryAxis?.values || []);
+    const nextColors = normalizeStringArray(colorAxis?.values || [], 10);
+
+    setSizes(nextSizes);
+    setColorsArr(nextColors);
+    setColorsText(nextColors.join(', '));
+  }, [variantAxes]);
+
+  useEffect(() => {
+    setVariantAxisDrafts((previous) => {
+      const next = {};
+      normalizeVariantAxes(variantAxes).forEach((axis, index) => {
+        const draft = String(previous[index] || '');
+        const draftValues = normalizeStringArray(
+          draft.split(',').map((value) => value.trim()),
+          40
+        );
+        const keepsCurrentDraft =
+          JSON.stringify(draftValues) === JSON.stringify(axis.values);
+        next[index] = keepsCurrentDraft
+          ? draft
+          : axis.values.join(', ');
+      });
+      return next;
+    });
+  }, [variantAxes]);
 
   const subirImagen = async ({ file, gallery = false, variantKey = '' }) => {
     if (!file) return;
@@ -766,28 +976,94 @@ export default function FormularioProducto() {
     const value = String(size || '').trim();
     if (!value) return;
 
-    setSizes((prev) => {
-      const exists = prev.some((item) => item.toLowerCase() === value.toLowerCase());
-      const next = exists
-        ? prev.filter((item) => item.toLowerCase() !== value.toLowerCase())
-        : [...prev, value];
-
-      const map = {};
-      Object.entries(variantStock).forEach(([key, qty]) => {
-        const [variantValue] = key.split('|||');
-        if (next.some((item) => item.toLowerCase() === variantValue.toLowerCase())) map[key] = qty;
-      });
-      setVariantStock(map);
-
-      return normalizeStringArray(next);
+    setVariantAxes((previous) => {
+      const axes = normalizeVariantAxes(previous, selectedPreset);
+      if (!axes.length) return previous;
+      const current = axes[0].values;
+      const exists = current.some(
+        (item) => item.toLowerCase() === value.toLowerCase()
+      );
+      axes[0] = {
+        ...axes[0],
+        values: exists
+          ? current.filter(
+              (item) => item.toLowerCase() !== value.toLowerCase()
+            )
+          : normalizeStringArray([...current, value], 40),
+      };
+      return axes;
     });
   };
 
-  const addSizesFromInput = () => {
-    if (!sizeInput.trim()) return;
-    const parts = sizeInput.split(',').map((part) => part.trim()).filter(Boolean);
-    setSizes((prev) => normalizeStringArray([...prev, ...parts]));
-    setSizeInput('');
+  const handleVariantPresetChange = (value) => {
+    const preset = getVariantPresetMeta(value);
+    setVariantPreset(value);
+    setVariantAxes((previous) => {
+      const previousAxes = normalizeVariantAxes(previous);
+      return normalizeVariantAxes(
+        (preset.axes || []).map((label) => {
+          const key = normalizeAttributeKey(label);
+          const existing = previousAxes.find(
+            (axis) => axis.key === key
+          );
+          return {
+            key,
+            label,
+            values: existing?.values || [],
+          };
+        }),
+        preset
+      );
+    });
+  };
+
+  const updateVariantAxis = (index, patch) => {
+    setVariantAxes((previous) =>
+      normalizeVariantAxes(previous).map((axis, axisIndex) => {
+        if (axisIndex !== index) return axis;
+        const nextLabel =
+          patch.label === undefined
+            ? axis.label
+            : cleanText(patch.label).slice(0, 40);
+        return {
+          ...axis,
+          ...patch,
+          key:
+            patch.label === undefined
+              ? axis.key
+              : normalizeAttributeKey(nextLabel),
+          label: nextLabel,
+          values:
+            patch.values === undefined
+              ? axis.values
+              : normalizeStringArray(patch.values, 40),
+        };
+      })
+    );
+  };
+
+  const addVariantAxis = () => {
+    setVariantAxes((previous) => {
+      const axes = normalizeVariantAxes(previous);
+      if (axes.length >= 4) return axes;
+      const label = `Atributo ${axes.length + 1}`;
+      return [
+        ...axes,
+        {
+          key: normalizeAttributeKey(label),
+          label,
+          values: [],
+        },
+      ];
+    });
+  };
+
+  const removeVariantAxis = (index) => {
+    setVariantAxes((previous) =>
+      normalizeVariantAxes(previous).filter(
+        (_, axisIndex) => axisIndex !== index
+      )
+    );
   };
 
   const removeCatChip = (value) => {
@@ -899,16 +1175,6 @@ export default function FormularioProducto() {
     );
   };
 
-  const setCell = (size, color, value) => {
-    const key = `${size}|||${color}`;
-    const qty = Math.max(0, Math.floor(Number(value) || 0));
-    setVariantStock((prev) => ({ ...prev, [key]: qty }));
-    const variantKey = buildVariantKey(size, color);
-    setAdvancedVariants((prev) => prev.map((variant) => (
-      variant.variantKey === variantKey ? { ...variant, initialStock: qty } : variant
-    )));
-  };
-
   const updateVariant = (variantKey, patch) => {
     setAdvancedVariants((prev) => prev.map((variant) => (
       variant.variantKey === variantKey ? { ...variant, ...patch } : variant
@@ -941,20 +1207,38 @@ export default function FormularioProducto() {
   };
 
   const totalFromMatrix = useMemo(() => {
-    return Object.values(variantStock).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
-  }, [variantStock]);
+    return advancedVariants
+      .filter((variant) => variant.active !== false)
+      .reduce(
+        (sum, variant) =>
+          sum + Math.max(0, Number(variant.initialStock || 0)),
+        0
+      );
+  }, [advancedVariants]);
 
   const inventoryArray = useMemo(() => {
     if (!trackInventory) return [];
 
     if (advancedVariants.length) {
-      return advancedVariants
+      const legacyRows = new Map();
+      advancedVariants
         .filter((variant) => variant.active !== false)
-        .map((variant) => ({
+        .forEach((variant) => {
+          const key = `${variant.size || ''}|||${variant.color || ''}`;
+          const previous = legacyRows.get(key) || {
           size: variant.size || '',
           color: variant.color || '',
-          stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
-        }));
+            stock: 0,
+          };
+          previous.stock += Math.max(
+            0,
+            Math.floor(Number(variant.initialStock || 0))
+          );
+          legacyRows.set(key, previous);
+        });
+      return Array.from(legacyRows.values()).filter(
+        (row) => row.size || row.color
+      );
     }
 
     const out = [];
@@ -973,12 +1257,31 @@ export default function FormularioProducto() {
   const variantPayload = useMemo(() => {
     if (!trackInventory) return [];
     return advancedVariants
-      .filter((variant) => variant.size || variant.color || variant.label)
+      .filter(
+        (variant) =>
+          variant.size ||
+          variant.color ||
+          variant.label ||
+          variant.attributes?.length
+      )
       .map((variant, index) => ({
-        variantKey: variant.variantKey || buildVariantKey(variant.size, variant.color),
-        label: variant.label || buildVariantLabel(variant.size, variant.color),
+        variantKey:
+          variant.variantKey ||
+          buildVariantKey(
+            variant.size,
+            variant.color,
+            variant.attributes
+          ),
+        label:
+          variant.label ||
+          buildVariantLabel(
+            variant.size,
+            variant.color,
+            variant.attributes
+          ),
         size: variant.size || '',
         color: variant.color || '',
+        attributes: normalizeVariantAttributes(variant.attributes),
         sku: variant.sku || '',
         barcode: variant.barcode || '',
         price: variant.price === '' || variant.price == null ? null : toMoney(variant.price, precio),
@@ -1010,6 +1313,19 @@ export default function FormularioProducto() {
     const price = Number(precio);
     if (!price || price <= 0 || Number.isNaN(price)) return toast.error('El precio debe ser mayor a 0');
     if (!categoria.trim()) return toast.error('La categoría es obligatoria');
+    const configuredVariantAxes = normalizeVariantAxes(variantAxes);
+    const activeVariantAxes = configuredVariantAxes.filter(
+      (axis) => axis.values.length > 0
+    );
+    const variantCombinationCount = activeVariantAxes.reduce(
+      (total, axis) => total * Math.max(1, axis.values.length),
+      activeVariantAxes.length ? 1 : 0
+    );
+    if (variantCombinationCount > 300) {
+      return toast.error(
+        'Las variantes generan más de 300 combinaciones. Reduce los valores de los atributos.'
+      );
+    }
     if (
       productType === 'digital' &&
       digitalDelivery.deliveryMode === 'automatic' &&
@@ -1116,10 +1432,7 @@ export default function FormularioProducto() {
       allowBackorder,
       variantPreset,
       variantAxes: trackInventory
-        ? [
-            { key: selectedPreset.axisLabel.toLowerCase(), label: selectedPreset.axisLabel, values: normalizeStringArray(sizes) },
-            { key: 'color', label: 'Color', values: finalColors },
-          ].filter((axis) => axis.values.length > 0)
+        ? normalizeVariantAxes(variantAxes)
         : [],
       colors: trackInventory ? finalColors : [],
       sizes: trackInventory ? normalizeStringArray(sizes) : [],
@@ -1784,7 +2097,7 @@ export default function FormularioProducto() {
               <>
                 <div className="space-y-2">
                   <FieldLabel>Plantilla de variantes</FieldLabel>
-                  <select value={variantPreset} onChange={(e) => setVariantPreset(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                  <select value={variantPreset} onChange={(e) => handleVariantPresetChange(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
                     {VARIANT_PRESETS.map((preset) => (
                       <option key={preset.value} value={preset.value}>{preset.label}</option>
                     ))}
@@ -1805,118 +2118,101 @@ export default function FormularioProducto() {
 
           {trackInventory && (
             <section className="space-y-5">
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <FieldLabel>{selectedPreset.axisLabel || 'Variante'}</FieldLabel>
-                  {(selectedPreset.suggestions || []).length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPreset.suggestions.map((item) => {
-                        const active = sizes.some((size) => size.toLowerCase() === item.toLowerCase());
-                        return (
-                          <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-4 py-2 text-xs font-black transition hover:-translate-y-0.5" style={active ? actionButtonStyle() : pillStyle}>
-                            {item}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Agregar variantes separadas por coma" />
-                    <button type="button" onClick={addSizesFromInput} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>
-                      Añadir
+              <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+                      Atributos de variantes
+                    </p>
+                    <h3 className="text-lg font-bold">Hasta cuatro atributos combinables</h3>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Ejemplo: Capacidad + RAM + Color + Conectividad.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {advancedVariants.length} combinaciones
+                    </span>
+                    <span className="rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      Stock inicial {totalFromMatrix}
+                    </span>
+                    <button type="button" disabled={variantAxes.length >= 4} onClick={addVariantAxis} className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle('soft')}>
+                      Añadir atributo
                     </button>
                   </div>
-                  {sizes.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {sizes.map((size) => (
-                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
-                          {size}
-                          <button type="button" className="font-black" onClick={() => toggleSize(size)} style={{ color: 'var(--admin-button-soft-text)' }}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                <div className="space-y-3">
-                  <FieldLabel helper="opcional">Colores / atributos visuales</FieldLabel>
-                  <ColorBarPicker selected={colorsArr} onChange={setColorsArr} max={10} />
-                  <input
-                    value={colorsText}
-                    onChange={(e) => setColorsText(e.target.value)}
-                    onBlur={() => {
-                      const parsed = colorsText.split(',').map((item) => item.trim()).filter(Boolean);
-                      const merged = normalizeStringArray([...(colorsArr || []), ...parsed], 10);
-                      setColorsArr(merged);
-                      setColorsText(merged.join(', '));
-                    }}
-                    className="w-full px-3 py-2"
-                    style={inputStyle}
-                    placeholder="Ej: negro, blanco, #f0c, gold"
-                  />
-                </div>
-              </div>
-
-              {(sizes.length > 0 || colorKeys.length > 0) && (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
-                      Matriz de inventario inicial
-                    </h3>
-                    <div className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                      Total matriz: <b style={{ color: 'var(--admin-card-text)' }}>{totalFromMatrix}</b>
-                      <button type="button" className="ml-3 rounded-full px-3 py-1.5 text-xs font-semibold" style={actionButtonStyle('soft')} onClick={() => setStock(totalFromMatrix)}>
-                        Usar como stock
-                      </button>
+                <div className="grid gap-4 p-4 lg:grid-cols-2">
+                  {variantAxes.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-5 text-center lg:col-span-2" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                      Este producto no tiene atributos. Selecciona una plantilla o añade el primero.
                     </div>
-                  </div>
+                  ) : (
+                    variantAxes.map((axis, index) => {
+                      const isColorAxis = ['color', 'colour', 'tono'].includes(axis.key);
+                      return (
+                        <article key={`${axis.key}-${index}`} className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%)' }}>
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <FieldLabel>Atributo {index + 1}</FieldLabel>
+                              <input value={axis.label} onChange={(e) => updateVariantAxis(index, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Capacidad" />
+                            </div>
+                            <button type="button" onClick={() => removeVariantAxis(index)} className="rounded-xl px-3 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                              Quitar
+                            </button>
+                          </div>
 
-                  <div className="overflow-auto rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
-                    <table className="min-w-full text-sm">
-                      <thead style={{ background: 'var(--admin-table-head-bg)', color: 'var(--admin-table-text)' }}>
-                        <tr>
-                          <th className="border-r p-2 text-left" style={{ borderColor: 'var(--admin-card-border)' }}>
-                            {selectedPreset.axisLabel || 'Variante'} \ Color
-                          </th>
-                          {colorKeys.length === 0 ? (
-                            <th className="p-2" style={{ color: 'var(--admin-card-muted-text)' }}>Sin colores</th>
-                          ) : (
-                            colorKeys.map((color) => (
-                              <th key={color} className="border-l p-2" style={{ borderColor: 'var(--admin-card-border)' }}>
-                                <div className="flex items-center gap-2">
-                                  <span className="inline-block h-4 w-4 rounded-full border" style={{ backgroundColor: color, borderColor: 'var(--admin-card-border)' }} />
-                                  <span className="font-normal">{color}</span>
-                                </div>
-                              </th>
-                            ))
+                          {isColorAxis && (
+                            <ColorBarPicker selected={axis.values} onChange={(values) => updateVariantAxis(index, { values })} max={40} />
                           )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sizes.length === 0 ? (
-                          <tr>
-                            <td className="p-3" style={{ color: 'var(--admin-card-muted-text)' }}>Sin variantes</td>
-                          </tr>
-                        ) : (
-                          sizes.map((size) => (
-                            <tr key={size}>
-                              <td className="border-r p-2 font-semibold" style={{ borderColor: 'var(--admin-card-border)' }}>{size}</td>
-                              {(colorKeys.length ? colorKeys : ['']).map((color) => {
-                                const key = `${size}|||${color}`;
+
+                          <div>
+                            <FieldLabel>Valores separados por coma</FieldLabel>
+                            <input
+                              value={variantAxisDrafts[index] ?? axis.values.join(', ')}
+                              onChange={(e) => {
+                                const draft = e.target.value;
+                                setVariantAxisDrafts((previous) => ({
+                                  ...previous,
+                                  [index]: draft,
+                                }));
+                                updateVariantAxis(index, {
+                                  values: draft
+                                    .split(',')
+                                    .map((value) => value.trim())
+                                    .filter(Boolean),
+                                });
+                              }}
+                              onBlur={() =>
+                                setVariantAxisDrafts((previous) => ({
+                                  ...previous,
+                                  [index]: axis.values.join(', '),
+                                }))
+                              }
+                              className="w-full px-3 py-2"
+                              style={inputStyle}
+                              placeholder={isColorAxis ? 'Negro, Dorado, #ffffff' : '128 GB, 256 GB'}
+                            />
+                          </div>
+
+                          {index === 0 && (selectedPreset.suggestions || []).length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {selectedPreset.suggestions.map((item) => {
+                                const active = axis.values.some((value) => value.toLowerCase() === item.toLowerCase());
                                 return (
-                                  <td key={key} className="border-l p-1" style={{ borderColor: 'var(--admin-card-border)' }}>
-                                    <input type="number" min="0" step="1" value={variantStock[key] ?? 0} onChange={(e) => setCell(size, color, e.target.value)} className="w-24 px-2 py-1 text-center" style={inputStyle} />
-                                  </td>
+                                  <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-3 py-1.5 text-xs font-black" style={active ? actionButtonStyle() : pillStyle}>
+                                    {item}
+                                  </button>
                                 );
                               })}
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })
+                  )}
                 </div>
-              )}
+              </section>
 
               {advancedVariants.length > 0 && (
                 <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
@@ -1951,6 +2247,15 @@ export default function FormularioProducto() {
                                 <span className="rounded-full border px-3 py-1 text-xs font-black" style={pillStyle}>{variant.label}</span>
                                 <span className="rounded-full border px-3 py-1 text-xs font-black" style={variant.active ? pillStyle : { ...pillStyle, opacity: 0.65 }}> {variant.active ? 'ACTIVA' : 'INACTIVA'} </span>
                               </div>
+                              {variant.attributes?.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {variant.attributes.map((attribute) => (
+                                    <span key={`${variant.variantKey}-${attribute.key}`} className="rounded-full border px-2.5 py-1 text-[11px] font-bold" style={pillStyle}>
+                                      {attribute.label}: {attribute.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
                                 {variant.variantKey} · Stock inicial {variant.initialStock || 0}
                               </p>
@@ -1998,7 +2303,6 @@ export default function FormularioProducto() {
                                     <input type="number" min="0" value={variant.initialStock ?? 0} onChange={(e) => {
                                       const qty = Math.max(0, Math.floor(Number(e.target.value || 0)));
                                       updateVariant(variant.variantKey, { initialStock: qty });
-                                      setCell(variant.size, variant.color, qty);
                                     }} className="w-full px-3 py-2" style={inputStyle} />
                                   </div>
                                   <label className="flex items-center gap-3 pt-6">

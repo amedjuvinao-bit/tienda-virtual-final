@@ -17,6 +17,15 @@ function cleanLower(value) {
   return clean(value).toLowerCase();
 }
 
+function normalizeAttributeKey(value) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function uniqueStrings(values = []) {
   const out = [];
   const seen = new Set();
@@ -55,6 +64,47 @@ function normalizeImages(product = {}) {
   return uniqueStrings(list);
 }
 
+function normalizeVariantAttributes(attributes = []) {
+  const normalized = [];
+  const seen = new Set();
+
+  (Array.isArray(attributes) ? attributes : []).forEach((attribute) => {
+    const label = clean(attribute?.label || attribute?.name || attribute?.key);
+    const key = normalizeAttributeKey(attribute?.key || attribute?.name || label);
+    const value = clean(attribute?.value);
+    if (!key || !value || seen.has(key) || normalized.length >= 4) return;
+    seen.add(key);
+    normalized.push({ key, label: label || key, value });
+  });
+
+  return normalized;
+}
+
+function normalizeVariantAxes(product = {}) {
+  const axes = [];
+  const seen = new Set();
+
+  (Array.isArray(product.variantAxes) ? product.variantAxes : []).forEach((axis) => {
+    const label = clean(axis?.label || axis?.name || axis?.key);
+    const key = normalizeAttributeKey(axis?.key || axis?.name || label);
+    const values = uniqueStrings(Array.isArray(axis?.values) ? axis.values : []);
+    if (!key || !label || seen.has(key) || axes.length >= 4) return;
+    seen.add(key);
+    axes.push({ key, label, values });
+  });
+
+  return axes;
+}
+
+function findAttributeValue(attributes = [], key = "") {
+  const normalizedKey = normalizeAttributeKey(key);
+  return clean(
+    normalizeVariantAttributes(attributes).find(
+      (attribute) => attribute.key === normalizedKey
+    )?.value
+  );
+}
+
 function buildVariantKey(size = "", color = "") {
   const sizeKey = cleanLower(size);
   const colorKey = cleanLower(color);
@@ -62,11 +112,32 @@ function buildVariantKey(size = "", color = "") {
   return !key || key === "__" ? "default__default" : key;
 }
 
-function normalizeVariant(product = {}, variant = {}, index = 0) {
+function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
   const size = clean(variant.size || variant.talla || variant.attribute || "");
   const rawColor = clean(variant.color || variant.colour || variant.visualAttribute || "");
   const colorLabel = getColorDisplayName(rawColor);
   const colorValue = getColorVisualValue(rawColor);
+  let attributes = normalizeVariantAttributes(
+    variant.attributes || variant.variantAttributes
+  );
+
+  if (!attributes.length) {
+    const legacyAttributes = [];
+    axes.forEach((axis) => {
+      if (["size", "talla", "presentacion"].includes(axis.key) && size) {
+        legacyAttributes.push({ key: axis.key, label: axis.label, value: size });
+      }
+      if (["color", "colour", "tono"].includes(axis.key) && rawColor) {
+        legacyAttributes.push({
+          key: axis.key,
+          label: axis.label,
+          value: rawColor,
+        });
+      }
+    });
+    attributes = normalizeVariantAttributes(legacyAttributes);
+  }
+
   const variantKey = cleanLower(variant.variantKey || buildVariantKey(size, rawColor));
   const images = uniqueStrings([
     clean(variant.image),
@@ -83,13 +154,27 @@ function normalizeVariant(product = {}, variant = {}, index = 0) {
     ? null
     : Number(variant.originalPrice);
 
-  const labelParts = [size, colorLabel].filter(Boolean);
+  const labelParts = attributes.length
+    ? attributes.map((attribute) =>
+        ["color", "colour", "tono"].includes(attribute.key)
+          ? getColorDisplayName(attribute.value)
+          : attribute.value
+      )
+    : [size, colorLabel].filter(Boolean);
+  const explicitLabel = clean(variant.label);
 
   return {
     ...variant,
+    attributes,
+    variantAttributes: attributes,
     variantKey,
     variantId: clean(variant.variantId || variantKey),
-    label: labelParts.length ? labelParts.join(" / ") : clean(variant.label) || "Variante general",
+    label:
+      explicitLabel && explicitLabel !== "Variante general"
+        ? explicitLabel
+        : labelParts.length
+          ? labelParts.join(" / ")
+          : "Variante general",
     size,
     color: colorLabel || rawColor,
     colorLabel: colorLabel || rawColor,
@@ -110,12 +195,40 @@ function normalizeVariant(product = {}, variant = {}, index = 0) {
 function decorateProductForPublic(product) {
   if (!product) return product;
 
+  let variantAxes = normalizeVariantAxes(product);
+  if (!variantAxes.length) {
+    const fallbackAxes = [];
+    if (
+      (product.sizes || []).length ||
+      (product.variants || []).some((variant) => clean(variant?.size))
+    ) {
+      fallbackAxes.push({ key: "size", label: "Talla", values: [] });
+    }
+    if (
+      (product.colors || []).length ||
+      (product.variants || []).some((variant) => clean(variant?.color))
+    ) {
+      fallbackAxes.push({ key: "color", label: "Color", values: [] });
+    }
+    variantAxes = fallbackAxes;
+  }
+
   const variants = Array.isArray(product.variants)
     ? product.variants
-        .map((variant, index) => normalizeVariant(product, variant, index))
+        .map((variant, index) => normalizeVariant(product, variant, index, variantAxes))
         .filter((variant) => variant.active !== false)
         .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
     : [];
+
+  variantAxes = variantAxes.map((axis) => ({
+    ...axis,
+    values: uniqueStrings([
+      ...axis.values,
+      ...variants.map((variant) =>
+        findAttributeValue(variant.attributes, axis.key)
+      ),
+    ]),
+  }));
 
   const baseSizes = Array.isArray(product.sizes) ? product.sizes : [];
   const variantSizes = variants.map((variant) => variant.size).filter(Boolean);
@@ -145,13 +258,29 @@ function decorateProductForPublic(product) {
     sizes,
     colors,
     colorOptions,
+    variantAxes,
     variants,
   };
 }
 
-function findSelectedVariant(product, selectedSize, selectedColor) {
+function findSelectedVariant(
+  product,
+  selectedSize,
+  selectedColor,
+  selectedVariantKey = ""
+) {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
   if (!variants.length) return null;
+
+  const variantKey = cleanLower(selectedVariantKey);
+  if (variantKey) {
+    const byKey = variants.find(
+      (variant) =>
+        cleanLower(variant.variantKey) === variantKey ||
+        cleanLower(variant.variantId) === variantKey
+    );
+    if (byKey) return byKey;
+  }
 
   const sizeKey = cleanLower(selectedSize);
   const colorKey = cleanLower(selectedColor);
@@ -168,6 +297,40 @@ function findSelectedVariant(product, selectedSize, selectedColor) {
     || variants.find((variant) => cleanLower(variant.colorLabel || variant.color) === colorKey)
     || variants[0]
     || null;
+}
+
+function findVariantForChangedAttribute(
+  product,
+  axisKey,
+  nextValue,
+  currentVariant
+) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const key = normalizeAttributeKey(axisKey);
+  const valueKey = cleanLower(nextValue);
+  if (!variants.length || !key || !valueKey) return null;
+
+  const candidates = variants.filter(
+    (variant) =>
+      cleanLower(findAttributeValue(variant.attributes, key)) === valueKey
+  );
+  if (!candidates.length) return null;
+
+  const currentAttributes = normalizeVariantAttributes(currentVariant?.attributes);
+  const score = (variant) =>
+    currentAttributes.reduce((total, attribute) => {
+      if (attribute.key === key) return total;
+      return total + (
+        cleanLower(findAttributeValue(variant.attributes, attribute.key)) ===
+        cleanLower(attribute.value)
+          ? 1
+          : 0
+      );
+    }, 0);
+
+  return [...candidates].sort(
+    (left, right) => score(right) - score(left)
+  )[0];
 }
 
 function findVariantForChangedOption(
@@ -254,6 +417,7 @@ export default function ProductDetail() {
 
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+  const [selectedVariantKey, setSelectedVariantKey] = useState("");
   const [quantity, setQuantity] = useState(1);
 
   const [reviewName, setReviewName] = useState("");
@@ -265,8 +429,25 @@ export default function ProductDetail() {
 
   const publicProduct = useMemo(() => decorateProductForPublic(product), [product]);
   const selectedVariant = useMemo(
-    () => findSelectedVariant(publicProduct, selectedSize, selectedColor),
-    [publicProduct, selectedSize, selectedColor]
+    () =>
+      findSelectedVariant(
+        publicProduct,
+        selectedSize,
+        selectedColor,
+        selectedVariantKey
+      ),
+    [publicProduct, selectedSize, selectedColor, selectedVariantKey]
+  );
+  const selectedAttributes = useMemo(
+    () =>
+      normalizeVariantAttributes(selectedVariant?.attributes).reduce(
+        (result, attribute) => ({
+          ...result,
+          [attribute.key]: attribute.value,
+        }),
+        {}
+      ),
+    [selectedVariant]
   );
   const variantAwareProduct = useMemo(
     () => buildVariantAwareProduct(publicProduct, selectedVariant),
@@ -285,6 +466,7 @@ export default function ProductDetail() {
         const initialVariant = decorated?.variants?.[0] || null;
 
         setProduct(data);
+        setSelectedVariantKey(initialVariant?.variantKey || "");
 
         if (initialVariant?.size || decorated?.sizes?.length) {
           setSelectedSize(initialVariant?.size || decorated.sizes[0]);
@@ -381,6 +563,7 @@ export default function ProductDetail() {
     );
 
     setSelectedSize(matchingVariant?.size || nextSize);
+    setSelectedVariantKey(matchingVariant?.variantKey || "");
 
     if (matchingVariant?.colorLabel || matchingVariant?.color) {
       setSelectedColor(
@@ -402,10 +585,27 @@ export default function ProductDetail() {
       matchingVariant?.color ||
       nextColor
     );
+    setSelectedVariantKey(matchingVariant?.variantKey || "");
 
     if (matchingVariant?.size) {
       setSelectedSize(matchingVariant.size);
     }
+  };
+
+  const handleVariantAttributeChange = (axisKey, nextValue) => {
+    const matchingVariant = findVariantForChangedAttribute(
+      publicProduct,
+      axisKey,
+      nextValue,
+      selectedVariant
+    );
+    if (!matchingVariant) return;
+
+    setSelectedVariantKey(matchingVariant.variantKey);
+    setSelectedSize(matchingVariant.size || "");
+    setSelectedColor(
+      matchingVariant.colorLabel || matchingVariant.color || ""
+    );
   };
 
   const handleAddToCart = () => {
@@ -420,6 +620,7 @@ export default function ProductDetail() {
       variantId: selectedVariant?.variantId || selectedVariant?.variantKey || "",
       variantKey: selectedVariant?.variantKey || "",
       variantLabel: selectedVariant?.label || "",
+      variantAttributes: selectedVariant?.attributes || [],
       variantSku: selectedVariant?.sku || variantAwareProduct.sku || "",
       variantBarcode: selectedVariant?.barcode || variantAwareProduct.barcode || "",
       image: variantAwareProduct.image,
@@ -501,6 +702,9 @@ export default function ProductDetail() {
       setSelectedSize={handleSizeChange}
       selectedColor={selectedColor}
       setSelectedColor={handleColorChange}
+      variantAxes={publicProduct?.variantAxes || []}
+      selectedAttributes={selectedAttributes}
+      onVariantAttributeChange={handleVariantAttributeChange}
       quantity={quantity}
       setQuantity={setQuantity}
       reviewName={reviewName}

@@ -749,7 +749,16 @@ async function generateOrderPdf({ order, invoice, settings, res }) {
     const p = it.product || {};
     const title = p.title || it.title || 'Producto';
     const sku = p.sku ? `SKU: ${p.sku}` : '';
-    const variant = [it.color, it.size].filter(Boolean).join(' / ') || '—';
+    const variant =
+      it.variantLabel ||
+      (Array.isArray(it.variantAttributes)
+        ? it.variantAttributes
+            .map((attribute) => attribute?.value)
+            .filter(Boolean)
+            .join(' / ')
+        : '') ||
+      [it.color, it.size].filter(Boolean).join(' / ') ||
+      '—';
     const price = Number(p.price ?? it.price ?? it.unitPrice ?? 0) || 0;
     const qty = qtyOf(it);
     const line = price * qty;

@@ -9,6 +9,7 @@ const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const {
   buildVariantKey,
+  normalizeAttributes,
 } = require('../lib/products/productVariantConfig');
 
 const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
@@ -136,10 +137,16 @@ function normalizeCartItems(items = []) {
 
     const size = normalizeVariantValue(item.size || item.talla || item.variant?.size);
     const color = normalizeVariantValue(item.color || item.variant?.color);
+    const variantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.variant?.attributes ||
+        []
+    );
     const variantKey = cleanText(
       item.variantKey ||
         item.variantId ||
-        buildVariantKey(size, color) ||
+        buildVariantKey(size, color, variantAttributes) ||
         'default__default'
     ).toLowerCase();
     const quantity = toNumber(item.quantity || item.qty || item.cantidad, 0);
@@ -176,6 +183,10 @@ function normalizeCartItems(items = []) {
       productObjectId: toObjectId(productId, `items[${index}].productId`),
       size,
       color,
+      variantLabel: cleanText(
+        item.variantLabel || item.variant?.label || ''
+      ),
+      variantAttributes,
       variantKey: variantKey || 'default__default',
       quantity,
       unitPrice,
@@ -344,6 +355,7 @@ async function expandReservableItems(
           sku: component.sku || '',
           size: component.size || '',
           color: component.color || '',
+          variantLabel: component.variantLabel || '',
           variantKey:
             component.variantKey || 'default__default',
           quantity:
@@ -570,6 +582,11 @@ async function reserveFromStockRow({
     branchSnapshot: getBranchSnapshot(branch),
     size: item.size,
     color: item.color,
+    variantLabel:
+      stock.variant?.label || item.variantLabel || '',
+    variantAttributes: normalizeAttributes(
+      stock.variant?.attributes || item.variantAttributes || []
+    ),
     variantKey:
       stock.variantKey || item.variantKey || 'default__default',
     bundleParentProduct: item.bundleParentProduct || null,
@@ -753,6 +770,10 @@ async function createSaleOutMovementFromReservationItem({
     variant: {
       size: reservationItem.size,
       color: reservationItem.color,
+      label: reservationItem.variantLabel || '',
+      attributes: normalizeAttributes(
+        reservationItem.variantAttributes || []
+      ),
       sku: reservationItem.productSnapshot?.sku || '',
       barcode: '',
     },

@@ -52,6 +52,15 @@ function rowKey(product = {}) {
 }
 
 function variantLabel(product = {}) {
+  if (String(product.variantLabel || '').trim()) {
+    return String(product.variantLabel).trim();
+  }
+  if (Array.isArray(product.variantAttributes) && product.variantAttributes.length) {
+    return product.variantAttributes
+      .map((attribute) => String(attribute?.value || '').trim())
+      .filter(Boolean)
+      .join(' / ');
+  }
   return [product.size, product.color].filter(Boolean).join(' / ') || 'Variante general';
 }
 
@@ -408,7 +417,17 @@ export default function PosSalesPageSafe() {
         customerMode: 'guest',
         registerCode: REGISTER_CODE,
         cashRegisterCode: REGISTER_CODE,
-        items: soldItems.map((item) => ({ productId: item.productId, quantity: item.quantity, size: item.size || '', color: item.color || '' })),
+        items: soldItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size || '',
+          color: item.color || '',
+          variantKey: item.variantKey || item.variantId || '',
+          variantLabel: item.variantLabel || variantLabel(item),
+          variantAttributes: Array.isArray(item.variantAttributes)
+            ? item.variantAttributes
+            : [],
+        })),
         payment: { method: paymentMethod, receivedAmount: cartSummary.total, amount: cartSummary.total },
         discount: { type: 'none', value: 0 },
       });

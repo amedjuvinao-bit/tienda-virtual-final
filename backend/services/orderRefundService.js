@@ -13,6 +13,7 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const {
   buildVariantKey,
+  normalizeAttributes,
 } = require('../lib/products/productVariantConfig');
 const {
   syncProductTotalStock,
@@ -83,7 +84,11 @@ function normalizeVariantKey(source = {}) {
       source.variantId ||
       buildVariantKey(
         source.size || source.talla || source.variant?.size || '',
-        source.color || source.variant?.color || ''
+        source.color || source.variant?.color || '',
+        source.variantAttributes ||
+          source.attributes ||
+          source.variant?.attributes ||
+          []
       ) ||
       'default__default'
   ) || 'default__default';
@@ -395,6 +400,10 @@ async function loadConfirmedSaleAllocations(order, session) {
         variantKey: normalizeVariantKey(item),
         size: cleanText(item.size),
         color: cleanText(item.color),
+        variantLabel: cleanText(item.variantLabel),
+        variantAttributes: normalizeAttributes(
+          item.variantAttributes || []
+        ),
         quantity: toQuantity(item.quantity),
         bundleParentProduct: idValue(item.bundleParentProduct) || null,
         productSnapshot: item.productSnapshot || {},
@@ -438,6 +447,10 @@ async function loadConfirmedSaleAllocations(order, session) {
       variantKey,
       size: cleanText(movement.variant?.size),
       color: cleanText(movement.variant?.color),
+      variantLabel: cleanText(movement.variant?.label),
+      variantAttributes: normalizeAttributes(
+        movement.variant?.attributes || []
+      ),
       quantity: toQuantity(movement.quantity),
       bundleParentProduct: null,
       productSnapshot: movement.productSnapshot || stock.productSnapshot || {},
@@ -465,6 +478,8 @@ function groupSaleAllocations(allocations = []) {
       variantKey: allocation.variantKey,
       size: allocation.size,
       color: allocation.color,
+      variantLabel: allocation.variantLabel,
+      variantAttributes: allocation.variantAttributes,
       allocations: new Map(),
     };
     const current = group.allocations.get(stockId) || {
@@ -850,6 +865,13 @@ async function restoreInventory({
         variant: {
           size: allocation.size || stock.variant?.size || '',
           color: allocation.color || stock.variant?.color || '',
+          label:
+            allocation.variantLabel || stock.variant?.label || '',
+          attributes: normalizeAttributes(
+            allocation.variantAttributes ||
+              stock.variant?.attributes ||
+              []
+          ),
           sku: stock.variant?.sku || '',
           barcode: stock.variant?.barcode || '',
         },

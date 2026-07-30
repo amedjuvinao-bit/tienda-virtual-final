@@ -51,11 +51,44 @@ function setQtyShape(it, newQty) {
   };
 }
 
+function getVariantId(item = {}) {
+  return String(item.variantKey || item.variantId || "").trim();
+}
+
+function getVariantDisplay(item = {}) {
+  const label = String(item.variantLabel || "").trim();
+  if (label) return label;
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => {
+          const attributeLabel = String(
+            attribute?.label || attribute?.key || ""
+          ).trim();
+          const value = String(attribute?.value || "").trim();
+          return attributeLabel && value
+            ? `${attributeLabel}: ${value}`
+            : value;
+        })
+        .filter(Boolean)
+    : [];
+
+  return (
+    attributes.join(" · ") ||
+    [item.color, item.size].filter(Boolean).join(" / ") ||
+    "Presentación general"
+  );
+}
+
 function sameItem(a, b) {
+  const variantA = getVariantId(a);
+  const variantB = getVariantId(b);
   return (
     String(getPid(a.productId)) === String(getPid(b.productId)) &&
-    String(a.color || "") === String(b.color || "") &&
-    String(a.size || "") === String(b.size || "")
+    (variantA || variantB
+      ? variantA === variantB
+      : String(a.color || "") === String(b.color || "") &&
+        String(a.size || "") === String(b.size || ""))
   );
 }
 
@@ -572,8 +605,7 @@ export default function CarritosAdmin() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="p-2 text-left">Producto</th>
-                        <th className="p-2">Color</th>
-                        <th className="p-2">Talla</th>
+                        <th className="p-2">Variante</th>
                         <th className="p-2 text-right">Cantidad</th>
                         <th className="p-2 text-right">Precio</th>
                         <th className="p-2 text-right">Subtotal</th>
@@ -589,7 +621,7 @@ export default function CarritosAdmin() {
                         const price = normalizePrice(it, p);
                         const qty = normalizeQty(it);
                         const sub = price * qty;
-                        const key = `${getPid(it.productId)}__${it.color || ""}__${it.size || ""}`;
+                        const key = `${getPid(it.productId)}__${getVariantId(it) || `${it.color || ""}__${it.size || ""}`}`;
                         const sessionId = detail?.sessionId || detail?.id || "";
 
                         return (
@@ -616,10 +648,7 @@ export default function CarritosAdmin() {
                               </div>
                             </td>
                             <td className="p-2 text-center">
-                              {it.color || "—"}
-                            </td>
-                            <td className="p-2 text-center">
-                              {it.size || "—"}
+                              {getVariantDisplay(it)}
                             </td>
 
                             {/* Cantidad con controles */}

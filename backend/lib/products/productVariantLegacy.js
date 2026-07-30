@@ -13,7 +13,8 @@ function assertUniqueVariantCombinations(variants = []) {
   for (const variant of variants) {
     const key = buildVariantKey(
       variant?.size || variant?.talla || '',
-      variant?.color || variant?.colour || ''
+      variant?.color || variant?.colour || '',
+      variant?.attributes || variant?.variantAttributes || []
     );
 
     if (seen.has(key)) {
@@ -41,7 +42,7 @@ function buildLegacyFromVariants(variants = [], product = {}) {
   const inventory = [];
   const seenSize = new Set();
   const seenColor = new Set();
-  const seenInventory = new Set();
+  const inventoryByLegacyKey = new Map();
 
   normalizedVariants
     .filter((variant) => variant.active !== false)
@@ -60,16 +61,20 @@ function buildLegacyFromVariants(variants = [], product = {}) {
       }
 
       const inventoryKey = `${size.toLowerCase()}|${color.toLowerCase()}`;
-      if ((size || color) && !seenInventory.has(inventoryKey)) {
-        seenInventory.add(inventoryKey);
-        inventory.push({
-          size,
-          color,
-          stock: Math.max(
-            0,
-            Math.floor(Number(variant?.initialStock || 0))
-          ),
-        });
+      if (size || color) {
+        const previous = inventoryByLegacyKey.get(inventoryKey);
+        const quantity = Math.max(
+          0,
+          Math.floor(Number(variant?.initialStock || 0))
+        );
+
+        if (previous) {
+          previous.stock += quantity;
+        } else {
+          const row = { size, color, stock: quantity };
+          inventoryByLegacyKey.set(inventoryKey, row);
+          inventory.push(row);
+        }
       }
     });
 

@@ -50,6 +50,10 @@ router.get('/:productId', requirePermission('products:view'), async (req, res) =
         price: Number(product.price || 0),
         cost: Number(product.cost || product.averageCost || 0),
         image: product.image || '',
+        variantPreset: product.variantPreset || 'none',
+        variantAxes: Array.isArray(product.variantAxes)
+          ? product.variantAxes
+          : [],
       },
       variants: normalizeProductVariants(product.variants || [], product),
     });
@@ -101,6 +105,9 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
     const syncLegacy = req.body?.syncLegacy !== false;
 
     product.variants = normalizedVariants;
+    if (Array.isArray(req.body?.variantAxes)) {
+      product.variantAxes = req.body.variantAxes;
+    }
     product.$locals = product.$locals || {};
     product.$locals.adminId = req.adminUserId || null;
     product.$locals.variantsAuthoritative = true;

@@ -1,6 +1,9 @@
 // backend/models/InventoryReservation.js
 
 const mongoose = require('mongoose');
+const {
+  normalizeAttributes,
+} = require('../lib/products/productVariantConfig');
 
 const { Schema } = mongoose;
 
@@ -19,6 +22,15 @@ const RESERVATION_SOURCES = [
   'admin',
   'system',
 ];
+
+const reservationVariantAttributeSchema = new Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
 
 const reservationItemSchema = new Schema(
   {
@@ -96,6 +108,18 @@ const reservationItemSchema = new Schema(
       trim: true,
       lowercase: true,
       default: 'default__default',
+    },
+
+    variantLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    variantAttributes: {
+      type: [reservationVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
     },
 
     bundleParentProduct: {

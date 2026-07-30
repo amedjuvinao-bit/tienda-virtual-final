@@ -17,6 +17,7 @@ const {
   cleanMoney,
   buildVariantKey,
   normalizeAttributes,
+  buildVariantLabel,
   normalizeProductVariants,
   normalizeStringArray,
 } = require('../lib/products/productVariantConfig');
@@ -107,18 +108,28 @@ ProductVariantSchema.pre('validate', function normalizeVariantBeforeValidate(nex
   try {
     this.size = cleanText(this.size, 80);
     this.color = cleanText(this.color, 120);
-    this.variantKey = cleanText(this.variantKey || buildVariantKey(this.size, this.color), 180).toLowerCase();
+    this.attributes = normalizeAttributes(this.attributes);
+    const canonicalKey = buildVariantKey(
+      this.size,
+      this.color,
+      this.attributes
+    );
+    this.variantKey = cleanText(
+      this.attributes.length
+        ? canonicalKey
+        : this.variantKey || canonicalKey,
+      180
+    ).toLowerCase();
 
     if (!this.variantKey || this.variantKey === '__') {
       this.variantKey = 'default__default';
     }
 
     if (!this.label) {
-      this.label = [this.size, this.color].filter(Boolean).join(' / ') || 'Variante general';
+      this.label = buildVariantLabel(this);
     }
 
     this.label = cleanText(this.label, 160);
-    this.attributes = normalizeAttributes(this.attributes);
     this.sku = cleanUpper(this.sku, 100);
     this.barcode = cleanText(this.barcode, 120);
     this.image = cleanText(this.image, 1000);
@@ -265,6 +276,11 @@ const BundleComponentSchema = new mongoose.Schema(
     size: { type: String, trim: true, default: '' },
     color: { type: String, trim: true, default: '' },
     variantLabel: { type: String, trim: true, default: '' },
+    variantAttributes: {
+      type: [VariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
     trackInventory: { type: Boolean, default: true },
     allowBackorder: { type: Boolean, default: false },
     requiresShipping: { type: Boolean, default: true },
@@ -351,6 +367,10 @@ const productSchema = new mongoose.Schema(
     variants: {
       type: [ProductVariantSchema],
       default: [],
+      validate: [
+        (rows) => Array.isArray(rows) && rows.length <= 300,
+        'El producto admite máximo 300 combinaciones de variantes.',
+      ],
     },
 
     // Tipo universal de producto
@@ -739,7 +759,11 @@ productSchema.pre('validate', async function (next) {
     const duplicateVariantKey = shouldValidateCommercialCodes
       ? findDuplicateCode(
           rawVariantRows.map((variant) =>
-            buildVariantKey(variant?.size, variant?.color)
+            buildVariantKey(
+              variant?.size,
+              variant?.color,
+              variant?.attributes
+            )
           ),
           (value) => cleanText(value, 180).toLowerCase()
         )

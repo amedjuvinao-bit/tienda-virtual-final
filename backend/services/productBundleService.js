@@ -69,7 +69,11 @@ function findVariant(product, requestedVariantKey) {
   const match = variants.find((variant) => {
     const key = clean(
       variant.variantKey ||
-        buildVariantKey(variant.size, variant.color)
+        buildVariantKey(
+          variant.size,
+          variant.color,
+          variant.attributes
+        )
     ).toLowerCase();
     return key === requested;
   });
@@ -181,9 +185,14 @@ async function resolveBundleComponents(
       {
         variantKey:
           variant.variantKey ||
-          buildVariantKey(variant.size, variant.color),
+          buildVariantKey(
+            variant.size,
+            variant.color,
+            variant.attributes
+          ),
         size: variant.size || '',
         color: variant.color || '',
+        variantAttributes: variant.attributes || [],
       }
     );
 
@@ -202,6 +211,9 @@ async function resolveBundleComponents(
         variant.label ||
         [variant.size, variant.color].filter(Boolean).join(' / ') ||
         'Presentación general',
+      variantAttributes: Array.isArray(variant.attributes)
+        ? variant.attributes
+        : [],
       trackInventory: product.trackInventory !== false,
       allowBackorder: product.allowBackorder === true,
       requiresShipping: productRequiresShipping(product),

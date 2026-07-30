@@ -598,6 +598,13 @@ function canonicalizeCart(cart) {
       title: String(it?.title || ''),
       color: String(it?.color || ''),
       size: String(it?.size || ''),
+      variantKey: String(
+        it?.variantKey ||
+          it?.variantId ||
+          it?.selectedVariantKey ||
+          it?.selectedVariantId ||
+          ''
+      ).toLowerCase(),
       price: Number(it?.price ?? it?.unitPrice ?? it?.priceNumber ?? 0) || 0,
       quantity: Number(it?.quantity ?? it?.qty ?? 0) || 0,
     }))
@@ -605,7 +612,8 @@ function canonicalizeCart(cart) {
 
   return sortBy(
     safe,
-    (x) => `${x.productId}|${x.color.toLowerCase()}|${x.size.toLowerCase()}|${x.price}|${x.quantity}`
+    (x) =>
+      `${x.productId}|${x.variantKey}|${x.color.toLowerCase()}|${x.size.toLowerCase()}|${x.price}|${x.quantity}`
   );
 }
 

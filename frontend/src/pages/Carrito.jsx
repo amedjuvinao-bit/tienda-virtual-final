@@ -14,6 +14,24 @@ function clampInt(value, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
+function getVariantDisplay(item = {}) {
+  if (String(item.variantLabel || "").trim()) {
+    return String(item.variantLabel).trim();
+  }
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => {
+          const label = String(attribute?.label || attribute?.key || "").trim();
+          const value = String(attribute?.value || "").trim();
+          return label && value ? `${label}: ${value}` : value;
+        })
+        .filter(Boolean)
+    : [];
+
+  return attributes.join(" · ") || [item.color, item.size].filter(Boolean).join(" / ");
+}
+
 function buildSafeCartPageConfig(raw) {
   const cfg = raw && typeof raw === "object" ? raw : {};
 
@@ -450,7 +468,7 @@ export default function CartPage() {
 
                     return (
                       <tr
-                        key={`${itemId}-${item.color}-${item.size}`}
+                        key={`${itemId}-${item.variantKey || item.variantId || `${item.color}-${item.size}`}`}
                         className="block sm:table-row py-4"
                         style={{
                           borderBottom: `1px solid ${style.tableLineColor}`,
@@ -476,22 +494,16 @@ export default function CartPage() {
                                 {item.title}
                               </h4>
                               <p
-                                className="leading-tight break-words"
-                                style={{ color: style.textSecondaryColor }}
-                              >
-                                {config.colorLabelText} {item.color}
-                              </p>
-                              <p
                                 className="mb-1 leading-tight break-words"
                                 style={{ color: style.textSecondaryColor }}
                               >
-                                {config.sizeLabelText} {item.size}
+                                Variante: {getVariantDisplay(item) || "Presentación general"}
                               </p>
 
                               {config.showRemoveButton && (
                                 <button
                                   onClick={() =>
-                                    removeFromCart(itemId, item.color, item.size)
+                                    removeFromCart(itemId, item.color, item.size, item.variantKey || item.variantId)
                                   }
                                   className="text-sm max-[360px]:text-xs hover:underline"
                                   style={{ color: style.accentColor }}
@@ -512,7 +524,7 @@ export default function CartPage() {
                                   >
                                     <button
                                       onClick={() =>
-                                        decreaseQuantity(itemId, item.color, item.size)
+                                        decreaseQuantity(itemId, item.color, item.size, item.variantKey || item.variantId)
                                       }
                                       className="py-1 max-[360px]:py-[2px] leading-none"
                                     >
@@ -526,7 +538,7 @@ export default function CartPage() {
                                     </span>
                                     <button
                                       onClick={() =>
-                                        increaseQuantity(itemId, item.color, item.size)
+                                        increaseQuantity(itemId, item.color, item.size, item.variantKey || item.variantId)
                                       }
                                       className="py-1 max-[360px]:py-[2px] leading-none"
                                     >
@@ -582,19 +594,13 @@ export default function CartPage() {
                                 className="text-sm"
                                 style={{ color: style.textSecondaryColor }}
                               >
-                                {config.colorLabelText} {item.color}
-                              </p>
-                              <p
-                                className="text-sm"
-                                style={{ color: style.textSecondaryColor }}
-                              >
-                                {config.sizeLabelText} {item.size}
+                                Variante: {getVariantDisplay(item) || "Presentación general"}
                               </p>
 
                               {config.showRemoveButton && (
                                 <button
                                   onClick={() =>
-                                    removeFromCart(itemId, item.color, item.size)
+                                    removeFromCart(itemId, item.color, item.size, item.variantKey || item.variantId)
                                   }
                                   className="text-sm hover:underline mt-1"
                                   style={{ color: style.accentColor }}
@@ -631,7 +637,7 @@ export default function CartPage() {
                             >
                               <button
                                 onClick={() =>
-                                  decreaseQuantity(itemId, item.color, item.size)
+                                  decreaseQuantity(itemId, item.color, item.size, item.variantKey || item.variantId)
                                 }
                                 className="py-1"
                               >
@@ -645,7 +651,7 @@ export default function CartPage() {
                               </span>
                               <button
                                 onClick={() =>
-                                  increaseQuantity(itemId, item.color, item.size)
+                                  increaseQuantity(itemId, item.color, item.size, item.variantKey || item.variantId)
                                 }
                                 className="py-1"
                               >

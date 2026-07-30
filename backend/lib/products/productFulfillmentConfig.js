@@ -1,5 +1,9 @@
 'use strict';
 
+const {
+  normalizeAttributes,
+} = require('./productVariantConfig');
+
 const DIGITAL_DELIVERY_MODES = Object.freeze([
   'automatic',
   'manual',
@@ -154,6 +158,9 @@ function normalizeBundleComponents(values = [], maximum = 30) {
       size: cleanText(value.size, 80),
       color: cleanText(value.color, 120),
       variantLabel: cleanText(value.variantLabel, 180),
+      variantAttributes: normalizeAttributes(
+        value.variantAttributes || value.attributes || []
+      ),
       trackInventory: value.trackInventory !== false,
       allowBackorder: value.allowBackorder === true,
       requiresShipping: value.requiresShipping !== false,

@@ -35,6 +35,16 @@ function normalizeColorValue(color) {
   return "";
 }
 
+function normalizeAttributeKey(value) {
+  return String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function isHexColor(value) {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(String(value || "").trim());
 }
@@ -749,6 +759,9 @@ export default function ProductDetailView({
   setSelectedSize,
   selectedColor,
   setSelectedColor,
+  variantAxes = [],
+  selectedAttributes = {},
+  onVariantAttributeChange,
   quantity,
   setQuantity,
   reviewName,
@@ -809,6 +822,19 @@ export default function ProductDetailView({
 
   const safeColors = Array.isArray(product?.colors) ? product.colors : [];
   const safeSizes = Array.isArray(product?.sizes) ? product.sizes : [];
+  const safeVariantAxes = (Array.isArray(variantAxes) ? variantAxes : [])
+    .map((axis) => ({
+      key: normalizeAttributeKey(axis?.key || axis?.label),
+      label: String(axis?.label || axis?.key || "").trim(),
+      values: Array.isArray(axis?.values)
+        ? [...new Set(axis.values.map((value) => String(value || "").trim()).filter(Boolean))]
+        : [],
+    }))
+    .filter((axis) => axis.key && axis.label && axis.values.length)
+    .slice(0, 4);
+  const hasVariantAxes =
+    safeVariantAxes.length > 0 &&
+    typeof onVariantAttributeChange === "function";
   const safeReviews = Array.isArray(product?.reviews) ? product.reviews : [];
   const publicCommercialFields = Array.isArray(
     product?.commercialFields
@@ -1466,7 +1492,97 @@ export default function ProductDetailView({
 
               <div className="pd-divider" style={{ background: borderColor }} />
 
-              {showSizes && safeSizes.length > 0 && (
+              {hasVariantAxes &&
+                safeVariantAxes.map((axis) => {
+                  const isColorAxis = ["color", "colour", "tono"].includes(axis.key);
+                  const isLegacySizeAxis = [
+                    "size",
+                    "talla",
+                    "presentacion",
+                  ].includes(axis.key);
+                  if (isColorAxis && !showColors) return null;
+                  if (isLegacySizeAxis && !showSizes) return null;
+
+                  return (
+                    <div className="pd-section-gap" key={axis.key}>
+                      <span
+                        className="pd-section-label"
+                        style={{ color: textSecondary }}
+                      >
+                        {axis.label}
+                      </span>
+                      <div
+                        className="max-md:gap-2"
+                        style={{
+                          display: "flex",
+                          gap: isColorAxis ? 10 : 8,
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        {axis.values.map((option, index) => {
+                          const value = String(option || "").trim();
+                          const active =
+                            String(selectedAttributes?.[axis.key] || "")
+                              .trim()
+                              .toLowerCase() === value.toLowerCase();
+
+                          if (isColorAxis && isHexColor(value)) {
+                            return (
+                              <button
+                                key={`${axis.key}-${value}-${index}`}
+                                type="button"
+                                onClick={() =>
+                                  onVariantAttributeChange(axis.key, value)
+                                }
+                                title={`${axis.label}: ${value}`}
+                                aria-label={`${axis.label}: ${value}`}
+                                aria-pressed={active}
+                                className={`pd-color-dot ${active ? "active" : ""}`}
+                                style={{
+                                  backgroundColor: value,
+                                  borderColor: active ? accent1 : "#d1d5db",
+                                  boxShadow: active
+                                    ? `0 0 0 3px ${hexToRgba(accent1, 0.22)}, 0 4px 10px rgba(0,0,0,0.08)`
+                                    : "0 2px 6px rgba(0,0,0,0.06)",
+                                }}
+                              />
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={`${axis.key}-${value}-${index}`}
+                              type="button"
+                              onClick={() =>
+                                onVariantAttributeChange(axis.key, value)
+                              }
+                              aria-pressed={active}
+                              className={isColorAxis ? "pd-color-chip" : "pd-size-btn"}
+                              style={{
+                                borderRadius: 10,
+                                borderColor: active ? accent1 : borderColor,
+                                backgroundColor: active
+                                  ? isColorAxis
+                                    ? textPrimary
+                                    : accent1
+                                  : "#ffffff",
+                                color: active ? "#ffffff" : textPrimary,
+                                boxShadow: active
+                                  ? `0 8px 20px ${hexToRgba(accent1, 0.22)}`
+                                  : "0 2px 8px rgba(31,23,42,0.04)",
+                              }}
+                            >
+                              {value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {!hasVariantAxes && showSizes && safeSizes.length > 0 && (
                 <div className="pd-section-gap">
                   <span className="pd-section-label" style={{ color: textSecondary }}>
                     Talla
@@ -1501,7 +1617,7 @@ export default function ProductDetailView({
                 </div>
               )}
 
-              {showColors && safeColors.length > 0 && (
+              {!hasVariantAxes && showColors && safeColors.length > 0 && (
                 <div className="pd-section-gap">
                   <span className="pd-section-label" style={{ color: textSecondary }}>
                     Color

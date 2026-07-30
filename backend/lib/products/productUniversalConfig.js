@@ -49,7 +49,7 @@ const VARIANT_PRESETS = Object.freeze({
   },
   tech: {
     label: 'Tecnología',
-    axes: ['Capacidad', 'Color'],
+    axes: ['Capacidad', 'RAM', 'Color', 'Conectividad'],
   },
   home: {
     label: 'Hogar',
@@ -72,6 +72,16 @@ function cleanText(value, fallback = '') {
 
 function cleanLower(value, fallback = '') {
   return cleanText(value, fallback).toLowerCase();
+}
+
+function normalizeAxisKey(value) {
+  return cleanText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 function normalizeProductType(value) {
@@ -100,11 +110,17 @@ function normalizeVariantAxes(input, fallbackPreset = 'none') {
   const seen = new Set();
 
   for (const item of source) {
-    const label = typeof item === 'string' ? item : item?.label || item?.name || '';
+    const label =
+      typeof item === 'string'
+        ? item
+        : item?.label || item?.name || item?.key || '';
     const cleanLabel = cleanText(label).slice(0, 40);
     if (!cleanLabel) continue;
 
-    const key = cleanLabel.toLowerCase();
+    const key = normalizeAxisKey(
+      typeof item === 'string' ? cleanLabel : item?.key || cleanLabel
+    );
+    if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
 

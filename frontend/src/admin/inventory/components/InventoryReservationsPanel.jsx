@@ -311,6 +311,19 @@ function getBranchCode(item) {
   return item?.branchSnapshot?.code || item?.branch?.code || '';
 }
 
+function getVariantLabel(item) {
+  const explicit = String(item?.variantLabel || '').trim();
+  if (explicit) return explicit;
+  const attributes = Array.isArray(item?.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+  return attributes.join(' / ') || [item?.size, item?.color]
+    .filter(Boolean)
+    .join(' / ') || 'Presentación general';
+}
+
 function getReservationDateLabel(reservation) {
   if (reservation?.status === 'confirmed') {
     return {
@@ -803,9 +816,8 @@ export default function InventoryReservationsPanel() {
                                         </div>
                                       </div>
 
-                                      <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[420px]">
-                                        <InfoPill label="Talla" value={item?.size || '—'} />
-                                        <InfoPill label="Color" value={item?.color || '—'} />
+                                      <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
+                                        <InfoPill label="Variante" value={getVariantLabel(item)} />
                                         <InfoPill
                                           label="Cantidad"
                                           value={formatNumber(item?.quantity)}

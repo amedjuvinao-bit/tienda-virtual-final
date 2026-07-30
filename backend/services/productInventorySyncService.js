@@ -90,10 +90,22 @@ function normalizeVariantRows(product = {}, options = {}) {
   const rows = [];
   const seen = new Set();
 
-  function addVariant({ size = '', color = '', sku = '', barcode = '', stock = 0 } = {}) {
+  function addVariant({
+    size = '',
+    color = '',
+    attributes = [],
+    label = '',
+    sku = '',
+    barcode = '',
+    stock = 0,
+    variantKey: providedVariantKey = '',
+  } = {}) {
     const cleanSize = cleanText(size);
     const cleanColor = cleanText(color);
-    const variantKey = buildVariantKey(cleanSize, cleanColor);
+    const variantKey = cleanLower(
+      providedVariantKey ||
+        buildVariantKey(cleanSize, cleanColor, attributes)
+    );
 
     if (seen.has(variantKey)) return;
     seen.add(variantKey);
@@ -101,6 +113,8 @@ function normalizeVariantRows(product = {}, options = {}) {
     rows.push({
       size: cleanSize,
       color: cleanColor,
+      attributes,
+      label: cleanText(label),
       sku: cleanText(sku).toUpperCase(),
       barcode: cleanText(barcode),
       stock: positiveInt(stock),
@@ -122,8 +136,11 @@ function normalizeVariantRows(product = {}, options = {}) {
     addVariant({
       size: variant.size,
       color: variant.color,
+      attributes: variant.attributes,
+      label: variant.label,
       sku: variant.sku,
       barcode: variant.barcode,
+      variantKey: variant.variantKey,
       stock: positiveInt(variant.initialStock, legacyStock),
     });
   });
@@ -300,9 +317,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
 
   const hadExistingRows = existingRows.length > 0;
   const desiredVariantKeys = new Set(
-    desiredRows.map((row) =>
-      InventoryStock.buildVariantKey(row.size, row.color)
-    )
+    desiredRows.map((row) => cleanLower(row.variantKey))
   );
 
   if (!desiredRows.length) {
@@ -359,7 +374,11 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
 
   for (const desired of desiredRows) {
     const variant = InventoryStock.buildVariantSnapshot(desired);
-    const variantKey = InventoryStock.buildVariantKey(variant.size, variant.color);
+    const variantKey = InventoryStock.buildVariantKey(
+      variant.size,
+      variant.color,
+      variant.attributes
+    );
     const mapKey = `${String(branchId)}__${variantKey}`;
     const initialQty = hadExistingRows ? 0 : positiveInt(desired.stock);
 

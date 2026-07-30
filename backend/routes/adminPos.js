@@ -181,6 +181,10 @@ function serializePosProduct(stock = {}, branch = {}) {
     price: Number(product.price || 0),
     image: getProductImage(product, stock),
     variantKey: stock.variantKey || 'default__default',
+    variantLabel: variant.label || '',
+    variantAttributes: Array.isArray(variant.attributes)
+      ? variant.attributes
+      : [],
     size: variant.size || '',
     color: variant.color || '',
     variantSku: variant.sku || '',
@@ -203,6 +207,8 @@ function serializePreview(preview = {}) {
       image: item.productSnapshot?.image || item.image || '',
       size: item.size,
       color: item.color,
+      variantLabel: item.variantLabel || '',
+      variantAttributes: item.variantAttributes || [],
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       lineSubtotal: item.lineSubtotal,

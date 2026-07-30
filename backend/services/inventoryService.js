@@ -6,6 +6,9 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
+const {
+  normalizeAttributes,
+} = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -60,26 +63,62 @@ function getVariantFromPayload(payload = {}, product = null) {
   const productInventory = Array.isArray(product?.inventory)
     ? product.inventory
     : [];
+  const requestedVariantKey = cleanLower(
+    payload.variantKey ||
+      payload.variantId ||
+      payload.variant?.variantKey ||
+      ''
+  );
+  const productVariants = Array.isArray(product?.variants)
+    ? product.variants
+    : [];
 
-  const matchedVariant = productInventory.find((item) => {
+  const matchedProductVariant =
+    (requestedVariantKey
+      ? productVariants.find(
+          (item) => cleanLower(item?.variantKey) === requestedVariantKey
+        )
+      : null) ||
+    productVariants.find((item) => {
+      const sameSize = cleanLower(item?.size) === cleanLower(size);
+      const sameColor = cleanLower(item?.color) === cleanLower(color);
+      return sameSize && sameColor;
+    });
+  const matchedLegacyInventory = productInventory.find((item) => {
     const sameSize = cleanLower(item?.size) === cleanLower(size);
     const sameColor = cleanLower(item?.color) === cleanLower(color);
 
     return sameSize && sameColor;
   });
+  const variantAttributes = normalizeAttributes(
+    payload.variantAttributes ||
+      payload.attributes ||
+      payload.variant?.attributes ||
+      matchedProductVariant?.attributes ||
+      []
+  );
 
   return {
-    size: cleanText(size),
-    color: cleanText(color),
+    size: cleanText(size || matchedProductVariant?.size),
+    color: cleanText(color || matchedProductVariant?.color),
+    label: cleanText(
+      payload.variantLabel ||
+        payload.variant?.label ||
+        matchedProductVariant?.label ||
+        ''
+    ),
+    attributes: variantAttributes,
     sku:
       payload.variant?.sku ||
       payload.sku ||
-      matchedVariant?.sku ||
+      matchedProductVariant?.sku ||
+      matchedLegacyInventory?.sku ||
       '',
     barcode:
       payload.variant?.barcode ||
       payload.barcode ||
-      matchedVariant?.barcode ||
+      matchedProductVariant?.barcode ||
+      matchedLegacyInventory?.barcode ||
       product?.barcode ||
       '',
   };
@@ -129,7 +168,8 @@ async function getOrCreateStock({
   const variantSnapshot = InventoryStock.buildVariantSnapshot(variant);
   const variantKey = InventoryStock.buildVariantKey(
     variantSnapshot.size,
-    variantSnapshot.color
+    variantSnapshot.color,
+    variantSnapshot.attributes
   );
 
   let stockRow = await InventoryStock.findOne({

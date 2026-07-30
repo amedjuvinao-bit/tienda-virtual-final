@@ -1,6 +1,11 @@
 // backend/models/InventoryStock.js
 
 const mongoose = require('mongoose');
+const {
+  buildVariantKey,
+  normalizeAttributes,
+  buildVariantLabel,
+} = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -22,13 +27,6 @@ function cleanNumber(value, fallback = 0) {
 
 function cleanPositiveNumber(value, fallback = 0) {
   return Math.max(0, cleanNumber(value, fallback));
-}
-
-function buildVariantKey(size = '', color = '') {
-  const cleanSize = cleanLower(size);
-  const cleanColor = cleanLower(color);
-
-  return `${cleanSize}__${cleanColor}`;
 }
 
 const BranchSnapshotSchema = new mongoose.Schema(
@@ -93,8 +91,24 @@ const ProductSnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const VariantAttributeSnapshotSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const VariantSnapshotSchema = new mongoose.Schema(
   {
+    label: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 160,
+    },
+
     size: {
       type: String,
       trim: true,
@@ -122,6 +136,12 @@ const VariantSnapshotSchema = new mongoose.Schema(
       trim: true,
       default: '',
       maxlength: 120,
+    },
+
+    attributes: {
+      type: [VariantAttributeSnapshotSchema],
+      default: [],
+      set: normalizeAttributes,
     },
   },
   { _id: false }
@@ -167,6 +187,8 @@ const InventoryStockSchema = new mongoose.Schema(
       default: () => ({
         size: '',
         color: '',
+        label: '',
+        attributes: [],
         sku: '',
         barcode: '',
       }),
@@ -325,10 +347,18 @@ InventoryStockSchema.pre('validate', function inventoryStockPreValidate(next) {
 
     this.variant.size = cleanText(this.variant.size);
     this.variant.color = cleanText(this.variant.color);
+    this.variant.attributes = normalizeAttributes(this.variant.attributes);
+    this.variant.label = cleanText(
+      this.variant.label || buildVariantLabel(this.variant)
+    );
     this.variant.sku = cleanUpper(this.variant.sku);
     this.variant.barcode = cleanText(this.variant.barcode);
 
-    this.variantKey = buildVariantKey(this.variant.size, this.variant.color);
+    this.variantKey = buildVariantKey(
+      this.variant.size,
+      this.variant.color,
+      this.variant.attributes
+    );
 
     if (!this.variantKey || this.variantKey === '__') {
       this.variantKey = 'default__default';
@@ -435,8 +465,12 @@ InventoryStockSchema.statics.buildProductSnapshot = function buildProductSnapsho
 
 InventoryStockSchema.statics.buildVariantSnapshot = function buildVariantSnapshot(variant = {}) {
   return {
+    label: cleanText(variant.label || buildVariantLabel(variant)),
     size: cleanText(variant.size),
     color: cleanText(variant.color),
+    attributes: normalizeAttributes(
+      variant.attributes || variant.variantAttributes || []
+    ),
     sku: cleanUpper(variant.sku),
     barcode: cleanText(variant.barcode),
   };

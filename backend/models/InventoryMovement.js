@@ -2,6 +2,11 @@
 
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
+const {
+  normalizeAttributes,
+  buildVariantLabel,
+  buildVariantKey,
+} = require('../lib/products/productVariantConfig');
 
 const INVENTORY_MOVEMENT_TYPES = [
   'initial_stock', // Carga inicial de inventario
@@ -154,8 +159,24 @@ const ProductSnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const VariantAttributeSnapshotSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const VariantSnapshotSchema = new mongoose.Schema(
   {
+    label: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 160,
+    },
+
     size: {
       type: String,
       trim: true,
@@ -183,6 +204,12 @@ const VariantSnapshotSchema = new mongoose.Schema(
       trim: true,
       default: '',
       maxlength: 120,
+    },
+
+    attributes: {
+      type: [VariantAttributeSnapshotSchema],
+      default: [],
+      set: normalizeAttributes,
     },
   },
   { _id: false }
@@ -274,6 +301,14 @@ const InventoryMovementSchema = new mongoose.Schema(
         sku: '',
         barcode: '',
       }),
+    },
+
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'default__default',
+      index: true,
     },
 
     branchFrom: {
@@ -467,6 +502,7 @@ const InventoryMovementSchema = new mongoose.Schema(
  * ============================ */
 
 InventoryMovementSchema.index({ product: 1, createdAt: -1 });
+InventoryMovementSchema.index({ product: 1, variantKey: 1, createdAt: -1 });
 InventoryMovementSchema.index({ product: 1, 'variant.size': 1, 'variant.color': 1 });
 InventoryMovementSchema.index({ branchFrom: 1, createdAt: -1 });
 InventoryMovementSchema.index({ branchTo: 1, createdAt: -1 });
@@ -515,6 +551,15 @@ InventoryMovementSchema.pre('validate', async function inventoryMovementPreValid
     if (this.variant) {
       this.variant.size = cleanText(this.variant.size);
       this.variant.color = cleanText(this.variant.color);
+      this.variant.attributes = normalizeAttributes(this.variant.attributes);
+      this.variantKey = buildVariantKey(
+        this.variant.size,
+        this.variant.color,
+        this.variant.attributes
+      );
+      this.variant.label = cleanText(
+        this.variant.label || buildVariantLabel(this.variant)
+      );
       this.variant.sku = cleanUpper(this.variant.sku);
       this.variant.barcode = cleanText(this.variant.barcode);
     }

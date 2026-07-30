@@ -70,6 +70,7 @@ export const VARIANT_PRESETS = [
     label: 'Sin variantes',
     helper: 'Usa esta opción cuando el producto no cambia por talla, color o presentación.',
     axisLabel: 'Variante',
+    axes: [],
     suggestions: [],
   },
   {
@@ -77,6 +78,7 @@ export const VARIANT_PRESETS = [
     label: 'Moda / ropa',
     helper: 'Tallas y colores para prendas de vestir.',
     axisLabel: 'Talla',
+    axes: ['Talla', 'Color'],
     suggestions: ['XS', 'S', 'M', 'L', 'XL', '0-3M', '3-6M', '6-9M', '12-18M', '2', '4', '6', '8', '10', '12', '14'],
   },
   {
@@ -84,6 +86,7 @@ export const VARIANT_PRESETS = [
     label: 'Calzado',
     helper: 'Numeraciones y colores para zapatos o sandalias.',
     axisLabel: 'Talla',
+    axes: ['Talla', 'Color'],
     suggestions: ['18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '35', '36', '37', '38', '39', '40'],
   },
   {
@@ -91,6 +94,7 @@ export const VARIANT_PRESETS = [
     label: 'Belleza / cosmética',
     helper: 'Tonos, presentaciones o tamaños para cosméticos.',
     axisLabel: 'Presentación',
+    axes: ['Tono', 'Presentación'],
     suggestions: ['30 ml', '50 ml', '100 ml', 'Tono claro', 'Tono medio', 'Tono oscuro', 'Muestra', 'Kit'],
   },
   {
@@ -98,13 +102,15 @@ export const VARIANT_PRESETS = [
     label: 'Alimentos',
     helper: 'Sabores, gramajes o presentaciones.',
     axisLabel: 'Presentación',
+    axes: ['Sabor', 'Presentación'],
     suggestions: ['Unidad', '250 g', '500 g', '1 kg', 'Caja', 'Paquete', 'Sabor vainilla', 'Sabor chocolate'],
   },
   {
     value: 'tech',
     label: 'Tecnología',
     helper: 'Capacidad, color, memoria o referencia.',
-    axisLabel: 'Especificación',
+    axisLabel: 'Capacidad',
+    axes: ['Capacidad', 'RAM', 'Color', 'Conectividad'],
     suggestions: ['64 GB', '128 GB', '256 GB', 'Negro', 'Blanco', 'USB-C', 'Bluetooth', 'WiFi'],
   },
   {
@@ -112,6 +118,7 @@ export const VARIANT_PRESETS = [
     label: 'Hogar',
     helper: 'Medidas, colores o materiales.',
     axisLabel: 'Medida',
+    axes: ['Medida', 'Color'],
     suggestions: ['Pequeño', 'Mediano', 'Grande', '1 plaza', '2 plazas', 'Madera', 'Metal', 'Vidrio'],
   },
   {
@@ -119,6 +126,7 @@ export const VARIANT_PRESETS = [
     label: 'Repuestos',
     helper: 'Referencias, compatibilidad o medidas técnicas.',
     axisLabel: 'Referencia',
+    axes: ['Referencia', 'Compatibilidad'],
     suggestions: ['Original', 'Genérico', 'Compatible', 'Set x2', 'Set x4', 'Derecho', 'Izquierdo'],
   },
   {
@@ -126,6 +134,7 @@ export const VARIANT_PRESETS = [
     label: 'Personalizado',
     helper: 'Define tus propias variantes según el negocio.',
     axisLabel: 'Variante',
+    axes: [],
     suggestions: [],
   },
 ];

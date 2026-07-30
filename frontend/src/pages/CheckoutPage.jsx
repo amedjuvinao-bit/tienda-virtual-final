@@ -72,6 +72,19 @@ function getItemLineTotal(item) {
   return unitPrice * qty;
 }
 
+function getVariantDisplay(item = {}) {
+  const explicitLabel = String(item.variantLabel || '').trim();
+  if (explicitLabel) return explicitLabel;
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+
+  return attributes.join(' / ') || [item.color, item.size].filter(Boolean).join(' / ');
+}
+
 function normalizeText(value) {
   return String(value || '')
     .trim()
@@ -1062,6 +1075,11 @@ function CheckoutPage() {
       color: item.color || '',
       size: item.size || '',
       variantId: item.variantId || item.variantKey || '',
+      variantKey: item.variantKey || item.variantId || '',
+      variantLabel: item.variantLabel || '',
+      variantAttributes: Array.isArray(item.variantAttributes)
+        ? item.variantAttributes
+        : [],
       quantity: getItemQuantity(item),
       price: Number(item.price ?? item?.product?.price ?? 0),
       productType: item.productType || item?.product?.productType || 'physical',
@@ -2392,7 +2410,7 @@ function CheckoutPage() {
                                 {item.title}
                               </p>
                               <p style={{ fontSize: '12px', color: checkoutConfig.style.textSecondaryColor, margin: 0 }}>
-                                {[item.color, item.size].filter(Boolean).join(' / ')}
+                                {getVariantDisplay(item)}
                               </p>
                             </div>
                             <div style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: checkoutConfig.style.textPrimaryColor }}>

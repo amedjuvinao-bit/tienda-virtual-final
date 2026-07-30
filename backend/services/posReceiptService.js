@@ -88,6 +88,17 @@ function mapOrderItems(order = {}) {
       title: cleanText(item.title || item.name || item.product?.title || 'Producto', 220),
       size: cleanText(item.size || '', 80),
       color: cleanText(item.color || '', 120),
+      variantLabel: cleanText(
+        item.variantLabel ||
+          (Array.isArray(item.variantAttributes)
+            ? item.variantAttributes
+                .map((attribute) => attribute?.value)
+                .filter(Boolean)
+                .join(' / ')
+            : '') ||
+          [item.size, item.color].filter(Boolean).join(' / '),
+        300
+      ),
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       unitPrice: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0,
       subtotal: (Number.isFinite(quantity) && quantity > 0 ? quantity : 1) * (Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0),
@@ -230,7 +241,7 @@ function buildReceiptText(receipt) {
     `Cliente: ${receipt.customer.name}`,
     '',
     'Productos:',
-    ...receipt.items.map((item) => `- ${item.title} ${item.size || ''} ${item.color || ''} x${item.quantity}: ${money(item.subtotal)}`),
+    ...receipt.items.map((item) => `- ${item.title}${item.variantLabel ? ` (${item.variantLabel})` : ''} x${item.quantity}: ${money(item.subtotal)}`),
     '',
     `Total: ${money(receipt.totals.total)}`,
     `Pago: ${receipt.payment.methodLabel || receipt.payment.method}`,
@@ -285,7 +296,7 @@ function buildReceiptHtml(receipt) {
             <tr>
               <td style="border-bottom:1px solid #f4f4f4;padding:8px;">
                 <strong>${escapeHtml(item.title)}</strong><br />
-                <span style="color:#777;font-size:12px;">${escapeHtml([item.size, item.color].filter(Boolean).join(' / '))}</span>
+                <span style="color:#777;font-size:12px;">${escapeHtml(item.variantLabel || '')}</span>
               </td>
               <td align="center" style="border-bottom:1px solid #f4f4f4;padding:8px;">${item.quantity}</td>
               <td align="right" style="border-bottom:1px solid #f4f4f4;padding:8px;">${money(item.subtotal)}</td>

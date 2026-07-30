@@ -1,5 +1,17 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
+const {
+  normalizeAttributes,
+} = require("../lib/products/productVariantConfig");
+
+const cartVariantAttributeSchema = new Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: "" },
+    label: { type: String, trim: true, default: "" },
+    value: { type: String, trim: true, default: "" },
+  },
+  { _id: false }
+);
 
 /**
  * Item del carrito:
@@ -26,6 +38,13 @@ const cartItemSchema = new Schema(
     color: { type: String, default: "" },
     size: { type: String, default: "" },
     variantId: { type: String, default: "" },
+    variantKey: { type: String, default: "" },
+    variantLabel: { type: String, default: "" },
+    variantAttributes: {
+      type: [cartVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
 
     // snapshot opcional para UI
     title: { type: String, default: "" },

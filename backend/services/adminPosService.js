@@ -16,6 +16,10 @@ const {
 const {
   getPublicFulfillmentView,
 } = require('../lib/products/productFulfillmentConfig');
+const {
+  buildVariantKey,
+  normalizeAttributes,
+} = require('../lib/products/productVariantConfig');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
 const DEFAULT_CURRENCY = 'COP';
@@ -78,13 +82,6 @@ function toObjectId(value, fieldName = 'id') {
   }
 
   return new mongoose.Types.ObjectId(cleanValue);
-}
-
-function buildVariantKey(size = '', color = '') {
-  const cleanSize = cleanLower(size, 80);
-  const cleanColor = cleanLower(color, 120);
-  const key = `${cleanSize}__${cleanColor}`;
-  return key === '__' ? 'default__default' : key;
 }
 
 function getProductImage(product = {}) {
@@ -178,6 +175,12 @@ function normalizePosItems(items = []) {
     const unitPrice = toMoney(item.unitPrice ?? item.price ?? item.precio);
     const size = cleanText(item.size || item.talla || item.variant?.size || '', 80);
     const color = cleanText(item.color || item.variant?.color || '', 120);
+    const variantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.variant?.attributes ||
+        []
+    );
 
     return {
       index,
@@ -188,7 +191,17 @@ function normalizePosItems(items = []) {
       lineSubtotal: quantity * unitPrice,
       size,
       color,
-      variantKey: buildVariantKey(size, color),
+      variantKey: cleanLower(
+        item.variantKey ||
+          item.variantId ||
+          buildVariantKey(size, color, variantAttributes),
+        180
+      ),
+      variantLabel: cleanText(
+        item.variantLabel || item.variant?.label || '',
+        160
+      ),
+      variantAttributes,
       title: cleanText(item.title || item.name || '', 220),
       sku: cleanUpper(item.sku || '', 100),
       barcode: cleanText(item.barcode || '', 120),
@@ -774,8 +787,12 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
             component
           ),
           variantSnapshot: {
+            label: cleanText(component.variantLabel || '', 160),
             size: cleanText(component.size || '', 80),
             color: cleanText(component.color || '', 120),
+            attributes: normalizeAttributes(
+              component.variantAttributes || []
+            ),
             sku: cleanUpper(component.sku || '', 100),
             barcode: '',
           },
@@ -848,8 +865,17 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
         product,
         productSnapshot: buildProductSnapshot(product, item),
         variantSnapshot: {
+          label: cleanText(
+            stock.variant?.label || item.variantLabel || '',
+            160
+          ),
           size: cleanText(stock.variant?.size || item.size, 80),
           color: cleanText(stock.variant?.color || item.color, 120),
+          attributes: normalizeAttributes(
+            stock.variant?.attributes ||
+              item.variantAttributes ||
+              []
+          ),
           sku: cleanUpper(stock.variant?.sku || item.sku || product.sku || '', 100),
           barcode: cleanText(stock.variant?.barcode || item.barcode || product.barcode || '', 120),
         },
@@ -875,8 +901,12 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
       productSnapshot: buildProductSnapshot(product, item),
       branchSnapshot: buildBranchSnapshot(branch),
       variantSnapshot: {
+        label: cleanText(item.variantLabel || '', 160),
         size: cleanText(item.size, 80),
         color: cleanText(item.color, 120),
+        attributes: normalizeAttributes(
+          item.variantAttributes || []
+        ),
         sku: cleanUpper(item.sku || product.sku || '', 100),
         barcode: cleanText(item.barcode || product.barcode || '', 120),
       },
@@ -926,6 +956,14 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
     image: item.productSnapshot?.image || item.image,
     color: item.color,
     size: item.size,
+    variantId: item.variantKey,
+    variantKey: item.variantKey,
+    variantLabel:
+      item.variantSnapshot?.label || item.variantLabel || '',
+    variantAttributes:
+      item.variantSnapshot?.attributes ||
+      item.variantAttributes ||
+      [],
     qty: item.quantity,
     quantity: item.quantity,
     price: item.unitPrice,
@@ -978,6 +1016,10 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       image: item.image,
       color: item.color,
       size: item.size,
+      variantId: item.variantId,
+      variantKey: item.variantKey,
+      variantLabel: item.variantLabel,
+      variantAttributes: item.variantAttributes,
       quantity: item.quantity,
       price: item.price,
     })),
