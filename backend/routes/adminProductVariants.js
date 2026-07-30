@@ -8,6 +8,10 @@ const requirePermission = require('../middleware/requirePermission');
 const Product = require('../models/Product');
 const { normalizeProductVariants } = require('../lib/products/productVariantConfig');
 const { buildLegacyFromVariants } = require('../lib/products/productVariantLegacy');
+const {
+  ProductInventoryPersistenceError,
+  saveProductWithInventoryTransaction,
+} = require('../services/productInventoryPersistenceService');
 
 const router = express.Router();
 
@@ -107,7 +111,13 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
       product.inventory = legacy.inventory;
     }
 
-    const saved = await product.save();
+    const saved = await saveProductWithInventoryTransaction(
+      product,
+      {
+        adminId: req.adminUserId || null,
+        variantsAuthoritative: true,
+      }
+    );
 
     return res.json({
       ok: true,
@@ -122,6 +132,15 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
       return res.status(400).json({
         ok: false,
         message: error.message,
+      });
+    }
+
+    if (error instanceof ProductInventoryPersistenceError) {
+      return res.status(error.status || 500).json({
+        ok: false,
+        message:
+          'No se actualizaron las variantes porque no fue posible confirmar el inventario. No se aplicó ningún cambio.',
+        code: error.code,
       });
     }
 

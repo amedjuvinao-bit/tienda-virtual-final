@@ -62,6 +62,8 @@ function run() {
     'test:products-fulfillment',
     'test:products-module',
     'test:product-inventory-sync',
+    'test:product-inventory-transaction-contract',
+    'test:product-inventory-transaction',
     'test:product-advanced-variants',
     'test:order-refund-contract',
     'test:order-refund-inventory',
@@ -79,7 +81,7 @@ function run() {
     missingScripts.length === 0,
     `Faltan scripts de cierre: ${missingScripts.join(', ')}`
   );
-  ok('Las 15 suites funcionales están registradas en backend');
+  ok('Las 17 suites funcionales están registradas en backend');
 
   const suitesOutsideCi = requiredSuites.filter(
     (script) =>
@@ -89,7 +91,7 @@ function run() {
     suitesOutsideCi.length === 0,
     `Suites fuera de Productos CI: ${suitesOutsideCi.join(', ')}`
   );
-  ok('Productos CI ejecuta las 15 suites funcionales');
+  ok('Productos CI ejecuta las 17 suites funcionales');
 
   assertIncludes(
     workflow,

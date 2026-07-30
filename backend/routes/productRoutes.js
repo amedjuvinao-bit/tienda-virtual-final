@@ -54,6 +54,10 @@ const {
   ProductFulfillmentInputError,
   resolveBundleComponents,
 } = require('../services/productBundleService');
+const {
+  ProductInventoryPersistenceError,
+  saveProductWithInventoryTransaction,
+} = require('../services/productInventoryPersistenceService');
 
 const PUBLIC_TAXONOMY_POPULATE = [
   {
@@ -953,7 +957,13 @@ router.post(
       doc.$locals.adminId = req.adminUserId || null;
       doc.$locals.variantsAuthoritative = variantsProvided;
 
-      const saved = await doc.save();
+      const saved = await saveProductWithInventoryTransaction(
+        doc,
+        {
+          adminId: req.adminUserId || null,
+          variantsAuthoritative: variantsProvided,
+        }
+      );
 
       return res.status(201).json(saved);
     } catch (error) {
@@ -988,6 +998,14 @@ router.post(
       if (error instanceof ProductFulfillmentInputError) {
         return res.status(error.status || 400).json({
           message: error.message,
+          code: error.code,
+        });
+      }
+
+      if (error instanceof ProductInventoryPersistenceError) {
+        return res.status(error.status || 500).json({
+          message:
+            'No se guardó el producto porque no fue posible confirmar su inventario. No se aplicó ningún cambio.',
           code: error.code,
         });
       }
@@ -1512,7 +1530,14 @@ router.put(
       }
 
       // Guarda con hooks (pre('validate') y pre('save') del modelo)
-      const updated = await prod.save();
+      const updated = await saveProductWithInventoryTransaction(
+        prod,
+        {
+          adminId: req.adminUserId || null,
+          variantsAuthoritative:
+            prod.$locals?.variantsAuthoritative === true,
+        }
+      );
 
       return res.json(updated);
     } catch (error) {
@@ -1548,6 +1573,14 @@ router.put(
       if (error instanceof ProductFulfillmentInputError) {
         return res.status(error.status || 400).json({
           message: error.message,
+          code: error.code,
+        });
+      }
+
+      if (error instanceof ProductInventoryPersistenceError) {
+        return res.status(error.status || 500).json({
+          message:
+            'No se actualizó el producto porque no fue posible confirmar su inventario. No se aplicó ningún cambio.',
           code: error.code,
         });
       }

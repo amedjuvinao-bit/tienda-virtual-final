@@ -16,6 +16,8 @@
     "test:products-universal": "node scripts/seedDemonstrationProducts.js",
     "test:products-demo-catalog": "node scripts/seedDemonstrationProducts.js",
     "test:product-inventory-sync": "node scripts/testProductInventorySyncModule.js",
+    "test:product-inventory-transaction-contract": "node scripts/testProductInventoryTransactionContract.js",
+    "test:product-inventory-transaction": "node scripts/testProductInventoryTransactionIntegration.js",
     "test:product-advanced-variants": "node scripts/testProductAdvancedVariantsModule.js",
     "test:order-refund-contract": "node scripts/testOrderRefundContract.js",
     "test:order-refund-inventory": "node scripts/testOrderRefundInventoryIntegration.js",

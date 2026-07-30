@@ -961,6 +961,7 @@ productSchema.pre('save', function (next) {
 // Sincroniza catálogo comercial con inventario real sin sobrescribir movimientos existentes.
 productSchema.post('save', async function syncProductInventoryAfterSave(doc) {
   if (!doc?.$locals?.syncInventoryAfterSave) return;
+  if (doc?.$locals?.inventoryPersistenceManaged === true) return;
 
   try {
     const { syncProductInventoryFromProduct } = require('../services/productInventorySyncService');
@@ -970,14 +971,26 @@ productSchema.post('save', async function syncProductInventoryAfterSave(doc) {
         adminId: doc.$locals.adminId || null,
         variantsAuthoritative:
           doc.$locals.variantsAuthoritative === true,
+        session:
+          typeof doc.$session === 'function'
+            ? doc.$session()
+            : null,
       }
     );
+
+    if (!doc.$locals.inventorySyncResult?.ok) {
+      throw new Error(
+        doc.$locals.inventorySyncResult?.message ||
+          'No se pudo sincronizar InventoryStock.'
+      );
+    }
   } catch (error) {
     doc.$locals.inventorySyncResult = {
       ok: false,
       message: error.message,
     };
     console.error('[Product] No se pudo sincronizar InventoryStock:', error.message);
+    throw error;
   }
 });
 

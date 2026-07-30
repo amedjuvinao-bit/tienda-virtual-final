@@ -88,6 +88,9 @@ jobs:
       - name: Validar contrato de estados masivos
         run: npm --prefix backend run test:order-bulk-status-contract
 
+      - name: Validar contrato Producto-Inventario
+        run: npm --prefix backend run test:product-inventory-transaction-contract
+
       - name: Validar contrato de cierre
         run: npm --prefix backend run test:products-final-closure
 
@@ -159,6 +162,11 @@ jobs:
           DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:order-bulk-status-inventory
+
+      - name: Validar transacción Producto-Inventario
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+        run: npm --prefix backend run test:product-inventory-transaction
 
       - name: Validar archivo lógico
         env:

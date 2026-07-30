@@ -34,7 +34,15 @@ function getAdminId(value) {
   return value || null;
 }
 
-async function findDefaultInventoryBranch() {
+function applySession(query, session = null) {
+  return session ? query.session(session) : query;
+}
+
+function writeOptions(session = null) {
+  return session ? { session } : undefined;
+}
+
+async function findDefaultInventoryBranch({ session = null } = {}) {
   const baseFilter = {
     deletedAt: null,
     active: true,
@@ -42,11 +50,29 @@ async function findDefaultInventoryBranch() {
   };
 
   return (
-    (await Branch.findOne({ ...baseFilter, isMain: true }).lean()) ||
-    (await Branch.findOne({ ...baseFilter, isDefaultForOnlineOrders: true }).lean()) ||
-    (await Branch.findOne({ ...baseFilter, type: 'warehouse' }).lean()) ||
-    (await Branch.findOne({ ...baseFilter, type: 'store' }).lean()) ||
-    (await Branch.findOne(baseFilter).sort({ createdAt: 1 }).lean())
+    (await applySession(
+      Branch.findOne({ ...baseFilter, isMain: true }),
+      session
+    ).lean()) ||
+    (await applySession(
+      Branch.findOne({
+        ...baseFilter,
+        isDefaultForOnlineOrders: true,
+      }),
+      session
+    ).lean()) ||
+    (await applySession(
+      Branch.findOne({ ...baseFilter, type: 'warehouse' }),
+      session
+    ).lean()) ||
+    (await applySession(
+      Branch.findOne({ ...baseFilter, type: 'store' }),
+      session
+    ).lean()) ||
+    (await applySession(
+      Branch.findOne(baseFilter).sort({ createdAt: 1 }),
+      session
+    ).lean())
   );
 }
 
@@ -129,7 +155,15 @@ function normalizeVariantRows(product = {}, options = {}) {
   return rows;
 }
 
-async function createInitialStockMovement({ stockRow, product, branch, variant, quantity, adminId }) {
+async function createInitialStockMovement({
+  stockRow,
+  product,
+  branch,
+  variant,
+  quantity,
+  adminId,
+  session = null,
+}) {
   const qty = positiveInt(quantity);
   if (!qty) return null;
 
@@ -169,30 +203,40 @@ async function createInitialStockMovement({ stockRow, product, branch, variant, 
     postedAt: now,
   });
 
-  await movement.save();
+  await movement.save(writeOptions(session));
 
   stockRow.lastMovement = movement._id;
   stockRow.lastMovementAt = now;
-  await stockRow.save();
+  await stockRow.save(writeOptions(session));
 
   return movement;
 }
 
-async function syncProductLegacyStock(productDoc, productId) {
+async function syncProductLegacyStock(
+  productDoc,
+  productId,
+  { session = null } = {}
+) {
   const ProductModel = productDoc?.constructor;
   if (!ProductModel || typeof ProductModel.updateOne !== 'function') return 0;
 
-  const rows = await InventoryStock.find({
-    product: productId,
-    deletedAt: null,
-    active: true,
-  }).select('stock').lean();
+  const rows = await applySession(
+    InventoryStock.find({
+      product: productId,
+      deletedAt: null,
+      active: true,
+    }),
+    session
+  )
+    .select('stock')
+    .lean();
 
   const total = rows.reduce((sum, row) => sum + positiveInt(row?.stock), 0);
 
   await ProductModel.updateOne(
     { _id: productId },
-    { $set: { stock: total } }
+    { $set: { stock: total } },
+    writeOptions(session)
   );
 
   return total;
@@ -201,6 +245,11 @@ async function syncProductLegacyStock(productDoc, productId) {
 async function syncProductInventoryFromProduct(productDoc, options = {}) {
   const product = toPlainProduct(productDoc);
   const adminId = getAdminId(options.adminId);
+  const session =
+    options.session ||
+    (typeof productDoc?.$session === 'function'
+      ? productDoc.$session()
+      : null);
 
   if (!product?._id) {
     return { ok: false, message: 'Producto inválido para sincronizar inventario.' };
@@ -216,7 +265,8 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
         productSnapshot,
         updatedBy: adminId,
       },
-    }
+    },
+    writeOptions(session)
   );
 
   if (product.trackInventory === false) {
@@ -227,18 +277,26 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
           active: false,
           updatedBy: adminId,
         },
-      }
+      },
+      writeOptions(session)
     );
 
-    const stock = await syncProductLegacyStock(productDoc, productId);
+    const stock = await syncProductLegacyStock(
+      productDoc,
+      productId,
+      { session }
+    );
     return { ok: true, action: 'inventory_disabled', stock };
   }
 
   const desiredRows = normalizeVariantRows(product, options);
-  const existingRows = await InventoryStock.find({
-    product: productId,
-    deletedAt: null,
-  });
+  const existingRows = await applySession(
+    InventoryStock.find({
+      product: productId,
+      deletedAt: null,
+    }),
+    session
+  );
 
   const hadExistingRows = existingRows.length > 0;
   const desiredVariantKeys = new Set(
@@ -259,10 +317,15 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
           active: false,
           updatedBy: adminId,
         },
-      }
+      },
+      writeOptions(session)
     );
 
-    const stock = await syncProductLegacyStock(productDoc, productId);
+    const stock = await syncProductLegacyStock(
+      productDoc,
+      productId,
+      { session }
+    );
     return {
       ok: true,
       action: 'variants_retired',
@@ -274,7 +337,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     };
   }
 
-  const branch = await findDefaultInventoryBranch();
+  const branch = await findDefaultInventoryBranch({ session });
   if (!branch?._id) {
     return {
       ok: false,
@@ -324,7 +387,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
         updatedBy: adminId,
       });
 
-      await stockRow.save();
+      await stockRow.save(writeOptions(session));
       createdRows += 1;
 
       if (initialQty > 0) {
@@ -335,6 +398,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
           variant,
           quantity: initialQty,
           adminId,
+          session,
         });
 
         if (movement) movementsCreated += 1;
@@ -351,7 +415,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
       stockRow.active = true;
       stockRow.updatedBy = adminId;
 
-      await stockRow.save();
+      await stockRow.save(writeOptions(session));
       if (wasInactive) reactivatedRows += 1;
     }
   }
@@ -368,11 +432,16 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
         active: false,
         updatedBy: adminId,
       },
-    }
+    },
+    writeOptions(session)
   );
   deactivatedRows = Number(retiredRows.modifiedCount || 0);
 
-  const stock = await syncProductLegacyStock(productDoc, productId);
+  const stock = await syncProductLegacyStock(
+    productDoc,
+    productId,
+    { session }
+  );
 
   return {
     ok: true,
