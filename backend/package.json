@@ -27,6 +27,8 @@
     "test:order-multi-branch-inventory": "node scripts/testOrderMultiBranchIntegration.js",
     "test:complete-sale-contract": "node scripts/testCompleteSaleContract.js",
     "test:complete-sale-integration": "node scripts/testCompleteSaleIntegration.js",
+    "test:demo-sales-plan": "node scripts/seedCompleteSalesShowcase.js --validate-plan --confirm-habilitacion",
+    "demo:sales-showcase": "node scripts/seedCompleteSalesShowcase.js",
     "test:products-public-security": "node scripts/testProductsPublicSecurity.js",
     "test:products-integrity": "node scripts/testProductsIntegrity.js",
     "test:products-catalog-operations": "node scripts/testProductsCatalogOperations.js",
