@@ -585,7 +585,7 @@ export default function OrderDetailSummaryRail({ order }) {
           />
           <MiniInfoCard
             icon={OrderDetailIcons.Building2}
-            label="Sede"
+            label={branchInfo.isMultiBranch ? 'Despacho' : 'Sede'}
             value={branchInfo.name}
           />
         </div>
@@ -601,7 +601,14 @@ export default function OrderDetailSummaryRail({ order }) {
         <div style={{ display: 'grid', gap: 10 }}>
           <InfoLine label="Creada el:" value={fmtDate(order?.createdAt)} />
           <InfoLine label="Canal:" value={sourceLabel} />
-          <InfoLine label="Código sede:" value={branchInfo.code || 'Sin sede'} />
+          <InfoLine
+            label={
+              branchInfo.isMultiBranch
+                ? 'Sedes involucradas:'
+                : 'Código sede:'
+            }
+            value={branchInfo.code || 'Sin sede'}
+          />
           <InfoLine label="Creada por:" value={admin.displayName} strong />
           <InfoLine label="Rol:" value={admin.role} />
         </div>

@@ -102,6 +102,42 @@ export function getBillingName(order) {
 export function getOrderBranchInfo(order) {
   const branchSnapshot = order?.branchSnapshot || {};
   const branch = order?.branch || {};
+  const allocations = Array.isArray(order?.inventoryAllocations)
+    ? order.inventoryAllocations
+    : [];
+  const allocationBranches = [];
+  const seen = new Set();
+
+  allocations.forEach((allocation) => {
+    const snapshot = allocation?.branchSnapshot || {};
+    const allocationBranch = allocation?.branch || {};
+    const id = String(
+      allocationBranch?._id ||
+        allocationBranch?.id ||
+        allocationBranch ||
+        snapshot.code ||
+        snapshot.name ||
+        ''
+    );
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    allocationBranches.push({
+      id,
+      name: cleanText(
+        snapshot.name || allocationBranch?.name,
+        'Sede sin nombre'
+      ),
+      code: String(
+        snapshot.code || allocationBranch?.code || ''
+      )
+        .trim()
+        .toUpperCase(),
+      type: cleanText(
+        snapshot.type || allocationBranch?.type,
+        '—'
+      ),
+    });
+  });
 
   const name =
     branchSnapshot.name ||
@@ -121,11 +157,31 @@ export function getOrderBranchInfo(order) {
     branch.type ||
     '';
 
+  const isMultiBranch = allocationBranches.length > 1;
+  const allocationBranch =
+    allocationBranches.length === 1
+      ? allocationBranches[0]
+      : null;
+
   return {
-    name: cleanText(name, 'Sin sede'),
-    code: String(code || '').trim().toUpperCase(),
+    name: isMultiBranch
+      ? `${allocationBranches.length} sedes de despacho`
+      : allocationBranch?.name || cleanText(name, 'Sin sede'),
+    code: isMultiBranch
+      ? allocationBranches
+          .map((item) => item.code)
+          .filter(Boolean)
+          .join(' + ')
+      : allocationBranch?.code ||
+        String(code || '').trim().toUpperCase(),
     type: cleanText(type, '—'),
-    hasBranch: Boolean(name || code),
+    hasBranch: Boolean(
+      allocationBranches.length || name || code
+    ),
+    isMultiBranch,
+    branchCount: allocationBranches.length,
+    branches: allocationBranches,
+    primaryName: cleanText(name, 'Sin sede'),
   };
 }
 

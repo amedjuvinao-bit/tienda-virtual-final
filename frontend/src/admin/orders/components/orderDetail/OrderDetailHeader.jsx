@@ -203,7 +203,11 @@ export default function OrderDetailHeader({
               <span>•</span>
               <span>Origen: {originInfo.label} · {originInfo.description}</span>
               <span>•</span>
-              <span>Sede: {branchInfo.name}</span>
+              <span>
+                {branchInfo.isMultiBranch
+                  ? `Despacho: ${branchInfo.name}`
+                  : `Sede: ${branchInfo.name}`}
+              </span>
             </div>
 
             <div
@@ -227,7 +231,9 @@ export default function OrderDetailHeader({
               </SoftBadge>
 
               <SoftBadge variant={branchInfo.hasBranch ? 'primary' : 'warning'}>
-                {branchInfo.code || 'Sin sede'}
+                {branchInfo.isMultiBranch
+                  ? `${branchInfo.branchCount} sedes`
+                  : branchInfo.code || 'Sin sede'}
               </SoftBadge>
 
               <SoftBadge variant="neutral">

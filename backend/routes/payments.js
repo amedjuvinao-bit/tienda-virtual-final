@@ -17,6 +17,9 @@ const {
   releaseInventoryReservation,
 } = require('../services/inventoryReservationService');
 const {
+  applyReservationToOrderDocument,
+} = require('../services/orderInventoryAllocationService');
+const {
   generateElectronicInvoiceAfterPayment,
 } = require('../services/electronicInvoiceAfterPaymentService');
 const {
@@ -606,9 +609,11 @@ async function handleInventoryReservationAfterPayment({
         },
         {
           session,
+          syncOrderAllocations: false,
         }
       );
 
+      applyReservationToOrderDocument(order, reservation);
       order.inventoryControl = {
         ...(order.inventoryControl && typeof order.inventoryControl === 'object'
           ? order.inventoryControl
@@ -649,9 +654,11 @@ async function handleInventoryReservationAfterPayment({
         },
         {
           session,
+          syncOrderAllocations: false,
         }
       );
 
+      applyReservationToOrderDocument(order, reservation);
       order.inventoryControl = {
         ...(order.inventoryControl && typeof order.inventoryControl === 'object'
           ? order.inventoryControl

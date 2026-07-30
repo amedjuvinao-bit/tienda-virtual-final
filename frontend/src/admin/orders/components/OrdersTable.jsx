@@ -55,6 +55,36 @@ export default function OrdersTable({
   const getBranchInfo = (order) => {
     const branchSnapshot = order?.branchSnapshot || {};
     const branch = order?.branch || {};
+    const allocations = Array.isArray(order?.inventoryAllocations)
+      ? order.inventoryAllocations
+      : [];
+    const allocationBranches = [];
+    const seen = new Set();
+
+    allocations.forEach((allocation) => {
+      const snapshot = allocation?.branchSnapshot || {};
+      const allocationBranch = allocation?.branch || {};
+      const id = String(
+        allocationBranch?._id ||
+          allocationBranch?.id ||
+          allocationBranch ||
+          snapshot.code ||
+          snapshot.name ||
+          ''
+      );
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      allocationBranches.push({
+        name: String(
+          snapshot.name || allocationBranch?.name || 'Sede sin nombre'
+        ).trim(),
+        code: String(
+          snapshot.code || allocationBranch?.code || ''
+        )
+          .trim()
+          .toUpperCase(),
+      });
+    });
 
     const name =
       branchSnapshot.name ||
@@ -74,11 +104,31 @@ export default function OrdersTable({
       branch.type ||
       '';
 
+    const isMultiBranch = allocationBranches.length > 1;
+    const singleAllocationBranch =
+      allocationBranches.length === 1
+        ? allocationBranches[0]
+        : null;
+
     return {
-      name: String(name || '').trim() || 'Sin sede',
-      code: String(code || '').trim().toUpperCase(),
+      name: isMultiBranch
+        ? `${allocationBranches.length} sedes de despacho`
+        : singleAllocationBranch?.name ||
+          String(name || '').trim() ||
+          'Sin sede',
+      code: isMultiBranch
+        ? allocationBranches
+            .map((item) => item.code)
+            .filter(Boolean)
+            .join(' + ')
+        : singleAllocationBranch?.code ||
+          String(code || '').trim().toUpperCase(),
       type: String(type || '').trim().toLowerCase(),
-      hasBranch: Boolean(name || code),
+      hasBranch: Boolean(
+        allocationBranches.length || name || code
+      ),
+      isMultiBranch,
+      branches: allocationBranches,
     };
   };
 
@@ -404,7 +454,9 @@ export default function OrdersTable({
                                 : branchInfo.name
                             }
                           >
-                            Sede: {branchInfo.code || branchInfo.name}
+                            {branchInfo.isMultiBranch
+                              ? branchInfo.name
+                              : `Sede: ${branchInfo.code || branchInfo.name}`}
                           </span>
                         </div>
                       </div>
@@ -467,7 +519,9 @@ export default function OrdersTable({
                           className="text-[9px] font-black uppercase tracking-[0.16em]"
                           style={{ color: THEME.mutedText }}
                         >
-                          Sede
+                          {branchInfo.isMultiBranch
+                            ? 'Despacho'
+                            : 'Sede'}
                         </div>
 
                         <div

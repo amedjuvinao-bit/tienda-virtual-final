@@ -42,6 +42,9 @@ const {
 const {
   processOrderRefund,
 } = require('../services/orderRefundService');
+const {
+  applyReservationToOrderDocument,
+} = require('../services/orderInventoryAllocationService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -832,7 +835,18 @@ function applyOrderBranchAccessFilter(req, filter) {
 
   if (canAdminSeeAllBranches(req)) {
     if (requestedBranchId) {
-      filter.branch = new mongoose.Types.ObjectId(requestedBranchId);
+      const branchObjectId = new mongoose.Types.ObjectId(
+        requestedBranchId
+      );
+      filter.$and = [
+        ...(Array.isArray(filter.$and) ? filter.$and : []),
+        {
+          $or: [
+            { branch: branchObjectId },
+            { 'inventoryAllocations.branch': branchObjectId },
+          ],
+        },
+      ];
     }
 
     return {
@@ -864,9 +878,26 @@ function applyOrderBranchAccessFilter(req, filter) {
 
   const branchIdsToUse = requestedBranchId ? [requestedBranchId] : allowedBranchIds;
 
-  filter.branch = {
-    $in: branchIdsToUse.map((id) => new mongoose.Types.ObjectId(id)),
-  };
+  const branchObjectIds = branchIdsToUse.map(
+    (id) => new mongoose.Types.ObjectId(id)
+  );
+  filter.$and = [
+    ...(Array.isArray(filter.$and) ? filter.$and : []),
+    {
+      $or: [
+        {
+          branch: {
+            $in: branchObjectIds,
+          },
+        },
+        {
+          'inventoryAllocations.branch': {
+            $in: branchObjectIds,
+          },
+        },
+      ],
+    },
+  ];
 
   return {
     ok: true,
@@ -963,6 +994,8 @@ router.get('/admin', async (req, res) => {
         { 'billing.id': rx },
         { 'branchSnapshot.name': rx },
         { 'branchSnapshot.code': rx },
+        { 'inventoryAllocations.branchSnapshot.name': rx },
+        { 'inventoryAllocations.branchSnapshot.code': rx },
       ];
 
       if (/^[0-9a-fA-F]{24}$/.test(q)) {
@@ -1703,7 +1736,22 @@ router.get(
   requirePermission('orders:view'),
   async (req, res) => {
   try {
-    const o = await Order.findById(req.params.id).lean();
+    const filter = {
+      _id: req.params.id,
+    };
+    const branchAccess = applyOrderBranchAccessFilter(req, filter);
+
+    if (!branchAccess.ok) {
+      return res.status(branchAccess.status || 403).json({
+        error:
+          branchAccess.error || 'BRANCH_ACCESS_DENIED',
+        message:
+          branchAccess.message ||
+          'No tienes permiso para consultar órdenes de esa sede.',
+      });
+    }
+
+    const o = await Order.findOne(filter).lean();
 
     const invoice = await ElectronicInvoice.findOne({
       orderId: o?._id,
@@ -2251,7 +2299,7 @@ router.post('/', rateLimit, async (req, res) => {
             req.body?.payment?.transactionId ||
             '',
           source: 'checkout',
-          items: pricing.items,
+          items: created.items,
           branchPriorityIds: orderBranchData.branchId
             ? [String(orderBranchData.branchId)]
             : [],
@@ -2272,6 +2320,10 @@ router.post('/', rateLimit, async (req, res) => {
 
         created.inventoryControl.reservationId =
           inventoryReservation?._id || null;
+        applyReservationToOrderDocument(
+          created,
+          inventoryReservation
+        );
         await created.save({ session });
       }
 

@@ -28,6 +28,10 @@ function cleanQuantity(value) {
 
 const InventoryRestorationSchema = new Schema(
   {
+    reservationItem: {
+      type: Schema.Types.ObjectId,
+      default: null,
+    },
     inventoryStock: {
       type: Schema.Types.ObjectId,
       ref: 'InventoryStock',

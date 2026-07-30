@@ -18,6 +18,10 @@ const {
 const {
   syncProductTotalStock,
 } = require('./inventoryService');
+const {
+  hydrateOrderInventoryAllocations,
+  applyReturnsToOrderInventoryAllocations,
+} = require('./orderInventoryAllocationService');
 
 function createRefundError(message, code, statusCode = 400, details = {}) {
   const error = new Error(message);
@@ -394,6 +398,7 @@ async function loadConfirmedSaleAllocations(order, session) {
           toQuantity(item.quantity) > 0
       )
       .map((item) => ({
+        reservationItem: idValue(item._id),
         inventoryStock: idValue(item.inventoryStock),
         branch: idValue(item.branch),
         product: idValue(item.product),
@@ -918,6 +923,8 @@ async function restoreInventory({
       await stock.save({ session });
 
       restorations.push({
+        reservationItem:
+          allocation.reservationItem || null,
         inventoryStock: stock._id,
         inventoryMovement: movement._id,
         branch: allocation.branch || stock.branch,
@@ -1164,6 +1171,15 @@ async function processOrderRefund(
     refund.processedAt = new Date();
     await refund.save({ session });
 
+    await hydrateOrderInventoryAllocations(order, {
+      session,
+    });
+    applyReturnsToOrderInventoryAllocations(
+      order,
+      inventoryRestorations,
+      refund.processedAt
+    );
+
     await Order.updateOne(
       { _id: order._id },
       {
@@ -1178,6 +1194,10 @@ async function processOrderRefund(
         $set: {
           'refundControl.lastRefundAt': refund.processedAt,
           'refundControl.lastRefund': refund._id,
+          inventoryAllocations:
+            order.inventoryAllocations,
+          inventoryAllocationSummary:
+            order.inventoryAllocationSummary,
         },
       },
       { session }

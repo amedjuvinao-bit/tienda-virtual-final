@@ -11,6 +11,9 @@ const {
   buildVariantKey,
   normalizeAttributes,
 } = require('../lib/products/productVariantConfig');
+const {
+  syncOrderInventoryAllocationsFromReservation,
+} = require('./orderInventoryAllocationService');
 
 const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
 
@@ -179,6 +182,8 @@ function normalizeCartItems(items = []) {
 
     return {
       originalItem: item,
+      orderItem:
+        getObjectIdValue(item.orderItem || item._id) || null,
       productId,
       productObjectId: toObjectId(productId, `items[${index}].productId`),
       size,
@@ -349,6 +354,8 @@ async function expandReservableItems(
         }
 
         expanded.push({
+          orderItem:
+            getObjectIdValue(item.orderItem || item._id) || null,
           productId: getObjectIdValue(component.product),
           title: component.title || '',
           image: component.image || '',
@@ -356,6 +363,11 @@ async function expandReservableItems(
           size: component.size || '',
           color: component.color || '',
           variantLabel: component.variantLabel || '',
+          variantAttributes: normalizeAttributes(
+            component.variantAttributes ||
+              component.attributes ||
+              []
+          ),
           variantKey:
             component.variantKey || 'default__default',
           quantity:
@@ -578,6 +590,10 @@ async function reserveFromStockRow({
     product: item.productObjectId,
     inventoryStock: stock._id,
     branch: stock.branch,
+    orderItem:
+      item.orderItem && isValidObjectId(item.orderItem)
+        ? toObjectId(item.orderItem, 'orderItem')
+        : null,
     productSnapshot: getProductSnapshot(product, item),
     branchSnapshot: getBranchSnapshot(branch),
     size: item.size,
@@ -949,6 +965,15 @@ async function releaseInventoryReservation(
     const reservation = await findReservation(identifier, session);
 
     if (reservation.status !== 'pending') {
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: reservation.order,
+          }
+        );
+      }
       return reservation;
     }
 
@@ -978,6 +1003,16 @@ async function releaseInventoryReservation(
 
     await reservation.save({ session });
 
+    if (options.syncOrderAllocations !== false) {
+      await syncOrderInventoryAllocationsFromReservation(
+        reservation,
+        {
+          session,
+          orderId: reservation.order,
+        }
+      );
+    }
+
     return reservation;
   }, options.session || null);
 }
@@ -996,6 +1031,15 @@ async function confirmInventoryReservation(
     const reservation = await findReservation(identifier, session);
 
     if (reservation.status === 'confirmed') {
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: order || reservation.order,
+          }
+        );
+      }
       return reservation;
     }
 
@@ -1159,6 +1203,16 @@ async function confirmInventoryReservation(
       }
     }
 
+    if (options.syncOrderAllocations !== false) {
+      await syncOrderInventoryAllocationsFromReservation(
+        reservation,
+        {
+          session,
+          orderId: order || reservation.order,
+        }
+      );
+    }
+
     return reservation;
   }, options.session || null);
 }
@@ -1194,6 +1248,16 @@ async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
       });
 
       await reservation.save({ session });
+
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: reservation.order,
+          }
+        );
+      }
 
       expiredReservations.push(reservation);
     }

@@ -55,6 +55,12 @@ const reservationItemSchema = new Schema(
       index: true,
     },
 
+    orderItem: {
+      type: Schema.Types.ObjectId,
+      default: null,
+      index: true,
+    },
+
     productSnapshot: {
       title: {
         type: String,

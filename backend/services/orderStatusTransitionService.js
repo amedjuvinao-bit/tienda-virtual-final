@@ -10,6 +10,11 @@ const {
 const {
   processOrderFulfillmentAfterPayment,
 } = require('./orderFulfillmentService');
+const {
+  applyReservationToOrderDocument,
+  advanceOrderInventoryAllocations,
+  hydrateOrderInventoryAllocations,
+} = require('./orderInventoryAllocationService');
 
 const MAX_BULK_ORDERS = 100;
 
@@ -431,9 +436,11 @@ async function transitionOrderStatus(
           },
           {
             session,
+            syncOrderAllocations: false,
           }
         );
 
+        applyReservationToOrderDocument(order, reservation);
         order.inventoryControl.discountedAtCheckout = true;
         order.inventoryControl.restockedOnFailure = false;
         order.inventoryControl.restockedAt = null;
@@ -479,9 +486,11 @@ async function transitionOrderStatus(
           },
           {
             session,
+            syncOrderAllocations: false,
           }
         );
 
+        applyReservationToOrderDocument(order, reservation);
         order.inventoryControl.discountedAtCheckout = false;
         order.inventoryControl.restockedOnFailure = true;
         order.inventoryControl.restockedAt = now;
@@ -517,6 +526,14 @@ async function transitionOrderStatus(
         order.payment.paidAt = null;
         order.fulfillmentStatus = 'cancelled';
       } else if (targetStatus === 'delivered') {
+        await hydrateOrderInventoryAllocations(order, {
+          session,
+        });
+        advanceOrderInventoryAllocations(
+          order,
+          targetStatus,
+          now
+        );
         order.fulfillmentStatus = 'delivered';
         if (order.fulfillment) {
           order.fulfillment.status = 'delivered';
@@ -525,7 +542,24 @@ async function transitionOrderStatus(
         targetStatus === 'shipped' &&
         order.fulfillmentStatus === 'pending'
       ) {
+        await hydrateOrderInventoryAllocations(order, {
+          session,
+        });
+        advanceOrderInventoryAllocations(
+          order,
+          targetStatus,
+          now
+        );
         order.fulfillmentStatus = 'processing';
+      } else if (targetStatus === 'shipped') {
+        await hydrateOrderInventoryAllocations(order, {
+          session,
+        });
+        advanceOrderInventoryAllocations(
+          order,
+          targetStatus,
+          now
+        );
       }
 
       const previousStatus = validation.currentStatus;
