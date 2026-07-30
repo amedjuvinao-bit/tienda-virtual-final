@@ -277,8 +277,10 @@ function makePhysical({
       stock: row.initialStock,
     })),
     stockRows: normalizedVariants.map((row) => ({
+      label: row.label,
       size: row.size,
       color: row.color,
+      attributes: row.attributes,
       sku: row.sku,
       barcode: row.barcode,
       stock: row.initialStock,
@@ -1368,12 +1370,19 @@ async function upsertProduct(
 
 async function upsertStock({ branch, product, row, item }) {
   const variant = InventoryStock.buildVariantSnapshot({
+    label: row.label,
     size: row.size,
     color: row.color,
+    attributes: row.attributes,
     sku: row.sku,
     barcode: row.barcode,
   });
   const variantKey = InventoryStock.buildVariantKey(
+    variant.size,
+    variant.color,
+    variant.attributes
+  );
+  const legacyVariantKey = InventoryStock.buildVariantKey(
     variant.size,
     variant.color
   );
@@ -1385,6 +1394,22 @@ async function upsertStock({ branch, product, row, item }) {
   };
 
   let stock = await InventoryStock.findOne(filter);
+
+  if (!stock && legacyVariantKey !== variantKey) {
+    stock = await InventoryStock.findOne({
+      branch: branch._id,
+      product: product._id,
+      variantKey: legacyVariantKey,
+      deletedAt: null,
+    });
+
+    if (stock) {
+      assert(
+        String(stock.notes || '').includes(SEED_TAG),
+        `La existencia heredada ${legacyVariantKey} de ${product.sku} no pertenece al catálogo DEMO`
+      );
+    }
+  }
 
   if (!stock) {
     stock = new InventoryStock({
@@ -1399,6 +1424,7 @@ async function upsertStock({ branch, product, row, item }) {
   stock.productSnapshot =
     InventoryStock.buildProductSnapshot(product);
   stock.variant = variant;
+  stock.variantKey = variantKey;
   stock.stock = Number(row.stock || 0);
   stock.reservedStock = Number(row.reservedStock || 0);
   stock.availableStock = Math.max(
@@ -1580,6 +1606,26 @@ async function validateProducts({
     (sum, item) => sum + item.stockRows.length,
     0
   );
+  const expectedVariantKeys = new Map(
+    physical.map((product) => [
+      String(product._id),
+      new Set(
+        (product.variants || [])
+          .filter((variant) => variant.active !== false)
+          .map((variant) => String(variant.variantKey || '').toLowerCase())
+          .filter(Boolean)
+      ),
+    ])
+  );
+  const stockVariantKeys = new Map();
+
+  stocks.forEach((stock) => {
+    const productId = String(stock.product);
+    const keys = stockVariantKeys.get(productId) || new Set();
+    keys.add(String(stock.variantKey || '').toLowerCase());
+    stockVariantKeys.set(productId, keys);
+  });
+
   assert(
     stocks.length >= expectedStockRows,
     `Se esperaban al menos ${expectedStockRows} existencias y hay ${stocks.length}`
@@ -1592,7 +1638,17 @@ async function validateProducts({
     ),
     'Una existencia no conserva la variante o el stock'
   );
+  assert(
+    [...expectedVariantKeys.entries()].every(([productId, variantKeys]) => {
+      const inventoryKeys = stockVariantKeys.get(productId) || new Set();
+      return [...variantKeys].every((variantKey) =>
+        inventoryKeys.has(variantKey)
+      );
+    }),
+    'Una variante del catálogo DEMO no coincide con su clave real en InventoryStock'
+  );
   ok(`${expectedStockRows} existencias por variante disponibles para manipulación`);
+  ok('Cada variante DEMO coincide con su existencia canónica en InventoryStock');
 
   assert(
     saved.every(
