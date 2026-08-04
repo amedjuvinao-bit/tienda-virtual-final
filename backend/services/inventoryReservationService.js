@@ -8,8 +8,9 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const {
-  buildVariantKey,
   normalizeAttributes,
+  normalizeVariantKey,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 const {
   syncOrderInventoryAllocationsFromReservation,
@@ -146,12 +147,12 @@ function normalizeCartItems(items = []) {
         item.variant?.attributes ||
         []
     );
-    const variantKey = cleanText(
-      item.variantKey ||
-        item.variantId ||
-        buildVariantKey(size, color, variantAttributes) ||
-        'default__default'
-    ).toLowerCase();
+    const identity = resolveVariantIdentity({
+      variantKey: item.variantKey || item.variantId,
+      size,
+      color,
+      attributes: variantAttributes,
+    });
     const quantity = toNumber(item.quantity || item.qty || item.cantidad, 0);
     const unitPrice = toNumber(item.unitPrice || item.price || item.precio, 0);
 
@@ -186,13 +187,13 @@ function normalizeCartItems(items = []) {
         getObjectIdValue(item.orderItem || item._id) || null,
       productId,
       productObjectId: toObjectId(productId, `items[${index}].productId`),
-      size,
-      color,
+      size: identity.size,
+      color: identity.color,
       variantLabel: cleanText(
         item.variantLabel || item.variant?.label || ''
       ),
-      variantAttributes,
-      variantKey: variantKey || 'default__default',
+      variantAttributes: identity.attributes,
+      variantKey: identity.variantKey,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -353,6 +354,14 @@ async function expandReservableItems(
           continue;
         }
 
+        const componentIdentity = resolveVariantIdentity({
+          variantKey: component.variantKey,
+          size: component.size,
+          color: component.color,
+          attributes:
+            component.variantAttributes || component.attributes || [],
+        });
+
         expanded.push({
           orderItem:
             getObjectIdValue(item.orderItem || item._id) || null,
@@ -360,16 +369,11 @@ async function expandReservableItems(
           title: component.title || '',
           image: component.image || '',
           sku: component.sku || '',
-          size: component.size || '',
-          color: component.color || '',
+          size: componentIdentity.size,
+          color: componentIdentity.color,
           variantLabel: component.variantLabel || '',
-          variantAttributes: normalizeAttributes(
-            component.variantAttributes ||
-              component.attributes ||
-              []
-          ),
-          variantKey:
-            component.variantKey || 'default__default',
+          variantAttributes: componentIdentity.attributes,
+          variantKey: componentIdentity.variantKey,
           quantity:
             Math.max(1, Number(item.quantity || item.qty || 1)) *
             Math.max(1, Number(component.quantity || 1)),
@@ -445,6 +449,31 @@ function buildReservationStockUpdate(quantityToReserve) {
       },
     },
   ];
+}
+
+function resolveReservationStockVariant(stock, requestedVariantKey = '') {
+  const stockIdentity = resolveVariantIdentity({
+    variantKey: stock?.variantKey,
+    size: stock?.variant?.size,
+    color: stock?.variant?.color,
+    attributes: stock?.variant?.attributes || [],
+  });
+  const requestedKey = normalizeVariantKey(requestedVariantKey);
+
+  if (requestedVariantKey && requestedKey !== stockIdentity.variantKey) {
+    throw createServiceError(
+      'La variante solicitada no coincide con la fila de inventario seleccionada.',
+      'VARIANT_KEY_MISMATCH',
+      {
+        inventoryStock: String(stock?._id || ''),
+        requestedVariantKey,
+        stockVariantKey: stockIdentity.variantKey,
+      },
+      409
+    );
+  }
+
+  return stockIdentity;
 }
 
 function buildReleaseStockUpdate(quantityToRelease) {
@@ -586,6 +615,11 @@ async function reserveFromStockRow({
     );
   }
 
+  const stockIdentity = resolveReservationStockVariant(
+    stock,
+    item.variantKey
+  );
+
   return {
     product: item.productObjectId,
     inventoryStock: stock._id,
@@ -596,15 +630,12 @@ async function reserveFromStockRow({
         : null,
     productSnapshot: getProductSnapshot(product, item),
     branchSnapshot: getBranchSnapshot(branch),
-    size: item.size,
-    color: item.color,
+    size: stockIdentity.size,
+    color: stockIdentity.color,
     variantLabel:
       stock.variant?.label || item.variantLabel || '',
-    variantAttributes: normalizeAttributes(
-      stock.variant?.attributes || item.variantAttributes || []
-    ),
-    variantKey:
-      stock.variantKey || item.variantKey || 'default__default',
+    variantAttributes: stockIdentity.attributes,
+    variantKey: stockIdentity.variantKey,
     bundleParentProduct: item.bundleParentProduct || null,
     bundleParentTitle: item.bundleParentTitle || '',
     quantity: quantityToReserve,
@@ -616,21 +647,51 @@ async function reserveFromStockRow({
   };
 }
 
-async function releaseReservedItems({ items = [], session }) {
+async function releaseReservedItems({
+  items = [],
+  session,
+  InventoryStockModel = InventoryStock,
+}) {
   for (const item of items) {
     const quantity = toNumber(item.quantity, 0);
 
     if (!item.inventoryStock || quantity <= 0) continue;
 
-    await InventoryStock.updateOne(
+    const identity = resolveVariantIdentity({
+      variantKey: item.variantKey,
+      size: item.size,
+      color: item.color,
+      attributes: item.variantAttributes || [],
+    });
+
+    const result = await InventoryStockModel.updateOne(
       {
         _id: item.inventoryStock,
+        ...(item.branch ? { branch: item.branch } : {}),
+        ...(item.product ? { product: item.product } : {}),
+        variantKey: identity.variantKey,
+        reservedStock: { $gte: quantity },
       },
       buildReleaseStockUpdate(quantity),
       {
         session,
       }
     );
+
+    if (Number(result?.matchedCount || 0) !== 1) {
+      throw createServiceError(
+        'No se pudo liberar completamente la fila reservada.',
+        'RESERVED_STOCK_RELEASE_FAILED',
+        {
+          inventoryStock: String(item.inventoryStock),
+          branch: String(item.branch || ''),
+          product: String(item.product || ''),
+          variantKey: identity.variantKey,
+          quantity,
+        },
+        409
+      );
+    }
   }
 }
 
@@ -758,6 +819,7 @@ async function syncProductTotalStock(productId, { session = null } = {}) {
 async function createSaleOutMovementFromReservationItem({
   reservation,
   reservationItem,
+  inventoryStock,
   stockBefore,
   stockAfter,
   order = null,
@@ -775,6 +837,10 @@ async function createSaleOutMovementFromReservationItem({
     cleanUpper(paymentTransactionId) ||
     cleanUpper(orderNumber) ||
     cleanUpper(reservation.reservationCode);
+  const stockIdentity = resolveReservationStockVariant(
+    inventoryStock,
+    reservationItem.variantKey
+  );
 
   const movement = new InventoryMovement({
     type: 'sale_out',
@@ -784,15 +850,14 @@ async function createSaleOutMovementFromReservationItem({
     product: reservationItem.product,
     productSnapshot: reservationItem.productSnapshot || {},
     variant: {
-      size: reservationItem.size,
-      color: reservationItem.color,
+      size: stockIdentity.size,
+      color: stockIdentity.color,
       label: reservationItem.variantLabel || '',
-      attributes: normalizeAttributes(
-        reservationItem.variantAttributes || []
-      ),
+      attributes: stockIdentity.attributes,
       sku: reservationItem.productSnapshot?.sku || '',
       barcode: '',
     },
+    variantKey: stockIdentity.variantKey,
 
     branchFrom: reservationItem.branch,
     branchFromSnapshot: reservationItem.branchSnapshot || {},
@@ -1147,6 +1212,7 @@ async function confirmInventoryReservation(
       const movement = await createSaleOutMovementFromReservationItem({
         reservation,
         reservationItem: item,
+        inventoryStock: updatedStock,
         stockBefore,
         stockAfter,
         order: order || reservation.order || null,
@@ -1278,5 +1344,7 @@ module.exports = {
   allocateReservationItems,
   expandReservableItems,
   releaseReservedItems,
+  resolveReservationStockVariant,
+  buildReleaseStockUpdate,
   createServiceError,
 };

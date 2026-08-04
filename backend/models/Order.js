@@ -1,8 +1,9 @@
 // backend/models/Order.js
 const mongoose = require('mongoose');
 const {
-  normalizeAttributes,
-} = require('../lib/products/productVariantConfig');
+  normalizeCanonicalAttributes: normalizeAttributes,
+  resolveVariantIdentity,
+} = require('../../shared/variantKeyAuthority.cjs');
 
 /* ========= Helpers de normalización y validación de tags ========= */
 const MAX_TAGS = 8;
@@ -69,6 +70,22 @@ function cleanMoney(value) {
 
 function cleanQty(value) {
   return Math.max(1, Math.floor(Number(value || 0)));
+}
+
+function applyCanonicalVariantIdentity(item) {
+  if (!item || typeof item !== 'object') return item;
+  const identity = resolveVariantIdentity({
+    variantKey: item.variantKey || item.variantId,
+    size: item.size,
+    color: item.color,
+    attributes: item.variantAttributes || [],
+  });
+  item.variantKey = identity.variantKey;
+  item.variantId = item.variantId || identity.variantKey;
+  item.size = identity.size;
+  item.color = identity.color;
+  item.variantAttributes = identity.attributes;
+  return item;
 }
 
 /* ========= Subesquemas ========= */
@@ -1204,6 +1221,12 @@ OrderSchema.pre('validate', function (next) {
           };
         })
         .filter(Boolean);
+    }
+
+    this.cart.forEach(applyCanonicalVariantIdentity);
+    this.items.forEach(applyCanonicalVariantIdentity);
+    if (Array.isArray(this.inventoryAllocations)) {
+      this.inventoryAllocations.forEach(applyCanonicalVariantIdentity);
     }
 
     if (!Array.isArray(this.items) || this.items.length === 0) {

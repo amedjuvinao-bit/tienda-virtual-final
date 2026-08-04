@@ -3,8 +3,9 @@
 const Order = require('../models/Order');
 const InventoryReservation = require('../models/InventoryReservation');
 const {
-  normalizeAttributes,
-} = require('../lib/products/productVariantConfig');
+  normalizeVariantKey,
+  resolveVariantIdentity,
+} = require('../../shared/variantKeyAuthority.cjs');
 
 const RELEASED_RESERVATION_STATUSES = new Set([
   'released',
@@ -49,7 +50,7 @@ function allocationIdentity(allocation = {}) {
     'stock',
     idValue(allocation.inventoryStock),
     idValue(allocation.product),
-    cleanLower(allocation.variantKey || 'default__default'),
+    normalizeVariantKey(allocation.variantKey) || 'default__default',
     idValue(allocation.bundleParentProduct),
     idValue(allocation.orderItem),
   ].join(':');
@@ -76,6 +77,12 @@ function getAllocationStatus(allocation = {}) {
 
 function normalizeAllocation(allocation = {}) {
   const plain = asPlain(allocation);
+  const variantIdentity = resolveVariantIdentity({
+    variantKey: plain.variantKey,
+    size: plain.size,
+    color: plain.color,
+    attributes: plain.variantAttributes || [],
+  });
   const quantity = toQuantity(plain.quantity);
   const soldQuantity = Math.min(quantity, toQuantity(plain.soldQuantity));
   const shippedQuantity = Math.min(
@@ -107,13 +114,11 @@ function normalizeAllocation(allocation = {}) {
     productSnapshot: plain.productSnapshot || {},
     bundleParentProduct: plain.bundleParentProduct || null,
     bundleParentTitle: cleanText(plain.bundleParentTitle),
-    variantKey: cleanLower(plain.variantKey || 'default__default'),
+    variantKey: variantIdentity.variantKey,
     variantLabel: cleanText(plain.variantLabel),
-    variantAttributes: normalizeAttributes(
-      plain.variantAttributes || []
-    ),
-    size: cleanText(plain.size),
-    color: cleanText(plain.color),
+    variantAttributes: variantIdentity.attributes,
+    size: variantIdentity.size,
+    color: variantIdentity.color,
     quantity,
     reservedQuantity: Math.min(
       quantity,
@@ -452,9 +457,8 @@ function applyReturnsToOrderInventoryAllocations(
     const stockId = idValue(restoration.inventoryStock);
     const productId = idValue(restoration.product);
     const branchId = idValue(restoration.branch);
-    const variantKey = cleanLower(
-      restoration.variantKey || 'default__default'
-    );
+    const variantKey =
+      normalizeVariantKey(restoration.variantKey) || 'default__default';
 
     const candidates = allocations.filter((allocation) => {
       if (
@@ -468,7 +472,7 @@ function applyReturnsToOrderInventoryAllocations(
         idValue(allocation.inventoryStock) === stockId &&
         idValue(allocation.product) === productId &&
         idValue(allocation.branch) === branchId &&
-        cleanLower(allocation.variantKey) === variantKey
+        normalizeVariantKey(allocation.variantKey) === variantKey
       );
     });
 

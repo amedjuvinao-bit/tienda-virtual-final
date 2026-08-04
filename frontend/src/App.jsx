@@ -7,12 +7,12 @@ import {
   useLocation,
   Navigate,
 } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
 
 import { fetchSiteSettings } from './theme/siteSettingsApi';
 import { applyTheme } from './theme/applyTheme';
 import { normalizeGlobalConfig } from './admin/appearance/general/generalHelpers';
 import GlobalPageLoader from './components/GlobalPageLoader';
+import AppToastContainer from './components/AppToastContainer';
 import { AppConfirmProvider } from './components/AppConfirmProvider';
 import AdminPermissionRoute from './admin/security/AdminPermissionRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -259,17 +259,7 @@ export default function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
 
-                <ToastContainer
-                  position="top-right"
-                  autoClose={3000}
-                  hideProgressBar={false}
-                  newestOnTop
-                  closeOnClick
-                  pauseOnFocusLoss
-                  draggable
-                  pauseOnHover
-                  theme="colored"
-                />
+                <AppToastContainer />
               </Suspense>
             </AppConfirmProvider>
           </BrowserRouter>

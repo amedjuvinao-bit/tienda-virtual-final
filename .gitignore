@@ -1,1 +1,15 @@
-node_modules
+node_modules/
+**/node_modules/
+
+# Configuración local y secretos. Versionar solamente archivos de ejemplo.
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Artefactos reproducibles de ejecución y compilación.
+backend-runtime*.log
+frontend/dist/
+backend/backups/
+backend/reports/qa50-catalog-v1/
+backend/tmp/qa50-catalog-v1/

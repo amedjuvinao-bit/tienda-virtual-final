@@ -5,15 +5,14 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Branch = require('../models/Branch');
 const {
   buildVariantKey,
+  canonicalizeVariantKey,
+  normalizeVariantKey,
   normalizeProductVariants,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
-}
-
-function cleanLower(value) {
-  return cleanText(value).toLowerCase();
 }
 
 function cleanNumber(value, fallback = 0) {
@@ -102,18 +101,21 @@ function normalizeVariantRows(product = {}, options = {}) {
   } = {}) {
     const cleanSize = cleanText(size);
     const cleanColor = cleanText(color);
-    const variantKey = cleanLower(
-      providedVariantKey ||
-        buildVariantKey(cleanSize, cleanColor, attributes)
-    );
+    const identity = resolveVariantIdentity({
+      variantKey: providedVariantKey,
+      size: cleanSize,
+      color: cleanColor,
+      attributes,
+    });
+    const variantKey = identity.variantKey;
 
     if (seen.has(variantKey)) return;
     seen.add(variantKey);
 
     rows.push({
-      size: cleanSize,
-      color: cleanColor,
-      attributes,
+      size: identity.size,
+      color: identity.color,
+      attributes: identity.attributes,
       label: cleanText(label),
       sku: cleanText(sku).toUpperCase(),
       barcode: cleanText(barcode),
@@ -172,6 +174,65 @@ function normalizeVariantRows(product = {}, options = {}) {
   return rows;
 }
 
+function buildVariantSyncPlan({ desiredRows = [], existingRows = [], branchId }) {
+  const normalizedDesiredRows = desiredRows.map((row) => {
+    const identity = resolveVariantIdentity({
+      variantKey: row?.variantKey,
+      size: row?.size,
+      color: row?.color,
+      attributes: row?.attributes || [],
+    });
+    return {
+      ...row,
+      variantKey: identity.variantKey,
+      size: identity.size,
+      color: identity.color,
+      attributes: identity.attributes,
+    };
+  });
+  const desiredVariantKeys = new Set(
+    normalizedDesiredRows.map((row) => row.variantKey)
+  );
+  const existingByKey = new Map();
+
+  existingRows.forEach((row) => {
+    const variantKey = canonicalizeVariantKey(row?.variantKey);
+    if (!variantKey) return;
+    const mapKey = `${String(row.branch)}__${variantKey}`;
+    const current = existingByKey.get(mapKey);
+    const isExactCanonical = normalizeVariantKey(row?.variantKey) === variantKey;
+    const currentIsExact =
+      current && normalizeVariantKey(current.variantKey) === variantKey;
+    if (!current || (isExactCanonical && !currentIsExact)) {
+      existingByKey.set(mapKey, row);
+    }
+  });
+
+  const rowsToReuse = [];
+  const rowsToCreate = [];
+  normalizedDesiredRows.forEach((row) => {
+    const existing = existingByKey.get(
+      `${String(branchId)}__${row.variantKey}`
+    );
+    (existing ? rowsToReuse : rowsToCreate).push({ row, existing: existing || null });
+  });
+
+  const rowsToDeactivate = existingRows.filter(
+    (row) =>
+      row?.active !== false &&
+      !desiredVariantKeys.has(canonicalizeVariantKey(row?.variantKey))
+  );
+
+  return {
+    desiredRows: normalizedDesiredRows,
+    desiredVariantKeys,
+    existingByKey,
+    rowsToReuse,
+    rowsToCreate,
+    rowsToDeactivate,
+  };
+}
+
 async function createInitialStockMovement({
   stockRow,
   product,
@@ -195,6 +256,7 @@ async function createInitialStockMovement({
     product: product._id,
     productSnapshot: InventoryMovement.buildProductSnapshot(product),
     variant: InventoryStock.buildVariantSnapshot(variant),
+    variantKey: stockRow.variantKey,
 
     branchTo: branch._id,
     branchToSnapshot: InventoryMovement.buildBranchSnapshot(branch),
@@ -316,10 +378,6 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
   );
 
   const hadExistingRows = existingRows.length > 0;
-  const desiredVariantKeys = new Set(
-    desiredRows.map((row) => cleanLower(row.variantKey))
-  );
-
   if (!desiredRows.length) {
     const deactivation = await InventoryStock.updateMany(
       {
@@ -361,24 +419,22 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
   }
 
   const branchId = branch._id;
-  const existingByKey = new Map();
-
-  existingRows.forEach((row) => {
-    existingByKey.set(`${String(row.branch)}__${row.variantKey}`, row);
+  const syncPlan = buildVariantSyncPlan({
+    desiredRows,
+    existingRows,
+    branchId,
   });
+  const desiredVariantKeys = syncPlan.desiredVariantKeys;
+  const existingByKey = syncPlan.existingByKey;
 
   let createdRows = 0;
   let reactivatedRows = 0;
   let deactivatedRows = 0;
   let movementsCreated = 0;
 
-  for (const desired of desiredRows) {
+  for (const desired of syncPlan.desiredRows) {
     const variant = InventoryStock.buildVariantSnapshot(desired);
-    const variantKey = InventoryStock.buildVariantKey(
-      variant.size,
-      variant.color,
-      variant.attributes
-    );
+    const variantKey = desired.variantKey;
     const mapKey = `${String(branchId)}__${variantKey}`;
     const initialQty = hadExistingRows ? 0 : positiveInt(desired.stock);
 
@@ -428,6 +484,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
       stockRow.branchSnapshot = InventoryStock.buildBranchSnapshot(branch);
       stockRow.productSnapshot = productSnapshot;
       stockRow.variant = variant;
+      stockRow.variantKey = variantKey;
       stockRow.reorderPoint = positiveInt(product.reorderPoint);
       stockRow.reorderQty = positiveInt(product.reorderQty);
       stockRow.warehouseLocation = product.warehouseLocation || stockRow.warehouseLocation || '';
@@ -439,21 +496,21 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
     }
   }
 
-  const retiredRows = await InventoryStock.updateMany(
-    {
-      product: productId,
-      deletedAt: null,
-      active: true,
-      variantKey: { $nin: [...desiredVariantKeys] },
-    },
-    {
-      $set: {
-        active: false,
-        updatedBy: adminId,
-      },
-    },
-    writeOptions(session)
-  );
+  const retiredIds = syncPlan.rowsToDeactivate
+    .map((row) => row?._id)
+    .filter(Boolean);
+  const retiredRows = retiredIds.length
+    ? await InventoryStock.updateMany(
+        { _id: { $in: retiredIds }, active: true },
+        {
+          $set: {
+            active: false,
+            updatedBy: adminId,
+          },
+        },
+        writeOptions(session)
+      )
+    : { modifiedCount: 0 };
   deactivatedRows = Number(retiredRows.modifiedCount || 0);
 
   const stock = await syncProductLegacyStock(
@@ -474,6 +531,7 @@ async function syncProductInventoryFromProduct(productDoc, options = {}) {
 }
 
 module.exports = {
+  buildVariantSyncPlan,
   normalizeVariantRows,
   syncProductInventoryFromProduct,
 };

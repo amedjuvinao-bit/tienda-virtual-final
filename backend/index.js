@@ -22,11 +22,17 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const {
+  applyMongooseIndexPolicy,
+} = require('./config/mongooseIndexPolicy');
 
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
 const PORT = env.port;
+const mongooseIndexPolicy = applyMongooseIndexPolicy(mongoose, {
+  nodeEnv: env.nodeEnv,
+});
 
 function tryRequire(relPath) {
   try {
@@ -48,8 +54,8 @@ app.use(cors());
 app.use(express.json());
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
+  windowMs: env.globalRateLimit.windowMs,
+  max: env.globalRateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -279,7 +285,9 @@ function startBillingInvoiceRecoveryJob() {
 }
 
 mongoose
-  .connect(env.mongoUri)
+  .connect(env.mongoUri, {
+    autoIndex: mongooseIndexPolicy.autoIndex,
+  })
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();

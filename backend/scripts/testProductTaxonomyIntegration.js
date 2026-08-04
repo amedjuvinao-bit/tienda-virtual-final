@@ -169,9 +169,9 @@ async function run() {
       limit: 20,
     });
 
-    assert.strictEqual(filtered.pagination.total, 1);
+    assert.strictEqual(filtered.pagination.totalProducts, 1);
     assert.strictEqual(
-      String(filtered.data[0]._id),
+      String(filtered.products[0]._id),
       String(product._id)
     );
     ok('Filtros administrativos usan taxonomía, etiquetas y campos');

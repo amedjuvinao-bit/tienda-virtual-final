@@ -12,6 +12,10 @@ const {
   ProductInventoryPersistenceError,
   saveProductWithInventoryTransaction,
 } = require('../services/productInventoryPersistenceService');
+const {
+  mapProductWriteError,
+  validateAndNormalizeProductInput,
+} = require('../services/productInputValidationService');
 
 const router = express.Router();
 
@@ -58,11 +62,13 @@ router.get('/:productId', requirePermission('products:view'), async (req, res) =
       variants: normalizeProductVariants(product.variants || [], product),
     });
   } catch (error) {
-    console.error('[adminProductVariants] GET error:', error);
+    console.error(
+      '[adminProductVariants] GET error:',
+      error?.code || error?.name || 'PRODUCT_READ_FAILED'
+    );
     return res.status(500).json({
       ok: false,
       message: 'No se pudieron consultar las variantes del producto.',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
 });
@@ -80,7 +86,15 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
     });
     if (!product) return sendProductNotFound(res);
 
-    const incomingVariants = Array.isArray(req.body?.variants) ? req.body.variants : [];
+    const validatedInput = await validateAndNormalizeProductInput(
+      { variants: Array.isArray(req.body?.variants) ? req.body.variants : [] },
+      {
+        mode: 'update',
+        existingProduct: product,
+        ProductModel: Product,
+      }
+    );
+    const incomingVariants = validatedInput.payload.variants;
     const productContext = {
       _id: product._id,
       title: product.title,
@@ -133,13 +147,13 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
       sync: saved?.$locals?.inventorySyncResult || null,
     });
   } catch (error) {
-    console.error('[adminProductVariants] PUT error:', error);
-
-    if (error?.name === 'ValidationError') {
-      return res.status(400).json({
-        ok: false,
-        message: error.message,
-      });
+    console.error(
+      '[adminProductVariants] PUT error:',
+      error?.code || error?.name || 'PRODUCT_WRITE_FAILED'
+    );
+    const mappedError = mapProductWriteError(error);
+    if (mappedError) {
+      return res.status(mappedError.status).json(mappedError.body);
     }
 
     if (error instanceof ProductInventoryPersistenceError) {
@@ -154,7 +168,6 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
     return res.status(500).json({
       ok: false,
       message: 'No se pudieron actualizar las variantes del producto.',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
 });

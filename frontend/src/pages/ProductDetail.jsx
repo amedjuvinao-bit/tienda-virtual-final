@@ -8,6 +8,9 @@ import { useFavorites } from "../context/FavoritesContext";
 import ProductDetailView from "../components/product-detail/ProductDetailView";
 import { getColorDisplayName, getColorVisualValue } from "../utils/colorDisplay";
 import { applyProductSeo } from "../lib/productSeo";
+import variantKeyAuthority from '@shared/variant-key-authority';
+
+const { buildVariantKey, normalizeVariantKey } = variantKeyAuthority;
 
 function clean(value) {
   return String(value || "").trim();
@@ -105,11 +108,19 @@ function findAttributeValue(attributes = [], key = "") {
   );
 }
 
-function buildVariantKey(size = "", color = "") {
-  const sizeKey = cleanLower(size);
-  const colorKey = cleanLower(color);
-  const key = `${sizeKey}__${colorKey}`;
-  return !key || key === "__" ? "default__default" : key;
+function resolveCanonicalColor(product = {}, selectedColor = "") {
+  const selectedKey = cleanLower(selectedColor);
+  if (!selectedKey) return "";
+
+  const rawColors = Array.isArray(product?.colors) ? product.colors : [];
+  const match = rawColors.find((rawColor) => {
+    return (
+      cleanLower(rawColor) === selectedKey ||
+      cleanLower(getColorDisplayName(rawColor)) === selectedKey
+    );
+  });
+
+  return clean(match || selectedColor);
 }
 
 function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
@@ -138,7 +149,8 @@ function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
     attributes = normalizeVariantAttributes(legacyAttributes);
   }
 
-  const variantKey = cleanLower(variant.variantKey || buildVariantKey(size, rawColor));
+  const variantKey = normalizeVariantKey(variant.variantKey) ||
+    buildVariantKey(size, rawColor, attributes);
   const images = uniqueStrings([
     clean(variant.image),
     ...(Array.isArray(variant.images) ? variant.images : []),
@@ -611,15 +623,27 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (!variantAwareProduct) return;
 
+    const size = selectedVariant?.size || selectedSize;
+    const displayColor = selectedVariant?.colorLabel || selectedColor;
+    const canonicalColor =
+      selectedVariant?.rawColor ||
+      resolveCanonicalColor(product, displayColor);
+    const variantKey =
+      selectedVariant?.variantKey ||
+      buildVariantKey(size, canonicalColor);
+    const variantLabel =
+      selectedVariant?.label ||
+      [size, displayColor].filter(Boolean).join(" / ");
+
     addToCart({
       ...variantAwareProduct,
       _id: variantAwareProduct._id || variantAwareProduct.id,
-      size: selectedVariant?.size || selectedSize,
-      color: selectedVariant?.colorLabel || selectedColor,
-      colorValue: selectedVariant?.colorValue || "",
-      variantId: selectedVariant?.variantId || selectedVariant?.variantKey || "",
-      variantKey: selectedVariant?.variantKey || "",
-      variantLabel: selectedVariant?.label || "",
+      size,
+      color: displayColor,
+      colorValue: canonicalColor,
+      variantId: selectedVariant?.variantId || variantKey,
+      variantKey,
+      variantLabel,
       variantAttributes: selectedVariant?.attributes || [],
       variantSku: selectedVariant?.sku || variantAwareProduct.sku || "",
       variantBarcode: selectedVariant?.barcode || variantAwareProduct.barcode || "",

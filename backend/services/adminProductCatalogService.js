@@ -10,6 +10,7 @@ const {
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+const MAX_PAGE = 100_000;
 const MAX_BULK_IDS = 100;
 
 const STATUS_VALUES = new Set([
@@ -74,59 +75,74 @@ class ProductCatalogInputError extends Error {
   }
 }
 
-function clampPositiveInteger(value, fallback, maximum = Number.MAX_SAFE_INTEGER) {
-  const parsed = Number.parseInt(String(value ?? ''), 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
-
-  return Math.min(parsed, maximum);
+function parsePositiveInteger(value, fallback, maximum, field) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) {
+    throw new ProductCatalogInputError(`${field} debe ser un entero positivo.`);
+  }
+  const parsed = Number(text);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
+    throw new ProductCatalogInputError(
+      `${field} debe estar entre 1 y ${maximum}.`
+    );
+  }
+  return parsed;
 }
 
 function cleanChoice(value, allowed, fallback = 'all') {
+  if (value === undefined || value === null || value === '') return fallback;
   const normalized = String(value || '').trim().toLowerCase();
-
-  return allowed.has(normalized) ? normalized : fallback;
+  if (!allowed.has(normalized)) {
+    throw new ProductCatalogInputError('Uno de los filtros no esta permitido.');
+  }
+  return normalized;
 }
 
 function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function parseOptionalObjectId(value) {
+function parseOptionalObjectId(value, field) {
   const text = String(value || '').trim();
-
-  return mongoose.Types.ObjectId.isValid(text)
-    ? new mongoose.Types.ObjectId(text)
-    : null;
+  if (!text) return null;
+  if (!mongoose.Types.ObjectId.isValid(text)) {
+    throw new ProductCatalogInputError(`${field} no es valido.`);
+  }
+  return new mongoose.Types.ObjectId(text);
 }
 
 function parseAdminProductCatalogQuery(query = {}) {
   const rawProductType = String(query.productType || 'all')
     .trim()
     .toLowerCase();
-  const productType = PRODUCT_TYPE_VALUES.includes(rawProductType)
-    ? rawProductType
-    : 'all';
-  const sortKey = Object.prototype.hasOwnProperty.call(
-    SORT_OPTIONS,
-    String(query.sort || '')
-  )
-    ? String(query.sort)
-    : '-createdAt';
+  if (rawProductType !== 'all' && !PRODUCT_TYPE_VALUES.includes(rawProductType)) {
+    throw new ProductCatalogInputError('productType no esta permitido.');
+  }
+  const productType = rawProductType;
+  const sortKey = String(query.sort || '-createdAt');
+  if (!Object.prototype.hasOwnProperty.call(SORT_OPTIONS, sortKey)) {
+    throw new ProductCatalogInputError('sort no esta permitido.');
+  }
+  const q = String(query.q || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+  const tag = String(query.tag || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+  if (q.length > 160 || tag.length > 80) {
+    throw new ProductCatalogInputError('Un filtro supera la longitud permitida.');
+  }
 
   return {
-    page: clampPositiveInteger(query.page, DEFAULT_PAGE),
-    limit: clampPositiveInteger(query.limit, DEFAULT_LIMIT, MAX_LIMIT),
-    q: String(query.q || '').trim().slice(0, 160),
+    page: parsePositiveInteger(query.page, DEFAULT_PAGE, MAX_PAGE, 'page'),
+    limit: parsePositiveInteger(query.limit, DEFAULT_LIMIT, MAX_LIMIT, 'limit'),
+    q,
     productType,
     status: cleanChoice(query.status, STATUS_VALUES),
     inventory: cleanChoice(
       query.inventory || query.inventoryFilter,
       INVENTORY_FILTER_VALUES
     ),
-    categoryId: parseOptionalObjectId(query.categoryId),
-    collectionId: parseOptionalObjectId(query.collectionId),
-    tag: String(query.tag || '').trim().slice(0, 80),
+    categoryId: parseOptionalObjectId(query.categoryId, 'categoryId'),
+    collectionId: parseOptionalObjectId(query.collectionId, 'collectionId'),
+    tag,
     sortKey,
     sort: SORT_OPTIONS[sortKey],
   };
@@ -573,46 +589,32 @@ async function listAdminProducts(query = {}) {
 
     requested.categoryName = category?.name || '';
   }
-  let page = requested.page;
-  let result = await aggregateCatalog(requested);
-  let pages = Math.max(
-    1,
-    Math.ceil(result.summary.total / requested.limit)
-  );
-
-  if (result.summary.total > 0 && page > pages) {
-    page = pages;
-    result = await aggregateCatalog({
-      ...requested,
-      page,
-    });
-    pages = Math.max(
-      1,
-      Math.ceil(result.summary.total / requested.limit)
-    );
-  }
+  const page = requested.page;
+  const result = await aggregateCatalog(requested);
+  const pages = result.summary.total === 0
+    ? 0
+    : Math.ceil(result.summary.total / requested.limit);
 
   const from =
-    result.summary.total === 0
+    result.summary.total === 0 || page > pages
       ? 0
       : (page - 1) * requested.limit + 1;
-  const to = Math.min(
-    result.summary.total,
-    page * requested.limit
-  );
+  const to = result.summary.total === 0 || page > pages
+    ? 0
+    : Math.min(result.summary.total, page * requested.limit);
 
   return {
-    data: result.data,
+    products: result.data,
     summary: result.summary,
     pagination: {
       page,
       limit: requested.limit,
-      total: result.summary.total,
-      pages,
+      totalProducts: result.summary.total,
+      totalPages: pages,
       from,
       to,
-      hasPrevious: page > 1,
-      hasNext: page < pages,
+      hasPreviousPage: page > 1,
+      hasNextPage: pages > 0 && page < pages,
     },
     filters: {
       q: requested.q,

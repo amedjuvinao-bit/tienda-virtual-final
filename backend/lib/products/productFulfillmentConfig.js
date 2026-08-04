@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  normalizeAttributes,
+  resolveVariantIdentity,
 } = require('./productVariantConfig');
 
 const DIGITAL_DELIVERY_MODES = Object.freeze([
@@ -142,25 +142,27 @@ function normalizeBundleComponents(values = [], maximum = 30) {
       value.product || value.productId || value._id,
       80
     );
-    const variantKey =
-      cleanText(value.variantKey || 'default__default', 180)
-        .toLowerCase() || 'default__default';
+    const variantIdentity = resolveVariantIdentity({
+      variantKey: value.variantKey,
+      size: value.size,
+      color: value.color,
+      attributes:
+        value.variantAttributes || value.attributes || [],
+    });
     if (!product) continue;
 
     components.push({
       product,
-      variantKey,
+      variantKey: variantIdentity.variantKey,
       quantity: clampInteger(value.quantity, 1, 1, 9999),
       title: cleanText(value.title, 220),
       sku: cleanText(value.sku, 120).toUpperCase(),
       image: cleanText(value.image, 1000),
       productType: cleanText(value.productType, 30).toLowerCase(),
-      size: cleanText(value.size, 80),
-      color: cleanText(value.color, 120),
+      size: variantIdentity.size,
+      color: variantIdentity.color,
       variantLabel: cleanText(value.variantLabel, 180),
-      variantAttributes: normalizeAttributes(
-        value.variantAttributes || value.attributes || []
-      ),
+      variantAttributes: variantIdentity.attributes,
       trackInventory: value.trackInventory !== false,
       allowBackorder: value.allowBackorder === true,
       requiresShipping: value.requiresShipping !== false,

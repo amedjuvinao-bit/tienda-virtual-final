@@ -17,8 +17,8 @@ const {
   getPublicFulfillmentView,
 } = require('../lib/products/productFulfillmentConfig');
 const {
-  buildVariantKey,
   normalizeAttributes,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
@@ -182,6 +182,13 @@ function normalizePosItems(items = []) {
         []
     );
 
+    const variantIdentity = resolveVariantIdentity({
+      variantKey: item.variantKey || item.variantId,
+      size,
+      color,
+      attributes: variantAttributes,
+    });
+
     return {
       index,
       productId,
@@ -189,19 +196,14 @@ function normalizePosItems(items = []) {
       quantity,
       unitPrice,
       lineSubtotal: quantity * unitPrice,
-      size,
-      color,
-      variantKey: cleanLower(
-        item.variantKey ||
-          item.variantId ||
-          buildVariantKey(size, color, variantAttributes),
-        180
-      ),
+      size: variantIdentity.size,
+      color: variantIdentity.color,
+      variantKey: variantIdentity.variantKey,
       variantLabel: cleanText(
         item.variantLabel || item.variant?.label || '',
         160
       ),
-      variantAttributes,
+      variantAttributes: variantIdentity.attributes,
       title: cleanText(item.title || item.name || '', 220),
       sku: cleanUpper(item.sku || '', 100),
       barcode: cleanText(item.barcode || '', 120),
@@ -769,6 +771,12 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
         )
           .session(session)
           .lean();
+        const componentIdentity = resolveVariantIdentity({
+          variantKey: componentStock.variantKey,
+          size: componentStock.variant?.size,
+          color: componentStock.variant?.color,
+          attributes: componentStock.variant?.attributes || [],
+        });
         inventoryLines.push({
           ...item,
           productId: String(componentProductId),
@@ -786,13 +794,12 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
             componentProduct || {},
             component
           ),
+          variantKey: componentIdentity.variantKey,
           variantSnapshot: {
             label: cleanText(component.variantLabel || '', 160),
-            size: cleanText(component.size || '', 80),
-            color: cleanText(component.color || '', 120),
-            attributes: normalizeAttributes(
-              component.variantAttributes || []
-            ),
+            size: componentIdentity.size,
+            color: componentIdentity.color,
+            attributes: componentIdentity.attributes,
             sku: cleanUpper(component.sku || '', 100),
             barcode: '',
           },
@@ -864,6 +871,7 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
         availableStock,
         product,
         productSnapshot: buildProductSnapshot(product, item),
+        variantKey: stock.variantKey,
         variantSnapshot: {
           label: cleanText(
             stock.variant?.label || item.variantLabel || '',
@@ -1180,6 +1188,7 @@ async function applyPosInventoryOut({ order, validatedItems = [], branch, admin 
           product: item.productObjectId,
           productSnapshot: item.productSnapshot,
           variant: item.variantSnapshot,
+          variantKey: item.variantKey,
           branchFrom: branch._id,
           branchFromSnapshot: buildBranchSnapshot(branch),
           quantity: item.quantity,

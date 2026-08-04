@@ -34,7 +34,7 @@ function check(label, callback) {
 check('La consulta normaliza página, límite, filtros y orden', () => {
   const query = parseAdminProductCatalogQuery({
     page: '3',
-    limit: '5000',
+    limit: String(MAX_LIMIT),
     q: '  CAMISETA  ',
     productType: 'physical',
     status: 'inactive',
@@ -51,22 +51,21 @@ check('La consulta normaliza página, límite, filtros y orden', () => {
   assert.strictEqual(query.sortKey, '-stock');
 });
 
-check('Los parámetros inválidos vuelven a valores seguros', () => {
-  const query = parseAdminProductCatalogQuery({
-    page: '-4',
-    limit: '0',
-    productType: 'inventado',
-    status: 'deleted',
-    inventory: 'anything',
-    sort: 'dropDatabase',
-  });
-
-  assert.strictEqual(query.page, 1);
-  assert.strictEqual(query.limit, 20);
-  assert.strictEqual(query.productType, 'all');
-  assert.strictEqual(query.status, 'all');
-  assert.strictEqual(query.inventory, 'all');
-  assert.strictEqual(query.sortKey, '-createdAt');
+check('Los parámetros inválidos se rechazan de forma segura', () => {
+  for (const invalid of [
+    { page: '-4' },
+    { limit: '0' },
+    { limit: String(MAX_LIMIT + 1) },
+    { productType: 'inventado' },
+    { status: 'deleted' },
+    { inventory: 'anything' },
+    { sort: 'dropDatabase' },
+  ]) {
+    assert.throws(
+      () => parseAdminProductCatalogQuery(invalid),
+      (error) => error instanceof ProductCatalogInputError
+    );
+  }
 });
 
 check('Las selecciones masivas eliminan duplicados y validan IDs', () => {
@@ -158,7 +157,7 @@ check('El panel consume páginas reales y no filtra el catálogo completo', () =
     'status: statusFilter',
     'inventory: inventoryFilter',
     'sort,',
-    'res.data?.pagination',
+    'productPage.pagination',
     'res.data?.summary',
     'selectedIds',
     'toggleCurrentPage',

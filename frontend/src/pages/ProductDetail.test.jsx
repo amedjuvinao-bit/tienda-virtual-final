@@ -72,7 +72,7 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
       >
         Elegir 12 GB RAM
       </button>
-      <button type="button" onClick={onAddToCart}>
+      <button data-testid="add-variant" type="button" onClick={onAddToCart}>
         Añadir variante
       </button>
     </div>
@@ -212,6 +212,43 @@ describe("ProductDetail con variantes", () => {
             value: "Wi-Fi",
           }),
         ]),
+      })
+    );
+  });
+
+  it("conserva la clave canonica aunque muestre la etiqueta amigable del color", async () => {
+    api.get.mockImplementation(async (url) => {
+      if (url === "/api/pages") return { data: [] };
+
+      return {
+        data: {
+          _id: "legacy-dress",
+          title: "Vestido legado",
+          image: "https://example.com/legacy.jpg",
+          price: 200000,
+          sizes: ["4"],
+          colors: ["royalblue"],
+          variants: [],
+        },
+      };
+    });
+
+    render(<ProductDetail />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("variant-size")).toHaveTextContent("4");
+      expect(screen.getByTestId("variant-color")).toHaveTextContent("Azul rey");
+    });
+
+    fireEvent.click(screen.getByTestId("add-variant"));
+
+    expect(addToCartMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: "Azul rey",
+        colorValue: "royalblue",
+        variantId: "4__royalblue",
+        variantKey: "4__royalblue",
+        variantLabel: "4 / Azul rey",
       })
     );
   });

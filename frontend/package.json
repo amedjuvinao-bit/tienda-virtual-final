@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "test:product-seo": "vitest run src/lib/productSeo.test.js",
     "test:product-variant-images": "vitest run src/pages/ProductDetail.test.jsx",
+    "test:product-pagination": "vitest run src/utils/productPagination.test.js",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
   "dependencies": {

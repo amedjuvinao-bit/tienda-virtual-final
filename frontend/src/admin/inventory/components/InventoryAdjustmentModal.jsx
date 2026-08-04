@@ -653,7 +653,9 @@ export default function InventoryAdjustmentModal({
       const [productsRes, branchesRes] = await Promise.all([
         api.get('/api/products', {
           params: {
-            all: 1,
+            page: 1,
+            limit: 100,
+            sort: 'title',
           },
         }),
         api.get('/api/admin/branches', {

@@ -58,6 +58,15 @@ const {
   ProductInventoryPersistenceError,
   saveProductWithInventoryTransaction,
 } = require('../services/productInventoryPersistenceService');
+const {
+  mapProductWriteError,
+  validateAndNormalizeProductInput,
+} = require('../services/productInputValidationService');
+const {
+  ProductListQueryError,
+  listPublicProductFacets,
+  listPublicProducts,
+} = require('../services/productListQueryService');
 
 const PUBLIC_TAXONOMY_POPULATE = [
   {
@@ -135,6 +144,11 @@ function buildProductConfigPayload(body = {}, fallbackProductType = 'physical') 
     parseBoolean(body.trackInventory, undefined)
   );
   const variantPreset = normalizeVariantPreset(body.variantPreset);
+  const preserveExplicitEmptyVariantAxes =
+    Array.isArray(body.variants) &&
+    body.variants.length === 0 &&
+    Array.isArray(body.variantAxes) &&
+    body.variantAxes.length === 0;
 
   return {
     productType,
@@ -142,7 +156,9 @@ function buildProductConfigPayload(body = {}, fallbackProductType = 'physical') 
     trackInventory,
     allowBackorder: parseBoolean(body.allowBackorder, false) === true,
     variantPreset,
-    variantAxes: normalizeVariantAxes(body.variantAxes, variantPreset),
+    variantAxes: preserveExplicitEmptyVariantAxes
+      ? []
+      : normalizeVariantAxes(body.variantAxes, variantPreset),
   };
 }
 
@@ -362,15 +378,45 @@ function serializeAdminProduct(product, inventorySummaryMap = new Map()) {
 // GET /api/products (catálogo público: siempre activos y visibles)
 router.get('/', async (req, res) => {
   try {
-    const products = await Product.find(buildPublicProductFilter())
-      .select(PUBLIC_PRODUCT_PROJECTION)
-      .populate(PUBLIC_TAXONOMY_POPULATE)
-      .lean();
-
-    res.json(products.map(serializePublicProduct));
+    const result = await listPublicProducts(req.query, {
+      ProductModel: Product,
+      populate: PUBLIC_TAXONOMY_POPULATE,
+    });
+    return res.json({ ok: true, ...result });
   } catch (error) {
-    console.error('❌ Error al obtener productos:', error.message);
-    res.status(500).json({ message: 'Error al obtener productos' });
+    if (error instanceof ProductListQueryError) {
+      return res.status(error.status).json({
+        ok: false,
+        error: error.code,
+        message: error.message,
+      });
+    }
+    console.error(
+      'Error al obtener productos:',
+      error?.code || error?.name || 'PRODUCT_LIST_FAILED'
+    );
+    return res.status(500).json({
+      ok: false,
+      error: 'PRODUCT_LIST_FAILED',
+      message: 'Error al obtener productos',
+    });
+  }
+});
+
+router.get('/meta', async (_req, res) => {
+  try {
+    const facets = await listPublicProductFacets({ ProductModel: Product });
+    return res.json({ ok: true, ...facets });
+  } catch (error) {
+    console.error(
+      'Error al obtener filtros de productos:',
+      error?.code || error?.name || 'PRODUCT_META_FAILED'
+    );
+    return res.status(500).json({
+      ok: false,
+      error: 'PRODUCT_META_FAILED',
+      message: 'Error al obtener filtros de productos',
+    });
   }
 });
 
@@ -593,7 +639,7 @@ router.get(
     try {
       const result = await listAdminProducts(req.query);
       const inventorySummaryMap = new Map(
-        result.data.map((product) => [
+        result.products.map((product) => [
           String(product._id),
           product.inventorySummary,
         ])
@@ -601,8 +647,7 @@ router.get(
 
       res.json({
         ok: true,
-        total: result.pagination.total,
-        data: result.data.map((product) =>
+        products: result.products.map((product) =>
           serializeAdminProduct(product, inventorySummaryMap)
         ),
         pagination: result.pagination,
@@ -610,12 +655,20 @@ router.get(
         filters: result.filters,
       });
     } catch (error) {
+      if (error instanceof ProductCatalogInputError) {
+        return res.status(error.status || 400).json({
+          ok: false,
+          error: 'PRODUCT_LIST_QUERY_INVALID',
+          message: error.message,
+        });
+      }
       console.error(
         '❌ Error al obtener productos admin:',
         error.message
       );
       res.status(500).json({
         ok: false,
+        error: 'ADMIN_PRODUCT_LIST_FAILED',
         message: 'Error al obtener productos administrativos',
       });
     }
@@ -765,6 +818,11 @@ router.post(
   requirePermission('products:create'),
   async (req, res) => {
     try {
+      const validatedInput = await validateAndNormalizeProductInput(
+        req.body || {},
+        { mode: 'create', ProductModel: Product }
+      );
+      req.body = validatedInput.payload;
       const {
         sku, // opcional (si no viene, lo genera el modelo con Counter)
         title,
@@ -824,6 +882,7 @@ router.post(
         productConfig.trackInventory &&
         Array.isArray(variants) &&
         variants.length > 0;
+      const variantsFieldProvided = Array.isArray(variants);
       const variantLegacy = variantsProvided
         ? buildLegacyFromVariants(variants, {
             title,
@@ -955,7 +1014,10 @@ router.post(
 
       doc.$locals = doc.$locals || {};
       doc.$locals.adminId = req.adminUserId || null;
-      doc.$locals.variantsAuthoritative = variantsProvided;
+      // Una lista vacía explícita significa "producto simple". El modelo debe
+      // conservarla vacía, mientras el sincronizador todavía puede crear la
+      // fila física default__default a partir de stock.
+      doc.$locals.variantsAuthoritative = variantsFieldProvided;
 
       const saved = await saveProductWithInventoryTransaction(
         doc,
@@ -967,32 +1029,13 @@ router.post(
 
       return res.status(201).json(saved);
     } catch (error) {
-      console.error('❌ Error al crear producto:', error);
-
-      if (error?.code === 11000 && error?.keyPattern) {
-        if (error.keyPattern.sku) {
-          return res.status(409).json({
-            message: 'SKU duplicado. Intenta con otro SKU.',
-          });
-        }
-
-        if (error.keyPattern.slug) {
-          return res.status(409).json({
-            message: 'Slug duplicado. Cambia el título.',
-          });
-        }
-
-        if (error.keyPattern.barcode) {
-          return res.status(409).json({
-            message: 'Barcode duplicado.',
-          });
-        }
-      }
-
-      if (error?.name === 'ValidationError') {
-        return res.status(400).json({
-          message: error.message,
-        });
+      console.error(
+        '❌ Error al crear producto:',
+        error?.code || error?.name || 'PRODUCT_WRITE_FAILED'
+      );
+      const mappedError = mapProductWriteError(error);
+      if (mappedError) {
+        return res.status(mappedError.status).json(mappedError.body);
       }
 
       if (error instanceof ProductFulfillmentInputError) {
@@ -1207,6 +1250,16 @@ router.put(
         });
       }
 
+      const validatedInput = await validateAndNormalizeProductInput(
+        req.body || {},
+        {
+          mode: 'update',
+          existingProduct: prod,
+          ProductModel: Product,
+        }
+      );
+      req.body = validatedInput.payload;
+
       const {
         // sku,  // ❌ no editable directamente
         title,
@@ -1266,6 +1319,7 @@ router.put(
         await resolveProductTaxonomyPayload(req.body, prod);
       const hadConfiguredVariants =
         Array.isArray(prod.variants) && prod.variants.length > 0;
+      let preserveExplicitEmptyVariants = false;
 
       // Detectar cambio de categoría
       const incomingCategory = provided(category) ? String(category) : undefined;
@@ -1459,7 +1513,6 @@ router.put(
       // ✅ INVENTARIO: replace (por defecto) o merge
       if (productConfig.trackInventory && Array.isArray(inventory)) {
         const sanitized = sanitizeInventory(inventory);
-
         if (hasInventoryDuplicates(sanitized)) {
           return res.status(400).json({
             message: 'Inventory tiene combinaciones duplicadas (color+size)',
@@ -1501,9 +1554,16 @@ router.put(
         });
         const variantsAuthoritative =
           variants.length > 0 || hadConfiguredVariants;
+        preserveExplicitEmptyVariants =
+          mode === 'replace' &&
+          hasField('variants') &&
+          variants.length === 0 &&
+          !hadConfiguredVariants;
 
         prod.variants = productConfig.trackInventory
-          ? variantLegacy.variants
+          ? preserveExplicitEmptyVariants
+            ? []
+            : variantLegacy.variants
           : [];
 
         if (productConfig.trackInventory && variantsAuthoritative) {
@@ -1517,7 +1577,10 @@ router.put(
         }
 
         prod.$locals = prod.$locals || {};
-        prod.$locals.variantsAuthoritative = variantsAuthoritative;
+        prod.$locals.variantsAuthoritative =
+          variantsAuthoritative || preserveExplicitEmptyVariants;
+        prod.$locals.inventoryVariantsAuthoritative =
+          variantsAuthoritative;
       }
 
       prod.$locals = prod.$locals || {};
@@ -1535,39 +1598,23 @@ router.put(
         {
           adminId: req.adminUserId || null,
           variantsAuthoritative:
-            prod.$locals?.variantsAuthoritative === true,
+            prod.$locals?.inventoryVariantsAuthoritative === true,
+          // Una configuración simple (variants: []) también necesita la fila
+          // profesional default__default. El sincronizador es idempotente y no
+          // modifica el stock de una fila existente.
+          skipInventorySync: false,
         }
       );
 
       return res.json(updated);
     } catch (error) {
-      console.error('❌ Error al actualizar producto:', error);
-
-      // Manejo fino de duplicados de índices únicos
-      if (error?.code === 11000 && error?.keyPattern) {
-        if (error.keyPattern.sku) {
-          return res.status(409).json({
-            message: 'SKU duplicado.',
-          });
-        }
-
-        if (error.keyPattern.slug) {
-          return res.status(409).json({
-            message: 'Slug duplicado. Cambia el título.',
-          });
-        }
-
-        if (error.keyPattern.barcode) {
-          return res.status(409).json({
-            message: 'Barcode duplicado.',
-          });
-        }
-      }
-
-      if (error?.name === 'ValidationError') {
-        return res.status(400).json({
-          message: error.message,
-        });
+      console.error(
+        '❌ Error al actualizar producto:',
+        error?.code || error?.name || 'PRODUCT_WRITE_FAILED'
+      );
+      const mappedError = mapProductWriteError(error);
+      if (mappedError) {
+        return res.status(mappedError.status).json(mappedError.body);
       }
 
       if (error instanceof ProductFulfillmentInputError) {

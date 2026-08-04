@@ -12,8 +12,9 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const {
-  buildVariantKey,
+  assertVariantIdentity,
   normalizeAttributes,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 const {
   syncProductTotalStock,
@@ -83,19 +84,16 @@ function toObjectId(value, fieldName = 'id') {
 }
 
 function normalizeVariantKey(source = {}) {
-  return cleanLower(
-    source.variantKey ||
-      source.variantId ||
-      buildVariantKey(
-        source.size || source.talla || source.variant?.size || '',
-        source.color || source.variant?.color || '',
-        source.variantAttributes ||
-          source.attributes ||
-          source.variant?.attributes ||
-          []
-      ) ||
-      'default__default'
-  ) || 'default__default';
+  return resolveVariantIdentity({
+    variantKey: source.variantKey || source.variantId,
+    size: source.size || source.talla || source.variant?.size || '',
+    color: source.color || source.variant?.color || '',
+    attributes:
+      source.variantAttributes ||
+      source.attributes ||
+      source.variant?.attributes ||
+      [],
+  }).variantKey;
 }
 
 function orderItemQuantity(item = {}) {
@@ -858,6 +856,12 @@ async function restoreInventory({
 
       const before = Number(stock.stock || 0);
       const after = before + quantity;
+      const stockIdentity = assertVariantIdentity({
+        variantKey: allocation.variantKey || stock.variantKey,
+        size: stock.variant?.size,
+        color: stock.variant?.color,
+        attributes: stock.variant?.attributes || [],
+      });
       const movement = new InventoryMovement({
         type: 'return_in',
         direction: 'in',
@@ -868,18 +872,15 @@ async function restoreInventory({
           stock.productSnapshot ||
           {},
         variant: {
-          size: allocation.size || stock.variant?.size || '',
-          color: allocation.color || stock.variant?.color || '',
+          size: stockIdentity.size,
+          color: stockIdentity.color,
           label:
             allocation.variantLabel || stock.variant?.label || '',
-          attributes: normalizeAttributes(
-            allocation.variantAttributes ||
-              stock.variant?.attributes ||
-              []
-          ),
+          attributes: stockIdentity.attributes,
           sku: stock.variant?.sku || '',
           barcode: stock.variant?.barcode || '',
         },
+        variantKey: stockIdentity.variantKey,
         branchFrom: null,
         branchFromSnapshot: {},
         branchTo: allocation.branch || stock.branch,

@@ -77,9 +77,9 @@ check('La compatibilidad heredada conserva variantes y excluye inactivas del sto
 
   assert.strictEqual(legacy.variants.length, 2);
   assert.deepStrictEqual(legacy.sizes, ['M']);
-  assert.deepStrictEqual(legacy.colors, ['Azul']);
+  assert.deepStrictEqual(legacy.colors, ['blue']);
   assert.deepStrictEqual(legacy.inventory, [
-    { size: 'M', color: 'Azul', stock: 5 },
+    { size: 'M', color: 'blue', stock: 5 },
   ]);
 });
 
@@ -242,7 +242,8 @@ check('El modelo conserva trazabilidad y valida códigos comerciales', () => {
 });
 
 check('Las existencias retiradas se desactivan sin borrarse', () => {
-  assert(syncService.includes("variantKey: { $nin: [...desiredVariantKeys] }"));
+  assert(syncService.includes('const retiredIds = syncPlan.rowsToDeactivate'));
+  assert(syncService.includes('{ _id: { $in: retiredIds }, active: true }'));
   assert(syncService.includes("action: 'variants_retired'"));
   assert(syncService.includes('deactivatedRows'));
   assert(!syncService.includes('InventoryStock.deleteMany'));

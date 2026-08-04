@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { Schema } = mongoose;
 const {
   normalizeAttributes,
+  resolveVariantIdentity,
 } = require("../lib/products/productVariantConfig");
 
 const cartVariantAttributeSchema = new Schema(
@@ -58,6 +59,25 @@ const cartItemSchema = new Schema(
 );
 
 // ⚡ Virtual: `quantity` <-> `qty`
+cartItemSchema.pre("validate", function normalizeCartVariant(next) {
+  try {
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey || this.variantId,
+      size: this.size,
+      color: this.color,
+      attributes: this.variantAttributes || [],
+    });
+    this.variantKey = identity.variantKey;
+    this.variantId = this.variantId || identity.variantKey;
+    this.size = identity.size;
+    this.color = identity.color;
+    this.variantAttributes = identity.attributes;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 cartItemSchema
   .virtual("quantity")
   .get(function () {

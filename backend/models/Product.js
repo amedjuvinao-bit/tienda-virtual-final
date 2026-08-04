@@ -17,6 +17,7 @@ const {
   cleanMoney,
   buildVariantKey,
   normalizeAttributes,
+  resolveVariantIdentity,
   buildVariantLabel,
   normalizeProductVariants,
   normalizeStringArray,
@@ -35,13 +36,27 @@ const {
   normalizeServiceDelivery,
   normalizeBundleComponents,
 } = require('../lib/products/productFulfillmentConfig');
+const {
+  buildProductCodeKeys,
+  normalizeBarcodeKey,
+  normalizeBarcodeValue,
+  normalizeSkuValue,
+} = require('../services/productInputValidationService');
+const {
+  PRODUCT_COMMERCIAL_CODE_UNIQUE_INDEXES,
+} = require('../lib/products/productCommercialCodeIndexDefinitions');
 
 // ==== Subesquemas opcionales ====
 const InventoryItemSchema = new mongoose.Schema(
   {
     size: { type: String, trim: true, default: '' },
     color: { type: String, trim: true, default: '' },
-    stock: { type: Number, default: 0, min: [0, 'El stock de la variante no puede ser negativo'] },
+    stock: {
+      type: Number,
+      default: 0,
+      min: [0, 'El stock de la variante no puede ser negativo'],
+      validate: [Number.isInteger, 'El stock de la variante debe ser entero'],
+    },
   },
   { _id: false }
 );
@@ -96,10 +111,20 @@ const ProductVariantSchema = new mongoose.Schema(
       ],
     },
     active: { type: Boolean, default: true },
-    sortOrder: { type: Number, default: 0, min: 0 },
+    sortOrder: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: [Number.isInteger, 'El orden de la variante debe ser entero'],
+    },
 
     // Solo se usa para carga inicial/sincronización; la existencia real vive en InventoryStock.
-    initialStock: { type: Number, default: 0, min: 0 },
+    initialStock: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: [Number.isInteger, 'El stock inicial debe ser entero'],
+    },
   },
   { _id: false }
 );
@@ -109,21 +134,16 @@ ProductVariantSchema.pre('validate', function normalizeVariantBeforeValidate(nex
     this.size = cleanText(this.size, 80);
     this.color = cleanText(this.color, 120);
     this.attributes = normalizeAttributes(this.attributes);
-    const canonicalKey = buildVariantKey(
-      this.size,
-      this.color,
-      this.attributes
-    );
-    this.variantKey = cleanText(
-      this.attributes.length
-        ? canonicalKey
-        : this.variantKey || canonicalKey,
-      180
-    ).toLowerCase();
-
-    if (!this.variantKey || this.variantKey === '__') {
-      this.variantKey = 'default__default';
-    }
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey,
+      size: this.size,
+      color: this.color,
+      attributes: this.attributes,
+    });
+    this.variantKey = identity.variantKey;
+    this.size = identity.size;
+    this.color = identity.color;
+    this.attributes = identity.attributes;
 
     if (!this.label) {
       this.label = buildVariantLabel(this);
@@ -292,6 +312,10 @@ const productSchema = new mongoose.Schema(
   {
     // SKU autogenerado si no lo envían
     sku: { type: String, required: true, trim: true }, // unicidad por índice
+
+    // Espacios de unicidad normalizados. No se exponen en respuestas.
+    skuKeys: { type: [String], default: undefined, select: false },
+    barcodeKeys: { type: [String], default: undefined, select: false },
 
     // Slug para URL amigable (autogenerado del título)
     slug: { type: String, trim: true }, // unicidad por índice
@@ -484,7 +508,12 @@ const productSchema = new mongoose.Schema(
     },
 
     // inventario/estado heredado. La fuente profesional es InventoryStock.
-    stock: { type: Number, default: 0, min: 0 },
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: [Number.isInteger, 'El stock debe ser entero'],
+    },
 
     // visible para el checkout/validador
     visible: { type: Boolean, default: true },
@@ -501,8 +530,18 @@ const productSchema = new mongoose.Schema(
     },
 
     // campos opcionales
-    reorderPoint: { type: Number, default: 0, min: 0 },
-    reorderQty: { type: Number, default: 0, min: 0 },
+    reorderPoint: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: [Number.isInteger, 'El punto de reorden debe ser entero'],
+    },
+    reorderQty: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: [Number.isInteger, 'La cantidad de reorden debe ser entera'],
+    },
     warehouseLocation: { type: String, trim: true, default: '' },
     weightGrams: { type: Number, default: 0, min: 0 },
     dimensionsCm: { type: DimensionsSchema, default: () => ({}) },
@@ -565,6 +604,13 @@ productSchema.index({
 productSchema.index({ 'variants.variantKey': 1 });
 productSchema.index({ 'variants.sku': 1 });
 productSchema.index({ 'variants.barcode': 1 });
+for (const definition of PRODUCT_COMMERCIAL_CODE_UNIQUE_INDEXES) {
+  productSchema.index(definition.key, {
+    name: definition.name,
+    unique: definition.unique,
+    partialFilterExpression: definition.partialFilterExpression,
+  });
+}
 productSchema.index(
   { sku: 1 },
   { unique: true, partialFilterExpression: { sku: { $type: 'string' } } }
@@ -685,6 +731,8 @@ function normalizeColorToHex(value) {
 // Autogenera SKU si no viene
 productSchema.pre('validate', async function (next) {
   try {
+    this.sku = normalizeSkuValue(this.sku);
+    this.barcode = normalizeBarcodeValue(this.barcode);
     this.productType = normalizeProductType(this.productType);
     this.unitOfMeasure = normalizeUnitOfMeasure(this.unitOfMeasure);
     this.variantPreset = normalizeVariantPreset(this.variantPreset);
@@ -742,7 +790,18 @@ productSchema.pre('validate', async function (next) {
       this.trackInventory
     );
 
-    if (!Array.isArray(this.variantAxes) || this.variantAxes.length === 0) {
+    const preserveExplicitEmptyVariantConfiguration =
+      this.$locals?.variantsAuthoritative === true &&
+      (!Array.isArray(this.variants) || this.variants.length === 0) &&
+      Array.isArray(this.variantAxes) &&
+      this.variantAxes.length === 0;
+
+    if (preserveExplicitEmptyVariantConfiguration) {
+      this.variantAxes = [];
+    } else if (
+      !Array.isArray(this.variantAxes) ||
+      this.variantAxes.length === 0
+    ) {
       this.variantAxes = normalizeVariantAxes([], this.variantPreset);
     } else {
       this.variantAxes = normalizeVariantAxes(this.variantAxes, this.variantPreset);
@@ -803,6 +862,7 @@ productSchema.pre('validate', async function (next) {
       const seq = await nextSeq(counterKey);
       this.sku = `${prefix}-${yyyymm}-${String(seq).padStart(4, '0')}`;
     }
+    this.sku = normalizeSkuValue(this.sku);
 
     const variantRows = Array.isArray(this.variants) ? this.variants : [];
     const skuValues = shouldValidateCommercialCodes
@@ -824,8 +884,20 @@ productSchema.pre('validate', async function (next) {
     );
     const duplicateBarcode = findDuplicateCode(
       barcodeValues,
-      (value) => cleanText(value, 120).toLowerCase()
+      normalizeBarcodeKey
     );
+
+    const normalizedCodeKeys = buildProductCodeKeys({
+      sku: this.sku,
+      barcode: this.barcode,
+      variants: variantRows,
+    });
+    this.skuKeys = normalizedCodeKeys.skuKeys.length
+      ? normalizedCodeKeys.skuKeys
+      : undefined;
+    this.barcodeKeys = normalizedCodeKeys.barcodeKeys.length
+      ? normalizedCodeKeys.barcodeKeys
+      : undefined;
 
     if (duplicateVariantKey) {
       this.invalidate(
@@ -853,6 +925,7 @@ productSchema.pre('validate', async function (next) {
         .findOne({
           _id: { $ne: this._id },
           $or: [
+            { skuKeys: { $in: skuValues } },
             { sku: { $in: skuValues } },
             { 'variants.sku': { $in: skuValues } },
           ],
@@ -862,8 +935,10 @@ productSchema.pre('validate', async function (next) {
 
       if (skuConflict) {
         this.invalidate(
-          'variants',
-          'Uno de los SKU ya pertenece a otro producto o variante.'
+          'skuKeys',
+          'Uno de los SKU ya pertenece a otro producto o variante.',
+          skuValues,
+          'PRODUCT_SKU_CONFLICT'
         );
       }
     }
@@ -873,6 +948,7 @@ productSchema.pre('validate', async function (next) {
         .findOne({
           _id: { $ne: this._id },
           $or: [
+            { barcodeKeys: { $in: normalizedCodeKeys.barcodeKeys } },
             { barcode: { $in: barcodeValues } },
             { 'variants.barcode': { $in: barcodeValues } },
           ],
@@ -882,8 +958,10 @@ productSchema.pre('validate', async function (next) {
 
       if (barcodeConflict) {
         this.invalidate(
-          'variants',
-          'Uno de los códigos de barras ya pertenece a otro producto o variante.'
+          'barcodeKeys',
+          'Uno de los códigos de barras ya pertenece a otro producto o variante.',
+          barcodeValues,
+          'PRODUCT_BARCODE_CONFLICT'
         );
       }
     }
@@ -971,10 +1049,21 @@ productSchema.pre('save', async function (next) {
 productSchema.pre('save', function (next) {
   try {
     if (this.isModified('inventory') && Array.isArray(this.inventory)) {
-      this.stock = this.inventory.reduce((acc, row) => {
-        const n = Number(row?.stock || 0);
-        return acc + (Number.isFinite(n) && n > 0 ? n : 0);
-      }, 0);
+      const preserveInitialSimpleStock =
+        this.isNew &&
+        this.$locals?.variantsAuthoritative === true &&
+        Array.isArray(this.variants) &&
+        this.variants.length === 0 &&
+        Array.isArray(this.variantAxes) &&
+        this.variantAxes.length === 0 &&
+        this.inventory.length === 0;
+
+      if (!preserveInitialSimpleStock) {
+        this.stock = this.inventory.reduce((acc, row) => {
+          const n = Number(row?.stock || 0);
+          return acc + (Number.isFinite(n) && n > 0 ? n : 0);
+        }, 0);
+      }
     }
     next();
   } catch (e) {

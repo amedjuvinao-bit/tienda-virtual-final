@@ -43,16 +43,23 @@ async function persistProductAndInventory(
     session,
     adminId = null,
     variantsAuthoritative = false,
+    skipInventorySync = false,
   }
 ) {
   productDoc.$locals = productDoc.$locals || {};
   productDoc.$locals.adminId =
     adminId || productDoc.$locals.adminId || null;
   productDoc.$locals.variantsAuthoritative =
+    productDoc.$locals.variantsAuthoritative === true ||
     variantsAuthoritative;
   productDoc.$locals.inventoryPersistenceManaged = true;
 
   const saved = await productDoc.save({ session });
+  if (skipInventorySync) {
+    saved.$locals = saved.$locals || {};
+    saved.$locals.inventorySyncSkipped = true;
+    return saved;
+  }
   const syncResult = await syncProductInventoryFromProduct(
     saved,
     {
@@ -87,6 +94,7 @@ async function saveProductWithInventoryTransaction(
   const adminId =
     options.adminId || productDoc?.$locals?.adminId || null;
   const externalSession = options.session || null;
+  const skipInventorySync = options.skipInventorySync === true;
 
   try {
     if (externalSession) {
@@ -94,6 +102,7 @@ async function saveProductWithInventoryTransaction(
         session: externalSession,
         adminId,
         variantsAuthoritative,
+        skipInventorySync,
       });
     }
 
@@ -109,6 +118,7 @@ async function saveProductWithInventoryTransaction(
             session,
             adminId,
             variantsAuthoritative,
+            skipInventorySync,
           }
         );
       },

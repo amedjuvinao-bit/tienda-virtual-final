@@ -16,6 +16,10 @@ const routeSource = fs.readFileSync(
   path.join(__dirname, '..', 'routes', 'productRoutes.js'),
   'utf8'
 );
+const listServiceSource = fs.readFileSync(
+  path.join(__dirname, '..', 'services', 'productListQueryService.js'),
+  'utf8'
+);
 const adminFormSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'admin', 'FormularioProducto.jsx'),
   'utf8'
@@ -129,8 +133,9 @@ check('La serialización no modifica el documento original', () => {
 });
 
 check('Todas las lecturas públicas usan filtro y serialización protegidos', () => {
-  const filterUses = routeSource.match(/buildPublicProductFilter\(/g) || [];
-  const serializerUses = routeSource.match(/serializePublicProduct/g) || [];
+  const publicReadSource = `${routeSource}\n${listServiceSource}`;
+  const filterUses = publicReadSource.match(/buildPublicProductFilter\(/g) || [];
+  const serializerUses = publicReadSource.match(/serializePublicProduct/g) || [];
 
   assert(filterUses.length >= 4, 'Faltan filtros públicos en una o más rutas');
   assert(serializerUses.length >= 4, 'Falta serialización pública en una o más rutas');
@@ -148,7 +153,9 @@ check('El detalle administrativo permanece protegido y conserva datos completos'
     'Falta protección requireAdmin en el detalle administrativo'
   );
   assert(
-    adminFormSource.includes('api.get(`/api/products/admin/${id}`)'),
+    /api\.get\(\s*`\/api\/products\/admin\/\$\{id\}`(?:\s*,|\s*\))/.test(
+      adminFormSource
+    ),
     'El formulario administrativo todavía consulta el detalle público'
   );
 });

@@ -5,7 +5,7 @@ const Counter = require('./Counter');
 const {
   normalizeAttributes,
   buildVariantLabel,
-  buildVariantKey,
+  assertVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 
 const INVENTORY_MOVEMENT_TYPES = [
@@ -307,7 +307,7 @@ const InventoryMovementSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
-      default: 'default__default',
+      default: '',
       index: true,
     },
 
@@ -552,11 +552,16 @@ InventoryMovementSchema.pre('validate', async function inventoryMovementPreValid
       this.variant.size = cleanText(this.variant.size);
       this.variant.color = cleanText(this.variant.color);
       this.variant.attributes = normalizeAttributes(this.variant.attributes);
-      this.variantKey = buildVariantKey(
-        this.variant.size,
-        this.variant.color,
-        this.variant.attributes
-      );
+      const identity = assertVariantIdentity({
+        variantKey: this.variantKey,
+        size: this.variant.size,
+        color: this.variant.color,
+        attributes: this.variant.attributes,
+      });
+      this.variantKey = identity.variantKey;
+      this.variant.size = identity.size;
+      this.variant.color = identity.color;
+      this.variant.attributes = identity.attributes;
       this.variant.label = cleanText(
         this.variant.label || buildVariantLabel(this.variant)
       );

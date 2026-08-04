@@ -144,7 +144,7 @@ export default function LookProductPicker({
           params: {
             q,
             limit: 12,
-            all: 1,
+            page: 1,
           },
         });
 

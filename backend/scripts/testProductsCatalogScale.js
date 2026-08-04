@@ -117,12 +117,12 @@ async function run() {
 
     assert.strictEqual(secondPage.pagination.page, 2);
     assert.strictEqual(secondPage.pagination.limit, 10);
-    assert.strictEqual(secondPage.pagination.total, PRODUCT_COUNT);
-    assert.strictEqual(secondPage.pagination.pages, 4);
-    assert.strictEqual(secondPage.data.length, 10);
+    assert.strictEqual(secondPage.pagination.totalProducts, PRODUCT_COUNT);
+    assert.strictEqual(secondPage.pagination.totalPages, 4);
+    assert.strictEqual(secondPage.products.length, 10);
     assert.strictEqual(secondPage.summary.total, PRODUCT_COUNT);
     assert.strictEqual(secondPage.summary.stock, 60);
-    assert.strictEqual(secondPage.data[0].sku, `${CATEGORY}-011`);
+    assert.strictEqual(secondPage.products[0].sku, `${CATEGORY}-011`);
     ok('Paginación real y resumen global independientes de la página');
 
     const search = await listAdminProducts({
@@ -130,8 +130,8 @@ async function run() {
       limit: 20,
     });
 
-    assert.strictEqual(search.pagination.total, 1);
-    assert.strictEqual(search.data[0].sku, `${CATEGORY}-005`);
+    assert.strictEqual(search.pagination.totalProducts, 1);
+    assert.strictEqual(search.products[0].sku, `${CATEGORY}-005`);
     ok('Búsqueda de servidor por SKU');
 
     const inactive = await listAdminProducts({
@@ -144,11 +144,11 @@ async function run() {
     ).filter((index) => index % 4 === 0).length;
 
     assert.strictEqual(
-      inactive.pagination.total,
+      inactive.pagination.totalProducts,
       expectedInactive
     );
     assert(
-      inactive.data.every((product) => product.active === false)
+      inactive.products.every((product) => product.active === false)
     );
     ok('Filtro de estado aplicado antes de paginar');
 
@@ -166,14 +166,14 @@ async function run() {
       limit: 100,
     });
 
-    assert.strictEqual(withStock.pagination.total, 9);
+    assert.strictEqual(withStock.pagination.totalProducts, 9);
     assert.strictEqual(
-      withoutStock.pagination.total,
+      withoutStock.pagination.totalProducts,
       20
     );
-    assert.strictEqual(lowStock.pagination.total, 2);
+    assert.strictEqual(lowStock.pagination.totalProducts, 2);
     assert.strictEqual(
-      withStock.data[0].inventorySummary.stock,
+      withStock.products[0].inventorySummary.stock,
       12
     );
     ok('Filtros de inventario excluyen servicios sin existencia propia');
@@ -218,9 +218,9 @@ async function run() {
       status: 'hidden',
     });
 
-    assert.strictEqual(hidden.pagination.total, 1);
-    assert.strictEqual(hidden.data[0].active, true);
-    assert.strictEqual(hidden.data[0].visible, false);
+    assert.strictEqual(hidden.pagination.totalProducts, 1);
+    assert.strictEqual(hidden.products[0].active, true);
+    assert.strictEqual(hidden.products[0].visible, false);
 
     await updateProductsInBulk({
       ids: [selected[0]],
@@ -257,7 +257,7 @@ async function run() {
       limit: 100,
     });
     assert.strictEqual(
-      afterArchive.pagination.total,
+      afterArchive.pagination.totalProducts,
       PRODUCT_COUNT - 2
     );
     ok('Retiro masivo conserva documentos y desactiva inventario');

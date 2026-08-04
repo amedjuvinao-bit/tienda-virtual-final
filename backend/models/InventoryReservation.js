@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 const {
   normalizeAttributes,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 
 const { Schema } = mongoose;
@@ -113,7 +114,7 @@ const reservationItemSchema = new Schema(
       type: String,
       trim: true,
       lowercase: true,
-      default: 'default__default',
+      default: '',
     },
 
     variantLabel: {
@@ -197,6 +198,24 @@ const reservationItemSchema = new Schema(
     timestamps: false,
   }
 );
+
+reservationItemSchema.pre('validate', function normalizeReservationVariant(next) {
+  try {
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey,
+      size: this.size,
+      color: this.color,
+      attributes: this.variantAttributes || [],
+    });
+    this.variantKey = identity.variantKey;
+    this.size = identity.size;
+    this.color = identity.color;
+    this.variantAttributes = identity.attributes;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const inventoryReservationSchema = new Schema(
   {

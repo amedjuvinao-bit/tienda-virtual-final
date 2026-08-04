@@ -1,5 +1,5 @@
 // src/admin/FormularioProducto.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -14,6 +14,41 @@ import {
   getVariantPresetMeta,
   shouldTrackInventoryByType,
 } from './products/productCatalogConfig';
+import variantKeyAuthority from '@shared/variant-key-authority';
+
+const {
+  buildVariantKey,
+  normalizeVariantKey,
+  resolveVariantIdentity,
+} = variantKeyAuthority;
+
+export function formatProductSaveError(error) {
+  const response = error?.response?.data;
+  const validationErrors = Array.isArray(response?.errors)
+    ? response.errors
+    : [];
+
+  const details = validationErrors
+    .map((entry) => {
+      const field = String(entry?.field || '').trim();
+      const message = String(entry?.message || '').trim();
+      if (!message) return '';
+      return field ? `${field}: ${message}` : message;
+    })
+    .filter(Boolean);
+
+  if (details.length) return details.join(' · ');
+
+  const status = error?.response?.status;
+  return (
+    response?.message ||
+    (status === 401
+      ? 'No autorizado.'
+      : status === 409
+        ? 'Dato único duplicado.'
+        : 'Error al guardar')
+  );
+}
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_PRESET;
@@ -79,7 +114,7 @@ function createCommercialFieldRow(index = 0) {
 function createBundleComponentRow(value = {}) {
   return {
     product: getReferenceId(value.product || value.productId),
-    variantKey: cleanText(value.variantKey || '').toLowerCase(),
+    variantKey: normalizeVariantKey(value.variantKey) || '',
     quantity: Math.max(1, Math.floor(Number(value.quantity || 1))),
   };
 }
@@ -124,43 +159,20 @@ function normalizeVariantAttributes(attributes = []) {
   return out;
 }
 
-function stableVariantHash(value) {
-  let first = 2166136261;
-  let second = 5381;
+function normalizeVariantForPayload(variant = {}) {
+  const identity = resolveVariantIdentity({
+    size: variant.size,
+    color: variant.color,
+    attributes: normalizeVariantAttributes(variant.attributes),
+  });
 
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    first ^= code;
-    first = Math.imul(first, 16777619);
-    second = Math.imul(second, 33) ^ code;
-  }
-
-  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0)
-    .toString(16)
-    .padStart(8, '0')}`;
-}
-
-function buildVariantKey(size = '', color = '', attributes = []) {
-  const normalizedAttributes = normalizeVariantAttributes(attributes);
-  if (normalizedAttributes.length) {
-    const pairs = [...normalizedAttributes]
-      .sort((left, right) => left.key.localeCompare(right.key, 'es'))
-      .map(
-      (attribute) =>
-        `${encodeURIComponent(attribute.key)}=${encodeURIComponent(
-          cleanText(attribute.value).toLowerCase()
-        )}`
-      );
-    const rawKey = `v2__${pairs.join('__')}`.toLowerCase();
-    return rawKey.length <= 180
-      ? rawKey
-      : `${rawKey.slice(0, 161)}__${stableVariantHash(rawKey)}`;
-  }
-
-  const sizeKey = cleanText(size).toLowerCase();
-  const colorKey = cleanText(color).toLowerCase();
-  const key = `${sizeKey}__${colorKey}`;
-  return !key || key === '__' ? 'default__default' : key;
+  return {
+    ...variant,
+    variantKey: identity.variantKey,
+    size: identity.size,
+    color: identity.color,
+    attributes: identity.attributes,
+  };
 }
 
 function buildVariantLabel(size = '', color = '', attributes = []) {
@@ -203,6 +215,19 @@ function normalizeVariantAxes(axes = [], preset = null) {
   return out;
 }
 
+export function shouldPreserveLegacyEmptyVariants({
+  isEditing = false,
+  loadedHadExplicitVariants = true,
+  loadedAxesSignature = '',
+  currentAxes = [],
+} = {}) {
+  return (
+    isEditing &&
+    loadedHadExplicitVariants === false &&
+    loadedAxesSignature === JSON.stringify(normalizeVariantAxes(currentAxes))
+  );
+}
+
 function getLegacyVariantFields(attributes = []) {
   const normalized = normalizeVariantAttributes(attributes);
   const colorAttribute = normalized.find((attribute) =>
@@ -237,7 +262,7 @@ function getInitialTrackInventory(productType, explicitValue) {
   return shouldTrackInventoryByType(productType);
 }
 
-function normalizeLoadedVariants(product = {}) {
+export function normalizeLoadedVariants(product = {}) {
   if (Array.isArray(product.variants) && product.variants.length) {
     return product.variants.map((variant, index) => {
       const size = cleanText(variant.size || '');
@@ -245,20 +270,31 @@ function normalizeLoadedVariants(product = {}) {
       const attributes = normalizeVariantAttributes(
         variant.attributes || variant.variantAttributes || []
       );
-      const key = cleanText(
-        attributes.length
-          ? buildVariantKey(size, color, attributes)
-          : variant.variantKey || buildVariantKey(size, color)
-      ).toLowerCase();
+      let identity;
+      try {
+        identity = resolveVariantIdentity({
+          variantKey: variant.variantKey,
+          size,
+          color,
+          attributes,
+        });
+      } catch (error) {
+        if (error?.code !== 'VARIANT_KEY_MISMATCH') throw error;
+
+        // Compatibilidad de edición para claves heredadas construidas con
+        // etiquetas visibles. La reconstrucción sigue perteneciendo
+        // exclusivamente a variantKeyAuthority.
+        identity = resolveVariantIdentity({ size, color, attributes });
+      }
       return {
-        variantKey: key,
+        variantKey: identity.variantKey,
         label: cleanText(
           variant.label ||
             buildVariantLabel(size, color, attributes)
         ),
-        size,
-        color,
-        attributes,
+        size: identity.size,
+        color: identity.color,
+        attributes: identity.attributes,
         sku: cleanText(variant.sku || '').toUpperCase(),
         barcode: cleanText(variant.barcode || ''),
         price: variant.price ?? '',
@@ -509,6 +545,8 @@ export default function FormularioProducto() {
   const [sizes, setSizes] = useState([]);
   const [variantStock, setVariantStock] = useState({});
   const [advancedVariants, setAdvancedVariants] = useState([]);
+  const loadedVariantAxesSignatureRef = useRef('');
+  const loadedHadExplicitVariantsRef = useRef(true);
   const [expandedVariant, setExpandedVariant] = useState('');
 
   const [reorderPoint, setReorderPoint] = useState(0);
@@ -573,11 +611,59 @@ export default function FormularioProducto() {
   }, [colorsArr]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) return undefined;
 
-    api.get(`/api/products/admin/${id}`)
-      .then(({ data }) => {
-        const p = data || {};
+    let active = true;
+    const controller = new AbortController();
+
+    const notifyLoadError = (message) => {
+      if (!active) return;
+
+      try {
+        toast.error(message);
+      } catch (notificationError) {
+        console.error(
+          '[FormularioProducto] Error de presentación al mostrar la notificación:',
+          notificationError
+        );
+      }
+    };
+
+    const loadProduct = async () => {
+      let p;
+
+      try {
+        const { data } = await api.get(`/api/products/admin/${id}`, {
+          signal: controller.signal,
+        });
+
+        if (!active) return;
+        p = data || {};
+      } catch (requestError) {
+        if (
+          !active ||
+          controller.signal.aborted ||
+          axios.isCancel(requestError) ||
+          requestError?.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+
+        if (requestError?.response?.status === 404) {
+          notifyLoadError('Este producto no existe o fue eliminado.');
+          navigate('/admin/productos');
+        } else {
+          console.error(
+            '[FormularioProducto] Error HTTP al cargar el producto:',
+            requestError
+          );
+          notifyLoadError('Error al cargar producto');
+        }
+
+        return;
+      }
+
+      try {
         const loadedProductType = p.productType || 'physical';
         const loadedTrackInventory = getInitialTrackInventory(loadedProductType, p.trackInventory);
 
@@ -658,6 +744,14 @@ export default function FormularioProducto() {
         }
 
         const loadedVariants = normalizeLoadedVariants(p);
+        loadedHadExplicitVariantsRef.current =
+          Array.isArray(p.variants) && p.variants.length > 0;
+        loadedVariantAxesSignatureRef.current = JSON.stringify(
+          normalizeVariantAxes(
+            p.variantAxes,
+            getVariantPresetMeta(loadedVariantPreset)
+          )
+        );
         setAdvancedVariants(loadedVariants);
         if (loadedVariants[0]?.variantKey) setExpandedVariant(loadedVariants[0].variantKey);
 
@@ -724,15 +818,21 @@ export default function FormularioProducto() {
             ? p.bundleComponents.map(createBundleComponentRow)
             : []
         );
-      })
-      .catch((err) => {
-        if (err?.response?.status === 404) {
-          toast.error('Este producto no existe o fue eliminado.');
-          navigate('/admin/productos');
-        } else {
-          toast.error('Error al cargar producto');
-        }
-      });
+      } catch (processingError) {
+        console.error(
+          '[FormularioProducto] Error al procesar los datos del producto:',
+          processingError
+        );
+        notifyLoadError('Error al procesar los datos del producto');
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [id, navigate]);
 
   const loadTaxonomy = async () => {
@@ -815,11 +915,11 @@ export default function FormularioProducto() {
             page: 1,
             limit: 100,
             status: 'active',
-            sort: 'title_asc',
+            sort: 'title',
           },
         });
         if (cancelled) return;
-        const list = Array.isArray(data?.data) ? data.data : [];
+        const list = Array.isArray(data?.products) ? data.products : [];
         setBundleCandidates(
           list.filter(
             (product) =>
@@ -884,6 +984,15 @@ export default function FormularioProducto() {
     if (!trackInventory) return;
 
     setAdvancedVariants((prev) => {
+      const axesSignature = JSON.stringify(normalizeVariantAxes(variantAxes));
+      if (
+        prev.length > 0 &&
+        loadedVariantAxesSignatureRef.current === axesSignature
+      ) {
+        return prev;
+      }
+
+      loadedVariantAxesSignatureRef.current = '';
       const merged = mergeAdvancedVariants({
         previous: prev,
         axes: variantAxes,
@@ -1223,11 +1332,12 @@ export default function FormularioProducto() {
       const legacyRows = new Map();
       advancedVariants
         .filter((variant) => variant.active !== false)
+        .map(normalizeVariantForPayload)
         .forEach((variant) => {
-          const key = `${variant.size || ''}|||${variant.color || ''}`;
+          const key = `${variant.size}|||${variant.color}`;
           const previous = legacyRows.get(key) || {
-          size: variant.size || '',
-          color: variant.color || '',
+            size: variant.size,
+            color: variant.color,
             stock: 0,
           };
           previous.stock += Math.max(
@@ -1256,6 +1366,18 @@ export default function FormularioProducto() {
 
   const variantPayload = useMemo(() => {
     if (!trackInventory) return [];
+    if (
+      shouldPreserveLegacyEmptyVariants({
+        isEditing: Boolean(id),
+        loadedHadExplicitVariants:
+          loadedHadExplicitVariantsRef.current,
+        loadedAxesSignature:
+          loadedVariantAxesSignatureRef.current,
+        currentAxes: variantAxes,
+      })
+    ) {
+      return [];
+    }
     return advancedVariants
       .filter(
         (variant) =>
@@ -1264,14 +1386,9 @@ export default function FormularioProducto() {
           variant.label ||
           variant.attributes?.length
       )
+      .map(normalizeVariantForPayload)
       .map((variant, index) => ({
-        variantKey:
-          variant.variantKey ||
-          buildVariantKey(
-            variant.size,
-            variant.color,
-            variant.attributes
-          ),
+        variantKey: variant.variantKey,
         label:
           variant.label ||
           buildVariantLabel(
@@ -1279,9 +1396,9 @@ export default function FormularioProducto() {
             variant.color,
             variant.attributes
           ),
-        size: variant.size || '',
-        color: variant.color || '',
-        attributes: normalizeVariantAttributes(variant.attributes),
+        size: variant.size,
+        color: variant.color,
+        attributes: variant.attributes,
         sku: variant.sku || '',
         barcode: variant.barcode || '',
         price: variant.price === '' || variant.price == null ? null : toMoney(variant.price, precio),
@@ -1293,7 +1410,7 @@ export default function FormularioProducto() {
         active: variant.active !== false,
         sortOrder: index,
       }));
-  }, [trackInventory, advancedVariants, precio, cost, averageCost]);
+  }, [trackInventory, advancedVariants, precio, cost, averageCost, id, variantAxes]);
 
   const formInvalid = useMemo(() => {
     const price = Number(precio);
@@ -1548,11 +1665,15 @@ export default function FormularioProducto() {
         toast.error('Token de administrador ausente. Inicia sesión de nuevo.');
         return;
       }
-      const status = err?.response?.status;
-      const msg = err?.response?.data?.message ||
-        (status === 401 ? 'No autorizado.' : status === 409 ? 'Dato único duplicado.' : 'Error al guardar');
+      const msg = formatProductSaveError(err);
       toast.error(msg);
-      console.error(err);
+      console.error('[FormularioProducto] Error al guardar:', {
+        status: err?.response?.status || null,
+        error: err?.response?.data?.error || null,
+        errors: Array.isArray(err?.response?.data?.errors)
+          ? err.response.data.errors
+          : [],
+      });
     } finally {
       setCargando(false);
     }

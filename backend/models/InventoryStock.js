@@ -5,6 +5,7 @@ const {
   buildVariantKey,
   normalizeAttributes,
   buildVariantLabel,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
@@ -348,21 +349,21 @@ InventoryStockSchema.pre('validate', function inventoryStockPreValidate(next) {
     this.variant.size = cleanText(this.variant.size);
     this.variant.color = cleanText(this.variant.color);
     this.variant.attributes = normalizeAttributes(this.variant.attributes);
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey,
+      size: this.variant.size,
+      color: this.variant.color,
+      attributes: this.variant.attributes,
+    });
+    this.variantKey = identity.variantKey;
+    this.variant.size = identity.size;
+    this.variant.color = identity.color;
+    this.variant.attributes = identity.attributes;
     this.variant.label = cleanText(
       this.variant.label || buildVariantLabel(this.variant)
     );
     this.variant.sku = cleanUpper(this.variant.sku);
     this.variant.barcode = cleanText(this.variant.barcode);
-
-    this.variantKey = buildVariantKey(
-      this.variant.size,
-      this.variant.color,
-      this.variant.attributes
-    );
-
-    if (!this.variantKey || this.variantKey === '__') {
-      this.variantKey = 'default__default';
-    }
 
     if (this.branchSnapshot) {
       this.branchSnapshot.name = cleanText(this.branchSnapshot.name);
@@ -428,6 +429,7 @@ InventoryStockSchema.methods.toSafeObject = function toSafeObject() {
  * ============================ */
 
 InventoryStockSchema.statics.buildVariantKey = buildVariantKey;
+InventoryStockSchema.statics.resolveVariantIdentity = resolveVariantIdentity;
 
 InventoryStockSchema.statics.buildBranchSnapshot = function buildBranchSnapshot(branch) {
   if (!branch) {

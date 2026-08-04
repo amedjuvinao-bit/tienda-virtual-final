@@ -1,5 +1,5 @@
 // frontend/src/admin/pages/CatalogPageEditor.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -612,8 +612,16 @@ function ManualProductsPicker({
   selectedKeys = [],
   onAdd = () => {},
   onRemove = () => {},
+  onSearch = () => {},
 }) {
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return undefined;
+    const timer = window.setTimeout(() => onSearch(cleanQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [query, onSearch]);
 
   const filtered = useMemo(() => {
     const q = String(query || "").trim().toLowerCase();
@@ -753,6 +761,7 @@ export default function CatalogPageEditor() {
   const [visualSubtab, setVisualSubtab] = useState("layout");
 
   const [allProducts, setAllProducts] = useState([]);
+  const [availableProductCategories, setAvailableProductCategories] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   const [titleImageFile, setTitleImageFile] = useState(null);
@@ -781,8 +790,11 @@ export default function CatalogPageEditor() {
       }
     }
 
-    return dedupeCaseInsensitive(collected).sort((a, b) => a.localeCompare(b));
-  }, [allProducts]);
+    return dedupeCaseInsensitive([
+      ...availableProductCategories,
+      ...collected,
+    ]).sort((a, b) => a.localeCompare(b));
+  }, [allProducts, availableProductCategories]);
 
   const selectedAllowedCategories = useMemo(
     () => parseCsvArray(form?.catalogConfig?.allowedCategoriesText || ""),
@@ -842,20 +854,47 @@ export default function CatalogPageEditor() {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async (query = '', productKeys = []) => {
     try {
       setLoadingProducts(true);
-      const res = await fetch(`${API_BASE}/api/products`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setAllProducts(Array.isArray(data) ? data : []);
+      const params = new URLSearchParams({
+        page: '1',
+        limit: query ? '20' : '40',
+        sort: 'title',
+      });
+      if (query) params.set('q', query);
+      productKeys.forEach((value) => params.append('productKeys', value));
+      const [productsResponse, metaResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/products?${params.toString()}`),
+        query || productKeys.length
+          ? Promise.resolve(null)
+          : fetch(`${API_BASE}/api/products/meta`),
+      ]);
+      if (!productsResponse.ok) throw new Error(`HTTP ${productsResponse.status}`);
+      const data = await productsResponse.json();
+      const incoming = Array.isArray(data?.products) ? data.products : [];
+      setAllProducts((current) => {
+        const byId = new Map(
+          [...current, ...incoming].map((product) => [
+            String(product?._id || product?.slug || ''),
+            product,
+          ])
+        );
+        byId.delete('');
+        return [...byId.values()];
+      });
+      if (metaResponse?.ok) {
+        const meta = await metaResponse.json();
+        setAvailableProductCategories(
+          Array.isArray(meta?.categories) ? meta.categories : []
+        );
+      }
     } catch (error) {
       console.error("Error cargando productos del editor catálogo:", error);
-      setAllProducts([]);
     } finally {
       setLoadingProducts(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -865,7 +904,13 @@ export default function CatalogPageEditor() {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    if (selectedManualKeys.length) {
+      fetchProducts('', selectedManualKeys);
+    }
+  }, [fetchProducts, selectedManualKeys]);
 
   const updateRoot = (patch) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -1546,6 +1591,7 @@ export default function CatalogPageEditor() {
                     selectedKeys={selectedManualKeys}
                     onAdd={addManualProduct}
                     onRemove={removeManualProduct}
+                    onSearch={fetchProducts}
                   />
 
                   <Textarea

@@ -1,5 +1,14 @@
 // backend/lib/products/productVariantConfig.js
 
+const {
+  assertVariantIdentity,
+  buildVariantKey,
+  canonicalizeVariantKey,
+  normalizeVariantKey,
+  parseVariantKey,
+  resolveVariantIdentity,
+} = require('../../../shared/variantKeyAuthority.cjs');
+
 function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
@@ -197,52 +206,6 @@ function getColorDisplayName(value) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-function encodeVariantKeyPart(value, max = 160) {
-  return encodeURIComponent(cleanLower(value, max));
-}
-
-function stableVariantHash(value) {
-  let first = 2166136261;
-  let second = 5381;
-
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    first ^= code;
-    first = Math.imul(first, 16777619);
-    second = Math.imul(second, 33) ^ code;
-  }
-
-  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0)
-    .toString(16)
-    .padStart(8, '0')}`;
-}
-
-function buildVariantKey(size = '', color = '', attributes = []) {
-  const normalizedAttributes = normalizeAttributes(attributes);
-
-  if (normalizedAttributes.length) {
-    const pairs = [...normalizedAttributes]
-      .sort((left, right) => left.key.localeCompare(right.key, 'es'))
-      .map(
-      (attribute) =>
-        `${encodeVariantKeyPart(attribute.key, 80)}=${encodeVariantKeyPart(
-          attribute.value,
-          160
-        )}`
-      );
-    const rawKey = `v2__${pairs.join('__')}`.toLowerCase();
-
-    if (rawKey.length <= 180) return rawKey;
-
-    return `${rawKey.slice(0, 161)}__${stableVariantHash(rawKey)}`;
-  }
-
-  const cleanSize = cleanLower(size, 80);
-  const cleanColor = cleanLower(color, 120);
-  const key = `${cleanSize}__${cleanColor}`;
-  return !key || key === '__' ? 'default__default' : key;
-}
-
 function normalizeStringArray(items, max = Infinity) {
   const list = toPlainArray(items);
   if (!list.length) return [];
@@ -365,13 +328,13 @@ function normalizeVariantInput(variant = {}, product = {}) {
       '',
     120
   );
-  const generatedKey = buildVariantKey(size, color, attributes);
-  const variantKey = cleanLower(
-    attributes.length
-      ? generatedKey
-      : plainVariant.variantKey || generatedKey,
-    180
-  );
+  const identity = resolveVariantIdentity({
+    variantKey: plainVariant.variantKey,
+    size,
+    color,
+    attributes,
+  });
+  const variantKey = identity.variantKey;
   const images = normalizeStringArray(plainVariant.images || plainVariant.gallery || [], 8);
   const image = cleanText(plainVariant.image || images[0] || '', 1000);
   const price = plainVariant.price === '' || plainVariant.price === null || plainVariant.price === undefined
@@ -387,10 +350,15 @@ function normalizeVariantInput(variant = {}, product = {}) {
 
   return {
     variantKey,
-    label: buildVariantLabel({ ...plainVariant, size, color }),
-    size,
-    color,
-    attributes,
+    label: buildVariantLabel({
+      ...plainVariant,
+      size: identity.size,
+      color: identity.color,
+      attributes: identity.attributes,
+    }),
+    size: identity.size,
+    color: identity.color,
+    attributes: identity.attributes,
     sku: cleanUpper(plainVariant.sku || plainVariant.variantSku || '', 100),
     barcode: cleanText(plainVariant.barcode || plainVariant.variantBarcode || '', 120),
     price,
@@ -452,13 +420,7 @@ function normalizeProductVariants(variants = [], product = {}) {
   source.forEach((variant, index) => {
     const plainVariant = toPlainObject(variant) || {};
     const normalized = normalizeVariantInput({ ...plainVariant, sortOrder: plainVariant?.sortOrder ?? index }, product);
-    const key =
-      normalized.variantKey ||
-      buildVariantKey(
-        normalized.size,
-        normalized.color,
-        normalized.attributes
-      );
+    const key = normalized.variantKey;
     if (seen.has(key)) return;
 
     seen.add(key);
@@ -480,18 +442,25 @@ function findProductVariant(product = {}, selector = {}) {
   ).filter((variant) => variant.active !== false);
   if (!variants.length) return null;
 
-  const desiredKey = cleanLower(selector.variantKey || '', 180);
+  const selectorIdentity = resolveVariantIdentity({
+    variantKey: selector.variantKey,
+    size: selector.size,
+    color: selector.color,
+    attributes: selector.attributes || selector.variantAttributes || [],
+  });
+  const desiredKey = selector.variantKey
+    ? selectorIdentity.variantKey
+    : '';
   if (desiredKey) {
     const byKey = variants.find((variant) => cleanLower(variant.variantKey, 180) === desiredKey);
     if (byKey) return byKey;
   }
 
-  const selectorKey = buildVariantKey(selector.size || '', selector.color || '');
-  const dynamicSelectorKey = buildVariantKey(
-    selector.size || '',
-    selector.color || '',
-    selector.attributes || selector.variantAttributes || []
+  const selectorKey = buildVariantKey(
+    selectorIdentity.size,
+    selectorIdentity.color
   );
+  const dynamicSelectorKey = selectorIdentity.variantKey;
   const byAttributes = variants.find(
     (variant) => variant.variantKey === dynamicSelectorKey
   );
@@ -507,13 +476,16 @@ function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
   const baseCost = cleanMoney(plainProduct.averageCost || plainProduct.cost || 0, 0);
 
   if (!variant) {
+    const selectorIdentity = resolveVariantIdentity({
+      variantKey: selector.variantKey,
+      size: selector.size,
+      color: selector.color,
+      attributes: selector.attributes || selector.variantAttributes || [],
+    });
+
     return {
       variant: null,
-      variantKey: buildVariantKey(
-        selector.size || '',
-        selector.color || '',
-        selector.attributes || selector.variantAttributes || []
-      ),
+      variantKey: selectorIdentity.variantKey,
       variantLabel: '',
       variantAttributes: normalizeAttributes(
         selector.attributes || selector.variantAttributes || []
@@ -551,6 +523,11 @@ module.exports = {
   cleanMoney,
   normalizeAttributeKey,
   buildVariantKey,
+  canonicalizeVariantKey,
+  normalizeVariantKey,
+  parseVariantKey,
+  resolveVariantIdentity,
+  assertVariantIdentity,
   getColorDisplayName,
   normalizeStringArray,
   normalizeAttributes,

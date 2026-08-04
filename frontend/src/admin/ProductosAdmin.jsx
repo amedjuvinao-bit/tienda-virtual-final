@@ -23,6 +23,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Can from './security/Can';
 import useAdminPermissions from './security/useAdminPermissions';
 import { formatProductTypeLabel, PRODUCT_TYPES } from './products/productCatalogConfig';
+import { normalizeProductPageResponse } from '../utils/productPagination';
 import api from '../lib/api';
 
 function formatCurrency(value) {
@@ -405,34 +406,31 @@ export default function ProductosAdmin() {
 
         if (cancel) return;
 
-        const list = Array.isArray(res.data?.data)
-          ? res.data.data
-          : Array.isArray(res.data)
-            ? res.data
-            : [];
+        const productPage = normalizeProductPageResponse(res.data, limit);
+        const list = productPage.products;
 
         setProducts(list);
         setPagination({
-          page: Number(res.data?.pagination?.page || 1),
-          limit: Number(res.data?.pagination?.limit || limit),
-          total: Number(
-            res.data?.pagination?.total ?? res.data?.total ?? 0
-          ),
+          page: productPage.pagination.page,
+          limit: productPage.pagination.limit,
+          total: productPage.pagination.totalProducts,
           pages: Math.max(
             1,
-            Number(res.data?.pagination?.pages || 1)
+            productPage.pagination.totalPages
           ),
-          from: Number(res.data?.pagination?.from || 0),
-          to: Number(res.data?.pagination?.to || 0),
+          from: productPage.pagination.from,
+          to: productPage.pagination.to,
         });
         setSummary({
           ...EMPTY_SUMMARY,
           ...(res.data?.summary || {}),
         });
 
-        const resolvedPage = Number(
-          res.data?.pagination?.page || page
-        );
+        const resolvedPage =
+          productPage.pagination.totalPages > 0 &&
+          productPage.pagination.page > productPage.pagination.totalPages
+            ? productPage.pagination.totalPages
+            : Number(productPage.pagination.page || page);
         if (resolvedPage !== page) {
           setPage(resolvedPage);
         }
