@@ -77,6 +77,7 @@ const env = {
     max: toNumber(process.env.GLOBAL_RATE_LIMIT_MAX, 300, { min: 10, max: 100_000 }),
   },
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
+  cartAccessSecret: clean(process.env.CART_ACCESS_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
   cloudinary: {
     cloudName: cloudName.value,
@@ -115,6 +116,17 @@ function assertEnv() {
     errors.push('BILLING_ENCRYPTION_KEY debe tener al menos 32 caracteres. No uses contraseñas cortas para cifrar credenciales fiscales.');
   }
 
+  if (env.cartAccessSecret && env.cartAccessSecret.length < 32) {
+    errors.push('CART_ACCESS_SECRET debe tener al menos 32 caracteres.');
+  }
+
+  if (
+    env.nodeEnv === 'production' &&
+    !env.cartAccessSecret
+  ) {
+    errors.push('Producción requiere CART_ACCESS_SECRET independiente con al menos 32 caracteres.');
+  }
+
   if (errors.length) {
     throw new EnvConfigError(`Configuración de entorno inválida:\n- ${errors.join('\n- ')}`, errors);
   }
@@ -141,6 +153,9 @@ function getSafeEnvSummary() {
     backendUrlConfigured: Boolean(env.backendUrl),
     globalRateLimit: env.globalRateLimit,
     jwtConfigured: Boolean(env.jwtSecret),
+    cartAccessSecretConfigured: Boolean(
+      env.cartAccessSecret && env.cartAccessSecret.length >= 32
+    ),
     billingEncryptionConfigured: Boolean(
       env.billingEncryptionKey && env.billingEncryptionKey.length >= 32
     ),

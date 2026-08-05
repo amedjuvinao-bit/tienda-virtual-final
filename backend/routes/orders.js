@@ -45,6 +45,9 @@ const {
 const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
+const {
+  markCartConverted,
+} = require('../services/cartAdminOperationsService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -2042,6 +2045,11 @@ router.post('/', rateLimit, async (req, res) => {
         const existingOrder = await Order.findById(prevKey.orderId);
 
         if (existingOrder && !canReuseMutableOrderData(existingOrder)) {
+          await markCartConverted({
+            sessionId: cleaned.sessionId,
+            orderId: existingOrder._id,
+            convertedAt: existingOrder.createdAt || new Date(),
+          });
           return res.status(200).json({
             _id: existingOrder._id,
             orderNumber: existingOrder.orderNumber,
@@ -2060,6 +2068,11 @@ router.post('/', rateLimit, async (req, res) => {
         const syncedOrder = await syncExistingOrderForRetry(prevKey.orderId, cleaned);
 
         if (syncedOrder) {
+          await markCartConverted({
+            sessionId: cleaned.sessionId,
+            orderId: syncedOrder._id,
+            convertedAt: syncedOrder.createdAt || new Date(),
+          });
           return res.status(200).json({
             _id: syncedOrder._id,
             orderNumber: syncedOrder.orderNumber,
@@ -2398,6 +2411,15 @@ router.post('/', rateLimit, async (req, res) => {
         ],
         { session }
       );
+      await markCartConverted(
+        {
+          sessionId: cleaned.sessionId,
+          orderId: created._id,
+          convertedAt: created.createdAt || new Date(),
+        },
+        { session }
+      );
+
 
       if (cleaned.customer?.wantsNewsletter) {
         const { emailOrPhone, phone } = cleaned.customer;
@@ -2467,6 +2489,11 @@ router.post('/', rateLimit, async (req, res) => {
       const prev = await syncExistingOrderForRetry(existing.orderId, cleaned);
 
       if (prev) {
+        await markCartConverted({
+          sessionId: cleaned.sessionId,
+          orderId: prev._id,
+          convertedAt: prev.createdAt || new Date(),
+        });
         return res.status(200).json({
           _id: prev._id,
           orderNumber: prev.orderNumber,

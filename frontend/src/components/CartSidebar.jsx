@@ -3,8 +3,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = API_BASE_URL;
 
 function clampInt(value, min, max, fallback) {
   const n = Number.parseInt(value, 10);

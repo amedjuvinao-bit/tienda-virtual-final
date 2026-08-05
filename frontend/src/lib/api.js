@@ -1,7 +1,8 @@
 // src/lib/api.js
 import axios from 'axios';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = API_BASE_URL;
 
 // ===== Claves de storage =====
 const ADMIN_TOKEN_KEY = 'admin_token';
@@ -55,24 +56,22 @@ api.interceptors.request.use((config) => {
   } catch { /* ignore */ }
 
   if (adminToken) {
-    if (!config.headers['x-admin-token']) {
-      config.headers['x-admin-token'] = adminToken;
-    }
-
     if (!config.headers['Authorization'] && !config.headers['authorization']) {
       config.headers['Authorization'] = `Bearer ${adminToken}`;
-    }
-
-    if (!config.headers['x-admin-user']) {
-      config.headers['x-admin-user'] = 'admin';
     }
   }
 
   try {
     const sessionId = localStorage.getItem(SESSION_ID_KEY);
-    if (sessionId) {
-      if (!config.headers['X-Session-Id']) config.headers['X-Session-Id'] = sessionId;
-      if (!config.headers['x-session-id']) config.headers['x-session-id'] = sessionId;
+    const headerNames = Object.keys(config.headers || {}).map((key) =>
+      String(key).toLowerCase()
+    );
+    const hasExplicitSessionHeader =
+      (typeof config.headers?.has === 'function' &&
+        config.headers.has('X-Session-Id')) ||
+      headerNames.includes('x-session-id');
+    if (sessionId && !hasExplicitSessionHeader) {
+      config.headers['X-Session-Id'] = sessionId;
     }
   } catch { /* ignore */ }
 

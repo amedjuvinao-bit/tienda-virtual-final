@@ -58,6 +58,43 @@ const cartItemSchema = new Schema(
   }
 );
 
+const cartAdminNoteSchema = new Schema(
+  {
+    text: { type: String, required: true, trim: true, maxlength: 2000 },
+    authorId: { type: String, trim: true, default: "", maxlength: 80 },
+    authorName: { type: String, trim: true, default: "", maxlength: 160 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
+const cartRecoveryAttemptSchema = new Schema(
+  {
+    channel: {
+      type: String,
+      enum: ["link", "email", "note"],
+      required: true,
+    },
+    result: {
+      type: String,
+      enum: ["generated", "sent", "failed", "recorded", "blocked"],
+      required: true,
+    },
+    subject: { type: String, trim: true, default: "", maxlength: 220 },
+    detail: { type: String, trim: true, default: "", maxlength: 500 },
+    administratorId: { type: String, trim: true, default: "", maxlength: 80 },
+    administratorName: { type: String, trim: true, default: "", maxlength: 160 },
+    idempotencyKeyHash: {
+      type: String,
+      default: "",
+      select: false,
+      maxlength: 64,
+    },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 // ⚡ Virtual: `quantity` <-> `qty`
 cartItemSchema.pre("validate", function normalizeCartVariant(next) {
   try {
@@ -90,10 +127,51 @@ cartItemSchema
 const cartSchema = new Schema(
   {
     sessionId: { type: String, required: true }, // 1 carrito por sesión
+    accessTokenHash: {
+      type: String,
+      select: false,
+      minlength: 64,
+      maxlength: 64,
+    },
+    accessVersion: { type: Number, default: 0, select: false },
+    accessIssuedAt: { type: Date, select: false },
     userId: { type: String, default: "" },
     userName: { type: String, default: "" },
     userEmail: { type: String, default: "", index: true },
     items: { type: [cartItemSchema], default: [] },
+    lastCustomerActivityAt: { type: Date, default: null, index: true },
+    lastAdminActivityAt: { type: Date, default: null },
+    convertedAt: { type: Date, default: null },
+    convertedOrderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+      index: true,
+    },
+    adminTags: {
+      type: [String],
+      default: [],
+      set: (values) => Array.from(
+        new Set(
+          (Array.isArray(values) ? values : [])
+            .map((value) => String(value || "").trim().toLowerCase())
+            .filter(Boolean)
+            .slice(0, 20)
+        )
+      ),
+    },
+    adminNotes: { type: [cartAdminNoteSchema], default: [] },
+    recoveryAttempts: { type: [cartRecoveryAttemptSchema], default: [] },
+    lastRecoveryAttemptAt: { type: Date, default: null },
+    lastRecoveryEmailAt: { type: Date, default: null },
+    recoveryEmailLockUntil: { type: Date, default: null, select: false },
+    recoveryEmailLockKeyHash: { type: String, default: "", select: false, maxlength: 64 },
+    recoveryAccess: {
+      tokenHash: { type: String, default: "", select: false, maxlength: 64 },
+      issuedAt: { type: Date, default: null },
+      expiresAt: { type: Date, default: null },
+      usedAt: { type: Date, default: null },
+    },
   },
   { timestamps: true }
 );
@@ -101,5 +179,7 @@ const cartSchema = new Schema(
 /* Índices */
 cartSchema.index({ sessionId: 1 }, { unique: true });
 cartSchema.index({ userId: 1 });
+cartSchema.index({ convertedOrderId: 1, lastCustomerActivityAt: -1 });
+cartSchema.index({ lastRecoveryAttemptAt: -1 });
 
 module.exports = mongoose.models.Cart || mongoose.model("Cart", cartSchema);
