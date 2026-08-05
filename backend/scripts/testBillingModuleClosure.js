@@ -59,10 +59,14 @@ function run(command, args, label, cwd = PROJECT_ROOT) {
   console.log('');
   console.log(`--- ${label} ---`);
 
+  const requiresWindowsShell =
+    process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+
   const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
+    shell: requiresWindowsShell,
   });
 
   if (result.error) {

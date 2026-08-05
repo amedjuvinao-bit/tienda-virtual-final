@@ -171,7 +171,7 @@ function run() {
   );
   ok('El servicio actualiza InventoryStock, kardex, producto y combos');
 
-  const routeSource = source('routes/orders.js');
+  const routeSource = source('routes/orders.js').replace(/\r\n?/g, '\n');
   const refundRoute = routeSource.slice(
     routeSource.indexOf("router.post(\n  '/:id/refund'"),
     routeSource.indexOf(
