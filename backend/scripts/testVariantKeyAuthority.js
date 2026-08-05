@@ -118,6 +118,7 @@ async function main() {
     await cart.validate();
     assert.equal(cart.items[0].variantKey, '4__royalblue');
     assert.equal(cart.items[0].color, 'royalblue');
+    assert.equal(cart.items[0].colorLabel, 'Azul rey');
     assert.equal(cart.items[0].variantLabel, 'Azul rey');
   });
 

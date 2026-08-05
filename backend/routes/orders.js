@@ -2126,6 +2126,12 @@ router.post('/', rateLimit, async (req, res) => {
     let inventoryReservation = null;
 
     await session.withTransaction(async () => {
+      // withTransaction puede volver a ejecutar este callback. Ningún documento
+      // procedente de un intento abortado puede reutilizarse en el siguiente.
+      created = null;
+      inventoryReservation = null;
+      activeIdempotencyRecord = null;
+
       if (idempoKey) {
         try {
           const docs = await IdempotencyKey.create(
@@ -2152,10 +2158,6 @@ router.post('/', rateLimit, async (req, res) => {
           throw e;
         }
       }
-
-      if (created) return;
-
-      
 
       const orderNumber = await getNextOrderNumber({ session });
       const settings = await SiteSettings.findOne().session(session).lean();
@@ -2413,28 +2415,35 @@ router.post('/', rateLimit, async (req, res) => {
       }
 
       if (idempoKey) {
-        await IdempotencyKey.updateOne(
-          { key: idempoKey, endpoint },
-          {
-            $set: {
-              status: 'completed',
-              orderId: created._id,
-              response: {
-                _id: created._id,
-                orderNumber: created.orderNumber,
-                reservationId: inventoryReservation?._id || null,
-                reservationCode: inventoryReservation?.reservationCode || '',
-                subtotal: pricing.subtotal,
-                discount: pricing.totalDiscount,
-                tax: pricing.tax.amount,
-                shipping: pricing.shipping,
-                total: pricing.total,
-              },
-              completedAt: new Date(),
-            },
-          },
-          { session }
-        );
+        if (!activeIdempotencyRecord) {
+          throw Object.assign(
+            new Error('No se pudo finalizar el registro de idempotencia.'),
+            { code: 'IDEMPOTENCY_FINALIZATION_FAILED' }
+          );
+        }
+
+        activeIdempotencyRecord.status = 'completed';
+        activeIdempotencyRecord.orderId = created._id;
+        activeIdempotencyRecord.response = {
+          _id: created._id,
+          orderNumber: created.orderNumber,
+          reservationId: inventoryReservation?._id || null,
+          reservationCode: inventoryReservation?.reservationCode || '',
+          subtotal: pricing.subtotal,
+          discount: pricing.totalDiscount,
+          tax: pricing.tax.amount,
+          shipping: pricing.shipping,
+          total: pricing.total,
+        };
+        activeIdempotencyRecord.completedAt = new Date();
+        await activeIdempotencyRecord.save({ session });
+
+        if (activeIdempotencyRecord.status !== 'completed') {
+          throw Object.assign(
+            new Error('El registro de idempotencia no quedó completado.'),
+            { code: 'IDEMPOTENCY_FINALIZATION_FAILED' }
+          );
+        }
       }
     });
 

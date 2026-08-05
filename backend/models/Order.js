@@ -74,6 +74,7 @@ function cleanQty(value) {
 
 function applyCanonicalVariantIdentity(item) {
   if (!item || typeof item !== 'object') return item;
+  const visibleColor = cleanText(item.colorLabel || item.color);
   const identity = resolveVariantIdentity({
     variantKey: item.variantKey || item.variantId,
     size: item.size,
@@ -84,6 +85,7 @@ function applyCanonicalVariantIdentity(item) {
   item.variantId = item.variantId || identity.variantKey;
   item.size = identity.size;
   item.color = identity.color;
+  item.colorLabel = visibleColor;
   item.variantAttributes = identity.attributes;
   return item;
 }
@@ -212,6 +214,11 @@ const OrderInventoryAllocationSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    colorLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     variantKey: {
       type: String,
       trim: true,
@@ -324,6 +331,7 @@ const OrderItemSchema = new mongoose.Schema(
     title: { type: String, required: true },
     image: String,
     color: String,
+    colorLabel: { type: String, trim: true, default: '' },
     size: String,
 
     qty: {
@@ -904,6 +912,7 @@ const OrderSchema = new mongoose.Schema(
           title: String,
           image: String,
           color: String,
+          colorLabel: { type: String, trim: true, default: '' },
           size: String,
           variantId: { type: String, trim: true, default: '' },
           variantKey: { type: String, trim: true, default: '' },
@@ -1206,6 +1215,7 @@ OrderSchema.pre('validate', function (next) {
             title: String(it.title),
             image: it?.image,
             color: it?.color,
+            colorLabel: it?.colorLabel || it?.color || '',
             size: it?.size,
             variantId: it?.variantId || it?.variantKey || '',
             variantKey: it?.variantKey || it?.variantId || '',

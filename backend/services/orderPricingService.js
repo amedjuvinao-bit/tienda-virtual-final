@@ -152,7 +152,7 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
     const commercial = resolveVariantCommercialSnapshot(product, {
       variantKey,
       size: item.size || '',
-      color: item.color || '',
+      color: item.colorValue || item.color || '',
       variantAttributes: requestedVariantAttributes,
     });
     const unitPrice = money(commercial?.price ?? product.price, 0);
@@ -187,7 +187,8 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       productId,
       title: clean(product.title || item.title, 160),
       image: clean(commercial?.image || item.image || product.image, 1000),
-      color: clean(item.color, 80),
+      color: clean(item.colorValue || item.color, 80),
+      colorLabel: clean(item.colorLabel || item.color, 80),
       size: clean(item.size, 80),
       variantId: commercial?.variantKey || variantKey,
       variantKey: commercial?.variantKey || variantKey,

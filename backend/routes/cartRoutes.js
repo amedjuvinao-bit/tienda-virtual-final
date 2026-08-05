@@ -123,7 +123,10 @@ function sanitizeCartItems(items) {
     const idStr = readProductId(raw);
     const title = String(raw?.title || raw?.product?.title || '').trim();
     const image = String(raw?.image || raw?.product?.image || '').trim();
-    const color = String(raw?.color || '').trim();
+    const colorLabel = clean(raw?.colorLabel || raw?.color || '').slice(0, 80);
+    const color = clean(
+      raw?.colorValue || raw?.rawColor || raw?.color || ''
+    ).slice(0, 80);
     const size = String(raw?.size || '').trim();
     const variantId = readVariantId(raw);
     const variantAttributes = normalizeAttributes(
@@ -156,6 +159,7 @@ function sanitizeCartItems(items) {
       image,
       price,
       color,
+      colorLabel,
       size,
       variantId: variantKey,
       variantKey,

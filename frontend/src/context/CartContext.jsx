@@ -54,7 +54,8 @@ function toBackendItem(it) {
     quantity: qty,
     title: it.title || (it.product && it.product.title) || '',
     image: it.image || (it.product && it.product.image) || '',
-    color: it.color || it.colorLabel || '',
+    color: it.colorValue || it.color || '',
+    colorLabel: it.colorLabel || it.color || '',
     size: it.size || '',
     variantId,
     variantKey: clean(it.variantKey || variantId),
@@ -89,7 +90,9 @@ function fromBackendItem(it) {
     _id: String(_id || ''),
     title: it.title || p?.title || '',
     image: it.image || p?.image || '',
-    color: it.color || '',
+    color: it.colorLabel || it.color || '',
+    colorValue: it.color || it.colorValue || '',
+    colorLabel: it.colorLabel || it.color || '',
     size: it.size || '',
     variantId,
     variantKey: clean(it.variantKey || variantId),
@@ -142,6 +145,8 @@ function itemsShallowEqual(a, b) {
     if (
       x._id !== y._id ||
       (x.color || '') !== (y.color || '') ||
+      (x.colorValue || '') !== (y.colorValue || '') ||
+      (x.colorLabel || '') !== (y.colorLabel || '') ||
       (x.size || '') !== (y.size || '') ||
       readVariantId(x) !== readVariantId(y) ||
       (x.variantLabel || '') !== (y.variantLabel || '') ||
@@ -271,6 +276,7 @@ export function CartProvider({ children }) {
           image: product.image || '',
           color: product.color || product.colorLabel || '',
           colorValue: product.colorValue || '',
+          colorLabel: product.colorLabel || product.color || '',
           size: product.size || '',
           variantId,
           variantKey: product.variantKey || variantId,

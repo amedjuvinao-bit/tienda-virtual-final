@@ -36,6 +36,9 @@ const {
   loadAndValidatePosItems,
   applyPosInventoryOut,
 } = require('../services/adminPosService');
+const {
+  assertVariantIdentity,
+} = require('../lib/products/productVariantConfig');
 
 const MONGO_URI =
   process.env.PRODUCTS_TEST_MONGO_URI ||
@@ -121,7 +124,6 @@ async function run() {
         trackInventory: true,
         variants: [
           {
-            variantKey: 'unica__azul',
             label: 'Unica / Azul',
             size: 'Unica',
             color: 'Azul',
@@ -131,6 +133,10 @@ async function run() {
         ],
       })
     );
+    const physicalBlueVariant = physical.variants.find(
+      (variant) => variant.sku === `${PREFIX}-PHY-AZ`
+    );
+    assert(physicalBlueVariant, 'No se resolvió la variante física canónica.');
     const digital = await Product.create(
       productInput({
         sku: `${PREFIX}-DIG`,
@@ -179,10 +185,10 @@ async function run() {
     await InventoryStock.create({
       branch: branch._id,
       product: physical._id,
-      variantKey: 'unica__azul',
+      variantKey: physicalBlueVariant.variantKey,
       variant: {
-        size: 'Unica',
-        color: 'Azul',
+        size: physicalBlueVariant.size,
+        color: physicalBlueVariant.color,
         sku: `${PREFIX}-PHY-AZ`,
       },
       stock: 8,
@@ -192,10 +198,22 @@ async function run() {
       deletedAt: null,
     });
 
+    assert.throws(
+      () =>
+        assertVariantIdentity({
+          variantKey: 'otra__different',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
+          attributes: physicalBlueVariant.attributes || [],
+        }),
+      (error) => error?.code === 'VARIANT_KEY_MISMATCH'
+    );
+    ok('Una clave de variante realmente diferente continúa rechazada');
+
     const components = await resolveBundleComponents([
       {
         product: physical._id,
-        variantKey: 'unica__azul',
+        variantKey: physicalBlueVariant.variantKey,
         quantity: 2,
       },
       {
@@ -330,7 +348,7 @@ async function run() {
     const stockAfterPos = await InventoryStock.findOne({
       product: physical._id,
       branch: branch._id,
-      variantKey: 'unica__azul',
+      variantKey: physicalBlueVariant.variantKey,
     }).lean();
     assert.strictEqual(stockAfterPos.stock, 6);
     const posMovement = await InventoryMovement.findOne({

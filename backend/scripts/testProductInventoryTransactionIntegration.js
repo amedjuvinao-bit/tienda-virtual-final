@@ -277,7 +277,7 @@ async function run() {
 
   const restoreEditSave = injectStockSaveFailure(
     product._id,
-    (row) => String(row?.variant?.color || '') === 'Falla'
+    (row) => String(row?.variant?.sku || '') === `${SUCCESS_SKU}-FAIL`
   );
 
   try {
@@ -308,7 +308,8 @@ async function run() {
   assert(
     stockRows.length === 1 &&
       stockRows[0].productSnapshot?.title === BASE_TITLE &&
-      String(stockRows[0].variant?.color || '') === 'Azul',
+      String(stockRows[0].variantKey || '') ===
+        String(saved.variants[0].variantKey || ''),
     'InventoryStock conservó filas o snapshots parciales.'
   );
   ok('El fallo revierte filas y snapshots de InventoryStock');

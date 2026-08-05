@@ -275,7 +275,6 @@ async function run() {
         trackInventory: true,
         variants: [
           {
-            variantKey: 'm__azul',
             label: 'M / Azul',
             size: 'M',
             color: 'Azul',
@@ -293,7 +292,6 @@ async function run() {
         trackInventory: true,
         variants: [
           {
-            variantKey: 'unica__negro',
             label: 'Unica / Negro',
             size: 'Unica',
             color: 'Negro',
@@ -302,6 +300,16 @@ async function run() {
           },
         ],
       })
+    );
+    const physicalBlueVariant = physical.variants.find(
+      (variant) => variant.sku === `${PREFIX}-PHY-M-AZ`
+    );
+    const componentBlackVariant = component.variants.find(
+      (variant) => variant.sku === `${PREFIX}-CMP-UN-NE`
+    );
+    assert(
+      physicalBlueVariant && componentBlackVariant,
+      'No se resolvieron las variantes canónicas creadas.'
     );
     const digital = await Product.create(
       productInput({
@@ -338,13 +346,13 @@ async function run() {
         bundleComponents: [
           {
             product: component._id,
-            variantKey: 'unica__negro',
+            variantKey: componentBlackVariant.variantKey,
             quantity: 2,
             title: component.title,
             sku: `${PREFIX}-CMP-UN-NE`,
             productType: 'physical',
-            size: 'Unica',
-            color: 'Negro',
+            size: componentBlackVariant.size,
+            color: componentBlackVariant.color,
             trackInventory: true,
             allowBackorder: false,
             requiresShipping: true,
@@ -360,14 +368,14 @@ async function run() {
       bundle._id
     );
 
-    await InventoryStock.create([
+    await Promise.all([
       {
         branch: branch._id,
         product: physical._id,
-        variantKey: 'm__azul',
+        variantKey: physicalBlueVariant.variantKey,
         variant: {
-          size: 'M',
-          color: 'Azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
           sku: `${PREFIX}-PHY-M-AZ`,
         },
         stock: 10,
@@ -379,10 +387,10 @@ async function run() {
       {
         branch: branch._id,
         product: component._id,
-        variantKey: 'unica__negro',
+        variantKey: componentBlackVariant.variantKey,
         variant: {
-          size: 'Unica',
-          color: 'Negro',
+          size: componentBlackVariant.size,
+          color: componentBlackVariant.color,
           sku: `${PREFIX}-CMP-UN-NE`,
         },
         stock: 20,
@@ -391,7 +399,17 @@ async function run() {
         active: true,
         deletedAt: null,
       },
-    ]);
+    ].map(async (snapshot) => {
+      const row = await InventoryStock.findOne({
+        branch: snapshot.branch,
+        product: snapshot.product,
+        variantKey: snapshot.variantKey,
+        deletedAt: null,
+      });
+      assert(row, `No existe la fila canónica ${snapshot.variantKey}.`);
+      row.set(snapshot);
+      return row.save();
+    }));
     ok('Catálogo temporal con físico, combo, digital y servicio creado');
 
     const physicalOrder = await createOrder({
@@ -400,9 +418,10 @@ async function run() {
       reservationRequired: true,
       items: [
         orderItem(physical, {
-          size: 'M',
-          color: 'Azul',
-          variantKey: 'm__azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
+          colorLabel: 'Azul',
+          variantKey: physicalBlueVariant.variantKey,
           quantity: 2,
           qty: 2,
           lineTotal: 100000,
@@ -432,9 +451,10 @@ async function run() {
       reservationRequired: true,
       items: [
         orderItem(physical, {
-          size: 'M',
-          color: 'Azul',
-          variantKey: 'm__azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
+          colorLabel: 'Azul',
+          variantKey: physicalBlueVariant.variantKey,
           quantity: 1,
           qty: 1,
           lineTotal: 50000,
@@ -447,9 +467,10 @@ async function run() {
       reservationRequired: true,
       items: [
         orderItem(physical, {
-          size: 'M',
-          color: 'Azul',
-          variantKey: 'm__azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
+          colorLabel: 'Azul',
+          variantKey: physicalBlueVariant.variantKey,
           quantity: 1,
           qty: 1,
           lineTotal: 50000,
@@ -480,7 +501,7 @@ async function run() {
     ok('Cinco órdenes con reservas y un estado heredado creadas');
 
     assert.deepStrictEqual(
-      await getStock(physical._id, 'm__azul', branch._id),
+      await getStock(physical._id, physicalBlueVariant.variantKey, branch._id),
       {
         stock: 10,
         reservedStock: 4,
@@ -488,7 +509,7 @@ async function run() {
       }
     );
     assert.deepStrictEqual(
-      await getStock(component._id, 'unica__negro', branch._id),
+      await getStock(component._id, componentBlackVariant.variantKey, branch._id),
       {
         stock: 20,
         reservedStock: 2,
@@ -510,7 +531,7 @@ async function run() {
     );
     assert.strictEqual(paidResult.failed, 0);
     assert.deepStrictEqual(
-      await getStock(physical._id, 'm__azul', branch._id),
+      await getStock(physical._id, physicalBlueVariant.variantKey, branch._id),
       {
         stock: 8,
         reservedStock: 2,
@@ -552,7 +573,7 @@ async function run() {
     assert.strictEqual(refreshedLegacyPaid.payment.status, 'paid');
     assert.strictEqual(legacyReservation.status, 'confirmed');
     assert.deepStrictEqual(
-      await getStock(physical._id, 'm__azul', branch._id),
+      await getStock(physical._id, physicalBlueVariant.variantKey, branch._id),
       {
         stock: 7,
         reservedStock: 1,
@@ -616,7 +637,7 @@ async function run() {
       'ORDER_REFUND_REQUIRED'
     );
     assert.deepStrictEqual(
-      await getStock(component._id, 'unica__negro', branch._id),
+      await getStock(component._id, componentBlackVariant.variantKey, branch._id),
       {
         stock: 20,
         reservedStock: 0,
@@ -648,7 +669,7 @@ async function run() {
     }).lean();
     assert.strictEqual(failedReservation.status, 'failed');
     assert.deepStrictEqual(
-      await getStock(physical._id, 'm__azul', branch._id),
+      await getStock(physical._id, physicalBlueVariant.variantKey, branch._id),
       {
         stock: 7,
         reservedStock: 0,

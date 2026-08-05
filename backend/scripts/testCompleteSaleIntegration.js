@@ -22,6 +22,7 @@ const Branch = require('../models/Branch');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const InventoryReservation = require('../models/InventoryReservation');
+const IdempotencyKey = require('../models/IdempotencyKey');
 const SiteSettings = require('../models/SiteSettings');
 const {
   saveProductWithInventoryTransaction,
@@ -493,6 +494,15 @@ async function run() {
   assert.strictEqual(created.status, 201, JSON.stringify(created.data));
   assert.strictEqual(created.data.total, UNIT_PRICE * 3);
   assert.strictEqual(created.data.subtotal, UNIT_PRICE * 3);
+  const completedCheckoutKey = await IdempotencyKey.findOne({
+    key: idempotencyKey,
+    endpoint: 'POST /orders',
+  }).lean();
+  assert.strictEqual(completedCheckoutKey?.status, 'completed');
+  assert.strictEqual(
+    String(completedCheckoutKey?.orderId || ''),
+    String(created.data._id)
+  );
   ok('Checkout crea la orden con precio autoritativo del servidor');
 
   const repeatedCheckout = await requestJson(

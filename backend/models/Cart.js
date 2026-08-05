@@ -37,6 +37,7 @@ const cartItemSchema = new Schema(
 
     // variantes / atributos
     color: { type: String, default: "" },
+    colorLabel: { type: String, default: "" },
     size: { type: String, default: "" },
     variantId: { type: String, default: "" },
     variantKey: { type: String, default: "" },
@@ -61,6 +62,7 @@ const cartItemSchema = new Schema(
 // ⚡ Virtual: `quantity` <-> `qty`
 cartItemSchema.pre("validate", function normalizeCartVariant(next) {
   try {
+    const visibleColor = String(this.colorLabel || this.color || "").trim();
     const identity = resolveVariantIdentity({
       variantKey: this.variantKey || this.variantId,
       size: this.size,
@@ -71,6 +73,7 @@ cartItemSchema.pre("validate", function normalizeCartVariant(next) {
     this.variantId = this.variantId || identity.variantKey;
     this.size = identity.size;
     this.color = identity.color;
+    this.colorLabel = visibleColor;
     this.variantAttributes = identity.attributes;
     next();
   } catch (error) {

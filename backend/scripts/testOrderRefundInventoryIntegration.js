@@ -160,7 +160,6 @@ async function run() {
         trackInventory: true,
         variants: [
           {
-            variantKey: 'm__azul',
             label: 'M / Azul',
             size: 'M',
             color: 'Azul',
@@ -168,7 +167,6 @@ async function run() {
             initialStock: 0,
           },
           {
-            variantKey: 'l__rojo',
             label: 'L / Rojo',
             size: 'L',
             color: 'Rojo',
@@ -186,7 +184,6 @@ async function run() {
         trackInventory: true,
         variants: [
           {
-            variantKey: 'unica__negro',
             label: 'Unica / Negro',
             size: 'Unica',
             color: 'Negro',
@@ -195,6 +192,19 @@ async function run() {
           },
         ],
       })
+    );
+    const physicalBlueVariant = physical.variants.find(
+      (variant) => variant.sku === `${PREFIX}-PHY-M-AZ`
+    );
+    const physicalRedVariant = physical.variants.find(
+      (variant) => variant.sku === `${PREFIX}-PHY-L-RO`
+    );
+    const componentBlackVariant = component.variants.find(
+      (variant) => variant.sku === `${PREFIX}-CMP-UN-NE`
+    );
+    assert(
+      physicalBlueVariant && physicalRedVariant && componentBlackVariant,
+      'No se resolvieron las variantes canónicas creadas.'
     );
     const digital = await Product.create(
       productInput({
@@ -216,13 +226,13 @@ async function run() {
         bundleComponents: [
           {
             product: component._id,
-            variantKey: 'unica__negro',
+            variantKey: componentBlackVariant.variantKey,
             quantity: 2,
             title: component.title,
             sku: `${PREFIX}-CMP-UN-NE`,
             productType: 'physical',
-            size: 'Unica',
-            color: 'Negro',
+            size: componentBlackVariant.size,
+            color: componentBlackVariant.color,
             trackInventory: true,
             allowBackorder: false,
             requiresShipping: true,
@@ -249,14 +259,14 @@ async function run() {
     );
     ok('Catálogo temporal con variante, digital y combo creado');
 
-    await InventoryStock.create([
+    await Promise.all([
       {
         branch: branch._id,
         product: physical._id,
-        variantKey: 'm__azul',
+        variantKey: physicalBlueVariant.variantKey,
         variant: {
-          size: 'M',
-          color: 'Azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
           sku: `${PREFIX}-PHY-M-AZ`,
         },
         stock: 10,
@@ -268,10 +278,10 @@ async function run() {
       {
         branch: branch._id,
         product: physical._id,
-        variantKey: 'l__rojo',
+        variantKey: physicalRedVariant.variantKey,
         variant: {
-          size: 'L',
-          color: 'Rojo',
+          size: physicalRedVariant.size,
+          color: physicalRedVariant.color,
           sku: `${PREFIX}-PHY-L-RO`,
         },
         stock: 6,
@@ -283,10 +293,10 @@ async function run() {
       {
         branch: branch._id,
         product: component._id,
-        variantKey: 'unica__negro',
+        variantKey: componentBlackVariant.variantKey,
         variant: {
-          size: 'Unica',
-          color: 'Negro',
+          size: componentBlackVariant.size,
+          color: componentBlackVariant.color,
           sku: `${PREFIX}-CMP-UN-NE`,
         },
         stock: 20,
@@ -295,7 +305,17 @@ async function run() {
         active: true,
         deletedAt: null,
       },
-    ]);
+    ].map(async (snapshot) => {
+      const row = await InventoryStock.findOne({
+        branch: snapshot.branch,
+        product: snapshot.product,
+        variantKey: snapshot.variantKey,
+        deletedAt: null,
+      });
+      assert(row, `No existe la fila canónica ${snapshot.variantKey}.`);
+      row.set(snapshot);
+      return row.save();
+    }));
 
     const order = await Order.create({
       orderNumber: `${PREFIX}-001`,
@@ -320,9 +340,10 @@ async function run() {
           productId: String(physical._id),
           title: physical.title,
           productType: 'physical',
-          size: 'M',
-          color: 'Azul',
-          variantKey: 'm__azul',
+          size: physicalBlueVariant.size,
+          color: physicalBlueVariant.color,
+          colorLabel: 'Azul',
+          variantKey: physicalBlueVariant.variantKey,
           quantity: 3,
           qty: 3,
           price: 50000,
@@ -348,7 +369,7 @@ async function run() {
                 {
                   product: component._id,
                   productType: 'physical',
-                  variantKey: 'unica__negro',
+                  variantKey: componentBlackVariant.variantKey,
                   quantity: 2,
                 },
                 {
@@ -407,11 +428,11 @@ async function run() {
     );
 
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul', branch._id),
+      await stockValue(physical._id, physicalBlueVariant.variantKey, branch._id),
       { stock: 7, availableStock: 7 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro', branch._id),
+      await stockValue(component._id, componentBlackVariant.variantKey, branch._id),
       { stock: 16, availableStock: 16 }
     );
     ok('La venta confirmó la variante y cuatro componentes del combo');
@@ -444,15 +465,15 @@ async function run() {
     assert.strictEqual(first.refund.totalReturnedUnits, 3);
     assert.strictEqual(first.refund.totalRestockedUnits, 3);
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul', branch._id),
+      await stockValue(physical._id, physicalBlueVariant.variantKey, branch._id),
       { stock: 8, availableStock: 8 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro', branch._id),
+      await stockValue(component._id, componentBlackVariant.variantKey, branch._id),
       { stock: 18, availableStock: 18 }
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'l__rojo', branch._id),
+      await stockValue(physical._id, physicalRedVariant.variantKey, branch._id),
       { stock: 6, availableStock: 6 }
     );
     ok('Reembolso parcial repuso variante y componentes en su sede original');
@@ -479,7 +500,7 @@ async function run() {
       2
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul', branch._id),
+      await stockValue(physical._id, physicalBlueVariant.variantKey, branch._id),
       { stock: 8, availableStock: 8 }
     );
     ok('Reintento idempotente no duplicó stock ni movimientos');
@@ -508,11 +529,11 @@ async function run() {
     );
     assert.strictEqual(second.idempotent, false);
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul', branch._id),
+      await stockValue(physical._id, physicalBlueVariant.variantKey, branch._id),
       { stock: 10, availableStock: 10 }
     );
     assert.deepStrictEqual(
-      await stockValue(component._id, 'unica__negro', branch._id),
+      await stockValue(component._id, componentBlackVariant.variantKey, branch._id),
       { stock: 20, availableStock: 20 }
     );
     ok('Segundo reembolso parcial completó la reposición exacta');
@@ -560,7 +581,7 @@ async function run() {
         'REFUND_QUANTITY_EXCEEDS_PURCHASED'
     );
     assert.deepStrictEqual(
-      await stockValue(physical._id, 'm__azul', branch._id),
+      await stockValue(physical._id, physicalBlueVariant.variantKey, branch._id),
       { stock: 10, availableStock: 10 }
     );
     ok('Cantidad ya devuelta no puede reponerse otra vez');

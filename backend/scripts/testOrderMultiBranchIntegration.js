@@ -245,6 +245,11 @@ async function run() {
     });
     ids.products.push(product._id);
 
+    // Esta integración define explícitamente la distribución entre dos sedes.
+    // Retira la fila inicial creada por la sincronización del producto para no
+    // mezclarla con el escenario multisede ni depender del orden de findOne().
+    await InventoryStock.deleteMany({ product: product._id });
+
     await InventoryStock.create([
       {
         branch: branchA._id,
