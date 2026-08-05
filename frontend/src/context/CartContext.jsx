@@ -1,7 +1,25 @@
 // src/context/CartContext.jsx
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-toastify';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
-import { getSessionId } from '../utils/getSessionId';
+import {
+  buildCartAccessHeaders,
+  clearCartAccess,
+  getCartAccess,
+  storeCartAccess,
+} from '../utils/cartAccess';
+import {
+  applyCartOperation,
+  cartItemIdentity,
+  createCartMutationCoordinator,
+  normalizeCartSnapshot,
+  writeVersionedCart,
+} from '../utils/cartMutationConcurrency';
+import {
+  buildCartRecoveryHeaders,
+  clearCartRecoveryFragment,
+  readCartRecoveryFragment,
+} from '../utils/cartRecoveryAccess';
 
 function clean(value) {
   return String(value || '').trim();
@@ -25,14 +43,6 @@ function normalizeVariantAttributes(attributes = []) {
   });
 
   return normalized;
-}
-
-function sameCartVariant(item, color, size, variantId = '') {
-  if (variantId) return readVariantId(item) === variantId;
-  return (
-    (item.color || '') === (color || '') &&
-    (item.size || '') === (size || '')
-  );
 }
 
 // ---------- Helpers de mapeo ----------
@@ -170,29 +180,170 @@ const CartContext = createContext();
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(readStoredCart);
   const [loading, setLoading] = useState(false);
-  const syncingRef = useRef(false);
+  const [cartMessage, setCartMessage] = useState('');
+  const cartRef = useRef(cart);
+  const authoritativeRef = useRef({ items: cart, version: '' });
+  const creatingRef = useRef(null);
+  const coordinatorRef = useRef(null);
+  const recoveryClaimRef = useRef(false);
+
+  const adoptSnapshot = (value, { updateUi = true } = {}) => {
+    const snapshot = normalizeCartSnapshot(value);
+    const local = snapshot.items.map(fromBackendItem).filter((item) => item._id);
+    const normalized = { items: local, version: snapshot.version };
+    authoritativeRef.current = normalized;
+    if (updateUi) {
+      cartRef.current = local;
+      setCart(local);
+    }
+    return normalized;
+  };
+
+  const createRemoteCart = async (items) => {
+    if (creatingRef.current) return creatingRef.current;
+    const creation = api
+      .post('/api/cart', { items })
+      .then(({ data }) => {
+        const sessionId = String(data?.sessionId || data?.cart?.sessionId || '').trim();
+        const token = String(data?.cartAccessToken || '').trim();
+        if (!storeCartAccess(sessionId, token)) {
+          throw new Error('No fue posible conservar el acceso seguro al carrito.');
+        }
+        const snapshot = adoptSnapshot({
+          cart: data?.cart || { items },
+          version: data?.version || data?.cart?.updatedAt,
+        });
+        return { sessionId, token, version: snapshot.version };
+      })
+      .finally(() => {
+        creatingRef.current = null;
+      });
+    creatingRef.current = creation;
+    return creation;
+  };
+
+  const loadRemoteCart = async (access = getCartAccess()) => {
+    if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+    const response = await api.get(
+      `/api/cart/${encodeURIComponent(access.sessionId)}`,
+      {
+        params: { populate: 1 },
+        headers: buildCartAccessHeaders(access),
+      }
+    );
+    return adoptSnapshot(response.data || {});
+  };
+
+  const ensureCartReady = async (items = cartRef.current.map(toBackendItem)) => {
+    const existing = getCartAccess();
+    if (existing) {
+      if (!authoritativeRef.current.version) await loadRemoteCart(existing);
+      return { ...existing, version: authoritativeRef.current.version };
+    }
+    clearCartAccess();
+    return createRemoteCart(items);
+  };
+
+  const writeCartVersion = async ({ items, version }) => {
+    const access = getCartAccess();
+    if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+    const response = await writeVersionedCart({
+      api,
+      access,
+      version,
+      items: items.map(toBackendItem),
+    });
+    return {
+      cart: response?.data?.cart,
+      version: response?.data?.version,
+    };
+  };
+
+  coordinatorRef.current ||= createCartMutationCoordinator({
+    getSnapshot: async () => {
+      await ensureCartReady(authoritativeRef.current.items.map(toBackendItem));
+      return authoritativeRef.current;
+    },
+    write: writeCartVersion,
+    reload: async () => {
+      const access = getCartAccess();
+      if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+      const response = await api.get(
+        `/api/cart/${encodeURIComponent(access.sessionId)}`,
+        {
+          params: { populate: 1 },
+          headers: buildCartAccessHeaders(access),
+        }
+      );
+      return response.data || {};
+    },
+    adopt: (snapshot) => adoptSnapshot(snapshot),
+    onTerminalConflict: () => {
+      const message = 'El carrito volvió a cambiar. Conservamos la versión más reciente.';
+      setCartMessage(message);
+      toast.error(message, { toastId: 'cart-write-conflict' });
+    },
+  });
+
+  const enqueueCartOperation = (operation, { optimistic = true } = {}) => {
+    if (optimistic) {
+      const optimisticCart = applyCartOperation(cartRef.current, operation);
+      cartRef.current = optimisticCart;
+      setCart(optimisticCart);
+    }
+    return coordinatorRef.current.enqueue(operation).catch((error) => {
+      if (error?.code !== 'CART_WRITE_CONFLICT') {
+        console.error('Error al sincronizar carrito:', error?.message);
+      }
+      throw error;
+    });
+  };
 
   // Asegura que el header X-Session-Id esté siempre presente
   useEffect(() => {
     try {
-      const sid = getSessionId();
-      setApiSessionId(sid);
+      const access = getCartAccess();
+      if (access?.sessionId) setApiSessionId(access.sessionId);
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (recoveryClaimRef.current) return;
+    const recovery = readCartRecoveryFragment();
+    if (!recovery) return;
+    recoveryClaimRef.current = true;
+    clearCartRecoveryFragment();
+    setLoading(true);
+    api
+      .post('/api/cart/recovery/claim', null, {
+        headers: buildCartRecoveryHeaders(recovery),
+      })
+      .then(({ data }) => {
+        const sessionId = clean(data?.sessionId);
+        const token = clean(data?.cartAccessToken);
+        if (!storeCartAccess(sessionId, token)) {
+          throw new Error('CART_RECOVERY_ACCESS_INVALID');
+        }
+        setApiSessionId(sessionId);
+        adoptSnapshot({
+          cart: data?.cart,
+          version: data?.version || data?.cart?.version,
+        });
+        toast.success('Tu carrito fue recuperado de forma segura.');
+      })
+      .catch(() => {
+        toast.error('El enlace de recuperacion no es valido o ya expiro.');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // ---------- Cargar carrito desde la base de datos cuando se fuerce manualmente ----------
   const syncCart = async () => {
-    const sessionId = getSessionId();
+    const access = getCartAccess();
+    if (!access) return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/cart/${encodeURIComponent(sessionId)}`, {
-        params: { populate: 1 },
-      });
-      const items = Array.isArray(res.data?.items) ? res.data.items : [];
-      const local = items.map(fromBackendItem).filter((x) => x._id);
-      if (local.length && !itemsShallowEqual(local, cart)) {
-        setCart(local);
-      }
+      await loadRemoteCart(access);
     } catch (err) {
       if (err?.response?.status !== 404) {
         console.log('No hay carrito o error al conectar al backend:', err?.message);
@@ -202,157 +353,69 @@ export function CartProvider({ children }) {
     }
   };
 
-  // ---------- Sincronizar con backend ante cambios ----------
-  useEffect(() => {
-    const run = async () => {
-      const sessionId = getSessionId();
-      if (cart.length === 0) return;
-      if (syncingRef.current) return;
-
-      const items = cart.map(toBackendItem);
-      syncingRef.current = true;
-      try {
-        const putRes = await api.put(`/api/cart/${encodeURIComponent(sessionId)}`, { items });
-        const srvItems = putRes?.data?.cart?.items;
-        if (Array.isArray(srvItems)) {
-          const mapped = srvItems.map(fromBackendItem).filter((x) => x._id);
-          if (!itemsShallowEqual(mapped, cart)) {
-            setCart(mapped);
-          }
-        }
-      } catch (err) {
-        console.error('❌ Error al sincronizar carrito:', err?.message);
-      } finally {
-        syncingRef.current = false;
-      }
-    };
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart]);
-
   // ---------- Persistencia local ----------
   useEffect(() => {
+    cartRef.current = cart;
     try {
       localStorage.setItem('cart', JSON.stringify(cart));
     } catch {}
   }, [cart]);
 
-  // ---------- Búsqueda índice (producto + variante exacta) ----------
-  const findItemIndex = (product) => {
-    const incomingVariantId = readVariantId(product);
-    return cart.findIndex(
-      (item) =>
-        item._id === product._id &&
-        sameCartVariant(
-          item,
-          product.color,
-          product.size,
-          incomingVariantId
-        )
-    );
-  };
-
   // ---------- Acciones CRUD locales ----------
   const addToCart = (product) => {
-    const index = findItemIndex(product);
     const unitPrice = Number(
       product.price ?? product.unitPrice ?? product.priceNumber ?? 0
     );
     const safePrice = Number.isFinite(unitPrice) && unitPrice >= 0 ? unitPrice : 0;
     const inc = Number(product.quantity || 1) || 1;
     const variantId = readVariantId(product);
-
-    if (index !== -1) {
-      const updated = [...cart];
-      const nextQty = Math.max(1, Number(updated[index].quantity || 0) + inc);
-      updated[index] = { ...updated[index], quantity: nextQty };
-      setCart(updated);
-    } else {
-      setCart([
-        ...cart,
-        {
-          _id: String(product._id || product.id || ''),
-          title: product.title || '',
-          image: product.image || '',
-          color: product.color || product.colorLabel || '',
-          colorValue: product.colorValue || '',
-          colorLabel: product.colorLabel || product.color || '',
-          size: product.size || '',
-          variantId,
-          variantKey: product.variantKey || variantId,
-          variantLabel: product.variantLabel || product.selectedVariant?.label || '',
-          variantAttributes: normalizeVariantAttributes(
-            product.variantAttributes ||
-            product.attributes ||
-            product.selectedVariant?.attributes
-          ),
-          variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
-          variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
-          productType: product.productType || 'physical',
-          requiresShipping: product.requiresShipping !== false,
-          fulfillment: product.fulfillment || null,
-          quantity: Math.max(1, inc),
-          price: safePrice,
-        },
-      ]);
-    }
+    const item = {
+      _id: String(product._id || product.id || ''),
+      title: product.title || '',
+      image: product.image || '',
+      color: product.color || product.colorLabel || '',
+      colorValue: product.colorValue || '',
+      colorLabel: product.colorLabel || product.color || '',
+      size: product.size || '',
+      variantId,
+      variantKey: product.variantKey || variantId,
+      variantLabel: product.variantLabel || product.selectedVariant?.label || '',
+      variantAttributes: normalizeVariantAttributes(
+        product.variantAttributes || product.attributes || product.selectedVariant?.attributes
+      ),
+      variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
+      variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
+      productType: product.productType || 'physical',
+      requiresShipping: product.requiresShipping !== false,
+      fulfillment: product.fulfillment || null,
+      quantity: Math.max(1, inc),
+      price: safePrice,
+    };
+    void enqueueCartOperation({ type: 'add', item }).catch(() => undefined);
   };
 
   const removeFromCart = (_id, color, size, variantId = '') => {
-    setCart(
-      cart.filter(
-        (it) =>
-          !(
-            it._id === _id &&
-            sameCartVariant(it, color, size, variantId)
-          )
-      )
-    );
+    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
+    void enqueueCartOperation({ type: 'remove', identity }).catch(() => undefined);
   };
 
   const increaseQuantity = (_id, color, size, variantId = '') => {
-    setCart(
-      cart.map((it) => {
-        if (
-          it._id === _id &&
-          sameCartVariant(it, color, size, variantId)
-        ) {
-          return { ...it, quantity: Math.max(1, Number(it.quantity || 0) + 1) };
-        }
-        return it;
-      })
-    );
+    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
+    void enqueueCartOperation({ type: 'increase', identity }).catch(() => undefined);
   };
 
   const decreaseQuantity = (_id, color, size, variantId = '') => {
-    setCart(
-      cart.map((it) => {
-        if (
-          it._id === _id &&
-          sameCartVariant(it, color, size, variantId)
-        ) {
-          const next = Math.max(1, Number(it.quantity || 0) - 1);
-          return { ...it, quantity: next };
-        }
-        return it;
-      })
-    );
+    const identity = cartItemIdentity({ _id, color, size, variantId, variantKey: variantId });
+    void enqueueCartOperation({ type: 'decrease', identity }).catch(() => undefined);
   };
 
-  // ---------- Limpiar / Eliminar documento ----------
+  // ---------- Vaciar sin borrar la credencial ni la sesion ----------
   const clearCart = async () => {
-    const sessionId = getSessionId();
     try {
-      await api.delete(`/api/cart/${encodeURIComponent(sessionId)}`);
-      console.log('🧹 Carrito eliminado en MongoDB');
+      const targetIdentities = cartRef.current.map(cartItemIdentity);
+      await enqueueCartOperation({ type: 'clear', targetIdentities });
     } catch (err) {
-      if (err?.response?.status === 404) {
-        console.warn('ℹ️ No hay carrito guardado para esta sesión (aún).');
-      } else {
-        console.error('❌ Error al eliminar carrito:', err?.message);
-      }
-    } finally {
-      setCart([]);
+      console.error('Error al vaciar carrito:', err?.message);
     }
   };
 
@@ -364,30 +427,35 @@ export function CartProvider({ children }) {
    * Retorna { items, adjustments, summary, ok, mode }
    */
   const validateCart = async (mode = 'soft') => {
-    const sessionId = getSessionId();
-
     try {
+      const access = await ensureCartReady(cartRef.current.map(toBackendItem));
       const { data } = await api.post('/api/cart/validate', {
-        sessionId,
-        items: cart.map(toBackendItem),
+        sessionId: access.sessionId,
         mode,
+      }, {
+        headers: buildCartAccessHeaders(access),
       });
       const items = Array.isArray(data?.items) ? data.items : [];
       const local = items.map(fromBackendItem).filter((x) => x._id);
 
-      if (!itemsShallowEqual(local, cart)) setCart(local);
+      if (!itemsShallowEqual(local, authoritativeRef.current.items)) {
+        await enqueueCartOperation(
+          { type: 'replace_validated', items: local },
+          { optimistic: true }
+        );
+      }
 
       return {
-        items: local,
+        items: cartRef.current,
         adjustments: Array.isArray(data?.adjustments) ? data.adjustments : [],
-        summary: data?.summary || calcSummary(local),
+        summary: data?.summary || calcSummary(cartRef.current),
         ok: !!data?.ok,
         mode: data?.mode || mode,
       };
     } catch (err) {
-      console.error('❌ Error al validar carrito:', err?.message);
-      const summary = calcSummary(cart);
-      return { items: cart, adjustments: [], summary, ok: false, mode };
+      console.error('Error al validar carrito:', err?.message);
+      const current = cartRef.current;
+      return { items: current, adjustments: [], summary: calcSummary(current), ok: false, mode };
     }
   };
 
@@ -398,6 +466,8 @@ export function CartProvider({ children }) {
     <CartContext.Provider
       value={{
         cart,
+        cartVersion: authoritativeRef.current.version,
+        cartMessage,
         loading,
         totalItems,
         subtotal,
@@ -407,6 +477,7 @@ export function CartProvider({ children }) {
         decreaseQuantity,
         clearCart,
         validateCart,
+        ensureCartReady,
         syncCart,
         API_BASE: api.defaults.baseURL,
       }}
