@@ -111,6 +111,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Marcador del contrato histórico; las pruebas ejecutables usan bases aisladas abajo.
+    # PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v6
@@ -150,73 +153,73 @@ jobs:
 
       - name: Ejecutar cierre histórico de Productos
         env:
-          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_module_closure
         run: npm --prefix backend run test:products-module
 
       - name: Validar sincronización de inventario
         env:
-          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_inventory_sync
         run: npm --prefix backend run test:product-inventory-sync
 
       - name: Validar variantes avanzadas
         env:
-          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_advanced_variants
         run: npm --prefix backend run test:product-advanced-variants
 
       - name: Validar reembolsos y devoluciones
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_refund_inventory?replicaSet=rs0
         run: npm --prefix backend run test:order-refund-inventory
 
       - name: Validar estados masivos de órdenes
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_bulk_status?replicaSet=rs0
           DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:order-bulk-status-inventory
 
       - name: Validar órdenes multisede
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_multi_branch?replicaSet=rs0
         run: npm --prefix backend run test:order-multi-branch-inventory
 
       - name: Validar venta integral completa
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_complete_sale?replicaSet=rs0
           DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:complete-sale-integration
 
       - name: Validar transacción Producto-Inventario
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_inventory_transaction?replicaSet=rs0
         run: npm --prefix backend run test:product-inventory-transaction
 
       - name: Validar archivo lógico
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_archive
         run: npm --prefix backend run test:product-archive
 
       - name: Validar catálogo con volumen
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_catalog_scale
         run: npm --prefix backend run test:products-catalog-scale
 
       - name: Validar taxonomía y colecciones
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_taxonomy
         run: npm --prefix backend run test:product-taxonomy
 
       - name: Validar cumplimiento por tipo de producto
         env:
-          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_fulfillment
           DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:product-fulfillment-integration
 
       - name: Validar catálogo demostrativo permanente
         env:
-          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_demo_catalog
         run: npm --prefix backend run test:products-demo-catalog
 
       - name: Detener MongoDB
