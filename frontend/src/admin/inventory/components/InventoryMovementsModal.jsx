@@ -273,6 +273,21 @@ function getVariantColor(row) {
   return row?.variant?.color || row?.color || '—';
 }
 
+function getVariantLabel(row) {
+  const explicit = String(
+    row?.variant?.label || row?.variantLabel || ''
+  ).trim();
+  if (explicit) return explicit;
+  const attributes = Array.isArray(row?.variant?.attributes)
+    ? row.variant.attributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+  return attributes.join(' / ') || [getVariantSize(row), getVariantColor(row)]
+    .filter((value) => value && value !== '—')
+    .join(' / ') || 'Presentación general';
+}
+
 function getMovementProductTitle(movement) {
   return (
     movement?.product?.title ||
@@ -369,6 +384,16 @@ function getSignedQuantity(movement) {
 
 function movementMatchesSelectedVariant(movement, selectedStockRow) {
   if (!selectedStockRow) return true;
+
+  const selectedVariantKey = normalizeValue(selectedStockRow?.variantKey);
+  const movementVariantKey = normalizeValue(movement?.variantKey);
+  if (
+    selectedVariantKey.startsWith('v2__') ||
+    movementVariantKey.startsWith('v2__') ||
+    (selectedVariantKey && movementVariantKey)
+  ) {
+    return selectedVariantKey === movementVariantKey;
+  }
 
   const selectedSize = normalizeValue(getVariantSize(selectedStockRow));
   const selectedColor = normalizeValue(getVariantColor(selectedStockRow));
@@ -766,7 +791,7 @@ export default function InventoryMovementsModal({
                           </h3>
 
                           <p className="mt-1 text-sm leading-6" style={styles.cardMuted}>
-                            {getBranchName(stockRow)} · Talla {getVariantSize(stockRow)} · Color {getVariantColor(stockRow)}
+                            {getBranchName(stockRow)} · Variante {getVariantLabel(stockRow)}
                           </p>
                         </div>
                       </div>

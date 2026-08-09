@@ -1,5 +1,18 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
+const {
+  normalizeAttributes,
+  resolveVariantIdentity,
+} = require("../lib/products/productVariantConfig");
+
+const cartVariantAttributeSchema = new Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: "" },
+    label: { type: String, trim: true, default: "" },
+    value: { type: String, trim: true, default: "" },
+  },
+  { _id: false }
+);
 
 /**
  * Item del carrito:
@@ -24,8 +37,16 @@ const cartItemSchema = new Schema(
 
     // variantes / atributos
     color: { type: String, default: "" },
+    colorLabel: { type: String, default: "" },
     size: { type: String, default: "" },
     variantId: { type: String, default: "" },
+    variantKey: { type: String, default: "" },
+    variantLabel: { type: String, default: "" },
+    variantAttributes: {
+      type: [cartVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
 
     // snapshot opcional para UI
     title: { type: String, default: "" },
@@ -39,6 +60,27 @@ const cartItemSchema = new Schema(
 );
 
 // ⚡ Virtual: `quantity` <-> `qty`
+cartItemSchema.pre("validate", function normalizeCartVariant(next) {
+  try {
+    const visibleColor = String(this.colorLabel || this.color || "").trim();
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey || this.variantId,
+      size: this.size,
+      color: this.color,
+      attributes: this.variantAttributes || [],
+    });
+    this.variantKey = identity.variantKey;
+    this.variantId = this.variantId || identity.variantKey;
+    this.size = identity.size;
+    this.color = identity.color;
+    this.colorLabel = visibleColor;
+    this.variantAttributes = identity.attributes;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 cartItemSchema
   .virtual("quantity")
   .get(function () {

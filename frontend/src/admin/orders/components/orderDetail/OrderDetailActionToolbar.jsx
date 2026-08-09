@@ -17,7 +17,11 @@ const STATUS_OPTIONS = [
   { code: 'shipped', label: 'Enviado' },
   { code: 'delivered', label: 'Entregado' },
   { code: 'cancelled', label: 'Cancelado' },
-  { code: 'refunded', label: 'Reembolsado' },
+  {
+    code: 'refunded',
+    label: 'Reembolsado (solo devolución)',
+    disabled: true,
+  },
 ];
 
 function normalizeTagValue(value) {
@@ -164,6 +168,7 @@ export default function OrderDetailActionToolbar({
                 <option
                   key={option.code}
                   value={option.code}
+                  disabled={option.disabled === true}
                   style={{
                     background: ORDER_DETAIL_THEME.inputBg,
                     color: ORDER_DETAIL_THEME.inputText,

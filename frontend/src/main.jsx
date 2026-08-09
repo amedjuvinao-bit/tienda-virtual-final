@@ -10,13 +10,9 @@ import './admin/billing/billingLayoutStability.css';
 import './admin/orders/electronicInvoice/electronicInvoiceModalFix.css';
 import './admin/billing/billingGenerateConfirmBridge';
 
-// Toastify (estilos y contenedor global)
+// Toastify (el contenedor global se monta una sola vez dentro de App)
 import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <>
-    <App />
-    <ToastContainer position="top-right" autoClose={3000} />
-  </>
+  <App />
 );

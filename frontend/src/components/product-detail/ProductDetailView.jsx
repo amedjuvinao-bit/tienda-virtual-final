@@ -14,6 +14,9 @@ import {
   Flame,
   ThumbsUp,
   Package,
+  Download,
+  CalendarDays,
+  Boxes,
 } from "lucide-react";
 
 /* ─── Helpers (sin cambios) ─── */
@@ -30,6 +33,16 @@ function normalizeColorValue(color) {
   if (typeof color?.value === "string") return color.value;
   if (typeof color?.hex === "string") return color.hex;
   return "";
+}
+
+function normalizeAttributeKey(value) {
+  return String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function isHexColor(value) {
@@ -746,6 +759,9 @@ export default function ProductDetailView({
   setSelectedSize,
   selectedColor,
   setSelectedColor,
+  variantAxes = [],
+  selectedAttributes = {},
+  onVariantAttributeChange,
   quantity,
   setQuantity,
   reviewName,
@@ -797,11 +813,38 @@ export default function ProductDetailView({
 
   useEffect(() => {
     setMainImage(images[0] || "");
-  }, [images]);
+  }, [images, product?.selectedVariantKey]);
+
+  const displayedMainImage =
+    mainImage && images.includes(mainImage)
+      ? mainImage
+      : images[0] || product?.image || "";
 
   const safeColors = Array.isArray(product?.colors) ? product.colors : [];
   const safeSizes = Array.isArray(product?.sizes) ? product.sizes : [];
+  const safeVariantAxes = (Array.isArray(variantAxes) ? variantAxes : [])
+    .map((axis) => ({
+      key: normalizeAttributeKey(axis?.key || axis?.label),
+      label: String(axis?.label || axis?.key || "").trim(),
+      values: Array.isArray(axis?.values)
+        ? [...new Set(axis.values.map((value) => String(value || "").trim()).filter(Boolean))]
+        : [],
+    }))
+    .filter((axis) => axis.key && axis.label && axis.values.length)
+    .slice(0, 4);
+  const hasVariantAxes =
+    safeVariantAxes.length > 0 &&
+    typeof onVariantAttributeChange === "function";
   const safeReviews = Array.isArray(product?.reviews) ? product.reviews : [];
+  const publicCommercialFields = Array.isArray(
+    product?.commercialFields
+  )
+    ? product.commercialFields.filter(
+        (field) =>
+          field?.public !== false &&
+          String(field?.label || '').trim()
+      )
+    : [];
 
   const styleCfg = cfg?.style || {};
   const visibleTitle = cfg.titleOverride?.trim() || product?.title || "Producto";
@@ -898,7 +941,9 @@ export default function ProductDetailView({
   const showColors = cfg.showColors !== false;
   const showQuantity = cfg.showQuantity !== false;
   const showAddToCart = cfg.showAddToCart !== false;
-  const showPickup = cfg.showPickupBlock !== false;
+  const showPickup =
+    cfg.showPickupBlock !== false &&
+    product?.requiresShipping !== false;
   const showBenefits = cfg.showBenefits !== false;
   const showAccordionBlock = cfg.showAccordionBlock !== false;
 
@@ -928,6 +973,11 @@ export default function ProductDetailView({
   const pickupText = cfg.pickupText || "Normalmente está listo en 24 horas";
   const pickupLinkText =
     cfg.pickupLinkText || "Ver información de la tienda";
+  const fulfillment = product?.fulfillment || null;
+  const fulfillmentKind = fulfillment?.kind || "";
+  const digitalFulfillment = fulfillment?.digital || null;
+  const serviceFulfillment = fulfillment?.service || null;
+  const bundleFulfillment = fulfillment?.bundle || null;
 
   const accordionTitle1 =
     cfg.accordionTitle1 ||
@@ -1097,7 +1147,7 @@ export default function ProductDetailView({
     showThumbnails && thumbnailPosition === "left" && images.length > 1 ? (
       <div className="pd-thumbs-left" style={{ gap: `${thumbGapPx}px` }}>
         {desktopThumbs.map((img, index) => {
-          const active = mainImage === img;
+          const active = displayedMainImage === img;
           return (
             <button
               key={`${img}-${index}`}
@@ -1130,7 +1180,7 @@ export default function ProductDetailView({
     showThumbnails && thumbnailPosition === "bottom" && images.length > 1 ? (
       <div className="pd-thumbs-bottom" style={{ gap: `${thumbGapPx}px` }}>
         {desktopThumbs.map((img, index) => {
-          const active = mainImage === img;
+          const active = displayedMainImage === img;
           return (
             <button
               key={`${img}-bottom-${index}`}
@@ -1185,7 +1235,7 @@ export default function ProductDetailView({
       )}
 
       <img
-        src={mainImage || product?.image}
+        src={displayedMainImage}
         alt={visibleTitle}
         className={`pd-main-img ${imageHoverZoom ? "pd-main-img-zoom" : ""}`}
         style={{
@@ -1310,7 +1360,7 @@ export default function ProductDetailView({
                       style={{ gap: `${Math.min(thumbGapPx, 10)}px` }}
                     >
                       {mobileThumbs.map((img, index) => {
-                        const active = mainImage === img;
+                        const active = displayedMainImage === img;
                         return (
                           <button
                             key={`${img}-mobile-${index}`}
@@ -1442,7 +1492,97 @@ export default function ProductDetailView({
 
               <div className="pd-divider" style={{ background: borderColor }} />
 
-              {showSizes && safeSizes.length > 0 && (
+              {hasVariantAxes &&
+                safeVariantAxes.map((axis) => {
+                  const isColorAxis = ["color", "colour", "tono"].includes(axis.key);
+                  const isLegacySizeAxis = [
+                    "size",
+                    "talla",
+                    "presentacion",
+                  ].includes(axis.key);
+                  if (isColorAxis && !showColors) return null;
+                  if (isLegacySizeAxis && !showSizes) return null;
+
+                  return (
+                    <div className="pd-section-gap" key={axis.key}>
+                      <span
+                        className="pd-section-label"
+                        style={{ color: textSecondary }}
+                      >
+                        {axis.label}
+                      </span>
+                      <div
+                        className="max-md:gap-2"
+                        style={{
+                          display: "flex",
+                          gap: isColorAxis ? 10 : 8,
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        {axis.values.map((option, index) => {
+                          const value = String(option || "").trim();
+                          const active =
+                            String(selectedAttributes?.[axis.key] || "")
+                              .trim()
+                              .toLowerCase() === value.toLowerCase();
+
+                          if (isColorAxis && isHexColor(value)) {
+                            return (
+                              <button
+                                key={`${axis.key}-${value}-${index}`}
+                                type="button"
+                                onClick={() =>
+                                  onVariantAttributeChange(axis.key, value)
+                                }
+                                title={`${axis.label}: ${value}`}
+                                aria-label={`${axis.label}: ${value}`}
+                                aria-pressed={active}
+                                className={`pd-color-dot ${active ? "active" : ""}`}
+                                style={{
+                                  backgroundColor: value,
+                                  borderColor: active ? accent1 : "#d1d5db",
+                                  boxShadow: active
+                                    ? `0 0 0 3px ${hexToRgba(accent1, 0.22)}, 0 4px 10px rgba(0,0,0,0.08)`
+                                    : "0 2px 6px rgba(0,0,0,0.06)",
+                                }}
+                              />
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={`${axis.key}-${value}-${index}`}
+                              type="button"
+                              onClick={() =>
+                                onVariantAttributeChange(axis.key, value)
+                              }
+                              aria-pressed={active}
+                              className={isColorAxis ? "pd-color-chip" : "pd-size-btn"}
+                              style={{
+                                borderRadius: 10,
+                                borderColor: active ? accent1 : borderColor,
+                                backgroundColor: active
+                                  ? isColorAxis
+                                    ? textPrimary
+                                    : accent1
+                                  : "#ffffff",
+                                color: active ? "#ffffff" : textPrimary,
+                                boxShadow: active
+                                  ? `0 8px 20px ${hexToRgba(accent1, 0.22)}`
+                                  : "0 2px 8px rgba(31,23,42,0.04)",
+                              }}
+                            >
+                              {value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {!hasVariantAxes && showSizes && safeSizes.length > 0 && (
                 <div className="pd-section-gap">
                   <span className="pd-section-label" style={{ color: textSecondary }}>
                     Talla
@@ -1477,7 +1617,7 @@ export default function ProductDetailView({
                 </div>
               )}
 
-              {showColors && safeColors.length > 0 && (
+              {!hasVariantAxes && showColors && safeColors.length > 0 && (
                 <div className="pd-section-gap">
                   <span className="pd-section-label" style={{ color: textSecondary }}>
                     Color
@@ -1602,6 +1742,88 @@ export default function ProductDetailView({
                         {cfg.addToCartText || "Añadir al carrito"}
                       </button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "digital_delivery" && digitalFulfillment && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <Download style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Entrega digital después del pago
+                    </p>
+                    <p style={{ fontSize: "13px", color: textSecondary, margin: "4px 0 0", lineHeight: 1.5 }}>
+                      {digitalFulfillment.deliveryMode === "automatic"
+                        ? `Recibirás un enlace seguro con hasta ${Number(digitalFulfillment.downloadLimit || 1)} descargas durante ${Number(digitalFulfillment.accessDays || 1)} días.`
+                        : "El comercio coordinará contigo la entrega del contenido digital."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "service" && serviceFulfillment && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <CalendarDays style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Servicio de {Number(serviceFulfillment.durationMinutes || 60)} minutos
+                    </p>
+                    <p style={{ fontSize: "13px", color: textSecondary, margin: "4px 0 0", lineHeight: 1.5 }}>
+                      {serviceFulfillment.locationType === "online"
+                        ? "Prestación en línea."
+                        : serviceFulfillment.locationType === "store"
+                          ? "Prestación en el establecimiento."
+                          : "Prestación en la ubicación del cliente."}
+                      {serviceFulfillment.customerInstructions
+                        ? ` ${serviceFulfillment.customerInstructions}`
+                        : " Recibirás las instrucciones de coordinación después del pago."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {fulfillmentKind === "bundle" && Array.isArray(bundleFulfillment?.components) && (
+                <div
+                  className="pd-pickup"
+                  style={{
+                    background: `linear-gradient(135deg, ${hexToRgba(accent1, 0.10)}, ${hexToRgba(accent2, 0.07)})`,
+                    border: `1.5px solid ${hexToRgba(borderColor, 0.9)}`,
+                  }}
+                >
+                  <div className="pd-pickup-icon" style={{ background: hexToRgba(accent1, 0.15), color: accent1 }}>
+                    <Boxes style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: accent1, margin: 0 }}>
+                      Este combo incluye
+                    </p>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: textSecondary, fontSize: "13px", lineHeight: 1.6 }}>
+                      {bundleFulfillment.components.map((component, index) => (
+                        <li key={`${component.product || component.sku || "item"}-${index}`}>
+                          {Number(component.quantity || 1)} × {component.title || "Producto"}
+                          {component.variantLabel && component.variantLabel !== "Presentación general"
+                            ? ` · ${component.variantLabel}`
+                            : ""}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               )}
@@ -1771,6 +1993,84 @@ export default function ProductDetailView({
                 </div>
               ))}
             </div>
+          )}
+
+          {publicCommercialFields.length > 0 && (
+            <section
+              style={{
+                marginTop: 48,
+                borderRadius: radius,
+                border: `1.5px solid ${borderColor}`,
+                backgroundColor: cardBg,
+                padding: 24,
+              }}
+              className={shadowClass}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  color: textPrimary,
+                  fontSize: 20,
+                  fontWeight: 700,
+                }}
+              >
+                Especificaciones
+              </h2>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 12,
+                  marginTop: 18,
+                }}
+              >
+                {publicCommercialFields.map((field, index) => {
+                  const fieldValue =
+                    field.type === 'boolean'
+                      ? String(field.value) === 'true'
+                        ? 'Sí'
+                        : 'No'
+                      : field.value;
+
+                  return (
+                    <div
+                      key={`${field.group}-${field.key}-${index}`}
+                      style={{
+                        borderRadius: 12,
+                        border: `1px solid ${borderColor}`,
+                        padding: '12px 14px',
+                        backgroundColor: pageBg,
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          color: textSecondary,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                        }}
+                      >
+                        {field.group || 'General'}
+                      </p>
+                      <p
+                        style={{
+                          margin: '5px 0 0',
+                          color: textPrimary,
+                          fontSize: 14,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <strong>{field.label}:</strong>{' '}
+                        {fieldValue || '—'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           {showReviewsSection && (

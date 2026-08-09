@@ -42,6 +42,15 @@ function getPaymentLabel(method) {
 }
 
 function getVariantLabel(product = {}) {
+  if (String(product.variantLabel || '').trim()) {
+    return String(product.variantLabel).trim();
+  }
+  if (Array.isArray(product.variantAttributes) && product.variantAttributes.length) {
+    return product.variantAttributes
+      .map((attribute) => String(attribute?.value || '').trim())
+      .filter(Boolean)
+      .join(' / ');
+  }
   const parts = [product.size, product.color].filter(Boolean);
   return parts.length ? parts.join(' / ') : 'Variante general';
 }
@@ -420,6 +429,11 @@ export default function PosSalesPage() {
           quantity: item.quantity,
           size: item.size || '',
           color: item.color || '',
+          variantKey: item.variantKey || item.variantId || '',
+          variantLabel: item.variantLabel || getVariantLabel(item),
+          variantAttributes: Array.isArray(item.variantAttributes)
+            ? item.variantAttributes
+            : [],
         })),
         payment: {
           method: paymentMethod,

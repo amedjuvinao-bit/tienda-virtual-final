@@ -1,6 +1,10 @@
 // backend/models/InventoryReservation.js
 
 const mongoose = require('mongoose');
+const {
+  normalizeAttributes,
+  resolveVariantIdentity,
+} = require('../lib/products/productVariantConfig');
 
 const { Schema } = mongoose;
 
@@ -19,6 +23,15 @@ const RESERVATION_SOURCES = [
   'admin',
   'system',
 ];
+
+const reservationVariantAttributeSchema = new Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
 
 const reservationItemSchema = new Schema(
   {
@@ -40,6 +53,12 @@ const reservationItemSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Branch',
       required: true,
+      index: true,
+    },
+
+    orderItem: {
+      type: Schema.Types.ObjectId,
+      default: null,
       index: true,
     },
 
@@ -82,13 +101,44 @@ const reservationItemSchema = new Schema(
     size: {
       type: String,
       trim: true,
-      required: true,
+      default: '',
     },
 
     color: {
       type: String,
       trim: true,
-      required: true,
+      default: '',
+    },
+
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+    },
+
+    variantLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    variantAttributes: {
+      type: [reservationVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
+
+    bundleParentProduct: {
+      type: Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+    },
+
+    bundleParentTitle: {
+      type: String,
+      trim: true,
+      default: '',
     },
 
     quantity: {
@@ -148,6 +198,24 @@ const reservationItemSchema = new Schema(
     timestamps: false,
   }
 );
+
+reservationItemSchema.pre('validate', function normalizeReservationVariant(next) {
+  try {
+    const identity = resolveVariantIdentity({
+      variantKey: this.variantKey,
+      size: this.size,
+      color: this.color,
+      attributes: this.variantAttributes || [],
+    });
+    this.variantKey = identity.variantKey;
+    this.size = identity.size;
+    this.color = identity.color;
+    this.variantAttributes = identity.attributes;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const inventoryReservationSchema = new Schema(
   {

@@ -10,6 +10,16 @@ const Order = require('../models/Order');
 const Customer = require('../models/Customer');
 const Counter = require('../models/Counter');
 const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
+const {
+  processOrderFulfillmentAfterPayment,
+} = require('./orderFulfillmentService');
+const {
+  getPublicFulfillmentView,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  normalizeAttributes,
+  resolveVariantIdentity,
+} = require('../lib/products/productVariantConfig');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
 const DEFAULT_CURRENCY = 'COP';
@@ -72,13 +82,6 @@ function toObjectId(value, fieldName = 'id') {
   }
 
   return new mongoose.Types.ObjectId(cleanValue);
-}
-
-function buildVariantKey(size = '', color = '') {
-  const cleanSize = cleanLower(size, 80);
-  const cleanColor = cleanLower(color, 120);
-  const key = `${cleanSize}__${cleanColor}`;
-  return key === '__' ? 'default__default' : key;
 }
 
 function getProductImage(product = {}) {
@@ -172,6 +175,19 @@ function normalizePosItems(items = []) {
     const unitPrice = toMoney(item.unitPrice ?? item.price ?? item.precio);
     const size = cleanText(item.size || item.talla || item.variant?.size || '', 80);
     const color = cleanText(item.color || item.variant?.color || '', 120);
+    const variantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.variant?.attributes ||
+        []
+    );
+
+    const variantIdentity = resolveVariantIdentity({
+      variantKey: item.variantKey || item.variantId,
+      size,
+      color,
+      attributes: variantAttributes,
+    });
 
     return {
       index,
@@ -180,9 +196,14 @@ function normalizePosItems(items = []) {
       quantity,
       unitPrice,
       lineSubtotal: quantity * unitPrice,
-      size,
-      color,
-      variantKey: buildVariantKey(size, color),
+      size: variantIdentity.size,
+      color: variantIdentity.color,
+      variantKey: variantIdentity.variantKey,
+      variantLabel: cleanText(
+        item.variantLabel || item.variant?.label || '',
+        160
+      ),
+      variantAttributes: variantIdentity.attributes,
       title: cleanText(item.title || item.name || '', 220),
       sku: cleanUpper(item.sku || '', 100),
       barcode: cleanText(item.barcode || '', 120),
@@ -662,6 +683,9 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
       active: { $ne: false },
       visible: { $ne: false },
     })
+      .select(
+        '+digitalDelivery.assetUrl +digitalDelivery.customerMessage +serviceDelivery.bookingUrl +serviceDelivery.internalInstructions +bundleComponents'
+      )
       .session(session)
       .lean();
 
@@ -674,69 +698,225 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
       );
     }
 
-    const stock = await InventoryStock.findOne({
-      branch: branch._id,
-      product: item.productObjectId,
-      variantKey: item.variantKey,
-      active: true,
-      deletedAt: null,
-    })
-      .session(session)
-      .lean();
-
-    if (!stock) {
-      throw createPosError(
-        `No existe inventario en la sede para ${product.title}.`,
-        'POS_STOCK_NOT_FOUND',
-        {
-          index: item.index,
-          productId: item.productId,
-          branchId: String(branch._id),
-          size: item.size,
-          color: item.color,
-        },
-        409
-      );
-    }
-
-    const availableStock = Math.max(
-      0,
-      toNumber(stock.availableStock, toNumber(stock.stock, 0) - toNumber(stock.reservedStock, 0))
-    );
-
-    if (availableStock < item.quantity && branch.settings?.allowNegativeStock !== true) {
-      throw createPosError(
-        `No hay stock suficiente para ${product.title}. Disponible: ${availableStock}.`,
-        'POS_STOCK_NOT_AVAILABLE',
-        {
-          index: item.index,
-          productId: item.productId,
-          branchId: String(branch._id),
-          requestedQuantity: item.quantity,
-          availableStock,
-          size: item.size,
-          color: item.color,
-        },
-        409
-      );
-    }
-
     const serverUnitPrice = getServerUnitPrice(product);
+    const fulfillment = getPublicFulfillmentView(product);
+    const inventoryLines = [];
+
+    if (product.productType === 'bundle') {
+      for (const component of product.bundleComponents || []) {
+        if (
+          component.trackInventory === false ||
+          component.allowBackorder === true
+        ) {
+          continue;
+        }
+
+        const componentProductId = toObjectId(
+          component.product,
+          'bundleComponents.product'
+        );
+        const requiredQuantity =
+          item.quantity * Math.max(1, Number(component.quantity || 1));
+        const componentStock = await InventoryStock.findOne({
+          branch: branch._id,
+          product: componentProductId,
+          variantKey:
+            component.variantKey || 'default__default',
+          active: true,
+          deletedAt: null,
+        })
+          .session(session)
+          .lean();
+
+        if (!componentStock) {
+          throw createPosError(
+            `No existe inventario en la sede para el componente ${component.title || product.title}.`,
+            'POS_BUNDLE_COMPONENT_STOCK_NOT_FOUND',
+            {
+              productId: String(product._id),
+              componentProductId: String(componentProductId),
+              branchId: String(branch._id),
+            },
+            409
+          );
+        }
+
+        const componentAvailable = Math.max(
+          0,
+          toNumber(
+            componentStock.availableStock,
+            toNumber(componentStock.stock, 0) -
+              toNumber(componentStock.reservedStock, 0)
+          )
+        );
+        if (
+          componentAvailable < requiredQuantity &&
+          branch.settings?.allowNegativeStock !== true
+        ) {
+          throw createPosError(
+            `No hay stock suficiente para el componente ${component.title || product.title}. Disponible: ${componentAvailable}.`,
+            'POS_BUNDLE_COMPONENT_STOCK_NOT_AVAILABLE',
+            {
+              productId: String(product._id),
+              componentProductId: String(componentProductId),
+              requestedQuantity: requiredQuantity,
+              availableStock: componentAvailable,
+            },
+            409
+          );
+        }
+
+        const componentProduct = await Product.findById(
+          componentProductId
+        )
+          .session(session)
+          .lean();
+        const componentIdentity = resolveVariantIdentity({
+          variantKey: componentStock.variantKey,
+          size: componentStock.variant?.size,
+          color: componentStock.variant?.color,
+          attributes: componentStock.variant?.attributes || [],
+        });
+        inventoryLines.push({
+          ...item,
+          productId: String(componentProductId),
+          productObjectId: componentProductId,
+          quantity: requiredQuantity,
+          stock: componentStock,
+          availableStock: componentAvailable,
+          product: componentProduct || {
+            _id: componentProductId,
+            title: component.title || '',
+            sku: component.sku || '',
+            image: component.image || '',
+          },
+          productSnapshot: buildProductSnapshot(
+            componentProduct || {},
+            component
+          ),
+          variantKey: componentIdentity.variantKey,
+          variantSnapshot: {
+            label: cleanText(component.variantLabel || '', 160),
+            size: componentIdentity.size,
+            color: componentIdentity.color,
+            attributes: componentIdentity.attributes,
+            sku: cleanUpper(component.sku || '', 100),
+            barcode: '',
+          },
+          bundleParentProduct: product._id,
+          bundleParentTitle: product.title || '',
+        });
+      }
+    } else if (
+      product.trackInventory !== false &&
+      product.allowBackorder !== true
+    ) {
+      const stock = await InventoryStock.findOne({
+        branch: branch._id,
+        product: item.productObjectId,
+        variantKey: item.variantKey,
+        active: true,
+        deletedAt: null,
+      })
+        .session(session)
+        .lean();
+
+      if (!stock) {
+        throw createPosError(
+          `No existe inventario en la sede para ${product.title}.`,
+          'POS_STOCK_NOT_FOUND',
+          {
+            index: item.index,
+            productId: item.productId,
+            branchId: String(branch._id),
+            size: item.size,
+            color: item.color,
+          },
+          409
+        );
+      }
+
+      const availableStock = Math.max(
+        0,
+        toNumber(
+          stock.availableStock,
+          toNumber(stock.stock, 0) -
+            toNumber(stock.reservedStock, 0)
+        )
+      );
+
+      if (
+        availableStock < item.quantity &&
+        branch.settings?.allowNegativeStock !== true
+      ) {
+        throw createPosError(
+          `No hay stock suficiente para ${product.title}. Disponible: ${availableStock}.`,
+          'POS_STOCK_NOT_AVAILABLE',
+          {
+            index: item.index,
+            productId: item.productId,
+            branchId: String(branch._id),
+            requestedQuantity: item.quantity,
+            availableStock,
+            size: item.size,
+            color: item.color,
+          },
+          409
+        );
+      }
+
+      inventoryLines.push({
+        ...item,
+        stock,
+        availableStock,
+        product,
+        productSnapshot: buildProductSnapshot(product, item),
+        variantKey: stock.variantKey,
+        variantSnapshot: {
+          label: cleanText(
+            stock.variant?.label || item.variantLabel || '',
+            160
+          ),
+          size: cleanText(stock.variant?.size || item.size, 80),
+          color: cleanText(stock.variant?.color || item.color, 120),
+          attributes: normalizeAttributes(
+            stock.variant?.attributes ||
+              item.variantAttributes ||
+              []
+          ),
+          sku: cleanUpper(stock.variant?.sku || item.sku || product.sku || '', 100),
+          barcode: cleanText(stock.variant?.barcode || item.barcode || product.barcode || '', 120),
+        },
+      });
+    }
 
     validatedItems.push({
       ...item,
       unitPrice: serverUnitPrice,
       lineSubtotal: item.quantity * serverUnitPrice,
       product,
-      stock,
-      availableStock,
+      fulfillment,
+      stock: inventoryLines[0]?.stock || null,
+      availableStock:
+        inventoryLines.length > 0
+          ? Math.min(
+              ...inventoryLines.map((line) =>
+                Number(line.availableStock || 0)
+              )
+            )
+          : Infinity,
+      inventoryLines,
       productSnapshot: buildProductSnapshot(product, item),
       branchSnapshot: buildBranchSnapshot(branch),
       variantSnapshot: {
-        size: cleanText(stock.variant?.size || item.size, 80),
-        color: cleanText(stock.variant?.color || item.color, 120),
-        sku: cleanUpper(stock.variant?.sku || item.sku || product.sku || '', 100),
-        barcode: cleanText(stock.variant?.barcode || item.barcode || product.barcode || '', 120),
+        label: cleanText(item.variantLabel || '', 160),
+        size: cleanText(item.size, 80),
+        color: cleanText(item.color, 120),
+        attributes: normalizeAttributes(
+          item.variantAttributes || []
+        ),
+        sku: cleanUpper(item.sku || product.sku || '', 100),
+        barcode: cleanText(item.barcode || product.barcode || '', 120),
       },
     });
   }
@@ -784,18 +964,40 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
     image: item.productSnapshot?.image || item.image,
     color: item.color,
     size: item.size,
+    variantId: item.variantKey,
+    variantKey: item.variantKey,
+    variantLabel:
+      item.variantSnapshot?.label || item.variantLabel || '',
+    variantAttributes:
+      item.variantSnapshot?.attributes ||
+      item.variantAttributes ||
+      [],
     qty: item.quantity,
     quantity: item.quantity,
     price: item.unitPrice,
     unitPrice: item.unitPrice,
     priceNumber: item.unitPrice,
+    productType: item.fulfillment?.productType || item.product?.productType || 'physical',
+    requiresShipping: item.fulfillment?.requiresShipping !== false,
+    fulfillmentKind: item.fulfillment?.kind || 'shipment',
+    fulfillmentSnapshot: item.fulfillment || {},
   }));
+  const hasVirtualFulfillment = normalizedPayload.items.some(
+    (item) =>
+      ['digital', 'service'].includes(item.product?.productType) ||
+      (
+        item.product?.productType === 'bundle' &&
+        (item.product?.bundleComponents || []).some((component) =>
+          ['digital', 'service'].includes(component.productType)
+        )
+      )
+  );
 
   return {
     sessionId: `pos_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     orderNumber,
     status: 'paid',
-    fulfillmentStatus: 'delivered',
+    fulfillmentStatus: hasVirtualFulfillment ? 'processing' : 'delivered',
     source: 'pos',
     channel: 'physical_store',
     saleType: 'pos_sale',
@@ -822,6 +1024,10 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       image: item.image,
       color: item.color,
       size: item.size,
+      variantId: item.variantId,
+      variantKey: item.variantKey,
+      variantLabel: item.variantLabel,
+      variantAttributes: item.variantAttributes,
       quantity: item.quantity,
       price: item.price,
     })),
@@ -860,7 +1066,8 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       },
     },
     inventoryControl: {
-      discountedAtCheckout: false,
+      reservationRequired: false,
+      discountedAtCheckout: true,
       restockedOnFailure: false,
       restockedAt: null,
     },
@@ -872,7 +1079,9 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
         type: 'status',
         statusFrom: undefined,
         statusTo: 'paid',
-        message: 'Venta física POS pagada y entregada.',
+        message: hasVirtualFulfillment
+          ? 'Venta POS pagada; cumplimiento digital o de servicio pendiente.'
+          : 'Venta física POS pagada y entregada.',
         by: adminSnapshot.username || 'pos',
         at: now,
       },
@@ -883,7 +1092,15 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
 async function applyPosInventoryOut({ order, validatedItems = [], branch, admin = {}, session }) {
   const movements = [];
 
-  for (const item of validatedItems) {
+  const inventoryLines = validatedItems.flatMap((item) =>
+    Array.isArray(item.inventoryLines)
+      ? item.inventoryLines
+      : item.stock
+        ? [item]
+        : []
+  );
+
+  for (const item of inventoryLines) {
     const stockBefore = toNumber(item.stock.stock, 0);
     const stockAfter = Math.max(0, stockBefore - item.quantity);
 
@@ -971,6 +1188,7 @@ async function applyPosInventoryOut({ order, validatedItems = [], branch, admin 
           product: item.productObjectId,
           productSnapshot: item.productSnapshot,
           variant: item.variantSnapshot,
+          variantKey: item.variantKey,
           branchFrom: branch._id,
           branchFromSnapshot: buildBranchSnapshot(branch),
           quantity: item.quantity,
@@ -982,7 +1200,9 @@ async function applyPosInventoryOut({ order, validatedItems = [], branch, admin 
           unitCost: toMoney(item.product?.averageCost || item.product?.cost || 0),
           totalCost: toMoney(item.product?.averageCost || item.product?.cost || 0) * item.quantity,
           reason: 'Venta física POS',
-          notes: `Salida automática por venta POS ${order.orderNumber}`,
+          notes: item.bundleParentProduct
+            ? `Salida por combo ${item.bundleParentTitle || ''} en venta POS ${order.orderNumber}`
+            : `Salida automática por venta POS ${order.orderNumber}`,
           reference: `POS-${order.orderNumber}`,
           order: order._id,
           orderNumber: order.orderNumber,
@@ -1042,6 +1262,34 @@ async function preparePosSalePreview(payload = {}, options = {}) {
     taxes: payload.taxes,
   });
   const customerResolution = await resolvePosCustomerForPreview(payload, normalizedPayload, { session });
+  const needsElectronicContact = validatedItems.some(
+    (item) =>
+      ['digital', 'service'].includes(item.product?.productType) ||
+      (
+        item.product?.productType === 'bundle' &&
+        (item.product?.bundleComponents || []).some((component) =>
+          ['digital', 'service'].includes(component.productType)
+        )
+      )
+  );
+  const deliveryEmail = cleanLower(
+    customerResolution.customerSnapshot?.email ||
+      customerResolution.customerSnapshot?.emailOrPhone ||
+      '',
+    180
+  );
+
+  if (
+    needsElectronicContact &&
+    !deliveryEmail.includes('@')
+  ) {
+    throw createPosError(
+      'Los productos digitales y servicios necesitan el correo del cliente para completar la entrega.',
+      'POS_FULFILLMENT_EMAIL_REQUIRED',
+      {},
+      400
+    );
+  }
 
   return {
     ...normalizedPayload,
@@ -1114,6 +1362,28 @@ async function createPosSale(payload = {}, options = {}) {
       });
     } finally {
       await session.endSession();
+    }
+  }
+
+  if (!externalSession) {
+    try {
+      await processOrderFulfillmentAfterPayment({
+        orderId: result.order._id,
+        paymentProvider: 'pos',
+        transaction: {
+          payment_method_type:
+            result.order.payment?.methodType || 'pos',
+          payment_method_name:
+            result.order.payment?.methodLabel || 'Venta física',
+          payment_method: result.order.payment?.method || 'pos',
+          rawMethod: result.order.payment?.rawMethod || {},
+        },
+      });
+    } catch (error) {
+      console.error(
+        '[adminPosService] Error preparando cumplimiento POS:',
+        error.message
+      );
     }
   }
 

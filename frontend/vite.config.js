@@ -1,9 +1,20 @@
 // vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@shared/variant-key-authority': fileURLToPath(
+        new URL('../shared/variantKeyAuthority.cjs', import.meta.url),
+      ),
+    },
+  },
+  optimizeDeps: {
+    include: ['@shared/variant-key-authority'],
+  },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',

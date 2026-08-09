@@ -14,6 +14,10 @@
  * - ✅ Conserva municipalityId para facturación electrónica
  */
 
+const {
+  normalizeAttributes,
+} = require('../lib/products/productVariantConfig');
+
 const MAX_CART_ITEMS = 200;
 const MAX_TAGS = 20;
 const PAYMENT_PROVIDERS = ['bold', 'wompi', 'mercado-pago', 'payu', 'manual'];
@@ -119,6 +123,14 @@ function normalizeCart(cart) {
           raw.variantKey || raw.variantId || raw.selectedVariantKey || raw.selectedVariantId,
           MAX_LEN.variantKey
         ) || undefined,
+      variantLabel:
+        trimTo(raw.variantLabel, 180) || undefined,
+      variantAttributes: normalizeAttributes(
+        raw.variantAttributes ||
+          raw.attributes ||
+          raw.selectedAttributes ||
+          []
+      ),
       image: trimTo(raw.image, 300) || undefined,
     });
   }

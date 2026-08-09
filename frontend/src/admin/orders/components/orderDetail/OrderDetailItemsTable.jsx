@@ -68,6 +68,25 @@ function getProductSize(item) {
   );
 }
 
+function getVariantDisplay(item) {
+  const label = cleanText(item?.variantLabel || item?.variant?.label || '');
+  if (label) return label;
+
+  const attributes = Array.isArray(item?.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => {
+          const attributeLabel = cleanText(attribute?.label || attribute?.key || '');
+          const value = cleanText(attribute?.value || '');
+          return attributeLabel && value ? `${attributeLabel}: ${value}` : value;
+        })
+        .filter(Boolean)
+    : [];
+
+  return attributes.join(' · ') || [getProductSize(item), getProductColor(item)]
+    .filter((value) => value && value !== '—')
+    .join(' / ') || 'Presentación general';
+}
+
 export default function OrderDetailItemsTable({ order }) {
   const items = getOrderItems(order);
 
@@ -117,8 +136,7 @@ export default function OrderDetailItemsTable({ order }) {
               >
                 <Th>Producto</Th>
                 <Th>SKU</Th>
-                <Th>Talla</Th>
-                <Th>Color</Th>
+                <Th>Variante</Th>
                 <Th align="center">Cant.</Th>
                 <Th align="right">Precio</Th>
                 <Th align="right">Subtotal</Th>
@@ -130,8 +148,7 @@ export default function OrderDetailItemsTable({ order }) {
                 const title = getProductTitle(item);
                 const image = getProductImage(item);
                 const sku = getProductSku(item);
-                const size = getProductSize(item);
-                const color = getProductColor(item);
+                const variant = getVariantDisplay(item);
                 const quantity = getItemQuantity(item);
                 const price = getItemPrice(item);
                 const subtotal = quantity * price;
@@ -235,11 +252,7 @@ export default function OrderDetailItemsTable({ order }) {
                     </Td>
 
                     <Td>
-                      <SoftBadge variant="neutral">{size}</SoftBadge>
-                    </Td>
-
-                    <Td>
-                      <ColorValue value={color} />
+                      <SoftBadge variant="neutral">{variant}</SoftBadge>
                     </Td>
 
                     <Td align="center">
@@ -344,48 +357,6 @@ function CodeText({ children }) {
       }}
     >
       {children || '—'}
-    </span>
-  );
-}
-
-function ColorValue({ value }) {
-  const colorText = cleanText(value);
-
-  const isHexColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || ''));
-
-  return (
-    <span
-      title={colorText}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 7,
-        color: ORDER_DETAIL_THEME.cardText,
-        fontSize: 12,
-        fontWeight: 800,
-        maxWidth: 130,
-      }}
-    >
-      <span
-        style={{
-          width: 13,
-          height: 13,
-          minWidth: 13,
-          borderRadius: 999,
-          border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-          background: isHexColor ? value : ORDER_DETAIL_THEME.primarySoftBg,
-        }}
-      />
-
-      <span
-        style={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {colorText}
-      </span>
     </span>
   );
 }

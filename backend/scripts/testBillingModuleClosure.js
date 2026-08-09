@@ -33,6 +33,7 @@ const BILLING_TESTS = [
   ['Datos fiscales del checkout', 'testBillingFiscalCheckoutModule.js'],
   ['Motor único e idempotencia', 'testBillingIdempotencyModule.js'],
   ['Recuperación y conciliación de facturas', 'testBillingInvoiceRecoveryModule.js'],
+  ['Limpieza segura de pendientes en habilitación', 'testFactusPendingCleanup.js'],
   ['Seguridad y permisos', 'testBillingSecurityModule.js'],
   ['Configuración segura de facturación', 'testBillingConfigurationModule.js'],
   ['Conexión real y readiness de Factus', 'testBillingConnectionModule.js'],
@@ -58,10 +59,14 @@ function run(command, args, label, cwd = PROJECT_ROOT) {
   console.log('');
   console.log(`--- ${label} ---`);
 
+  const requiresWindowsShell =
+    process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+
   const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
+    shell: requiresWindowsShell,
   });
 
   if (result.error) {

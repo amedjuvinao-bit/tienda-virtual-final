@@ -18,6 +18,9 @@ const INITIAL_FORM = {
   branchId: '',
   size: '',
   color: '',
+  variantKey: '',
+  variantLabel: '',
+  variantAttributes: [],
   type: 'initial_stock',
   quantity: '',
   reason: '',
@@ -304,6 +307,44 @@ function getVariantColor(row) {
   return cleanText(row?.variant?.color || row?.color || '');
 }
 
+function getVariantKey(row) {
+  return cleanText(
+    row?.variantKey ||
+      row?.variant?.variantKey ||
+      row?.variantId ||
+      ''
+  ).toLowerCase();
+}
+
+function getVariantAttributes(row) {
+  return (Array.isArray(row?.variant?.attributes)
+    ? row.variant.attributes
+    : Array.isArray(row?.attributes)
+      ? row.attributes
+      : Array.isArray(row?.variantAttributes)
+        ? row.variantAttributes
+        : []
+  )
+    .map((attribute) => ({
+      key: cleanText(attribute?.key || attribute?.label).toLowerCase(),
+      label: cleanText(attribute?.label || attribute?.key),
+      value: cleanText(attribute?.value),
+    }))
+    .filter((attribute) => attribute.key && attribute.value)
+    .slice(0, 4);
+}
+
+function getVariantLabel(row) {
+  const explicit = cleanText(row?.variant?.label || row?.variantLabel);
+  if (explicit) return explicit;
+  const attributes = getVariantAttributes(row);
+  return (
+    attributes.map((attribute) => attribute.value).join(' / ') ||
+    [getVariantSize(row), getVariantColor(row)].filter(Boolean).join(' / ') ||
+    'Presentación general'
+  );
+}
+
 function getAvailableStock(row) {
   if (typeof row?.availableStock === 'number') return row.availableStock;
 
@@ -369,6 +410,7 @@ function buildMergedProducts(products = [], stockRows = []) {
       sku: getProductSku(product),
       image: getProductImage(product),
       inventory: Array.isArray(product?.inventory) ? product.inventory : [],
+      variants: Array.isArray(product?.variants) ? product.variants : [],
       sizes: Array.isArray(product?.sizes) ? product.sizes : [],
       colors: Array.isArray(product?.colors) ? product.colors : [],
     });
@@ -385,6 +427,7 @@ function buildMergedProducts(products = [], stockRows = []) {
       sku: getProductSku(row),
       image: getProductImage(row),
       inventory: [],
+      variants: [],
       sizes: [],
       colors: [],
     };
@@ -392,16 +435,25 @@ function buildMergedProducts(products = [], stockRows = []) {
     const size = getVariantSize(row);
     const color = getVariantColor(row);
 
-    const exists = currentProduct.inventory.some(
-      (item) =>
+    const rowVariantKey = getVariantKey(row);
+    const exists = currentProduct.inventory.some((item) => {
+      const itemVariantKey = getVariantKey(item);
+      if (rowVariantKey || itemVariantKey) {
+        return rowVariantKey === itemVariantKey;
+      }
+      return (
         normalizeKey(item?.size) === normalizeKey(size) &&
         normalizeKey(item?.color) === normalizeKey(color)
-    );
+      );
+    });
 
     if ((size || color) && !exists) {
       currentProduct.inventory.push({
         size,
         color,
+        variantKey: rowVariantKey,
+        variantLabel: getVariantLabel(row),
+        attributes: getVariantAttributes(row),
         sku: row?.variant?.sku || '',
         barcode: row?.variant?.barcode || '',
       });
@@ -459,22 +511,41 @@ function buildVariantOptions(product, stockRows = []) {
   const addVariant = (variant = {}) => {
     const size = cleanText(variant?.size);
     const color = cleanText(variant?.color);
+    const variantKey = getVariantKey(variant);
+    const variantAttributes = getVariantAttributes(variant);
+    const variantLabel = getVariantLabel(variant);
 
-    if (!size && !color) return;
+    if (!size && !color && !variantKey && !variantAttributes.length) return;
 
-    const key = `${normalizeKey(size)}|${normalizeKey(color)}`;
+    const key =
+      variantKey ||
+      (variantAttributes.length
+        ? JSON.stringify(
+            variantAttributes.map((attribute) => [
+              attribute.key,
+              attribute.value.toLowerCase(),
+            ])
+          )
+        : `${normalizeKey(size)}|${normalizeKey(color)}`);
 
     if (!variantMap.has(key)) {
       variantMap.set(key, {
         size,
         color,
+        variantKey,
+        variantLabel,
+        variantAttributes,
         sku: cleanText(variant?.sku),
         barcode: cleanText(variant?.barcode),
       });
     }
   };
 
-  if (Array.isArray(product?.inventory)) {
+  if (Array.isArray(product?.variants) && product.variants.length) {
+    product.variants
+      .filter((variant) => variant?.active !== false)
+      .forEach(addVariant);
+  } else if (Array.isArray(product?.inventory)) {
     product.inventory.forEach(addVariant);
   }
 
@@ -484,6 +555,9 @@ function buildVariantOptions(product, stockRows = []) {
       addVariant({
         size: getVariantSize(row),
         color: getVariantColor(row),
+        variantKey: getVariantKey(row),
+        variantLabel: getVariantLabel(row),
+        variantAttributes: getVariantAttributes(row),
         sku: row?.variant?.sku || '',
         barcode: row?.variant?.barcode || '',
       });
@@ -518,41 +592,42 @@ function buildVariantOptions(product, stockRows = []) {
     colors.forEach((color) => addVariant({ size: 'Única', color }));
   }
 
-  return Array.from(variantMap.values()).sort((a, b) => {
-    const sizeCompare = a.size.localeCompare(b.size, 'es', {
+  return Array.from(variantMap.values()).sort((a, b) =>
+    getVariantLabel(a).localeCompare(getVariantLabel(b), 'es', {
       numeric: true,
-    });
-
-    if (sizeCompare !== 0) return sizeCompare;
-
-    return a.color.localeCompare(b.color, 'es');
-  });
+    })
+  );
 }
 
-function findExistingStockRow(stockRows = [], { productId, branchId, size, color }) {
+function findExistingStockRow(
+  stockRows = [],
+  { productId, branchId, size, color, variantKey }
+) {
   return (
     stockRows.find((row) => {
       const sameProduct = getProductId(row) === productId;
       const sameBranch = getBranchId(row) === branchId;
+      const rowVariantKey = getVariantKey(row);
+      const sameVariant = variantKey || rowVariantKey
+        ? rowVariantKey === variantKey
+        : null;
       const sameSize = normalizeKey(getVariantSize(row)) === normalizeKey(size);
       const sameColor = normalizeKey(getVariantColor(row)) === normalizeKey(color);
 
-      return sameProduct && sameBranch && sameSize && sameColor;
+      return (
+        sameProduct &&
+        sameBranch &&
+        (sameVariant === null ? sameSize && sameColor : sameVariant)
+      );
     }) || null
   );
 }
 
 function buildVariantValue(variant) {
-  return `${variant?.size || ''}|||${variant?.color || ''}`;
-}
-
-function parseVariantValue(value) {
-  const [size = '', color = ''] = String(value || '').split('|||');
-
-  return {
-    size,
-    color,
-  };
+  return (
+    getVariantKey(variant) ||
+    `${variant?.size || ''}|||${variant?.color || ''}`
+  );
 }
 
 export default function InventoryAdjustmentModal({
@@ -578,7 +653,9 @@ export default function InventoryAdjustmentModal({
       const [productsRes, branchesRes] = await Promise.all([
         api.get('/api/products', {
           params: {
-            all: 1,
+            page: 1,
+            limit: 100,
+            sort: 'title',
           },
         }),
         api.get('/api/admin/branches', {
@@ -640,8 +717,16 @@ export default function InventoryAdjustmentModal({
         branchId: form.branchId,
         size: form.size,
         color: form.color,
+        variantKey: form.variantKey,
       }),
-    [stockRows, form.productId, form.branchId, form.size, form.color]
+    [
+      stockRows,
+      form.productId,
+      form.branchId,
+      form.size,
+      form.color,
+      form.variantKey,
+    ]
   );
 
   const currentAvailableStock = existingStockRow
@@ -689,9 +774,10 @@ export default function InventoryAdjustmentModal({
 
     setForm((prev) => {
       const currentVariantExists = variantOptions.some(
-        (variant) =>
-          normalizeKey(variant.size) === normalizeKey(prev.size) &&
-          normalizeKey(variant.color) === normalizeKey(prev.color)
+        (variant) => buildVariantValue(variant) === (
+          prev.variantKey ||
+          `${prev.size || ''}|||${prev.color || ''}`
+        )
       );
 
       if (currentVariantExists) return prev;
@@ -702,6 +788,9 @@ export default function InventoryAdjustmentModal({
         ...prev,
         size: firstVariant?.size || '',
         color: firstVariant?.color || '',
+        variantKey: firstVariant?.variantKey || '',
+        variantLabel: firstVariant?.variantLabel || '',
+        variantAttributes: firstVariant?.variantAttributes || [],
       };
     });
   }, [open, selectedProduct, variantOptions]);
@@ -747,16 +836,25 @@ export default function InventoryAdjustmentModal({
       productId,
       size: firstVariant?.size || '',
       color: firstVariant?.color || '',
+      variantKey: firstVariant?.variantKey || '',
+      variantLabel: firstVariant?.variantLabel || '',
+      variantAttributes: firstVariant?.variantAttributes || [],
     }));
   };
 
   const updateVariant = (value) => {
-    const parsedVariant = parseVariantValue(value);
+    const selectedVariant = variantOptions.find(
+      (variant) => buildVariantValue(variant) === value
+    );
+    if (!selectedVariant) return;
 
     setForm((prev) => ({
       ...prev,
-      size: parsedVariant.size,
-      color: parsedVariant.color,
+      size: selectedVariant.size,
+      color: selectedVariant.color,
+      variantKey: selectedVariant.variantKey || '',
+      variantLabel: selectedVariant.variantLabel || '',
+      variantAttributes: selectedVariant.variantAttributes || [],
     }));
   };
 
@@ -776,13 +874,12 @@ export default function InventoryAdjustmentModal({
       return;
     }
 
-    if (!cleanText(form.size)) {
-      setError('Selecciona la talla.');
-      return;
-    }
-
-    if (!cleanText(form.color)) {
-      setError('Selecciona el color.');
+    if (
+      !form.variantKey &&
+      !cleanText(form.size) &&
+      !cleanText(form.color)
+    ) {
+      setError('Selecciona la variante.');
       return;
     }
 
@@ -804,6 +901,16 @@ export default function InventoryAdjustmentModal({
       branchId: form.branchId,
       size: cleanText(form.size),
       color: cleanText(form.color),
+      variantKey: form.variantKey,
+      variantLabel: form.variantLabel,
+      variantAttributes: form.variantAttributes,
+      variant: {
+        variantKey: form.variantKey,
+        label: form.variantLabel,
+        size: cleanText(form.size),
+        color: cleanText(form.color),
+        attributes: form.variantAttributes,
+      },
       quantity,
       reason: String(form.reason || '').trim(),
       reference: String(form.reference || '').trim(),
@@ -843,8 +950,7 @@ export default function InventoryAdjustmentModal({
     !referenceLoading &&
     Boolean(form.productId) &&
     Boolean(form.branchId) &&
-    Boolean(form.size) &&
-    Boolean(form.color);
+    Boolean(form.variantKey || form.size || form.color);
 
   return createPortal(
     <div
@@ -929,7 +1035,7 @@ export default function InventoryAdjustmentModal({
                   <PanelTitle
                     icon={<PackageSearch size={18} />}
                     title="Producto, sede y variante"
-                    description="El movimiento se aplica a una combinación exacta: producto, sede o bodega, talla y color."
+                    description="El movimiento se aplica a una combinación exacta de producto, sede y atributos de variante."
                   />
 
                   {referenceLoading && (
@@ -991,32 +1097,33 @@ export default function InventoryAdjustmentModal({
 
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                      <Label>Talla y color</Label>
+                      <Label>Variante</Label>
 
                       <select
                         value={buildVariantValue({
                           size: form.size,
                           color: form.color,
+                          variantKey: form.variantKey,
                         })}
                         onChange={(event) => updateVariant(event.target.value)}
                         disabled={saving || referenceLoading || variantOptions.length === 0}
                         className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
                         style={styles.input}
                       >
-                        <option value="">Seleccionar talla y color</option>
+                        <option value="">Seleccionar variante</option>
 
                         {variantOptions.map((variant) => (
                           <option
                             key={buildVariantValue(variant)}
                             value={buildVariantValue(variant)}
                           >
-                            Talla {variant.size || '—'} · Color {variant.color || '—'}
+                            {getVariantLabel(variant)}
                           </option>
                         ))}
                       </select>
 
                       <HelpText>
-                        Si el producto tiene varias tallas o colores, selecciona la combinación exacta.
+                        Selecciona la combinación exacta de atributos del producto.
                       </HelpText>
                     </div>
 
@@ -1064,10 +1171,9 @@ export default function InventoryAdjustmentModal({
                         </span>
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
                         <MiniInfo label="Sede" value={getBranchName(selectedBranch)} />
-                        <MiniInfo label="Talla" value={form.size || '—'} />
-                        <MiniInfo label="Color" value={form.color || '—'} />
+                        <MiniInfo label="Variante" value={form.variantLabel || [form.size, form.color].filter(Boolean).join(' / ') || '—'} />
                         <MiniInfo
                           label="Disponible"
                           value={

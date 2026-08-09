@@ -7,48 +7,20 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Product = require('../models/Product');
 const { normalizeProductVariants } = require('../lib/products/productVariantConfig');
-const { syncProductInventoryFromProduct } = require('../services/productInventorySyncService');
+const { buildLegacyFromVariants } = require('../lib/products/productVariantLegacy');
+const {
+  ProductInventoryPersistenceError,
+  saveProductWithInventoryTransaction,
+} = require('../services/productInventoryPersistenceService');
+const {
+  mapProductWriteError,
+  validateAndNormalizeProductInput,
+} = require('../services/productInputValidationService');
 
 const router = express.Router();
 
 function isValidObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || ''));
-}
-
-function buildLegacyFromVariants(variants = []) {
-  const sizes = [];
-  const colors = [];
-  const inventory = [];
-  const seenSize = new Set();
-  const seenColor = new Set();
-  const seenInventory = new Set();
-
-  variants.forEach((variant) => {
-    const size = String(variant?.size || '').trim();
-    const color = String(variant?.color || '').trim();
-
-    if (size && !seenSize.has(size.toLowerCase())) {
-      seenSize.add(size.toLowerCase());
-      sizes.push(size);
-    }
-
-    if (color && !seenColor.has(color.toLowerCase())) {
-      seenColor.add(color.toLowerCase());
-      colors.push(color);
-    }
-
-    const inventoryKey = `${size.toLowerCase()}|${color.toLowerCase()}`;
-    if ((size || color) && !seenInventory.has(inventoryKey)) {
-      seenInventory.add(inventoryKey);
-      inventory.push({
-        size,
-        color,
-        stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
-      });
-    }
-  });
-
-  return { sizes, colors, inventory };
 }
 
 function sendProductNotFound(res) {
@@ -67,7 +39,10 @@ router.get('/:productId', requirePermission('products:view'), async (req, res) =
 
     if (!isValidObjectId(productId)) return sendProductNotFound(res);
 
-    const product = await Product.findById(productId).lean();
+    const product = await Product.findOne({
+      _id: productId,
+      archivedAt: null,
+    }).lean();
     if (!product) return sendProductNotFound(res);
 
     return res.json({
@@ -79,15 +54,21 @@ router.get('/:productId', requirePermission('products:view'), async (req, res) =
         price: Number(product.price || 0),
         cost: Number(product.cost || product.averageCost || 0),
         image: product.image || '',
+        variantPreset: product.variantPreset || 'none',
+        variantAxes: Array.isArray(product.variantAxes)
+          ? product.variantAxes
+          : [],
       },
       variants: normalizeProductVariants(product.variants || [], product),
     });
   } catch (error) {
-    console.error('[adminProductVariants] GET error:', error);
+    console.error(
+      '[adminProductVariants] GET error:',
+      error?.code || error?.name || 'PRODUCT_READ_FAILED'
+    );
     return res.status(500).json({
       ok: false,
       message: 'No se pudieron consultar las variantes del producto.',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
 });
@@ -99,11 +80,22 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
 
     if (!isValidObjectId(productId)) return sendProductNotFound(res);
 
-    const product = await Product.findById(productId);
+    const product = await Product.findOne({
+      _id: productId,
+      archivedAt: null,
+    });
     if (!product) return sendProductNotFound(res);
 
-    const incomingVariants = Array.isArray(req.body?.variants) ? req.body.variants : [];
-    const normalizedVariants = normalizeProductVariants(incomingVariants, {
+    const validatedInput = await validateAndNormalizeProductInput(
+      { variants: Array.isArray(req.body?.variants) ? req.body.variants : [] },
+      {
+        mode: 'update',
+        existingProduct: product,
+        ProductModel: Product,
+      }
+    );
+    const incomingVariants = validatedInput.payload.variants;
+    const productContext = {
       _id: product._id,
       title: product.title,
       sku: product.sku,
@@ -117,45 +109,65 @@ router.put('/:productId', requirePermission('products:update'), async (req, res)
       colors: product.colors,
       stock: product.stock,
       trackInventory: product.trackInventory,
-    });
+    };
+    const legacy = buildLegacyFromVariants(
+      incomingVariants,
+      productContext
+    );
+    const normalizedVariants = legacy.variants;
 
     const syncLegacy = req.body?.syncLegacy !== false;
 
     product.variants = normalizedVariants;
+    if (Array.isArray(req.body?.variantAxes)) {
+      product.variantAxes = req.body.variantAxes;
+    }
+    product.$locals = product.$locals || {};
+    product.$locals.adminId = req.adminUserId || null;
+    product.$locals.variantsAuthoritative = true;
 
     if (syncLegacy) {
-      const legacy = buildLegacyFromVariants(normalizedVariants.filter((variant) => variant.active !== false));
       product.sizes = legacy.sizes;
       product.colors = legacy.colors;
-
-      if (legacy.inventory.length) {
-        product.inventory = legacy.inventory;
-      }
+      product.inventory = legacy.inventory;
     }
 
-    const saved = await product.save();
-    const syncResult = await syncProductInventoryFromProduct(saved);
+    const saved = await saveProductWithInventoryTransaction(
+      product,
+      {
+        adminId: req.adminUserId || null,
+        variantsAuthoritative: true,
+      }
+    );
 
     return res.json({
       ok: true,
       message: 'Variantes actualizadas correctamente.',
       variants: normalizeProductVariants(saved.variants || [], saved.toObject ? saved.toObject() : saved),
-      sync: syncResult,
+      sync: saved?.$locals?.inventorySyncResult || null,
     });
   } catch (error) {
-    console.error('[adminProductVariants] PUT error:', error);
+    console.error(
+      '[adminProductVariants] PUT error:',
+      error?.code || error?.name || 'PRODUCT_WRITE_FAILED'
+    );
+    const mappedError = mapProductWriteError(error);
+    if (mappedError) {
+      return res.status(mappedError.status).json(mappedError.body);
+    }
 
-    if (error?.name === 'ValidationError') {
-      return res.status(400).json({
+    if (error instanceof ProductInventoryPersistenceError) {
+      return res.status(error.status || 500).json({
         ok: false,
-        message: error.message,
+        message:
+          'No se actualizaron las variantes porque no fue posible confirmar el inventario. No se aplicó ningún cambio.',
+        code: error.code,
       });
     }
 
     return res.status(500).json({
       ok: false,
       message: 'No se pudieron actualizar las variantes del producto.',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
 });

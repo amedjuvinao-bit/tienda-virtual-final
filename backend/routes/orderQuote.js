@@ -45,6 +45,8 @@ router.post('/quote', async (req, res) => {
       items: quote.pricing.items.map((item) => ({
         productId: item.productId,
         variantId: item.variantId || item.variantKey || '',
+        variantLabel: item.variantLabel || '',
+        variantAttributes: item.variantAttributes || [],
         quantity: item.quantity,
         price: item.price,
         lineSubtotal: item.lineSubtotal,

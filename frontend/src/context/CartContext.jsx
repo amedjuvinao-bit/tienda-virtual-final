@@ -11,6 +11,30 @@ function readVariantId(item = {}) {
   return clean(item.variantId || item.variantKey || item.selectedVariantId || item.selectedVariantKey || '');
 }
 
+function normalizeVariantAttributes(attributes = []) {
+  const normalized = [];
+  const seen = new Set();
+
+  (Array.isArray(attributes) ? attributes : []).forEach((attribute) => {
+    const key = clean(attribute?.key || attribute?.name || attribute?.label).toLowerCase();
+    const label = clean(attribute?.label || attribute?.name || attribute?.key);
+    const value = clean(attribute?.value);
+    if (!key || !value || seen.has(key) || normalized.length >= 4) return;
+    seen.add(key);
+    normalized.push({ key, label: label || key, value });
+  });
+
+  return normalized;
+}
+
+function sameCartVariant(item, color, size, variantId = '') {
+  if (variantId) return readVariantId(item) === variantId;
+  return (
+    (item.color || '') === (color || '') &&
+    (item.size || '') === (size || '')
+  );
+}
+
 // ---------- Helpers de mapeo ----------
 /**
  * Convierte un item local (estado UI) al formato que espera el backend.
@@ -30,10 +54,20 @@ function toBackendItem(it) {
     quantity: qty,
     title: it.title || (it.product && it.product.title) || '',
     image: it.image || (it.product && it.product.image) || '',
-    color: it.color || it.colorLabel || '',
+    color: it.colorValue || it.color || '',
+    colorLabel: it.colorLabel || it.color || '',
     size: it.size || '',
     variantId,
+    variantKey: clean(it.variantKey || variantId),
+    variantLabel: clean(it.variantLabel || it.selectedVariant?.label),
+    variantAttributes: normalizeVariantAttributes(
+      it.variantAttributes || it.attributes || it.selectedVariant?.attributes
+    ),
     price,
+    productType: it.productType || it?.product?.productType || 'physical',
+    requiresShipping:
+      it.requiresShipping ?? it?.product?.requiresShipping ?? true,
+    fulfillment: it.fulfillment || it?.product?.fulfillment || null,
   };
 }
 
@@ -41,7 +75,12 @@ function toBackendItem(it) {
  * Convierte un item que viene del backend al formato local.
  */
 function fromBackendItem(it) {
-  const p = typeof it.productId === 'object' ? it.productId : null;
+  const p =
+    it?.product && typeof it.product === 'object'
+      ? it.product
+      : typeof it.productId === 'object'
+        ? it.productId
+        : null;
   const _id = p?._id || it.productId || it._id || it.id;
   const qty = Number(it.qty ?? it.quantity ?? 0) || 0;
   const price = Number(it.price ?? p?.price ?? 0) || 0;
@@ -51,15 +90,25 @@ function fromBackendItem(it) {
     _id: String(_id || ''),
     title: it.title || p?.title || '',
     image: it.image || p?.image || '',
-    color: it.color || '',
+    color: it.colorLabel || it.color || '',
+    colorValue: it.color || it.colorValue || '',
+    colorLabel: it.colorLabel || it.color || '',
     size: it.size || '',
     variantId,
-    variantKey: variantId,
+    variantKey: clean(it.variantKey || variantId),
+    variantLabel: clean(it.variantLabel),
+    variantAttributes: normalizeVariantAttributes(
+      it.variantAttributes || it.attributes
+    ),
     quantity: qty,
     price,
     slug: p?.slug,
     sku: it.variantSku || p?.sku || p?.skun || '',
     barcode: it.variantBarcode || p?.barcode || '',
+    productType: it.productType || p?.productType || 'physical',
+    requiresShipping:
+      it.requiresShipping ?? p?.requiresShipping ?? true,
+    fulfillment: it.fulfillment || p?.fulfillment || null,
   };
 }
 
@@ -96,10 +145,19 @@ function itemsShallowEqual(a, b) {
     if (
       x._id !== y._id ||
       (x.color || '') !== (y.color || '') ||
+      (x.colorValue || '') !== (y.colorValue || '') ||
+      (x.colorLabel || '') !== (y.colorLabel || '') ||
       (x.size || '') !== (y.size || '') ||
       readVariantId(x) !== readVariantId(y) ||
+      (x.variantLabel || '') !== (y.variantLabel || '') ||
+      JSON.stringify(normalizeVariantAttributes(x.variantAttributes)) !==
+        JSON.stringify(normalizeVariantAttributes(y.variantAttributes)) ||
       Number(x.quantity || 0) !== Number(y.quantity || 0) ||
-      Number(x.price || 0) !== Number(y.price || 0)
+      Number(x.price || 0) !== Number(y.price || 0) ||
+      (x.productType || 'physical') !==
+        (y.productType || 'physical') ||
+      (x.requiresShipping !== false) !==
+        (y.requiresShipping !== false)
     ) {
       return false;
     }
@@ -185,9 +243,12 @@ export function CartProvider({ children }) {
     return cart.findIndex(
       (item) =>
         item._id === product._id &&
-        (item.color || '') === (product.color || '') &&
-        (item.size || '') === (product.size || '') &&
-        readVariantId(item) === incomingVariantId
+        sameCartVariant(
+          item,
+          product.color,
+          product.size,
+          incomingVariantId
+        )
     );
   };
 
@@ -215,12 +276,21 @@ export function CartProvider({ children }) {
           image: product.image || '',
           color: product.color || product.colorLabel || '',
           colorValue: product.colorValue || '',
+          colorLabel: product.colorLabel || product.color || '',
           size: product.size || '',
           variantId,
           variantKey: product.variantKey || variantId,
           variantLabel: product.variantLabel || product.selectedVariant?.label || '',
+          variantAttributes: normalizeVariantAttributes(
+            product.variantAttributes ||
+            product.attributes ||
+            product.selectedVariant?.attributes
+          ),
           variantSku: product.variantSku || product.selectedVariant?.sku || product.sku || '',
           variantBarcode: product.variantBarcode || product.selectedVariant?.barcode || product.barcode || '',
+          productType: product.productType || 'physical',
+          requiresShipping: product.requiresShipping !== false,
+          fulfillment: product.fulfillment || null,
           quantity: Math.max(1, inc),
           price: safePrice,
         },
@@ -234,9 +304,7 @@ export function CartProvider({ children }) {
         (it) =>
           !(
             it._id === _id &&
-            (it.color || '') === (color || '') &&
-            (it.size || '') === (size || '') &&
-            (!variantId || readVariantId(it) === variantId)
+            sameCartVariant(it, color, size, variantId)
           )
       )
     );
@@ -247,9 +315,7 @@ export function CartProvider({ children }) {
       cart.map((it) => {
         if (
           it._id === _id &&
-          (it.color || '') === (color || '') &&
-          (it.size || '') === (size || '') &&
-          (!variantId || readVariantId(it) === variantId)
+          sameCartVariant(it, color, size, variantId)
         ) {
           return { ...it, quantity: Math.max(1, Number(it.quantity || 0) + 1) };
         }
@@ -263,9 +329,7 @@ export function CartProvider({ children }) {
       cart.map((it) => {
         if (
           it._id === _id &&
-          (it.color || '') === (color || '') &&
-          (it.size || '') === (size || '') &&
-          (!variantId || readVariantId(it) === variantId)
+          sameCartVariant(it, color, size, variantId)
         ) {
           const next = Math.max(1, Number(it.quantity || 0) - 1);
           return { ...it, quantity: next };

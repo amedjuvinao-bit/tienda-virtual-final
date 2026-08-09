@@ -49,7 +49,7 @@ const VARIANT_PRESETS = Object.freeze({
   },
   tech: {
     label: 'Tecnología',
-    axes: ['Capacidad', 'Color'],
+    axes: ['Capacidad', 'RAM', 'Color', 'Conectividad'],
   },
   home: {
     label: 'Hogar',
@@ -72,6 +72,16 @@ function cleanText(value, fallback = '') {
 
 function cleanLower(value, fallback = '') {
   return cleanText(value, fallback).toLowerCase();
+}
+
+function normalizeAxisKey(value) {
+  return cleanText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 function normalizeProductType(value) {
@@ -100,11 +110,17 @@ function normalizeVariantAxes(input, fallbackPreset = 'none') {
   const seen = new Set();
 
   for (const item of source) {
-    const label = typeof item === 'string' ? item : item?.label || item?.name || '';
+    const label =
+      typeof item === 'string'
+        ? item
+        : item?.label || item?.name || item?.key || '';
     const cleanLabel = cleanText(label).slice(0, 40);
     if (!cleanLabel) continue;
 
-    const key = cleanLabel.toLowerCase();
+    const key = normalizeAxisKey(
+      typeof item === 'string' ? cleanLabel : item?.key || cleanLabel
+    );
+    if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -126,10 +142,21 @@ function normalizeVariantAxes(input, fallbackPreset = 'none') {
 }
 
 function shouldTrackInventory(productType, explicitValue) {
+  const type = normalizeProductType(productType);
+
+  // Digitales, servicios y combos compuestos no manejan una existencia
+  // propia. En los combos se reservan sus componentes físicos.
+  if (
+    type === PRODUCT_TYPES.DIGITAL ||
+    type === PRODUCT_TYPES.SERVICE ||
+    type === PRODUCT_TYPES.BUNDLE
+  ) {
+    return false;
+  }
+
   if (typeof explicitValue === 'boolean') return explicitValue;
 
-  const type = normalizeProductType(productType);
-  return type === PRODUCT_TYPES.PHYSICAL || type === PRODUCT_TYPES.BUNDLE;
+  return type === PRODUCT_TYPES.PHYSICAL || type === PRODUCT_TYPES.CUSTOM;
 }
 
 function buildSkuPrefix(value) {

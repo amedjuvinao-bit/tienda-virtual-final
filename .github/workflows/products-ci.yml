@@ -1,0 +1,256 @@
+name: Productos CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/productos-comercial-avanzado
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: productos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-security:
+    name: Seguridad de dependencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Auditar backend
+        run: node .github/scripts/audit-production-dependencies.cjs backend
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Auditar frontend
+        run: node .github/scripts/audit-production-dependencies.cjs frontend
+
+  products-integrity:
+    name: Integridad de productos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar integridad comercial
+        run: npm --prefix backend run test:products-integrity
+
+      - name: Validar privacidad pública
+        run: npm --prefix backend run test:products-public-security
+
+      - name: Validar paginación y operaciones masivas
+        run: npm --prefix backend run test:products-catalog-operations
+
+      - name: Validar clasificación, SEO y campos comerciales
+        run: npm --prefix backend run test:products-commercial-catalog
+
+      - name: Validar digitales, servicios y combos
+        run: npm --prefix backend run test:products-fulfillment
+
+      - name: Validar contrato de reembolsos
+        run: npm --prefix backend run test:order-refund-contract
+
+      - name: Validar contrato de estados masivos
+        run: npm --prefix backend run test:order-bulk-status-contract
+
+      - name: Validar contrato multisede
+        run: npm --prefix backend run test:order-multi-branch-contract
+
+      - name: Validar contrato de venta integral
+        run: npm --prefix backend run test:complete-sale-contract
+
+      - name: Validar plan demostrativo permanente
+        run: npm --prefix backend run test:demo-sales-plan
+
+      - name: Validar pendiente Factus en habilitación
+        run: npm --prefix backend run test:factus-pending-cleanup
+
+      - name: Validar contrato Producto-Inventario
+        run: npm --prefix backend run test:product-inventory-transaction-contract
+
+      - name: Validar contrato de cierre
+        run: npm --prefix backend run test:products-final-closure
+
+  products-mongodb:
+    name: Productos e inventario
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Marcador del contrato histórico; las pruebas ejecutables usan bases aisladas abajo.
+    # PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci?replicaSet=rs0
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Iniciar MongoDB transaccional
+        run: |
+          docker run --detach \
+            --name productos-mongodb \
+            --publish 27017:27017 \
+            mongo:7 \
+            --replSet rs0 \
+            --bind_ip_all
+
+          for attempt in {1..30}; do
+            if docker exec productos-mongodb mongosh --quiet --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs productos-mongodb
+          exit 1
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Habilitar transacciones MongoDB
+        run: node backend/scripts/initMongoReplicaSet.js
+
+      - name: Ejecutar cierre histórico de Productos
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_module_closure
+        run: npm --prefix backend run test:products-module
+
+      - name: Validar sincronización de inventario
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_inventory_sync
+        run: npm --prefix backend run test:product-inventory-sync
+
+      - name: Validar variantes avanzadas
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_advanced_variants
+        run: npm --prefix backend run test:product-advanced-variants
+
+      - name: Validar reembolsos y devoluciones
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_refund_inventory?replicaSet=rs0
+        run: npm --prefix backend run test:order-refund-inventory
+
+      - name: Validar estados masivos de órdenes
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_bulk_status?replicaSet=rs0
+          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:order-bulk-status-inventory
+
+      - name: Validar órdenes multisede
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_multi_branch?replicaSet=rs0
+        run: npm --prefix backend run test:order-multi-branch-inventory
+
+      - name: Validar venta integral completa
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_complete_sale?replicaSet=rs0
+          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:complete-sale-integration
+
+      - name: Validar transacción Producto-Inventario
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_inventory_transaction?replicaSet=rs0
+        run: npm --prefix backend run test:product-inventory-transaction
+
+      - name: Validar archivo lógico
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_archive
+        run: npm --prefix backend run test:product-archive
+
+      - name: Validar catálogo con volumen
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_catalog_scale
+        run: npm --prefix backend run test:products-catalog-scale
+
+      - name: Validar taxonomía y colecciones
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_taxonomy
+        run: npm --prefix backend run test:product-taxonomy
+
+      - name: Validar cumplimiento por tipo de producto
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_fulfillment
+          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:product-fulfillment-integration
+
+      - name: Validar catálogo demostrativo permanente
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/productos_ci_demo_catalog
+        run: npm --prefix backend run test:products-demo-catalog
+
+      - name: Detener MongoDB
+        if: always()
+        run: docker rm --force productos-mongodb
+
+  products-ui:
+    name: Interfaz de productos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Validar SEO de la ficha pública
+        run: npm --prefix frontend run test:product-seo
+
+      - name: Validar cambio de foto por variante
+        run: npm --prefix frontend run test:product-variant-images
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build

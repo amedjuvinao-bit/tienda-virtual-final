@@ -1,5 +1,14 @@
 // backend/lib/products/productVariantConfig.js
 
+const {
+  assertVariantIdentity,
+  buildVariantKey,
+  canonicalizeVariantKey,
+  normalizeVariantKey,
+  parseVariantKey,
+  resolveVariantIdentity,
+} = require('../../../shared/variantKeyAuthority.cjs');
+
 function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
@@ -10,6 +19,16 @@ function cleanLower(value, max = 300) {
 
 function cleanUpper(value, max = 300) {
   return cleanText(value, max).toUpperCase();
+}
+
+function normalizeAttributeKey(value) {
+  return cleanText(value, 80)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 function cleanMoney(value, fallback = 0) {
@@ -187,13 +206,6 @@ function getColorDisplayName(value) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-function buildVariantKey(size = '', color = '') {
-  const cleanSize = cleanLower(size, 80);
-  const cleanColor = cleanLower(color, 120);
-  const key = `${cleanSize}__${cleanColor}`;
-  return !key || key === '__' ? 'default__default' : key;
-}
-
 function normalizeStringArray(items, max = Infinity) {
   const list = toPlainArray(items);
   if (!list.length) return [];
@@ -220,48 +232,109 @@ function normalizeStringArray(items, max = Infinity) {
 }
 
 function normalizeAttributes(attributes = []) {
-  return toPlainArray(attributes)
-    .map((attribute) => {
-      const attr = toPlainObject(attribute) || {};
-      const key = cleanLower(attr?.key || attr?.name || '', 80);
-      const label = cleanText(attr?.label || attr?.name || attr?.key || '', 120);
-      const value = cleanText(attr?.value || '', 160);
+  const out = [];
+  const seen = new Set();
 
-      if (!key && !label && !value) return null;
+  for (const attribute of toPlainArray(attributes)) {
+    const attr = toPlainObject(attribute) || {};
+    const label = cleanText(
+      attr?.label || attr?.name || attr?.key || '',
+      120
+    );
+    const key = normalizeAttributeKey(
+      attr?.key || attr?.name || label
+    );
+    const value = cleanText(attr?.value || '', 160);
 
-      return {
-        key: key || cleanLower(label, 80),
-        label: label || key,
-        value,
-      };
-    })
-    .filter(Boolean);
+    if (!key || !value || seen.has(key)) continue;
+
+    seen.add(key);
+    out.push({
+      key,
+      label: label || key,
+      value,
+    });
+
+    if (out.length >= 4) break;
+  }
+
+  return out;
+}
+
+function findAttributeValue(attributes = [], aliases = []) {
+  const aliasSet = new Set(aliases.map(normalizeAttributeKey));
+  const match = normalizeAttributes(attributes).find((attribute) =>
+    aliasSet.has(attribute.key)
+  );
+  return cleanText(match?.value || '', 160);
 }
 
 function buildVariantLabel(variant = {}) {
   const plainVariant = toPlainObject(variant) || {};
+  const attributes = normalizeAttributes(plainVariant.attributes);
   const size = cleanText(plainVariant.size, 80);
   const colorLabel = getColorDisplayName(plainVariant.color);
 
-  const label = cleanText(plainVariant.label, 160);
-  if (label && !label.includes('#')) return label;
+  const label = cleanText(plainVariant.label, 160).replace(
+    /#(?:[0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])/gi,
+    (value) => getColorDisplayName(value)
+  );
+  if (label && label !== 'Variante general') return label;
+
+  if (attributes.length) {
+    return (
+      attributes
+        .map((attribute) =>
+          attribute.key === 'color'
+            ? getColorDisplayName(attribute.value)
+            : attribute.value
+        )
+        .filter(Boolean)
+        .join(' / ') || 'Variante general'
+    );
+  }
 
   const parts = [size, colorLabel].filter(Boolean);
   if (parts.length) return parts.join(' / ');
 
-  const attrParts = normalizeAttributes(plainVariant.attributes)
-    .map((attribute) => attribute.value || attribute.label)
-    .filter(Boolean);
-
-  return attrParts.join(' / ') || 'Variante general';
+  return 'Variante general';
 }
 
 function normalizeVariantInput(variant = {}, product = {}) {
   const plainVariant = toPlainObject(variant) || {};
   const plainProduct = toPlainObject(product) || {};
-  const size = cleanText(plainVariant.size || plainVariant.talla || plainVariant.attribute || '', 80);
-  const color = cleanText(plainVariant.color || plainVariant.colour || plainVariant.visualAttribute || '', 120);
-  const variantKey = cleanLower(plainVariant.variantKey || buildVariantKey(size, color), 180);
+  const attributes = normalizeAttributes(plainVariant.attributes);
+  const colorFromAttributes = findAttributeValue(attributes, [
+    'color',
+    'colour',
+    'tono',
+  ]);
+  const firstNonColorAttribute = attributes.find(
+    (attribute) => !['color', 'colour', 'tono'].includes(attribute.key)
+  );
+  const size = cleanText(
+    plainVariant.size ||
+      plainVariant.talla ||
+      plainVariant.attribute ||
+      firstNonColorAttribute?.value ||
+      '',
+    80
+  );
+  const color = cleanText(
+    plainVariant.color ||
+      plainVariant.colour ||
+      plainVariant.visualAttribute ||
+      colorFromAttributes ||
+      '',
+    120
+  );
+  const identity = resolveVariantIdentity({
+    variantKey: plainVariant.variantKey,
+    size,
+    color,
+    attributes,
+  });
+  const variantKey = identity.variantKey;
   const images = normalizeStringArray(plainVariant.images || plainVariant.gallery || [], 8);
   const image = cleanText(plainVariant.image || images[0] || '', 1000);
   const price = plainVariant.price === '' || plainVariant.price === null || plainVariant.price === undefined
@@ -277,10 +350,15 @@ function normalizeVariantInput(variant = {}, product = {}) {
 
   return {
     variantKey,
-    label: buildVariantLabel({ ...plainVariant, size, color }),
-    size,
-    color,
-    attributes: normalizeAttributes(plainVariant.attributes),
+    label: buildVariantLabel({
+      ...plainVariant,
+      size: identity.size,
+      color: identity.color,
+      attributes: identity.attributes,
+    }),
+    size: identity.size,
+    color: identity.color,
+    attributes: identity.attributes,
     sku: cleanUpper(plainVariant.sku || plainVariant.variantSku || '', 100),
     barcode: cleanText(plainVariant.barcode || plainVariant.variantBarcode || '', 120),
     price,
@@ -342,7 +420,7 @@ function normalizeProductVariants(variants = [], product = {}) {
   source.forEach((variant, index) => {
     const plainVariant = toPlainObject(variant) || {};
     const normalized = normalizeVariantInput({ ...plainVariant, sortOrder: plainVariant?.sortOrder ?? index }, product);
-    const key = normalized.variantKey || buildVariantKey(normalized.size, normalized.color);
+    const key = normalized.variantKey;
     if (seen.has(key)) return;
 
     seen.add(key);
@@ -358,16 +436,36 @@ function normalizeProductVariants(variants = [], product = {}) {
 
 function findProductVariant(product = {}, selector = {}) {
   const plainProduct = toPlainObject(product) || {};
-  const variants = normalizeProductVariants(plainProduct.variants || [], plainProduct);
+  const variants = normalizeProductVariants(
+    plainProduct.variants || [],
+    plainProduct
+  ).filter((variant) => variant.active !== false);
   if (!variants.length) return null;
 
-  const desiredKey = cleanLower(selector.variantKey || '', 180);
+  const selectorIdentity = resolveVariantIdentity({
+    variantKey: selector.variantKey,
+    size: selector.size,
+    color: selector.color,
+    attributes: selector.attributes || selector.variantAttributes || [],
+  });
+  const desiredKey = selector.variantKey
+    ? selectorIdentity.variantKey
+    : '';
   if (desiredKey) {
     const byKey = variants.find((variant) => cleanLower(variant.variantKey, 180) === desiredKey);
     if (byKey) return byKey;
   }
 
-  const selectorKey = buildVariantKey(selector.size || '', selector.color || '');
+  const selectorKey = buildVariantKey(
+    selectorIdentity.size,
+    selectorIdentity.color
+  );
+  const dynamicSelectorKey = selectorIdentity.variantKey;
+  const byAttributes = variants.find(
+    (variant) => variant.variantKey === dynamicSelectorKey
+  );
+  if (byAttributes) return byAttributes;
+
   return variants.find((variant) => variant.variantKey === selectorKey) || null;
 }
 
@@ -378,9 +476,20 @@ function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
   const baseCost = cleanMoney(plainProduct.averageCost || plainProduct.cost || 0, 0);
 
   if (!variant) {
+    const selectorIdentity = resolveVariantIdentity({
+      variantKey: selector.variantKey,
+      size: selector.size,
+      color: selector.color,
+      attributes: selector.attributes || selector.variantAttributes || [],
+    });
+
     return {
       variant: null,
-      variantKey: buildVariantKey(selector.size || '', selector.color || ''),
+      variantKey: selectorIdentity.variantKey,
+      variantLabel: '',
+      variantAttributes: normalizeAttributes(
+        selector.attributes || selector.variantAttributes || []
+      ),
       price: basePrice,
       cost: baseCost,
       sku: cleanUpper(plainProduct.sku || '', 100),
@@ -393,6 +502,8 @@ function resolveVariantCommercialSnapshot(product = {}, selector = {}) {
   return {
     variant,
     variantKey: variant.variantKey,
+    variantLabel: variant.label,
+    variantAttributes: normalizeAttributes(variant.attributes),
     price: variant.price != null ? cleanMoney(variant.price, basePrice) : basePrice,
     cost: variant.cost != null ? cleanMoney(variant.cost, baseCost) : baseCost,
     sku: cleanUpper(variant.sku || plainProduct.sku || '', 100),
@@ -410,10 +521,17 @@ module.exports = {
   cleanLower,
   cleanUpper,
   cleanMoney,
+  normalizeAttributeKey,
   buildVariantKey,
+  canonicalizeVariantKey,
+  normalizeVariantKey,
+  parseVariantKey,
+  resolveVariantIdentity,
+  assertVariantIdentity,
   getColorDisplayName,
   normalizeStringArray,
   normalizeAttributes,
+  buildVariantLabel,
   normalizeProductVariants,
   findProductVariant,
   resolveVariantCommercialSnapshot,

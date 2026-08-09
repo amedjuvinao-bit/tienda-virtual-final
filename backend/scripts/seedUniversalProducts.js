@@ -495,7 +495,7 @@ async function validateAdminEndpoint() {
 
   let response;
   try {
-    response = await fetch(`${BASE_URL}/api/products/admin/list?all=1&q=UNI-`, {
+    response = await fetch(`${BASE_URL}/api/products/admin/list?page=1&limit=100&q=UNI-`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -519,7 +519,7 @@ async function validateAdminEndpoint() {
     throw error;
   }
 
-  const list = Array.isArray(data?.data) ? data.data : [];
+  const list = Array.isArray(data?.products) ? data.products : [];
   assert(list.length >= DEMO_PRODUCTS.length, `Endpoint admin devolvio ${list.length} productos seed`);
 
   const firstPhysical = list.find((item) => item.trackInventory === true);

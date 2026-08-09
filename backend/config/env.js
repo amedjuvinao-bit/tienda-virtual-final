@@ -72,6 +72,10 @@ const env = {
   mongoUriSource: mongo.name,
   frontendUrl: clean(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.VITE_FRONTEND_URL),
   backendUrl: clean(process.env.BACKEND_URL || process.env.API_URL || process.env.VITE_BACKEND_URL),
+  globalRateLimit: {
+    windowMs: toNumber(process.env.GLOBAL_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000, { min: 1_000 }),
+    max: toNumber(process.env.GLOBAL_RATE_LIMIT_MAX, 300, { min: 10, max: 100_000 }),
+  },
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
   cloudinary: {
@@ -135,6 +139,7 @@ function getSafeEnvSummary() {
     },
     frontendUrlConfigured: Boolean(env.frontendUrl),
     backendUrlConfigured: Boolean(env.backendUrl),
+    globalRateLimit: env.globalRateLimit,
     jwtConfigured: Boolean(env.jwtSecret),
     billingEncryptionConfigured: Boolean(
       env.billingEncryptionKey && env.billingEncryptionKey.length >= 32

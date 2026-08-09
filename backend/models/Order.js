@@ -1,5 +1,9 @@
 // backend/models/Order.js
 const mongoose = require('mongoose');
+const {
+  normalizeCanonicalAttributes: normalizeAttributes,
+  resolveVariantIdentity,
+} = require('../../shared/variantKeyAuthority.cjs');
 
 /* ========= Helpers de normalización y validación de tags ========= */
 const MAX_TAGS = 8;
@@ -68,6 +72,24 @@ function cleanQty(value) {
   return Math.max(1, Math.floor(Number(value || 0)));
 }
 
+function applyCanonicalVariantIdentity(item) {
+  if (!item || typeof item !== 'object') return item;
+  const visibleColor = cleanText(item.colorLabel || item.color);
+  const identity = resolveVariantIdentity({
+    variantKey: item.variantKey || item.variantId,
+    size: item.size,
+    color: item.color,
+    attributes: item.variantAttributes || [],
+  });
+  item.variantKey = identity.variantKey;
+  item.variantId = item.variantId || identity.variantKey;
+  item.size = identity.size;
+  item.color = identity.color;
+  item.colorLabel = visibleColor;
+  item.variantAttributes = identity.attributes;
+  return item;
+}
+
 /* ========= Subesquemas ========= */
 const TimelineEntrySchema = new mongoose.Schema(
   {
@@ -113,6 +135,194 @@ const AdminSnapshotSchema = new mongoose.Schema(
 );
 
 /* ========= Ítems (snapshot de producto) ========= */
+const OrderVariantAttributeSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, lowercase: true, default: '' },
+    label: { type: String, trim: true, default: '' },
+    value: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const OrderInventoryAllocationSchema = new mongoose.Schema(
+  {
+    reservation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InventoryReservation',
+      default: null,
+      index: true,
+    },
+    reservationItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+      index: true,
+    },
+    orderItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+      index: true,
+    },
+    inventoryStock: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InventoryStock',
+      required: true,
+      index: true,
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: true,
+      index: true,
+    },
+    branchSnapshot: {
+      type: BranchSnapshotSchema,
+      default: () => ({
+        name: '',
+        code: '',
+        type: '',
+      }),
+    },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+      index: true,
+    },
+    productSnapshot: {
+      title: { type: String, trim: true, default: '' },
+      sku: { type: String, trim: true, default: '' },
+      image: { type: String, trim: true, default: '' },
+      category: { type: String, trim: true, default: '' },
+    },
+    bundleParentProduct: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+    },
+    bundleParentTitle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    size: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    color: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    colorLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    variantKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'default__default',
+    },
+    variantLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    variantAttributes: {
+      type: [OrderVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
+    quantity: {
+      type: Number,
+      min: 1,
+      required: true,
+    },
+    reservedQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    soldQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    shippedQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    deliveredQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    returnedQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    releasedQuantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    status: {
+      type: String,
+      enum: [
+        'reserved',
+        'sold',
+        'partially_shipped',
+        'shipped',
+        'partially_delivered',
+        'delivered',
+        'partially_returned',
+        'returned',
+        'released',
+      ],
+      default: 'reserved',
+      index: true,
+    },
+    reservedAt: { type: Date, default: null },
+    soldAt: { type: Date, default: null },
+    shippedAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    releasedAt: { type: Date, default: null },
+    lastReturnedAt: { type: Date, default: null },
+  },
+  { _id: true }
+);
+
+const OrderInventoryAllocationSummarySchema = new mongoose.Schema(
+  {
+    allocationCount: { type: Number, min: 0, default: 0 },
+    branchCount: { type: Number, min: 0, default: 0 },
+    splitAcrossBranches: { type: Boolean, default: false },
+    branchIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Branch',
+        },
+      ],
+      default: [],
+    },
+    totalQuantity: { type: Number, min: 0, default: 0 },
+    reservedQuantity: { type: Number, min: 0, default: 0 },
+    activeReservedQuantity: { type: Number, min: 0, default: 0 },
+    soldQuantity: { type: Number, min: 0, default: 0 },
+    shippedQuantity: { type: Number, min: 0, default: 0 },
+    deliveredQuantity: { type: Number, min: 0, default: 0 },
+    returnedQuantity: { type: Number, min: 0, default: 0 },
+    releasedQuantity: { type: Number, min: 0, default: 0 },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const OrderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -121,6 +331,7 @@ const OrderItemSchema = new mongoose.Schema(
     title: { type: String, required: true },
     image: String,
     color: String,
+    colorLabel: { type: String, trim: true, default: '' },
     size: String,
 
     qty: {
@@ -151,10 +362,33 @@ const OrderItemSchema = new mongoose.Schema(
     },
     variantId: { type: String, trim: true, default: '' },
     variantKey: { type: String, trim: true, default: '' },
+    variantLabel: { type: String, trim: true, default: '' },
+    variantAttributes: {
+      type: [OrderVariantAttributeSchema],
+      default: [],
+      set: normalizeAttributes,
+    },
     variantSku: { type: String, trim: true, default: '' },
     variantBarcode: { type: String, trim: true, default: '' },
     category: { type: String, trim: true, default: '' },
     categories: { type: [String], default: [] },
+    productType: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'physical',
+    },
+    requiresShipping: { type: Boolean, default: true },
+    fulfillmentKind: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: 'shipment',
+    },
+    fulfillmentSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
     lineSubtotal: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountRate: { type: Number, min: 0, max: 100, default: 0 },
@@ -316,6 +550,156 @@ const PosMetadataSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const DigitalDeliveryItemSchema = new mongoose.Schema(
+  {
+    orderItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    sourceKey: { type: String, trim: true, required: true },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    title: { type: String, trim: true, default: '' },
+    fileName: { type: String, trim: true, default: '' },
+    deliveryMode: {
+      type: String,
+      enum: ['automatic', 'manual'],
+      default: 'manual',
+    },
+    assetUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    accessTokenHash: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    accessUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'ready', 'manual', 'expired', 'blocked'],
+      default: 'pending',
+    },
+    downloadLimit: { type: Number, min: 1, default: 3 },
+    downloadCount: { type: Number, min: 0, default: 0 },
+    expiresAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    lastDownloadedAt: { type: Date, default: null },
+    customerMessage: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
+const ServiceFulfillmentItemSchema = new mongoose.Schema(
+  {
+    orderItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    sourceKey: { type: String, trim: true, required: true },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    title: { type: String, trim: true, default: '' },
+    quantity: { type: Number, min: 1, default: 1 },
+    fulfillmentMode: {
+      type: String,
+      enum: ['scheduled', 'manual'],
+      default: 'manual',
+    },
+    locationType: {
+      type: String,
+      enum: ['online', 'store', 'customer'],
+      default: 'online',
+    },
+    durationMinutes: { type: Number, min: 5, default: 60 },
+    leadTimeHours: { type: Number, min: 0, default: 0 },
+    bookingUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    customerInstructions: { type: String, trim: true, default: '' },
+    internalInstructions: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    status: {
+      type: String,
+      enum: [
+        'awaiting_scheduling',
+        'scheduled',
+        'in_progress',
+        'completed',
+        'cancelled',
+      ],
+      default: 'awaiting_scheduling',
+    },
+    scheduledAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    notes: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
+const OrderFulfillmentSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: [
+        'pending',
+        'processing',
+        'partially_delivered',
+        'delivered',
+        'action_required',
+        'failed',
+      ],
+      default: 'pending',
+    },
+    digitalDeliveries: {
+      type: [DigitalDeliveryItemSchema],
+      default: [],
+    },
+    services: {
+      type: [ServiceFulfillmentItemSchema],
+      default: [],
+    },
+    processedAt: { type: Date, default: null },
+    notifiedAt: { type: Date, default: null },
+    notificationStatus: {
+      type: String,
+      enum: [
+        'pending',
+        'sending',
+        'sent',
+        'failed',
+        'not_required',
+      ],
+      default: 'pending',
+    },
+    notificationClaimedAt: { type: Date, default: null },
+    notificationError: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 /* ========= Esquema principal ========= */
 const OrderSchema = new mongoose.Schema(
   {
@@ -330,6 +714,7 @@ const OrderSchema = new mongoose.Schema(
         'processing',
         'paid',
         'shipped',
+        'delivered',
         'cancelled',
         'canceled',
         'refunded',
@@ -344,6 +729,11 @@ const OrderSchema = new mongoose.Schema(
       enum: ORDER_FULFILLMENT_STATUSES,
       default: 'pending',
       index: true,
+    },
+
+    fulfillment: {
+      type: OrderFulfillmentSchema,
+      default: () => ({}),
     },
 
     /* ========= Sede operativa ========= */
@@ -361,6 +751,16 @@ const OrderSchema = new mongoose.Schema(
         code: '',
         type: '',
       }),
+    },
+
+    inventoryAllocations: {
+      type: [OrderInventoryAllocationSchema],
+      default: [],
+    },
+
+    inventoryAllocationSummary: {
+      type: OrderInventoryAllocationSummarySchema,
+      default: () => ({}),
     },
 
     /* ========= Usuario administrativo que originó o gestionó la orden ========= */
@@ -512,7 +912,16 @@ const OrderSchema = new mongoose.Schema(
           title: String,
           image: String,
           color: String,
+          colorLabel: { type: String, trim: true, default: '' },
           size: String,
+          variantId: { type: String, trim: true, default: '' },
+          variantKey: { type: String, trim: true, default: '' },
+          variantLabel: { type: String, trim: true, default: '' },
+          variantAttributes: {
+            type: [OrderVariantAttributeSchema],
+            default: [],
+            set: normalizeAttributes,
+          },
           quantity: {
             type: Number,
             default: 0,
@@ -635,9 +1044,48 @@ const OrderSchema = new mongoose.Schema(
     },
 
     inventoryControl: {
+      reservationRequired: { type: Boolean, default: true },
+      reservationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InventoryReservation',
+        default: null,
+      },
       discountedAtCheckout: { type: Boolean, default: true },
       restockedOnFailure: { type: Boolean, default: false },
       restockedAt: { type: Date, default: null },
+    },
+
+    refundControl: {
+      totalAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+        set: cleanMoney,
+      },
+      transactionCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      returnedUnits: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      restockedUnits: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastRefundAt: {
+        type: Date,
+        default: null,
+      },
+      lastRefund: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'OrderRefund',
+        default: null,
+      },
     },
   },
   { timestamps: true }
@@ -658,6 +1106,11 @@ OrderSchema.index({ 'payment.method': 1, createdAt: -1 });
 OrderSchema.index({ 'payment.transactionId': 1 }, { sparse: true });
 OrderSchema.index({ 'payment.reference': 1 }, { sparse: true });
 OrderSchema.index({ branch: 1, createdAt: -1 });
+OrderSchema.index({ 'inventoryAllocations.branch': 1, createdAt: -1 });
+OrderSchema.index({
+  'inventoryAllocationSummary.splitAcrossBranches': 1,
+  createdAt: -1,
+});
 OrderSchema.index({ source: 1, createdAt: -1 });
 OrderSchema.index({ channel: 1, createdAt: -1 });
 OrderSchema.index({ saleType: 1, createdAt: -1 });
@@ -762,7 +1215,14 @@ OrderSchema.pre('validate', function (next) {
             title: String(it.title),
             image: it?.image,
             color: it?.color,
+            colorLabel: it?.colorLabel || it?.color || '',
             size: it?.size,
+            variantId: it?.variantId || it?.variantKey || '',
+            variantKey: it?.variantKey || it?.variantId || '',
+            variantLabel: it?.variantLabel || '',
+            variantAttributes: normalizeAttributes(
+              it?.variantAttributes || []
+            ),
             quantity: qty,
             qty,
             price,
@@ -771,6 +1231,12 @@ OrderSchema.pre('validate', function (next) {
           };
         })
         .filter(Boolean);
+    }
+
+    this.cart.forEach(applyCanonicalVariantIdentity);
+    this.items.forEach(applyCanonicalVariantIdentity);
+    if (Array.isArray(this.inventoryAllocations)) {
+      this.inventoryAllocations.forEach(applyCanonicalVariantIdentity);
     }
 
     if (!Array.isArray(this.items) || this.items.length === 0) {

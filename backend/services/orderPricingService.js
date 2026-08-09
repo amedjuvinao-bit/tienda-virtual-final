@@ -7,8 +7,15 @@ const SiteSettings = require('../models/SiteSettings');
 const couponService = require('./couponService');
 const {
   buildVariantKey,
+  normalizeAttributes,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
+const {
+  getPublicFulfillmentView,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  assertBundlePurchasable,
+} = require('./productBundleService');
 
 const MONEY_FACTOR = 100;
 
@@ -55,12 +62,22 @@ function readQuantity(item = {}) {
 }
 
 function readVariantKey(item = {}) {
+  const variantAttributes = normalizeAttributes(
+    item.variantAttributes ||
+      item.attributes ||
+      item.selectedAttributes ||
+      []
+  );
   return clean(
     item.variantId ||
       item.variantKey ||
       item.selectedVariantId ||
       item.selectedVariantKey ||
-      buildVariantKey(item.size || '', item.color || ''),
+      buildVariantKey(
+        item.size || '',
+        item.color || '',
+        variantAttributes
+      ),
     180
   );
 }
@@ -92,13 +109,17 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
   }
 
   let query = ProductModel.find({ _id: { $in: productIds } })
-    .select('title price image images sku barcode category categories variants visible active');
+    .select(
+      'title price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+    );
 
   if (session && typeof query.session === 'function') query = query.session(session);
   const products = await query.lean();
   const productMap = new Map(products.map((product) => [String(product._id), product]));
 
-  return sourceItems.map((item) => {
+  const resolvedItems = [];
+
+  for (const item of sourceItems) {
     const productId = readProductId(item);
     const product = productMap.get(productId);
 
@@ -122,10 +143,17 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
     }
 
     const variantKey = readVariantKey(item);
+    const requestedVariantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.selectedAttributes ||
+        []
+    );
     const commercial = resolveVariantCommercialSnapshot(product, {
       variantKey,
       size: item.size || '',
-      color: item.color || '',
+      color: item.colorValue || item.color || '',
+      variantAttributes: requestedVariantAttributes,
     });
     const unitPrice = money(commercial?.price ?? product.price, 0);
 
@@ -142,27 +170,49 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       product.category,
       ...(Array.isArray(product.categories) ? product.categories : []),
     ]);
+    let bundleComponents = [];
 
-    return {
+    if (product.productType === 'bundle') {
+      bundleComponents = await assertBundlePurchasable(product, {
+        session,
+        ProductModel,
+      });
+      product.bundleComponents = bundleComponents;
+    }
+
+    const fulfillment = getPublicFulfillmentView(product);
+
+    resolvedItems.push({
       product: product._id,
       productId,
       title: clean(product.title || item.title, 160),
       image: clean(commercial?.image || item.image || product.image, 1000),
-      color: clean(item.color, 80),
+      color: clean(item.colorValue || item.color, 80),
+      colorLabel: clean(item.colorLabel || item.color, 80),
       size: clean(item.size, 80),
       variantId: commercial?.variantKey || variantKey,
       variantKey: commercial?.variantKey || variantKey,
+      variantLabel:
+        clean(commercial?.variantLabel || item.variantLabel, 180),
+      variantAttributes:
+        commercial?.variantAttributes || requestedVariantAttributes,
       variantSku: clean(commercial?.sku || product.sku, 120),
       variantBarcode: clean(commercial?.barcode || product.barcode, 120),
       category: categories[0] || '',
       categories,
+      productType: fulfillment.productType,
+      requiresShipping: fulfillment.requiresShipping,
+      fulfillmentKind: fulfillment.kind,
+      fulfillmentSnapshot: fulfillment,
       quantity,
       qty: quantity,
       price: unitPrice,
       unitPrice,
       priceNumber: unitPrice,
-    };
-  });
+    });
+  }
+
+  return resolvedItems;
 }
 
 function normalizeTaxConfig(raw = {}) {
@@ -180,7 +230,16 @@ function normalizeTaxConfig(raw = {}) {
   };
 }
 
-function resolveShippingAmount({ settings = {}, customer = {}, subtotal = 0 } = {}) {
+function resolveShippingAmount({
+  settings = {},
+  customer = {},
+  subtotal = 0,
+  items = [],
+} = {}) {
+  const requiresShipping = (Array.isArray(items) ? items : [])
+    .some((item) => item?.requiresShipping !== false);
+  if (!requiresShipping) return 0;
+
   const deliveryType = clean(customer.deliveryType || 'envio', 30).toLowerCase();
   if (deliveryType === 'retiro') return 0;
 
@@ -373,7 +432,12 @@ async function buildOrderQuote(input = {}, options = {}) {
     items.reduce((sum, item) => sum + item.quantity * item.price, 0)
   );
   const customer = input.customer || {};
-  const originalShipping = resolveShippingAmount({ settings, customer, subtotal });
+  const originalShipping = resolveShippingAmount({
+    settings,
+    customer,
+    subtotal,
+    items,
+  });
   const couponCode = couponService.normalizeCode(
     input.couponCode || input?.coupon?.code || input.discountCode || ''
   );

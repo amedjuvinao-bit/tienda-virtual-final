@@ -40,9 +40,64 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
    * ======================================================= */
   {
     method: 'GET',
+    path: '/api/products/admin/list',
+    permission: 'products:view',
+    description: 'Listar productos con paginación administrativa.',
+  },
+  {
+    method: 'POST',
+    path: '/api/products/admin/bulk/update',
+    permission: 'products:update',
+    description: 'Actualizar productos seleccionados en bloque.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/products/admin/bulk/archive',
+    permission: 'products:delete',
+    description: 'Retirar productos seleccionados en bloque.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/products/admin/reviews',
     permission: 'products:reviews',
     description: 'Ver reseñas administrativas de productos.',
+  },
+  {
+    method: 'GET',
+    path: '/api/products/admin/taxonomy',
+    permission: 'products:view',
+    description: 'Ver categorías y colecciones de productos.',
+  },
+  {
+    method: 'POST',
+    path: '/api/products/admin/taxonomy',
+    permission: 'products:update',
+    description: 'Crear categorías o colecciones de productos.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/products/admin/taxonomy/:taxonomyId',
+    permission: 'products:update',
+    description: 'Editar categorías o colecciones de productos.',
+    audit: true,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/products/admin/taxonomy/:taxonomyId',
+    permission: 'products:update',
+    description: 'Retirar categorías o colecciones de productos.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/products/admin/:id',
+    permission: 'products:view',
+    description: 'Ver detalle administrativo de un producto.',
   },
   {
     method: 'PATCH',
@@ -164,6 +219,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/orders/:id/status',
     permission: 'orders:status',
     description: 'Cambiar estado de orden.',
+    audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/orders/:id/fulfillment/services/:serviceId',
+    permission: 'orders:update',
+    description: 'Actualizar la programación y estado de una prestación.',
     audit: true,
   },
   {

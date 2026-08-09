@@ -9,6 +9,7 @@ const { env, assertEnv } = require('../config/env');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const Cart = require('../models/Cart');
+const Order = require('../models/Order');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const {
@@ -321,6 +322,7 @@ async function validateCartPersistence(product) {
         title: product.title,
         image: snapshot.image,
         color: 'Azul',
+        colorLabel: 'Azul',
         size: '128GB',
         variantId: blueKey,
         price: snapshot.price,
@@ -331,15 +333,68 @@ async function validateCartPersistence(product) {
 
   const item = cart.items[0];
   assert(item.variantId === blueKey, 'Carrito no conserva variantId.');
-  assert(item.color === 'Azul', 'Carrito no conserva nombre visible del color.');
+  assert(item.color === '#0000ff', 'Carrito no conserva el valor canónico del color.');
+  assert(item.colorLabel === 'Azul', 'Carrito no conserva nombre visible del color.');
   assert(item.image === 'https://example.com/azul-cover.jpg', 'Carrito no conserva imagen de variante.');
   assert(Number(item.price) === 135000, 'Carrito no conserva precio de variante.');
   ok('Carrito guarda variante exacta con imagen, precio y color visible');
 
   const persisted = await Cart.findOne({ sessionId: TEST_SESSION }).lean();
+  assert(
+    persisted.items[0].colorLabel === 'Azul',
+    'La recarga del carrito perdió el nombre visible del color.'
+  );
   const subtotal = persisted.items.reduce((sum, row) => sum + Number(row.price || 0) * Number(row.qty || 0), 0);
   assert(subtotal === 270000, 'Subtotal de carrito no respeta precio propio de variante.');
   ok('Subtotal de carrito respeta precio propio de variante');
+
+  cart.items[0].qty = 3;
+  await cart.save();
+  const updatedCart = await Cart.findOne({ sessionId: TEST_SESSION });
+  assert(
+    updatedCart.items[0].colorLabel === 'Azul' &&
+      updatedCart.items[0].color === '#0000ff',
+    'Actualizar la cantidad perdió la separación entre color visible y canónico.'
+  );
+
+  const order = new Order({
+    sessionId: TEST_SESSION,
+    orderNumber: `CLOSE-${RUN_ID}`,
+    status: 'pending',
+    subtotal: 405000,
+    total: 405000,
+    items: [
+      {
+        product: product._id,
+        productId: String(product._id),
+        title: product.title,
+        image: updatedCart.items[0].image,
+        color: updatedCart.items[0].color,
+        colorLabel: updatedCart.items[0].colorLabel,
+        size: updatedCart.items[0].size,
+        variantKey: updatedCart.items[0].variantKey,
+        variantLabel: updatedCart.items[0].variantLabel,
+        variantAttributes: updatedCart.items[0].variantAttributes,
+        quantity: 3,
+        qty: 3,
+        price: 135000,
+        unitPrice: 135000,
+      },
+    ],
+    payment: {
+      provider: 'manual',
+      status: 'pending_manual',
+      amount: 405000,
+      currency: 'COP',
+    },
+  });
+  await order.validate();
+  assert(
+    order.items[0].colorLabel === 'Azul' &&
+      order.items[0].color === '#0000ff',
+    'La orden perdió el nombre visible o el valor canónico del color.'
+  );
+  ok('Cantidad, recarga y orden conservan color visible e identidad canónica');
 }
 
 async function validateEditDoesNotOverwriteStock(productId) {

@@ -189,6 +189,10 @@ function buildStockFilter(query = {}) {
       { 'productSnapshot.title': regex },
       { 'productSnapshot.sku': regex },
       { 'productSnapshot.category': regex },
+      { variantKey: regex },
+      { 'variant.label': regex },
+      { 'variant.attributes.label': regex },
+      { 'variant.attributes.value': regex },
       { 'variant.size': regex },
       { 'variant.color': regex },
       { 'variant.sku': regex },
@@ -292,6 +296,10 @@ function buildMovementFilter(query = {}) {
         { notes: regex },
         { 'productSnapshot.title': regex },
         { 'productSnapshot.sku': regex },
+        { variantKey: regex },
+        { 'variant.label': regex },
+        { 'variant.attributes.label': regex },
+        { 'variant.attributes.value': regex },
         { 'variant.size': regex },
         { 'variant.color': regex },
         { 'branchFromSnapshot.name': regex },
@@ -467,9 +475,19 @@ function buildReversalPayload(movement, reason = '') {
     productId,
     size: variant.size || '',
     color: variant.color || '',
+    variantKey: movement.variantKey || '',
+    variantLabel: variant.label || '',
+    variantAttributes: Array.isArray(variant.attributes)
+      ? variant.attributes
+      : [],
     variant: {
+      variantKey: movement.variantKey || '',
+      label: variant.label || '',
       size: variant.size || '',
       color: variant.color || '',
+      attributes: Array.isArray(variant.attributes)
+        ? variant.attributes
+        : [],
       sku: variant.sku || '',
       barcode: variant.barcode || '',
     },
@@ -556,6 +574,9 @@ function buildKardexFilter(query = {}) {
   const branchId = cleanText(query.branchId || query.branch || '');
   const size = cleanText(query.size || query.talla || '');
   const color = cleanText(query.color || '');
+  const variantKey = cleanText(
+    query.variantKey || query.variantId || ''
+  ).toLowerCase();
 
   if (!productId || !isValidObjectId(productId)) {
     return {
@@ -573,7 +594,7 @@ function buildKardexFilter(query = {}) {
     };
   }
 
-  if (!size) {
+  if (!variantKey && !size) {
     return {
       ok: false,
       status: 400,
@@ -581,7 +602,7 @@ function buildKardexFilter(query = {}) {
     };
   }
 
-  if (!color) {
+  if (!variantKey && !color) {
     return {
       ok: false,
       status: 400,
@@ -600,27 +621,58 @@ function buildKardexFilter(query = {}) {
     branchObjectId,
     size,
     color,
+    variantKey,
     filter: {
       deletedAt: null,
       product: productObjectId,
       status: {
         $in: ['posted', 'reversed'],
       },
-      'variant.size': size,
-      'variant.color': color,
-      $or: [
-        { branchFrom: branchObjectId },
-        { branchTo: branchObjectId },
+      $and: [
+        variantKey
+          ? variantKey.startsWith('v2__')
+            ? { variantKey }
+            : {
+                $or: [
+                  { variantKey },
+                  {
+                    'variant.size': size,
+                    'variant.color': color,
+                  },
+                ],
+              }
+          : {
+              'variant.size': size,
+              'variant.color': color,
+            },
+        {
+          $or: [
+            { branchFrom: branchObjectId },
+            { branchTo: branchObjectId },
+          ],
+        },
       ],
     },
   };
 }
 
-function buildKardexStockFilter({ productObjectId, branchObjectId, size, color }) {
-  return {
+function buildKardexStockFilter({
+  productObjectId,
+  branchObjectId,
+  size,
+  color,
+  variantKey,
+}) {
+  const base = {
     deletedAt: null,
     product: productObjectId,
     branch: branchObjectId,
+  };
+
+  if (variantKey) return { ...base, variantKey };
+
+  return {
+    ...base,
     $or: [
       {
         size,
@@ -797,8 +849,13 @@ function mapStockAlertItem(row = {}, type = 'lowStock') {
       type: cleanText(row?.branch?.type || row?.branchSnapshot?.type || ''),
     },
     variant: {
+      variantKey: cleanText(row?.variantKey || ''),
+      label: cleanText(row?.variant?.label || ''),
       size: cleanText(row?.variant?.size || row?.size || ''),
       color: cleanText(row?.variant?.color || row?.color || ''),
+      attributes: Array.isArray(row?.variant?.attributes)
+        ? row.variant.attributes
+        : [],
       sku: cleanText(row?.variant?.sku || ''),
       barcode: cleanText(row?.variant?.barcode || ''),
     },
@@ -855,8 +912,13 @@ function mapReservationAlertItem(reservation = {}, type = 'pendingReservation') 
       type: cleanText(firstItem?.branch?.type || firstItem?.branchSnapshot?.type || ''),
     },
     variant: {
+      variantKey: cleanText(firstItem?.variantKey || ''),
+      label: cleanText(firstItem?.variantLabel || ''),
       size: cleanText(firstItem?.size || ''),
       color: cleanText(firstItem?.color || ''),
+      attributes: Array.isArray(firstItem?.variantAttributes)
+        ? firstItem.variantAttributes
+        : [],
     },
     message: isExpired
       ? 'Reserva pendiente vencida. Debe ser liberada por el job automático.'
@@ -917,6 +979,28 @@ function getInventoryExportRows(rows = []) {
       sede: cleanText(row?.branch?.name || row?.branchSnapshot?.name || ''),
       codigoSede: cleanText(row?.branch?.code || row?.branchSnapshot?.code || ''),
       tipoSede: cleanText(row?.branch?.type || row?.branchSnapshot?.type || ''),
+      variante: cleanText(
+        row?.variant?.label ||
+          (Array.isArray(row?.variant?.attributes)
+            ? row.variant.attributes
+                .map((attribute) => attribute?.value)
+                .filter(Boolean)
+                .join(' / ')
+            : '') ||
+          [row?.variant?.size, row?.variant?.color]
+            .filter(Boolean)
+            .join(' / ')
+      ),
+      atributos: Array.isArray(row?.variant?.attributes)
+        ? row.variant.attributes
+            .map(
+              (attribute) =>
+                `${cleanText(attribute?.label || attribute?.key)}: ${cleanText(attribute?.value)}`
+            )
+            .filter((value) => !value.endsWith(': '))
+            .join(' | ')
+        : '',
+      variantKey: cleanText(row?.variantKey || ''),
       talla: cleanText(row?.variant?.size || row?.size || ''),
       color: cleanText(row?.variant?.color || row?.color || ''),
       codigoVariante: cleanText(row?.variant?.sku || ''),
@@ -939,6 +1023,9 @@ function buildInventoryCsv(rows = []) {
     'Sede',
     'Codigo sede',
     'Tipo sede',
+    'Variante',
+    'Atributos',
+    'Variant key',
     'Talla',
     'Color',
     'Codigo variante',
@@ -964,6 +1051,9 @@ function buildInventoryCsv(rows = []) {
         row.sede,
         row.codigoSede,
         row.tipoSede,
+        row.variante,
+        row.atributos,
+        row.variantKey,
         row.talla,
         row.color,
         row.codigoVariante,
@@ -1386,6 +1476,7 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
       branchObjectId,
       size,
       color,
+      variantKey,
       filter,
     } = parsedFilter;
 
@@ -1394,6 +1485,7 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
       branchObjectId,
       size,
       color,
+      variantKey,
     });
 
     const [stockRow, movements] = await Promise.all([
@@ -1442,8 +1534,13 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
         effect: effect.effect,
         product: getKardexProductSnapshot(movement.product, movement.productSnapshot),
         variant: {
+          variantKey: movement?.variantKey || variantKey || '',
+          label: movement?.variant?.label || '',
           size: movement?.variant?.size || size,
           color: movement?.variant?.color || color,
+          attributes: Array.isArray(movement?.variant?.attributes)
+            ? movement.variant.attributes
+            : [],
           sku: movement?.variant?.sku || '',
           barcode: movement?.variant?.barcode || '',
         },
@@ -1480,8 +1577,13 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
           ? getKardexBranchSnapshot(stockRow.branch, stockRow.branchSnapshot)
           : getKardexBranchSnapshot(branchObjectId, {}),
         variant: {
+          variantKey: stockRow?.variantKey || variantKey || '',
+          label: stockRow?.variant?.label || '',
           size,
           color,
+          attributes: Array.isArray(stockRow?.variant?.attributes)
+            ? stockRow.variant.attributes
+            : [],
         },
         stock: currentStock,
         summary: {

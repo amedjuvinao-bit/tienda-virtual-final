@@ -91,7 +91,6 @@ const STATUS_OPTIONS = [
   { code: 'shipped', label: 'Enviado' },
   { code: 'delivered', label: 'Entregado' },
   { code: 'cancelled', label: 'Cancelado' },
-  { code: 'refunded', label: 'Reembolsado' },
 ];
 
 const STATUS_FILTERS = [
@@ -544,14 +543,60 @@ export default function OrdersAdmin() {
     if (ids.length === 0) return;
     try {
       setBulkBusy(true);
-      await api.post('/api/orders/admin/bulk', {
+      const resp = await api.post('/api/orders/admin/bulk', {
         ids,
         action: { type: 'status', value: bulkStatus },
       });
-      setData((prev) => prev.map((o) => (selectedIds.has(o._id) ? { ...o, status: bulkStatus } : o)));
-      clearSelection();
-    } catch {
-      alert('No se pudieron aplicar los cambios de estado.');
+
+      const results = Array.isArray(resp?.data?.results)
+        ? resp.data.results
+        : [];
+      const successful = new Map(
+        results
+          .filter((result) => result?.ok)
+          .map((result) => [String(result.orderId), result])
+      );
+      const failedIds = new Set(
+        results
+          .filter((result) => !result?.ok)
+          .map((result) => String(result.orderId))
+      );
+
+      setData((prev) =>
+        prev.map((order) => {
+          const result = successful.get(String(order._id));
+          if (!result) return order;
+
+          return {
+            ...order,
+            status: result.status || bulkStatus,
+            payment: {
+              ...(order.payment || {}),
+              ...(result.paymentStatus
+                ? { status: result.paymentStatus }
+                : {}),
+            },
+            fulfillmentStatus:
+              result.fulfillmentStatus ||
+              order.fulfillmentStatus,
+          };
+        })
+      );
+      setSelectedIds(failedIds);
+
+      if (Number(resp?.data?.failed || 0) > 0) {
+        const firstFailure = results.find((result) => !result?.ok);
+        alert(
+          `${resp.data.modified || 0} orden(es) actualizada(s) y ` +
+            `${resp.data.failed} sin cambiar. ` +
+            `${firstFailure?.message || 'Revisa las órdenes seleccionadas.'}`
+        );
+      }
+    } catch (error) {
+      alert(
+        error?.response?.data?.message ||
+          'No se pudieron aplicar los cambios de estado.'
+      );
     } finally {
       setBulkBusy(false);
     }
@@ -595,13 +640,32 @@ export default function OrdersAdmin() {
     try {
       setSavingId(id);
       const resp = await api.patch(`/api/orders/${id}/status`, { status });
-      setData((prev) => prev.map((o) => (o._id === id ? { ...o, status } : o)));
+      const updatedOrder = resp?.data?.order || null;
+      const savedStatus = updatedOrder?.status || status;
+      setData((prev) =>
+        prev.map((o) =>
+          o._id === id
+            ? {
+                ...o,
+                ...(updatedOrder || {}),
+                status: savedStatus,
+              }
+            : o
+        )
+      );
       if (orderSelected && orderSelected._id === id) {
-        setOrderSelected((o) => ({ ...o, status }));
+        setOrderSelected((o) => ({
+          ...o,
+          ...(updatedOrder || {}),
+          status: savedStatus,
+        }));
       }
       return resp;
     } catch (e) {
-      alert('No se pudo guardar el estado.');
+      alert(
+        e?.response?.data?.message ||
+          'No se pudo guardar el estado.'
+      );
       throw e;
     } finally { setSavingId(null); }
   };

@@ -22,11 +22,17 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const {
+  applyMongooseIndexPolicy,
+} = require('./config/mongooseIndexPolicy');
 
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
 const PORT = env.port;
+const mongooseIndexPolicy = applyMongooseIndexPolicy(mongoose, {
+  nodeEnv: env.nodeEnv,
+});
 
 function tryRequire(relPath) {
   try {
@@ -48,8 +54,8 @@ app.use(cors());
 app.use(express.json());
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
+  windowMs: env.globalRateLimit.windowMs,
+  max: env.globalRateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -90,9 +96,6 @@ const paymentRoutes = tryRequire('./routes/payments');
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
 const geoRoutes = tryRequire('./routes/geo');
-const OrderModel = tryRequire('./models/Order');
-const requireAdminMiddleware = tryRequire('./middleware/requireAdmin');
-const requirePermissionMiddleware = tryRequire('./middleware/requirePermission');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
@@ -119,59 +122,14 @@ const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
+const digitalDeliveryRoutes = tryRequire('./routes/digitalDeliveries');
 
 if (productRoutes) app.use('/api/products', productRoutes);
 if (cartRoutes) app.use('/api/cart', cartRoutes);
 if (favoriteRoutes) app.use('/api/favorites', favoriteRoutes);
 if (couponRoutes) app.use('/api/coupons', couponRoutes);
-
-if (OrderModel && requireAdminMiddleware && requirePermissionMiddleware) {
-  app.patch(
-    '/api/orders/:id/status',
-    requireAdminMiddleware,
-    requirePermissionMiddleware('orders:update'),
-    async (req, res, next) => {
-      const rawStatus = String(req.body?.status || '').trim().toLowerCase();
-      const deliveredAliases = ['delivered', 'entregado', 'entregada'];
-
-      if (!deliveredAliases.includes(rawStatus)) {
-        return next();
-      }
-
-      try {
-        const before = await OrderModel.findById(req.params.id).select('status').lean();
-
-        if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
-
-        const updatedOrder = await OrderModel.findByIdAndUpdate(
-          req.params.id,
-          { $set: { status: 'delivered' } },
-          { new: true }
-        ).lean();
-
-        const OrderEventModel = mongoose.models.OrderEvent;
-
-        if (OrderEventModel) {
-          await OrderEventModel.create({
-            orderId: updatedOrder._id,
-            type: 'status_changed',
-            message: `Estado: ${before.status || '-'} -> delivered`,
-            meta: {
-              from: before.status || null,
-              to: 'delivered',
-              ip: req.ip,
-              by: req.headers['x-admin-user'] || null,
-            },
-          });
-        }
-
-        return res.json({ ok: true, order: updatedOrder });
-      } catch (error) {
-        console.error('PATCH /orders/:id/status delivered', error);
-        return res.status(500).json({ error: 'No se pudo actualizar el estado a entregada' });
-      }
-    }
-  );
+if (digitalDeliveryRoutes) {
+  app.use('/api/digital-deliveries', digitalDeliveryRoutes);
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
@@ -327,7 +285,9 @@ function startBillingInvoiceRecoveryJob() {
 }
 
 mongoose
-  .connect(env.mongoUri)
+  .connect(env.mongoUri, {
+    autoIndex: mongooseIndexPolicy.autoIndex,
+  })
   .then(() => {
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();

@@ -7,6 +7,14 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
+const {
+  normalizeAttributes,
+  normalizeVariantKey,
+  resolveVariantIdentity,
+} = require('../lib/products/productVariantConfig');
+const {
+  syncOrderInventoryAllocationsFromReservation,
+} = require('./orderInventoryAllocationService');
 
 const RAW_DEFAULT_RESERVATION_MINUTES = Number(process.env.INVENTORY_RESERVATION_MINUTES);
 
@@ -133,6 +141,18 @@ function normalizeCartItems(items = []) {
 
     const size = normalizeVariantValue(item.size || item.talla || item.variant?.size);
     const color = normalizeVariantValue(item.color || item.variant?.color);
+    const variantAttributes = normalizeAttributes(
+      item.variantAttributes ||
+        item.attributes ||
+        item.variant?.attributes ||
+        []
+    );
+    const identity = resolveVariantIdentity({
+      variantKey: item.variantKey || item.variantId,
+      size,
+      color,
+      attributes: variantAttributes,
+    });
     const quantity = toNumber(item.quantity || item.qty || item.cantidad, 0);
     const unitPrice = toNumber(item.unitPrice || item.price || item.precio, 0);
 
@@ -140,30 +160,6 @@ function normalizeCartItems(items = []) {
       throw createServiceError(
         `El producto de la posición ${index + 1} no tiene un ID válido.`,
         'INVALID_PRODUCT_ID',
-        {
-          index,
-          productId,
-        },
-        400
-      );
-    }
-
-    if (!size) {
-      throw createServiceError(
-        `El producto de la posición ${index + 1} no tiene talla definida.`,
-        'MISSING_SIZE',
-        {
-          index,
-          productId,
-        },
-        400
-      );
-    }
-
-    if (!color) {
-      throw createServiceError(
-        `El producto de la posición ${index + 1} no tiene color definido.`,
-        'MISSING_COLOR',
         {
           index,
           productId,
@@ -187,10 +183,17 @@ function normalizeCartItems(items = []) {
 
     return {
       originalItem: item,
+      orderItem:
+        getObjectIdValue(item.orderItem || item._id) || null,
       productId,
       productObjectId: toObjectId(productId, `items[${index}].productId`),
-      size,
-      color,
+      size: identity.size,
+      color: identity.color,
+      variantLabel: cleanText(
+        item.variantLabel || item.variant?.label || ''
+      ),
+      variantAttributes: identity.attributes,
+      variantKey: identity.variantKey,
       quantity,
       unitPrice,
       lineTotal: quantity * unitPrice,
@@ -198,16 +201,29 @@ function normalizeCartItems(items = []) {
       sku: cleanUpper(item.sku || ''),
       image: cleanText(item.image || ''),
       category: cleanText(item.category || ''),
+      bundleParentProduct:
+        getObjectIdValue(item.bundleParentProduct) || null,
+      bundleParentTitle: cleanText(item.bundleParentTitle || ''),
     };
   });
 }
 
 function buildStockVariantFilter(item) {
-  return {
+  const filter = {
     product: item.productObjectId,
     active: true,
     deletedAt: null,
-    $or: [
+  };
+
+  if (
+    item.variantKey &&
+    item.variantKey !== 'default__default'
+  ) {
+    filter.variantKey = item.variantKey;
+    return filter;
+  }
+
+  filter.$or = [
       {
         size: item.size,
         color: item.color,
@@ -216,8 +232,9 @@ function buildStockVariantFilter(item) {
         'variant.size': item.size,
         'variant.color': item.color,
       },
-    ],
-  };
+    ];
+
+  return filter;
 }
 
 function sortStocksByPriority(stocks = [], branchPriorityIds = []) {
@@ -271,11 +288,115 @@ async function loadProductMap(items, session) {
       $in: productIds.map((productId) => toObjectId(productId, 'productId')),
     },
   })
-    .select('title sku image images category')
+    .select(
+      'title sku image images category productType trackInventory allowBackorder bundleComponents active visible archivedAt'
+    )
     .session(session)
     .lean();
 
   return new Map(products.map((product) => [String(product._id), product]));
+}
+
+async function expandReservableItems(
+  items = [],
+  {
+    session = null,
+    ProductModel = Product,
+  } = {}
+) {
+  const sourceItems = Array.isArray(items) ? items : [];
+  if (!sourceItems.length) return [];
+
+  const productIds = Array.from(
+    new Set(
+      sourceItems
+        .map((item) =>
+          getObjectIdValue(
+            item.productId || item.product || item._id
+          )
+        )
+        .filter((id) => isValidObjectId(id))
+    )
+  );
+
+  let query = ProductModel.find({
+    _id: {
+      $in: productIds.map((id) => toObjectId(id, 'productId')),
+    },
+  }).select(
+    'title sku image productType trackInventory allowBackorder bundleComponents active visible archivedAt'
+  );
+
+  if (session && typeof query.session === 'function') {
+    query = query.session(session);
+  }
+
+  const products = await query.lean();
+  const productMap = new Map(
+    products.map((product) => [String(product._id), product])
+  );
+  const expanded = [];
+
+  for (const item of sourceItems) {
+    const productId = getObjectIdValue(
+      item.productId || item.product || item._id
+    );
+    const product = productMap.get(productId);
+
+    if (!product) continue;
+
+    if (product.productType === 'bundle') {
+      for (const component of product.bundleComponents || []) {
+        if (
+          component.trackInventory === false ||
+          component.allowBackorder === true
+        ) {
+          continue;
+        }
+
+        const componentIdentity = resolveVariantIdentity({
+          variantKey: component.variantKey,
+          size: component.size,
+          color: component.color,
+          attributes:
+            component.variantAttributes || component.attributes || [],
+        });
+
+        expanded.push({
+          orderItem:
+            getObjectIdValue(item.orderItem || item._id) || null,
+          productId: getObjectIdValue(component.product),
+          title: component.title || '',
+          image: component.image || '',
+          sku: component.sku || '',
+          size: componentIdentity.size,
+          color: componentIdentity.color,
+          variantLabel: component.variantLabel || '',
+          variantAttributes: componentIdentity.attributes,
+          variantKey: componentIdentity.variantKey,
+          quantity:
+            Math.max(1, Number(item.quantity || item.qty || 1)) *
+            Math.max(1, Number(component.quantity || 1)),
+          unitPrice: 0,
+          price: 0,
+          bundleParentProduct: product._id,
+          bundleParentTitle: product.title || item.title || '',
+        });
+      }
+      continue;
+    }
+
+    if (
+      product.trackInventory === false ||
+      product.allowBackorder === true
+    ) {
+      continue;
+    }
+
+    expanded.push(item);
+  }
+
+  return expanded;
 }
 
 async function loadBranchMap(branchIds, session) {
@@ -328,6 +449,31 @@ function buildReservationStockUpdate(quantityToReserve) {
       },
     },
   ];
+}
+
+function resolveReservationStockVariant(stock, requestedVariantKey = '') {
+  const stockIdentity = resolveVariantIdentity({
+    variantKey: stock?.variantKey,
+    size: stock?.variant?.size,
+    color: stock?.variant?.color,
+    attributes: stock?.variant?.attributes || [],
+  });
+  const requestedKey = normalizeVariantKey(requestedVariantKey);
+
+  if (requestedVariantKey && requestedKey !== stockIdentity.variantKey) {
+    throw createServiceError(
+      'La variante solicitada no coincide con la fila de inventario seleccionada.',
+      'VARIANT_KEY_MISMATCH',
+      {
+        inventoryStock: String(stock?._id || ''),
+        requestedVariantKey,
+        stockVariantKey: stockIdentity.variantKey,
+      },
+      409
+    );
+  }
+
+  return stockIdentity;
 }
 
 function buildReleaseStockUpdate(quantityToRelease) {
@@ -469,14 +615,29 @@ async function reserveFromStockRow({
     );
   }
 
+  const stockIdentity = resolveReservationStockVariant(
+    stock,
+    item.variantKey
+  );
+
   return {
     product: item.productObjectId,
     inventoryStock: stock._id,
     branch: stock.branch,
+    orderItem:
+      item.orderItem && isValidObjectId(item.orderItem)
+        ? toObjectId(item.orderItem, 'orderItem')
+        : null,
     productSnapshot: getProductSnapshot(product, item),
     branchSnapshot: getBranchSnapshot(branch),
-    size: item.size,
-    color: item.color,
+    size: stockIdentity.size,
+    color: stockIdentity.color,
+    variantLabel:
+      stock.variant?.label || item.variantLabel || '',
+    variantAttributes: stockIdentity.attributes,
+    variantKey: stockIdentity.variantKey,
+    bundleParentProduct: item.bundleParentProduct || null,
+    bundleParentTitle: item.bundleParentTitle || '',
     quantity: quantityToReserve,
     unitPrice: item.unitPrice,
     lineTotal: quantityToReserve * item.unitPrice,
@@ -486,21 +647,51 @@ async function reserveFromStockRow({
   };
 }
 
-async function releaseReservedItems({ items = [], session }) {
+async function releaseReservedItems({
+  items = [],
+  session,
+  InventoryStockModel = InventoryStock,
+}) {
   for (const item of items) {
     const quantity = toNumber(item.quantity, 0);
 
     if (!item.inventoryStock || quantity <= 0) continue;
 
-    await InventoryStock.updateOne(
+    const identity = resolveVariantIdentity({
+      variantKey: item.variantKey,
+      size: item.size,
+      color: item.color,
+      attributes: item.variantAttributes || [],
+    });
+
+    const result = await InventoryStockModel.updateOne(
       {
         _id: item.inventoryStock,
+        ...(item.branch ? { branch: item.branch } : {}),
+        ...(item.product ? { product: item.product } : {}),
+        variantKey: identity.variantKey,
+        reservedStock: { $gte: quantity },
       },
       buildReleaseStockUpdate(quantity),
       {
         session,
       }
     );
+
+    if (Number(result?.matchedCount || 0) !== 1) {
+      throw createServiceError(
+        'No se pudo liberar completamente la fila reservada.',
+        'RESERVED_STOCK_RELEASE_FAILED',
+        {
+          inventoryStock: String(item.inventoryStock),
+          branch: String(item.branch || ''),
+          product: String(item.product || ''),
+          variantKey: identity.variantKey,
+          quantity,
+        },
+        409
+      );
+    }
   }
 }
 
@@ -628,6 +819,7 @@ async function syncProductTotalStock(productId, { session = null } = {}) {
 async function createSaleOutMovementFromReservationItem({
   reservation,
   reservationItem,
+  inventoryStock,
   stockBefore,
   stockAfter,
   order = null,
@@ -645,6 +837,10 @@ async function createSaleOutMovementFromReservationItem({
     cleanUpper(paymentTransactionId) ||
     cleanUpper(orderNumber) ||
     cleanUpper(reservation.reservationCode);
+  const stockIdentity = resolveReservationStockVariant(
+    inventoryStock,
+    reservationItem.variantKey
+  );
 
   const movement = new InventoryMovement({
     type: 'sale_out',
@@ -654,11 +850,14 @@ async function createSaleOutMovementFromReservationItem({
     product: reservationItem.product,
     productSnapshot: reservationItem.productSnapshot || {},
     variant: {
-      size: reservationItem.size,
-      color: reservationItem.color,
+      size: stockIdentity.size,
+      color: stockIdentity.color,
+      label: reservationItem.variantLabel || '',
+      attributes: stockIdentity.attributes,
       sku: reservationItem.productSnapshot?.sku || '',
       barcode: '',
     },
+    variantKey: stockIdentity.variantKey,
 
     branchFrom: reservationItem.branch,
     branchFromSnapshot: reservationItem.branchSnapshot || {},
@@ -726,8 +925,16 @@ async function createInventoryReservation({
 
     const expiresAt = new Date(Date.now() + safeExpiresInMinutes * 60 * 1000);
 
+    const reservableItems = await expandReservableItems(items, {
+      session,
+    });
+
+    if (!reservableItems.length) {
+      return null;
+    }
+
     const { reservationItems, usedBranchIds } = await allocateReservationItems({
-      items,
+      items: reservableItems,
       branchPriorityIds,
       session,
     });
@@ -823,6 +1030,15 @@ async function releaseInventoryReservation(
     const reservation = await findReservation(identifier, session);
 
     if (reservation.status !== 'pending') {
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: reservation.order,
+          }
+        );
+      }
       return reservation;
     }
 
@@ -852,6 +1068,16 @@ async function releaseInventoryReservation(
 
     await reservation.save({ session });
 
+    if (options.syncOrderAllocations !== false) {
+      await syncOrderInventoryAllocationsFromReservation(
+        reservation,
+        {
+          session,
+          orderId: reservation.order,
+        }
+      );
+    }
+
     return reservation;
   }, options.session || null);
 }
@@ -870,6 +1096,15 @@ async function confirmInventoryReservation(
     const reservation = await findReservation(identifier, session);
 
     if (reservation.status === 'confirmed') {
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: order || reservation.order,
+          }
+        );
+      }
       return reservation;
     }
 
@@ -977,6 +1212,7 @@ async function confirmInventoryReservation(
       const movement = await createSaleOutMovementFromReservationItem({
         reservation,
         reservationItem: item,
+        inventoryStock: updatedStock,
         stockBefore,
         stockAfter,
         order: order || reservation.order || null,
@@ -1033,6 +1269,16 @@ async function confirmInventoryReservation(
       }
     }
 
+    if (options.syncOrderAllocations !== false) {
+      await syncOrderInventoryAllocationsFromReservation(
+        reservation,
+        {
+          session,
+          orderId: order || reservation.order,
+        }
+      );
+    }
+
     return reservation;
   }, options.session || null);
 }
@@ -1069,6 +1315,16 @@ async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
 
       await reservation.save({ session });
 
+      if (options.syncOrderAllocations !== false) {
+        await syncOrderInventoryAllocationsFromReservation(
+          reservation,
+          {
+            session,
+            orderId: reservation.order,
+          }
+        );
+      }
+
       expiredReservations.push(reservation);
     }
 
@@ -1086,6 +1342,9 @@ module.exports = {
   releaseInventoryReservation,
   expireInventoryReservations,
   allocateReservationItems,
+  expandReservableItems,
   releaseReservedItems,
+  resolveReservationStockVariant,
+  buildReleaseStockUpdate,
   createServiceError,
 };

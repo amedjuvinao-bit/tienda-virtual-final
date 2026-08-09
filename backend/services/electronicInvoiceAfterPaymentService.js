@@ -3,6 +3,9 @@
 const {
   issueElectronicInvoiceForOrder,
 } = require('./electronicInvoiceIssuanceService');
+const {
+  processOrderFulfillmentAfterPayment,
+} = require('./orderFulfillmentService');
 
 function trimSafe(value, max = 300) {
   return String(value || '').trim().slice(0, max);
@@ -18,6 +21,21 @@ async function generateElectronicInvoiceAfterPayment({
     paymentProvider || transaction?.provider || transaction?.payment_provider || 'payment',
     60
   ).toLowerCase();
+
+  try {
+    await processOrderFulfillmentAfterPayment({
+      orderId,
+      transaction,
+      paymentProvider: source,
+    });
+  } catch (error) {
+    console.error('❌ Error preparando entrega post pago:', {
+      orderId: String(orderId || ''),
+      paymentProvider: source,
+      code: error.code || '',
+      error: error.message,
+    });
+  }
 
   try {
     const result = await issueElectronicInvoiceForOrder({

@@ -217,6 +217,44 @@ function getVariantColor(row) {
   return row?.variant?.color || row?.color || '—';
 }
 
+function getVariantAttributes(row) {
+  const attributes =
+    row?.variant?.attributes ||
+    row?.variantAttributes ||
+    [];
+
+  return (Array.isArray(attributes) ? attributes : [])
+    .map((attribute) => ({
+      key: String(attribute?.key || attribute?.label || '').trim(),
+      label: String(attribute?.label || attribute?.key || '').trim(),
+      value: String(attribute?.value || '').trim(),
+    }))
+    .filter((attribute) => attribute.key && attribute.value)
+    .slice(0, 4);
+}
+
+function getVariantLabel(row) {
+  const explicit = String(
+    row?.variant?.label || row?.variantLabel || ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const attributes = getVariantAttributes(row);
+  if (attributes.length) {
+    return attributes.map((attribute) => attribute.value).join(' / ');
+  }
+
+  return [getVariantSize(row), getVariantColor(row)]
+    .filter((value) => value && value !== '—')
+    .join(' / ') || 'Presentación general';
+}
+
+function getVariantAttributesText(row) {
+  return getVariantAttributes(row)
+    .map((attribute) => `${attribute.label}: ${attribute.value}`)
+    .join(' | ');
+}
+
 function getReservedStock(row) {
   const reservedStock = Number(row?.reservedStock || 0);
   return Number.isFinite(reservedStock) && reservedStock > 0 ? reservedStock : 0;
@@ -340,6 +378,8 @@ function downloadVisibleInventoryCsv(rows = []) {
     'Sede',
     'Codigo sede',
     'Tipo sede',
+    'Variante',
+    'Atributos',
     'Talla',
     'Color',
     'Stock fisico',
@@ -360,6 +400,8 @@ function downloadVisibleInventoryCsv(rows = []) {
         getBranchName(row),
         getBranchCode(row),
         getBranchType(row),
+        getVariantLabel(row),
+        getVariantAttributesText(row),
         getVariantSize(row),
         getVariantColor(row),
         Number(row?.stock || 0),
@@ -444,6 +486,8 @@ export default function InventoryAdmin() {
         getBranchName(row),
         getBranchCode(row),
         getBranchType(row),
+        getVariantLabel(row),
+        getVariantAttributesText(row),
         getVariantSize(row),
         getVariantColor(row),
       ]
@@ -686,13 +730,14 @@ export default function InventoryAdmin() {
 
           {!loading && filteredStockRows.map((row) => {
             const color = getVariantColor(row);
+            const variantAttributes = getVariantAttributes(row);
             const stockStatus = getStockStatus(row);
             const available = getAvailableStock(row);
             const reserved = getReservedStock(row);
             const canTransfer = available > 0;
 
             return (
-              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${getVariantSize(row)}-${getVariantColor(row)}`} className="p-4 md:p-5" style={styles.inventoryCard}>
+              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="p-4 md:p-5" style={styles.inventoryCard}>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center" style={styles.productIconBox}>
@@ -746,19 +791,36 @@ export default function InventoryAdmin() {
                     <span className="inline-flex w-fit items-center px-3 py-1 text-xs font-black" style={styles.badge}>{getBranchType(row)}</span>
                   </InfoBlock>
 
-                  <InfoBlock icon={<Ruler size={17} />} label="Variante" title="Talla y color">
+                  <InfoBlock icon={<Ruler size={17} />} label="Variante" title={getVariantLabel(row)}>
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
-                        <Ruler size={13} /> Talla {getVariantSize(row)}
-                      </span>
-                      <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
-                        {isHexColor(color) ? (
-                          <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color, border: '1px solid var(--admin-table-border)' }} />
-                        ) : (
-                          <Palette size={13} />
-                        )}
-                        {color}
-                      </span>
+                      {variantAttributes.length > 0 ? (
+                        variantAttributes.map((attribute) => (
+                          <span key={`${row?._id || row?.variantKey}-${attribute.key}`} className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
+                            {attribute.key === 'color' && isHexColor(attribute.value) ? (
+                              <span className="h-4 w-4 rounded-full" style={{ backgroundColor: attribute.value, border: '1px solid var(--admin-table-border)' }} />
+                            ) : attribute.key === 'color' ? (
+                              <Palette size={13} />
+                            ) : (
+                              <Ruler size={13} />
+                            )}
+                            {attribute.label}: {attribute.value}
+                          </span>
+                        ))
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
+                            <Ruler size={13} /> Talla {getVariantSize(row)}
+                          </span>
+                          <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
+                            {isHexColor(color) ? (
+                              <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color, border: '1px solid var(--admin-table-border)' }} />
+                            ) : (
+                              <Palette size={13} />
+                            )}
+                            {color}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </InfoBlock>
 

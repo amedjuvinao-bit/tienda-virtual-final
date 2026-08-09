@@ -72,6 +72,19 @@ function getItemLineTotal(item) {
   return unitPrice * qty;
 }
 
+function getVariantDisplay(item = {}) {
+  const explicitLabel = String(item.variantLabel || '').trim();
+  if (explicitLabel) return explicitLabel;
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+
+  return attributes.join(' / ') || [item.color, item.size].filter(Boolean).join(' / ');
+}
+
 function normalizeText(value) {
   return String(value || '')
     .trim()
@@ -845,6 +858,51 @@ function CheckoutPage() {
 
   const { cart, clearCart } = useCart();
   const currentCart = cartView ?? cart;
+  const cartRequiresShipping = useMemo(
+    () =>
+      (currentCart || []).some(
+        (item) =>
+          item?.requiresShipping !== false &&
+          item?.product?.requiresShipping !== false
+      ),
+    [currentCart]
+  );
+  const cartNeedsElectronicDelivery = useMemo(
+    () =>
+      (currentCart || []).some((item) => {
+        const productType = String(
+          item?.productType || item?.product?.productType || ''
+        ).toLowerCase();
+
+        if (['digital', 'service'].includes(productType)) {
+          return true;
+        }
+
+        if (productType !== 'bundle') return false;
+
+        return (
+          item?.fulfillment?.bundle?.components ||
+          item?.product?.fulfillment?.bundle?.components ||
+          []
+        ).some((component) =>
+          ['digital', 'service'].includes(
+            String(component?.productType || '').toLowerCase()
+          )
+        );
+      }),
+    [currentCart]
+  );
+
+  useEffect(() => {
+    if (!cartRequiresShipping && deliveryType !== 'digital') {
+      setDeliveryType('digital');
+      return;
+    }
+
+    if (cartRequiresShipping && deliveryType === 'digital') {
+      setDeliveryType('envio');
+    }
+  }, [cartRequiresShipping, deliveryType]);
 
   const cssVars = useMemo(() => ({
     '--co-accent': checkoutConfig.style.accentColor,
@@ -904,6 +962,7 @@ function CheckoutPage() {
   }, [shippingConfig, customerCountry, selectedCountry?.code, selectedRegion, customerCity]);
 
   const shipping = useMemo(() => {
+    if (!cartRequiresShipping) return 0;
     if (deliveryType === 'retiro') return 0;
 
     const envios = shippingConfig;
@@ -933,7 +992,7 @@ function CheckoutPage() {
     }
 
     return 20000;
-  }, [deliveryType, shippingConfig, shippingConfigLoading, matchedZone, subtotal]);
+  }, [cartRequiresShipping, deliveryType, shippingConfig, shippingConfigLoading, matchedZone, subtotal]);
 
   const quotePricing = checkoutQuote?.pricing || null;
   const quotedSubtotal = Number(quotePricing?.subtotal ?? subtotal);
@@ -947,6 +1006,9 @@ function CheckoutPage() {
   );
 
   const shippingEta = useMemo(() => {
+    if (!cartRequiresShipping) {
+      return 'Sin envío físico';
+    }
     if (deliveryType === 'retiro') return 'Retiro disponible en tienda';
     if (finalShipping === 0) {
       return matchedZone?.eta || shippingConfig?.estimatedTime || shippingConfig?.fallback?.eta || 'Envío gratis aplicado';
@@ -957,14 +1019,15 @@ function CheckoutPage() {
       shippingConfig?.estimatedTime ||
       'Tiempo no configurado'
     );
-  }, [deliveryType, finalShipping, matchedZone, shippingConfig]);
+  }, [cartRequiresShipping, deliveryType, finalShipping, matchedZone, shippingConfig]);
 
   const shippingLabel = useMemo(() => {
+    if (!cartRequiresShipping) return 'Entrega digital o coordinación';
     if (deliveryType === 'retiro') return 'Retiro en tienda';
     if (matchedZone?.city) return `Envío a ${matchedZone.city}`;
     if (customerCity) return `Envío a ${customerCity}`;
     return 'Envío configurado';
-  }, [deliveryType, matchedZone, customerCity]);
+  }, [cartRequiresShipping, deliveryType, matchedZone, customerCity]);
 
   const paymentProviderMeta = useMemo(
     () => getPaymentProviderMeta(paymentsConfig.provider),
@@ -1012,8 +1075,17 @@ function CheckoutPage() {
       color: item.color || '',
       size: item.size || '',
       variantId: item.variantId || item.variantKey || '',
+      variantKey: item.variantKey || item.variantId || '',
+      variantLabel: item.variantLabel || '',
+      variantAttributes: Array.isArray(item.variantAttributes)
+        ? item.variantAttributes
+        : [],
       quantity: getItemQuantity(item),
       price: Number(item.price ?? item?.product?.price ?? 0),
+      productType: item.productType || item?.product?.productType || 'physical',
+      requiresShipping:
+        item.requiresShipping ?? item?.product?.requiresShipping ?? true,
+      fulfillment: item.fulfillment || item?.product?.fulfillment || null,
     })),
     customer: {
       deliveryType,
@@ -1341,8 +1413,18 @@ function CheckoutPage() {
     if (isBlank(customerLastname)) errs.push('El apellido es obligatorio.');
     if (isBlank(customerEmailOrPhone)) errs.push('Email o teléfono es obligatorio.');
     if (isBlank(customerId)) errs.push('La cédula es obligatoria.');
+    if (
+      cartNeedsElectronicDelivery &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        String(resolvedDianCustomer.email || '').trim()
+      )
+    ) {
+      errs.push(
+        'Los productos digitales y servicios necesitan un correo válido para la entrega.'
+      );
+    }
 
-    if (deliveryType === 'envio') {
+    if (cartRequiresShipping && deliveryType === 'envio') {
       if (isBlank(customerAddress)) errs.push('La dirección de envío es obligatoria.');
       if (isBlank(customerCountry)) errs.push('El país es obligatorio.');
       if (selectedCountry?.code === 'CO' && isBlank(selectedRegion)) errs.push('El departamento es obligatorio para Colombia.');
@@ -1590,6 +1672,10 @@ function CheckoutPage() {
         variantId: it.variantId || it.variantKey || '',
         quantity: Number(it.quantity ?? it.qty ?? 0) || 0,
         price: Number(it.price ?? it?.product?.price ?? 0) || 0,
+        productType: it.productType || it?.product?.productType || 'physical',
+        requiresShipping:
+          it.requiresShipping ?? it?.product?.requiresShipping ?? true,
+        fulfillment: it.fulfillment || it?.product?.fulfillment || null,
       }))
       .filter(it => it._id && it.quantity > 0);
 
@@ -1981,7 +2067,7 @@ function CheckoutPage() {
                 </div>
               )}
 
-              {checkoutConfig.showDeliverySection && (
+              {checkoutConfig.showDeliverySection && cartRequiresShipping && (
                 <div className="co-card">
                   <h2 className="co-card-title">{checkoutConfig.deliverySectionTitle}</h2>
 
@@ -2137,6 +2223,25 @@ function CheckoutPage() {
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: checkoutConfig.style.accentColor }}>
                       {finalShipping === 0 ? 'Gratis' : `$ ${finalShipping.toLocaleString('es-CO')}`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!cartRequiresShipping && (
+                <div className="co-card">
+                  <h2 className="co-card-title">Entrega de la compra</h2>
+                  <div className="co-shipping-box">
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                        Sin envío físico
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
+                        Recibirás por correo los enlaces digitales o las instrucciones para coordinar el servicio después de confirmar el pago.
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: checkoutConfig.style.accentColor }}>
+                      Gratis
                     </div>
                   </div>
                 </div>
@@ -2305,7 +2410,7 @@ function CheckoutPage() {
                                 {item.title}
                               </p>
                               <p style={{ fontSize: '12px', color: checkoutConfig.style.textSecondaryColor, margin: 0 }}>
-                                {[item.color, item.size].filter(Boolean).join(' / ')}
+                                {getVariantDisplay(item)}
                               </p>
                             </div>
                             <div style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0, color: checkoutConfig.style.textPrimaryColor }}>

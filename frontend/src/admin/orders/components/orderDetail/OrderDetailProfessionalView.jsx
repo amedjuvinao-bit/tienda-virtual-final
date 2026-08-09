@@ -6,6 +6,8 @@ import OrderDetailProgressStepper from './OrderDetailProgressStepper';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailCustomerBilling from './OrderDetailCustomerBilling';
 import OrderDetailItemsTable from './OrderDetailItemsTable';
+import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
+import OrderDetailFulfillmentPanel from './OrderDetailFulfillmentPanel';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
@@ -128,6 +130,10 @@ export default function OrderDetailProfessionalView({
             <OrderDetailCustomerBilling order={order} />
 
             <OrderDetailItemsTable order={order} />
+
+            <OrderDetailInventoryAllocations order={order} />
+
+            <OrderDetailFulfillmentPanel order={order} />
 
             <OrderDetailPaymentPanel order={order} />
 

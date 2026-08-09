@@ -196,10 +196,6 @@ function formatDate(value) {
   }).format(date);
 }
 
-function isHexColor(value) {
-  return /^#([0-9A-F]{3}){1,2}$/i.test(String(value || '').trim());
-}
-
 function getSeverityConfig(type) {
   if (type === 'outOfStock' || type === 'expiredReservation') {
     return {
@@ -237,10 +233,16 @@ function getBranchName(item) {
 }
 
 function getVariantLabel(item) {
-  const size = item?.variant?.size || '—';
-  const color = item?.variant?.color || '—';
-
-  return `Talla ${size} · Color ${color}`;
+  const explicit = String(item?.variant?.label || '').trim();
+  if (explicit) return explicit;
+  const attributes = Array.isArray(item?.variant?.attributes)
+    ? item.variant.attributes
+        .map((attribute) => String(attribute?.value || '').trim())
+        .filter(Boolean)
+    : [];
+  return attributes.join(' / ') || [item?.variant?.size, item?.variant?.color]
+    .filter(Boolean)
+    .join(' / ') || 'Presentación general';
 }
 
 function getReservationTitle(item) {
@@ -252,10 +254,7 @@ function getReservationProduct(item) {
 }
 
 function getReservationVariant(item) {
-  const size = item?.variant?.size || '—';
-  const color = item?.variant?.color || '—';
-
-  return `Talla ${size} · Color ${color}`;
+  return getVariantLabel(item);
 }
 
 function EmptyState({ icon, title, description }) {
@@ -334,8 +333,6 @@ function SummaryCard({ title, value, description, icon, variant = 'info' }) {
 
 function StockAlertCard({ item }) {
   const config = getSeverityConfig(item?.type);
-  const color = item?.variant?.color || '';
-
   return (
     <article className="p-4" style={styles.card}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -364,20 +361,7 @@ function StockAlertCard({ item }) {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="px-3 py-1 text-xs font-black" style={styles.badge}>
-              Talla {item?.variant?.size || '—'}
-            </span>
-
-            <span className="inline-flex items-center gap-2 px-3 py-1 text-xs font-black" style={styles.badge}>
-              {isHexColor(color) && (
-                <span
-                  className="h-3 w-3 rounded-full border"
-                  style={{
-                    background: color,
-                    borderColor: 'var(--admin-card-border)',
-                  }}
-                />
-              )}
-              {color || 'Sin color'}
+              Variante {getVariantLabel(item)}
             </span>
           </div>
 

@@ -12,6 +12,9 @@ const {
   releaseInventoryReservation,
 } = require('../services/inventoryReservationService');
 const {
+  applyReservationToOrderDocument,
+} = require('../services/orderInventoryAllocationService');
+const {
   generateElectronicInvoiceAfterPayment,
 } = require('../services/electronicInvoiceAfterPaymentService');
 
@@ -429,6 +432,16 @@ async function restockLegacyOrderIfNeeded(order, session) {
 async function syncReservationAfterPayU({ order, mapped, reference, transactionId, session }) {
   const paymentStatus = String(mapped.paymentStatus || '').trim().toLowerCase();
 
+  if (order.inventoryControl?.reservationRequired === false) {
+    order.inventoryControl = {
+      ...(order.inventoryControl || {}),
+      discountedAtCheckout: false,
+      restockedOnFailure: false,
+      restockedAt: null,
+    };
+    return null;
+  }
+
   try {
     if (paymentStatus === 'paid') {
       const reservation = await confirmInventoryReservation(
@@ -439,9 +452,13 @@ async function syncReservationAfterPayU({ order, mapped, reference, transactionI
           paymentReference: reference || order.payment?.reference || '',
           paymentTransactionId: transactionId || order.payment?.transactionId || '',
         },
-        { session }
+        {
+          session,
+          syncOrderAllocations: false,
+        }
       );
 
+      applyReservationToOrderDocument(order, reservation);
       order.inventoryControl = {
         ...(order.inventoryControl && typeof order.inventoryControl === 'object'
           ? order.inventoryControl
@@ -461,9 +478,13 @@ async function syncReservationAfterPayU({ order, mapped, reference, transactionI
           status: paymentStatus === 'cancelled' ? 'cancelled' : 'failed',
           releaseReason: `Pago ${paymentStatus} desde PayU`,
         },
-        { session }
+        {
+          session,
+          syncOrderAllocations: false,
+        }
       );
 
+      applyReservationToOrderDocument(order, reservation);
       order.inventoryControl = {
         ...(order.inventoryControl && typeof order.inventoryControl === 'object'
           ? order.inventoryControl

@@ -6,6 +6,10 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
+const {
+  normalizeAttributes,
+  resolveVariantIdentity,
+} = require('../lib/products/productVariantConfig');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -60,26 +64,70 @@ function getVariantFromPayload(payload = {}, product = null) {
   const productInventory = Array.isArray(product?.inventory)
     ? product.inventory
     : [];
+  const requestedVariantKey = cleanLower(
+    payload.variantKey ||
+      payload.variantId ||
+      payload.variant?.variantKey ||
+      ''
+  );
+  const productVariants = Array.isArray(product?.variants)
+    ? product.variants
+    : [];
 
-  const matchedVariant = productInventory.find((item) => {
+  const matchedProductVariant =
+    (requestedVariantKey
+      ? productVariants.find(
+          (item) => cleanLower(item?.variantKey) === requestedVariantKey
+        )
+      : null) ||
+    productVariants.find((item) => {
+      const sameSize = cleanLower(item?.size) === cleanLower(size);
+      const sameColor = cleanLower(item?.color) === cleanLower(color);
+      return sameSize && sameColor;
+    });
+  const matchedLegacyInventory = productInventory.find((item) => {
     const sameSize = cleanLower(item?.size) === cleanLower(size);
     const sameColor = cleanLower(item?.color) === cleanLower(color);
 
     return sameSize && sameColor;
   });
+  const variantAttributes = normalizeAttributes(
+    payload.variantAttributes ||
+      payload.attributes ||
+      payload.variant?.attributes ||
+      matchedProductVariant?.attributes ||
+      []
+  );
+  const variantIdentity = resolveVariantIdentity({
+    variantKey:
+      requestedVariantKey || matchedProductVariant?.variantKey || '',
+    size: size || matchedProductVariant?.size,
+    color: color || matchedProductVariant?.color,
+    attributes: variantAttributes,
+  });
 
   return {
-    size: cleanText(size),
-    color: cleanText(color),
+    size: variantIdentity.size,
+    color: variantIdentity.color,
+    variantKey: variantIdentity.variantKey,
+    label: cleanText(
+      payload.variantLabel ||
+        payload.variant?.label ||
+        matchedProductVariant?.label ||
+        ''
+    ),
+    attributes: variantIdentity.attributes,
     sku:
       payload.variant?.sku ||
       payload.sku ||
-      matchedVariant?.sku ||
+      matchedProductVariant?.sku ||
+      matchedLegacyInventory?.sku ||
       '',
     barcode:
       payload.variant?.barcode ||
       payload.barcode ||
-      matchedVariant?.barcode ||
+      matchedProductVariant?.barcode ||
+      matchedLegacyInventory?.barcode ||
       product?.barcode ||
       '',
   };
@@ -126,11 +174,19 @@ async function getOrCreateStock({
 }) {
   const branchId = getValidObjectId(branch?._id, 'La sede');
   const productId = getValidObjectId(product?._id, 'El producto');
-  const variantSnapshot = InventoryStock.buildVariantSnapshot(variant);
-  const variantKey = InventoryStock.buildVariantKey(
-    variantSnapshot.size,
-    variantSnapshot.color
-  );
+  const variantIdentity = resolveVariantIdentity({
+    variantKey: variant?.variantKey,
+    size: variant?.size,
+    color: variant?.color,
+    attributes: variant?.attributes || [],
+  });
+  const variantSnapshot = InventoryStock.buildVariantSnapshot({
+    ...variant,
+    size: variantIdentity.size,
+    color: variantIdentity.color,
+    attributes: variantIdentity.attributes,
+  });
+  const variantKey = variantIdentity.variantKey;
 
   let stockRow = await InventoryStock.findOne({
     branch: branchId,
@@ -375,6 +431,10 @@ async function createInventoryMovement(payload = {}, options = {}) {
       product: product._id,
       productSnapshot: InventoryMovement.buildProductSnapshot(product),
       variant,
+      variantKey:
+        stockFromRow?.variantKey ||
+        stockToRow?.variantKey ||
+        variant.variantKey,
 
       branchFrom: branchFrom?._id || null,
       branchFromSnapshot: InventoryMovement.buildBranchSnapshot(branchFrom),

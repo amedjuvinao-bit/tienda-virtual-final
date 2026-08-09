@@ -189,6 +189,33 @@ async function main() {
     assert(Number(savedProduct.stock || 0) === 4, 'Product.stock no se resincronizo despues de editar.');
     ok('Despues de editar, Product.stock sigue reflejando inventario real');
 
+    product = await Product.findById(product._id);
+    product.inventory = [
+      { size: 'Universal', color: '#000000', stock: 4 },
+    ];
+    product.sizes = ['Universal'];
+    product.colors = ['#000000'];
+    product.$locals = product.$locals || {};
+    product.$locals.variantsAuthoritative = true;
+    await product.save();
+    await waitForHook();
+
+    rows = await InventoryStock.find({
+      product: product._id,
+      deletedAt: null,
+    }).lean();
+    const retiredRow = rows.find(
+      (row) =>
+        String(row?.variant?.size || '').toLowerCase() ===
+        'nueva variante'
+    );
+    assert(retiredRow, 'La existencia retirada fue borrada.');
+    assert(
+      retiredRow.active === false,
+      'La existencia retirada siguio activa.'
+    );
+    ok('Retirar variante conserva historial y desactiva InventoryStock');
+
     product.trackInventory = false;
     product.inventory = [];
     product.sizes = [];

@@ -153,7 +153,7 @@ async function listInvoicesByExactReference({ credentials, tokenResult, expected
 
   const query = encodeURIComponent(expected);
   const { response, data } = await fetchJsonWithTimeout(
-    `${credentials.apiUrl}/v2/bills?filter[reference_code]=${query}&per_page=100`,
+    `${credentials.apiUrl}/v2/bills?filter[reference_code]=${query}&filter[per_page]=100`,
     {
       method: 'GET',
       headers: {
@@ -184,6 +184,184 @@ async function listInvoicesByExactReference({ credentials, tokenResult, expected
     documents,
     data,
   };
+}
+
+async function listPendingInvoices({ credentials, tokenResult }) {
+  const { response, data } = await fetchJsonWithTimeout(
+    `${credentials.apiUrl}/v2/bills?filter[status]=0&filter[per_page]=100`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `${tokenResult.tokenType} ${tokenResult.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return {
+      success: false,
+      status: response.status,
+      code: 'FACTUS_PENDING_INVOICE_LOOKUP_FAILED',
+      error: data?.message || data?.error || `HTTP ${response.status}`,
+      documents: [],
+    };
+  }
+
+  return {
+    success: true,
+    status: response.status,
+    documents: extractList(data).filter(isPendingDocument),
+    data,
+  };
+}
+
+function isFactusSandboxUrl(value) {
+  try {
+    return new URL(String(value || '')).hostname ===
+      'api-sandbox.factus.com.co';
+  } catch {
+    return false;
+  }
+}
+
+async function cleanupSinglePendingInvoiceInSandbox(data = {}) {
+  try {
+    if (data.confirm !== true) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_confirmation',
+        status: 409,
+        code: 'FACTUS_PENDING_CLEANUP_CONFIRMATION_REQUIRED',
+        error:
+          'La limpieza requiere confirmación explícita y solo puede ejecutarse en Factus habilitación.',
+      };
+    }
+
+    const providerConfig = runtimeProviderConfig(data);
+    const credentials = validateProviderCredentials(providerConfig);
+
+    if (!isFactusSandboxUrl(credentials.apiUrl)) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_environment',
+        status: 409,
+        code: 'FACTUS_PENDING_CLEANUP_PRODUCTION_BLOCKED',
+        error:
+          'La limpieza automática de facturas pendientes está bloqueada fuera de Factus habilitación.',
+      };
+    }
+
+    const tokenResult = await getFactusAccessToken(credentials);
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_auth',
+        ...tokenResult,
+      };
+    }
+
+    const listed = await listPendingInvoices({
+      credentials,
+      tokenResult,
+    });
+
+    if (!listed.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_lookup',
+        status: listed.status,
+        code: listed.code,
+        error: listed.error,
+      };
+    }
+
+    if (listed.documents.length === 0) {
+      return {
+        success: true,
+        provider: 'factus',
+        stage: 'pending_cleanup',
+        status: listed.status,
+        cleaned: false,
+        message: 'Factus habilitación no tiene facturas pendientes.',
+      };
+    }
+
+    if (listed.documents.length !== 1) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_ambiguous',
+        status: 409,
+        code: 'FACTUS_PENDING_CLEANUP_AMBIGUOUS',
+        pendingReferences: listed.documents.map(referenceCode).filter(Boolean),
+        error:
+          'Factus devolvió más de una factura pendiente. No se eliminó ningún documento.',
+      };
+    }
+
+    const pending = listed.documents[0];
+    const pendingReference = referenceCode(pending);
+
+    if (!pendingReference) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_reference',
+        status: 409,
+        code: 'FACTUS_PENDING_CLEANUP_REFERENCE_MISSING',
+        error:
+          'La factura pendiente no tiene una referencia verificable. No se eliminó ningún documento.',
+      };
+    }
+
+    const deleted = await deleteFactusBillByReference({
+      credentials,
+      tokenResult,
+      referenceCode: pendingReference,
+    });
+
+    if (!deleted.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'pending_cleanup_delete',
+        status: deleted.status,
+        code: 'FACTUS_PENDING_CLEANUP_DELETE_FAILED',
+        referenceCode: pendingReference,
+        error:
+          deleted.error ||
+          'No fue posible retirar la factura pendiente de Factus habilitación.',
+      };
+    }
+
+    return {
+      success: true,
+      provider: 'factus',
+      stage: 'pending_cleanup',
+      status: deleted.status,
+      cleaned: true,
+      referenceCode: pendingReference,
+      message:
+        `Se retiró la factura no validada ${pendingReference} de Factus habilitación.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      stage: 'pending_cleanup_exception',
+      status: Number(error?.status || 503),
+      code: error?.code || 'FACTUS_PENDING_CLEANUP_ERROR',
+      error:
+        error?.message ||
+        'No fue posible revisar las facturas pendientes de Factus habilitación.',
+    };
+  }
 }
 
 async function findExactPendingInvoice({ credentials, tokenResult, expectedReference }) {
@@ -459,6 +637,7 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
 }
 
 module.exports = {
+  cleanupSinglePendingInvoiceInSandbox,
   findInvoiceByReferenceFromFactus,
   sendCreditNoteToFactus,
   sendInvoiceToFactus,

@@ -7,8 +7,15 @@ const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const {
   buildVariantKey,
+  normalizeAttributes,
   resolveVariantCommercialSnapshot,
 } = require('../lib/products/productVariantConfig');
+const {
+  getPublicFulfillmentView,
+} = require('../lib/products/productFulfillmentConfig');
+const {
+  getBundleAvailableQuantity,
+} = require('../services/productBundleService');
 
 const { isValidObjectId } = mongoose;
 
@@ -79,11 +86,16 @@ function getVariantSelector(raw = {}) {
   const variantKey = cleanLower(readVariantId(raw));
   const size = clean(raw.size || raw.talla || '');
   const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
+  const variantAttributes = normalizeAttributes(
+    raw.variantAttributes || raw.attributes || raw.selectedAttributes || []
+  );
 
   return {
-    variantKey: variantKey || buildVariantKey(size, color),
+    variantKey:
+      variantKey || buildVariantKey(size, color, variantAttributes),
     size,
     color,
+    variantAttributes,
   };
 }
 
@@ -111,9 +123,23 @@ function sanitizeCartItems(items) {
     const idStr = readProductId(raw);
     const title = String(raw?.title || raw?.product?.title || '').trim();
     const image = String(raw?.image || raw?.product?.image || '').trim();
-    const color = String(raw?.color || '').trim();
+    const colorLabel = clean(raw?.colorLabel || raw?.color || '').slice(0, 80);
+    const color = clean(
+      raw?.colorValue || raw?.rawColor || raw?.color || ''
+    ).slice(0, 80);
     const size = String(raw?.size || '').trim();
     const variantId = readVariantId(raw);
+    const variantAttributes = normalizeAttributes(
+      raw?.variantAttributes ||
+        raw?.attributes ||
+        raw?.selectedAttributes ||
+        []
+    );
+    const variantKey =
+      variantId || buildVariantKey(size, color, variantAttributes);
+    const variantLabel = clean(
+      raw?.variantLabel || raw?.selectedVariant?.label || ''
+    ).slice(0, 180);
 
     const qtyNum = Number(raw?.qty ?? raw?.quantity ?? raw?.qtyNumber ?? 0);
     const qty = Number.isFinite(qtyNum) ? Math.max(0, Math.floor(qtyNum)) : 0;
@@ -123,7 +149,7 @@ function sanitizeCartItems(items) {
     if (!idStr) continue;
     if (qty <= 0) continue;
 
-    const dedupeKey = `${idStr}|||${color}|||${size}|||${variantId}`;
+    const dedupeKey = `${idStr}|||${variantKey}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
@@ -133,9 +159,12 @@ function sanitizeCartItems(items) {
       image,
       price,
       color,
+      colorLabel,
       size,
-      variantId,
-      variantKey: variantId,
+      variantId: variantKey,
+      variantKey,
+      variantLabel,
+      variantAttributes,
       qty,
       quantity: qty, // compatibilidad
     });
@@ -159,12 +188,26 @@ async function safePopulateItems(items) {
     if (validIds.length === 0) return arr.map((it) => ({ ...it, product: null }));
 
     const products = await Product.find({ _id: { $in: validIds } })
-      .select('title price image images slug sku barcode category inventory stock visible active trackInventory allowBackorder variants')
+      .select(
+        'title price image images slug sku barcode category inventory stock visible active productType trackInventory allowBackorder variants digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+      )
       .populate({ path: 'category', select: 'name' })
       .lean()
       .exec();
 
-    const map = new Map(products.map((p) => [String(p._id), p]));
+    const map = new Map(
+      products.map((product) => {
+        const fulfillment = getPublicFulfillmentView(product);
+        return [
+          String(product._id),
+          {
+            ...product,
+            fulfillment,
+            requiresShipping: fulfillment.requiresShipping,
+          },
+        ];
+      })
+    );
     return arr.map((it) => {
       const rawId = it?._id;
       const idStr = rawId && typeof rawId === 'object' ? (rawId._id || rawId.id) : rawId;
@@ -227,6 +270,9 @@ function computeAvailableStockForVariant(p, color, size) {
 
 async function computeAvailableStockForCartItem(p, item) {
   if (!p) return Infinity;
+  if (p.productType === 'bundle') {
+    return getBundleAvailableQuantity(p);
+  }
   if (p.trackInventory === false || p.allowBackorder === true) return Infinity;
 
   const selector = getVariantSelector(item);
@@ -263,6 +309,10 @@ function resolveCartCommercialSnapshot(p, item) {
       sku: '',
       barcode: '',
       variantKey: readVariantId(item),
+      variantLabel: clean(item.variantLabel || ''),
+      variantAttributes: normalizeAttributes(
+        item.variantAttributes || item.attributes || []
+      ),
     };
   }
 
@@ -607,10 +657,20 @@ router.post('/validate', async (req, res) => {
         ...it,
         variantId: readVariantId(it) || commercial?.variantKey || '',
         variantKey: readVariantId(it) || commercial?.variantKey || '',
+        variantLabel:
+          commercial?.variantLabel || it.variantLabel || '',
+        variantAttributes:
+          commercial?.variantAttributes ||
+          normalizeAttributes(it.variantAttributes || []),
         variantSku: commercial?.sku || '',
         variantBarcode: commercial?.barcode || '',
         image: commercial?.image || it.image || p?.image || '',
         price: currentPrice,
+        productType: p?.productType || 'physical',
+        requiresShipping:
+          p?.requiresShipping !== false,
+        fulfillment:
+          p?.fulfillment || getPublicFulfillmentView(p || {}),
         qty: finalQty,
         quantity: finalQty,
       };

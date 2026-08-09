@@ -10,6 +10,7 @@ import {
   BadgeDollarSign,
 } from "lucide-react";
 import api from "../lib/api";
+import { normalizeFilterCategories } from "./filterSidebarMeta";
 
 // ===== Precio =====
 const MIN_PRICE = 0;
@@ -404,12 +405,15 @@ export default function FilterSidebar({
   const fetchMeta = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/api/products`, {
+      const { data } = await api.get(`/api/products/meta`, {
         params: { _: Date.now() },
       });
-      const list = Array.isArray(data) ? data : [];
-      setAvailableColors(extractColorsFromProducts(list));
-      setAvailableCategories(extractCategoriesFromProducts(list));
+      setAvailableColors(
+        Array.isArray(data?.colors) ? data.colors : []
+      );
+      setAvailableCategories(
+        normalizeFilterCategories(data?.categories)
+      );
     } catch (error) {
       console.error("Error cargando metadatos del filtro:", error);
     } finally {

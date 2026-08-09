@@ -26,13 +26,25 @@ const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const {
   createInventoryReservation,
+  expandReservableItems,
   expireInventoryReservations,
 } = require('../services/inventoryReservationService');
+const {
+  getAllowedOrderStatuses,
+  transitionOrderStatus,
+  processBulkOrderStatusTransitions,
+} = require('../services/orderStatusTransitionService');
 const couponService = require('../services/couponService');
 const { buildOrderQuote } = require('../services/orderPricingService');
 const {
   downloadOfficialInvoiceDocument,
 } = require('../services/electronicInvoiceDocumentService');
+const {
+  processOrderRefund,
+} = require('../services/orderRefundService');
+const {
+  applyReservationToOrderDocument,
+} = require('../services/orderInventoryAllocationService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -140,6 +152,36 @@ function getOrderCustomerEmail(orderData = {}) {
   )
     .trim()
     .toLowerCase();
+}
+
+function isValidDeliveryEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    String(value || '').trim().toLowerCase()
+  );
+}
+
+function orderNeedsElectronicDelivery(items = []) {
+  return (Array.isArray(items) ? items : []).some((item) => {
+    const productType = String(
+      item?.productType || ''
+    ).trim().toLowerCase();
+
+    if (['digital', 'service'].includes(productType)) {
+      return true;
+    }
+
+    if (productType !== 'bundle') return false;
+
+    return (
+      item?.fulfillmentSnapshot?.bundle?.components || []
+    ).some((component) =>
+      ['digital', 'service'].includes(
+        String(component?.productType || '')
+          .trim()
+          .toLowerCase()
+      )
+    );
+  });
 }
 
 function buildOrderCouponSnapshot(quote = {}) {
@@ -559,6 +601,13 @@ function canonicalizeCart(cart) {
       title: String(it?.title || ''),
       color: String(it?.color || ''),
       size: String(it?.size || ''),
+      variantKey: String(
+        it?.variantKey ||
+          it?.variantId ||
+          it?.selectedVariantKey ||
+          it?.selectedVariantId ||
+          ''
+      ).toLowerCase(),
       price: Number(it?.price ?? it?.unitPrice ?? it?.priceNumber ?? 0) || 0,
       quantity: Number(it?.quantity ?? it?.qty ?? 0) || 0,
     }))
@@ -566,7 +615,8 @@ function canonicalizeCart(cart) {
 
   return sortBy(
     safe,
-    (x) => `${x.productId}|${x.color.toLowerCase()}|${x.size.toLowerCase()}|${x.price}|${x.quantity}`
+    (x) =>
+      `${x.productId}|${x.variantKey}|${x.color.toLowerCase()}|${x.size.toLowerCase()}|${x.price}|${x.quantity}`
   );
 }
 
@@ -785,7 +835,18 @@ function applyOrderBranchAccessFilter(req, filter) {
 
   if (canAdminSeeAllBranches(req)) {
     if (requestedBranchId) {
-      filter.branch = new mongoose.Types.ObjectId(requestedBranchId);
+      const branchObjectId = new mongoose.Types.ObjectId(
+        requestedBranchId
+      );
+      filter.$and = [
+        ...(Array.isArray(filter.$and) ? filter.$and : []),
+        {
+          $or: [
+            { branch: branchObjectId },
+            { 'inventoryAllocations.branch': branchObjectId },
+          ],
+        },
+      ];
     }
 
     return {
@@ -817,9 +878,26 @@ function applyOrderBranchAccessFilter(req, filter) {
 
   const branchIdsToUse = requestedBranchId ? [requestedBranchId] : allowedBranchIds;
 
-  filter.branch = {
-    $in: branchIdsToUse.map((id) => new mongoose.Types.ObjectId(id)),
-  };
+  const branchObjectIds = branchIdsToUse.map(
+    (id) => new mongoose.Types.ObjectId(id)
+  );
+  filter.$and = [
+    ...(Array.isArray(filter.$and) ? filter.$and : []),
+    {
+      $or: [
+        {
+          branch: {
+            $in: branchObjectIds,
+          },
+        },
+        {
+          'inventoryAllocations.branch': {
+            $in: branchObjectIds,
+          },
+        },
+      ],
+    },
+  ];
 
   return {
     ok: true,
@@ -916,6 +994,8 @@ router.get('/admin', async (req, res) => {
         { 'billing.id': rx },
         { 'branchSnapshot.name': rx },
         { 'branchSnapshot.code': rx },
+        { 'inventoryAllocations.branchSnapshot.name': rx },
+        { 'inventoryAllocations.branchSnapshot.code': rx },
       ];
 
       if (/^[0-9a-fA-F]{24}$/.test(q)) {
@@ -968,9 +1048,15 @@ router.get('/admin', async (req, res) => {
       ['pagado', 'paid'],
       ['pagada', 'paid'],
       ['paid', 'paid'],
+      ['fallido', 'failed'],
+      ['rechazado', 'failed'],
+      ['failed', 'failed'],
       ['enviado', 'shipped'],
       ['enviada', 'shipped'],
       ['shipped', 'shipped'],
+      ['entregado', 'delivered'],
+      ['entregada', 'delivered'],
+      ['delivered', 'delivered'],
       ['cancelado', 'cancelled'],
       ['cancelada', 'cancelled'],
       ['cancelled', 'cancelled'],
@@ -980,7 +1066,16 @@ router.get('/admin', async (req, res) => {
       ['refunded', 'refunded'],
     ]);
 
-    const ALLOWED = ['pending', 'processing', 'paid', 'shipped', 'cancelled', 'refunded'];
+    const ALLOWED = [
+      'pending',
+      'processing',
+      'paid',
+      'failed',
+      'shipped',
+      'delivered',
+      'cancelled',
+      'refunded',
+    ];
 
     const rawStatus = String(req.query.status || '').trim();
 
@@ -1142,7 +1237,7 @@ router.get('/admin', async (req, res) => {
           totalSales: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['paid', 'shipped']] },
+                { $in: ['$status', ['paid', 'shipped', 'delivered']] },
                 { $ifNull: ['$total', 0] },
                 0,
               ],
@@ -1162,7 +1257,7 @@ router.get('/admin', async (req, res) => {
           paidOrders: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['paid', 'shipped']] },
+                { $in: ['$status', ['paid', 'shipped', 'delivered']] },
                 1,
                 0,
               ],
@@ -1505,9 +1600,158 @@ router.get('/:id/thanks', async (req, res) => {
 /* ============================
  * GET /api/orders/:id
  * ============================ */
-router.get('/:id', async (req, res) => {
+router.patch(
+  '/:id/fulfillment/services/:serviceId',
+  requireAdmin,
+  requirePermission('orders:update'),
+  async (req, res) => {
+    try {
+      const allowedStatuses = new Set([
+        'awaiting_scheduling',
+        'scheduled',
+        'in_progress',
+        'completed',
+        'cancelled',
+      ]);
+      const status = String(req.body?.status || '')
+        .trim()
+        .toLowerCase();
+
+      if (!allowedStatuses.has(status)) {
+        return res.status(400).json({
+          message: 'Estado de servicio inválido.',
+          allowed: [...allowedStatuses],
+        });
+      }
+
+      const order = await Order.findById(req.params.id).select(
+        '+fulfillment.services.bookingUrl +fulfillment.services.internalInstructions'
+      );
+      if (!order) {
+        return res.status(404).json({
+          message: 'Orden no encontrada.',
+        });
+      }
+
+      const service = order.fulfillment?.services?.id(
+        req.params.serviceId
+      );
+      if (!service) {
+        return res.status(404).json({
+          message: 'Prestación de servicio no encontrada.',
+        });
+      }
+
+      let scheduledAt = service.scheduledAt || null;
+      if (req.body?.scheduledAt) {
+        const parsed = new Date(req.body.scheduledAt);
+        if (Number.isNaN(parsed.getTime())) {
+          return res.status(400).json({
+            message: 'La fecha programada no es válida.',
+          });
+        }
+        scheduledAt = parsed;
+      }
+
+      service.status = status;
+      service.scheduledAt =
+        ['scheduled', 'in_progress', 'completed'].includes(status)
+          ? scheduledAt || new Date()
+          : scheduledAt;
+      service.completedAt =
+        status === 'completed'
+          ? service.completedAt || new Date()
+          : null;
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'notes')) {
+        service.notes = String(req.body.notes || '')
+          .trim()
+          .slice(0, 2000);
+      }
+
+      const services = order.fulfillment?.services || [];
+      const completedServices = services.filter(
+        (item) => item.status === 'completed'
+      ).length;
+      const activeServices = services.filter(
+        (item) => item.status !== 'cancelled'
+      );
+      const allServicesCompleted =
+        activeServices.length > 0 &&
+        activeServices.every(
+          (item) => item.status === 'completed'
+        );
+      const hasShipment = (order.items || []).some(
+        (item) => item.requiresShipping !== false
+      );
+
+      if (allServicesCompleted && !hasShipment) {
+        order.fulfillment.status = 'delivered';
+        order.fulfillmentStatus = 'delivered';
+      } else if (completedServices > 0) {
+        order.fulfillment.status = 'partially_delivered';
+        order.fulfillmentStatus = 'partially_delivered';
+      } else {
+        order.fulfillment.status = 'action_required';
+        if (!hasShipment) order.fulfillmentStatus = 'processing';
+      }
+
+      await order.save();
+      await OrderEvent.create({
+        orderId: order._id,
+        type: 'system',
+        message: `Servicio ${service.title || service._id}: ${status}`,
+        meta: {
+          serviceId: String(service._id),
+          status,
+          scheduledAt: service.scheduledAt || null,
+          by: req.adminUserId || null,
+        },
+      });
+
+      return res.json({
+        ok: true,
+        fulfillmentStatus: order.fulfillmentStatus,
+        fulfillment: {
+          status: order.fulfillment.status,
+          notificationStatus:
+            order.fulfillment.notificationStatus,
+        },
+        service,
+      });
+    } catch (error) {
+      console.error(
+        'PATCH /orders/:id/fulfillment/services/:serviceId',
+        error
+      );
+      return res.status(500).json({
+        message: 'No fue posible actualizar el servicio.',
+      });
+    }
+  }
+);
+
+router.get(
+  '/:id',
+  requireAdmin,
+  requirePermission('orders:view'),
+  async (req, res) => {
   try {
-    const o = await Order.findById(req.params.id).lean();
+    const filter = {
+      _id: req.params.id,
+    };
+    const branchAccess = applyOrderBranchAccessFilter(req, filter);
+
+    if (!branchAccess.ok) {
+      return res.status(branchAccess.status || 403).json({
+        error:
+          branchAccess.error || 'BRANCH_ACCESS_DENIED',
+        message:
+          branchAccess.message ||
+          'No tienes permiso para consultar órdenes de esa sede.',
+      });
+    }
+
+    const o = await Order.findOne(filter).lean();
 
     const invoice = await ElectronicInvoice.findOne({
       orderId: o?._id,
@@ -1523,70 +1767,54 @@ router.get('/:id', async (req, res) => {
   } catch {
     res.status(400).json({ error: 'ID inválido' });
   }
-});
+  }
+);
 
 /* ============================
  * PATCH /api/orders/:id/status
  * ============================ */
 router.options('/:id/status', (_req, res) => res.sendStatus(204));
 
-router.patch('/:id/status', requireAdmin, requirePermission('orders:update'), async (req, res) => {
+router.patch('/:id/status', requireAdmin, requirePermission('orders:status'), async (req, res) => {
   try {
-    const STATUS_MAP = new Map([
-      ['pendiente', 'pending'],
-      ['pending', 'pending'],
-      ['procesando', 'processing'],
-      ['processing', 'processing'],
-      ['pagado', 'paid'],
-      ['paid', 'paid'],
-      ['enviado', 'shipped'],
-      ['shipped', 'shipped'],
-      ['cancelado', 'cancelled'],
-      ['cancelada', 'cancelled'],
-      ['cancelled', 'cancelled'],
-      ['canceled', 'cancelled'],
-      ['reembolsado', 'refunded'],
-      ['reembolsada', 'refunded'],
-      ['refunded', 'refunded'],
-    ]);
-
-    const raw = String(req.body?.status || '').toLowerCase().trim();
-    const status = STATUS_MAP.get(raw);
-
-    if (!status) {
-      return res.status(400).json({
-        error: 'Estado inválido',
-        allowed: Array.from(new Set(STATUS_MAP.values())),
-        received: raw,
-      });
-    }
-
-    const before = await Order.findById(req.params.id).select('status').lean();
-
-    if (!before) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    const upd = await Order.findByIdAndUpdate(
-      req.params.id,
-      { $set: { status } },
-      { new: true }
-    ).lean();
-
-    await OrderEvent.create({
-      orderId: upd._id,
-      type: 'status_changed',
-      message: `Estado: ${before.status || '—'} -> ${status}`,
-      meta: {
-        from: before.status || null,
-        to: status,
-        ip: req.ip,
-        by: req.headers['x-admin-user'] || null,
+    const result = await transitionOrderStatus(
+      {
+        orderId: req.params.id,
+        status: req.body?.status,
+        actor: {
+          id: req.adminUserId || req.user?._id || req.user?.id || null,
+          label:
+            req.adminDisplayName ||
+            req.adminUsername ||
+            req.headers['x-admin-user'] ||
+            'admin',
+          source: 'admin',
+          ip: req.ip,
+        },
       },
-    });
+      {
+        OrderEventModel: OrderEvent,
+      }
+    );
 
-    res.json({ ok: true, order: upd });
+    res.json({
+      ok: true,
+      changed: result.changed,
+      order: result.order,
+      fulfillmentWarning: result.fulfillmentWarning,
+    });
   } catch (e) {
     console.error('PATCH /orders/:id/status', e);
-    res.status(500).json({ error: 'No se pudo actualizar el estado' });
+    res.status(e.statusCode || e.status || 500).json({
+      error: e.code || 'ORDER_STATUS_TRANSITION_FAILED',
+      message: e.message,
+      code: e.code || '',
+      details: e.details || undefined,
+      allowed:
+        e.code === 'INVALID_ORDER_STATUS'
+          ? getAllowedOrderStatuses()
+          : undefined,
+    });
   }
 });
 
@@ -1898,6 +2126,12 @@ router.post('/', rateLimit, async (req, res) => {
     let inventoryReservation = null;
 
     await session.withTransaction(async () => {
+      // withTransaction puede volver a ejecutar este callback. Ningún documento
+      // procedente de un intento abortado puede reutilizarse en el siguiente.
+      created = null;
+      inventoryReservation = null;
+      activeIdempotencyRecord = null;
+
       if (idempoKey) {
         try {
           const docs = await IdempotencyKey.create(
@@ -1924,10 +2158,6 @@ router.post('/', rateLimit, async (req, res) => {
           throw e;
         }
       }
-
-      if (created) return;
-
-      
 
       const orderNumber = await getNextOrderNumber({ session });
       const settings = await SiteSettings.findOne().session(session).lean();
@@ -1959,6 +2189,26 @@ router.post('/', rateLimit, async (req, res) => {
       }
 
       const pricing = quote.pricing;
+      if (
+        orderNeedsElectronicDelivery(pricing.items) &&
+        !isValidDeliveryEmail(getOrderCustomerEmail(cleaned))
+      ) {
+        throw Object.assign(
+          new Error(
+            'Los productos digitales y servicios necesitan un correo válido para completar la entrega.'
+          ),
+          {
+            code: 'FULFILLMENT_EMAIL_REQUIRED',
+            statusCode: 400,
+          }
+        );
+      }
+
+      const reservableItems = await expandReservableItems(
+        pricing.items,
+        { session }
+      );
+      const reservationRequired = reservableItems.length > 0;
       const pricingSnapshot = buildPricingSnapshot(pricing);
       const couponSnapshot = buildOrderCouponSnapshot(quote);
       const discountSnapshot = buildOrderDiscountSnapshot(quote);
@@ -2022,6 +2272,8 @@ router.post('/', rateLimit, async (req, res) => {
         source: orderSource,
 
         inventoryControl: {
+          reservationRequired,
+          reservationId: null,
           discountedAtCheckout: false,
           restockedOnFailure: false,
           restockedAt: null,
@@ -2033,8 +2285,9 @@ router.post('/', rateLimit, async (req, res) => {
       created = await Order.create([{ ...base }], { session });
       created = created[0];
 
-      inventoryReservation = await createInventoryReservation(
-        {
+      if (reservationRequired) {
+        inventoryReservation = await createInventoryReservation(
+          {
           sessionId: cleaned.sessionId,
           order: created._id,
           orderNumber: created.orderNumber,
@@ -2048,7 +2301,7 @@ router.post('/', rateLimit, async (req, res) => {
             req.body?.payment?.transactionId ||
             '',
           source: 'checkout',
-          items: pricing.items,
+          items: created.items,
           branchPriorityIds: orderBranchData.branchId
             ? [String(orderBranchData.branchId)]
             : [],
@@ -2063,9 +2316,18 @@ router.post('/', rateLimit, async (req, res) => {
             orderBranchSnapshot: orderBranchData.branchSnapshot,
           },
           notes: 'Reserva automática creada al generar la orden online.',
-        },
-        { session }
-      );
+          },
+          { session }
+        );
+
+        created.inventoryControl.reservationId =
+          inventoryReservation?._id || null;
+        applyReservationToOrderDocument(
+          created,
+          inventoryReservation
+        );
+        await created.save({ session });
+      }
 
       if (quote.couponValidation?.valid && created.coupon?.coupon) {
         const redemption = await couponService.recordCouponRedemption(
@@ -2153,28 +2415,35 @@ router.post('/', rateLimit, async (req, res) => {
       }
 
       if (idempoKey) {
-        await IdempotencyKey.updateOne(
-          { key: idempoKey, endpoint },
-          {
-            $set: {
-              status: 'completed',
-              orderId: created._id,
-              response: {
-                _id: created._id,
-                orderNumber: created.orderNumber,
-                reservationId: inventoryReservation?._id || null,
-                reservationCode: inventoryReservation?.reservationCode || '',
-                subtotal: pricing.subtotal,
-                discount: pricing.totalDiscount,
-                tax: pricing.tax.amount,
-                shipping: pricing.shipping,
-                total: pricing.total,
-              },
-              completedAt: new Date(),
-            },
-          },
-          { session }
-        );
+        if (!activeIdempotencyRecord) {
+          throw Object.assign(
+            new Error('No se pudo finalizar el registro de idempotencia.'),
+            { code: 'IDEMPOTENCY_FINALIZATION_FAILED' }
+          );
+        }
+
+        activeIdempotencyRecord.status = 'completed';
+        activeIdempotencyRecord.orderId = created._id;
+        activeIdempotencyRecord.response = {
+          _id: created._id,
+          orderNumber: created.orderNumber,
+          reservationId: inventoryReservation?._id || null,
+          reservationCode: inventoryReservation?.reservationCode || '',
+          subtotal: pricing.subtotal,
+          discount: pricing.totalDiscount,
+          tax: pricing.tax.amount,
+          shipping: pricing.shipping,
+          total: pricing.total,
+        };
+        activeIdempotencyRecord.completedAt = new Date();
+        await activeIdempotencyRecord.save({ session });
+
+        if (activeIdempotencyRecord.status !== 'completed') {
+          throw Object.assign(
+            new Error('El registro de idempotencia no quedó completado.'),
+            { code: 'IDEMPOTENCY_FINALIZATION_FAILED' }
+          );
+        }
       }
     });
 
@@ -2704,58 +2973,58 @@ router.get(
  * ======================================================= */
 router.options('/:id/refund', (_req, res) => res.sendStatus(204));
 
-router.post('/:id/refund', requireAdmin, async (req, res) => {
-  const session = await mongoose.startSession();
-
+router.post(
+  '/:id/refund',
+  requireAdmin,
+  requirePermission('orders:refund'),
+  async (req, res) => {
   try {
-    const id = req.params.id;
-    const amount = Number(req.body?.amount || 0);
-    const reason = String(req.body?.reason || '').trim();
-    const items = Array.isArray(req.body?.items) ? req.body.items : [];
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        error: 'AMOUNT_INVALID',
-        message: 'Monto inválido.',
-      });
-    }
-
-    const order = await Order.findById(id).lean();
-
-    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    await session.withTransaction(async () => {
-      if (items.length) {
-        await incrementStock(items, { session });
+    const result = await processOrderRefund(
+      {
+        orderId: req.params.id,
+        amount: req.body?.amount,
+        reason: req.body?.reason,
+        items: req.body?.items,
+        idempotencyKey:
+          req.headers['x-idempotency-key'] ||
+          req.body?.idempotencyKey ||
+          '',
+        adminId:
+          req.adminUserId ||
+          req.user?._id ||
+          req.user?.id ||
+          null,
+        adminLabel:
+          req.adminDisplayName ||
+          req.adminUsername ||
+          req.user?.displayName ||
+          req.user?.username ||
+          req.headers['x-admin-user'] ||
+          'admin',
+      },
+      {
+        OrderEventModel: OrderEvent,
       }
+    );
 
-      await OrderEvent.create(
-        [
-          {
-            orderId: order._id,
-            type: 'refund_created',
-            message: `Reembolso por ${moneyCOP(amount)}${reason ? ` · ${reason}` : ''}`,
-            meta: {
-              amount,
-              currency: 'COP',
-              reason,
-              items,
-              by: req.headers['x-admin-user'] || 'admin',
-            },
-          },
-        ],
-        { session }
-      );
+    return res.status(result.idempotent ? 200 : 201).json({
+      ok: true,
+      idempotent: result.idempotent,
+      refund: result.refund,
     });
-
-    return res.json({ ok: true });
   } catch (e) {
     console.error('POST /orders/:id/refund', e);
-    return res.status(500).json({ error: 'No se pudo procesar el reembolso' });
-  } finally {
-    session.endSession();
+    return res.status(Number(e.statusCode || 500)).json({
+      error: e.code || 'ORDER_REFUND_FAILED',
+      message:
+        e.statusCode && e.message
+          ? e.message
+          : 'No se pudo procesar el reembolso.',
+      details: e.details || undefined,
+    });
   }
-});
+  }
+);
 
 /* =========================================================
  * POST /api/orders/admin/bulk
@@ -2766,9 +3035,17 @@ router.post('/admin/bulk', async (req, res) => {
 
     if (ids.length === 0) return res.status(400).json({ error: 'IDS_REQUIRED' });
 
-    const objIds = ids.map(asObjectId).filter(Boolean);
+    const uniqueIds = Array.from(
+      new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))
+    );
+    const objIds = uniqueIds.map(asObjectId).filter(Boolean);
 
-    if (objIds.length === 0) return res.status(400).json({ error: 'INVALID_IDS' });
+    if (objIds.length !== uniqueIds.length) {
+      return res.status(400).json({
+        error: 'INVALID_IDS',
+        message: 'La selección contiene identificadores de orden inválidos.',
+      });
+    }
 
     const action = req.body?.action || {};
     const type = String(action.type || '').toLowerCase();
@@ -2776,53 +3053,32 @@ router.post('/admin/bulk', async (req, res) => {
     let modified = 0;
     const events = [];
 
-    const STATUS_MAP = new Map([
-      ['pendiente', 'pending'],
-      ['pending', 'pending'],
-      ['procesando', 'processing'],
-      ['processing', 'processing'],
-      ['pagado', 'paid'],
-      ['paid', 'paid'],
-      ['enviado', 'shipped'],
-      ['shipped', 'shipped'],
-      ['cancelado', 'cancelled'],
-      ['cancelada', 'cancelled'],
-      ['cancelled', 'cancelled'],
-      ['canceled', 'cancelled'],
-      ['reembolsado', 'refunded'],
-      ['reembolsada', 'refunded'],
-      ['refunded', 'refunded'],
-    ]);
-
     if (type === 'status') {
-      const raw = String(action.value || '').toLowerCase().trim();
-      const status = STATUS_MAP.get(raw);
-
-      if (!status) return res.status(400).json({ error: 'INVALID_STATUS' });
-
-      const orders = await Order.find({ _id: { $in: objIds } });
-
-      for (const o of orders) {
-        const prev = o.status;
-
-        if (prev === status) continue;
-
-        o.status = status;
-        await o.save();
-
-        modified++;
-
-        events.push({
-          orderId: o._id,
-          type: 'status_changed',
-          message: `Estado: ${prev || '—'} -> ${status}`,
-          meta: {
-            from: prev || null,
-            to: status,
-            by: 'admin_bulk',
+      const result = await processBulkOrderStatusTransitions(
+        {
+          orderIds: objIds,
+          status: action.value,
+          actor: {
+            id:
+              req.adminUserId ||
+              req.user?._id ||
+              req.user?.id ||
+              null,
+            label:
+              req.adminDisplayName ||
+              req.adminUsername ||
+              req.headers['x-admin-user'] ||
+              'admin',
+            source: 'admin_bulk',
+            ip: req.ip,
           },
-        });
-      }
+        },
+        {
+          OrderEventModel: OrderEvent,
+        }
+      );
+
+      return res.status(result.failed > 0 ? 207 : 200).json(result);
     } else if (type === 'tags_add') {
       const tags = normalizeTags(action.value || action.values || []);
 
@@ -2872,7 +3128,12 @@ router.post('/admin/bulk', async (req, res) => {
     res.json({ ok: true, modified });
   } catch (e) {
     console.error('POST /orders/admin/bulk', e);
-    res.status(500).json({ error: 'No se pudieron aplicar las acciones masivas' });
+    res.status(e.statusCode || e.status || 500).json({
+      error: e.code || 'ORDER_BULK_ACTION_FAILED',
+      message:
+        e.message || 'No se pudieron aplicar las acciones masivas',
+      details: e.details || undefined,
+    });
   }
 });
 

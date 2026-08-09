@@ -571,6 +571,17 @@ export default function InventoryTransferModal({
       branchTo: form.destinationBranchId,
       size: getVariantSize(selectedSourceStock),
       color: getVariantColor(selectedSourceStock),
+      variantKey: selectedSourceStock?.variantKey || '',
+      variantLabel: selectedSourceStock?.variant?.label || '',
+      variantAttributes: Array.isArray(
+        selectedSourceStock?.variant?.attributes
+      )
+        ? selectedSourceStock.variant.attributes
+        : [],
+      variant: {
+        ...(selectedSourceStock?.variant || {}),
+        variantKey: selectedSourceStock?.variantKey || '',
+      },
       quantity,
       reason: cleanText(form.reason),
       reference: cleanText(form.reference),

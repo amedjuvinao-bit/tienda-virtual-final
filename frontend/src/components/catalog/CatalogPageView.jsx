@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
+import { normalizeProductPageResponse } from "../../utils/productPagination";
 import {
   Filter,
   ChevronLeft,
@@ -992,6 +993,18 @@ export default function CatalogPageView({
   );
 
   const [products, setProducts] = useState([]);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [productPagination, setProductPagination] = useState({
+    page: 1,
+    limit: 24,
+    totalProducts: 0,
+    totalPages: 0,
+    from: 0,
+    to: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  });
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
@@ -1076,18 +1089,6 @@ export default function CatalogPageView({
     isMobile,
     hydratedFromURL,
   ]);
-
-  useEffect(() => {
-    fetch(`${API}/api/products`)
-      .then((r) => r.json())
-      .then((data) => {
-        const todos = Array.isArray(data) ? data : [];
-        setProducts(todos);
-      })
-      .catch((e) =>
-        console.error("Error al cargar productos del catálogo:", e)
-      );
-  }, []);
 
   useEffect(() => {
     if (hydratedFromURL) return;
@@ -1196,80 +1197,9 @@ const safeMax = Math.min(DEFAULT_MAX, Math.max(min, max));
     safeConfig.columnsMobile,
   ]);
 
-  const filteredProducts = useMemo(() => {
-    const selColorsLower = selectedColors.map((c) =>
-      String(c).toLowerCase()
-    );
-    const selCatsLower = selectedCategories.map((c) =>
-      String(c).toLowerCase()
-    );
-
-    const allowedCategories = parseCsvArray(
-      safeConfig.allowedCategoriesText
-    ).map((c) => String(c).toLowerCase());
-
-    const manualKeys = parseCsvArray(safeConfig.manualProductIdsText).map((c) =>
-      String(c).toLowerCase()
-    );
-
-    const result = products.filter((product) => {
-      if (safeConfig.onlyActive && product?.active === false) return false;
-
-      const productId = String(product?._id || "").toLowerCase();
-      const productSlug = String(product?.slug || "").toLowerCase();
-
-      const prodCats =
-        Array.isArray(product?.categories) && product.categories.length
-          ? product.categories
-          : product?.category
-            ? [product.category]
-            : [];
-
-      const prodCatsLower = prodCats.map((c) => String(c).toLowerCase());
-
-      if (safeConfig.sourceMode === "categories") {
-        const matchesAllowedUniverse =
-          allowedCategories.length > 0 &&
-          prodCatsLower.some((pc) => allowedCategories.includes(pc));
-
-        if (!matchesAllowedUniverse) return false;
-      }
-
-      if (safeConfig.sourceMode === "manual") {
-        const matchesManualUniverse =
-          manualKeys.length > 0 &&
-          (manualKeys.includes(productId) || manualKeys.includes(productSlug));
-
-        if (!matchesManualUniverse) return false;
-      }
-
-      const matchesCategory =
-        selCatsLower.length === 0 ||
-        prodCatsLower.some((pc) => selCatsLower.includes(pc));
-
-      const prodColors = Array.isArray(product?.colors) ? product.colors : [];
-      const prodColorsLower = prodColors.map((c) => {
-        if (typeof c === "string") return c.toLowerCase();
-        return String(c?.hex || c?.value || c?.name || "").toLowerCase();
-      });
-
-      const matchesColor =
-        selColorsLower.length === 0 ||
-        prodColorsLower.some((pc) => selColorsLower.includes(pc));
-
-      const matchesPrice =
-        Number(product?.price || 0) >= priceRange[0] &&
-        Number(product?.price || 0) <= priceRange[1];
-
-      return matchesCategory && matchesColor && matchesPrice;
-    });
-
-    const limit = clampInt(safeConfig.limit, 0, 200, 0);
-    if (limit > 0) return result.slice(0, limit);
-
-    return result;
+  useEffect(() => {
+    setCatalogPage(1);
   }, [
-    products,
     selectedColors,
     selectedCategories,
     priceRange,
@@ -1277,8 +1207,96 @@ const safeMax = Math.min(DEFAULT_MAX, Math.max(min, max));
     safeConfig.sourceMode,
     safeConfig.allowedCategoriesText,
     safeConfig.manualProductIdsText,
-    safeConfig.onlyActive,
   ]);
+
+  useEffect(() => {
+    if (!hydratedFromURL) return undefined;
+    const categoryScope = safeConfig.sourceMode === "categories"
+      ? parseCsvArray(safeConfig.allowedCategoriesText)
+      : [];
+    const productKeys = safeConfig.sourceMode === "manual"
+      ? parseCsvArray(safeConfig.manualProductIdsText)
+      : [];
+    if (
+      (safeConfig.sourceMode === "categories" && categoryScope.length === 0) ||
+      (safeConfig.sourceMode === "manual" && productKeys.length === 0)
+    ) {
+      setProducts([]);
+      setProductPagination((current) => ({
+        ...current,
+        page: catalogPage,
+        totalProducts: 0,
+        totalPages: 0,
+        from: 0,
+        to: 0,
+        hasPreviousPage: catalogPage > 1,
+        hasNextPage: false,
+      }));
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const pageLimit = safeConfig.limit > 0
+      ? clampInt(safeConfig.limit, 1, 100, 24)
+      : 24;
+    const params = new URLSearchParams({
+      page: String(catalogPage),
+      limit: String(pageLimit),
+      sort: "-createdAt",
+      status: "published",
+      minPrice: String(priceRange[0]),
+      maxPrice: String(priceRange[1]),
+    });
+    if (selectedCategories.length) {
+      selectedCategories.forEach((value) => params.append("category", value));
+    }
+    selectedColors.forEach((value) => params.append("color", value));
+    categoryScope.forEach((value) => params.append("categoryScope", value));
+    productKeys.forEach((value) => params.append("productKeys", value));
+
+    setProductsLoading(true);
+    fetch(`${API}/api/products?${params.toString()}`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((payload) => {
+        const pageResult = normalizeProductPageResponse(payload, pageLimit);
+        if (
+          pageResult.pagination.totalPages > 0 &&
+          pageResult.pagination.page > pageResult.pagination.totalPages
+        ) {
+          setCatalogPage(pageResult.pagination.totalPages);
+          return;
+        }
+        setProducts(pageResult.products);
+        setProductPagination(pageResult.pagination);
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        console.error("Error al cargar productos del catálogo:", error);
+        setProducts([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setProductsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [
+    catalogPage,
+    hydratedFromURL,
+    priceRange,
+    safeConfig.allowedCategoriesText,
+    safeConfig.limit,
+    safeConfig.manualProductIdsText,
+    safeConfig.sourceMode,
+    selectedCategories,
+    selectedColors,
+  ]);
+
+  const filteredProducts = products;
 
   const activeFilters = [
     ...selectedCategories.map((c) => ({ type: "cat", label: c })),
@@ -1518,8 +1536,8 @@ const safeMax = Math.min(DEFAULT_MAX, Math.max(min, max));
                 <div className="cpv-toolbar">
                   <div className="cpv-toolbar-left">
                     <span className="cpv-result-pill">
-                      <strong>{filteredProducts.length}</strong>
-                      {filteredProducts.length === 1
+                      <strong>{productPagination.totalProducts}</strong>
+                      {productPagination.totalProducts === 1
                         ? " producto"
                         : " productos"}
                     </span>
@@ -1621,7 +1639,11 @@ const safeMax = Math.min(DEFAULT_MAX, Math.max(min, max));
                 className={`cpv-grid ${colClasses[renderedCols] || colClasses[4]}`}
                 style={gridStyle}
               >
-                {filteredProducts.length === 0 ? (
+                {productsLoading ? (
+                  <div className="cpv-empty">
+                    <p>Cargando productos...</p>
+                  </div>
+                ) : filteredProducts.length === 0 ? (
                   <div className="cpv-empty">
                     <div className="cpv-empty-icon">🔍</div>
                     <h3>{safeConfig.emptyTitle}</h3>
@@ -1645,6 +1667,30 @@ const safeMax = Math.min(DEFAULT_MAX, Math.max(min, max));
                   ))
                 )}
               </div>
+
+              {productPagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    className="cpv-filter-chip"
+                    disabled={!productPagination.hasPreviousPage || productsLoading}
+                    onClick={() => setCatalogPage((current) => Math.max(1, current - 1))}
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Página {productPagination.page} de {productPagination.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="cpv-filter-chip"
+                    disabled={!productPagination.hasNextPage || productsLoading}
+                    onClick={() => setCatalogPage((current) => current + 1)}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
             </main>
           </div>
 

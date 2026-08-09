@@ -1,5 +1,5 @@
 // src/admin/FormularioProducto.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -14,6 +14,41 @@ import {
   getVariantPresetMeta,
   shouldTrackInventoryByType,
 } from './products/productCatalogConfig';
+import variantKeyAuthority from '@shared/variant-key-authority';
+
+const {
+  buildVariantKey,
+  normalizeVariantKey,
+  resolveVariantIdentity,
+} = variantKeyAuthority;
+
+export function formatProductSaveError(error) {
+  const response = error?.response?.data;
+  const validationErrors = Array.isArray(response?.errors)
+    ? response.errors
+    : [];
+
+  const details = validationErrors
+    .map((entry) => {
+      const field = String(entry?.field || '').trim();
+      const message = String(entry?.message || '').trim();
+      if (!message) return '';
+      return field ? `${field}: ${message}` : message;
+    })
+    .filter(Boolean);
+
+  if (details.length) return details.join(' · ');
+
+  const status = error?.response?.status;
+  return (
+    response?.message ||
+    (status === 401
+      ? 'No autorizado.'
+      : status === 409
+        ? 'Dato único duplicado.'
+        : 'Error al guardar')
+  );
+}
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_PRESET;
@@ -58,6 +93,32 @@ function normalizeStringArray(arr, max = Infinity) {
   return out;
 }
 
+function getReferenceId(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return String(value._id || value.id || '');
+}
+
+function createCommercialFieldRow(index = 0) {
+  return {
+    key: '',
+    label: '',
+    group: 'General',
+    type: 'text',
+    value: '',
+    public: true,
+    sortOrder: index,
+  };
+}
+
+function createBundleComponentRow(value = {}) {
+  return {
+    product: getReferenceId(value.product || value.productId),
+    variantKey: normalizeVariantKey(value.variantKey) || '',
+    quantity: Math.max(1, Math.floor(Number(value.quantity || 1))),
+  };
+}
+
 function toMoney(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.round(number)) : Math.max(0, Math.round(Number(fallback || 0)));
@@ -67,16 +128,119 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-function buildVariantKey(size = '', color = '') {
-  const sizeKey = cleanText(size).toLowerCase();
-  const colorKey = cleanText(color).toLowerCase();
-  const key = `${sizeKey}__${colorKey}`;
-  return !key || key === '__' ? 'default__default' : key;
+function normalizeAttributeKey(value) {
+  return cleanText(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
-function buildVariantLabel(size = '', color = '') {
-  const parts = [cleanText(size), cleanText(color)].filter(Boolean);
+function normalizeVariantAttributes(attributes = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const attribute of Array.isArray(attributes) ? attributes : []) {
+    const label = cleanText(
+      attribute?.label || attribute?.name || attribute?.key || ''
+    ).slice(0, 120);
+    const key = normalizeAttributeKey(
+      attribute?.key || attribute?.name || label
+    );
+    const value = cleanText(attribute?.value || '').slice(0, 160);
+    if (!key || !value || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label: label || key, value });
+    if (out.length >= 4) break;
+  }
+
+  return out;
+}
+
+function normalizeVariantForPayload(variant = {}) {
+  const identity = resolveVariantIdentity({
+    size: variant.size,
+    color: variant.color,
+    attributes: normalizeVariantAttributes(variant.attributes),
+  });
+
+  return {
+    ...variant,
+    variantKey: identity.variantKey,
+    size: identity.size,
+    color: identity.color,
+    attributes: identity.attributes,
+  };
+}
+
+function buildVariantLabel(size = '', color = '', attributes = []) {
+  const attributeValues = normalizeVariantAttributes(attributes)
+    .map((attribute) => attribute.value)
+    .filter(Boolean);
+  const parts = attributeValues.length
+    ? attributeValues
+    : [cleanText(size), cleanText(color)].filter(Boolean);
   return parts.join(' / ') || 'Variante general';
+}
+
+function normalizeVariantAxes(axes = [], preset = null) {
+  const source =
+    Array.isArray(axes) && axes.length
+      ? axes
+      : (preset?.axes || []).map((label) => ({ label, values: [] }));
+  const out = [];
+  const seen = new Set();
+
+  for (const axis of source) {
+    const label = cleanText(
+      typeof axis === 'string'
+        ? axis
+        : axis?.label || axis?.name || axis?.key || ''
+    ).slice(0, 40);
+    const key = normalizeAttributeKey(
+      typeof axis === 'string' ? label : axis?.key || label
+    );
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      key,
+      label: label || key,
+      values: normalizeStringArray(axis?.values || [], 40),
+    });
+    if (out.length >= 4) break;
+  }
+
+  return out;
+}
+
+export function shouldPreserveLegacyEmptyVariants({
+  isEditing = false,
+  loadedHadExplicitVariants = true,
+  loadedAxesSignature = '',
+  currentAxes = [],
+} = {}) {
+  return (
+    isEditing &&
+    loadedHadExplicitVariants === false &&
+    loadedAxesSignature === JSON.stringify(normalizeVariantAxes(currentAxes))
+  );
+}
+
+function getLegacyVariantFields(attributes = []) {
+  const normalized = normalizeVariantAttributes(attributes);
+  const colorAttribute = normalized.find((attribute) =>
+    ['color', 'colour', 'tono'].includes(attribute.key)
+  );
+  const sizeAttribute = normalized.find(
+    (attribute) => !['color', 'colour', 'tono'].includes(attribute.key)
+  );
+
+  return {
+    size: sizeAttribute?.value || '',
+    color: colorAttribute?.value || '',
+  };
 }
 
 function getColorValue(color) {
@@ -98,17 +262,39 @@ function getInitialTrackInventory(productType, explicitValue) {
   return shouldTrackInventoryByType(productType);
 }
 
-function normalizeLoadedVariants(product = {}) {
+export function normalizeLoadedVariants(product = {}) {
   if (Array.isArray(product.variants) && product.variants.length) {
     return product.variants.map((variant, index) => {
       const size = cleanText(variant.size || '');
       const color = cleanText(variant.color || '');
-      const key = cleanText(variant.variantKey || buildVariantKey(size, color)).toLowerCase();
+      const attributes = normalizeVariantAttributes(
+        variant.attributes || variant.variantAttributes || []
+      );
+      let identity;
+      try {
+        identity = resolveVariantIdentity({
+          variantKey: variant.variantKey,
+          size,
+          color,
+          attributes,
+        });
+      } catch (error) {
+        if (error?.code !== 'VARIANT_KEY_MISMATCH') throw error;
+
+        // Compatibilidad de edición para claves heredadas construidas con
+        // etiquetas visibles. La reconstrucción sigue perteneciendo
+        // exclusivamente a variantKeyAuthority.
+        identity = resolveVariantIdentity({ size, color, attributes });
+      }
       return {
-        variantKey: key,
-        label: cleanText(variant.label || buildVariantLabel(size, color)),
-        size,
-        color,
+        variantKey: identity.variantKey,
+        label: cleanText(
+          variant.label ||
+            buildVariantLabel(size, color, attributes)
+        ),
+        size: identity.size,
+        color: identity.color,
+        attributes: identity.attributes,
         sku: cleanText(variant.sku || '').toUpperCase(),
         barcode: cleanText(variant.barcode || ''),
         price: variant.price ?? '',
@@ -134,6 +320,7 @@ function normalizeLoadedVariants(product = {}) {
         label: buildVariantLabel(size, color),
         size,
         color,
+        attributes: [],
         sku: '',
         barcode: '',
         price: '',
@@ -148,42 +335,80 @@ function normalizeLoadedVariants(product = {}) {
     });
 }
 
-function mergeAdvancedVariants({ previous = [], sizes = [], colors = [], stockMap = {}, basePrice = 0, baseCost = 0 }) {
-  const cleanSizes = normalizeStringArray(sizes);
-  const cleanColors = normalizeStringArray(colors.map(getColorValue).filter(Boolean), 10);
-  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
+function buildAxisCombinations(axes = [], maximum = 300) {
+  const configuredAxes = normalizeVariantAxes(axes)
+    .filter((axis) => axis.values.length > 0);
+  if (!configuredAxes.length) return [];
 
-  const axisValues = cleanSizes.length ? cleanSizes : [''];
-  const colorValues = cleanColors.length ? cleanColors : [''];
+  let combinations = [[]];
+  for (const axis of configuredAxes) {
+    const next = [];
+    for (const combination of combinations) {
+      for (const value of axis.values) {
+        next.push([
+          ...combination,
+          { key: axis.key, label: axis.label, value },
+        ]);
+        if (next.length >= maximum) break;
+      }
+      if (next.length >= maximum) break;
+    }
+    combinations = next;
+  }
+
+  return combinations;
+}
+
+function mergeAdvancedVariants({
+  previous = [],
+  axes = [],
+  basePrice = 0,
+  baseCost = 0,
+}) {
+  const existingByKey = new Map(previous.map((variant) => [cleanText(variant.variantKey).toLowerCase(), variant]));
   const combos = [];
 
-  if (!cleanSizes.length && !cleanColors.length) return previous;
+  const combinations = buildAxisCombinations(axes);
+  if (!combinations.length) return previous;
+  const legacyIdentity =
+    previous.length > 0 &&
+    previous.every(
+      (variant) =>
+        normalizeVariantAttributes(variant.attributes).length === 0
+    ) &&
+    normalizeVariantAxes(axes).filter(
+      (axis) => axis.values.length > 0
+    ).length <= 2;
 
-  axisValues.forEach((size) => {
-    colorValues.forEach((color) => {
-      const key = buildVariantKey(size, color);
-      const existing = existingByKey.get(key);
-      const stockKey = `${size}|||${color}`;
-      const initialStock = Math.max(0, Math.floor(Number(stockMap[stockKey] ?? existing?.initialStock ?? 0)));
+  combinations.forEach((attributes) => {
+    const { size, color } = getLegacyVariantFields(attributes);
+    const storedAttributes = legacyIdentity ? [] : attributes;
+    const key = buildVariantKey(size, color, storedAttributes);
+    const existing = existingByKey.get(key);
 
-      combos.push({
-        variantKey: key,
-        label: existing?.label || buildVariantLabel(size, color),
-        size,
-        color,
-        sku: existing?.sku || '',
-        barcode: existing?.barcode || '',
-        price: existing?.price ?? '',
-        cost: existing?.cost ?? '',
-        originalPrice: existing?.originalPrice ?? '',
-        image: existing?.image || '',
-        images: normalizeStringArray(existing?.images || [], 8),
-        initialStock,
-        active: existing?.active !== false,
-        sortOrder: existing?.sortOrder ?? combos.length,
-        _basePrice: basePrice,
-        _baseCost: baseCost,
-      });
+    combos.push({
+      variantKey: key,
+      label:
+        existing?.label ||
+        buildVariantLabel(size, color, attributes),
+      size,
+      color,
+      attributes: storedAttributes,
+      sku: existing?.sku || '',
+      barcode: existing?.barcode || '',
+      price: existing?.price ?? '',
+      cost: existing?.cost ?? '',
+      originalPrice: existing?.originalPrice ?? '',
+      image: existing?.image || '',
+      images: normalizeStringArray(existing?.images || [], 8),
+      initialStock: Math.max(
+        0,
+        Math.floor(Number(existing?.initialStock || 0))
+      ),
+      active: existing?.active !== false,
+      sortOrder: existing?.sortOrder ?? combos.length,
+      _basePrice: basePrice,
+      _baseCost: baseCost,
     });
   });
 
@@ -292,20 +517,36 @@ export default function FormularioProducto() {
   const [unitOfMeasure, setUnitOfMeasure] = useState('unit');
   const [allowBackorder, setAllowBackorder] = useState(false);
   const [variantPreset, setVariantPreset] = useState('fashion');
+  const [variantAxes, setVariantAxes] = useState(() =>
+    normalizeVariantAxes([], getVariantPresetMeta('fashion'))
+  );
+  const [variantAxisDrafts, setVariantAxisDrafts] = useState({});
 
   const [categoria, setCategoria] = useState('');
   const [originalCategoria, setOriginalCategoria] = useState('');
   const [catOptions, setCatOptions] = useState([]);
   const [categoriesExtra, setCategoriesExtra] = useState([]);
-  const [catInput, setCatInput] = useState('');
+  const [taxonomy, setTaxonomy] = useState({
+    categories: [],
+    collections: [],
+    legacyCategories: [],
+  });
+  const [primaryCategoryId, setPrimaryCategoryId] = useState('');
+  const [categoryIds, setCategoryIds] = useState([]);
+  const [collectionIds, setCollectionIds] = useState([]);
+  const [taxonomyName, setTaxonomyName] = useState('');
+  const [taxonomyKind, setTaxonomyKind] = useState('category');
+  const [taxonomyParent, setTaxonomyParent] = useState('');
+  const [taxonomySaving, setTaxonomySaving] = useState(false);
 
   const [colorsArr, setColorsArr] = useState([]);
   const [colorsText, setColorsText] = useState('');
   const [stock, setStock] = useState(0);
   const [sizes, setSizes] = useState([]);
-  const [sizeInput, setSizeInput] = useState('');
   const [variantStock, setVariantStock] = useState({});
   const [advancedVariants, setAdvancedVariants] = useState([]);
+  const loadedVariantAxesSignatureRef = useRef('');
+  const loadedHadExplicitVariantsRef = useRef(true);
   const [expandedVariant, setExpandedVariant] = useState('');
 
   const [reorderPoint, setReorderPoint] = useState(0);
@@ -326,6 +567,39 @@ export default function FormularioProducto() {
   const [supplierName, setSupplierName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [notes, setNotes] = useState('');
+  const [tags, setTags] = useState([]);
+  const [tagsInput, setTagsInput] = useState('');
+  const [seoTitle, setSeoTitle] = useState('');
+  const [seoDescription, setSeoDescription] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState([]);
+  const [seoKeywordsInput, setSeoKeywordsInput] = useState('');
+  const [seoImage, setSeoImage] = useState('');
+  const [canonicalUrl, setCanonicalUrl] = useState('');
+  const [seoNoIndex, setSeoNoIndex] = useState(false);
+  const [commercialFields, setCommercialFields] = useState([]);
+  const [digitalDelivery, setDigitalDelivery] = useState({
+    deliveryMode: 'automatic',
+    assetUrl: '',
+    fileName: '',
+    mimeType: '',
+    fileSizeBytes: 0,
+    downloadLimit: 3,
+    accessDays: 30,
+    customerMessage: '',
+  });
+  const [serviceDelivery, setServiceDelivery] = useState({
+    fulfillmentMode: 'scheduled',
+    locationType: 'online',
+    durationMinutes: 60,
+    leadTimeHours: 0,
+    bookingUrl: '',
+    customerInstructions: '',
+    internalInstructions: '',
+  });
+  const [bundleComponents, setBundleComponents] = useState([]);
+  const [bundleCandidates, setBundleCandidates] = useState([]);
+  const [bundleProductDetails, setBundleProductDetails] = useState({});
+  const [bundleCandidatesLoading, setBundleCandidatesLoading] = useState(false);
 
   const selectedType = useMemo(() => getProductTypeMeta(productType), [productType]);
   const selectedPreset = useMemo(() => getVariantPresetMeta(variantPreset), [variantPreset]);
@@ -337,11 +611,59 @@ export default function FormularioProducto() {
   }, [colorsArr]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) return undefined;
 
-    api.get(`/api/products/${id}`)
-      .then(({ data }) => {
-        const p = data || {};
+    let active = true;
+    const controller = new AbortController();
+
+    const notifyLoadError = (message) => {
+      if (!active) return;
+
+      try {
+        toast.error(message);
+      } catch (notificationError) {
+        console.error(
+          '[FormularioProducto] Error de presentación al mostrar la notificación:',
+          notificationError
+        );
+      }
+    };
+
+    const loadProduct = async () => {
+      let p;
+
+      try {
+        const { data } = await api.get(`/api/products/admin/${id}`, {
+          signal: controller.signal,
+        });
+
+        if (!active) return;
+        p = data || {};
+      } catch (requestError) {
+        if (
+          !active ||
+          controller.signal.aborted ||
+          axios.isCancel(requestError) ||
+          requestError?.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+
+        if (requestError?.response?.status === 404) {
+          notifyLoadError('Este producto no existe o fue eliminado.');
+          navigate('/admin/productos');
+        } else {
+          console.error(
+            '[FormularioProducto] Error HTTP al cargar el producto:',
+            requestError
+          );
+          notifyLoadError('Error al cargar producto');
+        }
+
+        return;
+      }
+
+      try {
         const loadedProductType = p.productType || 'physical';
         const loadedTrackInventory = getInitialTrackInventory(loadedProductType, p.trackInventory);
 
@@ -356,10 +678,39 @@ export default function FormularioProducto() {
         setTrackInventory(loadedTrackInventory);
         setUnitOfMeasure(p.unitOfMeasure || 'unit');
         setAllowBackorder(p.allowBackorder === true);
-        setVariantPreset(p.variantPreset || (Array.isArray(p.sizes) && p.sizes.length ? 'fashion' : 'none'));
+        const loadedVariantPreset =
+          p.variantPreset ||
+          (Array.isArray(p.sizes) && p.sizes.length
+            ? 'fashion'
+            : 'none');
+        setVariantPreset(loadedVariantPreset);
+        setVariantAxes(
+          normalizeVariantAxes(
+            p.variantAxes,
+            getVariantPresetMeta(loadedVariantPreset)
+          )
+        );
         setCategoria(p.category || '');
         setOriginalCategoria(p.category || '');
         setCategoriesExtra(normalizeStringArray(p.categories || []));
+        const loadedPrimaryCategoryId = getReferenceId(
+          p.primaryCategoryRef
+        );
+        const loadedCategoryIds = normalizeStringArray(
+          (p.categoryRefs || []).map(getReferenceId)
+        );
+        setPrimaryCategoryId(loadedPrimaryCategoryId);
+        setCategoryIds(
+          loadedPrimaryCategoryId &&
+          !loadedCategoryIds.includes(loadedPrimaryCategoryId)
+            ? [loadedPrimaryCategoryId, ...loadedCategoryIds]
+            : loadedCategoryIds
+        );
+        setCollectionIds(
+          normalizeStringArray(
+            (p.collectionRefs || []).map(getReferenceId)
+          )
+        );
 
         let normalizedColors = [];
         if (Array.isArray(p.colors) && p.colors.length) {
@@ -393,6 +744,14 @@ export default function FormularioProducto() {
         }
 
         const loadedVariants = normalizeLoadedVariants(p);
+        loadedHadExplicitVariantsRef.current =
+          Array.isArray(p.variants) && p.variants.length > 0;
+        loadedVariantAxesSignatureRef.current = JSON.stringify(
+          normalizeVariantAxes(
+            p.variantAxes,
+            getVariantPresetMeta(loadedVariantPreset)
+          )
+        );
         setAdvancedVariants(loadedVariants);
         if (loadedVariants[0]?.variantKey) setExpandedVariant(loadedVariants[0].variantKey);
 
@@ -413,31 +772,105 @@ export default function FormularioProducto() {
         setSupplierName(p.supplier?.name || '');
         setBarcode(p.barcode || '');
         setNotes(p.notes || '');
-      })
-      .catch((err) => {
-        if (err?.response?.status === 404) {
-          toast.error('Este producto no existe o fue eliminado.');
-          navigate('/admin/productos');
-        } else {
-          toast.error('Error al cargar producto');
-        }
-      });
+        setTags(normalizeStringArray(p.tags || [], 30));
+        setSeoTitle(p.seo?.title || '');
+        setSeoDescription(p.seo?.description || '');
+        setSeoKeywords(
+          normalizeStringArray(p.seo?.keywords || [], 15)
+        );
+        setSeoImage(p.seo?.image || '');
+        setCanonicalUrl(p.seo?.canonicalUrl || '');
+        setSeoNoIndex(p.seo?.noIndex === true);
+        setCommercialFields(
+          Array.isArray(p.commercialFields)
+            ? p.commercialFields.map((field, index) => ({
+                key: field?.key || '',
+                label: field?.label || '',
+                group: field?.group || 'General',
+                type: field?.type || 'text',
+                value: field?.value ?? '',
+                public: field?.public !== false,
+                sortOrder: index,
+              }))
+            : []
+        );
+        setDigitalDelivery({
+          deliveryMode: p.digitalDelivery?.deliveryMode || 'automatic',
+          assetUrl: p.digitalDelivery?.assetUrl || '',
+          fileName: p.digitalDelivery?.fileName || '',
+          mimeType: p.digitalDelivery?.mimeType || '',
+          fileSizeBytes: Number(p.digitalDelivery?.fileSizeBytes || 0),
+          downloadLimit: Number(p.digitalDelivery?.downloadLimit || 3),
+          accessDays: Number(p.digitalDelivery?.accessDays || 30),
+          customerMessage: p.digitalDelivery?.customerMessage || '',
+        });
+        setServiceDelivery({
+          fulfillmentMode: p.serviceDelivery?.fulfillmentMode || 'scheduled',
+          locationType: p.serviceDelivery?.locationType || 'online',
+          durationMinutes: Number(p.serviceDelivery?.durationMinutes || 60),
+          leadTimeHours: Number(p.serviceDelivery?.leadTimeHours || 0),
+          bookingUrl: p.serviceDelivery?.bookingUrl || '',
+          customerInstructions: p.serviceDelivery?.customerInstructions || '',
+          internalInstructions: p.serviceDelivery?.internalInstructions || '',
+        });
+        setBundleComponents(
+          Array.isArray(p.bundleComponents)
+            ? p.bundleComponents.map(createBundleComponentRow)
+            : []
+        );
+      } catch (processingError) {
+        console.error(
+          '[FormularioProducto] Error al procesar los datos del producto:',
+          processingError
+        );
+        notifyLoadError('Error al procesar los datos del producto');
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [id, navigate]);
 
+  const loadTaxonomy = async () => {
+    try {
+      const { data } = await api.get(
+        '/api/products/admin/taxonomy'
+      );
+      const next = {
+        categories: Array.isArray(data?.categories)
+          ? data.categories
+          : [],
+        collections: Array.isArray(data?.collections)
+          ? data.collections
+          : [],
+        legacyCategories: Array.isArray(data?.legacyCategories)
+          ? data.legacyCategories
+          : [],
+      };
+
+      setTaxonomy(next);
+      setCatOptions(
+        normalizeStringArray([
+          ...next.categories.map((item) => item.name),
+          ...next.legacyCategories,
+        ])
+      );
+      return next;
+    } catch (error) {
+      console.error(
+        'No fue posible cargar categorías y colecciones.',
+        error
+      );
+      return null;
+    }
+  };
+
   useEffect(() => {
-    api.get('/api/products', { params: { _: Date.now() } })
-      .then(({ data }) => {
-        const set = new Set();
-        (Array.isArray(data) ? data : []).forEach((p) => {
-          const cats = Array.isArray(p?.categories) && p.categories.length ? p.categories : p?.category ? [p.category] : [];
-          cats.forEach((cat) => {
-            const value = String(cat || '').trim();
-            if (value) set.add(value);
-          });
-        });
-        setCatOptions([...set]);
-      })
-      .catch(() => {});
+    loadTaxonomy();
   }, []);
 
   useEffect(() => {
@@ -457,23 +890,112 @@ export default function FormularioProducto() {
   }, [categoria, id, originalCategoria]);
 
   useEffect(() => {
+    if (['digital', 'service', 'bundle'].includes(productType)) {
+      setTrackInventory(false);
+      setAllowBackorder(false);
+      setVariantPreset('none');
+      return;
+    }
+
     if (!id) {
       setTrackInventory(shouldTrackInventoryByType(productType));
-      if (productType === 'digital' || productType === 'service') {
-        setVariantPreset('none');
-      }
     }
   }, [productType, id]);
+
+  useEffect(() => {
+    if (productType !== 'bundle') return undefined;
+
+    let cancelled = false;
+
+    const loadCandidates = async () => {
+      try {
+        setBundleCandidatesLoading(true);
+        const { data } = await api.get('/api/products/admin/list', {
+          params: {
+            page: 1,
+            limit: 100,
+            status: 'active',
+            sort: 'title',
+          },
+        });
+        if (cancelled) return;
+        const list = Array.isArray(data?.products) ? data.products : [];
+        setBundleCandidates(
+          list.filter(
+            (product) =>
+              product.productType !== 'bundle' &&
+              String(product._id) !== String(id || '')
+          )
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setBundleCandidates([]);
+          toast.error('No fue posible cargar los productos para el combo.');
+        }
+      } finally {
+        if (!cancelled) setBundleCandidatesLoading(false);
+      }
+    };
+
+    loadCandidates();
+    return () => {
+      cancelled = true;
+    };
+  }, [productType, id]);
+
+  useEffect(() => {
+    if (productType !== 'bundle') return;
+
+    const missingIds = bundleComponents
+      .map((component) => component.product)
+      .filter(
+        (productId) =>
+          productId && !bundleProductDetails[productId]
+      );
+
+    if (!missingIds.length) return;
+
+    let cancelled = false;
+    Promise.all(
+      [...new Set(missingIds)].map(async (productId) => {
+        const { data } = await api.get(`/api/products/admin/${productId}`);
+        return [productId, data || {}];
+      })
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setBundleProductDetails((previous) => ({
+          ...previous,
+          ...Object.fromEntries(entries),
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error('No fue posible cargar una variante del combo.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productType, bundleComponents, bundleProductDetails]);
 
   useEffect(() => {
     if (!trackInventory) return;
 
     setAdvancedVariants((prev) => {
+      const axesSignature = JSON.stringify(normalizeVariantAxes(variantAxes));
+      if (
+        prev.length > 0 &&
+        loadedVariantAxesSignatureRef.current === axesSignature
+      ) {
+        return prev;
+      }
+
+      loadedVariantAxesSignatureRef.current = '';
       const merged = mergeAdvancedVariants({
         previous: prev,
-        sizes,
-        colors: colorKeys,
-        stockMap: variantStock,
+        axes: variantAxes,
         basePrice: toMoney(precio, 0),
         baseCost: toMoney(cost || averageCost, 0),
       });
@@ -484,7 +1006,42 @@ export default function FormularioProducto() {
 
       return merged;
     });
-  }, [trackInventory, sizes, colorKeys, variantStock, precio, cost, averageCost, expandedVariant]);
+  }, [trackInventory, variantAxes, precio, cost, averageCost, expandedVariant]);
+
+  useEffect(() => {
+    const configuredAxes = normalizeVariantAxes(variantAxes);
+    const colorAxis = configuredAxes.find((axis) =>
+      ['color', 'colour', 'tono'].includes(axis.key)
+    );
+    const primaryAxis = configuredAxes.find(
+      (axis) => !['color', 'colour', 'tono'].includes(axis.key)
+    );
+    const nextSizes = normalizeStringArray(primaryAxis?.values || []);
+    const nextColors = normalizeStringArray(colorAxis?.values || [], 10);
+
+    setSizes(nextSizes);
+    setColorsArr(nextColors);
+    setColorsText(nextColors.join(', '));
+  }, [variantAxes]);
+
+  useEffect(() => {
+    setVariantAxisDrafts((previous) => {
+      const next = {};
+      normalizeVariantAxes(variantAxes).forEach((axis, index) => {
+        const draft = String(previous[index] || '');
+        const draftValues = normalizeStringArray(
+          draft.split(',').map((value) => value.trim()),
+          40
+        );
+        const keepsCurrentDraft =
+          JSON.stringify(draftValues) === JSON.stringify(axis.values);
+        next[index] = keepsCurrentDraft
+          ? draft
+          : axis.values.join(', ');
+      });
+      return next;
+    });
+  }, [variantAxes]);
 
   const subirImagen = async ({ file, gallery = false, variantKey = '' }) => {
     if (!file) return;
@@ -528,62 +1085,227 @@ export default function FormularioProducto() {
     const value = String(size || '').trim();
     if (!value) return;
 
-    setSizes((prev) => {
-      const exists = prev.some((item) => item.toLowerCase() === value.toLowerCase());
-      const next = exists
-        ? prev.filter((item) => item.toLowerCase() !== value.toLowerCase())
-        : [...prev, value];
-
-      const map = {};
-      Object.entries(variantStock).forEach(([key, qty]) => {
-        const [variantValue] = key.split('|||');
-        if (next.some((item) => item.toLowerCase() === variantValue.toLowerCase())) map[key] = qty;
-      });
-      setVariantStock(map);
-
-      return normalizeStringArray(next);
+    setVariantAxes((previous) => {
+      const axes = normalizeVariantAxes(previous, selectedPreset);
+      if (!axes.length) return previous;
+      const current = axes[0].values;
+      const exists = current.some(
+        (item) => item.toLowerCase() === value.toLowerCase()
+      );
+      axes[0] = {
+        ...axes[0],
+        values: exists
+          ? current.filter(
+              (item) => item.toLowerCase() !== value.toLowerCase()
+            )
+          : normalizeStringArray([...current, value], 40),
+      };
+      return axes;
     });
   };
 
-  const addSizesFromInput = () => {
-    if (!sizeInput.trim()) return;
-    const parts = sizeInput.split(',').map((part) => part.trim()).filter(Boolean);
-    setSizes((prev) => normalizeStringArray([...prev, ...parts]));
-    setSizeInput('');
+  const handleVariantPresetChange = (value) => {
+    const preset = getVariantPresetMeta(value);
+    setVariantPreset(value);
+    setVariantAxes((previous) => {
+      const previousAxes = normalizeVariantAxes(previous);
+      return normalizeVariantAxes(
+        (preset.axes || []).map((label) => {
+          const key = normalizeAttributeKey(label);
+          const existing = previousAxes.find(
+            (axis) => axis.key === key
+          );
+          return {
+            key,
+            label,
+            values: existing?.values || [],
+          };
+        }),
+        preset
+      );
+    });
   };
 
-  const addCatChip = (value) => {
-    const clean = String(value || '').trim();
-    if (!clean) return;
-    setCategoriesExtra((prev) => normalizeStringArray([...prev, clean]));
+  const updateVariantAxis = (index, patch) => {
+    setVariantAxes((previous) =>
+      normalizeVariantAxes(previous).map((axis, axisIndex) => {
+        if (axisIndex !== index) return axis;
+        const nextLabel =
+          patch.label === undefined
+            ? axis.label
+            : cleanText(patch.label).slice(0, 40);
+        return {
+          ...axis,
+          ...patch,
+          key:
+            patch.label === undefined
+              ? axis.key
+              : normalizeAttributeKey(nextLabel),
+          label: nextLabel,
+          values:
+            patch.values === undefined
+              ? axis.values
+              : normalizeStringArray(patch.values, 40),
+        };
+      })
+    );
+  };
+
+  const addVariantAxis = () => {
+    setVariantAxes((previous) => {
+      const axes = normalizeVariantAxes(previous);
+      if (axes.length >= 4) return axes;
+      const label = `Atributo ${axes.length + 1}`;
+      return [
+        ...axes,
+        {
+          key: normalizeAttributeKey(label),
+          label,
+          values: [],
+        },
+      ];
+    });
+  };
+
+  const removeVariantAxis = (index) => {
+    setVariantAxes((previous) =>
+      normalizeVariantAxes(previous).filter(
+        (_, axisIndex) => axisIndex !== index
+      )
+    );
   };
 
   const removeCatChip = (value) => {
     setCategoriesExtra((prev) => prev.filter((item) => item.toLowerCase() !== String(value).toLowerCase()));
   };
 
-  const handleCatInputKey = (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addCatChip(catInput);
-      setCatInput('');
+  const selectPrimaryCategory = (value) => {
+    const categoryId = String(value || '');
+    setPrimaryCategoryId(categoryId);
+
+    if (!categoryId) return;
+
+    const selected = taxonomy.categories.find(
+      (item) => item._id === categoryId
+    );
+    if (selected) setCategoria(selected.name);
+    setCategoryIds((previous) =>
+      normalizeStringArray([categoryId, ...previous])
+    );
+  };
+
+  const toggleReference = (value, setter) => {
+    const idValue = String(value || '');
+    if (!idValue) return;
+
+    setter((previous) =>
+      previous.includes(idValue)
+        ? previous.filter((item) => item !== idValue)
+        : [...previous, idValue]
+    );
+  };
+
+  const createTaxonomy = async () => {
+    const name = taxonomyName.trim();
+    if (!name || taxonomySaving) return;
+
+    setTaxonomySaving(true);
+    try {
+      const { data } = await api.post(
+        '/api/products/admin/taxonomy',
+        {
+          kind: taxonomyKind,
+          name,
+          parent:
+            taxonomyKind === 'category'
+              ? taxonomyParent || null
+              : null,
+        }
+      );
+      const created = data?.item;
+      await loadTaxonomy();
+
+      if (created?._id && created.kind === 'category') {
+        setPrimaryCategoryId(created._id);
+        setCategoria(created.name || name);
+        setCategoryIds((previous) =>
+          normalizeStringArray([
+            created._id,
+            ...previous,
+          ])
+        );
+      } else if (created?._id) {
+        setCollectionIds((previous) =>
+          normalizeStringArray([
+            ...previous,
+            created._id,
+          ])
+        );
+      }
+
+      setTaxonomyName('');
+      setTaxonomyParent('');
+      toast.success(
+        taxonomyKind === 'category'
+          ? 'Categoría creada'
+          : 'Colección creada'
+      );
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message ||
+          'No fue posible crear la clasificación.'
+      );
+    } finally {
+      setTaxonomySaving(false);
     }
   };
 
-  const setCell = (size, color, value) => {
-    const key = `${size}|||${color}`;
-    const qty = Math.max(0, Math.floor(Number(value) || 0));
-    setVariantStock((prev) => ({ ...prev, [key]: qty }));
-    const variantKey = buildVariantKey(size, color);
-    setAdvancedVariants((prev) => prev.map((variant) => (
-      variant.variantKey === variantKey ? { ...variant, initialStock: qty } : variant
-    )));
+  const addTokens = (rawValue, current, setter, maximum) => {
+    const values = String(rawValue || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    setter(normalizeStringArray([...current, ...values], maximum));
+  };
+
+  const updateCommercialField = (index, patch) => {
+    setCommercialFields((previous) =>
+      previous.map((field, fieldIndex) =>
+        fieldIndex === index
+          ? { ...field, ...patch }
+          : field
+      )
+    );
+  };
+
+  const removeCommercialField = (index) => {
+    setCommercialFields((previous) =>
+      previous.filter((_, fieldIndex) => fieldIndex !== index)
+    );
   };
 
   const updateVariant = (variantKey, patch) => {
     setAdvancedVariants((prev) => prev.map((variant) => (
       variant.variantKey === variantKey ? { ...variant, ...patch } : variant
     )));
+  };
+
+  const updateBundleComponent = (index, patch) => {
+    setBundleComponents((previous) =>
+      previous.map((component, componentIndex) =>
+        componentIndex === index
+          ? { ...component, ...patch }
+          : component
+      )
+    );
+  };
+
+  const removeBundleComponent = (index) => {
+    setBundleComponents((previous) =>
+      previous.filter(
+        (_, componentIndex) => componentIndex !== index
+      )
+    );
   };
 
   const removeVariantImage = (variantKey, imageIndex) => {
@@ -594,21 +1316,40 @@ export default function FormularioProducto() {
   };
 
   const totalFromMatrix = useMemo(() => {
-    return Object.values(variantStock).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
-  }, [variantStock]);
+    return advancedVariants
+      .filter((variant) => variant.active !== false)
+      .reduce(
+        (sum, variant) =>
+          sum + Math.max(0, Number(variant.initialStock || 0)),
+        0
+      );
+  }, [advancedVariants]);
 
   const inventoryArray = useMemo(() => {
     if (!trackInventory) return [];
 
-    const rows = advancedVariants.length
-      ? advancedVariants.map((variant) => ({
-          size: variant.size || '',
-          color: variant.color || '',
-          stock: Math.max(0, Math.floor(Number(variant.initialStock || 0))),
-        }))
-      : [];
-
-    if (rows.length) return rows;
+    if (advancedVariants.length) {
+      const legacyRows = new Map();
+      advancedVariants
+        .filter((variant) => variant.active !== false)
+        .map(normalizeVariantForPayload)
+        .forEach((variant) => {
+          const key = `${variant.size}|||${variant.color}`;
+          const previous = legacyRows.get(key) || {
+            size: variant.size,
+            color: variant.color,
+            stock: 0,
+          };
+          previous.stock += Math.max(
+            0,
+            Math.floor(Number(variant.initialStock || 0))
+          );
+          legacyRows.set(key, previous);
+        });
+      return Array.from(legacyRows.values()).filter(
+        (row) => row.size || row.color
+      );
+    }
 
     const out = [];
     sizes.forEach((size) => {
@@ -625,13 +1366,39 @@ export default function FormularioProducto() {
 
   const variantPayload = useMemo(() => {
     if (!trackInventory) return [];
+    if (
+      shouldPreserveLegacyEmptyVariants({
+        isEditing: Boolean(id),
+        loadedHadExplicitVariants:
+          loadedHadExplicitVariantsRef.current,
+        loadedAxesSignature:
+          loadedVariantAxesSignatureRef.current,
+        currentAxes: variantAxes,
+      })
+    ) {
+      return [];
+    }
     return advancedVariants
-      .filter((variant) => variant.active !== false && (variant.size || variant.color || variant.label))
+      .filter(
+        (variant) =>
+          variant.size ||
+          variant.color ||
+          variant.label ||
+          variant.attributes?.length
+      )
+      .map(normalizeVariantForPayload)
       .map((variant, index) => ({
-        variantKey: variant.variantKey || buildVariantKey(variant.size, variant.color),
-        label: variant.label || buildVariantLabel(variant.size, variant.color),
-        size: variant.size || '',
-        color: variant.color || '',
+        variantKey: variant.variantKey,
+        label:
+          variant.label ||
+          buildVariantLabel(
+            variant.size,
+            variant.color,
+            variant.attributes
+          ),
+        size: variant.size,
+        color: variant.color,
+        attributes: variant.attributes,
         sku: variant.sku || '',
         barcode: variant.barcode || '',
         price: variant.price === '' || variant.price == null ? null : toMoney(variant.price, precio),
@@ -643,7 +1410,7 @@ export default function FormularioProducto() {
         active: variant.active !== false,
         sortOrder: index,
       }));
-  }, [trackInventory, advancedVariants, precio, cost, averageCost]);
+  }, [trackInventory, advancedVariants, precio, cost, averageCost, id, variantAxes]);
 
   const formInvalid = useMemo(() => {
     const price = Number(precio);
@@ -663,6 +1430,84 @@ export default function FormularioProducto() {
     const price = Number(precio);
     if (!price || price <= 0 || Number.isNaN(price)) return toast.error('El precio debe ser mayor a 0');
     if (!categoria.trim()) return toast.error('La categoría es obligatoria');
+    const configuredVariantAxes = normalizeVariantAxes(variantAxes);
+    const activeVariantAxes = configuredVariantAxes.filter(
+      (axis) => axis.values.length > 0
+    );
+    const variantCombinationCount = activeVariantAxes.reduce(
+      (total, axis) => total * Math.max(1, axis.values.length),
+      activeVariantAxes.length ? 1 : 0
+    );
+    if (variantCombinationCount > 300) {
+      return toast.error(
+        'Las variantes generan más de 300 combinaciones. Reduce los valores de los atributos.'
+      );
+    }
+    if (
+      productType === 'digital' &&
+      digitalDelivery.deliveryMode === 'automatic' &&
+      !digitalDelivery.assetUrl.trim()
+    ) {
+      return toast.error('La entrega automática necesita el enlace privado del archivo.');
+    }
+    if (
+      productType === 'service' &&
+      serviceDelivery.fulfillmentMode === 'scheduled' &&
+      !serviceDelivery.bookingUrl.trim()
+    ) {
+      return toast.error('La agenda mediante enlace necesita una URL de reserva.');
+    }
+    if (productType === 'bundle' && bundleComponents.length === 0) {
+      return toast.error('Agrega al menos un producto al combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some((component) => !component.product)
+    ) {
+      return toast.error('Selecciona el producto de cada componente del combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some(
+        (component) => !bundleProductDetails[component.product]?._id
+      )
+    ) {
+      return toast.error('Espera mientras se cargan los componentes del combo.');
+    }
+    if (
+      productType === 'bundle' &&
+      bundleComponents.some((component) => {
+        const variants = (
+          bundleProductDetails[component.product]?.variants || []
+        ).filter((variant) => variant.active !== false);
+        return (
+          variants.length > 1 &&
+          !variants.some(
+            (variant) =>
+              variant.variantKey === component.variantKey
+          )
+        );
+      })
+    ) {
+      return toast.error('Selecciona la variante de cada producto del combo.');
+    }
+
+    const bundleIdentities = new Set();
+    for (const component of bundleComponents) {
+      const variants = (
+        bundleProductDetails[component.product]?.variants || []
+      ).filter((variant) => variant.active !== false);
+      const variantKey =
+        component.variantKey ||
+        (variants.length === 1
+          ? variants[0].variantKey
+          : 'default__default');
+      const identity = `${component.product}:${variantKey}`;
+      if (bundleIdentities.has(identity)) {
+        return toast.error('El combo contiene el mismo producto y variante más de una vez.');
+      }
+      bundleIdentities.add(identity);
+    }
 
     let finalColors = Array.isArray(colorsArr) ? [...colorsArr] : [];
     if (colorsText && colorsText.trim()) {
@@ -677,11 +1522,12 @@ export default function FormularioProducto() {
       return;
     }
 
-    const dimensions = Number(dimL) || Number(dimW) || Number(dimH)
-      ? { l: Number(dimL) || 0, w: Number(dimW) || 0, h: Number(dimH) || 0 }
-      : undefined;
-
-    const supplier = supplierName && supplierName.trim() ? { name: supplierName.trim() } : undefined;
+    const dimensions = {
+      l: Math.max(0, Number(dimL) || 0),
+      w: Math.max(0, Number(dimW) || 0),
+      h: Math.max(0, Number(dimH) || 0),
+    };
+    const supplier = { name: supplierName.trim() };
     const categoriesNormalized = normalizeStringArray(categoriesExtra);
 
     const data = {
@@ -694,20 +1540,21 @@ export default function FormularioProducto() {
       active: activo,
       category: categoria.trim(),
       categories: categoriesNormalized,
+      primaryCategoryId: primaryCategoryId || null,
+      categoryIds: normalizeStringArray(categoryIds),
+      collectionIds: normalizeStringArray(collectionIds),
       productType,
       unitOfMeasure,
       trackInventory,
       allowBackorder,
       variantPreset,
       variantAxes: trackInventory
-        ? [
-            { key: selectedPreset.axisLabel.toLowerCase(), label: selectedPreset.axisLabel, values: normalizeStringArray(sizes) },
-            { key: 'color', label: 'Color', values: finalColors },
-          ].filter((axis) => axis.values.length > 0)
+        ? normalizeVariantAxes(variantAxes)
         : [],
       colors: trackInventory ? finalColors : [],
       sizes: trackInventory ? normalizeStringArray(sizes) : [],
       inventory: trackInventory ? inventoryArray : [],
+      variants: trackInventory ? variantPayload : [],
       reorderPoint: trackInventory ? Math.max(0, Number(reorderPoint || 0)) : 0,
       reorderQty: trackInventory ? Math.max(0, Number(reorderQty || 0)) : 0,
       warehouseLocation: trackInventory ? warehouseLocation || '' : '',
@@ -721,6 +1568,76 @@ export default function FormularioProducto() {
       season: season || '',
       supplier,
       barcode: barcode || '',
+      tags: normalizeStringArray(tags, 30),
+      seo: {
+        title: seoTitle.trim(),
+        description: seoDescription.trim(),
+        keywords: normalizeStringArray(seoKeywords, 15),
+        image: seoImage.trim(),
+        canonicalUrl: canonicalUrl.trim(),
+        noIndex: Boolean(seoNoIndex),
+      },
+      commercialFields: commercialFields
+        .filter((field) => field.label?.trim())
+        .map((field, index) => ({
+          key: field.key || field.label,
+          label: field.label,
+          group: field.group || 'General',
+          type: field.type || 'text',
+          value: field.value ?? '',
+          public: field.public !== false,
+          sortOrder: index,
+        })),
+      digitalDelivery:
+        productType === 'digital'
+          ? {
+              ...digitalDelivery,
+              fileSizeBytes: Math.max(
+                0,
+                Math.floor(Number(digitalDelivery.fileSizeBytes || 0))
+              ),
+              downloadLimit: Math.max(
+                1,
+                Math.floor(Number(digitalDelivery.downloadLimit || 1))
+              ),
+              accessDays: Math.max(
+                1,
+                Math.floor(Number(digitalDelivery.accessDays || 1))
+              ),
+            }
+          : {},
+      serviceDelivery:
+        productType === 'service'
+          ? {
+              ...serviceDelivery,
+              durationMinutes: Math.max(
+                5,
+                Math.floor(Number(serviceDelivery.durationMinutes || 60))
+              ),
+              leadTimeHours: Math.max(
+                0,
+                Math.floor(Number(serviceDelivery.leadTimeHours || 0))
+              ),
+            }
+          : {},
+      bundleComponents:
+        productType === 'bundle'
+          ? bundleComponents.map((component) => ({
+              product: component.product,
+              variantKey: component.variantKey || (() => {
+                const variants = (
+                  bundleProductDetails[component.product]?.variants || []
+                ).filter((variant) => variant.active !== false);
+                return variants.length === 1
+                  ? variants[0].variantKey
+                  : 'default__default';
+              })(),
+              quantity: Math.max(
+                1,
+                Math.floor(Number(component.quantity || 1))
+              ),
+            }))
+          : [],
       notes: notes || '',
     };
 
@@ -734,22 +1651,11 @@ export default function FormularioProducto() {
 
     setCargando(true);
     try {
-      let savedProduct = null;
       if (id) {
         const regen = originalCategoria && categoria && categoria !== originalCategoria ? '&regenSku=1' : '';
-        const { data: updated } = await api.put(`/api/products/${id}?mode=replace${regen}`, data);
-        savedProduct = updated;
+        await api.put(`/api/products/${id}?mode=replace${regen}`, data);
       } else {
-        const { data: created } = await api.post('/api/products', data);
-        savedProduct = created;
-      }
-
-      const productId = savedProduct?._id || savedProduct?.id || id;
-      if (trackInventory && productId && variantPayload.length) {
-        await api.put(`/api/admin/product-variants/${productId}`, {
-          variants: variantPayload,
-          syncLegacy: true,
-        });
+        await api.post('/api/products', data);
       }
 
       toast.success(id ? 'Producto actualizado' : 'Producto creado');
@@ -759,11 +1665,15 @@ export default function FormularioProducto() {
         toast.error('Token de administrador ausente. Inicia sesión de nuevo.');
         return;
       }
-      const status = err?.response?.status;
-      const msg = err?.response?.data?.message ||
-        (status === 401 ? 'No autorizado.' : status === 409 ? 'Dato único duplicado.' : 'Error al guardar');
+      const msg = formatProductSaveError(err);
       toast.error(msg);
-      console.error(err);
+      console.error('[FormularioProducto] Error al guardar:', {
+        status: err?.response?.status || null,
+        error: err?.response?.data?.error || null,
+        errors: Array.isArray(err?.response?.data?.errors)
+          ? err.response.data.errors
+          : [],
+      });
     } finally {
       setCargando(false);
     }
@@ -810,13 +1720,25 @@ export default function FormularioProducto() {
             </div>
 
             <div className="space-y-2">
-              <FieldLabel required>Categoría</FieldLabel>
-              <input list="categoriasOptions" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Tecnología, belleza, servicios" required />
-              <datalist id="categoriasOptions">
-                {[...new Set([...(catOptions || []), ...CATEGORY_SUGGESTIONS])].map((cat) => (
-                  <option key={cat} value={cat} />
+              <FieldLabel required>Categoría principal</FieldLabel>
+              <select value={primaryCategoryId} onChange={(e) => selectPrimaryCategory(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                <option value="">Seleccionar categoría</option>
+                {taxonomy.categories.map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.path || item.name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
+              {!primaryCategoryId && (
+                <>
+                  <input list="categoriasOptions" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Categoría existente sin migrar" required />
+                  <datalist id="categoriasOptions">
+                    {[...new Set([...(catOptions || []), ...CATEGORY_SUGGESTIONS])].map((cat) => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -849,6 +1771,430 @@ export default function FormularioProducto() {
             </div>
           </section>
 
+          {productType === 'digital' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                  Entrega digital
+                </h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  El enlace privado nunca se publica en el catálogo. Se habilita después de confirmar el pago.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                <div className="space-y-2">
+                  <FieldLabel required>Modalidad de entrega</FieldLabel>
+                  <select
+                    value={digitalDelivery.deliveryMode}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        deliveryMode: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="automatic">Automática después del pago</option>
+                    <option value="manual">Coordinada manualmente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel required={digitalDelivery.deliveryMode === 'automatic'}>
+                    Enlace privado del archivo
+                  </FieldLabel>
+                  <input
+                    type="url"
+                    value={digitalDelivery.assetUrl}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        assetUrl: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="https://almacen-privado.example/archivo.pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Nombre del archivo</FieldLabel>
+                  <input
+                    value={digitalDelivery.fileName}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        fileName: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="guia-profesional.pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Tipo MIME</FieldLabel>
+                  <input
+                    value={digitalDelivery.mimeType}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        mimeType: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="application/pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Tamaño en bytes</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    value={digitalDelivery.fileSizeBytes}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        fileSizeBytes: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Límite de descargas</FieldLabel>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={digitalDelivery.downloadLimit}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        downloadLimit: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Días de acceso</FieldLabel>
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={digitalDelivery.accessDays}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        accessDays: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <FieldLabel>Mensaje para el comprador</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={digitalDelivery.customerMessage}
+                    onChange={(event) =>
+                      setDigitalDelivery((previous) => ({
+                        ...previous,
+                        customerMessage: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="Instrucciones de uso o información complementaria."
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {productType === 'service' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                  Prestación del servicio
+                </h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  Define cómo se agenda, dónde se presta y qué instrucciones recibe el comprador al pagar.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                <div className="space-y-2">
+                  <FieldLabel required>Coordinación</FieldLabel>
+                  <select
+                    value={serviceDelivery.fulfillmentMode}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        fulfillmentMode: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="scheduled">Agenda mediante enlace</option>
+                    <option value="manual">Coordinación manual</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Lugar</FieldLabel>
+                  <select
+                    value={serviceDelivery.locationType}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        locationType: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="online">En línea</option>
+                    <option value="store">En el establecimiento</option>
+                    <option value="customer">En la ubicación del cliente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel required>Duración en minutos</FieldLabel>
+                  <input
+                    type="number"
+                    min="5"
+                    value={serviceDelivery.durationMinutes}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        durationMinutes: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Anticipación mínima en horas</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    value={serviceDelivery.leadTimeHours}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        leadTimeHours: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel required={serviceDelivery.fulfillmentMode === 'scheduled'}>
+                    Enlace privado de agenda
+                  </FieldLabel>
+                  <input
+                    type="url"
+                    value={serviceDelivery.bookingUrl}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        bookingUrl: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                    placeholder="https://agenda.example/reservar"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <FieldLabel>Instrucciones para el comprador</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={serviceDelivery.customerInstructions}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        customerInstructions: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel>Notas internas</FieldLabel>
+                  <textarea
+                    rows={3}
+                    value={serviceDelivery.internalInstructions}
+                    onChange={(event) =>
+                      setServiceDelivery((previous) => ({
+                        ...previous,
+                        internalInstructions: event.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {productType === 'bundle' && (
+            <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+                    Componentes del combo
+                  </h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                    Al vender el combo se reservan y descuentan las existencias de cada componente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBundleComponents((previous) => [
+                      ...previous,
+                      createBundleComponentRow(),
+                    ])
+                  }
+                  className="rounded-xl px-4 py-2 text-sm font-bold"
+                  style={buttonStyle('soft')}
+                  disabled={bundleCandidatesLoading}
+                >
+                  Agregar componente
+                </button>
+              </div>
+
+              {bundleCandidatesLoading && (
+                <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  Cargando productos disponibles…
+                </p>
+              )}
+
+              {!bundleCandidatesLoading && bundleComponents.length === 0 && (
+                <p className="rounded-xl border p-4 text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                  Agrega al menos un producto para construir el combo.
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {bundleComponents.map((component, index) => {
+                  const detail = bundleProductDetails[component.product] || {};
+                  const variants = Array.isArray(detail.variants)
+                    ? detail.variants.filter((variant) => variant.active !== false)
+                    : [];
+
+                  return (
+                    <div key={`${component.product || 'new'}-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_120px_auto]" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                      <div className="space-y-2">
+                        <FieldLabel required>Producto</FieldLabel>
+                        <select
+                          value={component.product}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              product: event.target.value,
+                              variantKey: 'default__default',
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                        >
+                          <option value="">Seleccionar producto</option>
+                          {bundleCandidates.map((candidate) => (
+                            <option key={candidate._id} value={candidate._id}>
+                              {candidate.title} · {candidate.sku}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <FieldLabel>Variante</FieldLabel>
+                        <select
+                          value={component.variantKey}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              variantKey: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                          disabled={!component.product || !detail._id}
+                        >
+                          {variants.length === 0 ? (
+                            <option value="default__default">Presentación general</option>
+                          ) : (
+                            <>
+                              {variants.length > 1 && (
+                                <option value="">Seleccionar variante</option>
+                              )}
+                              {variants.map((variant) => (
+                                <option key={variant.variantKey} value={variant.variantKey}>
+                                  {variant.label || [variant.size, variant.color].filter(Boolean).join(' / ') || 'Presentación general'}
+                                </option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <FieldLabel required>Cantidad</FieldLabel>
+                        <input
+                          type="number"
+                          min="1"
+                          value={component.quantity}
+                          onChange={(event) =>
+                            updateBundleComponent(index, {
+                              quantity: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2"
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => removeBundleComponent(index)}
+                          className="rounded-xl px-3 py-2 text-sm font-bold"
+                          style={buttonStyle('soft')}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={sectionStyle}>
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
@@ -859,7 +2205,7 @@ export default function FormularioProducto() {
 
             <div className="grid gap-3">
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} />
+                <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} disabled={['digital', 'service', 'bundle'].includes(productType)} />
                 <span className="text-sm font-semibold">Controlar inventario para este producto</span>
               </label>
               <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
@@ -872,7 +2218,7 @@ export default function FormularioProducto() {
               <>
                 <div className="space-y-2">
                   <FieldLabel>Plantilla de variantes</FieldLabel>
-                  <select value={variantPreset} onChange={(e) => setVariantPreset(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                  <select value={variantPreset} onChange={(e) => handleVariantPresetChange(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
                     {VARIANT_PRESETS.map((preset) => (
                       <option key={preset.value} value={preset.value}>{preset.label}</option>
                     ))}
@@ -893,118 +2239,101 @@ export default function FormularioProducto() {
 
           {trackInventory && (
             <section className="space-y-5">
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <FieldLabel>{selectedPreset.axisLabel || 'Variante'}</FieldLabel>
-                  {(selectedPreset.suggestions || []).length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPreset.suggestions.map((item) => {
-                        const active = sizes.some((size) => size.toLowerCase() === item.toLowerCase());
-                        return (
-                          <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-4 py-2 text-xs font-black transition hover:-translate-y-0.5" style={active ? actionButtonStyle() : pillStyle}>
-                            {item}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Agregar variantes separadas por coma" />
-                    <button type="button" onClick={addSizesFromInput} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>
-                      Añadir
+              <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
+                      Atributos de variantes
+                    </p>
+                    <h3 className="text-lg font-bold">Hasta cuatro atributos combinables</h3>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Ejemplo: Capacidad + RAM + Color + Conectividad.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {advancedVariants.length} combinaciones
+                    </span>
+                    <span className="rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      Stock inicial {totalFromMatrix}
+                    </span>
+                    <button type="button" disabled={variantAxes.length >= 4} onClick={addVariantAxis} className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle('soft')}>
+                      Añadir atributo
                     </button>
                   </div>
-                  {sizes.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {sizes.map((size) => (
-                        <span key={size} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
-                          {size}
-                          <button type="button" className="font-black" onClick={() => toggleSize(size)} style={{ color: 'var(--admin-button-soft-text)' }}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                <div className="space-y-3">
-                  <FieldLabel helper="opcional">Colores / atributos visuales</FieldLabel>
-                  <ColorBarPicker selected={colorsArr} onChange={setColorsArr} max={10} />
-                  <input
-                    value={colorsText}
-                    onChange={(e) => setColorsText(e.target.value)}
-                    onBlur={() => {
-                      const parsed = colorsText.split(',').map((item) => item.trim()).filter(Boolean);
-                      const merged = normalizeStringArray([...(colorsArr || []), ...parsed], 10);
-                      setColorsArr(merged);
-                      setColorsText(merged.join(', '));
-                    }}
-                    className="w-full px-3 py-2"
-                    style={inputStyle}
-                    placeholder="Ej: negro, blanco, #f0c, gold"
-                  />
-                </div>
-              </div>
-
-              {(sizes.length > 0 || colorKeys.length > 0) && (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
-                      Matriz de inventario inicial
-                    </h3>
-                    <div className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                      Total matriz: <b style={{ color: 'var(--admin-card-text)' }}>{totalFromMatrix}</b>
-                      <button type="button" className="ml-3 rounded-full px-3 py-1.5 text-xs font-semibold" style={actionButtonStyle('soft')} onClick={() => setStock(totalFromMatrix)}>
-                        Usar como stock
-                      </button>
+                <div className="grid gap-4 p-4 lg:grid-cols-2">
+                  {variantAxes.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-5 text-center lg:col-span-2" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+                      Este producto no tiene atributos. Selecciona una plantilla o añade el primero.
                     </div>
-                  </div>
+                  ) : (
+                    variantAxes.map((axis, index) => {
+                      const isColorAxis = ['color', 'colour', 'tono'].includes(axis.key);
+                      return (
+                        <article key={`${axis.key}-${index}`} className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%)' }}>
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <FieldLabel>Atributo {index + 1}</FieldLabel>
+                              <input value={axis.label} onChange={(e) => updateVariantAxis(index, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Capacidad" />
+                            </div>
+                            <button type="button" onClick={() => removeVariantAxis(index)} className="rounded-xl px-3 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>
+                              Quitar
+                            </button>
+                          </div>
 
-                  <div className="overflow-auto rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
-                    <table className="min-w-full text-sm">
-                      <thead style={{ background: 'var(--admin-table-head-bg)', color: 'var(--admin-table-text)' }}>
-                        <tr>
-                          <th className="border-r p-2 text-left" style={{ borderColor: 'var(--admin-card-border)' }}>
-                            {selectedPreset.axisLabel || 'Variante'} \ Color
-                          </th>
-                          {colorKeys.length === 0 ? (
-                            <th className="p-2" style={{ color: 'var(--admin-card-muted-text)' }}>Sin colores</th>
-                          ) : (
-                            colorKeys.map((color) => (
-                              <th key={color} className="border-l p-2" style={{ borderColor: 'var(--admin-card-border)' }}>
-                                <div className="flex items-center gap-2">
-                                  <span className="inline-block h-4 w-4 rounded-full border" style={{ backgroundColor: color, borderColor: 'var(--admin-card-border)' }} />
-                                  <span className="font-normal">{color}</span>
-                                </div>
-                              </th>
-                            ))
+                          {isColorAxis && (
+                            <ColorBarPicker selected={axis.values} onChange={(values) => updateVariantAxis(index, { values })} max={40} />
                           )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sizes.length === 0 ? (
-                          <tr>
-                            <td className="p-3" style={{ color: 'var(--admin-card-muted-text)' }}>Sin variantes</td>
-                          </tr>
-                        ) : (
-                          sizes.map((size) => (
-                            <tr key={size}>
-                              <td className="border-r p-2 font-semibold" style={{ borderColor: 'var(--admin-card-border)' }}>{size}</td>
-                              {(colorKeys.length ? colorKeys : ['']).map((color) => {
-                                const key = `${size}|||${color}`;
+
+                          <div>
+                            <FieldLabel>Valores separados por coma</FieldLabel>
+                            <input
+                              value={variantAxisDrafts[index] ?? axis.values.join(', ')}
+                              onChange={(e) => {
+                                const draft = e.target.value;
+                                setVariantAxisDrafts((previous) => ({
+                                  ...previous,
+                                  [index]: draft,
+                                }));
+                                updateVariantAxis(index, {
+                                  values: draft
+                                    .split(',')
+                                    .map((value) => value.trim())
+                                    .filter(Boolean),
+                                });
+                              }}
+                              onBlur={() =>
+                                setVariantAxisDrafts((previous) => ({
+                                  ...previous,
+                                  [index]: axis.values.join(', '),
+                                }))
+                              }
+                              className="w-full px-3 py-2"
+                              style={inputStyle}
+                              placeholder={isColorAxis ? 'Negro, Dorado, #ffffff' : '128 GB, 256 GB'}
+                            />
+                          </div>
+
+                          {index === 0 && (selectedPreset.suggestions || []).length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {selectedPreset.suggestions.map((item) => {
+                                const active = axis.values.some((value) => value.toLowerCase() === item.toLowerCase());
                                 return (
-                                  <td key={key} className="border-l p-1" style={{ borderColor: 'var(--admin-card-border)' }}>
-                                    <input type="number" min="0" step="1" value={variantStock[key] ?? 0} onChange={(e) => setCell(size, color, e.target.value)} className="w-24 px-2 py-1 text-center" style={inputStyle} />
-                                  </td>
+                                  <button key={item} type="button" onClick={() => toggleSize(item)} className="rounded-full px-3 py-1.5 text-xs font-black" style={active ? actionButtonStyle() : pillStyle}>
+                                    {item}
+                                  </button>
                                 );
                               })}
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })
+                  )}
                 </div>
-              )}
+              </section>
 
               {advancedVariants.length > 0 && (
                 <section className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
@@ -1039,6 +2368,15 @@ export default function FormularioProducto() {
                                 <span className="rounded-full border px-3 py-1 text-xs font-black" style={pillStyle}>{variant.label}</span>
                                 <span className="rounded-full border px-3 py-1 text-xs font-black" style={variant.active ? pillStyle : { ...pillStyle, opacity: 0.65 }}> {variant.active ? 'ACTIVA' : 'INACTIVA'} </span>
                               </div>
+                              {variant.attributes?.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {variant.attributes.map((attribute) => (
+                                    <span key={`${variant.variantKey}-${attribute.key}`} className="rounded-full border px-2.5 py-1 text-[11px] font-bold" style={pillStyle}>
+                                      {attribute.label}: {attribute.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
                                 {variant.variantKey} · Stock inicial {variant.initialStock || 0}
                               </p>
@@ -1086,7 +2424,6 @@ export default function FormularioProducto() {
                                     <input type="number" min="0" value={variant.initialStock ?? 0} onChange={(e) => {
                                       const qty = Math.max(0, Math.floor(Number(e.target.value || 0)));
                                       updateVariant(variant.variantKey, { initialStock: qty });
-                                      setCell(variant.size, variant.color, qty);
                                     }} className="w-full px-3 py-2" style={inputStyle} />
                                   </div>
                                   <label className="flex items-center gap-3 pt-6">
@@ -1163,15 +2500,195 @@ export default function FormularioProducto() {
             </div>
           </section>
 
-          <section className="grid gap-5 md:grid-cols-3">
-            <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2"><FieldLabel>Temporada / colección</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
-            <div className="space-y-2 md:col-span-3">
-              <FieldLabel>Categorías adicionales</FieldLabel>
-              <div className="flex gap-2"><input list="categoriasOptions" value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={handleCatInputKey} placeholder="Escribe y presiona Enter" className="flex-1 px-3 py-2" style={inputStyle} /><button type="button" onClick={() => { addCatChip(catInput); setCatInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir</button></div>
-              {categoriesExtra.length > 0 && (<div className="mt-2 flex flex-wrap gap-2">{categoriesExtra.map((cat) => (<span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>{cat}<button type="button" className="font-black" style={{ color: 'var(--admin-button-soft-text)' }} onClick={() => removeCatChip(cat)}>×</button></span>))}</div>)}
+          <section className="space-y-5 rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Clasificación comercial</h3>
+              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Organiza el producto en categorías jerárquicas, colecciones y etiquetas reutilizables.
+              </p>
             </div>
+
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="space-y-2"><FieldLabel>Marca</FieldLabel><input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+              <div className="space-y-2"><FieldLabel>Temporada</FieldLabel><input value={season} onChange={(e) => setSeason(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Primavera 2026" /></div>
+              <div className="space-y-2"><FieldLabel>Proveedor</FieldLabel><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="space-y-3">
+                <FieldLabel>Categorías asociadas</FieldLabel>
+                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  {taxonomy.categories.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Crea la primera categoría en el bloque inferior.</p>
+                  ) : (
+                    taxonomy.categories.map((item) => {
+                      const isPrimary = item._id === primaryCategoryId;
+                      const checked = categoryIds.includes(item._id);
+                      return (
+                        <label key={item._id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                          <span className="flex items-center gap-3">
+                            <input type="checkbox" checked={checked} disabled={isPrimary} onChange={() => toggleReference(item._id, setCategoryIds)} style={{ accentColor: 'var(--admin-primary)' }} />
+                            <span className="text-sm font-semibold">{item.path || item.name}</span>
+                          </span>
+                          {isPrimary && <span className="text-[10px] font-black uppercase" style={{ color: 'var(--admin-primary)' }}>Principal</span>}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <FieldLabel>Colecciones</FieldLabel>
+                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                  {taxonomy.collections.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Todavía no hay colecciones creadas.</p>
+                  ) : (
+                    taxonomy.collections.map((item) => (
+                      <label key={item._id} className="flex items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                        <input type="checkbox" checked={collectionIds.includes(item._id)} onChange={() => toggleReference(item._id, setCollectionIds)} style={{ accentColor: 'var(--admin-primary)' }} />
+                        <span className="text-sm font-semibold">{item.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+              <div className="md:col-span-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-primary)' }}>Crear clasificación rápida</p>
+              </div>
+              <select value={taxonomyKind} onChange={(e) => { setTaxonomyKind(e.target.value); setTaxonomyParent(''); }} className="w-full px-3 py-2" style={inputStyle}>
+                <option value="category">Categoría</option>
+                <option value="collection">Colección</option>
+              </select>
+              <input value={taxonomyName} onChange={(e) => setTaxonomyName(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Nombre" />
+              {taxonomyKind === 'category' ? (
+                <select value={taxonomyParent} onChange={(e) => setTaxonomyParent(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                  <option value="">Sin categoría superior</option>
+                  {taxonomy.categories.map((item) => <option key={item._id} value={item._id}>{item.path || item.name}</option>)}
+                </select>
+              ) : (
+                <div className="flex items-center px-3 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Las colecciones no dependen de una categoría.</div>
+              )}
+              <button type="button" disabled={taxonomySaving || !taxonomyName.trim()} onClick={createTaxonomy} className="rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>
+                {taxonomySaving ? 'Creando...' : 'Crear y seleccionar'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel>Etiquetas</FieldLabel>
+              <div className="flex gap-2">
+                <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ',') {
+                    event.preventDefault();
+                    addTokens(tagsInput, tags, setTags, 30);
+                    setTagsInput('');
+                  }
+                }} className="flex-1 px-3 py-2" style={inputStyle} placeholder="Ej. regalo, destacado, nueva colección" />
+                <button type="button" onClick={() => { addTokens(tagsInput, tags, setTags, 30); setTagsInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>Añadir</button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {tag}
+                      <button type="button" onClick={() => setTags((previous) => previous.filter((item) => item !== tag))}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!primaryCategoryId && categoriesExtra.length > 0 && (
+              <div className="space-y-2">
+                <FieldLabel>Categorías heredadas</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {categoriesExtra.map((cat) => (
+                    <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
+                      {cat}
+                      <button type="button" onClick={() => removeCatChip(cat)}>×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="grid gap-6 rounded-2xl border p-5 lg:grid-cols-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>SEO del producto</h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Controla cómo aparece el producto en buscadores y al compartirlo.</p>
+              </div>
+              <div>
+                <FieldLabel helper={`${seoTitle.length}/70`}>Título SEO</FieldLabel>
+                <input maxLength={70} value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder={titulo || 'Título del producto'} />
+              </div>
+              <div>
+                <FieldLabel helper={`${seoDescription.length}/320`}>Metadescripción</FieldLabel>
+                <textarea maxLength={320} rows={4} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder={descripcion || 'Descripción breve para buscadores'} />
+              </div>
+              <div>
+                <FieldLabel>Palabras clave</FieldLabel>
+                <div className="flex gap-2">
+                  <input value={seoKeywordsInput} onChange={(e) => setSeoKeywordsInput(e.target.value)} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ',') {
+                      event.preventDefault();
+                      addTokens(seoKeywordsInput, seoKeywords, setSeoKeywords, 15);
+                      setSeoKeywordsInput('');
+                    }
+                  }} className="flex-1 px-3 py-2" style={inputStyle} placeholder="separadas por coma" />
+                  <button type="button" onClick={() => { addTokens(seoKeywordsInput, seoKeywords, setSeoKeywords, 15); setSeoKeywordsInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>Añadir</button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">{seoKeywords.map((keyword) => <span key={keyword} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={pillStyle}>{keyword}<button type="button" onClick={() => setSeoKeywords((previous) => previous.filter((item) => item !== keyword))}>×</button></span>)}</div>
+              </div>
+              <div><FieldLabel>Imagen social</FieldLabel><input value={seoImage} onChange={(e) => setSeoImage(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la portada del producto" /></div>
+              <div><FieldLabel>URL canónica</FieldLabel><input type="url" value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la URL actual" /></div>
+              <label className="flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                <input type="checkbox" checked={seoNoIndex} onChange={(e) => setSeoNoIndex(e.target.checked)} style={{ accentColor: 'var(--admin-primary)' }} />
+                <span className="text-sm font-semibold">Ocultar este producto de los buscadores</span>
+              </label>
+            </div>
+
+            <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+              <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-primary)' }}>Vista previa</p>
+              <p className="mt-5 text-xl font-semibold" style={{ color: '#1a0dab' }}>{seoTitle || titulo || 'Título del producto'}</p>
+              <p className="mt-1 text-sm" style={{ color: '#188038' }}>{canonicalUrl || `https://tu-tienda.com/producto/${id || 'nuevo-producto'}`}</p>
+              <p className="mt-2 text-sm leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>{seoDescription || descripcion || 'Agrega una descripción clara para mejorar la presentación en los resultados de búsqueda.'}</p>
+              <div className="mt-6 rounded-xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                <p className="text-sm font-bold">Metadatos incluidos al publicar</p>
+                <p className="mt-2 text-xs leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Título, descripción, canonical, robots, Open Graph, Twitter Card y datos estructurados de Product.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-2xl border p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Campos comerciales personalizados</h3>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Añade especificaciones propias sin modificar el modelo cada vez.</p>
+              </div>
+              <button type="button" onClick={() => setCommercialFields((previous) => [...previous, createCommercialFieldRow(previous.length)])} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle()}>Añadir campo</button>
+            </div>
+
+            {commercialFields.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>Sin campos personalizados.</div>
+            ) : (
+              <div className="space-y-3">
+                {commercialFields.map((field, index) => (
+                  <article key={`${field.key}-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-6" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                    <div className="md:col-span-2"><FieldLabel>Nombre</FieldLabel><input value={field.label} onChange={(e) => updateCommercialField(index, { label: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Material" /></div>
+                    <div><FieldLabel>Grupo</FieldLabel><input value={field.group} onChange={(e) => updateCommercialField(index, { group: e.target.value })} className="w-full px-3 py-2" style={inputStyle} placeholder="General" /></div>
+                    <div><FieldLabel>Tipo</FieldLabel><select value={field.type} onChange={(e) => updateCommercialField(index, { type: e.target.value })} className="w-full px-3 py-2" style={inputStyle}><option value="text">Texto</option><option value="number">Número</option><option value="boolean">Sí / No</option><option value="date">Fecha</option><option value="url">Enlace</option></select></div>
+                    <div className="md:col-span-2"><FieldLabel>Valor</FieldLabel>{field.type === 'boolean' ? <select value={field.value} onChange={(e) => updateCommercialField(index, { value: e.target.value })} className="w-full px-3 py-2" style={inputStyle}><option value="true">Sí</option><option value="false">No</option></select> : <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'url' ? 'url' : 'text'} value={field.value} onChange={(e) => updateCommercialField(index, { value: e.target.value })} className="w-full px-3 py-2" style={inputStyle} />}</div>
+                    <div className="flex items-center gap-3 md:col-span-5"><input type="checkbox" checked={field.public !== false} onChange={(e) => updateCommercialField(index, { public: e.target.checked })} style={{ accentColor: 'var(--admin-primary)' }} /><span className="text-sm font-semibold">Visible en la ficha pública</span></div>
+                    <button type="button" onClick={() => removeCommercialField(index)} className="rounded-xl px-3 py-2 text-sm font-semibold" style={actionButtonStyle('danger')}>Quitar</button>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="grid gap-6 lg:grid-cols-2">

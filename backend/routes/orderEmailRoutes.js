@@ -111,6 +111,22 @@ function getUnitPrice(item = {}) {
   return Number(item.price ?? item.unitPrice ?? item.priceNumber ?? 0) || 0;
 }
 
+function getVariantLabel(item = {}) {
+  const explicit = cleanText(item.variantLabel, '');
+  if (explicit) return explicit;
+
+  const attributes = Array.isArray(item.variantAttributes)
+    ? item.variantAttributes
+        .map((attribute) => cleanText(attribute?.value, ''))
+        .filter(Boolean)
+    : [];
+
+  return (
+    attributes.join(' / ') ||
+    [item.size, item.color].filter(Boolean).join(' / ')
+  );
+}
+
 function itemsHtml(order = {}) {
   const items = getOrderItems(order);
 
@@ -132,7 +148,7 @@ function itemsHtml(order = {}) {
           .map((item) => {
             const qty = getQty(item);
             const unit = getUnitPrice(item);
-            const variant = [item.size, item.color].filter(Boolean).join(' / ');
+            const variant = getVariantLabel(item);
 
             return `
               <tr>
@@ -160,7 +176,7 @@ function itemsText(order = {}) {
     .map((item) => {
       const qty = getQty(item);
       const unit = getUnitPrice(item);
-      const variant = [item.size, item.color].filter(Boolean).join(' / ');
+      const variant = getVariantLabel(item);
       return `- ${cleanText(item.title || item.name, 'Producto')} x ${qty}${variant ? ` (${variant})` : ''}: ${moneyCOP(unit * qty)}`;
     })
     .join('\n');
