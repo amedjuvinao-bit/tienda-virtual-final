@@ -2,11 +2,18 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Cart = require('../models/Cart');
+const Product = require('../models/Product');
+const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const {
+  buildVariantKey,
   normalizeAttributes,
+  resolveVariantCommercialSnapshot,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
+const {
+  getBundleAvailableQuantity,
+} = require('../services/productBundleService');
 const {
   SAFE_CART_ACCESS_ERROR,
   getCartAccessFromRequest,
@@ -135,7 +142,7 @@ async function buildPublicCartResponse(
     Array.isArray(plain?.items) ? plain.items : [],
     { mode: 'soft' }
   );
-  const items = validation.items;
+  const items = await ensureProductContractFields(validation.items);
   const summaryItems = items.filter((item) => item.valid);
   return {
     ...plain,
@@ -206,6 +213,14 @@ function clean(value) {
   return String(value || '').trim();
 }
 
+function cleanLower(value) {
+  return clean(value).toLowerCase();
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Obtiene un id de producto robusto desde varias formas comunes
 function readProductId(raw) {
   const p = raw?.product ?? raw;
@@ -224,6 +239,22 @@ function readProductId(raw) {
 
 function readVariantId(raw = {}) {
   return clean(raw.variantId || raw.variantKey || raw.selectedVariantId || raw.selectedVariantKey || '');
+}
+
+function getVariantSelector(raw = {}) {
+  const variantKey = cleanLower(readVariantId(raw));
+  const size = clean(raw.size || raw.talla || '');
+  const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
+  const variantAttributes = normalizeAttributes(
+    raw.variantAttributes || raw.attributes || raw.selectedAttributes || []
+  );
+
+  return {
+    variantKey: variantKey || buildVariantKey(size, color, variantAttributes),
+    size,
+    color,
+    variantAttributes,
+  };
 }
 
 // Snapshot de precio robusto desde múltiples nombres
@@ -323,6 +354,123 @@ function getCartSummary(cartDoc) {
     subtotal += qty * unitPrice;
   }
   return { totalItems, subtotal };
+}
+
+function computeAvailableStockTotal(product) {
+  if (!product) return 0;
+  if (Array.isArray(product.inventory) && product.inventory.length) {
+    return product.inventory.reduce(
+      (total, row) => total + Number(row?.stock ?? row?.qty ?? row?.quantity ?? 0),
+      0
+    );
+  }
+  return Number(product.stock ?? 0);
+}
+
+function computeAvailableStockForVariant(product, color, size) {
+  if (!product) return 0;
+  if (!Array.isArray(product.inventory) || product.inventory.length === 0) {
+    return Number(product.stock ?? 0);
+  }
+  const colorPattern = new RegExp(`^${escapeRegex(color)}$`, 'i');
+  const sizePattern = new RegExp(`^${escapeRegex(size)}$`, 'i');
+  const row = product.inventory.find(
+    (entry) =>
+      colorPattern.test(String(entry?.color || '')) &&
+      sizePattern.test(String(entry?.size || ''))
+  );
+  return Number(row?.stock ?? row?.qty ?? row?.quantity ?? 0);
+}
+
+async function computeAvailableStockForCartItem(product, item) {
+  if (!product) return Infinity;
+  if (product.productType === 'bundle') {
+    return getBundleAvailableQuantity(product);
+  }
+  if (product.trackInventory === false || product.allowBackorder === true) {
+    return Infinity;
+  }
+
+  const selector = getVariantSelector(item);
+  const byVariant = Boolean(selector.variantKey) || Boolean(clean(item.color)) || Boolean(clean(item.size));
+  if (selector.variantKey && selector.variantKey !== 'default__default') {
+    const stockRow = await InventoryStock.findOne({
+      product: product._id,
+      variantKey: selector.variantKey,
+      deletedAt: null,
+      active: { $ne: false },
+    })
+      .select('stock reservedStock availableStock')
+      .lean()
+      .exec();
+    if (stockRow) {
+      const available = Number(stockRow.availableStock);
+      if (Number.isFinite(available)) return Math.max(0, available);
+      return Math.max(
+        0,
+        Number(stockRow.stock || 0) - Number(stockRow.reservedStock || 0)
+      );
+    }
+  }
+
+  return byVariant
+    ? computeAvailableStockForVariant(product, item.color, item.size)
+    : computeAvailableStockTotal(product);
+}
+
+function resolveCartCommercialSnapshot(product, item) {
+  if (!product) {
+    return {
+      sku: '',
+      barcode: '',
+      variantKey: readVariantId(item),
+    };
+  }
+  return resolveVariantCommercialSnapshot(product, getVariantSelector(item));
+}
+
+// La autoridad canonica ya entrega estos campos. Este fallback conserva el
+// contrato comercial de Productos cuando se inyecta una autoridad compatible
+// que no los proyecta, sin debilitar la validacion de CarritosAdmin.
+async function ensureProductContractFields(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  if (mongoose.connection.readyState !== 1) return source;
+  const missing = source.filter(
+    (item) =>
+      item?.valid === true &&
+      (!Object.hasOwn(item, 'variantSku') ||
+        !Object.hasOwn(item, 'variantBarcode') ||
+        !Object.hasOwn(item, 'availableStock'))
+  );
+  if (!missing.length) return source;
+
+  const ids = Array.from(
+    new Set(missing.map((item) => readProductId(item)).filter(mongoose.isValidObjectId))
+  );
+  if (!ids.length) return source;
+  const products = await Product.find({ _id: { $in: ids } }).lean().exec();
+  const productMap = new Map(products.map((product) => [String(product._id), product]));
+
+  return Promise.all(source.map(async (item) => {
+    const product = productMap.get(readProductId(item));
+    if (!product || item?.valid !== true) return item;
+    const commercial = resolveCartCommercialSnapshot(product, item);
+    const availableStock = await computeAvailableStockForCartItem(product, item);
+    return {
+      ...item,
+      variantSku: Object.hasOwn(item, 'variantSku')
+        ? item.variantSku
+        : commercial.sku || '',
+      variantBarcode: Object.hasOwn(item, 'variantBarcode')
+        ? item.variantBarcode
+        : commercial.barcode || '',
+      availableStock: Object.hasOwn(item, 'availableStock')
+        ? item.availableStock
+        : Number.isFinite(availableStock)
+          ? Math.max(0, availableStock)
+          : null,
+    };
+  }));
 }
 
 /* ============================

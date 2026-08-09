@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 import { getSessionId } from '../utils/getSessionId';
+import { buildCartAccessHeaders } from '../utils/cartAccess';
 import { useNavigate } from 'react-router-dom';
 import ModalReembolso from '../components/ModalReembolso';
 import ModalEnvio from '../components/ModalEnvio';
@@ -21,6 +22,15 @@ import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const WOMPI_WIDGET_URL = 'https://checkout.wompi.co/widget.js';
+
+function createOrderFromAuthorizedCart({ order, cartAccess, idempotencyKey }) {
+  return api.post('/api/orders', order, {
+    headers: {
+      ...buildCartAccessHeaders(cartAccess),
+      'Idempotency-Key': idempotencyKey,
+    },
+  });
+}
 
 /* ─── helpers ─── */
 function clampInt(value, min, max, fallback) {
@@ -856,7 +866,7 @@ function CheckoutPage() {
   const [customerCountry, setCustomerCountry] = useState('Colombia');
   const [dianCustomer, setDianCustomer] = useState(dianCustomerDefaults);
 
-  const { cart, clearCart } = useCart();
+  const { cart, clearCart, ensureCartReady, validateCart } = useCart();
   const currentCart = cartView ?? cart;
   const cartRequiresShipping = useMemo(
     () =>
@@ -1608,24 +1618,16 @@ function CheckoutPage() {
         return;
     }
 
-    const sessionId = getSessionId();
-    try { setApiSessionId(sessionId); } catch { }
-    
+    let cartAccess;
     let val;
     let serverItems = null;
     let putSummary = null;
 
     try {
-      const { data } = await api.post('/api/cart/validate', { sessionId, mode: 'strict' });
-      val = data;
-
-      if (Array.isArray(val?.items)) {
-        try {
-          const putRes = await api.put(`/api/cart/${sessionId}`, { items: val.items });
-          serverItems = putRes?.data?.cart?.items ?? null;
-          putSummary = putRes?.data?.cart?.summary ?? null;
-        } catch (_) { }
-      }
+      cartAccess = await ensureCartReady();
+      val = await validateCart('strict');
+      serverItems = Array.isArray(val?.items) ? val.items : null;
+      putSummary = val?.summary || null;
 
       const filteredFromServer = (serverItems || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
       const filteredFromVal = (val?.items || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
@@ -1660,6 +1662,9 @@ function CheckoutPage() {
       setIsPlacing(false);
       return;
     }
+
+    const sessionId = cartAccess.sessionId;
+    try { setApiSessionId(sessionId); } catch { }
 
     const validatedRaw = Array.isArray(serverItems) ? serverItems : (Array.isArray(val?.items) ? val.items : []);
     const finalItems = validatedRaw
@@ -1759,8 +1764,10 @@ function CheckoutPage() {
           ? window.crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       
-          const response = await api.post('/api/orders', order, {
-        headers: { 'Idempotency-Key': idempKey }
+      const response = await createOrderFromAuthorizedCart({
+        order,
+        cartAccess,
+        idempotencyKey: idempKey,
       });
 
       const createdOrderId = response.data?._id || response.data?.order?._id || '';

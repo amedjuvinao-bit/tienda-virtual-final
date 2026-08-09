@@ -1337,6 +1337,7 @@ async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
 
 module.exports = {
   DEFAULT_RESERVATION_MINUTES,
+  buildStockVariantFilter,
   createInventoryReservation,
   confirmInventoryReservation,
   releaseInventoryReservation,
@@ -1347,4 +1348,5 @@ module.exports = {
   resolveReservationStockVariant,
   buildReleaseStockUpdate,
   createServiceError,
+  getAvailableFromStock,
 };

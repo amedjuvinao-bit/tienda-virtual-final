@@ -1,7 +1,7 @@
 // src/admin/FavoritosAdmin.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import api, { setAdminToken } from "../lib/api";
+import api from "../lib/api";
 
 /* ---------- Helpers ---------- */
 function money(n) {
@@ -67,15 +67,6 @@ function toBackendFavorite(it) {
    Componente: FavoritosAdmin
    ========================================================= */
 export default function FavoritosAdmin() {
-  // Asegura token admin desde .env si falta en localStorage
-  useEffect(() => {
-    const has = localStorage.getItem("admin_token");
-    if (!has) {
-      const envToken = import.meta.env.VITE_ADMIN_TOKEN || "rosa_boutique_123_secreto";
-      setAdminToken(envToken);
-    }
-  }, []);
-
   // filtros y paginación
   const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");

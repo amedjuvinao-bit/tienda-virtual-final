@@ -234,14 +234,17 @@ export function CartProvider({ children }) {
     return adoptSnapshot(response.data || {});
   };
 
-  const ensureCartReady = async (items = cartRef.current.map(toBackendItem)) => {
+  const ensureCartReady = async (items) => {
     const existing = getCartAccess();
     if (existing) {
       if (!authoritativeRef.current.version) await loadRemoteCart(existing);
       return { ...existing, version: authoritativeRef.current.version };
     }
     clearCartAccess();
-    return createRemoteCart(items);
+    const createPayload = Array.isArray(items)
+      ? { items }
+      : { items: cart.map(toBackendItem) };
+    return createRemoteCart(createPayload.items);
   };
 
   const writeCartVersion = async ({ items, version }) => {
