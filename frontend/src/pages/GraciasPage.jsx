@@ -5,6 +5,10 @@ import Header from '../components/Header';
 import FooterSection from '../components/FooterSection';
 import WhatsAppButton from '../components/WhatsAppButton';
 import GraciasImg from '../assets/IMGPAGGRACIAS.jpg';
+import {
+  buildOrderPaymentAccessHeaders,
+  getOrderPaymentAccess,
+} from '../utils/orderPaymentAccess';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -607,6 +611,14 @@ export default function GraciasPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { state } = location;
+  const accessOrderId =
+    state?.orderId ||
+    new URLSearchParams(location.search).get('orderId') ||
+    '';
+  const paymentAccess = useMemo(
+    () => getOrderPaymentAccess(accessOrderId),
+    [accessOrderId]
+  );
 
   const wompiTransactionId =
   new URLSearchParams(location.search).get('id') ||
@@ -622,12 +634,14 @@ export default function GraciasPage() {
   useEffect(() => {
     let cancel = false;
 
-    if (!wompiTransactionId) {
+    if (!wompiTransactionId || !paymentAccess) {
       setWompiTxData(null);
       return;
     }
 
-    fetch(`${API_BASE}/api/payments/wompi/transaction/${wompiTransactionId}`)
+    fetch(`${API_BASE}/api/payments/wompi/transaction/${wompiTransactionId}`, {
+      headers: buildOrderPaymentAccessHeaders(paymentAccess),
+    })
       .then(res => res.json())
       .then(data => {
         if (cancel) return;
@@ -643,7 +657,7 @@ export default function GraciasPage() {
     return () => {
       cancel = true;
     };
-  }, [wompiTransactionId]);
+  }, [paymentAccess, wompiTransactionId]);
 
   const payuResponse = useMemo(
     () => parsePayUResponse(location.search),
@@ -720,11 +734,7 @@ export default function GraciasPage() {
         : Number(paymentResponse.itemCount || 0);
 
   const resolvedBuyerEmail =
-    thanksOrderData?.customerEmail ||
-    thanksOrderData?.email ||
-    paymentResponse.buyerEmail ||
-    wompiTxData?.customerEmail ||
-    '';
+    paymentResponse.buyerEmail || '';
 
   const resolvedProvider =
     thanksOrderData?.paymentProvider ||
@@ -852,8 +862,10 @@ export default function GraciasPage() {
       try {
         const [pageRes, orderRes] = await Promise.all([
           fetch(`${API_BASE}/api/pages/gracias`),
-          backendOrderId
-            ? fetch(`${API_BASE}/api/orders/${backendOrderId}/thanks`)
+          backendOrderId && paymentAccess
+            ? fetch(`${API_BASE}/api/orders/${backendOrderId}/thanks`, {
+                headers: buildOrderPaymentAccessHeaders(paymentAccess),
+              })
             : Promise.resolve(null),
         ]);
 
@@ -883,7 +895,7 @@ export default function GraciasPage() {
 
     load();
     return () => { cancel = true; };
-  }, [backendOrderId]);
+  }, [backendOrderId, paymentAccess]);
 
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}

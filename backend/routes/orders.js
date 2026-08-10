@@ -45,6 +45,22 @@ const {
 const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
+const {
+  markCartConverted,
+} = require('../services/cartAdminOperationsService');
+const {
+  requireAuthorizedOrderCart,
+} = require('../services/authorizedCartOrderService');
+const {
+  SAFE_PAYMENT_ACCESS_ERROR,
+  buildPublicThanksResponse,
+  getPaymentAccessSecret,
+  issueGuestOrderAccess,
+  resolveAuthorizedPublicPaymentOrder,
+} = require('../services/publicPaymentAccessService');
+const {
+  SAFE_CART_ACCESS_ERROR,
+} = require('../services/cartAccessService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -78,6 +94,32 @@ function rateLimit(req, res, next) {
   }
 
   next();
+}
+
+function withOrderPaymentAccess(payload, { order, sessionId, secret } = {}) {
+  return {
+    ...(payload || {}),
+    paymentAccess: issueGuestOrderAccess({
+      orderId: order?._id,
+      sessionId,
+      secret,
+    }),
+  };
+}
+
+function buildOrderCreationResult(order, extra = {}) {
+  return {
+    _id: order?._id,
+    orderNumber: order?.orderNumber,
+    subtotal: Number(order?.subtotal || 0),
+    discount: order?.discount || null,
+    coupon: order?.coupon || null,
+    pricing: order?.pricing || null,
+    taxes: order?.taxes || null,
+    shipping: Number(order?.shipping || 0),
+    total: Number(order?.total || 0),
+    ...extra,
+  };
 }
 
 /* =========================================================
@@ -1552,48 +1594,26 @@ router.get('/admin', async (req, res) => {
  * ============================ */
 router.get('/:id/thanks', async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).lean();
-
-    if (!order) {
-      return res.status(404).json({ error: 'Orden no encontrada' });
+    const access = await resolveAuthorizedPublicPaymentOrder({
+      req,
+      OrderModel: Order,
+      orderId: req.params.id,
+    });
+    if (!access.allowed) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
     }
 
-    const customer = order.customer || {};
-    const payment = order.payment || {};
-    const items = Array.isArray(order.items)
-      ? order.items
-      : Array.isArray(order.cart)
-        ? order.cart
-        : [];
-
-    const summary = order.summary || calcSummaryFromItems(items);
-
-    return res.json({
-      ok: true,
-      orderId: String(order._id || ''),
-      orderNumber: String(order.orderNumber || ''),
-      status: String(order.status || ''),
-      subtotal: Number(order.subtotal ?? summary.subtotal ?? 0),
-      shipping: Number(order.shipping || 0),
-      total: Number(order.total || 0),
-      itemCount: Number(summary.totalItems || 0),
-      customerName: [customer.name, customer.lastname].filter(Boolean).join(' ').trim(),
-      customerEmail: String(customer.emailOrPhone || customer.email || ''),
-      customerPhone: String(customer.phone || ''),
-      customerCity: String(customer.city || ''),
-      customerAddress: String(customer.address || ''),
-      customerCountry: String(customer.country || ''),
-      customerDepartment: String(customer.department || ''),
-      paymentProvider: String(payment.provider || ''),
-      paymentProviderLabel: String(payment.providerLabel || ''),
-      paymentStatus: String(payment.status || ''),
-      currency: String(payment.currency || 'COP'),
-      createdAt: order.createdAt || null,
-      updatedAt: order.updatedAt || null,
-    });
+    return res.json(buildPublicThanksResponse({ order: access.order }));
   } catch (error) {
     console.error('GET /orders/:id/thanks', error);
-    return res.status(400).json({ error: 'ID inválido' });
+    if (error?.code === 'PAYMENT_ACCESS_SECRET_MISCONFIGURED') {
+      return res.status(500).json({
+        ok: false,
+        error: 'PAYMENT_ACCESS_UNAVAILABLE',
+        message: 'No fue posible validar el acceso a la orden.',
+      });
+    }
+    return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
   }
 });
 
@@ -2014,8 +2034,38 @@ router.put('/:id/tags', requireAdmin, async (req, res) => {
 /* ============================
  * POST /api/orders
  * ============================ */
-router.post('/', rateLimit, async (req, res) => {
+router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
   const endpoint = 'POST /orders';
+
+  let paymentAccessSecret;
+  try {
+    paymentAccessSecret = getPaymentAccessSecret();
+  } catch (error) {
+    console.error('No fue posible habilitar el acceso publico de la orden.');
+    return res.status(500).json({
+      ok: false,
+      error: 'ORDER_ACCESS_UNAVAILABLE',
+      message: 'No fue posible iniciar la compra de forma segura.',
+    });
+  }
+
+  if (req.authorizedOrderReplay?.orderId) {
+    const replayOrder = await Order.findById(req.authorizedOrderReplay.orderId);
+    if (!replayOrder) return res.status(404).json(SAFE_CART_ACCESS_ERROR);
+    return res.status(200).json(
+      withOrderPaymentAccess(
+        buildOrderCreationResult(replayOrder, {
+          idempotent: true,
+          reused: true,
+        }),
+        {
+          order: replayOrder,
+          sessionId: req.authorizedCartSessionId,
+          secret: paymentAccessSecret,
+        }
+      )
+    );
+  }
 
   const { ok, errors, cleaned } = validateOrderPayload(req.body || {});
 
@@ -2039,40 +2089,56 @@ router.post('/', rateLimit, async (req, res) => {
       const sameRequestHash = String(prevKey.requestHash || '') === String(derivedKey || '');
 
       if (prevKey.status === 'completed' && prevKey.orderId) {
+        if (!sameRequestHash) {
+          return res.status(409).json({
+            error: 'IDEMPOTENCY_CONFLICT',
+            message: 'La clave de idempotencia ya fue usada con otro payload.',
+          });
+        }
         const existingOrder = await Order.findById(prevKey.orderId);
 
         if (existingOrder && !canReuseMutableOrderData(existingOrder)) {
-          return res.status(200).json({
-            _id: existingOrder._id,
-            orderNumber: existingOrder.orderNumber,
-            subtotal: Number(existingOrder.subtotal || 0),
-            discount: existingOrder.discount || null,
-            coupon: existingOrder.coupon || null,
-            pricing: existingOrder.pricing || null,
-            taxes: existingOrder.taxes || null,
-            shipping: Number(existingOrder.shipping || 0),
-            total: Number(existingOrder.total || 0),
-            idempotent: true,
-            reused: true,
+          await markCartConverted({
+            sessionId: cleaned.sessionId,
+            orderId: existingOrder._id,
+            convertedAt: existingOrder.createdAt || new Date(),
           });
+          return res.status(200).json(
+            withOrderPaymentAccess(
+              buildOrderCreationResult(existingOrder, {
+                idempotent: true,
+                reused: true,
+              }),
+              {
+                order: existingOrder,
+                sessionId: cleaned.sessionId,
+                secret: paymentAccessSecret,
+              }
+            )
+          );
         }
 
         const syncedOrder = await syncExistingOrderForRetry(prevKey.orderId, cleaned);
 
         if (syncedOrder) {
-          return res.status(200).json({
-            _id: syncedOrder._id,
-            orderNumber: syncedOrder.orderNumber,
-            subtotal: Number(syncedOrder.subtotal || 0),
-            discount: syncedOrder.discount || null,
-            coupon: syncedOrder.coupon || null,
-            pricing: syncedOrder.pricing || null,
-            taxes: syncedOrder.taxes || null,
-            shipping: Number(syncedOrder.shipping || 0),
-            total: Number(syncedOrder.total || 0),
-            idempotent: true,
-            reused: true,
+          await markCartConverted({
+            sessionId: cleaned.sessionId,
+            orderId: syncedOrder._id,
+            convertedAt: syncedOrder.createdAt || new Date(),
           });
+          return res.status(200).json(
+            withOrderPaymentAccess(
+              buildOrderCreationResult(syncedOrder, {
+                idempotent: true,
+                reused: true,
+              }),
+              {
+                order: syncedOrder,
+                sessionId: cleaned.sessionId,
+                secret: paymentAccessSecret,
+              }
+            )
+          );
         }
       }
 
@@ -2400,6 +2466,21 @@ router.post('/', rateLimit, async (req, res) => {
         ],
         { session }
       );
+      const cartConversion = await markCartConverted(
+        {
+          sessionId: cleaned.sessionId,
+          orderId: created._id,
+          convertedAt: created.createdAt || new Date(),
+        },
+        { session }
+      );
+      if (Number(cartConversion?.matchedCount || 0) !== 1) {
+        throw Object.assign(
+          new Error('La credencial del carrito ya fue utilizada.'),
+          { code: 'CART_ACCESS_ALREADY_USED', statusCode: 404 }
+        );
+      }
+
 
       if (cleaned.customer?.wantsNewsletter) {
         const { emailOrPhone, phone } = cleaned.customer;
@@ -2450,24 +2531,24 @@ router.post('/', rateLimit, async (req, res) => {
     if (created && created._id) {
       const statusCode = created.idempotent || created.reused ? 200 : 201;
 
-      return res.status(statusCode).json({
-        _id: created._id,
-        orderNumber: created.orderNumber,
-        subtotal: Number(created.subtotal || 0),
-        discount: created.discount || null,
-        coupon: created.coupon || null,
-        pricing: created.pricing || null,
-        taxes: created.taxes || null,
-        shipping: Number(created.shipping || 0),
-        total: Number(created.total || 0),
-        reservationId: inventoryReservation?._id || null,
-        reservationCode: inventoryReservation?.reservationCode || '',
-        reservationStatus: inventoryReservation?.status || '',
-        reservationExpiresAt: inventoryReservation?.expiresAt || null,
-        ...(created.idempotent || created.reused
-          ? { idempotent: true, reused: true }
-          : {}),     
-      });
+      return res.status(statusCode).json(
+        withOrderPaymentAccess(
+          buildOrderCreationResult(created, {
+            reservationId: inventoryReservation?._id || null,
+            reservationCode: inventoryReservation?.reservationCode || '',
+            reservationStatus: inventoryReservation?.status || '',
+            reservationExpiresAt: inventoryReservation?.expiresAt || null,
+            ...(created.idempotent || created.reused
+              ? { idempotent: true, reused: true }
+              : {}),
+          }),
+          {
+            order: created,
+            sessionId: cleaned.sessionId,
+            secret: paymentAccessSecret,
+          }
+        )
+      );
     }
 
     const existing = await IdempotencyKey.findOne({ key: idempoKey, endpoint }).lean();
@@ -2476,19 +2557,24 @@ router.post('/', rateLimit, async (req, res) => {
       const prev = await syncExistingOrderForRetry(existing.orderId, cleaned);
 
       if (prev) {
-        return res.status(200).json({
-          _id: prev._id,
-          orderNumber: prev.orderNumber,
-          subtotal: Number(prev.subtotal || 0),
-          discount: prev.discount || null,
-          coupon: prev.coupon || null,
-          pricing: prev.pricing || null,
-          taxes: prev.taxes || null,
-          shipping: Number(prev.shipping || 0),
-          total: Number(prev.total || 0),
-          idempotent: true,
-          reused: true,
+        await markCartConverted({
+          sessionId: cleaned.sessionId,
+          orderId: prev._id,
+          convertedAt: prev.createdAt || new Date(),
         });
+        return res.status(200).json(
+          withOrderPaymentAccess(
+            buildOrderCreationResult(prev, {
+              idempotent: true,
+              reused: true,
+            }),
+            {
+              order: prev,
+              sessionId: cleaned.sessionId,
+              secret: paymentAccessSecret,
+            }
+          )
+        );
       }
     }
 
@@ -2514,6 +2600,9 @@ router.post('/', rateLimit, async (req, res) => {
     }
 
     const code = String(error?.code || '');
+    if (code === 'CART_ACCESS_ALREADY_USED') {
+      return res.status(404).json(SAFE_CART_ACCESS_ERROR);
+    }
     if (code === 'INSUFFICIENT_STOCK') {
       return res.status(error.statusCode || 409).json({
         error: 'No hay inventario suficiente para completar la compra.',

@@ -7,6 +7,11 @@ import { useCart } from '../context/CartContext';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 import { getSessionId } from '../utils/getSessionId';
+import { buildCartAccessHeaders } from '../utils/cartAccess';
+import {
+  buildOrderPaymentAccessHeaders,
+  storeOrderPaymentAccess,
+} from '../utils/orderPaymentAccess';
 import { useNavigate } from 'react-router-dom';
 import ModalReembolso from '../components/ModalReembolso';
 import ModalEnvio from '../components/ModalEnvio';
@@ -21,6 +26,15 @@ import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const WOMPI_WIDGET_URL = 'https://checkout.wompi.co/widget.js';
+
+function createOrderFromAuthorizedCart({ order, cartAccess, idempotencyKey }) {
+  return api.post('/api/orders', order, {
+    headers: {
+      ...buildCartAccessHeaders(cartAccess),
+      'Idempotency-Key': idempotencyKey,
+    },
+  });
+}
 
 /* ─── helpers ─── */
 function clampInt(value, min, max, fallback) {
@@ -856,7 +870,7 @@ function CheckoutPage() {
   const [customerCountry, setCustomerCountry] = useState('Colombia');
   const [dianCustomer, setDianCustomer] = useState(dianCustomerDefaults);
 
-  const { cart, clearCart } = useCart();
+  const { cart, clearCart, ensureCartReady, validateCart } = useCart();
   const currentCart = cartView ?? cart;
   const cartRequiresShipping = useMemo(
     () =>
@@ -1486,15 +1500,15 @@ function CheckoutPage() {
     orderShipping,
     orderTotal,
     lineItemCount,
+    paymentAccess,
   }) => {
-    console.log('Entrando a openWompiCheckout');
-    console.log('ORDER ID:', orderId);
-
     const selectedCountryCode = selectedCountry?.code || 'CO';
 
-    const { data } = await api.post('/api/payments/wompi/checkout-data', { orderId });
-
-    console.log('WOMPI BACKEND DATA:', data);
+    const { data } = await api.post(
+      '/api/payments/wompi/checkout-data',
+      { orderId },
+      { headers: buildOrderPaymentAccessHeaders(paymentAccess) }
+    );
 
     if (!data) {
       throw new Error(data?.message || 'No se pudo preparar el checkout de Wompi.');
@@ -1506,7 +1520,13 @@ function CheckoutPage() {
       throw new Error('El widget de Wompi no está disponible en este navegador.');
     }
 
-    const wompiCustomerData = buildWompiCustomerData(data.customerData, selectedCountryCode);
+    const wompiCustomerData = buildWompiCustomerData({
+      email: String(customerEmailOrPhone || '').includes('@')
+        ? String(customerEmailOrPhone || '').trim()
+        : '',
+      full_name: [customerName, customerLastname].filter(Boolean).join(' ').trim(),
+      phone_number: customerPhone,
+    }, selectedCountryCode);
 
     const wompiShippingAddress = buildWompiShippingAddress({
       deliveryType,
@@ -1519,9 +1539,6 @@ function CheckoutPage() {
       customerLastname,
       customerPostalCode,
     });
-
-    console.log('DATA COMPLETA WOMPI:', data);
-    console.log('PUBLIC KEY DESDE BACKEND:', data.publicKey);
 
     const widgetConfig = {
       currency: data.currency,
@@ -1544,17 +1561,10 @@ function CheckoutPage() {
       widgetConfig.shippingAddress = wompiShippingAddress;
     }
 
-    console.log('WOMPI WIDGET CONFIG:', widgetConfig);
-    console.log('REDIRECT URL BACKEND:', data.redirectUrl);
-    console.log('WidgetCheckout disponible:', typeof window.WidgetCheckout);
-    console.log('CONFIG FINAL EXACTA:', JSON.stringify(widgetConfig, null, 2));
-
     const checkout = new window.WidgetCheckout(widgetConfig);
 
     setIsPlacing(false);
     checkout.open(async (result) => {
-      console.log('Resultado Wompi:', result);
-
       const tx = result?.transaction || null;
       const txStatus = String(tx?.status || '').toUpperCase();
 
@@ -1608,24 +1618,16 @@ function CheckoutPage() {
         return;
     }
 
-    const sessionId = getSessionId();
-    try { setApiSessionId(sessionId); } catch { }
-    
+    let cartAccess;
     let val;
     let serverItems = null;
     let putSummary = null;
 
     try {
-      const { data } = await api.post('/api/cart/validate', { sessionId, mode: 'strict' });
-      val = data;
-
-      if (Array.isArray(val?.items)) {
-        try {
-          const putRes = await api.put(`/api/cart/${sessionId}`, { items: val.items });
-          serverItems = putRes?.data?.cart?.items ?? null;
-          putSummary = putRes?.data?.cart?.summary ?? null;
-        } catch (_) { }
-      }
+      cartAccess = await ensureCartReady();
+      val = await validateCart('strict');
+      serverItems = Array.isArray(val?.items) ? val.items : null;
+      putSummary = val?.summary || null;
 
       const filteredFromServer = (serverItems || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
       const filteredFromVal = (val?.items || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
@@ -1660,6 +1662,9 @@ function CheckoutPage() {
       setIsPlacing(false);
       return;
     }
+
+    const sessionId = cartAccess.sessionId;
+    try { setApiSessionId(sessionId); } catch { }
 
     const validatedRaw = Array.isArray(serverItems) ? serverItems : (Array.isArray(val?.items) ? val.items : []);
     const finalItems = validatedRaw
@@ -1759,8 +1764,10 @@ function CheckoutPage() {
           ? window.crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       
-          const response = await api.post('/api/orders', order, {
-        headers: { 'Idempotency-Key': idempKey }
+      const response = await createOrderFromAuthorizedCart({
+        order,
+        cartAccess,
+        idempotencyKey: idempKey,
       });
 
       const createdOrderId = response.data?._id || response.data?.order?._id || '';
@@ -1773,6 +1780,7 @@ function CheckoutPage() {
       const createdTax = Number(response.data?.taxes?.iva?.amount ?? createdPricing.taxAmount ?? 0);
       const createdShipping = Number(response.data?.shipping ?? createdPricing.shipping ?? 0);
       const createdTotal = Number(response.data?.total ?? createdPricing.total ?? order.total);
+      const paymentAccess = response.data?.paymentAccess || null;
 
       if (!(response.status === 201 || response.status === 200) || !createdOrderId) {
         setErrors(['Ocurrió un problema al procesar tu orden. Intenta nuevamente.']);
@@ -1780,7 +1788,11 @@ function CheckoutPage() {
         setIsPlacing(false);
         return;
       }
-      console.log('PROVIDER ACTUAL:', paymentsConfig.provider);
+      if (!storeOrderPaymentAccess(paymentAccess)) {
+        setErrors(['No fue posible conservar el acceso seguro de esta orden.']);
+        setIsPlacing(false);
+        return;
+      }
       if (paymentsConfig.provider === 'manual') {
         await clearCart();
         navigate('/gracias', {
@@ -1809,6 +1821,7 @@ function CheckoutPage() {
             orderShipping: createdShipping,
             orderTotal: createdTotal,
             lineItemCount: finalItems.length,
+            paymentAccess,
           });
           return;
         } catch (gatewayError) {

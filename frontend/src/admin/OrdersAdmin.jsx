@@ -480,7 +480,7 @@ export default function OrdersAdmin() {
       .catch((e) => {
         if (cancel) return;
         if (e?.response?.status === 401) {
-          setErr('No autorizado. Inicia sesión de admin o configura VITE_ADMIN_TOKEN.');
+          setErr('No autorizado. Inicia una sesion administrativa valida.');
         } else {
           setErr('No se pudieron cargar las órdenes.');
         }

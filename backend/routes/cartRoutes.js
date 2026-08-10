@@ -9,15 +9,29 @@ const {
   buildVariantKey,
   normalizeAttributes,
   resolveVariantCommercialSnapshot,
+  resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
-const {
-  getPublicFulfillmentView,
-} = require('../lib/products/productFulfillmentConfig');
 const {
   getBundleAvailableQuantity,
 } = require('../services/productBundleService');
-
-const { isValidObjectId } = mongoose;
+const {
+  SAFE_CART_ACCESS_ERROR,
+  getCartAccessFromRequest,
+  getCartAccessSecret,
+  isValidCartAccessToken,
+  isValidCartSessionId,
+  issueCartAccess,
+  stripCartSecrets,
+  verifyCartAccess,
+} = require('../services/cartAccessService');
+const {
+  defaultCartCanonicalValidationService,
+  toStoredCartItem,
+} = require('../services/cartCanonicalValidationService');
+const {
+  createCartRecoveryService,
+} = require('../services/cartRecoveryService');
+const cartAdminRoutes = require('./cartAdminRoutes');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -46,6 +60,151 @@ function rateLimit(req, res, next) {
   next();
 }
 
+function sendCartAccessNotFound(res) {
+  return res.status(404).json(SAFE_CART_ACCESS_ERROR);
+}
+
+const CART_VERSION_HEADER = 'if-match-updated-at';
+
+function cartVersionOf(cart) {
+  if (!cart?.updatedAt) return '';
+  const date = new Date(cart.updatedAt);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function readExpectedCartVersion(req) {
+  const raw = clean(req?.headers?.[CART_VERSION_HEADER]);
+  if (!raw) return { ok: false, reason: 'missing', value: '' };
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== raw) {
+    return { ok: false, reason: 'invalid', value: '' };
+  }
+  return { ok: true, reason: '', value: raw, date };
+}
+
+function sendCartVersionPrecondition(res, reason) {
+  return res.status(428).json({
+    ok: false,
+    error: reason === 'invalid'
+      ? 'CART_VERSION_INVALID'
+      : 'CART_VERSION_REQUIRED',
+    message: 'Debes enviar la version exacta y vigente del carrito.',
+  });
+}
+
+function authorizedCartVersionFilter(cart, sessionId, expectedVersion) {
+  return {
+    _id: cart._id,
+    sessionId,
+    accessTokenHash: cart.accessTokenHash,
+    accessVersion: cart.accessVersion,
+    updatedAt: expectedVersion,
+  };
+}
+
+function getCanonicalValidationService(req) {
+  return req?.app?.locals?.cartCanonicalValidationService ||
+    defaultCartCanonicalValidationService;
+}
+
+function getCartRecoveryService(req) {
+  return req?.app?.locals?.cartRecoveryService || createCartRecoveryService();
+}
+
+function sendInvalidCartItems(res, validation) {
+  return res.status(409).json({
+    ok: false,
+    error: 'CART_ITEMS_INVALID',
+    message: 'El carrito contiene productos que no pueden comprarse.',
+    items: validation.invalidItems,
+  });
+}
+
+async function buildPublicCartResponse(
+  cart,
+  { canonicalService = defaultCartCanonicalValidationService } = {}
+) {
+  const plain = stripCartSecrets(cart);
+  for (const field of [
+    'adminTags',
+    'adminNotes',
+    'recoveryAttempts',
+    'recoveryAccess',
+    'lastAdminActivityAt',
+    'lastRecoveryAttemptAt',
+    'lastRecoveryEmailAt',
+    'convertedOrderId',
+    'convertedAt',
+  ]) {
+    delete plain[field];
+  }
+  const validation = await canonicalService.validateItems(
+    Array.isArray(plain?.items) ? plain.items : [],
+    { mode: 'soft' }
+  );
+  const items = await ensureProductContractFields(validation.items);
+  const summaryItems = items.filter((item) => item.valid);
+  return {
+    ...plain,
+    version: cartVersionOf(plain),
+    items,
+    valid: validation.ok,
+    invalidItems: validation.invalidItems,
+    summary: getCartSummary({ items: summaryItems }),
+  };
+}
+
+async function sendCartWriteConflict(req, res, cart) {
+  const current = await Cart.findOne({
+    _id: cart._id,
+    sessionId: cart.sessionId,
+    accessTokenHash: cart.accessTokenHash,
+    accessVersion: cart.accessVersion,
+  })
+    .select('+accessTokenHash +accessVersion +accessIssuedAt')
+    .exec();
+
+  if (!current) return sendCartAccessNotFound(res);
+  const publicCart = await buildPublicCartResponse(current, {
+    canonicalService: getCanonicalValidationService(req),
+  });
+  return res.status(409).json({
+    ok: false,
+    error: 'CART_WRITE_CONFLICT',
+    message: 'El carrito cambio en otra pestana. Se conservo la version del servidor.',
+    version: publicCart.version,
+    cart: publicCart,
+  });
+}
+
+async function loadAuthorizedCart(req, requestedSessionId) {
+  const credentials = getCartAccessFromRequest(req);
+  const safeRequestedSessionId = clean(requestedSessionId);
+  if (
+    !credentials.sessionId ||
+    credentials.sessionId !== safeRequestedSessionId ||
+    !credentials.token ||
+    !isValidCartSessionId(safeRequestedSessionId) ||
+    !isValidCartAccessToken(credentials.token)
+  ) {
+    return null;
+  }
+
+  const cart = await Cart.findOne({ sessionId: safeRequestedSessionId })
+    .select('+accessTokenHash +accessVersion +accessIssuedAt')
+    .exec();
+  if (!cart) return null;
+
+  return verifyCartAccess({
+    cart,
+    sessionId: credentials.sessionId,
+    token: credentials.token,
+    secret: getCartAccessSecret(),
+  })
+    ? cart
+    : null;
+}
+
 /* -------------------------------------------------------
  * Helpers
  * ----------------------------------------------------- */
@@ -58,8 +217,8 @@ function cleanLower(value) {
   return clean(value).toLowerCase();
 }
 
-function escapeRegex(s) {
-  return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Obtiene un id de producto robusto desde varias formas comunes
@@ -91,8 +250,7 @@ function getVariantSelector(raw = {}) {
   );
 
   return {
-    variantKey:
-      variantKey || buildVariantKey(size, color, variantAttributes),
+    variantKey: variantKey || buildVariantKey(size, color, variantAttributes),
     size,
     color,
     variantAttributes,
@@ -135,8 +293,13 @@ function sanitizeCartItems(items) {
         raw?.selectedAttributes ||
         []
     );
-    const variantKey =
-      variantId || buildVariantKey(size, color, variantAttributes);
+    const identity = resolveVariantIdentity({
+      variantKey: variantId,
+      size,
+      color,
+      attributes: variantAttributes,
+    });
+    const variantKey = identity.variantKey;
     const variantLabel = clean(
       raw?.variantLabel || raw?.selectedVariant?.label || ''
     ).slice(0, 180);
@@ -158,13 +321,13 @@ function sanitizeCartItems(items) {
       title,
       image,
       price,
-      color,
+      color: identity.color,
       colorLabel,
-      size,
+      size: identity.size,
       variantId: variantKey,
       variantKey,
       variantLabel,
-      variantAttributes,
+      variantAttributes: identity.attributes,
       qty,
       quantity: qty, // compatibilidad
     });
@@ -174,113 +337,65 @@ function sanitizeCartItems(items) {
   return out;
 }
 
-// Populate manual, TOLERANTE: nunca lanza; añade `product` sin tocar `_id`
-async function safePopulateItems(items) {
-  try {
-    const arr = Array.isArray(items) ? items : [];
-    const validIds = [];
-    for (const it of arr) {
-      const rawId = it?._id;
-      const idStr = rawId && typeof rawId === 'object' ? (rawId._id || rawId.id) : rawId;
-      if (idStr && isValidObjectId(String(idStr))) validIds.push(String(idStr));
-    }
-
-    if (validIds.length === 0) return arr.map((it) => ({ ...it, product: null }));
-
-    const products = await Product.find({ _id: { $in: validIds } })
-      .select(
-        'title price image images slug sku barcode category inventory stock visible active productType trackInventory allowBackorder variants digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
-      )
-      .populate({ path: 'category', select: 'name' })
-      .lean()
-      .exec();
-
-    const map = new Map(
-      products.map((product) => {
-        const fulfillment = getPublicFulfillmentView(product);
-        return [
-          String(product._id),
-          {
-            ...product,
-            fulfillment,
-            requiresShipping: fulfillment.requiresShipping,
-          },
-        ];
-      })
-    );
-    return arr.map((it) => {
-      const rawId = it?._id;
-      const idStr = rawId && typeof rawId === 'object' ? (rawId._id || rawId.id) : rawId;
-      const key = idStr ? String(idStr) : null;
-      const pdoc = key && map.get(key) ? map.get(key) : null;
-      return { ...it, product: pdoc || null };
-    });
-  } catch (err) {
-    console.error('safePopulateItems fallback (sin populate):', err?.message || err);
-    return Array.isArray(items) ? items.map((it) => ({ ...it, product: null })) : [];
-  }
-}
-
+// Resume exclusivamente los renglones ya reconstruidos por la autoridad canonica.
 function getCartSummary(cartDoc) {
   const items = Array.isArray(cartDoc.items) ? cartDoc.items : [];
   let totalItems = 0;
   let subtotal = 0;
 
   for (const it of items) {
-    const qty = Number(it?.qty ?? it?.quantity ?? 0);
+    const rawQty = Number(it?.qty ?? it?.quantity ?? 0);
+    const qty = Number.isFinite(rawQty) ? Math.max(0, rawQty) : 0;
     totalItems += qty;
 
-    const priceFromCart = Number(it?.price || 0);
-    const priceFromProduct = Number(it?.product?.price || 0);
-    const unitPrice =
-      priceFromCart > 0 ? priceFromCart : (priceFromProduct > 0 ? priceFromProduct : 0);
+    const rawPrice = Number(it?.price || 0);
+    const unitPrice = Number.isFinite(rawPrice) ? Math.max(0, rawPrice) : 0;
 
     subtotal += qty * unitPrice;
   }
   return { totalItems, subtotal };
 }
 
-function computeAvailableStockTotal(p) {
-  if (!p) return 0;
-  if (Array.isArray(p.inventory) && p.inventory.length) {
-    return p.inventory.reduce(
-      (acc, r) => acc + Number(r?.stock ?? r?.qty ?? r?.quantity ?? 0),
+function computeAvailableStockTotal(product) {
+  if (!product) return 0;
+  if (Array.isArray(product.inventory) && product.inventory.length) {
+    return product.inventory.reduce(
+      (total, row) => total + Number(row?.stock ?? row?.qty ?? row?.quantity ?? 0),
       0
     );
   }
-  return Number(p?.stock ?? 0);
+  return Number(product.stock ?? 0);
 }
 
-function computeAvailableStockForVariant(p, color, size) {
-  if (!p) return 0;
-  const c = String(color || '');
-  const s = String(size || '');
-  if (!Array.isArray(p.inventory) || p.inventory.length === 0) {
-    return Number(p?.stock ?? 0);
+function computeAvailableStockForVariant(product, color, size) {
+  if (!product) return 0;
+  if (!Array.isArray(product.inventory) || product.inventory.length === 0) {
+    return Number(product.stock ?? 0);
   }
-  // Coincidencia exacta, case-insensitive
-  const rxC = new RegExp(`^${escapeRegex(c)}$`, 'i');
-  const rxS = new RegExp(`^${escapeRegex(s)}$`, 'i');
-  const v = p.inventory.find(
-    (row) => rxC.test(String(row?.color || '')) && rxS.test(String(row?.size || ''))
+  const colorPattern = new RegExp(`^${escapeRegex(color)}$`, 'i');
+  const sizePattern = new RegExp(`^${escapeRegex(size)}$`, 'i');
+  const row = product.inventory.find(
+    (entry) =>
+      colorPattern.test(String(entry?.color || '')) &&
+      sizePattern.test(String(entry?.size || ''))
   );
-  if (!v) return 0;
-  return Number(v?.stock ?? v?.qty ?? v?.quantity ?? 0);
+  return Number(row?.stock ?? row?.qty ?? row?.quantity ?? 0);
 }
 
-async function computeAvailableStockForCartItem(p, item) {
-  if (!p) return Infinity;
-  if (p.productType === 'bundle') {
-    return getBundleAvailableQuantity(p);
+async function computeAvailableStockForCartItem(product, item) {
+  if (!product) return Infinity;
+  if (product.productType === 'bundle') {
+    return getBundleAvailableQuantity(product);
   }
-  if (p.trackInventory === false || p.allowBackorder === true) return Infinity;
+  if (product.trackInventory === false || product.allowBackorder === true) {
+    return Infinity;
+  }
 
   const selector = getVariantSelector(item);
-  const byVariant = Boolean(clean(selector.variantKey)) || Boolean(clean(item.color)) || Boolean(clean(item.size));
-
+  const byVariant = Boolean(selector.variantKey) || Boolean(clean(item.color)) || Boolean(clean(item.size));
   if (selector.variantKey && selector.variantKey !== 'default__default') {
     const stockRow = await InventoryStock.findOne({
-      product: p._id,
+      product: product._id,
       variantKey: selector.variantKey,
       deletedAt: null,
       active: { $ne: false },
@@ -288,69 +403,106 @@ async function computeAvailableStockForCartItem(p, item) {
       .select('stock reservedStock availableStock')
       .lean()
       .exec();
-
     if (stockRow) {
       const available = Number(stockRow.availableStock);
       if (Number.isFinite(available)) return Math.max(0, available);
-      return Math.max(0, Number(stockRow.stock || 0) - Number(stockRow.reservedStock || 0));
+      return Math.max(
+        0,
+        Number(stockRow.stock || 0) - Number(stockRow.reservedStock || 0)
+      );
     }
   }
 
   return byVariant
-    ? computeAvailableStockForVariant(p, item.color, item.size)
-    : computeAvailableStockTotal(p);
+    ? computeAvailableStockForVariant(product, item.color, item.size)
+    : computeAvailableStockTotal(product);
 }
 
-function resolveCartCommercialSnapshot(p, item) {
-  if (!p) {
+function resolveCartCommercialSnapshot(product, item) {
+  if (!product) {
     return {
-      price: Math.max(0, Number(item.price || 0)),
-      image: item.image || '',
       sku: '',
       barcode: '',
       variantKey: readVariantId(item),
-      variantLabel: clean(item.variantLabel || ''),
-      variantAttributes: normalizeAttributes(
-        item.variantAttributes || item.attributes || []
-      ),
     };
   }
+  return resolveVariantCommercialSnapshot(product, getVariantSelector(item));
+}
 
-  const selector = getVariantSelector(item);
-  return resolveVariantCommercialSnapshot(p, selector);
+// La autoridad canonica ya entrega estos campos. Este fallback conserva el
+// contrato comercial de Productos cuando se inyecta una autoridad compatible
+// que no los proyecta, sin debilitar la validacion de CarritosAdmin.
+async function ensureProductContractFields(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  if (mongoose.connection.readyState !== 1) return source;
+  const missing = source.filter(
+    (item) =>
+      item?.valid === true &&
+      (!Object.hasOwn(item, 'variantSku') ||
+        !Object.hasOwn(item, 'variantBarcode') ||
+        !Object.hasOwn(item, 'availableStock'))
+  );
+  if (!missing.length) return source;
+
+  const ids = Array.from(
+    new Set(missing.map((item) => readProductId(item)).filter(mongoose.isValidObjectId))
+  );
+  if (!ids.length) return source;
+  const products = await Product.find({ _id: { $in: ids } }).lean().exec();
+  const productMap = new Map(products.map((product) => [String(product._id), product]));
+
+  return Promise.all(source.map(async (item) => {
+    const product = productMap.get(readProductId(item));
+    if (!product || item?.valid !== true) return item;
+    const commercial = resolveCartCommercialSnapshot(product, item);
+    const availableStock = await computeAvailableStockForCartItem(product, item);
+    return {
+      ...item,
+      variantSku: Object.hasOwn(item, 'variantSku')
+        ? item.variantSku
+        : commercial.sku || '',
+      variantBarcode: Object.hasOwn(item, 'variantBarcode')
+        ? item.variantBarcode
+        : commercial.barcode || '',
+      availableStock: Object.hasOwn(item, 'availableStock')
+        ? item.availableStock
+        : Number.isFinite(availableStock)
+          ? Math.max(0, availableStock)
+          : null,
+    };
+  }));
 }
 
 /* ============================
  * POST /api/cart
  * ============================ */
 router.post('/', rateLimit, async (req, res) => {
-  const { sessionId, items, userId, userName, userEmail } = req.body;
+  const { items, userId, userName, userEmail } = req.body || {};
 
-  if (!sessionId || !Array.isArray(items)) {
+  if (!Array.isArray(items)) {
     return res.status(400).json({
-      message: 'Datos inválidos. Se requiere sessionId y lista de items.',
+      message: 'Datos inválidos. Se requiere una lista de items.',
     });
   }
 
   try {
-    const safeItems = sanitizeCartItems(items);
-
-    // Idempotente por sessionId: si existe, actualiza; si no, crea
-    const existing = await Cart.findOne({ sessionId }).exec();
-    if (existing) {
-      existing.items = safeItems;
-      if (userId) existing.userId = userId;
-      if (userName) existing.userName = userName;
-      if (userEmail) existing.userEmail = userEmail;
-      await existing.save();
-      return res.status(200).json({
-        message: 'Carrito actualizado exitosamente',
-        cart: existing,
-      });
-    }
-
+    const validation = await getCanonicalValidationService(req).validateItems(items, {
+      mode: 'strict',
+    });
+    if (!validation.ok) return sendInvalidCartItems(res, validation);
+    const safeItems = sanitizeCartItems(validation.items.map(toStoredCartItem));
+    const cartId = new mongoose.Types.ObjectId();
+    const access = issueCartAccess({
+      cartId,
+      secret: getCartAccessSecret(),
+    });
     const newCart = new Cart({
-      sessionId,
+      _id: cartId,
+      sessionId: access.sessionId,
+      accessTokenHash: access.tokenHash,
+      accessVersion: access.version,
+      accessIssuedAt: new Date(),
+      lastCustomerActivityAt: new Date(),
       items: safeItems,
       ...(userId ? { userId } : {}),
       ...(userName ? { userName } : {}),
@@ -361,10 +513,13 @@ router.post('/', rateLimit, async (req, res) => {
 
     res.status(201).json({
       message: 'Carrito creado exitosamente',
-      cart: newCart,
+      sessionId: access.sessionId,
+      cartAccessToken: access.token,
+      version: cartVersionOf(newCart),
+      cart: stripCartSecrets(newCart),
     });
   } catch (error) {
-    console.error('Error al guardar carrito:', error);
+    console.error('Error al crear carrito:', error?.code || error?.message);
     res.status(500).json({ message: 'Error al guardar el carrito en la base de datos' });
   }
 });
@@ -374,6 +529,8 @@ router.post('/', rateLimit, async (req, res) => {
  * - ?format=csv
  * - ?populate=1
  * ===================================================== */
+router.use('/admin', requireAdmin, cartAdminRoutes);
+
 router.get('/admin', requireAdmin, async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page || 1));
@@ -381,7 +538,6 @@ router.get('/admin', requireAdmin, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const q = String(req.query.q || '').trim();
-    const populate = String(req.query.populate || '0') === '1';
     const format = String(req.query.format || '').toLowerCase();
 
     const filter = {};
@@ -416,35 +572,15 @@ router.get('/admin', requireAdmin, async (req, res) => {
       .lean()
       .exec();
 
-    let data;
-    if (populate) {
-      const out = [];
-      for (const c of carts) {
-        let itemsPop = c.items || [];
-        try {
-          itemsPop = await safePopulateItems(c.items);
-        } catch (_) { /* fallback ya en helper */ }
-        const summary = getCartSummary({ items: itemsPop });
-        out.push({
-          ...c,
-          items: itemsPop,
-          itemsCount: Array.isArray(c.items) ? c.items.length : 0,
-          summary,
-          totalItems: summary.totalItems,
-          subtotal: summary.subtotal,
-        });
-      }
-      data = out;
-    } else {
-      data = carts.map((c) => {
-        const summary = getCartSummary(c);
-        return {
-          ...c,
-          itemsCount: Array.isArray(c.items) ? c.items.length : 0,
-          summary,
-          totalItems: summary.totalItems,
-          subtotal: summary.subtotal,
-        };
+    const canonicalService = getCanonicalValidationService(req);
+    const data = [];
+    for (const cart of carts) {
+      const publicCart = await buildPublicCartResponse(cart, { canonicalService });
+      data.push({
+        ...publicCart,
+        itemsCount: publicCart.items.length,
+        totalItems: publicCart.summary.totalItems,
+        subtotal: publicCart.summary.subtotal,
       });
     }
 
@@ -479,87 +615,158 @@ router.get('/admin', requireAdmin, async (req, res) => {
   }
 });
 
+/* Rutas administrativas explícitas: no sustituyen la prueba del comprador. */
+router.get('/admin/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ sessionId: req.params.sessionId }).lean().exec();
+    if (!cart) return res.status(404).json({ message: 'Carrito no encontrado.' });
+    const publicCart = await buildPublicCartResponse(cart, {
+      canonicalService: getCanonicalValidationService(req),
+    });
+    return res.status(200).json(publicCart);
+  } catch (error) {
+    console.error('Error al obtener carrito administrativo:', error?.message);
+    return res.status(500).json({ message: 'Error interno al obtener el carrito.' });
+  }
+});
+
+router.put('/admin/:sessionId', requireAdmin, async (req, res) => {
+  if (!Array.isArray(req.body?.items)) {
+    return res.status(400).json({ message: 'La lista de items es inválida.' });
+  }
+  try {
+    const validation = await getCanonicalValidationService(req).validateItems(
+      req.body.items,
+      { mode: 'strict' }
+    );
+    if (!validation.ok) return sendInvalidCartItems(res, validation);
+    const setObj = {
+      items: sanitizeCartItems(validation.items.map(toStoredCartItem)),
+    };
+    for (const field of ['userId', 'userName', 'userEmail']) {
+      if (req.body?.[field]) setObj[field] = req.body[field];
+    }
+    const updated = await Cart.findOneAndUpdate(
+      { sessionId: req.params.sessionId },
+      { $set: setObj, $currentDate: { updatedAt: true } },
+      { new: true, runValidators: true }
+    ).lean();
+    if (!updated) return res.status(404).json({ message: 'Carrito no encontrado.' });
+    const publicCart = await buildPublicCartResponse(updated, {
+      canonicalService: getCanonicalValidationService(req),
+    });
+    return res.status(200).json({
+      message: 'Carrito actualizado correctamente',
+      cart: publicCart,
+    });
+  } catch (error) {
+    console.error('Error al actualizar carrito administrativo:', error?.message);
+    return res.status(500).json({ message: 'Error interno al actualizar el carrito.' });
+  }
+});
+
+router.delete('/admin/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const deleted = await Cart.findOneAndDelete({ sessionId: req.params.sessionId });
+    if (!deleted) return res.status(404).json({ message: 'Carrito no encontrado.' });
+    return res.status(200).json({ message: 'Carrito eliminado correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar carrito administrativo:', error?.message);
+    return res.status(500).json({ message: 'Error interno al eliminar el carrito.' });
+  }
+});
+
+router.post('/recovery/claim', rateLimit, async (req, res) => {
+  try {
+    const claimed = await getCartRecoveryService(req).claim({
+      sessionId: req.headers['x-session-id'],
+      credential: req.headers['x-cart-recovery-token'],
+    });
+    if (!claimed) return sendCartAccessNotFound(res);
+    const cart = await buildPublicCartResponse(claimed.cart, {
+      canonicalService: getCanonicalValidationService(req),
+    });
+    return res.json({
+      sessionId: claimed.sessionId,
+      cartAccessToken: claimed.token,
+      version: cart.version,
+      cart,
+    });
+  } catch (error) {
+    console.error('Error reclamando recuperacion del carrito:', error?.code || 'unknown');
+    return sendCartAccessNotFound(res);
+  }
+});
+
 /* ============================
  * GET /api/cart/:sessionId
  * ============================ */
-router.get('/:sessionId', async (req, res) => {
+router.get('/:sessionId', rateLimit, async (req, res) => {
   const { sessionId } = req.params;
-  const populate = String(req.query.populate || '0') === '1';
 
   try {
-    const cart = await Cart.findOne({ sessionId }).lean().exec();
-    if (!cart) {
-      return res.status(404).json({ message: 'No se encontró carrito para esta sesión.' });
-    }
-
-    let items = cart.items || [];
-    if (populate) {
-      try {
-        items = await safePopulateItems(items);
-      } catch (_) { /* fallback ya en helper */ }
-    }
-    const summary = getCartSummary({ items });
-
-    res.status(200).json({ ...cart, items, summary });
+    const cartDocument = await loadAuthorizedCart(req, sessionId);
+    if (!cartDocument) return sendCartAccessNotFound(res);
+    const cart = await buildPublicCartResponse(cartDocument, {
+      canonicalService: getCanonicalValidationService(req),
+    });
+    res.status(200).json(cart);
   } catch (error) {
-    console.error('Error al obtener carrito:', error);
+    console.error('Error al obtener carrito:', error?.code || error?.message);
     res.status(500).json({ message: 'Error interno al obtener el carrito.' });
   }
 });
 
 /**
  * ========================================
- * PUT /api/cart/:sessionId  (upsert)
+ * PUT /api/cart/:sessionId
  * ========================================
  */
 router.put('/:sessionId', rateLimit, async (req, res) => {
   const { sessionId } = req.params;
-  const { items, userId, userName, userEmail } = req.body;
-  if (!Array.isArray(items)) {
-    return res.status(400).json({ message: 'La lista de items es inválida o no existe.' });
-  }
+  const { items, userId, userName, userEmail } = req.body || {};
 
   try {
-    const ifMatch = req.headers['if-match-updated-at'] || req.query.ifMatchUpdatedAt || null;
-    const safeItems = sanitizeCartItems(items);
-
-    if (ifMatch) {
-      const current = await Cart.findOne({ sessionId }).select('updatedAt').exec();
-      if (
-        current &&
-        current.updatedAt &&
-        new Date(ifMatch).getTime() !== new Date(current.updatedAt).getTime()
-      ) {
-        return res.status(409).json({
-          message: 'El carrito cambió en el servidor. Refresca y vuelve a intentar.',
-          serverUpdatedAt: current.updatedAt,
-        });
-      }
+    const cart = await loadAuthorizedCart(req, sessionId);
+    if (!cart) return sendCartAccessNotFound(res);
+    const expectedVersion = readExpectedCartVersion(req);
+    if (!expectedVersion.ok) {
+      return sendCartVersionPrecondition(res, expectedVersion.reason);
     }
-
-    const setObj = { items: safeItems };
-    if (userId) setObj.userId = userId;
-    if (userName) setObj.userName = userName;
-    if (userEmail) setObj.userEmail = userEmail;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ message: 'La lista de items es inválida o no existe.' });
+    }
+    const validation = await getCanonicalValidationService(req).validateItems(items, {
+      mode: 'strict',
+    });
+    if (!validation.ok) return sendInvalidCartItems(res, validation);
+    const safeItems = sanitizeCartItems(validation.items.map(toStoredCartItem));
+    const set = { items: safeItems, lastCustomerActivityAt: new Date() };
+    if (safeItems.length === 0) set['recoveryAccess.usedAt'] = new Date();
+    if (userId) set.userId = userId;
+    if (userName) set.userName = userName;
+    if (userEmail) set.userEmail = userEmail;
 
     const updatedCart = await Cart.findOneAndUpdate(
-      { sessionId },
-      { $set: setObj, $currentDate: { updatedAt: true } },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    ).lean();
+      authorizedCartVersionFilter(cart, sessionId, expectedVersion.date),
+      { $set: set, $currentDate: { updatedAt: true } },
+      { new: true, runValidators: true, timestamps: false }
+    )
+      .select('+accessTokenHash +accessVersion +accessIssuedAt')
+      .exec();
 
-    let itemsPop = updatedCart.items || [];
-    try {
-      itemsPop = await safePopulateItems(itemsPop);
-    } catch (_) { /* fallback */ }
-    const summary = getCartSummary({ items: itemsPop });
+    if (!updatedCart) return sendCartWriteConflict(req, res, cart);
+    const publicCart = await buildPublicCartResponse(updatedCart, {
+      canonicalService: getCanonicalValidationService(req),
+    });
 
     res.status(200).json({
-      message: 'Carrito actualizado o creado correctamente',
-      cart: { ...updatedCart, items: itemsPop, summary },
+      message: 'Carrito actualizado correctamente',
+      version: publicCart.version,
+      cart: publicCart,
     });
   } catch (error) {
-    console.error('Error al actualizar carrito:', error);
+    console.error('Error al actualizar carrito:', error?.code || error?.message);
     res.status(500).json({ message: 'Error interno al actualizar el carrito' });
   }
 });
@@ -571,11 +778,20 @@ router.delete('/:sessionId', rateLimit, async (req, res) => {
   const { sessionId } = req.params;
 
   try {
-    const result = await Cart.findOneAndDelete({ sessionId });
-    if (!result) {
-      return res.status(404).json({ message: 'No se encontró carrito para esta sesión.' });
+    const cart = await loadAuthorizedCart(req, sessionId);
+    if (!cart) return sendCartAccessNotFound(res);
+    const expectedVersion = readExpectedCartVersion(req);
+    if (!expectedVersion.ok) {
+      return sendCartVersionPrecondition(res, expectedVersion.reason);
     }
-    res.status(200).json({ message: 'Carrito eliminado correctamente' });
+    const deleted = await Cart.findOneAndDelete(
+      authorizedCartVersionFilter(cart, sessionId, expectedVersion.date)
+    );
+    if (!deleted) return sendCartWriteConflict(req, res, cart);
+    res.status(200).json({
+      message: 'Carrito eliminado correctamente',
+      version: cartVersionOf(deleted),
+    });
   } catch (error) {
     console.error('❌ Error al eliminar carrito:', error.message);
     res.status(500).json({ message: 'Error al eliminar el carrito en la base de datos' });
@@ -590,114 +806,42 @@ router.delete('/:sessionId', rateLimit, async (req, res) => {
  * - Usa InventoryStock real por variantKey para stock disponible
  * ========================================
  */
-router.post('/validate', async (req, res) => {
+router.post('/validate', rateLimit, async (req, res) => {
   try {
     const { sessionId, items, mode } = req.body || {};
     const strict = String(mode || 'soft') === 'strict';
 
     let sourceItems = [];
+    let cartVersion = '';
 
     if (sessionId) {
-      const cart = await Cart.findOne({ sessionId }).lean().exec();
-
-      if (cart && Array.isArray(cart.items)) {
-        sourceItems = cart.items;
-      } else if (Array.isArray(items) && items.length > 0) {
-        sourceItems = items;
-      } else {
-        return res
-          .status(404)
-          .json({ message: 'Carrito no encontrado para validar y no se enviaron items.' });
-      }
+      const cart = await loadAuthorizedCart(req, sessionId);
+      if (!cart) return sendCartAccessNotFound(res);
+      sourceItems = Array.isArray(cart.items) ? cart.items : [];
+      cartVersion = cartVersionOf(cart);
     } else if (Array.isArray(items) && items.length > 0) {
       sourceItems = items;
     } else {
       return res.status(400).json({ message: 'Debes enviar sessionId o items para validar.' });
     }
 
-    const sanitized = sanitizeCartItems(sourceItems);
-    let populated = sanitized;
-    try {
-      populated = await safePopulateItems(sanitized);
-    } catch (_) { /* fallback */ }
+    const validation = await getCanonicalValidationService(req).validateItems(
+      sourceItems,
+      { mode: strict ? 'strict' : 'soft' }
+    );
+    const validated = validation.items;
+    const adjustments = validation.adjustments;
 
-    const validated = [];
-    const adjustments = [];
-    for (const it of populated) {
-      const p = it.product || null;
-      const commercial = resolveCartCommercialSnapshot(p, it);
-
-      const currentPrice = Math.max(0, Number(commercial?.price ?? p?.price ?? it.price ?? 0));
-      const visible = p ? (p.visible !== false && p.active !== false) : true;
-      const available = await computeAvailableStockForCartItem(p, it);
-      const byVariant = Boolean(readVariantId(it)) || String(it.color || '').length > 0 || String(it.size || '').length > 0;
-
-      let finalQty = Number(it.qty || 0);
-      const note = [];
-
-      if (!visible) {
-        finalQty = 0;
-        note.push('producto no visible');
-      }
-
-      if (available <= 0) {
-        finalQty = 0;
-        note.push(byVariant ? 'sin stock para la variante' : 'sin stock');
-      } else if (Number.isFinite(available) && finalQty > available) {
-        if (strict) {
-          finalQty = 0;
-          note.push(byVariant ? 'supera stock de la variante (strict)' : 'cantidad supera stock (strict)');
-        } else {
-          finalQty = available;
-          note.push(byVariant ? `cantidad ajustada a stock de la variante (${available})` : `cantidad ajustada a stock (${available})`);
-        }
-      }
-
-      const finalItem = {
-        ...it,
-        variantId: readVariantId(it) || commercial?.variantKey || '',
-        variantKey: readVariantId(it) || commercial?.variantKey || '',
-        variantLabel:
-          commercial?.variantLabel || it.variantLabel || '',
-        variantAttributes:
-          commercial?.variantAttributes ||
-          normalizeAttributes(it.variantAttributes || []),
-        variantSku: commercial?.sku || '',
-        variantBarcode: commercial?.barcode || '',
-        image: commercial?.image || it.image || p?.image || '',
-        price: currentPrice,
-        productType: p?.productType || 'physical',
-        requiresShipping:
-          p?.requiresShipping !== false,
-        fulfillment:
-          p?.fulfillment || getPublicFulfillmentView(p || {}),
-        qty: finalQty,
-        quantity: finalQty,
-      };
-      validated.push(finalItem);
-
-      if (note.length || Number(it.price || 0) !== currentPrice) {
-        adjustments.push({
-          productId: String(it._id),
-          variantId: finalItem.variantId,
-          requestedQty: it.qty,
-          finalQty,
-          price: currentPrice,
-          previousPrice: Number(it.price || 0),
-          note: note.join('; ') || 'precio actualizado desde variante',
-        });
-      }
-    }
-
-    const itemsForSummary = strict ? validated.filter((i) => i.qty > 0) : validated;
+    const itemsForSummary = validated.filter((item) => item.valid);
     const summary = getCartSummary({ items: itemsForSummary });
 
     res.status(200).json({
-      ok: true,
+      ok: validation.ok,
       mode: strict ? 'strict' : 'soft',
       items: validated,
       adjustments,
       summary,
+      version: cartVersion || undefined,
     });
   } catch (error) {
     console.error('Error en /api/cart/validate:', error);
@@ -709,93 +853,9 @@ router.post('/validate', async (req, res) => {
  * POST /api/cart/merge
  * ========================================= */
 router.post('/merge', rateLimit, async (req, res) => {
-  try {
-    const { fromSessionId, toUserId, toSessionId, strategy } = req.body || {};
-    if (!fromSessionId || !toUserId) {
-      return res.status(400).json({ message: 'fromSessionId y toUserId son requeridos.' });
-    }
-
-    const anon = await Cart.findOne({ sessionId: fromSessionId }).lean().exec();
-    const userCartId = toSessionId
-      ? { $or: [{ userId: toUserId }, { sessionId: toSessionId }] }
-      : { userId: toUserId };
-    let userCart = await Cart.findOne(userCartId).lean().exec();
-
-    if (!anon && !userCart) {
-      const created = await Cart.findOneAndUpdate(
-        { userId: toUserId },
-        {
-          $setOnInsert: {
-            sessionId: toSessionId || `sess_${toUserId}_${Date.now()}`,
-            items: [],
-          },
-        },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      ).lean();
-      return res
-        .status(200)
-        .json({ message: 'Nada para fusionar. Carrito de usuario listo.', cart: created });
-    }
-
-    const baseItems = Array.isArray(userCart?.items) ? userCart.items : [];
-    const incoming = Array.isArray(anon?.items) ? anon.items : [];
-
-    const map = new Map();
-    const makeKey = (it) =>
-      `${String(it._id)}|||${it.color || ''}|||${it.size || ''}|||${it.variantId || ''}`;
-
-    for (const it of sanitizeCartItems(baseItems)) {
-      map.set(makeKey(it), { ...it });
-    }
-
-    const mode = strategy || 'sum';
-    for (const it of sanitizeCartItems(incoming)) {
-      const k = makeKey(it);
-      const exists = map.get(k);
-      if (!exists) {
-        map.set(k, { ...it });
-      } else {
-        if (mode === 'preferIncoming') {
-          map.set(k, { ...it });
-        } else if (mode === 'preferExisting') {
-          // deja "exists"
-        } else {
-          const qty = Math.max(0, Number((exists.qty || 0) + (it.qty || 0)));
-          map.set(k, {
-            ...exists,
-            qty,
-            quantity: qty,
-            price: it.price || exists.price || 0,
-            title: it.title || exists.title,
-            image: it.image || exists.image,
-          });
-        }
-      }
-    }
-
-    const mergedItems = Array.from(map.values());
-    const updatedCart = await Cart.findOneAndUpdate(
-      userCart ? { _id: userCart._id } : { userId: toUserId },
-      { $set: { items: mergedItems, userId: toUserId }, $currentDate: { updatedAt: true } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ).lean();
-
-    if (anon) await Cart.deleteOne({ _id: anon._id });
-
-    let itemsPop = updatedCart.items || [];
-    try {
-      itemsPop = await safePopulateItems(itemsPop);
-    } catch (_) { /* fallback */ }
-    const summary = getCartSummary({ items: itemsPop });
-
-    res.status(200).json({
-      message: 'Carritos fusionados correctamente',
-      cart: { ...updatedCart, items: itemsPop, summary },
-    });
-  } catch (error) {
-    console.error('Error al fusionar carritos:', error);
-    res.status(500).json({ message: 'Error al fusionar carritos.' });
-  }
+  // Sin autenticación de clientes no existe una identidad segura para el
+  // carrito de destino. La operación queda cerrada, sin consultar MongoDB.
+  return sendCartAccessNotFound(res);
 });
 
 module.exports = router;
