@@ -70,6 +70,9 @@ jobs:
           npm --prefix backend ci
           npm --prefix frontend ci
 
+      - name: Validar autoridad de configuración de pagos
+        run: npm --prefix backend run test:payment-configuration-authority
+
       - name: Validar almacenamiento Cloudinary
         run: npm --prefix backend run test:cloudinary-storage
 

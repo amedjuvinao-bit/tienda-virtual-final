@@ -2,7 +2,6 @@
 
 const Cart = require('../models/Cart');
 const IdempotencyKey = require('../models/IdempotencyKey');
-const SiteSettings = require('../models/SiteSettings');
 const {
   SAFE_CART_ACCESS_ERROR,
   getCartAccessFromRequest,
@@ -15,58 +14,12 @@ const {
   defaultCartCanonicalValidationService,
   toStoredCartItem,
 } = require('./cartCanonicalValidationService');
+const {
+  resolveOrderPaymentSelection,
+} = require('./paymentConfigurationAuthorityService');
 
 const DEFAULT_ORDER_CART_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
 const ORDER_ENDPOINT = 'POST /orders';
-
-function cleanPaymentText(value, max = 180) {
-  return String(value || '').trim().slice(0, max);
-}
-
-async function resolveOrderPaymentSelection(requestedProvider) {
-  const settings = await SiteSettings.findOne().lean().exec();
-  const configured = settings?.theme?.global?.payments || {};
-  const provider = cleanPaymentText(configured.provider, 40).toLowerCase();
-  const requested = cleanPaymentText(requestedProvider, 40).toLowerCase();
-
-  if (configured.active === false) {
-    const error = new Error('Los pagos estan desactivados en la tienda.');
-    error.code = 'PAYMENTS_DISABLED';
-    error.statusCode = 409;
-    error.publicMessage = error.message;
-    throw error;
-  }
-  if (!provider) {
-    const error = new Error('No existe un metodo de pago configurado.');
-    error.code = 'PAYMENT_PROVIDER_NOT_CONFIGURED';
-    error.statusCode = 409;
-    error.publicMessage = error.message;
-    throw error;
-  }
-  if (requested && requested !== provider) {
-    const error = new Error('El metodo de pago solicitado no esta disponible.');
-    error.code = 'PAYMENT_PROVIDER_MISMATCH';
-    error.statusCode = 409;
-    error.publicMessage = error.message;
-    throw error;
-  }
-
-  const mode = cleanPaymentText(configured.mode, 20).toLowerCase() === 'production'
-    ? 'production'
-    : 'sandbox';
-  const currency = cleanPaymentText(configured.currency || 'COP', 12).toUpperCase();
-  const snapshot = {
-    active: true,
-    provider,
-    providerLabel: cleanPaymentText(configured.providerLabel || provider, 80),
-    mode,
-    currency: currency || 'COP',
-    checkoutLabel: cleanPaymentText(configured.checkoutLabel, 180),
-    enableWebhook: configured.enableWebhook === true,
-    status: provider === 'manual' ? 'pending_manual' : 'pending_gateway',
-  };
-  return { config: snapshot, snapshot };
-}
 
 function toPlain(value) {
   if (!value) return value;

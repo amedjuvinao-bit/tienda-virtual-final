@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
 const mongoose = require('mongoose');
+const SiteSettings = require('../models/SiteSettings');
 
 const {
   buildAuthorizedOrderBody,
@@ -131,7 +132,8 @@ function fakeCartModel(cart) {
 
 async function withServer(payments, callback) {
   const { cart, access } = createCart();
-  const authority = authorityFor(payments);
+  const originalFindOne = SiteSettings.findOne;
+  SiteSettings.findOne = fakeSettingsModel(payments).findOne;
   const effects = { handler: 0, orders: 0, reservations: 0, payments: 0, invoices: 0 };
   const app = express();
   app.use(express.json());
@@ -149,7 +151,6 @@ async function withServer(payments, callback) {
           };
         },
       },
-      resolvePaymentSelection: authority.resolveOrderPaymentSelection,
     }),
     (req, res) => {
       effects.handler += 1;
@@ -167,6 +168,7 @@ async function withServer(payments, callback) {
       effects,
     });
   } finally {
+    SiteSettings.findOne = originalFindOne;
     await new Promise((resolve) => server.close(resolve));
   }
 }
@@ -280,7 +282,7 @@ async function main() {
     assert.equal(payu.snapshot.enableWebhook, true);
   });
 
-  await check('HTTP ignora todos los campos operativos inyectados', async () => {
+  await check('HTTP predeterminado usa la autoridad e ignora campos operativos inyectados', async () => {
     await withServer(wompiConfig(), async ({ url, access, effects }) => {
       const response = await postOrder(url, access, {
         provider: 'wompi',
