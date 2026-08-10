@@ -5,6 +5,7 @@ import { applyTheme } from "../theme/applyTheme";
 import GeneralPanel from "./appearance/general/GeneralPanel";
 import HeaderPanel from "./appearance/header/HeaderPanel";
 import { normalizeGlobalConfig } from "./appearance/general/generalHelpers";
+import { API_BASE_URL } from "../config/apiBaseUrl";
 
 // ✅ Banner separado
 import BannerPanel from "./appearance/banner/BannerPanel";
@@ -15,7 +16,7 @@ import {
   normalizeLookSection,
 } from "./appearance/sections/look/lookSectionHelpers";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 // ✅ clave para “avisar” al frontend (CarouselBanner) que recargue settings
 const RB_SETTINGS_TICK_KEY = "rb_site_settings_tick";

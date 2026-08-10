@@ -6,8 +6,9 @@ import Header from '../components/Header';
 import FooterSection from '../components/FooterSection';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = API_BASE_URL;
 
 // Normaliza un ítem de favoritos (sin importar si viene del backend o del front)
 // para que ProductCard reciba un "product" con la forma esperada.

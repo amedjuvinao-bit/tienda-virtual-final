@@ -10,11 +10,12 @@ import ComplementosLook from "../components/ComplementosLook";
 import CategoriasSection from "../components/CategoriasSection";
 import InstagramSection from "../components/InstagramSection";
 import TiktokSection from "../components/TiktokSection";
+import { API_BASE_URL } from "../config/apiBaseUrl";
 import InformacionSection from "../components/InformacionSection";
 import CatalogPageView from "../components/catalog/CatalogPageView";
 import NotFound from "./NotFound";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 const FALLBACK_INSTA_POSTS = [
   {

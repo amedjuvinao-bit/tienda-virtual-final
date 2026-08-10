@@ -1,7 +1,7 @@
 // frontend/src/theme/siteSettingsApi.js
+import { API_BASE_URL } from '../config/apiBaseUrl';
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE = API_BASE_URL;
 
 /**
  * GET /api/site-settings

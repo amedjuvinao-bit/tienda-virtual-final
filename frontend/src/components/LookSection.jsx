@@ -3,13 +3,14 @@ import { ChevronLeft, ChevronRight, Search, Star, ShoppingCart } from "lucide-re
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
+import { API_BASE_URL } from "../config/apiBaseUrl";
 import {
   LOOK_MAX_PRODUCTS,
   LOOK_SECTION_DEFAULTS,
   normalizeLookSection,
 } from "../admin/appearance/sections/look/lookSectionHelpers";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 function moneyCOP(value) {
   const n = Number(value);
