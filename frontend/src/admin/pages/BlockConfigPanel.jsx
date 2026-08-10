@@ -32,8 +32,9 @@ import {
   INFO_SECTION_ID,
   normalizeInfoSection,
 } from "../appearance/sections/info/infoSectionHelpers";
+import { API_BASE_URL } from "../../config/apiBaseUrl";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 const Input = ({ label, ...rest }) => (
   <label className="block min-w-0">

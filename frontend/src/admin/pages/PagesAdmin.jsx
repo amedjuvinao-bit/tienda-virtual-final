@@ -1,8 +1,9 @@
 // src/admin/pages/PagesAdmin.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../config/apiBaseUrl";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 const SYSTEM_CART_SLUG = "carrito";
 const SYSTEM_CART_PAGE_TYPE = "cart-page";
 const SYSTEM_CHECKOUT_SLUG = "checkout";

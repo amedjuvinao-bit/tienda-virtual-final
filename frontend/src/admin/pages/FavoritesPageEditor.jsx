@@ -1,8 +1,9 @@
 // src/admin/pages/FavoritesPageEditor.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { API_BASE_URL } from "../../config/apiBaseUrl";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 const EDITOR_TABS = [
   { id: "general", label: "General" },

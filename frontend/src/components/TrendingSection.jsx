@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
+import { API_BASE_URL } from "../config/apiBaseUrl";
 
 function moneyCOP(value) {
   const n = Number(value);
@@ -11,7 +12,7 @@ function moneyCOP(value) {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 function normalizeColorHex(c) {
   const raw =

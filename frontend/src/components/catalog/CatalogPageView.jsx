@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import FilterSidebar from "../FilterSidebar";
 import ProductCard from "../ProductCard";
 import { normalizeProductPageResponse } from "../../utils/productPagination";
+import { API_BASE_URL } from "../../config/apiBaseUrl";
 import {
   Filter,
   ChevronLeft,
@@ -12,7 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API = API_BASE_URL;
 
 // columnas -> clases tailwind
 const colClasses = {

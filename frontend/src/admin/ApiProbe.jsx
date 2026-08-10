@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 
 export default function ApiProbe() {
   const [status, setStatus] = useState('idle');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
-  // intenta con relativo (si usas proxy) y con localhost:5000 como fallback
-  const endpoints = [
-    '/api/site-settings',
-    'http://localhost:5000/api/site-settings',
-  ];
+  const endpoints = [`${API_BASE_URL}/api/site-settings`];
 
   const probe = async () => {
     setStatus('loading'); setError(''); setData(null);
