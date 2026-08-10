@@ -153,6 +153,37 @@ function verifyGuestOrderAccessToken({
   };
 }
 
+function issueGuestOrderAccess({
+  orderId,
+  sessionId,
+  secret,
+  now = Date.now(),
+  ttlMs = DEFAULT_ACCESS_TTL_MS,
+} = {}) {
+  const token = createGuestOrderAccessToken({
+    orderId,
+    sessionId,
+    secret,
+    now,
+    ttlMs,
+  });
+  const verification = verifyGuestOrderAccessToken({
+    token,
+    sessionId,
+    secret,
+    now,
+  });
+  if (!verification.valid) {
+    throw new Error('No fue posible emitir el acceso publico de la orden.');
+  }
+  return {
+    orderId: cleanText(orderId, 40).toLowerCase(),
+    sessionId: cleanText(sessionId, 180),
+    token,
+    expiresAt: verification.expiresAt.toISOString(),
+  };
+}
+
 function resolveAuthenticatedPaymentPrincipal(req = {}) {
   const adminId = idValue(req.adminUserId || req.adminUserDoc?._id);
   if (isValidObjectIdText(adminId)) {
@@ -201,6 +232,87 @@ function getGuestAccessFromRequest(req, secret) {
     sessionId,
     verification: verifyGuestOrderAccessToken({ token, sessionId, secret }),
   };
+}
+
+async function resolveAuthorizedPublicPaymentOrder({
+  req,
+  OrderModel,
+  orderId = '',
+  getSecret = getPaymentAccessSecret,
+} = {}) {
+  const secret = getSecret();
+  const guest = getGuestAccessFromRequest(req, secret);
+  const tokenOrderId = cleanText(guest.verification?.orderId, 40).toLowerCase();
+  const requestedOrderId = cleanText(orderId || tokenOrderId, 40).toLowerCase();
+
+  if (
+    guest.verification?.valid !== true ||
+    !isValidObjectIdText(requestedOrderId) ||
+    (orderId && !safeEqual(requestedOrderId, tokenOrderId)) ||
+    !OrderModel ||
+    typeof OrderModel.findById !== 'function'
+  ) {
+    return { allowed: false };
+  }
+
+  let query = OrderModel.findById(requestedOrderId);
+  if (typeof query?.lean === 'function') query = query.lean();
+  const order = typeof query?.exec === 'function' ? await query.exec() : await query;
+  const authorization = authorizeOrderPaymentAccess({
+    order,
+    principal: resolveAuthenticatedPaymentPrincipal(req),
+    guestVerification: guest.verification,
+    sessionId: guest.sessionId,
+  });
+
+  if (!authorization.allowed) return { allowed: false };
+  return {
+    allowed: true,
+    order,
+    sessionId: guest.sessionId,
+    verification: guest.verification,
+  };
+}
+
+function extractWompiOrderNumber(reference) {
+  const safeReference = cleanText(reference, 200);
+  if (!safeReference) return '';
+  const baseReference = safeReference.split('__TRY__')[0];
+  const match = baseReference.match(/^ORDER-(.+)$/i);
+  return cleanText(match?.[1], 80);
+}
+
+function isWompiTransactionOwnedByOrder({
+  order,
+  transaction,
+  requestedTransactionId,
+} = {}) {
+  const requestedId = cleanText(requestedTransactionId, 120);
+  const transactionId = cleanText(transaction?.id, 120);
+  const storedTransactionId = cleanText(order?.payment?.transactionId, 120);
+  const orderNumber = cleanText(order?.orderNumber, 80);
+  const referenceOrderNumber = extractWompiOrderNumber(transaction?.reference);
+  const expectedAmountInCents = Math.round(Number(order?.total || 0) * 100);
+  const transactionAmountInCents = Number(transaction?.amount_in_cents || 0);
+  const expectedCurrency = cleanText(order?.payment?.currency || 'COP', 12).toUpperCase();
+  const transactionCurrency = cleanText(transaction?.currency, 12).toUpperCase();
+
+  if (
+    !order ||
+    !isValidTransactionId(requestedId) ||
+    !safeEqual(requestedId, transactionId) ||
+    (storedTransactionId && !safeEqual(storedTransactionId, transactionId)) ||
+    expectedAmountInCents <= 0 ||
+    transactionAmountInCents !== expectedAmountInCents ||
+    !safeEqual(expectedCurrency, transactionCurrency)
+  ) {
+    return false;
+  }
+
+  return Boolean(
+    (storedTransactionId && safeEqual(storedTransactionId, transactionId)) ||
+      (orderNumber && safeEqual(orderNumber, referenceOrderNumber))
+  );
 }
 
 function buildPublicCheckoutResponse({
@@ -254,18 +366,57 @@ function buildPublicTransactionResponse({ order, transaction, mapped, payments }
   };
 }
 
+function buildPublicThanksResponse({ order } = {}) {
+  const items = Array.isArray(order?.items)
+    ? order.items
+    : Array.isArray(order?.cart)
+      ? order.cart
+      : [];
+  const totalItems = items.reduce(
+    (sum, item) => sum + Math.max(0, Number(item?.quantity ?? item?.qty ?? 0)),
+    0
+  );
+  const customer = order?.customer || {};
+
+  return {
+    ok: true,
+    orderId: idValue(order?._id),
+    orderNumber: cleanText(order?.orderNumber, 60),
+    status: cleanText(order?.status, 40).toLowerCase(),
+    subtotal: Number(order?.subtotal || 0),
+    shipping: Number(order?.shipping || 0),
+    total: Number(order?.total || 0),
+    itemCount: Number(order?.summary?.totalItems || totalItems || 0),
+    customerName: cleanText(
+      [customer.name, customer.lastname].filter(Boolean).join(' '),
+      160
+    ),
+    paymentProvider: cleanText(order?.payment?.provider, 40).toLowerCase(),
+    paymentProviderLabel: cleanText(order?.payment?.providerLabel, 80),
+    paymentStatus: cleanText(order?.payment?.status, 40).toLowerCase(),
+    currency: cleanText(order?.payment?.currency || 'COP', 12).toUpperCase(),
+    createdAt: order?.createdAt || null,
+    updatedAt: order?.updatedAt || null,
+  };
+}
+
 module.exports = {
   DEFAULT_ACCESS_TTL_MS,
   SAFE_PAYMENT_ACCESS_ERROR,
   authorizeOrderPaymentAccess,
   buildPublicCheckoutResponse,
+  buildPublicThanksResponse,
   buildPublicTransactionResponse,
   createGuestOrderAccessToken,
+  extractWompiOrderNumber,
   getGuestAccessFromRequest,
   getPaymentAccessSecret,
+  isWompiTransactionOwnedByOrder,
   isValidObjectIdText,
   isValidSessionId,
   isValidTransactionId,
+  issueGuestOrderAccess,
   resolveAuthenticatedPaymentPrincipal,
+  resolveAuthorizedPublicPaymentOrder,
   verifyGuestOrderAccessToken,
 };

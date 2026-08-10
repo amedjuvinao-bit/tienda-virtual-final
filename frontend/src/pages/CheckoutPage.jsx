@@ -8,6 +8,10 @@ import api, { setSessionId as setApiSessionId } from '../lib/api';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 import { getSessionId } from '../utils/getSessionId';
 import { buildCartAccessHeaders } from '../utils/cartAccess';
+import {
+  buildOrderPaymentAccessHeaders,
+  storeOrderPaymentAccess,
+} from '../utils/orderPaymentAccess';
 import { useNavigate } from 'react-router-dom';
 import ModalReembolso from '../components/ModalReembolso';
 import ModalEnvio from '../components/ModalEnvio';
@@ -1496,15 +1500,15 @@ function CheckoutPage() {
     orderShipping,
     orderTotal,
     lineItemCount,
+    paymentAccess,
   }) => {
-    console.log('Entrando a openWompiCheckout');
-    console.log('ORDER ID:', orderId);
-
     const selectedCountryCode = selectedCountry?.code || 'CO';
 
-    const { data } = await api.post('/api/payments/wompi/checkout-data', { orderId });
-
-    console.log('WOMPI BACKEND DATA:', data);
+    const { data } = await api.post(
+      '/api/payments/wompi/checkout-data',
+      { orderId },
+      { headers: buildOrderPaymentAccessHeaders(paymentAccess) }
+    );
 
     if (!data) {
       throw new Error(data?.message || 'No se pudo preparar el checkout de Wompi.');
@@ -1516,7 +1520,13 @@ function CheckoutPage() {
       throw new Error('El widget de Wompi no está disponible en este navegador.');
     }
 
-    const wompiCustomerData = buildWompiCustomerData(data.customerData, selectedCountryCode);
+    const wompiCustomerData = buildWompiCustomerData({
+      email: String(customerEmailOrPhone || '').includes('@')
+        ? String(customerEmailOrPhone || '').trim()
+        : '',
+      full_name: [customerName, customerLastname].filter(Boolean).join(' ').trim(),
+      phone_number: customerPhone,
+    }, selectedCountryCode);
 
     const wompiShippingAddress = buildWompiShippingAddress({
       deliveryType,
@@ -1529,9 +1539,6 @@ function CheckoutPage() {
       customerLastname,
       customerPostalCode,
     });
-
-    console.log('DATA COMPLETA WOMPI:', data);
-    console.log('PUBLIC KEY DESDE BACKEND:', data.publicKey);
 
     const widgetConfig = {
       currency: data.currency,
@@ -1554,17 +1561,10 @@ function CheckoutPage() {
       widgetConfig.shippingAddress = wompiShippingAddress;
     }
 
-    console.log('WOMPI WIDGET CONFIG:', widgetConfig);
-    console.log('REDIRECT URL BACKEND:', data.redirectUrl);
-    console.log('WidgetCheckout disponible:', typeof window.WidgetCheckout);
-    console.log('CONFIG FINAL EXACTA:', JSON.stringify(widgetConfig, null, 2));
-
     const checkout = new window.WidgetCheckout(widgetConfig);
 
     setIsPlacing(false);
     checkout.open(async (result) => {
-      console.log('Resultado Wompi:', result);
-
       const tx = result?.transaction || null;
       const txStatus = String(tx?.status || '').toUpperCase();
 
@@ -1780,6 +1780,7 @@ function CheckoutPage() {
       const createdTax = Number(response.data?.taxes?.iva?.amount ?? createdPricing.taxAmount ?? 0);
       const createdShipping = Number(response.data?.shipping ?? createdPricing.shipping ?? 0);
       const createdTotal = Number(response.data?.total ?? createdPricing.total ?? order.total);
+      const paymentAccess = response.data?.paymentAccess || null;
 
       if (!(response.status === 201 || response.status === 200) || !createdOrderId) {
         setErrors(['Ocurrió un problema al procesar tu orden. Intenta nuevamente.']);
@@ -1787,7 +1788,11 @@ function CheckoutPage() {
         setIsPlacing(false);
         return;
       }
-      console.log('PROVIDER ACTUAL:', paymentsConfig.provider);
+      if (!storeOrderPaymentAccess(paymentAccess)) {
+        setErrors(['No fue posible conservar el acceso seguro de esta orden.']);
+        setIsPlacing(false);
+        return;
+      }
       if (paymentsConfig.provider === 'manual') {
         await clearCart();
         navigate('/gracias', {
@@ -1816,6 +1821,7 @@ function CheckoutPage() {
             orderShipping: createdShipping,
             orderTotal: createdTotal,
             lineItemCount: finalItems.length,
+            paymentAccess,
           });
           return;
         } catch (gatewayError) {

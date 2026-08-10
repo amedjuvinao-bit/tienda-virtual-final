@@ -25,6 +25,15 @@ const {
 const {
   issueElectronicInvoiceForOrder,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  SAFE_PAYMENT_ACCESS_ERROR,
+  buildPublicCheckoutResponse,
+  buildPublicTransactionResponse,
+  isValidObjectIdText,
+  isValidTransactionId,
+  isWompiTransactionOwnedByOrder,
+  resolveAuthorizedPublicPaymentOrder,
+} = require('../services/publicPaymentAccessService');
 
 const WOMPI_ENVIRONMENTS = {
   sandbox: 'https://sandbox.wompi.co/v1',
@@ -829,11 +838,18 @@ router.get('/public-config', async (_req, res) => {
 router.post('/wompi/checkout-data', async (req, res) => {
   try {
     const orderId = trimSafe(req.body?.orderId, 100);
-    if (!orderId) {
-      return res
-        .status(400)
-        .json({ error: 'ORDER_ID_REQUIRED', message: 'Debes enviar orderId.' });
+    if (!isValidObjectIdText(orderId)) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
     }
+    const access = await resolveAuthorizedPublicPaymentOrder({
+      req,
+      OrderModel: Order,
+      orderId,
+    });
+    if (!access.allowed) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
+    }
+    const order = access.order;
 
     const payments = await getActivePaymentsConfig();
 
@@ -859,13 +875,6 @@ router.post('/wompi/checkout-data', async (req, res) => {
         message:
           'Falta la configuración esencial de Wompi (publicKey o integrityKey).',
       });
-    }
-
-    const order = await Order.findById(orderId).lean();
-    if (!order) {
-      return res
-        .status(404)
-        .json({ error: 'ORDER_NOT_FOUND', message: 'Orden no encontrada.' });
     }
 
     const amountInCents = amountToCents(order.total);
@@ -902,36 +911,29 @@ router.post('/wompi/checkout-data', async (req, res) => {
       });
     }
 
-    return res.json({
-      ok: true,
-      provider: 'wompi',
-      mode: payments.mode,
-      baseUrl,
-      publicKey: wompi.publicKey,
-      currency,
+    return res.json(buildPublicCheckoutResponse({
+      payments,
+      wompi,
+      order,
       amountInCents,
+      currency,
       reference,
       redirectUrl,
       signature,
-      acceptanceToken: acceptance.acceptanceToken,
-      acceptancePermalink: acceptance.acceptancePermalink,
-      personalDataAcceptanceToken: acceptance.personalDataAcceptanceToken,
-      personalDataPermalink: acceptance.personalDataPermalink,
       acceptance,
-      order: {
-        id: String(order._id),
-        orderNumber: order.orderNumber || '',
-        total: Number(order.total || 0),
-      },
-      customerData: buildCustomerData(order),
-      checkoutLabel: payments.checkoutLabel || 'Wompi',
-      successMessage: payments.successMessage || '',
-    });
+    }));
   } catch (error) {
     console.error('POST /payments/wompi/checkout-data', error);
+    if (error?.code === 'PAYMENT_ACCESS_SECRET_MISCONFIGURED') {
+      return res.status(500).json({
+        ok: false,
+        error: 'PAYMENT_ACCESS_UNAVAILABLE',
+        message: 'No fue posible validar el acceso al pago.',
+      });
+    }
     return res.status(500).json({
       error: 'WOMPI_CHECKOUT_DATA_ERROR',
-      message: error.message || 'No se pudo preparar el checkout de Wompi.',
+      message: 'No se pudo preparar el checkout de Wompi.',
     });
   }
 });
@@ -939,14 +941,17 @@ router.post('/wompi/checkout-data', async (req, res) => {
 router.get('/wompi/transaction/:transactionId', async (req, res) => {
   try {
     const transactionId = trimSafe(req.params?.transactionId, 120);
-
-    if (!transactionId) {
-      return res.status(400).json({
-        ok: false,
-        error: 'TRANSACTION_ID_REQUIRED',
-        message: 'Debes enviar transactionId.',
-      });
+    if (!isValidTransactionId(transactionId)) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
     }
+    const access = await resolveAuthorizedPublicPaymentOrder({
+      req,
+      OrderModel: Order,
+    });
+    if (!access.allowed) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
+    }
+    const order = access.order;
 
     const payments = await getActivePaymentsConfig();
 
@@ -969,42 +974,35 @@ router.get('/wompi/transaction/:transactionId', async (req, res) => {
       publicKey: wompi.publicKey,
     });
 
-    const reference = trimSafe(transaction?.reference, 200);
-    const orderNumber = extractOrderNumberFromWompiReference(reference);
-
-    let order = null;
-
-    if (orderNumber) {
-      order = await Order.findOne({ orderNumber }).lean();
-    }
-
-    if (!order && transactionId) {
-      order = await Order.findOne({ 'payment.transactionId': transactionId }).lean();
+    if (!isWompiTransactionOwnedByOrder({
+      order,
+      transaction,
+      requestedTransactionId: transactionId,
+    })) {
+      return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
     }
 
     const mapped = parseWompiTransactionStatus(transaction?.status);
 
-    return res.json({
-      ok: true,
-      transactionId: trimSafe(transaction?.id, 120),
-      reference,
-      orderId: order ? String(order._id) : '',
-      orderNumber: order?.orderNumber || orderNumber || '',
-      orderStatus: order?.status || '',
-      paymentStatus: order?.payment?.status || mapped.paymentStatus,
-      wompiStatus: trimSafe(transaction?.status, 40).toUpperCase(),
-      amountInCents: Number(transaction?.amount_in_cents || 0),
-      currency: trimSafe(transaction?.currency, 12).toUpperCase() || payments.currency || 'COP',
-      customerEmail: trimSafe(transaction?.customer_email, 120),
-      paymentMethodType: trimSafe(transaction?.payment_method_type, 80),
-      rawTransaction: transaction,
-    });
+    return res.json(buildPublicTransactionResponse({
+      order,
+      transaction,
+      mapped,
+      payments,
+    }));
   } catch (error) {
     console.error('GET /payments/wompi/transaction/:transactionId', error);
+    if (error?.code === 'PAYMENT_ACCESS_SECRET_MISCONFIGURED') {
+      return res.status(500).json({
+        ok: false,
+        error: 'PAYMENT_ACCESS_UNAVAILABLE',
+        message: 'No fue posible validar el acceso al pago.',
+      });
+    }
     return res.status(500).json({
       ok: false,
       error: 'WOMPI_TRANSACTION_LOOKUP_ERROR',
-      message: error.message || 'No se pudo consultar la transacción de Wompi.',
+      message: 'No se pudo consultar la transacción de Wompi.',
     });
   }
 });

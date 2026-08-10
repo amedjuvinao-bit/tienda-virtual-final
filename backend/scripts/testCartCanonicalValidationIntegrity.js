@@ -277,6 +277,7 @@ function makeCart(cartItem) {
     sessionId: access.sessionId,
     accessTokenHash: access.tokenHash,
     accessVersion: access.version,
+    accessIssuedAt: new Date(),
     active: true,
     items: [cartItem],
   };

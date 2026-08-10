@@ -1,6 +1,7 @@
 'use strict';
 
 const Cart = require('../models/Cart');
+const IdempotencyKey = require('../models/IdempotencyKey');
 const SiteSettings = require('../models/SiteSettings');
 const {
   SAFE_CART_ACCESS_ERROR,
@@ -14,6 +15,9 @@ const {
   defaultCartCanonicalValidationService,
   toStoredCartItem,
 } = require('./cartCanonicalValidationService');
+
+const DEFAULT_ORDER_CART_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
+const ORDER_ENDPOINT = 'POST /orders';
 
 function cleanPaymentText(value, max = 180) {
   return String(value || '').trim().slice(0, max);
@@ -131,11 +135,50 @@ function sendCartAccessNotFound(res) {
   return res.status(404).json(SAFE_CART_ACCESS_ERROR);
 }
 
+function isFreshOrderCartAccess(
+  cart,
+  { now = new Date(), ttlMs = DEFAULT_ORDER_CART_ACCESS_TTL_MS } = {}
+) {
+  const issuedAt = new Date(cart?.accessIssuedAt || 0);
+  const current = new Date(now);
+  const ageMs = current.getTime() - issuedAt.getTime();
+  return (
+    !Number.isNaN(issuedAt.getTime()) &&
+    !Number.isNaN(current.getTime()) &&
+    ageMs >= -60_000 &&
+    ageMs <= Number(ttlMs)
+  );
+}
+
+async function findAuthorizedIdempotentReplay({
+  cart,
+  req,
+  IdempotencyKeyModel = IdempotencyKey,
+} = {}) {
+  const orderId = String(cart?.convertedOrderId || '').trim();
+  const key = String(req?.headers?.['idempotency-key'] || '').trim();
+  if (!orderId || !key) return null;
+
+  let query = IdempotencyKeyModel.findOne({
+    key,
+    endpoint: ORDER_ENDPOINT,
+    status: 'completed',
+    orderId,
+  });
+  if (typeof query?.lean === 'function') query = query.lean();
+  const record = typeof query?.exec === 'function' ? await query.exec() : await query;
+  if (!record?.orderId) return null;
+  return { orderId: String(record.orderId), idempotencyKey: key };
+}
+
 function createRequireAuthorizedOrderCart({
   CartModel = Cart,
   getSecret = getCartAccessSecret,
   canonicalValidationService = defaultCartCanonicalValidationService,
   resolvePaymentSelection = resolveOrderPaymentSelection,
+  IdempotencyKeyModel = IdempotencyKey,
+  now = () => new Date(),
+  accessTtlMs = DEFAULT_ORDER_CART_ACCESS_TTL_MS,
 } = {}) {
   return async function requireAuthorizedOrderCart(req, res, next) {
     try {
@@ -160,16 +203,34 @@ function createRequireAuthorizedOrderCart({
           String(cart.status || '').trim().toLowerCase()
         ) ||
         !Array.isArray(cart.items) ||
-        cart.items.length === 0 ||
         !verifyCartAccess({
           cart,
           sessionId: credentials.sessionId,
           token: credentials.token,
           secret: getSecret(),
+        }) ||
+        !isFreshOrderCartAccess(cart, {
+          now: now(),
+          ttlMs: accessTtlMs,
         })
       ) {
         return sendCartAccessNotFound(res);
       }
+
+      if (cart.convertedOrderId) {
+        const replay = await findAuthorizedIdempotentReplay({
+          cart,
+          req,
+          IdempotencyKeyModel,
+        });
+        if (!replay) return sendCartAccessNotFound(res);
+        req.authorizedCart = toPlain(cart) || {};
+        req.authorizedCartSessionId = credentials.sessionId;
+        req.authorizedOrderReplay = replay;
+        return next();
+      }
+
+      if (cart.items.length === 0) return sendCartAccessNotFound(res);
 
       const validation = await canonicalValidationService.validateItems(cart.items, {
         mode: 'strict',
@@ -194,6 +255,7 @@ function createRequireAuthorizedOrderCart({
         .toLowerCase();
       const paymentSelection = await resolvePaymentSelection(requestedProvider);
       req.authorizedCart = authoritativeCart;
+      req.authorizedCartSessionId = credentials.sessionId;
       req.authorizedPaymentConfig = paymentSelection.config;
       req.authorizedPaymentSnapshot = paymentSelection.snapshot;
       req.body = buildAuthorizedOrderBody(
@@ -238,8 +300,11 @@ function createRequireAuthorizedOrderCart({
 }
 
 module.exports = {
+  DEFAULT_ORDER_CART_ACCESS_TTL_MS,
   buildAuthoritativeCartItems,
   buildAuthorizedOrderBody,
   createRequireAuthorizedOrderCart,
+  findAuthorizedIdempotentReplay,
+  isFreshOrderCartAccess,
   requireAuthorizedOrderCart: createRequireAuthorizedOrderCart(),
 };
