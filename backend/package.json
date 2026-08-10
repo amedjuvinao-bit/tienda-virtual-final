@@ -54,6 +54,7 @@
     "test:cart-canonical-validation": "node scripts/testCartCanonicalValidationIntegrity.js",
     "test:cart-admin-operations": "node scripts/testCartAdminOperationsIntegrity.js",
     "test:cart-admin-routes": "node scripts/testCartAdminRoutesIntegration.js",
+    "test:payment-configuration-authority": "node scripts/testPaymentConfigurationAuthorityIntegrity.js",
     "test:product-taxonomy": "node scripts/testProductTaxonomyIntegration.js",
     "test:product-archive": "node scripts/testProductArchiveIntegrity.js",
     "test:products-module": "node scripts/testProductsModuleClosure.js",

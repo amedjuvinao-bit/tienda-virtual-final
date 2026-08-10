@@ -3,8 +3,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const {
+  getActivePaymentsConfig,
+} = require('../services/paymentConfigurationAuthorityService');
 
-const SiteSettings = require('../models/SiteSettings');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const {
@@ -35,49 +37,6 @@ const PAYU_SANDBOX_IPS = new Set(['54.158.171.129']);
 
 function trimSafe(value, max = 300) {
   return String(value || '').trim().slice(0, max);
-}
-
-function normalizePaymentsConfig(raw) {
-  const cfg = raw && typeof raw === 'object' ? raw : {};
-  const credentials =
-    cfg.credentials && typeof cfg.credentials === 'object' ? cfg.credentials : {};
-  const payu =
-    credentials.payu && typeof credentials.payu === 'object' ? credentials.payu : {};
-
-  return {
-    active: cfg.active !== false,
-    provider: trimSafe(cfg.provider, 40).toLowerCase(),
-    mode:
-      trimSafe(cfg.mode, 20).toLowerCase() === 'production'
-        ? 'production'
-        : 'sandbox',
-    currency: trimSafe(cfg.currency || 'COP', 12).toUpperCase() || 'COP',
-    checkoutLabel: trimSafe(cfg.checkoutLabel, 180),
-    successMessage: trimSafe(cfg.successMessage, 300),
-    enableWebhook: cfg.enableWebhook === true,
-    credentials: {
-      payu: {
-        merchantId: trimSafe(payu.merchantId, 100),
-        accountId: trimSafe(payu.accountId, 100),
-        apiLogin: trimSafe(payu.apiLogin, 150),
-        apiKey: trimSafe(payu.apiKey, 150),
-        signatureAlgorithm: trimSafe(payu.signatureAlgorithm || 'MD5', 40).toUpperCase(),
-        signatureSecret: trimSafe(
-          payu.signatureSecret ||
-            payu.webhookSecret ||
-            process.env.PAYU_SIGNATURE_SECRET ||
-            '',
-          200
-        ),
-      },
-    },
-  };
-}
-
-async function getActivePaymentsConfig() {
-  const settings = await SiteSettings.findOne().lean();
-  const payments = settings?.theme?.global?.payments || {};
-  return normalizePaymentsConfig(payments);
 }
 
 function buildOrderReference(order) {
