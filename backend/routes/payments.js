@@ -20,11 +20,15 @@ const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
 const {
-  generateElectronicInvoiceAfterPayment,
+  executeElectronicInvoiceAfterPayment,
 } = require('../services/electronicInvoiceAfterPaymentService');
 const {
   issueElectronicInvoiceForOrder,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  createWompiWebhookIntegrityService,
+  resolveMonotonicWompiTransition,
+} = require('../services/wompiWebhookIntegrityService');
 const {
   SAFE_PAYMENT_ACCESS_ERROR,
   buildPublicCheckoutResponse,
@@ -79,6 +83,189 @@ const OrderEvent =
     ),
     'order_events'
   );
+
+const WOMPI_INVOICE_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
+
+async function withWompiOrderTransaction(orderNumber, work) {
+  const session = await mongoose.startSession();
+
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const order = await Order.findOne({ orderNumber }).session(session);
+
+      if (!order) {
+        throw Object.assign(
+          new Error(`No se encontro la orden ${orderNumber}.`),
+          { code: 'ORDER_NOT_FOUND' }
+        );
+      }
+
+      result = await work(order, { session });
+      await order.save({ session });
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+async function scheduleWompiInvoiceOnce({
+  orderId,
+  transaction = {},
+  payments = {},
+  paymentProvider = 'wompi',
+} = {}) {
+  const now = new Date();
+  const staleClaimBefore = new Date(
+    now.getTime() - WOMPI_INVOICE_CLAIM_TIMEOUT_MS
+  );
+  const claimId = crypto.randomUUID();
+  const transactionId = String(transaction?.id || '').trim().slice(0, 120);
+  const claimedOrder = await Order.findOneAndUpdate(
+    {
+      _id: orderId,
+      'payment.status': 'paid',
+      'paymentProcessing.inventory.status': {
+        $in: ['confirmed', 'not_required'],
+      },
+      $or: [
+        { 'paymentProcessing.invoice.status': { $exists: false } },
+        {
+          'paymentProcessing.invoice.status': {
+            $in: ['pending', 'failed'],
+          },
+        },
+        {
+          'paymentProcessing.invoice.status': 'scheduling',
+          'paymentProcessing.invoice.claimedAt': { $lt: staleClaimBefore },
+        },
+      ],
+    },
+    {
+      $set: {
+        'paymentProcessing.invoice.status': 'scheduling',
+        'paymentProcessing.invoice.claimId': claimId,
+        'paymentProcessing.invoice.claimedAt': now,
+        'paymentProcessing.invoice.transactionId': transactionId,
+        'paymentProcessing.invoice.outcomeCode': '',
+        'paymentProcessing.invoice.errorCode': '',
+      },
+    },
+    { new: true }
+  );
+
+  if (!claimedOrder) {
+    return { scheduled: false, duplicate: true };
+  }
+
+  try {
+    const outcome = await executeElectronicInvoiceAfterPayment({
+      orderId,
+      transaction,
+      payments,
+      paymentProvider,
+      allowRetry: true,
+    });
+
+    if (outcome?.outcome === 'performed' && outcome.performed === true) {
+      const persistence = await Order.updateOne(
+        {
+          _id: orderId,
+          'paymentProcessing.invoice.claimId': claimId,
+        },
+        {
+          $set: {
+            'paymentProcessing.invoice.status': 'scheduled',
+            'paymentProcessing.invoice.scheduledAt': new Date(),
+            'paymentProcessing.invoice.outcomeCode': String(
+              outcome.reasonCode || 'INVOICE_PROCESSED'
+            ).slice(0, 100),
+            'paymentProcessing.invoice.errorCode': '',
+          },
+        }
+      );
+
+      return {
+        scheduled: Boolean(persistence?.matchedCount),
+        superseded: !persistence?.matchedCount,
+        claimId,
+        outcome,
+      };
+    }
+
+    const terminalBusinessSkip =
+      outcome?.outcome === 'skipped' &&
+      outcome?.terminal === true &&
+      outcome?.reasonCode === 'ELECTRONIC_BILLING_INACTIVE';
+    const nextStatus = terminalBusinessSkip ? 'not_required' : 'pending';
+    const persistence = await Order.updateOne(
+      {
+        _id: orderId,
+        'paymentProcessing.invoice.claimId': claimId,
+      },
+      {
+        $set: {
+          'paymentProcessing.invoice.status': nextStatus,
+          'paymentProcessing.invoice.scheduledAt': null,
+          'paymentProcessing.invoice.outcomeCode': String(
+            outcome?.reasonCode || 'INVOICE_NOT_PERFORMED'
+          ).slice(0, 100),
+          'paymentProcessing.invoice.errorCode': '',
+        },
+      }
+    );
+
+    return {
+      scheduled: false,
+      skipped: outcome?.outcome === 'skipped',
+      terminal: terminalBusinessSkip,
+      pending: nextStatus === 'pending',
+      superseded: !persistence?.matchedCount,
+      claimId,
+      outcome,
+    };
+  } catch (error) {
+    try {
+      await Order.updateOne(
+        {
+          _id: orderId,
+          'paymentProcessing.invoice.claimId': claimId,
+        },
+        {
+          $set: {
+            'paymentProcessing.invoice.status': 'failed',
+            'paymentProcessing.invoice.scheduledAt': null,
+            'paymentProcessing.invoice.outcomeCode': '',
+            'paymentProcessing.invoice.errorCode': String(
+              error?.code || 'INVOICE_SCHEDULING_ERROR'
+            ).slice(0, 100),
+          },
+        }
+      );
+    } catch (persistenceError) {
+      console.error('No se pudo persistir el fallo de programacion de factura Wompi.', {
+        orderId: String(orderId || ''),
+        code: persistenceError?.code || '',
+      });
+    }
+    throw error;
+  }
+}
+
+const wompiWebhookIntegrityService = createWompiWebhookIntegrityService({
+  withOrderTransaction: withWompiOrderTransaction,
+  confirmInventoryReservation,
+  applyReservationToOrderDocument,
+  createOrderEvent: async (event, context = {}) => {
+    await OrderEvent.create([event], { session: context.session });
+  },
+  scheduleInvoiceOnce: (payload) =>
+    scheduleWompiInvoiceOnce({
+      ...payload,
+      paymentProvider: 'wompi',
+    }),
+});
 
 function trimSafe(value, max = 300) {
   return String(value || '').trim().slice(0, max);
@@ -1059,11 +1246,6 @@ router.post('/admin/wompi/test-merchant', requireAdmin, async (req, res) => {
 });
 
 router.post('/wompi/webhook', async (req, res) => {
-  let shouldGenerateDian = false;
-  let dianOrderId = null;
-  let dianTransaction = null;
-  let dianPayments = null;
-
   try {
     const payload = req.body && typeof req.body === 'object' ? req.body : {};
     const payments = await getActivePaymentsConfig();
@@ -1165,6 +1347,82 @@ router.post('/wompi/webhook', async (req, res) => {
     }
 
     const mapped = parseWompiTransactionStatus(transaction.status);
+
+    if (mapped.paymentStatus === 'paid') {
+      const approvedResult = await wompiWebhookIntegrityService.processApproved({
+        orderNumber,
+        transaction,
+        payments,
+        reference,
+        verified: true,
+      });
+
+      if (!approvedResult.ok) {
+        console.error(
+          'Wompi aprobo el pago, pero la reserva de inventario requiere reintento.',
+          {
+            orderNumber,
+            transactionId: trimSafe(transaction.id, 120),
+            code: approvedResult.error?.code || '',
+          }
+        );
+
+        return res.status(503).json({
+          ok: false,
+          received: true,
+          retryable: true,
+          error: 'INVENTORY_CONFIRMATION_PENDING',
+          message:
+            'El pago fue aprobado, pero la confirmacion de inventario requiere reintento.',
+          event: eventName,
+          orderNumber,
+          orderStatus: 'pending',
+          paymentStatus: 'paid',
+          transactionId: trimSafe(transaction.id, 120),
+          reference,
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        received: true,
+        event: eventName,
+        orderNumber: approvedResult.orderNumber || orderNumber,
+        orderStatus: 'paid',
+        paymentStatus: 'paid',
+        inventoryConfirmed: approvedResult.inventoryReady === true,
+        invoiceEligible: approvedResult.invoiceEligible === true,
+        invoiceScheduled: approvedResult.invoiceScheduled === true,
+        duplicateApproved: approvedResult.duplicateApproved === true,
+        transactionId: trimSafe(transaction.id, 120),
+        reference,
+      });
+    }
+
+    const monotonicTransition = resolveMonotonicWompiTransition(
+      existingOrder,
+      mapped
+    );
+
+    if (monotonicTransition.ignored) {
+      return res.status(200).json({
+        ok: true,
+        received: true,
+        ignored: true,
+        reason: monotonicTransition.reason,
+        event: eventName,
+        orderNumber,
+        orderStatus: existingOrder.status,
+        paymentStatus: 'paid',
+        transactionId: trimSafe(
+          existingOrder.payment?.transactionId || transaction.id,
+          120
+        ),
+        reference:
+          trimSafe(existingOrder.payment?.reference, 180) || reference,
+      });
+    }
+
     const shouldRestock =
       mapped.paymentStatus === 'failed' || mapped.paymentStatus === 'cancelled';
 
@@ -1178,6 +1436,31 @@ router.post('/wompi/webhook', async (req, res) => {
 
         if (!order) {
           throw new Error(`ORDER_NOT_FOUND_TX_${orderNumber}`);
+        }
+
+        const transitionInTransaction = resolveMonotonicWompiTransition(
+          order,
+          mapped
+        );
+
+        if (transitionInTransaction.ignored) {
+          responsePayload = {
+            ok: true,
+            received: true,
+            ignored: true,
+            reason: transitionInTransaction.reason,
+            event: eventName,
+            orderNumber: order.orderNumber,
+            orderStatus: order.status,
+            paymentStatus: 'paid',
+            transactionId: trimSafe(
+              order.payment?.transactionId || transaction.id,
+              120
+            ),
+            reference:
+              trimSafe(order.payment?.reference, 180) || reference,
+          };
+          return;
         }
 
         const beforeOrderStatus = String(order.status || '').trim().toLowerCase();
@@ -1217,10 +1500,6 @@ router.post('/wompi/webhook', async (req, res) => {
         order.payment.reference = trimSafe(transaction.reference || reference, 180);
         order.payment.amountInCents = Number(transaction.amount_in_cents || 0);
         order.payment.amount = Number(transaction.amount_in_cents || 0) / 100;
-        order.payment.paidAt =
-          transaction.finalized_at ||
-          transaction.created_at ||
-          new Date();
 
         order.payment.rawMethod = transaction.payment_method || {};
 
@@ -1288,13 +1567,6 @@ router.post('/wompi/webhook', async (req, res) => {
           restockedOnFailure: order.inventoryControl?.restockedOnFailure,
         });
 
-        if (mapped.paymentStatus === 'paid') {
-          shouldGenerateDian = true;
-          dianOrderId = order._id;
-          dianTransaction = transaction;
-          dianPayments = payments;
-        }
-
         responsePayload = {
           ok: true,
           received: true,
@@ -1306,15 +1578,6 @@ router.post('/wompi/webhook', async (req, res) => {
           reference,
         };
       });
-
-      if (shouldGenerateDian && dianOrderId) {
-        generateElectronicInvoiceAfterPayment({
-          orderId: dianOrderId,
-          transaction: dianTransaction,
-          payments: dianPayments,
-          paymentProvider: 'wompi',
-        });
-      }
 
       return res.status(200).json(responsePayload);
     } finally {
