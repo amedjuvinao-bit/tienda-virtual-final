@@ -9,6 +9,9 @@ const SiteSettings = require('../models/SiteSettings');
 const { generateCUFE } = require('../lib/dian/cufe');
 const { generateInvoiceXML } = require('../lib/dian/xmlGenerator');
 const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter');
+const {
+  isInventoryReadyForBilling,
+} = require('./orderInventoryBillingReadinessService');
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
@@ -472,11 +475,13 @@ function isBillableOrder(order = {}) {
   const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
   const source = cleanText(order.source || order.channel, 50).toLowerCase();
 
-  return (
+  const financiallyBillable = (
     BILLABLE_ORDER_STATUSES.includes(status) ||
     PAID_PAYMENT_STATUSES.includes(paymentStatus) ||
     (source === 'pos' && money(order.total) > 0)
   );
+
+  return financiallyBillable && isInventoryReadyForBilling(order);
 }
 
 function isDuplicateKeyError(error) {

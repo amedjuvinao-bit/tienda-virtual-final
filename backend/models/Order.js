@@ -462,6 +462,55 @@ const PaymentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const PaymentInventoryProcessingSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'not_required', 'failed'],
+      default: 'pending',
+    },
+    lastAttemptAt: { type: Date, default: null },
+    confirmedAt: { type: Date, default: null },
+    errorCode: { type: String, trim: true, default: '' },
+    errorMessage: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const PaymentInvoiceProcessingSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['pending', 'scheduling', 'scheduled', 'not_required', 'failed'],
+      default: 'pending',
+    },
+    claimId: { type: String, trim: true, default: '' },
+    claimedAt: { type: Date, default: null },
+    scheduledAt: { type: Date, default: null },
+    transactionId: { type: String, trim: true, default: '' },
+    outcomeCode: { type: String, trim: true, default: '' },
+    errorCode: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const PaymentProcessingSchema = new mongoose.Schema(
+  {
+    provider: { type: String, trim: true, lowercase: true, default: '' },
+    approvedTransactionId: { type: String, trim: true, default: '' },
+    approvedAt: { type: Date, default: null },
+    inventory: {
+      type: PaymentInventoryProcessingSchema,
+      default: () => ({}),
+    },
+    invoice: {
+      type: PaymentInvoiceProcessingSchema,
+      default: () => ({}),
+    },
+  },
+  { _id: false }
+);
+
 /* ========= Descuento comercial ========= */
 const DiscountSchema = new mongoose.Schema(
   {
@@ -1041,6 +1090,11 @@ const OrderSchema = new mongoose.Schema(
         splitPayments: [],
         rawMethod: {},
       }),
+    },
+
+    paymentProcessing: {
+      type: PaymentProcessingSchema,
+      default: undefined,
     },
 
     inventoryControl: {
