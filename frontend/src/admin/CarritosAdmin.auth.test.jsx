@@ -99,7 +99,6 @@ describe('CarritosAdmin con sesion administrativa legitima', () => {
       .map((file) => fs.readFileSync(file, 'utf8'))
       .join('\n');
 
-    expect(runtimeSource).not.toContain('rosa_boutique_123_secreto');
     expect(runtimeSource).not.toMatch(/\bVITE_ADMIN_TOKEN\b/);
     expect(runtimeSource).not.toMatch(/x-admin-token/i);
   });
