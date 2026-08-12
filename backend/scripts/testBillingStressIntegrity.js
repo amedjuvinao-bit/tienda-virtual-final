@@ -310,7 +310,7 @@ function buildOrderPayload(index, scenario) {
       method: 'visa',
       methodLabel: 'Tarjeta de prueba',
       transactionId: `STRESS-TX-${index + 1}`,
-      reference: orderNumber,
+      reference: index % 2 === 0 ? `ORDER-${orderNumber}` : orderNumber,
       amount: total,
       amountInCents: total * 100,
       paidAt: new Date('2026-07-27T12:00:00.000Z'),
