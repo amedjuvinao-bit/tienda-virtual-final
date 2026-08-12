@@ -153,7 +153,11 @@ async function validateControlledRetry() {
     subtotal: 50000,
     total: 50000,
     customer: { documentNumber: '987654321', email: 'retry@example.com' },
-    payment: { status: 'paid', provider: 'payu' },
+    payment: {
+      status: 'paid',
+      provider: 'payu',
+      paidAt: new Date('2026-07-27T12:00:00.000Z'),
+    },
     items: [{ name: 'Producto retry', quantity: 1, price: 50000 }],
   };
   const settings = {
@@ -237,7 +241,13 @@ async function validateConcurrentIssuance() {
       documentNumber: '123456789',
       email: 'cliente@example.com',
     },
-    payment: { status: 'paid', provider: 'wompi' },
+    payment: {
+      status: 'paid',
+      provider: 'wompi',
+      paidAt: new Date('2026-07-27T12:00:00.000Z'),
+      transactionId: 'WOMPI-TX-000300',
+      reference: 'ORDER-000300',
+    },
     items: [{ name: 'Producto', quantity: 1, price: 100000 }],
   };
   const settings = {
