@@ -13,7 +13,9 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
 const {
+  buildPaymentFailureReleaseReason,
   confirmInventoryReservation,
+  reconcilePaymentFailureReservation,
   releaseInventoryReservation,
 } = require('../services/inventoryReservationService');
 const {
@@ -27,8 +29,14 @@ const {
 } = require('../services/electronicInvoiceIssuanceService');
 const {
   createWompiWebhookIntegrityService,
+  isApprovedPayment,
   resolveMonotonicWompiTransition,
 } = require('../services/wompiWebhookIntegrityService');
+const {
+  createPaymentInventoryFailureService,
+  isRetryablePaymentInventoryError,
+  runPaymentInventoryTransaction,
+} = require('../services/paymentInventoryFailureService');
 const {
   SAFE_PAYMENT_ACCESS_ERROR,
   buildPublicCheckoutResponse,
@@ -253,6 +261,14 @@ async function scheduleWompiInvoiceOnce({
   }
 }
 
+const paymentInventoryFailureService = createPaymentInventoryFailureService({
+  releaseReservation: releaseInventoryReservation,
+  applyReservation: applyReservationToOrderDocument,
+  reconcileReservation: reconcilePaymentFailureReservation,
+  isApprovedPayment,
+  buildReleaseReason: buildPaymentFailureReleaseReason,
+});
+
 const wompiWebhookIntegrityService = createWompiWebhookIntegrityService({
   withOrderTransaction: withWompiOrderTransaction,
   confirmInventoryReservation,
@@ -265,6 +281,8 @@ const wompiWebhookIntegrityService = createWompiWebhookIntegrityService({
       ...payload,
       paymentProvider: 'wompi',
     }),
+  reconcileFailureRecovery: (payload) =>
+    paymentInventoryFailureService.reconcileApproved(payload),
 });
 
 function trimSafe(value, max = 300) {
@@ -1373,11 +1391,12 @@ router.post('/wompi/webhook', async (req, res) => {
           retryable: true,
           error: 'INVENTORY_CONFIRMATION_PENDING',
           message:
-            'El pago fue aprobado, pero la confirmacion de inventario requiere reintento.',
+            'Wompi aprobo el pago, pero la orden local espera una confirmacion atomica de inventario.',
           event: eventName,
           orderNumber,
           orderStatus: 'pending',
-          paymentStatus: 'paid',
+          providerPaymentStatus: 'paid',
+          paymentStatus: approvedResult.paymentStatus || 'pending_gateway',
           transactionId: trimSafe(transaction.id, 120),
           reference,
         });
@@ -1423,28 +1442,33 @@ router.post('/wompi/webhook', async (req, res) => {
       });
     }
 
-    const shouldRestock =
+    const shouldRecoverFailedInventory =
       mapped.paymentStatus === 'failed' || mapped.paymentStatus === 'cancelled';
 
-    const session = await mongoose.startSession();
-
-    try {
-      let responsePayload = null;
-
-      await session.withTransaction(async () => {
+    const responsePayload = await runPaymentInventoryTransaction({
+      startSession: () => mongoose.startSession(),
+      work: async (session) => {
         const order = await Order.findOne({ orderNumber }).session(session);
 
         if (!order) {
           throw new Error(`ORDER_NOT_FOUND_TX_${orderNumber}`);
         }
 
+        const approvalContext = {
+          orderId: order._id,
+          provider: 'wompi',
+          paymentReference: reference,
+          paymentTransactionId: trimSafe(transaction.id, 120),
+        };
+
         const transitionInTransaction = resolveMonotonicWompiTransition(
           order,
-          mapped
+          mapped,
+          approvalContext
         );
 
         if (transitionInTransaction.ignored) {
-          responsePayload = {
+          return {
             ok: true,
             received: true,
             ignored: true,
@@ -1460,7 +1484,37 @@ router.post('/wompi/webhook', async (req, res) => {
             reference:
               trimSafe(order.payment?.reference, 180) || reference,
           };
-          return;
+        }
+
+        let inventoryRecovery = null;
+        if (shouldRecoverFailedInventory) {
+          inventoryRecovery = await paymentInventoryFailureService.process({
+            order,
+            paymentStatus: mapped.paymentStatus,
+            provider: 'wompi',
+            paymentReference: reference,
+            paymentTransactionId: trimSafe(transaction.id, 120),
+            session,
+            approvalContext,
+          });
+          if (inventoryRecovery.canonicalApproval === true) {
+            return {
+              ok: true,
+              received: true,
+              ignored: true,
+              reason: 'APPROVED_IS_TERMINAL',
+              event: eventName,
+              orderNumber: order.orderNumber,
+              orderStatus: order.status,
+              paymentStatus: order.payment?.status || 'paid',
+              transactionId: trimSafe(
+                order.payment?.transactionId || transaction.id,
+                120
+              ),
+              reference:
+                trimSafe(order.payment?.reference, 180) || reference,
+            };
+          }
         }
 
         const beforeOrderStatus = String(order.status || '').trim().toLowerCase();
@@ -1544,18 +1598,33 @@ router.post('/wompi/webhook', async (req, res) => {
             { session }
           );
         }
-        await handleInventoryReservationAfterPayment({
-          order,
-          mapped,
-          transaction,
-          reference,
-          provider: 'wompi',
-          session,
-        });
-
-        if (shouldRestock) {
-       
-          await restockOrderIfNeeded(order, session);
+        if (
+          shouldRecoverFailedInventory &&
+          inventoryRecovery?.duplicate !== true &&
+          inventoryRecovery?.ignored !== true
+        ) {
+          await OrderEvent.create(
+            [
+              {
+                orderId: order._id,
+                type:
+                  inventoryRecovery.action === 'release_reservation'
+                    ? 'inventory_reservation_released'
+                    : 'inventory_failure_recovery_completed',
+                message:
+                  inventoryRecovery.action === 'legacy_compensation'
+                    ? 'Inventario heredado compensado por pago no aprobado.'
+                    : 'Recuperacion de inventario completada por pago no aprobado.',
+                meta: {
+                  provider: 'wompi',
+                  orderNumber: order.orderNumber,
+                  paymentStatus: mapped.paymentStatus,
+                  action: inventoryRecovery.action,
+                },
+              },
+            ],
+            { session }
+          );
         }
 
         await order.save({ session });
@@ -1567,7 +1636,7 @@ router.post('/wompi/webhook', async (req, res) => {
           restockedOnFailure: order.inventoryControl?.restockedOnFailure,
         });
 
-        responsePayload = {
+        return {
           ok: true,
           received: true,
           event: eventName,
@@ -1577,14 +1646,22 @@ router.post('/wompi/webhook', async (req, res) => {
           transactionId: trimSafe(transaction.id, 120),
           reference,
         };
-      });
+      },
+    });
 
-      return res.status(200).json(responsePayload);
-    } finally {
-      await session.endSession();
-    }
+    return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('POST /payments/wompi/webhook', error);
+    if (isRetryablePaymentInventoryError(error)) {
+      return res.status(503).json({
+        ok: false,
+        received: true,
+        retryable: true,
+        error: error.code || 'PAYMENT_INVENTORY_RECOVERY_RETRYABLE',
+        message:
+          'La recuperacion de inventario no termino y debe reintentarse.',
+      });
+    }
     return res.status(500).json({ error: 'WOMPI_WEBHOOK_ERROR' });
   }
 });

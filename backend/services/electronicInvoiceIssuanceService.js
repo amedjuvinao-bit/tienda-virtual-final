@@ -12,6 +12,9 @@ const { sendElectronicInvoiceToProvider } = require('../lib/dian/providerAdapter
 const {
   isInventoryReadyForBilling,
 } = require('./orderInventoryBillingReadinessService');
+const {
+  isApprovedPayment: isCanonicalWompiApproval,
+} = require('./wompiWebhookIntegrityService');
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
@@ -471,15 +474,18 @@ function readPaymentMethodFromTransaction(transaction = {}) {
 }
 
 function isBillableOrder(order = {}) {
-  const status = cleanText(order.status, 50).toLowerCase();
   const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
   const source = cleanText(order.source || order.channel, 50).toLowerCase();
+  const paymentProvider = cleanText(order.payment?.provider, 50).toLowerCase();
 
-  const financiallyBillable = (
-    BILLABLE_ORDER_STATUSES.includes(status) ||
-    PAID_PAYMENT_STATUSES.includes(paymentStatus) ||
-    (source === 'pos' && money(order.total) > 0)
-  );
+  const persistedGatewayApproval =
+    PAID_PAYMENT_STATUSES.includes(paymentStatus) &&
+    Boolean(order.payment?.paidAt);
+  const financiallyBillable =
+    (paymentProvider === 'wompi'
+      ? isCanonicalWompiApproval(order)
+      : persistedGatewayApproval) ||
+    (source === 'pos' && money(order.total) > 0);
 
   return financiallyBillable && isInventoryReadyForBilling(order);
 }
