@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
   AlertTriangle,
@@ -137,6 +137,7 @@ export default function FavoritosAdmin() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const destructiveActionRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -236,24 +237,43 @@ export default function FavoritosAdmin() {
   };
 
   const removeFavorite = async (item) => {
-    if (!detail?._id || !item?._id || !canDelete || !requireSession()) return;
+    if (
+      !detail?._id ||
+      !item?._id ||
+      !canDelete ||
+      destructiveActionRef.current ||
+      !requireSession()
+    ) return;
+    const isLastItem = (detail.items?.length || 0) === 1;
+    const itemName = item.current?.title || item.title || 'este producto';
+    const confirmation = isLastItem
+      ? `“${itemName}” es el último producto guardado. Al retirarlo también se eliminará la lista completa. Esta acción no se puede deshacer. ¿Deseas continuar?`
+      : `¿Retirar “${itemName}” de esta lista de favoritos? Esta acción no se puede deshacer.`;
+    if (!window.confirm(confirmation)) return;
+    destructiveActionRef.current = true;
     setBusy(true);
     try {
       const response = await favoriteAdminApi.removeItem(detail._id, item._id);
       if (response.data?.deleted) setDetail(null);
       else setDetail(response.data);
       await load();
-      toast.success('Producto retirado de favoritos.');
+      toast.success(
+        response.data?.deleted
+          ? 'Producto y lista vacía eliminados.'
+          : 'Producto retirado de favoritos.'
+      );
     } catch {
       toast.error('No fue posible retirar el producto.');
     } finally {
+      destructiveActionRef.current = false;
       setBusy(false);
     }
   };
 
   const deleteFavorites = async () => {
-    if (!detail?._id || !canDelete || !requireSession()) return;
+    if (!detail?._id || !canDelete || destructiveActionRef.current || !requireSession()) return;
     if (!window.confirm('¿Eliminar definitivamente esta lista de favoritos?')) return;
+    destructiveActionRef.current = true;
     setBusy(true);
     try {
       await favoriteAdminApi.remove(detail._id);
@@ -263,6 +283,7 @@ export default function FavoritosAdmin() {
     } catch {
       toast.error('No fue posible eliminar la lista.');
     } finally {
+      destructiveActionRef.current = false;
       setBusy(false);
     }
   };

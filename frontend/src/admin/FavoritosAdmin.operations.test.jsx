@@ -77,9 +77,13 @@ describe('panel administrativo profesional de favoritos', () => {
     state.api.summary.mockResolvedValue({ data: summary });
     state.api.detail.mockResolvedValue({ data: detail });
     state.api.removeItem.mockResolvedValue({ data: detail });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('carga indicadores, valor potencial y productos de interés', async () => {
     render(<FavoritosAdmin />);
@@ -111,12 +115,38 @@ describe('panel administrativo profesional de favoritos', () => {
     expect(state.api.detail).toHaveBeenCalledWith(favoriteId);
   });
 
-  it('retira un producto por su identificador administrativo', async () => {
+  it('advierte que retirar el último producto también elimina la lista', async () => {
+    state.api.removeItem.mockResolvedValue({ data: { deleted: true, itemsCount: 0 } });
     render(<FavoritosAdmin />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
     fireEvent.click(await screen.findByTitle('Retirar de favoritos'));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/último producto[\s\S]*lista completa[\s\S]*no se puede deshacer/i)
+    );
     await waitFor(() => expect(state.api.removeItem).toHaveBeenCalledWith(favoriteId, itemId));
-    expect(state.toast.success).toHaveBeenCalled();
+    expect(state.toast.success).toHaveBeenCalledWith('Producto y lista vacía eliminados.');
+  });
+
+  it('cancelar el aviso conserva el producto y no llama al endpoint destructivo', async () => {
+    window.confirm.mockReturnValue(false);
+    const secondItem = {
+      ...detail.items[0],
+      _id: '68a4a78a59706e44cade0418',
+      title: 'Blusa secundaria',
+      current: { ...detail.items[0].current, title: 'Blusa secundaria' },
+    };
+    state.api.detail.mockResolvedValue({
+      data: { ...detail, items: [...detail.items, secondItem] },
+    });
+    render(<FavoritosAdmin />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
+    const removeButtons = await screen.findAllByTitle('Retirar de favoritos');
+    fireEvent.click(removeButtons[0]);
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/retirar[\s\S]*Vestido principal[\s\S]*no se puede deshacer/i)
+    );
+    expect(state.api.removeItem).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Vestido principal');
   });
 
   it('mantiene indicadores cuando falla solamente el listado', async () => {
