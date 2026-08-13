@@ -16,6 +16,29 @@ const PAID_STATUSES = ['paid', 'shipped', 'delivered'];
 const PENDING_STATUSES = ['pending', 'processing'];
 const CANCELLED_STATUSES = ['cancelled', 'canceled'];
 const VALIDATED_INVOICE_STATUSES = ['validated', 'validada', 'validado'];
+const OPERATIONAL_VIEWS = new Set([
+  'all',
+  'attention',
+  'awaiting_payment',
+  'prepare',
+  'dispatch',
+  'transit',
+  'incidents',
+  'sla_risk',
+  'completed',
+]);
+const PREPARATION_SHIPMENT_STATUSES = [
+  'ready_to_pick',
+  'picking',
+  'picked',
+  'packing',
+];
+const TRANSIT_SHIPMENT_STATUSES = ['dispatched', 'in_transit'];
+const ACTIVE_SLA_SHIPMENT_STATUSES = [
+  ...PREPARATION_SHIPMENT_STATUSES,
+  'packed',
+  ...TRANSIT_SHIPMENT_STATUSES,
+];
 
 const STATUS_CANON = new Map([
   ['pendiente', 'pending'],
@@ -246,6 +269,160 @@ function normalizeInvoiceFilter(value) {
   return 'all';
 }
 
+function normalizeOperationalView(value) {
+  const view = String(value || '').trim().toLowerCase();
+  return OPERATIONAL_VIEWS.has(view) ? view : 'all';
+}
+
+function buildSlaRiskCriteria(now = new Date()) {
+  const riskUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    $or: [
+      {
+        'fulfillment.shipments': {
+          $elemMatch: {
+            'sla.breachedAt': { $exists: true, $ne: null },
+          },
+        },
+      },
+      {
+        'fulfillment.shipments': {
+          $elemMatch: {
+            status: { $in: ['ready_to_pick', 'picking'] },
+            'sla.pickingDueAt': { $lte: riskUntil },
+          },
+        },
+      },
+      {
+        'fulfillment.shipments': {
+          $elemMatch: {
+            status: { $in: ['picked', 'packing', 'packed'] },
+            'sla.dispatchDueAt': { $lte: riskUntil },
+          },
+        },
+      },
+      {
+        'fulfillment.shipments': {
+          $elemMatch: {
+            status: { $in: TRANSIT_SHIPMENT_STATUSES },
+            'sla.deliveryDueAt': { $lte: riskUntil },
+          },
+        },
+      },
+    ],
+  };
+}
+
+function hasActivePhysicalAllocationExpression() {
+  return {
+    $anyElementTrue: {
+      $map: {
+        input: { $ifNull: ['$inventoryAllocations', []] },
+        as: 'allocation',
+        in: {
+          $gt: [
+            {
+              $subtract: [
+                { $ifNull: ['$$allocation.soldQuantity', 0] },
+                { $ifNull: ['$$allocation.returnedQuantity', 0] },
+              ],
+            },
+            0,
+          ],
+        },
+      },
+    },
+  };
+}
+
+function hasConfirmedPaymentExpression() {
+  return {
+    $or: [
+      {
+        $eq: [
+          { $toLower: { $ifNull: ['$payment.status', ''] } },
+          'paid',
+        ],
+      },
+      { $in: ['$status', ['paid', 'shipped', 'delivered', 'refunded']] },
+    ],
+  };
+}
+
+function buildOperationalViewCriteria(value, now = new Date()) {
+  const view = normalizeOperationalView(value);
+  const incidentCriteria = {
+    $or: [
+      { 'fulfillment.shipments.status': 'exception' },
+      { 'fulfillment.shipments.incidents.status': 'open' },
+    ],
+  };
+  const slaRiskCriteria = buildSlaRiskCriteria(now);
+
+  if (view === 'all') return null;
+  if (view === 'attention') {
+    return {
+      $or: [
+        { status: 'failed' },
+        incidentCriteria,
+        slaRiskCriteria,
+      ],
+    };
+  }
+  if (view === 'awaiting_payment') {
+    return {
+      $and: [
+        { status: { $in: ['pending', 'processing'] } },
+        { 'payment.status': { $ne: 'paid' } },
+      ],
+    };
+  }
+  if (view === 'prepare') {
+    return {
+      $and: [
+        {
+          $or: [
+            { status: { $in: ['paid', 'shipped'] } },
+            { 'payment.status': 'paid' },
+          ],
+        },
+        { status: { $nin: ['failed', 'cancelled', 'canceled', 'delivered', 'refunded'] } },
+        {
+          $or: [
+            {
+              $and: [
+                { 'fulfillment.shipments.0': { $exists: false } },
+                { $expr: hasActivePhysicalAllocationExpression() },
+              ],
+            },
+            {
+              'fulfillment.shipments': {
+                $elemMatch: { status: { $in: PREPARATION_SHIPMENT_STATUSES } },
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
+  if (view === 'dispatch') {
+    return { 'fulfillment.shipments.status': 'packed' };
+  }
+  if (view === 'transit') {
+    return { 'fulfillment.shipments.status': { $in: TRANSIT_SHIPMENT_STATUSES } };
+  }
+  if (view === 'incidents') return incidentCriteria;
+  if (view === 'sla_risk') return slaRiskCriteria;
+  if (view === 'completed') return { status: 'delivered' };
+  return null;
+}
+
+function combineFilters(filter, extraCriteria) {
+  if (!extraCriteria) return filter;
+  if (!filter || Object.keys(filter).length === 0) return extraCriteria;
+  return { $and: [filter, extraCriteria] };
+}
+
 function buildInvoiceLookupStage(ElectronicInvoiceModel = ElectronicInvoice) {
   return {
     $lookup: {
@@ -353,12 +530,18 @@ function hasValidatedInvoiceExpression() {
 function buildPagePipeline({
   filter,
   invoiceFilter,
+  operationalView = 'all',
+  now = new Date(),
   sort,
   skip,
   limit,
   ElectronicInvoiceModel = ElectronicInvoice,
 }) {
-  const pipeline = [{ $match: filter }];
+  const operationalCriteria = buildOperationalViewCriteria(
+    operationalView,
+    now
+  );
+  const pipeline = [{ $match: combineFilters(filter, operationalCriteria) }];
   const invoiceStage = buildInvoiceFilterStage(invoiceFilter);
 
   if (invoiceStage) {
@@ -378,6 +561,8 @@ function buildPagePipeline({
 function buildSummaryPipeline({
   filter,
   invoiceFilter,
+  operationalView = 'all',
+  now = new Date(),
   ElectronicInvoiceModel = ElectronicInvoice,
 }) {
   const pipeline = [
@@ -387,7 +572,14 @@ function buildSummaryPipeline({
   const invoiceStage = buildInvoiceFilterStage(invoiceFilter);
   if (invoiceStage) pipeline.push(invoiceStage);
 
-  pipeline.push(
+  const operationalCriteria = buildOperationalViewCriteria(
+    operationalView,
+    now
+  );
+  const financialPipeline = [];
+  if (operationalCriteria) financialPipeline.push({ $match: operationalCriteria });
+
+  financialPipeline.push(
     {
       $group: {
         _id: null,
@@ -449,7 +641,211 @@ function buildSummaryPipeline({
     }
   );
 
+  pipeline.push(
+    {
+      $facet: {
+        financial: financialPipeline,
+        operational: buildOperationalSummaryPipeline(now),
+      },
+    },
+    {
+      $project: {
+        financial: { $arrayElemAt: ['$financial', 0] },
+        operational: { $arrayElemAt: ['$operational', 0] },
+      },
+    }
+  );
+
   return pipeline;
+}
+
+function shipmentStatusExpression(statuses) {
+  return {
+    $anyElementTrue: {
+      $map: {
+        input: { $ifNull: ['$fulfillment.shipments', []] },
+        as: 'shipment',
+        in: {
+          $in: [
+            { $toLower: { $ifNull: ['$$shipment.status', ''] } },
+            statuses,
+          ],
+        },
+      },
+    },
+  };
+}
+
+function openIncidentExpression() {
+  return {
+    $anyElementTrue: {
+      $map: {
+        input: { $ifNull: ['$fulfillment.shipments', []] },
+        as: 'shipment',
+        in: {
+          $anyElementTrue: {
+            $map: {
+              input: { $ifNull: ['$$shipment.incidents', []] },
+              as: 'incident',
+              in: { $eq: ['$$incident.status', 'open'] },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function slaRiskExpression(now = new Date()) {
+  const riskUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    $anyElementTrue: {
+      $map: {
+        input: { $ifNull: ['$fulfillment.shipments', []] },
+        as: 'shipment',
+        in: {
+          $let: {
+            vars: {
+              status: { $toLower: { $ifNull: ['$$shipment.status', ''] } },
+              dueAt: {
+                $switch: {
+                  branches: [
+                    {
+                      case: {
+                        $in: [
+                          { $toLower: { $ifNull: ['$$shipment.status', ''] } },
+                          ['ready_to_pick', 'picking'],
+                        ],
+                      },
+                      then: '$$shipment.sla.pickingDueAt',
+                    },
+                    {
+                      case: {
+                        $in: [
+                          { $toLower: { $ifNull: ['$$shipment.status', ''] } },
+                          ['picked', 'packing', 'packed'],
+                        ],
+                      },
+                      then: '$$shipment.sla.dispatchDueAt',
+                    },
+                    {
+                      case: {
+                        $in: [
+                          { $toLower: { $ifNull: ['$$shipment.status', ''] } },
+                          TRANSIT_SHIPMENT_STATUSES,
+                        ],
+                      },
+                      then: '$$shipment.sla.deliveryDueAt',
+                    },
+                  ],
+                  default: null,
+                },
+              },
+            },
+            in: {
+              $or: [
+                { $ne: [{ $ifNull: ['$$shipment.sla.breachedAt', null] }, null] },
+                {
+                  $and: [
+                    { $in: ['$$status', ACTIVE_SLA_SHIPMENT_STATUSES] },
+                    { $ne: [{ $ifNull: ['$$dueAt', null] }, null] },
+                    { $lte: ['$$dueAt', riskUntil] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function buildOperationalSummaryPipeline(now = new Date()) {
+  const hasIncidents = {
+    $or: [shipmentStatusExpression(['exception']), openIncidentExpression()],
+  };
+  const hasSlaRisk = slaRiskExpression(now);
+  const shipmentCount = { $size: { $ifNull: ['$fulfillment.shipments', []] } };
+  const isPreparation = shipmentStatusExpression(PREPARATION_SHIPMENT_STATUSES);
+  const hasPhysicalAllocation = hasActivePhysicalAllocationExpression();
+  const hasConfirmedPayment = hasConfirmedPaymentExpression();
+
+  return [
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        attention: {
+          $sum: {
+            $cond: [
+              { $or: [{ $eq: ['$status', 'failed'] }, hasIncidents, hasSlaRisk] },
+              1,
+              0,
+            ],
+          },
+        },
+        awaitingPayment: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $in: ['$status', ['pending', 'processing']] },
+                  { $not: [hasConfirmedPayment] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        prepare: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  hasConfirmedPayment,
+                  {
+                    $not: [
+                      {
+                        $in: [
+                          '$status',
+                          ['failed', 'cancelled', 'canceled', 'delivered', 'refunded'],
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    $or: [
+                      {
+                        $and: [
+                          { $eq: [shipmentCount, 0] },
+                          hasPhysicalAllocation,
+                        ],
+                      },
+                      isPreparation,
+                    ],
+                  },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        dispatch: {
+          $sum: { $cond: [shipmentStatusExpression(['packed']), 1, 0] },
+        },
+        transit: {
+          $sum: { $cond: [shipmentStatusExpression(TRANSIT_SHIPMENT_STATUSES), 1, 0] },
+        },
+        incidents: { $sum: { $cond: [hasIncidents, 1, 0] } },
+        slaRisk: { $sum: { $cond: [hasSlaRisk, 1, 0] } },
+        completed: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
+      },
+    },
+    { $project: { _id: 0 } },
+  ];
 }
 
 function executeAggregate(Model, pipeline) {
@@ -489,6 +885,170 @@ function calculateItemSummary(items) {
     },
     { totalItems: 0, subtotal: 0 }
   );
+}
+
+function shipmentDueAt(shipment) {
+  const status = String(shipment?.status || '').trim().toLowerCase();
+  if (['ready_to_pick', 'picking'].includes(status)) {
+    return shipment?.sla?.pickingDueAt || null;
+  }
+  if (['picked', 'packing', 'packed'].includes(status)) {
+    return shipment?.sla?.dispatchDueAt || null;
+  }
+  if (TRANSIT_SHIPMENT_STATUSES.includes(status)) {
+    return shipment?.sla?.deliveryDueAt || null;
+  }
+  return null;
+}
+
+function deriveOrderOperationalView(order, now = new Date()) {
+  const status = String(order?.status || '').trim().toLowerCase();
+  const paymentStatus = String(order?.payment?.status || '').trim().toLowerCase();
+  const paymentConfirmed =
+    paymentStatus === 'paid' ||
+    ['paid', 'shipped', 'delivered', 'refunded'].includes(status);
+  const shipments = Array.isArray(order?.fulfillment?.shipments)
+    ? order.fulfillment.shipments.filter(
+        (shipment) => String(shipment?.status || '').toLowerCase() !== 'cancelled'
+      )
+    : [];
+  const statuses = shipments.map((shipment) =>
+    String(shipment?.status || '').trim().toLowerCase()
+  );
+  const hasPhysicalAllocation = (Array.isArray(order?.inventoryAllocations)
+    ? order.inventoryAllocations
+    : []
+  ).some(
+    (allocation) =>
+      Number(allocation?.soldQuantity || 0) -
+        Number(allocation?.returnedQuantity || 0) >
+      0
+  );
+  const openIncidentCount = shipments.reduce(
+    (total, shipment) =>
+      total +
+      (Array.isArray(shipment?.incidents)
+        ? shipment.incidents.filter((incident) => incident?.status === 'open').length
+        : 0),
+    0
+  );
+  const dueDates = shipments
+    .map((shipment) => ({
+      shipment,
+      dueAt: shipmentDueAt(shipment),
+    }))
+    .filter((entry) => entry.dueAt)
+    .map((entry) => ({ ...entry, dueDate: new Date(entry.dueAt) }))
+    .filter((entry) => !Number.isNaN(entry.dueDate.getTime()))
+    .sort((left, right) => left.dueDate - right.dueDate);
+  const nextDue = dueDates[0] || null;
+  const hasRecordedBreach = shipments.some((shipment) => shipment?.sla?.breachedAt);
+  const dueDelta = nextDue ? nextDue.dueDate.getTime() - now.getTime() : null;
+  const slaState = hasRecordedBreach || (dueDelta !== null && dueDelta < 0)
+    ? 'breached'
+    : dueDelta !== null && dueDelta <= 24 * 60 * 60 * 1000
+      ? 'risk'
+      : nextDue
+        ? 'on_track'
+        : 'none';
+  const progressMap = {
+    ready_to_pick: 8,
+    picking: 20,
+    picked: 35,
+    packing: 48,
+    packed: 60,
+    dispatched: 72,
+    in_transit: 86,
+    delivered: 100,
+    exception: 0,
+  };
+  const progress = shipments.length
+    ? Math.round(
+        statuses.reduce(
+          (total, shipmentStatus) => total + (progressMap[shipmentStatus] || 0),
+          0
+        ) / shipments.length
+      )
+    : status === 'delivered'
+      ? 100
+      : 0;
+
+  let queue = 'monitor';
+  let urgency = 'normal';
+  let nextAction = 'Revisar orden';
+
+  if (status === 'failed') {
+    queue = 'attention';
+    urgency = 'critical';
+    nextAction = 'Revisar pago fallido';
+  } else if (openIncidentCount > 0 || statuses.includes('exception')) {
+    queue = 'incidents';
+    urgency = 'critical';
+    nextAction = 'Resolver incidencia';
+  } else if (slaState === 'breached') {
+    queue = 'sla_risk';
+    urgency = 'critical';
+    nextAction = 'Atender SLA vencido';
+  } else if (slaState === 'risk') {
+    queue = 'sla_risk';
+    urgency = 'high';
+    nextAction = 'Priorizar cumplimiento';
+  } else if (
+    ['pending', 'processing'].includes(status) &&
+    !paymentConfirmed &&
+    shipments.length === 0
+  ) {
+    queue = 'awaiting_payment';
+    urgency = 'normal';
+    nextAction = 'Esperar confirmación de pago';
+  } else if (
+    paymentConfirmed &&
+    !['delivered', 'refunded'].includes(status) &&
+    shipments.length === 0 &&
+    hasPhysicalAllocation
+  ) {
+    queue = 'prepare';
+    urgency = 'high';
+    nextAction = status === 'shipped'
+      ? 'Reconstruir trazabilidad logística'
+      : 'Preparar logística';
+  } else if (statuses.includes('packed')) {
+    queue = 'dispatch';
+    urgency = 'high';
+    nextAction = 'Registrar despacho';
+  } else if (statuses.some((value) => TRANSIT_SHIPMENT_STATUSES.includes(value))) {
+    queue = 'transit';
+    urgency = 'normal';
+    nextAction = statuses.includes('dispatched')
+      ? 'Confirmar salida a tránsito'
+      : 'Confirmar entrega';
+  } else if (statuses.some((value) => PREPARATION_SHIPMENT_STATUSES.includes(value))) {
+    queue = 'prepare';
+    urgency = 'normal';
+    nextAction = statuses.includes('packing') || statuses.includes('picked')
+      ? 'Completar empaque'
+      : statuses.includes('picking')
+        ? 'Completar picking'
+        : 'Iniciar picking';
+  } else if (status === 'delivered' || (shipments.length && statuses.every((value) => value === 'delivered'))) {
+    queue = 'completed';
+    urgency = 'low';
+    nextAction = 'Entrega completada';
+  }
+
+  return {
+    queue,
+    urgency,
+    nextAction,
+    shipmentCount: shipments.length,
+    openIncidentCount,
+    progress,
+    sla: {
+      state: slaState,
+      dueAt: nextDue?.dueDate || null,
+      remainingMs: dueDelta,
+    },
+  };
 }
 
 async function enrichOrders(docs, { populate, ProductModel = Product } = {}) {
@@ -539,6 +1099,7 @@ async function enrichOrders(docs, { populate, ProductModel = Product } = {}) {
       summary,
       totalItems: Number(summary.totalItems || 0),
       subtotal: Number(summary.subtotal || 0),
+      operational: deriveOrderOperationalView(order),
     };
   });
 }
@@ -558,6 +1119,28 @@ function emptyFinancialSummary() {
     validatedInvoices: 0,
     validatedDianOrders: 0,
   };
+}
+
+function emptyOperationalSummary() {
+  return {
+    total: 0,
+    attention: 0,
+    awaitingPayment: 0,
+    prepare: 0,
+    dispatch: 0,
+    transit: 0,
+    incidents: 0,
+    slaRisk: 0,
+    completed: 0,
+  };
+}
+
+function normalizeOperationalSummary(row) {
+  const empty = emptyOperationalSummary();
+  if (!row) return empty;
+  return Object.fromEntries(
+    Object.keys(empty).map((key) => [key, Number(row[key] || 0)])
+  );
 }
 
 function normalizeFinancialSummary(row) {
@@ -639,6 +1222,8 @@ async function queryAdminOrders(
   const populate = String(query.populate || '0') === '1';
   const format = String(query.format || '').trim().toLowerCase();
   const invoiceFilter = normalizeInvoiceFilter(query.invoiceFilter);
+  const operationalView = normalizeOperationalView(query.operationalView);
+  const now = new Date();
   const includeSummary = format !== 'csv' && String(query.includeSummary || '1') !== '0';
   const filterResult = buildAdminOrderFilter(req);
 
@@ -649,6 +1234,8 @@ async function queryAdminOrders(
   const pagePipeline = buildPagePipeline({
     filter: filterResult.filter,
     invoiceFilter,
+    operationalView,
+    now,
     sort: parseSort(query.sort),
     skip,
     limit,
@@ -661,6 +1248,8 @@ async function queryAdminOrders(
         buildSummaryPipeline({
           filter: filterResult.filter,
           invoiceFilter,
+          operationalView,
+          now,
           ElectronicInvoiceModel,
         })
       )
@@ -676,10 +1265,15 @@ async function queryAdminOrders(
   };
 
   if (includeSummary) {
-    const financialSummary = normalizeFinancialSummary(summaryRows?.[0]);
+    const summaryRow = summaryRows?.[0] || {};
+    const financialSummary = normalizeFinancialSummary(summaryRow.financial);
+    const operationalSummary = normalizeOperationalSummary(
+      summaryRow.operational
+    );
     response.total = financialSummary.totalOrders;
     response.totalPages = Math.max(1, Math.ceil(response.total / limit));
     response.financialSummary = financialSummary;
+    response.operationalSummary = operationalSummary;
   }
 
   if (format === 'csv') response.csv = ordersToCsv(data);
@@ -688,10 +1282,14 @@ async function queryAdminOrders(
 
 module.exports = {
   buildAdminOrderFilter,
+  buildOperationalViewCriteria,
+  buildOperationalSummaryPipeline,
   buildInvoiceFilterStage,
   buildPagePipeline,
   buildSummaryPipeline,
+  normalizeOperationalView,
   normalizeInvoiceFilter,
   parseSort,
   queryAdminOrders,
+  deriveOrderOperationalView,
 };

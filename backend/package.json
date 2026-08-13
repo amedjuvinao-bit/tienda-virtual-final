@@ -15,6 +15,7 @@
     "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:orders-architecture": "node scripts/testOrderAdminQueryArchitecture.js",
     "test:orders-logistics": "node scripts/testOrderLogisticsContract.js",
+    "test:orders-operations": "node scripts/testOrderOperationsCenterContract.js",
     "test:dashboard-admin": "node scripts/testDashboardAdminModule.js",
     "test:products-universal": "node scripts/seedDemonstrationProducts.js",
     "test:products-demo-catalog": "node scripts/seedDemonstrationProducts.js",

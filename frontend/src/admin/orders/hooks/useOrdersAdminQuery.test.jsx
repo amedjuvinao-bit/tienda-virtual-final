@@ -131,6 +131,7 @@ describe('useOrdersAdminQuery', () => {
           total: 41,
           totalPages: 3,
           financialSummary: { totalOrders: 41, totalSales: 900000 },
+          operationalSummary: { total: 41, attention: 4, prepare: 8 },
           summaryIncluded: true,
         },
       })
@@ -159,5 +160,6 @@ describe('useOrdersAdminQuery', () => {
     expect(apiState.get.mock.calls[1][1].params.includeSummary).toBe(0);
     expect(result.current.total).toBe(41);
     expect(result.current.financialSummary.totalSales).toBe(900000);
+    expect(result.current.operationalSummary.attention).toBe(4);
   });
 });

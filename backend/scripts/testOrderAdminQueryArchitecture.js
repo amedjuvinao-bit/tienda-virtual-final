@@ -6,6 +6,7 @@ const path = require('path');
 
 const {
   buildAdminOrderFilter,
+  buildOperationalViewCriteria,
   buildPagePipeline,
   buildSummaryPipeline,
   parseSort,
@@ -96,21 +97,27 @@ async function main() {
     invoiceFilter: 'all',
     ElectronicInvoiceModel: invoiceModel,
   });
-  const group = summaryPipeline.find((stage) => stage.$group)?.$group;
+  const summaryFacet = summaryPipeline.find((stage) => stage.$facet)?.$facet;
+  const group = summaryFacet?.financial?.find((stage) => stage.$group)?.$group;
   assert.ok(group?.totalOrders);
   assert.ok(group?.withInvoiceOrders);
   assert.ok(group?.validatedInvoiceOrders);
+  assert.ok(summaryFacet?.operational?.some((stage) => stage.$group));
   ok('página, totales financieros y estado DIAN tienen pipelines explícitos');
+
+  assert.ok(buildOperationalViewCriteria('attention').$or);
+  assert.strictEqual(buildOperationalViewCriteria('all'), null);
+  ok('colas operativas y alertas logísticas se resuelven en MongoDB');
 
   const aggregateCalls = [];
   const fakeOrderModel = {
     aggregate(pipeline) {
-      const isSummary = pipeline.some((stage) => stage.$group);
+      const isSummary = pipeline.some((stage) => stage.$facet);
       aggregateCalls.push({ pipeline, isSummary, allowDiskUse: false });
       const call = aggregateCalls[aggregateCalls.length - 1];
       const rows = isSummary
-        ? [
-            {
+        ? [{
+            financial: {
               totalOrders: 42,
               totalSales: 840000,
               pendingAmount: 120000,
@@ -121,7 +128,13 @@ async function main() {
               validatedInvoiceOrders: 28,
               averageTicket: 120000,
             },
-          ]
+            operational: {
+              total: 42,
+              attention: 3,
+              prepare: 5,
+              transit: 2,
+            },
+          }]
         : [
             {
               _id: '64c000000000000000000001',
@@ -156,6 +169,7 @@ async function main() {
   assert.strictEqual(result.totalPages, 3);
   assert.strictEqual(result.financialSummary.withoutInvoiceOrders, 12);
   assert.strictEqual(result.financialSummary.validatedDianOrders, 28);
+  assert.strictEqual(result.operationalSummary.attention, 3);
   assert.strictEqual(result.data[0].totalItems, 2);
   ok('la respuesta mantiene paginación, indicadores y campos derivados compatibles');
 

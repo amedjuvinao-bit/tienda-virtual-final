@@ -34,6 +34,7 @@ export default function useOrdersQuickViews({
   clearStatus,
 }) {
   const [quickView, setQuickView] = useState('all');
+  const [operationalView, setOperationalView] = useState('all');
 
   // Filtros operativos preparados para conectar luego con la consulta principal.
   const [printedFilter, setPrintedFilter] = useState('all');
@@ -64,6 +65,7 @@ export default function useOrdersQuickViews({
   const resetOperationalFilters = () => {
     setPrintedFilter('all');
     setArchivedFilter('active');
+    setOperationalView('all');
   };
 
   const resetBaseFilters = () => {
@@ -131,6 +133,26 @@ export default function useOrdersQuickViews({
       return;
     }
 
+    const operationalViews = new Set([
+      'attention',
+      'awaiting_payment',
+      'prepare',
+      'dispatch',
+      'transit',
+      'incidents',
+      'sla_risk',
+      'completed',
+    ]);
+
+    if (operationalViews.has(viewKey)) {
+      clearDateFilters();
+      clearStatusFilters();
+      setPrintedFilter('all');
+      setArchivedFilter('active');
+      setOperationalView(viewKey);
+      return;
+    }
+
     resetBaseFilters();
   };
 
@@ -149,5 +171,8 @@ export default function useOrdersQuickViews({
 
     archivedFilter,
     setArchivedFilter,
+
+    operationalView,
+    setOperationalView,
   };
 }

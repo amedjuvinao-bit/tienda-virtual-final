@@ -53,6 +53,7 @@ export default function useOrdersAdminQuery({
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [financialSummary, setFinancialSummary] = useState(null);
+  const [operationalSummary, setOperationalSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const requestSequence = useRef(0);
@@ -71,6 +72,7 @@ export default function useOrdersAdminQuery({
       setTotal(0);
       setTotalPages(1);
       setFinancialSummary(null);
+      setOperationalSummary(null);
       setLoading(false);
       setErr(
         hasSession
@@ -102,6 +104,7 @@ export default function useOrdersAdminQuery({
           setTotal(knownTotal.current);
           setTotalPages(Number(payload.totalPages || 1));
           setFinancialSummary(payload.financialSummary || null);
+          setOperationalSummary(payload.operationalSummary || null);
         } else {
           const pageSize = Math.max(1, Number(params?.limit || 20));
           setTotalPages(Math.max(1, Math.ceil(knownTotal.current / pageSize)));
@@ -128,6 +131,7 @@ export default function useOrdersAdminQuery({
     totalPages,
     total,
     financialSummary,
+    operationalSummary,
     loading,
     err,
     setErr,

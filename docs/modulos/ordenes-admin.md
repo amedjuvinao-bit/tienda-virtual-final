@@ -3,11 +3,27 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **4. Logística avanzada multisede**.
+- Etapa actual: **5. Centro operativo comercial y logístico**.
 - Estado de la etapa: implementada y cubierta por pruebas automáticas.
-- Siguientes etapas: experiencia visual del listado, observabilidad/stress y cierre integral.
+- Siguientes etapas: observabilidad/stress y cierre integral.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística.
+
+## Centro operativo comercial y logístico
+
+El listado ya no depende de vistas rápidas flotantes ni de tarjetas sobredimensionadas. La interfaz integra una mesa de trabajo con ocho colas: atención inmediata, pagos pendientes, preparación, despacho, tránsito, incidencias, SLA en riesgo y completadas. Los contadores respetan sesión, sede, búsqueda, fechas, estado, etiquetas, archivo y filtro de factura.
+
+`operationalView` es un valor cerrado validado en backend. MongoDB aplica el filtro antes de paginar y calcula los contadores mediante `$facet`; React no recibe el universo de órdenes para volver a clasificarlo. Una orden aparece en preparación solo si tiene pago confirmado y asignaciones físicas vendidas vigentes o un envío ya iniciado. Los productos digitales y servicios sin inventario no se presentan falsamente como trabajo de bodega.
+
+Cada fila recibe un resumen derivado por el servidor:
+
+- cola, urgencia y siguiente acción;
+- cantidad de envíos e incidencias abiertas;
+- progreso logístico consolidado;
+- próximo vencimiento y estado SLA (`on_track`, `risk` o `breached`);
+- sede o distribución multisede, canal, unidades, valor y estado comercial.
+
+La prioridad se resuelve en este orden: pago fallido, incidencia abierta, SLA vencido, SLA en riesgo, pago pendiente y flujo logístico. Así una alerta crítica no queda oculta por un estado comercial general. La bandeja ofrece lectura cómoda o compacta y abre el detalle profesional con la acción `Gestionar`; las mutaciones siguen protegidas por los permisos de las etapas anteriores.
 
 ## Logística avanzada multisede
 
@@ -239,12 +255,13 @@ Desde la raíz del repositorio en Windows:
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-security
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-architecture
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm exec -- vitest run && npm run build
 ```
 
 Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
@@ -266,7 +283,7 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 
 ## Evidencia de la etapa 3
 
-- Arquitectura backend: 9 controles sobre separación, filtros, paginación, agregaciones, índices y compatibilidad de respuesta.
+- Arquitectura backend: 10 controles sobre separación, filtros, paginación, agregaciones, colas, índices y compatibilidad de respuesta.
 - Concurrencia frontend: 3 pruebas sobre doble montaje, respuestas obsoletas y paginación sin recalcular métricas.
 - Seguridad de Órdenes: 10 controles backend y 7 pruebas frontend conservados.
 - El contrato nuevo se ejecuta en GitHub Actions dentro de `products-ci.yml`.
@@ -278,6 +295,14 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Centro logístico: 4 pruebas de inicialización autorizada, orden operativo, solo lectura y resolución de incidencias.
 - Seguridad: el permiso `orders:fulfillment` separa logística de la edición general de una orden.
 - CI ejecuta `test:orders-logistics` sin transportadoras externas ni escritura en bases productivas.
+
+## Evidencia de la etapa 5
+
+- Centro operativo backend: 13 controles sobre vistas cerradas, pago, inventario físico, SLA, incidencias, prioridades, agregación y CI.
+- Centro operativo frontend: 4 pruebas sobre contadores, filtros, trazabilidad por fila, densidad y estado vacío.
+- Arquitectura: el resumen financiero conserva compatibilidad y añade `operationalSummary` solo cuando `includeSummary` está activo.
+- Rendimiento: cambiar únicamente página continúa reutilizando métricas; cambiar de cola solicita una página y resumen coherentes.
+- El contrato se ejecuta en GitHub Actions y no escribe en MongoDB ni llama servicios externos.
 - El recorrido contractual verifica que una orden no se cierra antes del manifiesto y la prueba de entrega.
 
 ## Trabajo pendiente deliberado

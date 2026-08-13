@@ -1,674 +1,441 @@
+import { useState } from 'react';
+import {
+  AlertTriangle,
+  Building2,
+  CalendarClock,
+  ChevronRight,
+  LayoutList,
+  Rows3,
+  ShoppingBag,
+  Truck,
+} from 'lucide-react';
+
+const QUEUE_STYLES = {
+  attention: { label: 'Atención', color: '#be123c', bg: '#fff1f2' },
+  incidents: { label: 'Incidencia', color: '#be123c', bg: '#fff1f2' },
+  sla_risk: { label: 'SLA prioritario', color: '#b45309', bg: '#fffbeb' },
+  awaiting_payment: { label: 'Esperando pago', color: '#0369a1', bg: '#f0f9ff' },
+  prepare: { label: 'Preparación', color: 'var(--admin-primary)', bg: 'var(--admin-primary-soft-bg)' },
+  dispatch: { label: 'Despacho', color: '#7c3aed', bg: '#f5f3ff' },
+  transit: { label: 'En tránsito', color: '#0369a1', bg: '#f0f9ff' },
+  completed: { label: 'Completada', color: '#047857', bg: '#ecfdf5' },
+  monitor: { label: 'Seguimiento', color: '#475569', bg: '#f8fafc' },
+};
+
+const STATUS_LABELS = {
+  pending: 'Pendiente',
+  processing: 'Procesando',
+  paid: 'Pagada',
+  failed: 'Fallida',
+  shipped: 'Enviada',
+  delivered: 'Entregada',
+  cancelled: 'Cancelada',
+  canceled: 'Cancelada',
+  refunded: 'Reembolsada',
+};
+
+function customerName(order) {
+  const customer = order?.customer || {};
+  return [customer.name, customer.lastname].filter(Boolean).join(' ') || 'Cliente';
+}
+
+function branchInfo(order) {
+  const allocations = Array.isArray(order?.inventoryAllocations)
+    ? order.inventoryAllocations
+    : [];
+  const branches = new Map();
+  allocations.forEach((allocation) => {
+    const snapshot = allocation?.branchSnapshot || {};
+    const branch = allocation?.branch || {};
+    const key = String(branch?._id || branch?.id || branch || snapshot.code || snapshot.name || '');
+    if (!key || branches.has(key)) return;
+    branches.set(key, {
+      name: snapshot.name || branch?.name || 'Sede',
+      code: String(snapshot.code || branch?.code || '').toUpperCase(),
+    });
+  });
+  if (branches.size > 1) return `${branches.size} sedes`;
+  const single = Array.from(branches.values())[0];
+  if (single) return single.code || single.name;
+  return (
+    order?.branchSnapshot?.code ||
+    order?.branchSnapshot?.name ||
+    order?.branch?.code ||
+    order?.branch?.name ||
+    'Sin sede'
+  );
+}
+
+function channelLabel(order) {
+  const source = String(order?.source || '').toLowerCase();
+  const channel = String(order?.channel || '').toLowerCase();
+  const provider = String(order?.payment?.provider || '').toLowerCase();
+  if (
+    source === 'pos' ||
+    channel === 'physical_store' ||
+    provider === 'pos' ||
+    order?.pos?.receiptNumber
+  ) return 'POS';
+  if (source === 'manual') return 'Manual';
+  if (source === 'admin') return 'Admin';
+  if (source === 'import') return 'Importada';
+  return 'Web';
+}
+
+function formatSla(operational) {
+  const state = operational?.sla?.state || 'none';
+  const remainingMs = Number(operational?.sla?.remainingMs);
+  if (state === 'breached') {
+    const hours = Number.isFinite(remainingMs)
+      ? Math.max(1, Math.ceil(Math.abs(remainingMs) / 3600000))
+      : null;
+    return hours ? `Vencido hace ${hours} h` : 'SLA vencido';
+  }
+  if (state === 'risk' && Number.isFinite(remainingMs)) {
+    return `Vence en ${Math.max(1, Math.ceil(remainingMs / 3600000))} h`;
+  }
+  if (state === 'on_track') return 'SLA en tiempo';
+  return 'Sin SLA activo';
+}
+
 export default function OrdersTable({
   ADMIN_BORDER,
-
   data,
   loading,
   selectedIds,
   selectionEnabled = false,
-
   toggleSelectAllVisible,
   toggleOne,
   isSelected,
-
   toggleSort,
   sortAria,
   sortIcon,
-
   fmtDate,
   toCOP,
   statusBadgeClasses,
-
   openOrderDetail,
 }) {
-  const THEME = {
-    cardBg: 'var(--admin-card-bg)',
-    cardText: 'var(--admin-card-text)',
-    mutedText: 'var(--admin-card-muted-text)',
-    primary: 'var(--admin-primary)',
-    primaryHover: 'var(--admin-primary-hover)',
-    primarySoftBg: 'var(--admin-primary-soft-bg)',
-    primarySoftText: 'var(--admin-button-soft-text)',
-    inputBg: 'var(--admin-input-bg)',
-    cardBorder: 'var(--admin-card-border)',
-  };
-
-  const getStatusAccent = (status) => {
-    const normalized = String(status || '').toLowerCase();
-
-    if (normalized.includes('paid') || normalized.includes('pag')) return 'from-emerald-400 to-green-500';
-    if (normalized.includes('pending') || normalized.includes('pend')) return 'from-amber-300 to-yellow-500';
-    if (normalized.includes('fail') || normalized.includes('fall')) return 'from-rose-400 to-red-500';
-    if (normalized.includes('cancel')) return 'from-gray-300 to-gray-500';
-    if (normalized.includes('refund') || normalized.includes('reemb')) return 'from-violet-400 to-purple-500';
-    if (normalized.includes('sent') || normalized.includes('env')) return 'from-sky-400 to-blue-500';
-
-    return 'from-pink-300 to-pink-500';
-  };
-
-  const getOrderLevel = (total) => {
-    const value = Number(total || 0);
-
-    if (value >= 700000) return 'Ticket alto';
-    if (value >= 250000) return 'Ticket medio';
-    return 'Orden estándar';
-  };
-
-  const getBranchInfo = (order) => {
-    const branchSnapshot = order?.branchSnapshot || {};
-    const branch = order?.branch || {};
-    const allocations = Array.isArray(order?.inventoryAllocations)
-      ? order.inventoryAllocations
-      : [];
-    const allocationBranches = [];
-    const seen = new Set();
-
-    allocations.forEach((allocation) => {
-      const snapshot = allocation?.branchSnapshot || {};
-      const allocationBranch = allocation?.branch || {};
-      const id = String(
-        allocationBranch?._id ||
-          allocationBranch?.id ||
-          allocationBranch ||
-          snapshot.code ||
-          snapshot.name ||
-          ''
-      );
-      if (!id || seen.has(id)) return;
-      seen.add(id);
-      allocationBranches.push({
-        name: String(
-          snapshot.name || allocationBranch?.name || 'Sede sin nombre'
-        ).trim(),
-        code: String(
-          snapshot.code || allocationBranch?.code || ''
-        )
-          .trim()
-          .toUpperCase(),
-      });
-    });
-
-    const name =
-      branchSnapshot.name ||
-      branch.name ||
-      order?.branchName ||
-      order?.branch_label ||
-      '';
-
-    const code =
-      branchSnapshot.code ||
-      branch.code ||
-      order?.branchCode ||
-      '';
-
-    const type =
-      branchSnapshot.type ||
-      branch.type ||
-      '';
-
-    const isMultiBranch = allocationBranches.length > 1;
-    const singleAllocationBranch =
-      allocationBranches.length === 1
-        ? allocationBranches[0]
-        : null;
-
-    return {
-      name: isMultiBranch
-        ? `${allocationBranches.length} sedes de despacho`
-        : singleAllocationBranch?.name ||
-          String(name || '').trim() ||
-          'Sin sede',
-      code: isMultiBranch
-        ? allocationBranches
-            .map((item) => item.code)
-            .filter(Boolean)
-            .join(' + ')
-        : singleAllocationBranch?.code ||
-          String(code || '').trim().toUpperCase(),
-      type: String(type || '').trim().toLowerCase(),
-      hasBranch: Boolean(
-        allocationBranches.length || name || code
-      ),
-      isMultiBranch,
-      branches: allocationBranches,
-    };
-  };
-
-  const getOrderOriginInfo = (order) => {
-    const source = String(order?.source || '').trim().toLowerCase();
-    const channel = String(order?.channel || '').trim().toLowerCase();
-    const saleType = String(order?.saleType || '').trim().toLowerCase();
-    const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
-    const pos = order?.pos || {};
-
-    const isPos =
-      source === 'pos' ||
-      channel === 'physical_store' ||
-      saleType === 'pos_sale' ||
-      paymentProvider === 'pos' ||
-      Boolean(pos.receiptNumber || pos.saleNumber || pos.registerCode);
-
-    if (isPos) {
-      const reference = pos.receiptNumber || pos.saleNumber || order?.payment?.reference || '';
-      const terminal = pos.registerCode || pos.terminalId || '';
-
-      return {
-        label: 'POS',
-        description: 'Venta física',
-        detail: [reference, terminal ? `Caja ${terminal}` : 'Caja'].filter(Boolean).join(' · '),
-        badgeBg: 'linear-gradient(135deg, color-mix(in srgb, #22c55e 18%, #ffffff), color-mix(in srgb, var(--admin-primary-soft-bg) 65%, #ffffff))',
-        badgeText: '#047857',
-        border: 'color-mix(in srgb, #22c55e 42%, var(--admin-card-border))',
-      };
-    }
-
-    if (source === 'manual' || saleType === 'manual_order') {
-      return {
-        label: 'MANUAL',
-        description: 'Orden manual',
-        detail: 'Creada desde administración',
-        badgeBg: 'color-mix(in srgb, #f59e0b 14%, var(--admin-input-bg))',
-        badgeText: '#92400e',
-        border: 'color-mix(in srgb, #f59e0b 38%, var(--admin-card-border))',
-      };
-    }
-
-    if (source === 'admin') {
-      return {
-        label: 'ADMIN',
-        description: 'Panel administrativo',
-        detail: 'Gestión interna',
-        badgeBg: 'color-mix(in srgb, var(--admin-primary) 12%, var(--admin-input-bg))',
-        badgeText: 'var(--admin-primary)',
-        border: 'color-mix(in srgb, var(--admin-primary) 34%, var(--admin-card-border))',
-      };
-    }
-
-    if (source === 'import') {
-      return {
-        label: 'IMPORTADA',
-        description: 'Carga externa',
-        detail: 'Orden importada',
-        badgeBg: 'color-mix(in srgb, #64748b 14%, var(--admin-input-bg))',
-        badgeText: '#475569',
-        border: 'color-mix(in srgb, #64748b 34%, var(--admin-card-border))',
-      };
-    }
-
-    return {
-      label: 'WEB',
-      description: 'Tienda virtual',
-      detail: 'Pedido online',
-      badgeBg: 'color-mix(in srgb, #38bdf8 14%, var(--admin-input-bg))',
-      badgeText: '#0369a1',
-      border: 'color-mix(in srgb, #38bdf8 36%, var(--admin-card-border))',
-    };
-  };
+  const [density, setDensity] = useState('comfortable');
+  const compact = density === 'compact';
 
   return (
-    <div className="space-y-3">
-      <style>{`
-        .orders-theme-action-btn,
-        .orders-theme-action-btn *,
-        .orders-theme-action-btn svg,
-        .orders-theme-action-btn svg * {
-          color: var(--admin-button-soft-text) !important;
-          stroke: var(--admin-button-soft-text) !important;
-          fill: none !important;
-        }
-
-        .orders-theme-action-btn {
-          background: var(--admin-primary-soft-bg) !important;
-          border-color: var(--admin-card-border) !important;
-        }
-
-        .orders-theme-action-btn:hover,
-        .orders-theme-action-btn:hover *,
-        .orders-theme-action-btn:hover svg,
-        .orders-theme-action-btn:hover svg * {
-          color: var(--admin-primary-text) !important;
-          stroke: var(--admin-primary-text) !important;
-          fill: none !important;
-        }
-
-        .orders-theme-action-btn:hover {
-          background: var(--admin-primary) !important;
-          border-color: var(--admin-primary) !important;
-        }
-      `}</style>
-
-      <div
-        className="overflow-hidden rounded-[28px] border shadow-[0_24px_70px_rgba(236,72,153,0.16)] backdrop-blur"
+    <section
+      aria-label="Bandeja operacional de órdenes"
+      className="overflow-hidden rounded-[26px] border shadow-[0_20px_56px_rgba(15,23,42,0.08)]"
+      style={{
+        borderColor: ADMIN_BORDER,
+        background: 'var(--admin-card-bg)',
+        color: 'var(--admin-card-text)',
+      }}
+    >
+      <header
+        className="flex flex-col gap-4 border-b px-5 py-5 xl:flex-row xl:items-end xl:justify-between"
         style={{
           borderColor: ADMIN_BORDER,
-          background: THEME.cardBg,
-          color: THEME.cardText,
+          background:
+            'linear-gradient(105deg, var(--admin-card-bg), var(--admin-primary-soft-bg), var(--admin-card-bg))',
         }}
       >
-        <div
-          className="flex flex-col gap-3 border-b px-5 py-5 md:flex-row md:items-center md:justify-between"
-          style={{
-            borderColor: ADMIN_BORDER,
-            background: `linear-gradient(90deg, ${THEME.cardBg}, ${THEME.primarySoftBg}, ${THEME.cardBg})`,
-            color: THEME.cardText,
-          }}
-        >
-          <div>
-            <div
-              className="text-[10px] font-black uppercase tracking-[0.24em]"
-              style={{ color: THEME.primary }}
+        <div>
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.24em]"
+            style={{ color: 'var(--admin-primary)' }}
+          >
+            Bandeja operacional
+          </p>
+          <h2 className="mt-1 text-xl font-black">Órdenes con prioridad accionable</h2>
+          <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+            Cliente, valor, sede, cumplimiento y siguiente acción en una sola lectura.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {selectionEnabled ? (
+            <label
+              className="flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black"
+              style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)' }}
             >
-              Bandeja operacional
-            </div>
-
-            <div className="mt-1 text-xl font-black" style={{ color: THEME.cardText }}>
-              Órdenes recientes
-            </div>
-
-            <div className="text-xs" style={{ color: THEME.mutedText }}>
-              Monitorea ventas, estados, sedes, canal de origen y acciones rápidas.
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {selectionEnabled ? (
-            <label className="orders-theme-action-btn flex h-10 items-center gap-2 rounded-2xl border px-3 text-xs font-bold shadow-sm transition duration-200 hover:-translate-y-0.5">
               <input
+                aria-label="Seleccionar órdenes visibles"
                 type="checkbox"
                 className="accent-pink-600"
-                checked={data.length > 0 && data.every((o) => selectedIds.has(o._id))}
+                checked={data.length > 0 && data.every((order) => selectedIds.has(order._id))}
                 onChange={toggleSelectAllVisible}
               />
-              <span>Seleccionar</span>
+              Seleccionar
             </label>
-            ) : null}
+          ) : null}
 
-            {[
-              ['createdAt', 'Fecha'],
-              ['orderNumber', 'Orden'],
-              ['total', 'Total'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleSort(key)}
-                aria-sort={sortAria(key)}
-                className="orders-theme-action-btn flex h-10 items-center gap-1 rounded-2xl border px-3 text-[11px] font-black transition duration-200 hover:-translate-y-0.5"
-              >
-                <span>{label}</span>
-                <span className="flex items-center">{sortIcon(key)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3 p-4">
-          {loading &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={`sk-${i}`}
-                className="h-32 animate-pulse rounded-[26px] border"
-                style={{
-                  borderColor: ADMIN_BORDER,
-                  background: THEME.primarySoftBg,
-                }}
-              />
-            ))}
-
-          {!loading && data.length === 0 && (
-            <div
-              className="rounded-[26px] border p-10 text-center text-sm"
+          {[
+            ['createdAt', 'Fecha'],
+            ['orderNumber', 'Orden'],
+            ['total', 'Total'],
+          ].map(([field, label]) => (
+            <button
+              key={field}
+              type="button"
+              onClick={() => toggleSort(field)}
+              aria-sort={sortAria(field)}
+              className="h-10 rounded-xl border px-3 text-[11px] font-black transition hover:-translate-y-0.5"
               style={{
                 borderColor: ADMIN_BORDER,
-                background: THEME.cardBg,
-                color: THEME.mutedText,
+                background: 'var(--admin-card-bg)',
+                color: 'var(--admin-card-text)',
               }}
             >
-              Sin resultados
-            </div>
-          )}
+              {label} {sortIcon(field)}
+            </button>
+          ))}
 
-          {!loading &&
-            data.map((o) => {
-              const cust = o.customer || {};
-              const name = [cust.name, cust.lastname].filter(Boolean).join(' ') || 'Cliente';
-              const tags = Array.isArray(o.tags) ? o.tags : [];
-              const branchInfo = getBranchInfo(o);
-              const originInfo = getOrderOriginInfo(o);
+          <div
+            aria-label="Densidad del listado"
+            className="flex h-10 overflow-hidden rounded-xl border"
+            style={{ borderColor: ADMIN_BORDER }}
+          >
+            <button
+              type="button"
+              aria-label="Vista cómoda"
+              aria-pressed={!compact}
+              onClick={() => setDensity('comfortable')}
+              className="flex w-10 items-center justify-center"
+              style={{
+                background: !compact ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
+                color: !compact ? 'var(--admin-primary-text)' : 'var(--admin-card-muted-text)',
+              }}
+            >
+              <LayoutList className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Vista compacta"
+              aria-pressed={compact}
+              onClick={() => setDensity('compact')}
+              className="flex w-10 items-center justify-center"
+              style={{
+                background: compact ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
+                color: compact ? 'var(--admin-primary-text)' : 'var(--admin-card-muted-text)',
+              }}
+            >
+              <Rows3 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
 
-              const initials = name
-                .split(' ')
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join('')
-                .toUpperCase();
+      <div
+        className="hidden grid-cols-[minmax(230px,1.45fr)_minmax(175px,.85fr)_minmax(250px,1.25fr)_minmax(145px,.72fr)_112px] gap-4 border-b px-5 py-3 text-[9px] font-black uppercase tracking-[0.16em] xl:grid"
+        style={{
+          borderColor: ADMIN_BORDER,
+          background: 'var(--admin-input-bg)',
+          color: 'var(--admin-card-muted-text)',
+        }}
+      >
+        <span>Orden y cliente</span>
+        <span>Venta</span>
+        <span>Operación</span>
+        <span>Estado</span>
+        <span className="text-right">Acción</span>
+      </div>
 
-              const orderLevel = getOrderLevel(o.total);
+      <div className="divide-y" style={{ borderColor: ADMIN_BORDER }}>
+        {loading
+          ? Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className={`animate-pulse px-5 ${compact ? 'py-3' : 'py-5'}`}
+              >
+                <div className="h-16 rounded-xl" style={{ background: 'var(--admin-primary-soft-bg)' }} />
+              </div>
+            ))
+          : null}
+
+        {!loading && data.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <ShoppingBag
+              className="mx-auto h-8 w-8"
+              style={{ color: 'var(--admin-card-muted-text)' }}
+            />
+            <p className="mt-3 text-sm font-black">No hay órdenes para esta cola</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+              Cambia la vista operativa o restablece los filtros.
+            </p>
+          </div>
+        ) : null}
+
+        {!loading
+          ? data.map((order) => {
+              const customer = order.customer || {};
+              const operational = order.operational || {};
+              const queue = QUEUE_STYLES[operational.queue] || QUEUE_STYLES.monitor;
+              const progress = Math.min(100, Math.max(0, Number(operational.progress || 0)));
+              const tags = Array.isArray(order.tags) ? order.tags : [];
+              const slaState = operational?.sla?.state || 'none';
 
               return (
-                <div
-                  key={o._id}
-                  className="group relative overflow-hidden rounded-[26px] border shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(236,72,153,0.20)]"
-                  style={{
-                    borderColor: ADMIN_BORDER,
-                    background: THEME.cardBg,
-                    color: THEME.cardText,
-                  }}
+                <article
+                  key={order._id}
+                  className={`group relative grid grid-cols-1 gap-4 px-5 transition hover:bg-[var(--admin-primary-soft-bg)] xl:grid-cols-[minmax(230px,1.45fr)_minmax(175px,.85fr)_minmax(250px,1.25fr)_minmax(145px,.72fr)_112px] xl:items-center ${compact ? 'py-3' : 'py-5'}`}
                 >
-                  <div className={`absolute left-0 top-0 h-full w-2 bg-gradient-to-b ${getStatusAccent(o.status)}`} />
+                  <span
+                    className="absolute bottom-0 left-0 top-0 w-1"
+                    style={{ background: queue.color }}
+                  />
 
-                  <div className="grid grid-cols-12 items-stretch">
-                    <div
-                      className="col-span-12 flex items-center gap-3 border-b px-5 py-5 lg:col-span-4 lg:border-b-0 lg:border-r"
-                      style={{ borderColor: ADMIN_BORDER }}
-                    >
-                      {selectionEnabled ? (
+                  <div className="flex min-w-0 items-start gap-3">
+                    {selectionEnabled ? (
                       <input
+                        aria-label={`Seleccionar orden ${order.orderNumber || order._id}`}
                         type="checkbox"
-                        className="accent-pink-600"
-                        checked={isSelected(o._id)}
-                        onChange={() => toggleOne(o._id)}
+                        className="mt-1 accent-pink-600"
+                        checked={isSelected(order._id)}
+                        onChange={() => toggleOne(order._id)}
                       />
-                      ) : null}
-
-                      <div className="relative">
-                        <div
-                          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl text-sm font-black ring-1 shadow-sm"
-                          style={{
-                            background: THEME.primarySoftBg,
-                            color: THEME.primary,
-                            borderColor: ADMIN_BORDER,
-                          }}
+                    ) : null}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong
+                          className="font-mono text-sm"
+                          style={{ color: 'var(--admin-primary)' }}
                         >
-                          {initials || 'C'}
-                        </div>
-
+                          #{order.orderNumber || '—'}
+                        </strong>
                         <span
-                          className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2"
-                          style={{
-                            borderColor: THEME.cardBg,
-                            background: '#34d399',
-                          }}
-                        />
+                          className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
+                          style={{ background: queue.bg, color: queue.color }}
+                        >
+                          {queue.label}
+                        </span>
                       </div>
-
-                      <div className="min-w-0">
-                        <div className="truncate text-base font-black" style={{ color: THEME.cardText }}>
-                          {name}
-                        </div>
-
-                        <div className="mt-0.5 truncate text-[11px]" style={{ color: THEME.mutedText }}>
-                          {cust.emailOrPhone || cust.email || 'Sin contacto'}
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          <span
-                            className="inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black"
-                            style={{
-                              borderColor: originInfo.border,
-                              background: originInfo.badgeBg,
-                              color: originInfo.badgeText,
-                            }}
-                            title={originInfo.detail}
-                          >
-                            {originInfo.label} · {originInfo.description}
-                          </span>
-
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                            style={{
-                              background: THEME.primarySoftBg,
-                              color: THEME.primarySoftText,
-                            }}
-                          >
-                            Cliente
-                          </span>
-
-                          {cust.phone && (
+                      <p className="mt-1 truncate text-sm font-black">{customerName(order)}</p>
+                      <p
+                        className="mt-0.5 truncate text-[10px]"
+                        style={{ color: 'var(--admin-card-muted-text)' }}
+                      >
+                        {customer.emailOrPhone || customer.email || customer.phone || 'Sin contacto'} · {fmtDate(order.createdAt)}
+                      </p>
+                      {!compact && tags.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {tags.slice(0, 3).map((tag) => (
                             <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                              style={{
-                                background: THEME.inputBg,
-                                color: THEME.cardText,
-                              }}
+                              key={tag}
+                              className="rounded-md border px-1.5 py-0.5 text-[9px] font-bold"
+                              style={{ borderColor: ADMIN_BORDER }}
                             >
-                              Teléfono
+                              #{tag}
                             </span>
-                          )}
-
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                            style={{
-                              background: THEME.inputBg,
-                              color: THEME.cardText,
-                            }}
-                          >
-                            {orderLevel}
-                          </span>
-
-                          <span
-                            className="max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-black"
-                            style={{
-                              borderColor: ADMIN_BORDER,
-                              background: branchInfo.hasBranch ? THEME.primarySoftBg : THEME.inputBg,
-                              color: branchInfo.hasBranch ? THEME.primarySoftText : THEME.mutedText,
-                            }}
-                            title={
-                              branchInfo.code
-                                ? `${branchInfo.name} · ${branchInfo.code}`
-                                : branchInfo.name
-                            }
-                          >
-                            {branchInfo.isMultiBranch
-                              ? branchInfo.name
-                              : `Sede: ${branchInfo.code || branchInfo.name}`}
-                          </span>
+                          ))}
                         </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="col-span-6 border-b px-5 py-5 sm:col-span-3 lg:col-span-2 lg:border-b-0 lg:border-r"
-                      style={{ borderColor: ADMIN_BORDER }}
-                    >
-                      <div
-                        className="text-[10px] font-black uppercase tracking-[0.16em]"
-                        style={{ color: THEME.mutedText }}
-                      >
-                        Orden
-                      </div>
-
-                      <div className="mt-1 font-mono text-sm font-black" style={{ color: THEME.primary }}>
-                        #{o.orderNumber || '—'}
-                      </div>
-
-                      <div className="mt-1 text-[11px]" style={{ color: THEME.mutedText }}>
-                        {fmtDate(o.createdAt)}
-                      </div>
-
-                      <div
-                        className="mt-3 rounded-2xl border px-3 py-2"
-                        style={{
-                          borderColor: originInfo.border,
-                          background: originInfo.badgeBg,
-                        }}
-                      >
-                        <div
-                          className="text-[9px] font-black uppercase tracking-[0.16em]"
-                          style={{ color: originInfo.badgeText }}
-                        >
-                          Origen
-                        </div>
-
-                        <div
-                          className="mt-0.5 truncate text-[12px] font-black"
-                          style={{ color: THEME.cardText }}
-                          title={`${originInfo.label} · ${originInfo.description}`}
-                        >
-                          {originInfo.label} · {originInfo.description}
-                        </div>
-
-                        <div className="mt-0.5 truncate text-[10px] font-bold" style={{ color: THEME.mutedText }}>
-                          {originInfo.detail}
-                        </div>
-                      </div>
-
-                      <div
-                        className="mt-2 rounded-2xl border px-3 py-2"
-                        style={{
-                          borderColor: ADMIN_BORDER,
-                          background: THEME.inputBg,
-                        }}
-                      >
-                        <div
-                          className="text-[9px] font-black uppercase tracking-[0.16em]"
-                          style={{ color: THEME.mutedText }}
-                        >
-                          {branchInfo.isMultiBranch
-                            ? 'Despacho'
-                            : 'Sede'}
-                        </div>
-
-                        <div
-                          className="mt-0.5 truncate text-[11px] font-black"
-                          style={{ color: branchInfo.hasBranch ? THEME.cardText : THEME.mutedText }}
-                          title={
-                            branchInfo.code
-                              ? `${branchInfo.name} · ${branchInfo.code}`
-                              : branchInfo.name
-                          }
-                        >
-                          {branchInfo.name}
-                        </div>
-
-                        {branchInfo.code && (
-                          <div
-                            className="mt-0.5 font-mono text-[10px] font-black"
-                            style={{ color: THEME.primary }}
-                          >
-                            {branchInfo.code}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div
-                      className="col-span-6 border-b px-5 py-5 sm:col-span-3 lg:col-span-2 lg:border-b-0 lg:border-r"
-                      style={{ borderColor: ADMIN_BORDER }}
-                    >
-                      <div
-                        className="text-[10px] font-black uppercase tracking-[0.16em]"
-                        style={{ color: THEME.mutedText }}
-                      >
-                        Productos
-                      </div>
-
-                      <div className="mt-1 text-sm font-black" style={{ color: THEME.cardText }}>
-                        {o.itemsCount ?? 0} ítems
-                      </div>
-
-                      <div className="mt-1 text-[11px]" style={{ color: THEME.mutedText }}>
-                        {o.totalItems ?? 0} unidades
-                      </div>
-                    </div>
-
-                    <div
-                      className="col-span-6 min-w-0 px-4 py-5 sm:col-span-3 lg:col-span-2 lg:border-r"
-                      style={{ borderColor: ADMIN_BORDER }}
-                    >
-                      <div
-                        className="min-w-0 overflow-hidden rounded-3xl p-3 shadow-inner"
-                        style={{
-                          background: THEME.primarySoftBg,
-                          color: THEME.cardText,
-                        }}
-                      >
-                        <div
-                          className="text-[10px] font-black uppercase tracking-[0.16em]"
-                          style={{ color: THEME.mutedText }}
-                        >
-                          Total venta
-                        </div>
-
-                        <div
-                          className="mt-1 max-w-full whitespace-nowrap font-black leading-tight tracking-[-0.04em]"
-                          style={{
-                            color: THEME.cardText,
-                            fontSize: 'clamp(0.95rem, 1.22vw, 1.25rem)',
-                          }}
-                        >
-                          {toCOP(o.total ?? 0)}
-                        </div>
-
-                        <div className="mt-1 max-w-full truncate text-[11px]" style={{ color: THEME.mutedText }}>
-                          Subtotal {toCOP(o.subtotal ?? 0)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="col-span-6 flex flex-col justify-center px-4 py-5 sm:col-span-3 lg:col-span-2">
-                      <div className="flex w-full flex-col items-stretch justify-center gap-2">
-                        <div className="flex w-full justify-center">
-                          <span className={`inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-black leading-none shadow-sm ${statusBadgeClasses(o.status)}`}>
-                            {o.status || '—'}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="w-full rounded-2xl px-4 py-2 text-[11px] font-black text-white shadow-lg transition duration-200 hover:scale-105"
-                          style={{
-                            background: `linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryHover})`,
-                          }}
-                          onClick={() => openOrderDetail(o)}
-                        >
-                          Abrir
-                        </button>
-
-                        <div
-                          className="mt-1 flex min-w-0 flex-wrap justify-center gap-1 border-t pt-2"
-                          style={{ borderColor: ADMIN_BORDER }}
-                        >
-                          {tags.length === 0 ? (
-                            <span className="text-[11px] font-semibold" style={{ color: THEME.mutedText }}>
-                              Sin tags
-                            </span>
-                          ) : (
-                            tags.slice(0, 3).map((t) => (
-                              <span
-                                key={t}
-                                className="max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-bold"
-                                style={{
-                                  borderColor: ADMIN_BORDER,
-                                  background: THEME.primarySoftBg,
-                                  color: THEME.primarySoftText,
-                                }}
-                              >
-                                #{t}
-                              </span>
-                            ))
-                          )}
-
-                          {tags.length > 3 && (
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                              style={{
-                                background: THEME.inputBg,
-                                color: THEME.cardText,
-                              }}
-                            >
-                              +{tags.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      ) : null}
                     </div>
                   </div>
-                </div>
+
+                  <div>
+                    <p className="text-base font-black tabular-nums">{toCOP(order.total || 0)}</p>
+                    <div
+                      className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px]"
+                      style={{ color: 'var(--admin-card-muted-text)' }}
+                    >
+                      <span>{order.totalItems || 0} unidades</span>
+                      <span>{channelLabel(order)}</span>
+                    </div>
+                    <p className="mt-1 flex items-center gap-1 text-[10px] font-bold">
+                      <Building2 className="h-3 w-3" />
+                      {branchInfo(order)}
+                    </p>
+                  </div>
+
+                  <div
+                    className="rounded-xl border px-3 py-3"
+                    style={{
+                      borderColor:
+                        slaState === 'breached'
+                          ? '#fecdd3'
+                          : slaState === 'risk'
+                            ? '#fde68a'
+                            : ADMIN_BORDER,
+                      background: queue.bg,
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-[11px] font-black">
+                        {operational.nextAction || 'Revisar orden'}
+                      </p>
+                      {operational.openIncidentCount ? (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-rose-700">
+                          <AlertTriangle className="h-3 w-3" />
+                          {operational.openIncidentCount}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div
+                      className="mt-2 h-1.5 overflow-hidden rounded-sm"
+                      style={{ background: 'color-mix(in srgb, var(--admin-card-border) 75%, transparent)' }}
+                    >
+                      <div
+                        className="h-full rounded-sm transition-all"
+                        style={{ width: `${progress}%`, background: queue.color }}
+                      />
+                    </div>
+                    <div
+                      className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold"
+                      style={{ color: 'var(--admin-card-muted-text)' }}
+                    >
+                      <span className="flex items-center gap-1">
+                        <Truck className="h-3 w-3" />
+                        {operational.shipmentCount || 0} envío(s) · {progress}%
+                      </span>
+                      <span
+                        className="flex items-center gap-1"
+                        style={{
+                          color:
+                            slaState === 'breached'
+                              ? '#be123c'
+                              : slaState === 'risk'
+                                ? '#b45309'
+                                : 'var(--admin-card-muted-text)',
+                        }}
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        {formatSla(operational)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span
+                      className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-black ${statusBadgeClasses(order.status)}`}
+                    >
+                      {STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
+                    </span>
+                    {!compact ? (
+                      <p
+                        className="mt-2 text-[9px] font-bold"
+                        style={{ color: 'var(--admin-card-muted-text)' }}
+                      >
+                        Actualizada {fmtDate(order.updatedAt || order.createdAt)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex xl:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openOrderDetail(order)}
+                      className="inline-flex h-10 items-center justify-center gap-1 rounded-xl px-4 text-xs font-black transition hover:-translate-y-0.5 hover:shadow-lg"
+                      style={{
+                        background: 'var(--admin-primary)',
+                        color: 'var(--admin-primary-text)',
+                      }}
+                    >
+                      Gestionar
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </article>
               );
-            })}
-        </div>
+            })
+          : null}
       </div>
-    </div>
+    </section>
   );
 }

@@ -1,11 +1,9 @@
 // frontend/src/admin/OrdersAdmin.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import useAdminPermissions from './security/useAdminPermissions';
-import ElectronicInvoiceBox from './orders/electronicInvoice/ElectronicInvoiceBox';
 import OrdersFilters from './orders/components/OrdersFilters';
 import OrdersTable from './orders/components/OrdersTable';
 import OrderDetailModal from './orders/components/OrderDetailModal';
@@ -17,7 +15,6 @@ import useOrdersInvoiceFilters from './orders/hooks/useOrdersInvoiceFilters';
 import useOrdersAdminQuery from './orders/hooks/useOrdersAdminQuery';
 
 const ADMIN_BORDER = 'var(--admin-table-border)';
-const ADMIN_PRIMARY = 'var(--admin-primary)';
 
 const toCOP = (n) =>
   Number(n || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
@@ -103,7 +100,6 @@ const parseDashboardStatusParam = (rawStatus) => {
    =========================== */
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
-  const [showQuickViewsFloating, setShowQuickViewsFloating] = useState(false);
   const { isAuthenticated, adminToken, authLoading } = useAuth();
   const { can } = useAdminPermissions();
   const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
@@ -241,10 +237,10 @@ export default function OrdersAdmin() {
 
   const {
     quickView,
-    setQuickView,
     applyQuickView,
     printedFilter,
     archivedFilter,
+    operationalView,
   } = useOrdersQuickViews({
     setPage,
     setDateFrom,
@@ -330,6 +326,9 @@ export default function OrdersAdmin() {
       ...(invoiceFilter && invoiceFilter !== 'all'
       ? { invoiceFilter }
       : {}),
+      ...(operationalView && operationalView !== 'all'
+        ? { operationalView }
+        : {}),
         }),
     [
       page,
@@ -346,6 +345,7 @@ export default function OrdersAdmin() {
       printedFilter,
       archivedFilter,
       invoiceFilter,
+      operationalView,
     ]
   );
 
@@ -355,6 +355,7 @@ export default function OrdersAdmin() {
     totalPages,
     total,
     financialSummary,
+    operationalSummary,
     loading,
     err,
     setErr,
@@ -716,153 +717,37 @@ export default function OrdersAdmin() {
         financialSummary={financialSummary}
       />
 
+      <OrdersQuickViews
+        quickView={quickView}
+        onApplyQuickView={applyQuickView}
+        operationalSummary={operationalSummary}
+      />
+
       <section className="mb-5">
         <OrdersInvoiceFilters
           invoiceFilter={invoiceFilter}
           setInvoiceFilter={setInvoiceFilter}
           onApplyInvoiceFilter={applyInvoiceFilter}
         />
-
-        {typeof document !== 'undefined' &&
-          createPortal(
-            <div
-              className="flex flex-col items-end gap-3"
-              style={{
-                position: 'fixed',
-                right: '28px',
-                bottom: '28px',
-                zIndex: 2147483647,
-              }}
-            >
-              {showQuickViewsFloating && (
-                <div
-                  className="rounded-[26px] border p-3 shadow-[0_24px_70px_rgba(15,23,42,0.28)]"
-                  style={{
-                    width: 'min(92vw, 460px)',
-                    maxHeight: '72vh',
-                    overflow: 'auto',
-                    borderColor: ADMIN_BORDER,
-                    background: 'var(--admin-card-bg)',
-                    color: 'var(--admin-card-text)',
-                  }}
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3 px-1">
-                    <div>
-                      <p
-                        className="text-[10px] font-black uppercase tracking-[0.22em]"
-                        style={{ color: ADMIN_PRIMARY }}
-                      >
-                        Vistas rápidas
-                      </p>
-
-                      <p
-                        className="text-xs"
-                        style={{ color: 'var(--admin-card-muted-text)' }}
-                      >
-                        Accesos flotantes de órdenes
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickViewsFloating(false)}
-                      className="rounded-xl border px-3 py-1.5 text-xs font-black transition hover:scale-[1.02]"
-                      style={{
-                        borderColor: ADMIN_BORDER,
-                        background: 'var(--admin-primary-soft-bg)',
-                        color: 'var(--admin-primary-soft-text)',
-                      }}
-                    >
-                      Cerrar
-                    </button>
-                  </div>
-
-                  <OrdersQuickViews
-                    quickView={quickView}
-                    setQuickView={setQuickView}
-                    onApplyQuickView={applyQuickView}
-                  />
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowQuickViewsFloating((prev) => !prev)}
-                className="group relative overflow-hidden rounded-[18px] border px-4 py-3 text-sm font-black transition duration-300 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--admin-primary) 55%, #ffffff)',
-                  background:
-                    'linear-gradient(135deg, rgba(255,255,255,0.96), color-mix(in srgb, var(--admin-primary-soft-bg) 72%, #ffffff 28%))',
-                  color: 'var(--admin-card-text)',
-                  boxShadow:
-                    '0 16px 38px rgba(15,23,42,0.16), 0 0 22px color-mix(in srgb, var(--admin-primary) 26%, transparent)',
-                  backdropFilter: 'blur(16px)',
-                }}
-              >
-                <span
-                  className="pointer-events-none absolute left-0 top-0 h-full w-[5px]"
-                  style={{
-                    background: 'var(--admin-primary)',
-                  }}
-                />
-
-                <span
-                  className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"
-                  style={{
-                    background:
-                      'linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.55) 45%, transparent 75%)',
-                  }}
-                />
-
-                <span className="relative flex items-center gap-3 pl-1">
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] border"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--admin-primary) 42%, #ffffff)',
-                      background:
-                        'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary-soft-bg) 86%, #ffffff), #ffffff)',
-                      color: 'var(--admin-primary)',
-                      boxShadow:
-                        'inset 0 0 12px rgba(255,255,255,0.75), 0 8px 18px color-mix(in srgb, var(--admin-primary) 20%, transparent)',
-                    }}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 7h16" />
-                      <path d="M7 12h10" />
-                      <path d="M10 17h4" />
-                      <path d="M18 4l2 2-2 2" />
-                    </svg>
-                  </span>
-
-                  <span className="flex flex-col items-start leading-none">
-                    <span
-                      className="text-[9px] font-black uppercase tracking-[0.22em]"
-                      style={{ color: 'var(--admin-card-muted-text)' }}
-                    >
-                      Panel rápido
-                    </span>
-
-                    <span
-                      className="mt-1 text-sm font-black"
-                      style={{ color: 'var(--admin-card-text)' }}
-                    >
-                      {showQuickViewsFloating ? 'Ocultar vistas' : 'Vistas rápidas'}
-                    </span>
-                  </span>
-                </span>
-              </button>
-            </div>,
-            document.body
-          )}
       </section>
+
+      <OrdersActiveFilters
+        quickView={quickView}
+        onApplyQuickView={applyQuickView}
+        typingQ={typingQ}
+        setTypingQ={setTypingQ}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        clearStatus={clearStatus}
+        STATUS_FILTERS={STATUS_FILTERS}
+        tagsStr={tagsStr}
+        setTagsStr={setTagsStr}
+        setPage={setPage}
+      />
       {/* ====== BARRA DE ACCIONES MASIVAS ====== */}
       {selectionEnabled && selectedIds.size > 0 && (
         <div className="mb-2 p-2 rounded-lg border bg-pink-50/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between" style={{ borderColor: ADMIN_BORDER }}>
@@ -966,8 +851,7 @@ export default function OrdersAdmin() {
       )}
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-lg border bg-white" style={{ borderColor: ADMIN_BORDER }}>
-        <OrdersTable
+      <OrdersTable
           ADMIN_BORDER={ADMIN_BORDER}
           data={data}
           loading={loading}
@@ -983,8 +867,7 @@ export default function OrdersAdmin() {
           toCOP={toCOP}
           statusBadgeClasses={statusBadgeClasses}
           openOrderDetail={openOrderDetail}
-        />
-      </div>
+      />
 
       {/* Paginación */}
       <div
