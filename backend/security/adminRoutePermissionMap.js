@@ -440,6 +440,26 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'GET',
+    path: '/api/favorites/admin/summary',
+    permission: 'favorites:view',
+    description: 'Consultar indicadores administrativos de favoritos.',
+  },
+  {
+    method: 'GET',
+    path: '/api/favorites/admin/:id',
+    permission: 'favorites:view',
+    description: 'Consultar detalle administrativo de favoritos.',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/favorites/admin/:id/items/:itemId',
+    permission: 'favorites:delete',
+    description: 'Retirar un producto de favoritos desde administración.',
+    audit: true,
+    danger: true,
+  },
+  {
     method: 'DELETE',
     path: '/api/favorites/admin/:id',
     permission: 'favorites:delete',
