@@ -11,7 +11,7 @@ Este documento registra las decisiones verificables del módulo. La etapa 1 esta
 
 ## Centro operativo comercial y logístico
 
-El listado ya no depende de vistas rápidas flotantes ni de tarjetas sobredimensionadas. La interfaz integra una mesa de trabajo con ocho colas: atención inmediata, pagos pendientes, preparación, despacho, tránsito, incidencias, SLA en riesgo y completadas. Los contadores respetan sesión, sede, búsqueda, fechas, estado, etiquetas, archivo y filtro de factura.
+El listado ya no depende de vistas rápidas flotantes ni de tarjetas sobredimensionadas. Las ocho colas se integran como una barra compacta de flujo: atención inmediata, pagos pendientes, preparación, despacho, tránsito, incidencias, SLA en riesgo y completadas. En pantallas pequeñas la barra se convierte en un selector único para no ocupar varias filas. Los contadores respetan sesión, sede, búsqueda, fechas, estado, etiquetas, archivo y filtro de factura.
 
 `operationalView` es un valor cerrado validado en backend. MongoDB aplica el filtro antes de paginar y calcula los contadores mediante `$facet`; React no recibe el universo de órdenes para volver a clasificarlo. Una orden aparece en preparación solo si tiene pago confirmado y asignaciones físicas vendidas vigentes o un envío ya iniciado. Los productos digitales y servicios sin inventario no se presentan falsamente como trabajo de bodega.
 
@@ -23,7 +23,7 @@ Cada fila recibe un resumen derivado por el servidor:
 - próximo vencimiento y estado SLA (`on_track`, `risk` o `breached`);
 - sede o distribución multisede, canal, unidades, valor y estado comercial.
 
-La prioridad se resuelve en este orden: pago fallido, incidencia abierta, SLA vencido, SLA en riesgo, pago pendiente y flujo logístico. Así una alerta crítica no queda oculta por un estado comercial general. La bandeja ofrece lectura cómoda o compacta y abre el detalle profesional con la acción `Gestionar`; las mutaciones siguen protegidas por los permisos de las etapas anteriores.
+La prioridad se resuelve en este orden: pago fallido, incidencia abierta, SLA vencido, SLA en riesgo, pago pendiente y flujo logístico. Así una alerta crítica no queda oculta por un estado comercial general. En escritorio la bandeja usa una tabla semántica de ancho porcentual, sin mínimos que corten la última columna; en resoluciones menores cada fila se reorganiza como una ficha de dos columnas. `Gestionar` permanece visible en ambos modos. La bandeja conserva lectura cómoda o compacta y las mutaciones siguen protegidas por los permisos de las etapas anteriores.
 
 ## Logística avanzada multisede
 
@@ -299,7 +299,7 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 ## Evidencia de la etapa 5
 
 - Centro operativo backend: 13 controles sobre vistas cerradas, pago, inventario físico, SLA, incidencias, prioridades, agregación y CI.
-- Centro operativo frontend: 4 pruebas sobre contadores, filtros, trazabilidad por fila, densidad y estado vacío.
+- Centro operativo frontend: 5 pruebas sobre contadores, filtros, trazabilidad por fila, densidad, tabla semántica, acción responsive y estado vacío.
 - Arquitectura: el resumen financiero conserva compatibilidad y añade `operationalSummary` solo cuando `includeSummary` está activo.
 - Rendimiento: cambiar únicamente página continúa reutilizando métricas; cambiar de cola solicita una página y resumen coherentes.
 - El contrato se ejecuta en GitHub Actions y no escribe en MongoDB ni llama servicios externos.
@@ -307,6 +307,5 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 
 ## Trabajo pendiente deliberado
 
-1. Rediseño visual operativo del listado con bandejas, densidad configurable y acciones contextuales.
-2. Pruebas transaccionales/stress con réplica MongoDB, métricas operativas y alertas.
-3. Cierre integral, documentación final y fusión controlada de la rama.
+1. Pruebas transaccionales/stress con réplica MongoDB, métricas operativas y alertas.
+2. Cierre integral, documentación final y fusión controlada de la rama.

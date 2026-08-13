@@ -40,9 +40,7 @@ function customerName(order) {
 }
 
 function branchInfo(order) {
-  const allocations = Array.isArray(order?.inventoryAllocations)
-    ? order.inventoryAllocations
-    : [];
+  const allocations = Array.isArray(order?.inventoryAllocations) ? order.inventoryAllocations : [];
   const branches = new Map();
   allocations.forEach((allocation) => {
     const snapshot = allocation?.branchSnapshot || {};
@@ -57,25 +55,14 @@ function branchInfo(order) {
   if (branches.size > 1) return `${branches.size} sedes`;
   const single = Array.from(branches.values())[0];
   if (single) return single.code || single.name;
-  return (
-    order?.branchSnapshot?.code ||
-    order?.branchSnapshot?.name ||
-    order?.branch?.code ||
-    order?.branch?.name ||
-    'Sin sede'
-  );
+  return order?.branchSnapshot?.code || order?.branchSnapshot?.name || order?.branch?.code || order?.branch?.name || 'Sin sede';
 }
 
 function channelLabel(order) {
   const source = String(order?.source || '').toLowerCase();
   const channel = String(order?.channel || '').toLowerCase();
   const provider = String(order?.payment?.provider || '').toLowerCase();
-  if (
-    source === 'pos' ||
-    channel === 'physical_store' ||
-    provider === 'pos' ||
-    order?.pos?.receiptNumber
-  ) return 'POS';
+  if (source === 'pos' || channel === 'physical_store' || provider === 'pos' || order?.pos?.receiptNumber) return 'POS';
   if (source === 'manual') return 'Manual';
   if (source === 'admin') return 'Admin';
   if (source === 'import') return 'Importada';
@@ -86,9 +73,7 @@ function formatSla(operational) {
   const state = operational?.sla?.state || 'none';
   const remainingMs = Number(operational?.sla?.remainingMs);
   if (state === 'breached') {
-    const hours = Number.isFinite(remainingMs)
-      ? Math.max(1, Math.ceil(Math.abs(remainingMs) / 3600000))
-      : null;
+    const hours = Number.isFinite(remainingMs) ? Math.max(1, Math.ceil(Math.abs(remainingMs) / 3600000)) : null;
     return hours ? `Vencido hace ${hours} h` : 'SLA vencido';
   }
   if (state === 'risk' && Number.isFinite(remainingMs)) {
@@ -102,6 +87,11 @@ export default function OrdersTable({
   ADMIN_BORDER,
   data,
   loading,
+  total = 0,
+  from = 0,
+  to = 0,
+  limit = 20,
+  onLimitChange,
   selectedIds,
   selectionEnabled = false,
   toggleSelectAllVisible,
@@ -121,7 +111,7 @@ export default function OrdersTable({
   return (
     <section
       aria-label="Bandeja operacional de órdenes"
-      className="overflow-hidden rounded-[26px] border shadow-[0_20px_56px_rgba(15,23,42,0.08)]"
+      className="overflow-hidden rounded-2xl border shadow-sm"
       style={{
         borderColor: ADMIN_BORDER,
         background: 'var(--admin-card-bg)',
@@ -129,32 +119,24 @@ export default function OrdersTable({
       }}
     >
       <header
-        className="flex flex-col gap-4 border-b px-5 py-5 xl:flex-row xl:items-end xl:justify-between"
-        style={{
-          borderColor: ADMIN_BORDER,
-          background:
-            'linear-gradient(105deg, var(--admin-card-bg), var(--admin-primary-soft-bg), var(--admin-card-bg))',
-        }}
+        className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
+        style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)' }}
       >
-        <div>
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.24em]"
-            style={{ color: 'var(--admin-primary)' }}
-          >
-            Bandeja operacional
-          </p>
-          <h2 className="mt-1 text-xl font-black">Órdenes con prioridad accionable</h2>
-          <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
-            Cliente, valor, sede, cumplimiento y siguiente acción en una sola lectura.
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-black">Listado de órdenes</h2>
+            <span className="text-[10px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+              {loading ? 'Cargando…' : `${total} total · ${from}–${to}`}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[10px]" style={{ color: 'var(--admin-card-muted-text)' }}>
+            La prioridad y la siguiente acción aparecen dentro de cada fila.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {selectionEnabled ? (
-            <label
-              className="flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black"
-              style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)' }}
-            >
+            <label className="flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[10px] font-black" style={{ borderColor: ADMIN_BORDER }}>
               <input
                 aria-label="Seleccionar órdenes visibles"
                 type="checkbox"
@@ -162,42 +144,30 @@ export default function OrdersTable({
                 checked={data.length > 0 && data.every((order) => selectedIds.has(order._id))}
                 onChange={toggleSelectAllVisible}
               />
-              Seleccionar
+              Seleccionar página
             </label>
           ) : null}
 
-          {[
-            ['createdAt', 'Fecha'],
-            ['orderNumber', 'Orden'],
-            ['total', 'Total'],
-          ].map(([field, label]) => (
-            <button
-              key={field}
-              type="button"
-              onClick={() => toggleSort(field)}
-              aria-sort={sortAria(field)}
-              className="h-10 rounded-xl border px-3 text-[11px] font-black transition hover:-translate-y-0.5"
-              style={{
-                borderColor: ADMIN_BORDER,
-                background: 'var(--admin-card-bg)',
-                color: 'var(--admin-card-text)',
-              }}
+          <label className="flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[10px] font-bold" style={{ borderColor: ADMIN_BORDER }}>
+            <span>Filas</span>
+            <select
+              aria-label="Órdenes por página"
+              value={limit}
+              onChange={(event) => onLimitChange?.(Number(event.target.value))}
+              className="bg-transparent font-black outline-none"
+              style={{ color: 'var(--admin-card-text)' }}
             >
-              {label} {sortIcon(field)}
-            </button>
-          ))}
+              {[10, 20, 50, 100].map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
 
-          <div
-            aria-label="Densidad del listado"
-            className="flex h-10 overflow-hidden rounded-xl border"
-            style={{ borderColor: ADMIN_BORDER }}
-          >
+          <div aria-label="Densidad del listado" className="flex h-9 overflow-hidden rounded-lg border" style={{ borderColor: ADMIN_BORDER }}>
             <button
               type="button"
               aria-label="Vista cómoda"
               aria-pressed={!compact}
               onClick={() => setDensity('comfortable')}
-              className="flex w-10 items-center justify-center"
+              className="flex w-9 items-center justify-center"
               style={{
                 background: !compact ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
                 color: !compact ? 'var(--admin-primary-text)' : 'var(--admin-card-muted-text)',
@@ -210,7 +180,7 @@ export default function OrdersTable({
               aria-label="Vista compacta"
               aria-pressed={compact}
               onClick={() => setDensity('compact')}
-              className="flex w-10 items-center justify-center"
+              className="flex w-9 items-center justify-center"
               style={{
                 background: compact ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
                 color: compact ? 'var(--admin-primary-text)' : 'var(--admin-card-muted-text)',
@@ -220,222 +190,240 @@ export default function OrdersTable({
             </button>
           </div>
         </div>
+
+        <div className="flex gap-1.5 xl:hidden">
+          {[
+            ['createdAt', 'Fecha'],
+            ['orderNumber', 'Orden'],
+            ['total', 'Total'],
+          ].map(([field, label]) => (
+            <button
+              key={field}
+              type="button"
+              onClick={() => toggleSort(field)}
+              className="h-8 rounded-lg border px-2 text-[10px] font-black"
+              style={{ borderColor: ADMIN_BORDER }}
+            >
+              {label} {sortIcon(field)}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <div
-        className="hidden grid-cols-[minmax(230px,1.45fr)_minmax(175px,.85fr)_minmax(250px,1.25fr)_minmax(145px,.72fr)_112px] gap-4 border-b px-5 py-3 text-[9px] font-black uppercase tracking-[0.16em] xl:grid"
-        style={{
-          borderColor: ADMIN_BORDER,
-          background: 'var(--admin-input-bg)',
-          color: 'var(--admin-card-muted-text)',
-        }}
-      >
-        <span>Orden y cliente</span>
-        <span>Venta</span>
-        <span>Operación</span>
-        <span>Estado</span>
-        <span className="text-right">Acción</span>
-      </div>
+      {loading ? (
+        <div className="space-y-2 p-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-16 animate-pulse rounded-xl" style={{ background: 'var(--admin-primary-soft-bg)' }} />
+          ))}
+        </div>
+      ) : null}
 
-      <div className="divide-y" style={{ borderColor: ADMIN_BORDER }}>
-        {loading
-          ? Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className={`animate-pulse px-5 ${compact ? 'py-3' : 'py-5'}`}
-              >
-                <div className="h-16 rounded-xl" style={{ background: 'var(--admin-primary-soft-bg)' }} />
-              </div>
-            ))
-          : null}
+      {!loading && data.length === 0 ? (
+        <div className="px-6 py-14 text-center">
+          <ShoppingBag className="mx-auto h-8 w-8" style={{ color: 'var(--admin-card-muted-text)' }} />
+          <p className="mt-3 text-sm font-black">No hay órdenes para esta cola</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+            Cambia la vista operativa o restablece los filtros.
+          </p>
+        </div>
+      ) : null}
 
-        {!loading && data.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <ShoppingBag
-              className="mx-auto h-8 w-8"
-              style={{ color: 'var(--admin-card-muted-text)' }}
-            />
-            <p className="mt-3 text-sm font-black">No hay órdenes para esta cola</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Cambia la vista operativa o restablece los filtros.
-            </p>
-          </div>
-        ) : null}
-
-        {!loading
-          ? data.map((order) => {
-              const customer = order.customer || {};
-              const operational = order.operational || {};
-              const queue = QUEUE_STYLES[operational.queue] || QUEUE_STYLES.monitor;
-              const progress = Math.min(100, Math.max(0, Number(operational.progress || 0)));
-              const tags = Array.isArray(order.tags) ? order.tags : [];
-              const slaState = operational?.sla?.state || 'none';
-
-              return (
-                <article
-                  key={order._id}
-                  className={`group relative grid grid-cols-1 gap-4 px-5 transition hover:bg-[var(--admin-primary-soft-bg)] xl:grid-cols-[minmax(230px,1.45fr)_minmax(175px,.85fr)_minmax(250px,1.25fr)_minmax(145px,.72fr)_112px] xl:items-center ${compact ? 'py-3' : 'py-5'}`}
-                >
-                  <span
-                    className="absolute bottom-0 left-0 top-0 w-1"
-                    style={{ background: queue.color }}
-                  />
-
-                  <div className="flex min-w-0 items-start gap-3">
-                    {selectionEnabled ? (
-                      <input
-                        aria-label={`Seleccionar orden ${order.orderNumber || order._id}`}
-                        type="checkbox"
-                        className="mt-1 accent-pink-600"
-                        checked={isSelected(order._id)}
-                        onChange={() => toggleOne(order._id)}
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong
-                          className="font-mono text-sm"
-                          style={{ color: 'var(--admin-primary)' }}
-                        >
-                          #{order.orderNumber || '—'}
-                        </strong>
-                        <span
-                          className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
-                          style={{ background: queue.bg, color: queue.color }}
-                        >
-                          {queue.label}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-sm font-black">{customerName(order)}</p>
-                      <p
-                        className="mt-0.5 truncate text-[10px]"
-                        style={{ color: 'var(--admin-card-muted-text)' }}
-                      >
-                        {customer.emailOrPhone || customer.email || customer.phone || 'Sin contacto'} · {fmtDate(order.createdAt)}
-                      </p>
-                      {!compact && tags.length ? (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-md border px-1.5 py-0.5 text-[9px] font-bold"
-                              style={{ borderColor: ADMIN_BORDER }}
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-base font-black tabular-nums">{toCOP(order.total || 0)}</p>
-                    <div
-                      className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px]"
-                      style={{ color: 'var(--admin-card-muted-text)' }}
-                    >
-                      <span>{order.totalItems || 0} unidades</span>
-                      <span>{channelLabel(order)}</span>
-                    </div>
-                    <p className="mt-1 flex items-center gap-1 text-[10px] font-bold">
-                      <Building2 className="h-3 w-3" />
-                      {branchInfo(order)}
-                    </p>
-                  </div>
-
-                  <div
-                    className="rounded-xl border px-3 py-3"
-                    style={{
-                      borderColor:
-                        slaState === 'breached'
-                          ? '#fecdd3'
-                          : slaState === 'risk'
-                            ? '#fde68a'
-                            : ADMIN_BORDER,
-                      background: queue.bg,
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-[11px] font-black">
-                        {operational.nextAction || 'Revisar orden'}
-                      </p>
-                      {operational.openIncidentCount ? (
-                        <span className="flex items-center gap-1 text-[9px] font-black text-rose-700">
-                          <AlertTriangle className="h-3 w-3" />
-                          {operational.openIncidentCount}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div
-                      className="mt-2 h-1.5 overflow-hidden rounded-sm"
-                      style={{ background: 'color-mix(in srgb, var(--admin-card-border) 75%, transparent)' }}
-                    >
-                      <div
-                        className="h-full rounded-sm transition-all"
-                        style={{ width: `${progress}%`, background: queue.color }}
-                      />
-                    </div>
-                    <div
-                      className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold"
-                      style={{ color: 'var(--admin-card-muted-text)' }}
-                    >
-                      <span className="flex items-center gap-1">
-                        <Truck className="h-3 w-3" />
-                        {operational.shipmentCount || 0} envío(s) · {progress}%
-                      </span>
-                      <span
-                        className="flex items-center gap-1"
-                        style={{
-                          color:
-                            slaState === 'breached'
-                              ? '#be123c'
-                              : slaState === 'risk'
-                                ? '#b45309'
-                                : 'var(--admin-card-muted-text)',
-                        }}
-                      >
-                        <CalendarClock className="h-3 w-3" />
-                        {formatSla(operational)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span
-                      className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-black ${statusBadgeClasses(order.status)}`}
-                    >
-                      {STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
-                    </span>
-                    {!compact ? (
-                      <p
-                        className="mt-2 text-[9px] font-bold"
-                        style={{ color: 'var(--admin-card-muted-text)' }}
-                      >
-                        Actualizada {fmtDate(order.updatedAt || order.createdAt)}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex xl:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => openOrderDetail(order)}
-                      className="inline-flex h-10 items-center justify-center gap-1 rounded-xl px-4 text-xs font-black transition hover:-translate-y-0.5 hover:shadow-lg"
-                      style={{
-                        background: 'var(--admin-primary)',
-                        color: 'var(--admin-primary-text)',
-                      }}
-                    >
-                      Gestionar
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </article>
-              );
-            })
-          : null}
-      </div>
+      {!loading && data.length > 0 ? (
+        <table className="block w-full table-fixed xl:table" aria-label="Órdenes operativas">
+          <colgroup className="hidden xl:table-column-group">
+            <col style={{ width: '29%' }} />
+            <col style={{ width: '17%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '9%' }} />
+          </colgroup>
+          <thead className="hidden xl:table-header-group">
+            <tr style={{ background: 'var(--admin-input-bg)' }}>
+              <SortableHeader field="orderNumber" label="Orden y cliente" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
+              <SortableHeader field="total" label="Venta" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
+              <HeaderCell label="Operación" ADMIN_BORDER={ADMIN_BORDER} />
+              <SortableHeader field="createdAt" label="Estado / fecha" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
+              <HeaderCell label="Acción" ADMIN_BORDER={ADMIN_BORDER} align="right" />
+            </tr>
+          </thead>
+          <tbody className="block space-y-2 p-2 xl:table-row-group xl:space-y-0 xl:p-0">
+            {data.map((order) => (
+              <OrderRow
+                key={order._id}
+                order={order}
+                compact={compact}
+                {...{
+                  ADMIN_BORDER,
+                  selectionEnabled,
+                  toggleOne,
+                  isSelected,
+                  fmtDate,
+                  toCOP,
+                  statusBadgeClasses,
+                  openOrderDetail,
+                }}
+              />
+            ))}
+          </tbody>
+        </table>
+      ) : null}
     </section>
+  );
+}
+
+function SortableHeader({ ADMIN_BORDER, field, label, toggleSort, sortAria, sortIcon }) {
+  return (
+    <th
+      scope="col"
+      aria-sort={sortAria(field)}
+      className="border-b px-3 py-2.5 text-left"
+      style={{ borderColor: ADMIN_BORDER }}
+    >
+      <button type="button" onClick={() => toggleSort(field)} className="text-[9px] font-black uppercase tracking-[0.14em]">
+        {label} {sortIcon(field)}
+      </button>
+    </th>
+  );
+}
+
+function HeaderCell({ ADMIN_BORDER, label, align = 'left' }) {
+  return (
+    <th
+      scope="col"
+      className={`border-b px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.14em] ${align === 'right' ? 'text-right' : 'text-left'}`}
+      style={{ borderColor: ADMIN_BORDER }}
+    >
+      {label}
+    </th>
+  );
+}
+
+function OrderRow({
+  order,
+  compact,
+  ADMIN_BORDER,
+  selectionEnabled,
+  toggleOne,
+  isSelected,
+  fmtDate,
+  toCOP,
+  statusBadgeClasses,
+  openOrderDetail,
+}) {
+  const customer = order.customer || {};
+  const operational = order.operational || {};
+  const queue = QUEUE_STYLES[operational.queue] || QUEUE_STYLES.monitor;
+  const progress = Math.min(100, Math.max(0, Number(operational.progress || 0)));
+  const tags = Array.isArray(order.tags) ? order.tags : [];
+  const slaState = operational?.sla?.state || 'none';
+  const cellPadding = compact ? 'xl:py-2.5' : 'xl:py-3.5';
+
+  return (
+    <tr
+      className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border p-3 transition hover:bg-[var(--admin-primary-soft-bg)] xl:table-row xl:rounded-none xl:border-0 xl:p-0"
+      style={{ borderColor: ADMIN_BORDER }}
+    >
+      <td
+        className={`order-1 col-span-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`}
+        style={{ borderColor: ADMIN_BORDER, borderLeft: `3px solid ${queue.color}` }}
+      >
+        <div className="flex min-w-0 items-start gap-2.5">
+          {selectionEnabled ? (
+            <input
+              aria-label={`Seleccionar orden ${order.orderNumber || order._id}`}
+              type="checkbox"
+              className="mt-1 shrink-0 accent-pink-600"
+              checked={isSelected(order._id)}
+              onChange={() => toggleOne(order._id)}
+            />
+          ) : null}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <strong className="font-mono text-xs" style={{ color: 'var(--admin-primary)' }}>
+                #{order.orderNumber || '—'}
+              </strong>
+              <span className="rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase" style={{ background: queue.bg, color: queue.color }}>
+                {queue.label}
+              </span>
+            </div>
+            <p className="mt-1 truncate text-xs font-black">{customerName(order)}</p>
+            <p className="mt-0.5 truncate text-[9px]" style={{ color: 'var(--admin-card-muted-text)' }}>
+              {customer.emailOrPhone || customer.email || customer.phone || 'Sin contacto'}
+            </p>
+            {!compact && tags.length ? (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {tags.slice(0, 2).map((tag) => (
+                  <span key={tag} className="rounded border px-1 py-0.5 text-[8px] font-bold" style={{ borderColor: ADMIN_BORDER }}>#{tag}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </td>
+
+      <td className={`order-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+        <p className="truncate text-sm font-black tabular-nums">{toCOP(order.total || 0)}</p>
+        <p className="mt-1 truncate text-[9px]" style={{ color: 'var(--admin-card-muted-text)' }}>
+          {order.totalItems || 0} ud. · {channelLabel(order)}
+        </p>
+        <p className="mt-1 flex items-center gap-1 truncate text-[9px] font-bold">
+          <Building2 className="h-3 w-3 shrink-0" />
+          {branchInfo(order)}
+        </p>
+      </td>
+
+      <td className={`order-4 col-span-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+        <div className="min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-[10px] font-black">{operational.nextAction || 'Revisar orden'}</p>
+            {operational.openIncidentCount ? (
+              <span className="flex shrink-0 items-center gap-1 text-[8px] font-black text-rose-700">
+                <AlertTriangle className="h-3 w-3" />
+                {operational.openIncidentCount}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full" style={{ background: 'var(--admin-primary-soft-bg)' }}>
+            <div className="h-full rounded-full" style={{ width: `${progress}%`, background: queue.color }} />
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[8px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            <span className="flex items-center gap-1">
+              <Truck className="h-3 w-3" />
+              {operational.shipmentCount || 0} envío(s) · {progress}%
+            </span>
+            <span
+              className="flex items-center gap-1"
+              style={{ color: slaState === 'breached' ? '#be123c' : slaState === 'risk' ? '#b45309' : 'var(--admin-card-muted-text)' }}
+            >
+              <CalendarClock className="h-3 w-3" />
+              {formatSla(operational)}
+            </span>
+          </div>
+        </div>
+      </td>
+
+      <td className={`order-3 block min-w-0 border-b-0 text-right xl:table-cell xl:border-b xl:px-3 xl:text-left ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+        <span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-black ${statusBadgeClasses(order.status)}`}>
+          {STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
+        </span>
+        {!compact ? (
+          <p className="mt-1.5 truncate text-[8px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+            {fmtDate(order.updatedAt || order.createdAt)}
+          </p>
+        ) : null}
+      </td>
+
+      <td className={`order-5 col-span-2 block border-b-0 xl:table-cell xl:border-b xl:px-2 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+        <button
+          type="button"
+          onClick={() => openOrderDetail(order)}
+          className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition hover:shadow-md"
+          style={{ background: 'var(--admin-primary)', color: 'var(--admin-primary-text)' }}
+        >
+          Gestionar
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </td>
+    </tr>
   );
 }

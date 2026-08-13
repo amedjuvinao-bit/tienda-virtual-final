@@ -158,7 +158,12 @@ function main() {
   assert.ok(tableSource.includes('operational.nextAction'));
   assert.ok(tableSource.includes('formatSla'));
   assert.ok(tableSource.includes('Gestionar'));
-  ok('la bandeja ofrece densidad, prioridad, SLA y acción contextual');
+  assert.ok(tableSource.includes('<table'));
+  assert.ok(tableSource.includes('xl:table'));
+  assert.ok(tableSource.includes('grid grid-cols-2'));
+  assert.ok(boardSource.includes('Cola operativa'));
+  assert.ok(boardSource.includes('xl:grid-cols-9'));
+  ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');
 
   const workflow = read('.github/workflows/products-ci.yml');
   assert.ok(workflow.includes('test:orders-operations'));

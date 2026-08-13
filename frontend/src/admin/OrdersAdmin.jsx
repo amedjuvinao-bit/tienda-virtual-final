@@ -825,24 +825,6 @@ export default function OrdersAdmin() {
         </div>
       )}
 
-      {/* Barra informativa */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-gray-700">
-          {loading ? 'Cargando…' : `${total} orden${total === 1 ? '' : 'es'} • Mostrando ${from}–${to}`}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-700">Por página</span>
-          <select
-            className="border rounded px-2 py-1 text-xs h-8"
-            style={{ borderColor: ADMIN_BORDER }}
-            value={limit}
-            onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-          >
-            {[10, 20, 50, 100].map((n) => (<option key={n} value={n}>{n}</option>))}
-          </select>
-        </div>
-      </div>
-
       {/* Error */}
       {err && (
         <div className="mb-2 rounded p-2 text-xs text-red-700 border bg-red-50" style={{ borderColor: '#fecaca' }}>
@@ -855,6 +837,14 @@ export default function OrdersAdmin() {
           ADMIN_BORDER={ADMIN_BORDER}
           data={data}
           loading={loading}
+          total={total}
+          from={from}
+          to={to}
+          limit={limit}
+          onLimitChange={(nextLimit) => {
+            setLimit(nextLimit);
+            setPage(1);
+          }}
           selectedIds={selectedIds}
           selectionEnabled={selectionEnabled}
           toggleSelectAllVisible={toggleSelectAllVisible}

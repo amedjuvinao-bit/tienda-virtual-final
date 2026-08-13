@@ -78,10 +78,11 @@ describe('centro operativo avanzado de órdenes', () => {
     expect(
       screen.getByRole('region', { name: 'Centro de operaciones de órdenes' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Colas comerciales y logísticas')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ver operación completa · 28/i })).toBeInTheDocument();
+    expect(screen.getByText('Flujo operativo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Todas · 28/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Cola operativa' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Por preparar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Preparar · 8/i }));
     expect(onApplyQuickView).toHaveBeenCalledWith('prepare');
   });
 
@@ -123,6 +124,24 @@ describe('centro operativo avanzado de órdenes', () => {
     fireEvent.click(compact);
     expect(compact).toHaveAttribute('aria-pressed', 'true');
     expect(comfortable).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('usa una tabla semántica en escritorio y conserva la acción dentro de la fila responsive', () => {
+    render(
+      <OrdersTable
+        {...tableProps}
+        total={1}
+        from={1}
+        to={1}
+        data={[ORDER]}
+        openOrderDetail={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('table', { name: 'Órdenes operativas' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Orden y cliente/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Gestionar/i })).toBeInTheDocument();
+    expect(screen.getByText('1 total · 1–1')).toBeInTheDocument();
   });
 
   it('explica el estado vacío de la cola seleccionada', () => {
