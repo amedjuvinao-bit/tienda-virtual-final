@@ -178,6 +178,31 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(state.api.put).not.toHaveBeenCalled();
   });
 
+  it('mantiene el botón flotante visible y permite mostrar u ocultar los filtros', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+
+    renderOrders();
+
+    await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    const showFilters = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    expect(showFilters).toHaveAttribute('aria-expanded', 'false');
+    expect(showFilters).toHaveAttribute('aria-controls', 'orders-control-panel');
+
+    fireEvent.click(showFilters);
+    const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
+    expect(hideFilters).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(hideFilters);
+    expect(
+      screen.getByRole('button', { name: 'Mostrar panel de filtros' })
+    ).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('expone cada capacidad solamente cuando el rol la posee', async () => {
     state.auth = {
       isAuthenticated: true,

@@ -311,8 +311,8 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El botón flotante `Mostrar/Ocultar filtros` permanece visible durante el desplazamiento, comunica su estado mediante `aria-expanded` y `aria-controls`, y nunca participa del ancho de la tabla.
 - La consola funciona como panel lateral superpuesto en cualquier resolución. En pantallas de hasta 900 px incorpora fondo de enfoque y en móvil los indicadores se reorganizan en dos columnas.
 - El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
-- La tabla recupera columnas independientes para fecha, venta, operación, estado y acciones; las acciones de consulta y gestión permanecen disponibles como controles separados sin sacrificar ancho útil.
-- Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola.
+- La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
+- Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
 - Regresión frontend completa: 28 archivos y 105 pruebas aprobadas; build de producción aprobado con Vite.
 
 ## Trabajo pendiente deliberado

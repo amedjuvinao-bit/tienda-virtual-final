@@ -159,7 +159,7 @@ function main() {
   assert.ok(tableSource.includes('formatSla'));
   assert.ok(tableSource.includes('Gestionar'));
   assert.ok(tableSource.includes('<table'));
-  assert.ok(tableSource.includes('lg:table'));
+  assert.ok(tableSource.includes('xl:table'));
   assert.ok(tableSource.includes('grid grid-cols-2'));
   assert.ok(boardSource.includes('Cola operativa'));
   assert.ok(boardSource.includes('xl:grid-cols-9'));

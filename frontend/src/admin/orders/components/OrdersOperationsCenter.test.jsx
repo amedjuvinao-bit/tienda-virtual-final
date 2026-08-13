@@ -126,40 +126,6 @@ describe('centro operativo avanzado de órdenes', () => {
     expect(comfortable).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('permite ocultar y volver a mostrar la consola lateral desde el listado', () => {
-    const onToggleControls = vi.fn();
-    const { rerender } = render(
-      <OrdersTable
-        {...tableProps}
-        data={[ORDER]}
-        openOrderDetail={vi.fn()}
-        controlsOpen
-        onToggleControls={onToggleControls}
-      />
-    );
-
-    const hideButton = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
-    expect(hideButton).toHaveAttribute('aria-expanded', 'true');
-    expect(hideButton).toHaveAttribute('aria-controls', 'orders-control-panel');
-    expect(hideButton).toHaveClass('orders-control-toggle');
-    fireEvent.click(hideButton);
-    expect(onToggleControls).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <OrdersTable
-        {...tableProps}
-        data={[ORDER]}
-        openOrderDetail={vi.fn()}
-        controlsOpen={false}
-        onToggleControls={onToggleControls}
-      />
-    );
-
-    expect(
-      screen.getByRole('button', { name: 'Mostrar panel de filtros' })
-    ).toHaveAttribute('aria-expanded', 'false');
-  });
-
   it('usa una tabla semántica en escritorio y conserva la acción dentro de la fila responsive', () => {
     render(
       <OrdersTable

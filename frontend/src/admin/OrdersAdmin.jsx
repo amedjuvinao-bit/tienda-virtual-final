@@ -1,6 +1,7 @@
 // frontend/src/admin/OrdersAdmin.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import useAdminPermissions from './security/useAdminPermissions';
@@ -126,13 +127,7 @@ export default function OrdersAdmin() {
   const [populate, setPopulate] = useState(true);
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
-  const [controlsOpen, setControlsOpen] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return true;
-    }
-
-    return window.matchMedia('(min-width: 1181px)').matches;
-  });
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   const requireSessionAndPermission = (allowed, message) => {
     if (hasSession && allowed) return true;
@@ -838,6 +833,23 @@ export default function OrdersAdmin() {
         }
       `}</style>
 
+      <button
+        type="button"
+        aria-controls="orders-control-panel"
+        aria-expanded={controlsOpen}
+        aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
+        onClick={() => setControlsOpen((open) => !open)}
+        className="orders-control-toggle inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition hover:-translate-y-0.5"
+        style={{
+          borderColor: 'var(--admin-primary)',
+          background: 'var(--admin-primary)',
+          color: 'var(--admin-primary-text)',
+        }}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+      </button>
+
       {/* ===== Toolbar (SIEMPRE 2 LÍNEAS EN DESKTOP) ===== */}
       <OrdersFilters
         ADMIN_BORDER={ADMIN_BORDER}
@@ -1016,8 +1028,6 @@ export default function OrdersAdmin() {
           toCOP={toCOP}
           statusBadgeClasses={statusBadgeClasses}
           openOrderDetail={openOrderDetail}
-          controlsOpen={controlsOpen}
-          onToggleControls={() => setControlsOpen((open) => !open)}
       />
 
       {/* Paginación */}

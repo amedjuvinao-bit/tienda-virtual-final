@@ -3,12 +3,10 @@ import {
   AlertTriangle,
   Building2,
   CalendarClock,
-  Eye,
+  ChevronRight,
   LayoutList,
-  Pencil,
   Rows3,
   ShoppingBag,
-  SlidersHorizontal,
   Truck,
 } from 'lucide-react';
 
@@ -106,8 +104,6 @@ export default function OrdersTable({
   toCOP,
   statusBadgeClasses,
   openOrderDetail,
-  controlsOpen = true,
-  onToggleControls,
 }) {
   const [density, setDensity] = useState('comfortable');
   const compact = density === 'compact';
@@ -122,25 +118,8 @@ export default function OrdersTable({
         color: 'var(--admin-card-text)',
       }}
     >
-      <button
-        type="button"
-        aria-controls="orders-control-panel"
-        aria-expanded={controlsOpen}
-        aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
-        onClick={onToggleControls}
-        className="orders-control-toggle inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition hover:-translate-y-0.5 hover:border-[var(--admin-primary)]"
-        style={{
-          borderColor: 'var(--admin-primary)',
-          background: 'var(--admin-primary)',
-          color: 'var(--admin-primary-text)',
-        }}
-      >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
-        <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
-      </button>
-
       <header
-        className="flex flex-col gap-3 border-b px-4 py-3 xl:flex-row xl:items-center xl:justify-between"
+        className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
         style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)' }}
       >
         <div className="min-w-0">
@@ -250,26 +229,24 @@ export default function OrdersTable({
       ) : null}
 
       {!loading && data.length > 0 ? (
-        <table className="block w-full table-fixed lg:table" aria-label="Órdenes operativas">
-          <colgroup className="hidden lg:table-column-group">
-            <col style={{ width: '25%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '28%' }} />
-            <col style={{ width: '12%' }} />
+        <table className="block w-full table-fixed xl:table" aria-label="Órdenes operativas">
+          <colgroup className="hidden xl:table-column-group">
+            <col style={{ width: '29%' }} />
+            <col style={{ width: '17%' }} />
+            <col style={{ width: '32%' }} />
+            <col style={{ width: '13%' }} />
             <col style={{ width: '9%' }} />
           </colgroup>
-          <thead className="hidden lg:table-header-group">
+          <thead className="hidden xl:table-header-group">
             <tr style={{ background: 'var(--admin-input-bg)' }}>
               <SortableHeader field="orderNumber" label="Orden y cliente" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
-              <SortableHeader field="createdAt" label="Fecha" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
               <SortableHeader field="total" label="Venta" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
               <HeaderCell label="Operación" ADMIN_BORDER={ADMIN_BORDER} />
-              <HeaderCell label="Estado" ADMIN_BORDER={ADMIN_BORDER} />
-              <HeaderCell label="Acciones" ADMIN_BORDER={ADMIN_BORDER} align="right" />
+              <SortableHeader field="createdAt" label="Estado / fecha" {...{ ADMIN_BORDER, toggleSort, sortAria, sortIcon }} />
+              <HeaderCell label="Acción" ADMIN_BORDER={ADMIN_BORDER} align="right" />
             </tr>
           </thead>
-          <tbody className="block space-y-2 p-2 lg:table-row-group lg:space-y-0 lg:p-0">
+          <tbody className="block space-y-2 p-2 xl:table-row-group xl:space-y-0 xl:p-0">
             {data.map((order) => (
               <OrderRow
                 key={order._id}
@@ -339,15 +316,15 @@ function OrderRow({
   const progress = Math.min(100, Math.max(0, Number(operational.progress || 0)));
   const tags = Array.isArray(order.tags) ? order.tags : [];
   const slaState = operational?.sla?.state || 'none';
-  const cellPadding = compact ? 'lg:py-2.5' : 'lg:py-3.5';
+  const cellPadding = compact ? 'xl:py-2.5' : 'xl:py-3.5';
 
   return (
     <tr
-      className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border p-3 transition hover:bg-[var(--admin-primary-soft-bg)] lg:table-row lg:rounded-none lg:border-0 lg:p-0"
+      className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border p-3 transition hover:bg-[var(--admin-primary-soft-bg)] xl:table-row xl:rounded-none xl:border-0 xl:p-0"
       style={{ borderColor: ADMIN_BORDER }}
     >
       <td
-        className={`order-1 col-span-2 block min-w-0 border-b-0 lg:table-cell lg:border-b lg:px-3 ${cellPadding}`}
+        className={`order-1 col-span-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`}
         style={{ borderColor: ADMIN_BORDER, borderLeft: `3px solid ${queue.color}` }}
       >
         <div className="flex min-w-0 items-start gap-2.5">
@@ -384,14 +361,7 @@ function OrderRow({
         </div>
       </td>
 
-      <td className={`order-2 block min-w-0 border-b-0 lg:table-cell lg:border-b lg:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
-        <p className="truncate text-[10px] font-bold">{fmtDate(order.createdAt)}</p>
-        <p className="mt-1 text-[9px]" style={{ color: 'var(--admin-card-muted-text)' }}>
-          Creación
-        </p>
-      </td>
-
-      <td className={`order-3 block min-w-0 border-b-0 lg:table-cell lg:border-b lg:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+      <td className={`order-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
         <p className="truncate text-sm font-black tabular-nums">{toCOP(order.total || 0)}</p>
         <p className="mt-1 truncate text-[9px]" style={{ color: 'var(--admin-card-muted-text)' }}>
           {order.totalItems || 0} ud. · {channelLabel(order)}
@@ -402,7 +372,7 @@ function OrderRow({
         </p>
       </td>
 
-      <td className={`order-5 col-span-2 block min-w-0 border-b-0 lg:table-cell lg:border-b lg:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+      <td className={`order-4 col-span-2 block min-w-0 border-b-0 xl:table-cell xl:border-b xl:px-3 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-[10px] font-black">{operational.nextAction || 'Revisar orden'}</p>
@@ -432,7 +402,7 @@ function OrderRow({
         </div>
       </td>
 
-      <td className={`order-4 block min-w-0 border-b-0 text-right lg:table-cell lg:border-b lg:px-3 lg:text-left ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+      <td className={`order-3 block min-w-0 border-b-0 text-right xl:table-cell xl:border-b xl:px-3 xl:text-left ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
         <span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-black ${statusBadgeClasses(order.status)}`}>
           {STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
         </span>
@@ -443,27 +413,16 @@ function OrderRow({
         ) : null}
       </td>
 
-      <td className={`order-6 col-span-2 block border-b-0 lg:table-cell lg:border-b lg:px-2 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            type="button"
-            onClick={() => openOrderDetail(order)}
-            aria-label={`Ver orden ${order.orderNumber || order._id}`}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition hover:shadow-md"
-            style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => openOrderDetail(order)}
-            aria-label={`Gestionar orden ${order.orderNumber || order._id}`}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition hover:shadow-md"
-            style={{ background: 'var(--admin-primary)', color: 'var(--admin-primary-text)' }}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      <td className={`order-5 col-span-2 block border-b-0 xl:table-cell xl:border-b xl:px-2 ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
+        <button
+          type="button"
+          onClick={() => openOrderDetail(order)}
+          className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition hover:shadow-md"
+          style={{ background: 'var(--admin-primary)', color: 'var(--admin-primary-text)' }}
+        >
+          Gestionar
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       </td>
     </tr>
   );
