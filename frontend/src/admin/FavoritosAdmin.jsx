@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../lib/api";
+import useAdminPermissions from "./security/useAdminPermissions";
 
 /* ---------- Helpers ---------- */
 function money(n) {
@@ -28,7 +29,7 @@ function aliasFromSession(sessionId) {
 
 // Extras de producto
 function readSku(p, it) {
-  return (p?.sku ?? p?.skun ?? it?.sku ?? "—") || "—";
+  return (p?.variantSku ?? p?.sku ?? p?.skun ?? it?.sku ?? "—") || "—";
 }
 function readCategory(p, it) {
   const c = p?.category ?? it?.category;
@@ -37,6 +38,8 @@ function readCategory(p, it) {
   return c?.name || "—";
 }
 function readStock(p) {
+  if (p?.inventoryTracked === false) return null;
+  if (Number.isFinite(Number(p?.availableStock))) return Number(p.availableStock);
   if (Array.isArray(p?.inventory) && p.inventory.length) {
     return p.inventory.reduce(
       (acc, r) => acc + Number(r?.stock ?? r?.qty ?? r?.quantity ?? 0),
@@ -46,27 +49,12 @@ function readStock(p) {
   return Number(p?.stock ?? 0);
 }
 
-/* ---------- Normalización para guardar en backend ---------- */
-function toBackendFavorite(it) {
-  const pidObj = it?.productId;
-  const pid =
-    typeof pidObj === "object" && pidObj
-      ? (pidObj._id || pidObj.id || "")
-      : (pidObj || it?._id || it?.id || "");
-  return {
-    productId: String(pid || "").trim(),
-    title: it?.title || (typeof pidObj === "object" ? pidObj?.title : "") || "",
-    image: it?.image || (typeof pidObj === "object" ? pidObj?.image : "") || "",
-    price: Number(it?.price ?? (typeof pidObj === "object" ? pidObj?.price : 0)) || 0,
-    color: it?.color || "",
-    size: it?.size || "",
-  };
-}
-
 /* =========================================================
    Componente: FavoritosAdmin
    ========================================================= */
 export default function FavoritosAdmin() {
+  const { can } = useAdminPermissions();
+  const canDelete = can("favorites:delete");
   // filtros y paginación
   const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -94,7 +82,6 @@ export default function FavoritosAdmin() {
     if (q.trim()) params.set("q", q.trim());
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
-    params.set("populate", "1");
     return params.toString();
   }, [page, limit, q, dateFrom, dateTo]);
 
@@ -107,24 +94,20 @@ export default function FavoritosAdmin() {
       setTotal(Number(data?.total || 0));
       setTotalPages(Number(data?.totalPages || 1));
     } catch (e) {
-      console.error(e);
       toast.error("Error cargando favoritos");
     } finally {
       setLoading(false);
     }
   };
 
-  // abrir modal de detalle (por sessionId)
-  const openDetail = async (sessionId) => {
+  // abrir modal de detalle por identificador interno, nunca por la sesión pública
+  const openDetail = async (id) => {
     try {
       setLoadingDetail(true);
       setShowModal(true);
-      const { data } = await api.get(
-        `/api/favorites/${encodeURIComponent(sessionId)}?populate=1`
-      );
+      const { data } = await api.get(`/api/favorites/admin/${encodeURIComponent(id)}`);
       setDetail(data);
     } catch (e) {
-      console.error(e);
       toast.error("No se pudo cargar el detalle de favoritos");
     } finally {
       setLoadingDetail(false);
@@ -152,85 +135,45 @@ export default function FavoritosAdmin() {
     }
   };
 
-  // --------- Acciones dentro del modal (normalizadas) ---------
+  // --------- Acciones administrativas del modal ---------
 
   const removeFavorite = async (it) => {
-    if (!detail?.sessionId) return;
+    if (!detail?._id || !it?._id || !canDelete) return;
     try {
       setSaving(true);
-
-      // 1) Estado optimista
-      const pid = typeof it.productId === "object" ? it.productId?._id : it.productId;
-      const nextItems = (detail.items || []).filter((row) => {
-        const rowPid = typeof row.productId === "object" ? row.productId?._id : row.productId;
-        return !(
-          String(rowPid || "") === String(pid || "") &&
-          String(row.color || "") === String(it.color || "") &&
-          String(row.size || "") === String(it.size || "")
-        );
-      });
-      setDetail((d) => ({ ...d, items: nextItems, itemsCount: nextItems.length }));
-
-      // 2) Payload normalizado
-      const payloadItems = nextItems.map(toBackendFavorite);
-
-      // 3) Guarda en backend
-      const { data } = await api.put(
-        `/api/favorites/${encodeURIComponent(detail.sessionId)}`,
-        { items: payloadItems }
+      const { data } = await api.delete(
+        `/api/favorites/admin/${encodeURIComponent(detail._id)}/items/${encodeURIComponent(it._id)}`
       );
-
-      // 4) Refresca modal con respuesta del backend
-      setDetail((d) => ({
-        ...(d || {}),
-        ...(data?.favorites || {}),
-      }));
-
-      // 5) Refresca lista
+      if (data?.deleted) {
+        setShowModal(false);
+        setDetail(null);
+      } else {
+        setDetail(data);
+      }
       await load();
       toast.success("Favorito eliminado");
     } catch (e) {
-      console.error(e);
       toast.error("No se pudo eliminar el favorito");
     } finally {
       setSaving(false);
     }
   };
 
-  const emptyFavorites = async () => {
-    if (!detail?.sessionId) return;
-    if (!confirm("¿Vaciar todos los favoritos de esta sesión? (no elimina el documento)")) return;
-
-    try {
-      setSaving(true);
-      setDetail((d) => ({ ...(d || {}), items: [], itemsCount: 0 }));
-      await api.put(`/api/favorites/${encodeURIComponent(detail.sessionId)}`, { items: [] });
-      await load();
-      toast.success("Favoritos vaciados");
-    } catch (e) {
-      console.error(e);
-      toast.error("No se pudo vaciar favoritos");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteFavorites = async () => {
-    if (!detail?.sessionId) return;
-    const ok = confirm(
+    if (!detail?._id || !canDelete) return;
+    const ok = window.confirm(
       "Esta acción ELIMINA el documento de favoritos de esta sesión. ¿Deseas continuar?"
     );
     if (!ok) return;
 
     try {
       setSaving(true);
-      await api.delete(`/api/favorites/${encodeURIComponent(detail.sessionId)}`);
+      await api.delete(`/api/favorites/admin/${encodeURIComponent(detail._id)}`);
       setShowModal(false);
       setDetail(null);
       await load();
       toast.success("Favoritos eliminados");
     } catch (e) {
-      console.error(e);
       toast.error("No se pudo eliminar el documento de favoritos");
     } finally {
       setSaving(false);
@@ -379,7 +322,7 @@ export default function FavoritosAdmin() {
                       {/* Acciones */}
                       <td className="p-2 text-center align-middle">
                         <button
-                          onClick={() => openDetail(r.sessionId)}
+                          onClick={() => openDetail(r._id)}
                           className="px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 w-full"
                         >
                           Ver detalle
@@ -473,10 +416,10 @@ export default function FavoritosAdmin() {
                       </thead>
                       <tbody>
                         {(detail.items || []).map((it, idx) => {
-                          const p = typeof it.productId === "object" ? it.productId : null;
+                          const p = it?.current || null;
                           const title = p?.title || it.title || "—";
                           const img = p?.image || it.image || "";
-                          const price = Number(it.price || p?.price || 0);
+                          const price = Number(p?.valid ? p.price : it.price || 0);
                           const sku = readSku(p, it);
                           const category = readCategory(p, it);
                           const stock = readStock(p);
@@ -497,7 +440,7 @@ export default function FavoritosAdmin() {
                                   <div className="leading-tight min-w-0">
                                     <div className="font-medium truncate">{title}</div>
                                     <div className="text-xs text-gray-500 break-all">
-                                      {String(p?._id || it.productId || "")}
+                                      {String(it.productId || "")}
                                     </div>
                                   </div>
                                 </div>
@@ -505,15 +448,21 @@ export default function FavoritosAdmin() {
                               <td className="p-2 text-center">{sku}</td>
                               <td className="p-2 text-center">{category}</td>
                               <td className="p-2 text-right">{money(price)}</td>
-                              <td className="p-2 text-right">{Number(stock || 0)}</td>
+                              <td className="p-2 text-right">
+                                {stock == null ? "No aplica" : Number(stock || 0)}
+                              </td>
                               <td className="p-2 text-center">
-                                <button
-                                  disabled={saving}
-                                  onClick={() => removeFavorite(it)}
-                                  className="px-3 py-1 rounded border hover:bg-gray-50"
-                                >
-                                  Quitar
-                                </button>
+                                {canDelete ? (
+                                  <button
+                                    disabled={saving}
+                                    onClick={() => removeFavorite(it)}
+                                    className="px-3 py-1 rounded border hover:bg-gray-50"
+                                  >
+                                    Quitar
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-400">Solo lectura</span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -532,20 +481,15 @@ export default function FavoritosAdmin() {
 
             <div className="px-5 py-3 border-t flex items-center justify-between">
               <div className="flex gap-2">
-                <button
-                  disabled={saving}
-                  onClick={emptyFavorites}
-                  className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50"
-                >
-                  Vaciar favoritos
-                </button>
+                {canDelete && (
                 <button
                   disabled={saving}
                   onClick={deleteFavorites}
-                  className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50"
+                  className="px-4 py-2 rounded-xl border border-red-200 bg-white text-red-700 hover:bg-red-50"
                 >
                   Eliminar favoritos
                 </button>
+                )}
               </div>
 
               <button
