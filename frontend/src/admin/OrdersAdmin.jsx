@@ -692,43 +692,90 @@ export default function OrdersAdmin() {
       <style>{`
         .orders-admin-shell {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
-          grid-template-areas:
-            "heading heading"
-            "metrics metrics"
-            "table controls";
-          gap: 16px;
-          align-items: start;
-        }
-        .orders-admin-shell.controls-closed {
           grid-template-columns: minmax(0, 1fr);
           grid-template-areas:
             "heading"
             "metrics"
             "table";
+          gap: 16px;
+          align-items: start;
+        }
+        .orders-admin-shell.controls-closed {
+          grid-template-columns: minmax(0, 1fr);
         }
         .orders-filter-fragments { display: contents; }
         .orders-admin-heading { grid-area: heading; }
         .orders-admin-metrics { grid-area: metrics; min-width: 0; }
         .orders-table-workspace { grid-area: table; min-width: 0; }
         .orders-control-panel {
-          grid-area: controls;
-          min-width: 0;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          align-self: start;
-          position: sticky;
-          top: 16px;
-          max-height: calc(100vh - 32px);
+          position: fixed;
+          inset: 112px 18px 18px auto;
+          width: min(420px, calc(100vw - 36px));
+          padding: 14px;
           overflow-y: auto;
           overscroll-behavior: contain;
           scrollbar-width: thin;
-          z-index: 20;
+          border: 1px solid var(--admin-card-border);
+          border-radius: 20px;
+          background: var(--admin-page-bg, var(--admin-card-bg));
+          box-shadow: -18px 20px 60px rgba(15, 23, 42, 0.2);
+          transform: translateX(0);
+          opacity: 1;
+          transition: transform 180ms ease, opacity 180ms ease;
+          z-index: 80;
         }
-        .orders-control-panel.is-closed { display: none; }
-        .orders-control-mobile-heading { display: none; }
+        .orders-control-panel.is-closed {
+          display: flex;
+          pointer-events: none;
+          visibility: hidden;
+          opacity: 0;
+          transform: translateX(calc(100% + 40px));
+        }
+        .orders-control-mobile-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 2px 2px 4px;
+        }
+        .orders-control-mobile-heading p {
+          margin: 0;
+          color: var(--admin-card-text);
+          font-size: 14px;
+          font-weight: 900;
+        }
+        .orders-control-mobile-heading span {
+          color: var(--admin-card-muted-text);
+          font-size: 10px;
+        }
+        .orders-control-mobile-heading button {
+          display: inline-flex;
+          width: 36px;
+          height: 36px;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--admin-card-border);
+          border-radius: 10px;
+          background: var(--admin-card-bg);
+          color: var(--admin-card-text);
+          cursor: pointer;
+        }
         .orders-control-backdrop { display: none; }
+        .orders-control-toggle {
+          position: fixed;
+          right: 24px;
+          bottom: 24px;
+          z-index: 95;
+          min-width: 132px;
+          justify-content: center;
+          box-shadow: 0 12px 34px color-mix(in srgb, var(--admin-primary) 24%, transparent);
+        }
+        .orders-admin-shell.controls-open .orders-control-toggle {
+          right: 454px;
+        }
         .orders-control-panel .orf-filters {
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         }
@@ -746,62 +793,7 @@ export default function OrdersAdmin() {
         .orders-control-panel > section,
         .orders-control-panel > div { margin-bottom: 0 !important; }
 
-        @media (max-width: 1180px) {
-          .orders-admin-shell,
-          .orders-admin-shell.controls-open,
-          .orders-admin-shell.controls-closed {
-            grid-template-columns: minmax(0, 1fr);
-            grid-template-areas:
-              "heading"
-              "metrics"
-              "table";
-          }
-          .orders-control-panel {
-            position: fixed;
-            inset: 0 0 0 auto;
-            width: min(92vw, 420px);
-            max-height: none;
-            padding: 16px;
-            background: var(--admin-page-bg, var(--admin-card-bg));
-            border-left: 1px solid var(--admin-card-border);
-            box-shadow: -24px 0 64px rgba(15, 23, 42, 0.2);
-            transform: translateX(0);
-            z-index: 80;
-          }
-          .orders-control-panel.is-closed {
-            display: flex;
-            pointer-events: none;
-            visibility: hidden;
-            transform: translateX(100%);
-          }
-          .orders-control-mobile-heading {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 2px 2px 4px;
-          }
-          .orders-control-mobile-heading p {
-            margin: 0;
-            color: var(--admin-card-text);
-            font-size: 14px;
-            font-weight: 900;
-          }
-          .orders-control-mobile-heading span {
-            color: var(--admin-card-muted-text);
-            font-size: 10px;
-          }
-          .orders-control-mobile-heading button {
-            display: inline-flex;
-            width: 36px;
-            height: 36px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--admin-card-border);
-            border-radius: 10px;
-            background: var(--admin-card-bg);
-            color: var(--admin-card-text);
-          }
+        @media (max-width: 900px) {
           .orders-control-backdrop {
             display: block;
             position: fixed;
@@ -811,11 +803,25 @@ export default function OrdersAdmin() {
             backdrop-filter: blur(2px);
             z-index: 70;
           }
+          .orders-admin-shell.controls-open .orders-control-toggle {
+            pointer-events: none;
+            opacity: 0;
+          }
         }
 
         @media (max-width: 720px) {
           .orders-admin-shell { padding: 12px !important; gap: 12px; }
           .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .orders-control-panel {
+            inset: 82px 10px 10px auto;
+            width: calc(100vw - 20px);
+            padding: 12px;
+          }
+          .orders-control-toggle {
+            right: 12px;
+            bottom: 18px;
+            min-width: 118px;
+          }
           .orders-control-panel .orf-filters {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }

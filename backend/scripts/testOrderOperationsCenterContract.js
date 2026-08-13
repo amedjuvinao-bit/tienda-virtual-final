@@ -159,10 +159,15 @@ function main() {
   assert.ok(tableSource.includes('formatSla'));
   assert.ok(tableSource.includes('Gestionar'));
   assert.ok(tableSource.includes('<table'));
-  assert.ok(tableSource.includes('xl:table'));
+  assert.ok(tableSource.includes('lg:table'));
   assert.ok(tableSource.includes('grid grid-cols-2'));
   assert.ok(boardSource.includes('Cola operativa'));
   assert.ok(boardSource.includes('xl:grid-cols-9'));
+  assert.ok(adminSource.includes('.orders-control-toggle'));
+  assert.ok(adminSource.includes('position: fixed'));
+  assert.ok(adminSource.includes('bottom: 24px'));
+  assert.ok(adminSource.includes('inset: 112px 18px 18px auto'));
+  assert.ok(!adminSource.includes('grid-template-columns: minmax(0, 1fr) minmax(320px, 360px)'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');
 
   const workflow = read('.github/workflows/products-ci.yml');

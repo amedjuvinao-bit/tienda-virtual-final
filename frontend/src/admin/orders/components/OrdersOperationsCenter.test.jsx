@@ -141,6 +141,7 @@ describe('centro operativo avanzado de órdenes', () => {
     const hideButton = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
     expect(hideButton).toHaveAttribute('aria-expanded', 'true');
     expect(hideButton).toHaveAttribute('aria-controls', 'orders-control-panel');
+    expect(hideButton).toHaveClass('orders-control-toggle');
     fireEvent.click(hideButton);
     expect(onToggleControls).toHaveBeenCalledTimes(1);
 
