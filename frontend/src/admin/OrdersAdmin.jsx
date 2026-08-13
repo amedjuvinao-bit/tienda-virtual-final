@@ -1,5 +1,5 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
@@ -14,44 +14,10 @@ import useOrdersQuickViews from './orders/hooks/useOrdersQuickViews';
 import OrdersActiveFilters from './orders/components/OrdersActiveFilters';
 import OrdersInvoiceFilters from './orders/components/OrdersInvoiceFilters';
 import useOrdersInvoiceFilters from './orders/hooks/useOrdersInvoiceFilters';
+import useOrdersAdminQuery from './orders/hooks/useOrdersAdminQuery';
 
 const ADMIN_BORDER = 'var(--admin-table-border)';
 const ADMIN_PRIMARY = 'var(--admin-primary)';
-
-const MODAL_FIELD_STYLE = {
-  borderColor: 'var(--admin-input-border)',
-  backgroundColor: 'var(--admin-input-bg)',
-  color: 'var(--admin-input-text)',
-};
-
-const MODAL_LIGHT_PANEL_STYLE = {
-  borderColor: 'var(--admin-light-panel-border)',
-  backgroundColor: 'var(--admin-light-panel-bg)',
-  color: 'var(--admin-light-panel-text)',
-};
-
-const MODAL_LIGHT_SOFT_STYLE = {
-  borderColor: 'var(--admin-light-panel-border)',
-  backgroundColor: 'var(--admin-light-panel-soft-bg)',
-  color: 'var(--admin-light-panel-text)',
-};
-
-const MODAL_LIGHT_MUTED_STYLE = {
-  color: 'var(--admin-light-panel-muted-text)',
-};
-
-const MODAL_PRIMARY_BUTTON_STYLE = {
-  backgroundColor: 'var(--admin-primary)',
-  color: 'var(--admin-primary-text)',
-};
-
-const OPTION_STYLE = {
-  backgroundColor: '#ffffff',
-  color: '#111827',
-};
-
-
-
 
 const toCOP = (n) =>
   Number(n || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
@@ -127,90 +93,6 @@ const parseDashboardStatusParam = (rawStatus) => {
   );
 };
 
-/* ---------- Fallbacks client-side ---------- */
-function applyStatusClientFilter(list, statusFilter) {
-  if (!Array.isArray(list) || statusFilter.length === 0) return list;
-  const want = new Set(statusFilter.map((s) => String(s).toLowerCase()));
-  return list.filter((o) => {
-    const s = String(o?.status || '').toLowerCase();
-    if (want.has('cancelled') || want.has('canceled')) {
-      if (s === 'cancelled' || s === 'canceled') return true;
-    }
-    return want.has(s);
-  });
-}
-function applyTagsClientFilter(list, tags, mode) {
-  if (!Array.isArray(list) || tags.length === 0) return list;
-  const want = tags.map(normalizeTag);
-  const hasAll = (arr) => {
-    const ot = (arr || []).map(normalizeTag);
-    return want.every((t) => ot.includes(t));
-  };
-  const hasAny = (arr) => {
-    const ot = (arr || []).map(normalizeTag);
-    return want.some((t) => ot.includes(t));
-  };
-  return list.filter((o) => (mode === 'all' ? hasAll(o.tags) : hasAny(o.tags)));
-}
-
-/* ---------- UI helpers para TIMELINE (mejorado) ---------- */
-function isTagsUpdate(ev) {
-  const t = String(ev?.type || '').toLowerCase();
-  const msg = String(ev?.message || '');
-  const hasArrays = Array.isArray(ev?.meta?.after) || Array.isArray(ev?.meta?.before);
-  const saysTags = /^tags\b/i.test(msg) || /tags/i.test(msg);
-  return t === 'tags_updated' || (t === 'note_updated' && (hasArrays || saysTags));
-}
-
-function uiForEvent(ev = {}) {
-  const t = String(ev?.type || '').toLowerCase();
-
-  if (isTagsUpdate(ev)) {
-    return { icon: '🏷️', badge: 'bg-fuchsia-100 text-fuchsia-700', label: 'Tags' };
-  }
-  if (t === 'status_changed') {
-    return { icon: '🔄', badge: 'bg-blue-100 text-blue-700', label: 'Estado' };
-  }
-  if (t === 'note_created') {
-    return { icon: '📝', badge: 'bg-emerald-100 text-emerald-700', label: 'Nota' };
-  }
-  if (t === 'note_updated') {
-    return { icon: '✏️', badge: 'bg-amber-100 text-amber-700', label: 'Nota editada' };
-  }
-  if (t === 'note_deleted') {
-    return { icon: '🗑️', badge: 'bg-rose-100 text-rose-700', label: 'Nota eliminada' };
-  }
-  if (t === 'email_sent') {
-    return { icon: '✉️', badge: 'bg-indigo-100 text-indigo-700', label: 'Email' };
-  }
-  return { icon: '⚙️', badge: 'bg-gray-100 text-gray-700', label: 'Sistema' };
-}
-
-function titleForEvent(ev) {
-  const t = String(ev?.type || '').toLowerCase();
-
-  if (isTagsUpdate(ev)) {
-    const after =
-      Array.isArray(ev?.meta?.after) ? ev.meta.after.join(', ') :
-      (ev?.message && ev.message.replace(/^Tags(?:\s+\w+)?:\s*/i, '')) ||
-      '—';
-    return `Tags: ${after || '—'}`;
-  }
-
-  if (t === 'status_changed') {
-    const from = ev?.meta?.from || '—';
-    const to = ev?.meta?.to || '—';
-    return `Estado: ${from} → ${to}`;
-  }
-  if (t === 'note_created') return 'Nota creada';
-  if (t === 'note_updated') return 'Nota actualizada';
-  if (t === 'note_deleted') return 'Nota eliminada';
-  if (t === 'email_sent') {
-    return ev?.meta?.template ? `Correo: ${ev.meta.template}` : 'Correo enviado';
-  }
-  return ev?.message || 'Evento';
-}
-
 /* ===========================
    Modal (header sticky + body scroll)
    =========================== */
@@ -240,18 +122,12 @@ export default function OrdersAdmin() {
   const canViewBranches = can('branches:view');
   const selectionEnabled = canBulk || canExport;
 
-  const [data, setData] = useState([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [financialSummary, setFinancialSummary] = useState(null);
   const [limit, setLimit] = useState(20);
   const [q, setQ] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [populate, setPopulate] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
 
@@ -302,21 +178,6 @@ export default function OrdersAdmin() {
       return next;
     });
   };
-  const allVisibleSelected =
-    data.length > 0 && data.every((o) => selectedIds.has(o._id));
-  const toggleSelectAllVisible = () => {
-    if (!selectionEnabled) return;
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allVisibleSelected) {
-        data.forEach((o) => next.delete(o._id));
-      } else {
-        data.forEach((o) => next.add(o._id));
-      }
-      return next;
-    });
-  };
-
   // Modal
   const [showDetail, setShowDetail] = useState(false);
   const [orderSelected, setOrderSelected] = useState(null);
@@ -488,72 +349,43 @@ export default function OrdersAdmin() {
     ]
   );
 
-  useEffect(() => {
-    let cancel = false;
-
-    if (authLoading) {
-      return () => {
-        cancel = true;
-      };
-    }
-
-    if (!hasSession || !canView) {
-      setData([]);
-      setTotal(0);
-      setTotalPages(1);
-      setFinancialSummary(null);
-      setSelectedIds(new Set());
-      setLoading(false);
-      setErr(
-        hasSession
-          ? 'No tienes permiso para consultar órdenes.'
-          : 'Tu sesión administrativa no es válida. Inicia sesión nuevamente.'
-      );
-      return () => {
-        cancel = true;
-      };
-    }
-
-    setLoading(true);
-    setErr('');
-    api
-      .get('/api/orders/admin', { params })
-      .then((res) => {
-        if (cancel) return;
-        const payload = res?.data || {};
-        const serverList = Array.isArray(payload.data) ? payload.data : [];
-        const afterStatus = applyStatusClientFilter(serverList, statusFilter);
-        const finalList = applyTagsClientFilter(afterStatus, parsedTags, tagsMode);
-        setData(finalList);
-        setPage(Number(payload.page || 1));
-        setTotalPages(Number(payload.totalPages || 1));
-        setTotal(Number(payload.total || 0));
-        setFinancialSummary(payload.financialSummary || null);
-        setSelectedIds((prev) => {
-          const next = new Set();
-          finalList.forEach((o) => { if (prev.has(o._id)) next.add(o._id); });
-          return next;
-        });
-      })
-      .catch((e) => {
-        if (cancel) return;
-        if (e?.response?.status === 401) {
-          setErr('No autorizado. Inicia una sesion administrativa valida.');
-        } else {
-          setErr('No se pudieron cargar las órdenes.');
-        }
-      })
-      .finally(() => !cancel && setLoading(false));
-    return () => { cancel = true; };
-  }, [
+  const {
+    data,
+    setData,
+    totalPages,
+    total,
+    financialSummary,
+    loading,
+    err,
+    setErr,
+  } = useOrdersAdminQuery({
     authLoading,
     hasSession,
     canView,
     params,
-    statusFilter,
-    parsedTags,
-    tagsMode,
-  ]);
+  });
+
+  const allVisibleSelected =
+    data.length > 0 && data.every((order) => selectedIds.has(order._id));
+  const toggleSelectAllVisible = () => {
+    if (!selectionEnabled) return;
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (allVisibleSelected) {
+        data.forEach((order) => next.delete(order._id));
+      } else {
+        data.forEach((order) => next.add(order._id));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setSelectedIds((previous) => {
+      const visibleIds = new Set(data.map((order) => order._id));
+      return new Set(Array.from(previous).filter((id) => visibleIds.has(id)));
+    });
+  }, [data]);
 
   useEffect(() => {
     if (!selectionEnabled) clearSelection();

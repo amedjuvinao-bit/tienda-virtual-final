@@ -11,6 +11,7 @@
     "test:product-pagination": "vitest run src/utils/productPagination.test.js",
     "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
     "test:orders-security": "vitest run src/admin/OrdersAdmin.security.test.jsx src/admin/orders/components/OrderSecurityControls.test.jsx",
+    "test:orders-architecture": "vitest run src/admin/orders/hooks/useOrdersAdminQuery.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
   "dependencies": {

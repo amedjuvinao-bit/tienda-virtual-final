@@ -3,11 +3,53 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **2. Conciliación comercial y coherencia transaccional**.
+- Etapa actual: **3. Arquitectura y rendimiento del listado operativo**.
 - Estado de la etapa: implementada y cubierta por pruebas automáticas.
-- Siguientes etapas: arquitectura/rendimiento, logística, experiencia visual avanzada y cierre integral.
+- Siguientes etapas: logística, experiencia visual avanzada y cierre integral.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes.
+
+## Arquitectura y rendimiento
+
+### Separación de responsabilidades
+
+`GET /api/orders/admin` conserva su URL, autorización, filtros y forma de respuesta, pero ya no implementa la consulta dentro de `backend/routes/orders.js`.
+
+- `backend/controllers/orderAdminQueryController.js` traduce el resultado a HTTP y CSV.
+- `backend/services/orderAdminQueryService.js` valida filtros, construye pipelines, pagina, calcula indicadores y deriva los productos.
+- `frontend/src/admin/orders/hooks/useOrdersAdminQuery.js` administra carga, errores, concurrencia y conservación de métricas.
+- `frontend/src/admin/OrdersAdmin.jsx` queda concentrado en composición y operaciones de interfaz.
+
+El archivo principal de rutas pasó de 3.350 a 2.734 líneas. Las rutas públicas de creación y pago y las mutaciones administrativas mantienen sus contratos actuales; esta separación no cambia las integraciones con inventario, caja, productos ni facturación.
+
+### Consulta escalable
+
+La implementación anterior recorría varias veces el mismo conjunto y llevaba a Node.js todos los identificadores de órdenes para volver a consultar facturas. El motor nuevo:
+
+- ejecuta la página y el resumen como pipelines explícitos de MongoDB;
+- relaciona facturas por `$lookup` sobre `ElectronicInvoice.orderId`, que ya está indexado;
+- calcula en una sola agregación total, ventas, pendientes, canceladas, ticket promedio, órdenes sin factura y validadas DIAN;
+- usa `allowDiskUse(true)` para evitar depender del límite de memoria de una agregación grande;
+- pagina con un desempate estable por `_id`, evitando repetir u omitir filas con la misma fecha o total;
+- aplica la búsqueda por sede tanto a la sede principal como a las asignaciones de inventario multisede;
+- mantiene la población de productos limitada únicamente a los ítems de la página visible.
+
+Los índices compuestos `orders_admin_branch_status_date`, `orders_admin_allocation_status_date` y `orders_admin_archive_status_date` cubren las combinaciones operativas más frecuentes de sede, estado, archivo y fecha.
+
+### Métricas independientes de la paginación
+
+El parámetro `includeSummary` es opcional y compatible hacia atrás:
+
+- omitido o `1`: entrega `total`, `totalPages` y `financialSummary`;
+- `0`: entrega solo la página solicitada y marca `summaryIncluded: false`.
+
+La interfaz solicita el resumen al entrar o cambiar un filtro comercial. Cambiar únicamente página, tamaño, orden o población de productos reutiliza el total conocido y no recalcula todos los indicadores. Cambiar el tamaño de página recalcula localmente el número de páginas a partir del total ya autorizado.
+
+### Concurrencia en React
+
+El hook del listado mantiene un registro de solicitudes en curso por parámetros. El doble efecto de `StrictMode` reutiliza la misma promesa en vez de generar dos lecturas idénticas. Un contador de secuencia impide que una respuesta antigua sobrescriba resultados obtenidos con filtros más recientes.
+
+Los filtros de estado y etiquetas son autoritativos en backend. La interfaz ya no vuelve a recortar una página después de recibirla, lo que evitaba inconsistencias entre cantidad visible, total y paginación.
 
 ## Conciliación comercial de devoluciones
 
@@ -145,12 +187,13 @@ Desde la raíz del repositorio en Windows:
 
 ```bat
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-security
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-architecture
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm exec -- vitest run && npm run build
 ```
 
 Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
@@ -170,9 +213,16 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El contrato se ejecuta en GitHub Actions dentro de `products-ci.yml`.
 - Las pruebas no llaman gateways ni escriben en bases de datos productivas.
 
+## Evidencia de la etapa 3
+
+- Arquitectura backend: 9 controles sobre separación, filtros, paginación, agregaciones, índices y compatibilidad de respuesta.
+- Concurrencia frontend: 3 pruebas sobre doble montaje, respuestas obsoletas y paginación sin recalcular métricas.
+- Seguridad de Órdenes: 10 controles backend y 7 pruebas frontend conservados.
+- El contrato nuevo se ejecuta en GitHub Actions dentro de `products-ci.yml`.
+- Las pruebas de arquitectura usan modelos simulados y no escriben en MongoDB.
+
 ## Trabajo pendiente deliberado
 
-1. Separación del archivo monolítico de rutas y optimización de consultas/resúmenes.
-2. Flujo logístico avanzado: picking, packing, despacho, transportadora, SLA e incidencias.
-3. Rediseño visual operativo con bandejas, densidad configurable y acciones contextuales.
-4. Pruebas transaccionales/stress con réplica MongoDB y cierre formal de la rama.
+1. Flujo logístico avanzado: picking, packing, despacho, transportadora, SLA e incidencias.
+2. Rediseño visual operativo con bandejas, densidad configurable y acciones contextuales.
+3. Pruebas transaccionales/stress con réplica MongoDB y cierre formal de la rama.

@@ -1175,6 +1175,18 @@ OrderSchema.index({ 'payment.transactionId': 1 }, { sparse: true });
 OrderSchema.index({ 'payment.reference': 1 }, { sparse: true });
 OrderSchema.index({ branch: 1, createdAt: -1 });
 OrderSchema.index({ 'inventoryAllocations.branch': 1, createdAt: -1 });
+OrderSchema.index(
+  { branch: 1, status: 1, createdAt: -1 },
+  { name: 'orders_admin_branch_status_date' }
+);
+OrderSchema.index(
+  { 'inventoryAllocations.branch': 1, status: 1, createdAt: -1 },
+  { name: 'orders_admin_allocation_status_date' }
+);
+OrderSchema.index(
+  { archived: 1, status: 1, createdAt: -1 },
+  { name: 'orders_admin_archive_status_date' }
+);
 OrderSchema.index({
   'inventoryAllocationSummary.splitAcrossBranches': 1,
   createdAt: -1,

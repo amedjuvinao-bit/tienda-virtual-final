@@ -39,6 +39,9 @@ function run() {
   const orderScopeService = read(
     'backend/services/orderAdminScopeService.js'
   );
+  const orderQueryService = read(
+    'backend/services/orderAdminQueryService.js'
+  );
   const detailView = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailProfessionalView.jsx'
   );
@@ -107,7 +110,7 @@ function run() {
     )
   );
   assert(
-    ordersRoute.includes(
+    orderQueryService.includes(
       "'inventoryAllocations.branchSnapshot.name'"
     )
   );
