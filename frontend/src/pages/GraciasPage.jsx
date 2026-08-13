@@ -5,12 +5,13 @@ import Header from '../components/Header';
 import FooterSection from '../components/FooterSection';
 import WhatsAppButton from '../components/WhatsAppButton';
 import GraciasImg from '../assets/IMGPAGGRACIAS.jpg';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 import {
   buildOrderPaymentAccessHeaders,
   getOrderPaymentAccess,
 } from '../utils/orderPaymentAccess';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 /* ─── Helpers ─── */
 function clampInt(value, min, max, fallback) {
@@ -630,28 +631,50 @@ export default function GraciasPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [thanksOrderData, setThanksOrderData] = useState(null);
   const [wompiTxData, setWompiTxData] = useState(null);
+  const [thanksAccessError, setThanksAccessError] = useState('');
 
   useEffect(() => {
     let cancel = false;
 
-    if (!wompiTransactionId || !paymentAccess) {
+    if (!wompiTransactionId) {
       setWompiTxData(null);
+      return;
+    }
+
+    if (!paymentAccess) {
+      setWompiTxData(null);
+      setThanksAccessError(
+        'No fue posible verificar el acceso a esta orden. Abre esta página desde el mismo navegador donde realizaste la compra.'
+      );
       return;
     }
 
     fetch(`${API_BASE}/api/payments/wompi/transaction/${wompiTransactionId}`, {
       headers: buildOrderPaymentAccessHeaders(paymentAccess),
     })
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          const requestError = new Error(`HTTP ${res.status}`);
+          requestError.status = res.status;
+          throw requestError;
+        }
+        return res.json();
+      })
       .then(data => {
         if (cancel) return;
-        console.log('WOMPI TX DATA:', data);
+        setThanksAccessError('');
         setWompiTxData(data?.ok ? data : null);
       })
       .catch(err => {
         if (cancel) return;
-        console.error('ERROR CONSULTANDO TX:', err);
+        console.error('Error consultando el estado protegido del pago.', {
+          code: err?.code || 'REQUEST_FAILED',
+          status: Number(err?.status || 0),
+        });
         setWompiTxData(null);
+        setThanksAccessError(
+          'No fue posible verificar el acceso a esta orden. Revisa que estés usando el mismo navegador de la compra.'
+        );
       });
 
     return () => {
@@ -859,37 +882,62 @@ export default function GraciasPage() {
     let cancel = false;
 
     const load = async () => {
+      let pageData = null;
       try {
-        const [pageRes, orderRes] = await Promise.all([
-          fetch(`${API_BASE}/api/pages/gracias`),
-          backendOrderId && paymentAccess
-            ? fetch(`${API_BASE}/api/orders/${backendOrderId}/thanks`, {
-                headers: buildOrderPaymentAccessHeaders(paymentAccess),
-              })
-            : Promise.resolve(null),
-        ]);
-
-        if (pageRes && !pageRes.ok) throw new Error(`HTTP ${pageRes.status}`);
-        const pageData = pageRes ? await pageRes.json() : null;
-
-        let orderData = null;
-        if (orderRes) {
-          if (!orderRes.ok) throw new Error(`HTTP ${orderRes.status}`);
-          orderData = await orderRes.json();
-        }
-
-        if (cancel) return;
-
-        setThanksPageData(pageData);
-        setThanksConfig(buildSafeThanksPageConfig(pageData?.thanksPageConfig));
-        setThanksOrderData(orderData?.ok ? orderData : null);
+        const pageRes = await fetch(`${API_BASE}/api/pages/gracias`);
+        if (!pageRes.ok) throw new Error(`HTTP ${pageRes.status}`);
+        pageData = await pageRes.json();
       } catch (err) {
-        console.error("❌ Error cargando configuración/datos de gracias:", err);
+        console.error('Error cargando la configuración de la página de gracias.', {
+          code: err?.code || 'REQUEST_FAILED',
+          status: Number(err?.status || 0),
+        });
         if (!cancel) {
           setThanksPageData(null);
           setThanksConfig(buildSafeThanksPageConfig({}));
-          setThanksOrderData(null);
         }
+      }
+
+      if (cancel) return;
+      setThanksPageData(pageData);
+      setThanksConfig(buildSafeThanksPageConfig(pageData?.thanksPageConfig));
+
+      if (!backendOrderId) {
+        setThanksOrderData(null);
+        return;
+      }
+
+      if (!paymentAccess) {
+        setThanksOrderData(null);
+        setThanksAccessError(
+          'No fue posible verificar el acceso a esta orden. Abre esta página desde el mismo navegador donde realizaste la compra.'
+        );
+        return;
+      }
+
+      try {
+        const orderRes = await fetch(`${API_BASE}/api/orders/${backendOrderId}/thanks`, {
+          headers: buildOrderPaymentAccessHeaders(paymentAccess),
+        });
+        if (!orderRes.ok) {
+          const requestError = new Error(`HTTP ${orderRes.status}`);
+          requestError.status = orderRes.status;
+          throw requestError;
+        }
+        const orderData = await orderRes.json();
+        if (cancel) return;
+        setThanksOrderData(orderData?.ok ? orderData : null);
+        setThanksAccessError('');
+      } catch (err) {
+        console.error('Error consultando el resumen protegido de la orden.', {
+          code: err?.code || 'REQUEST_FAILED',
+          status: Number(err?.status || 0),
+        });
+        if (cancel) return;
+        setThanksOrderData(null);
+        setThanksAccessError(
+          'No fue posible verificar el acceso a esta orden. Revisa que estés usando el mismo navegador de la compra.'
+        );
       }
     };
 
@@ -1107,6 +1155,17 @@ export default function GraciasPage() {
                       ? dynamicMainMessage
                       : "Si realizaste una compra, te enviaremos los detalles por correo. Puedes volver al inicio para seguir navegando."}
                   </p>
+
+                  {thanksAccessError && (
+                    <div
+                      role="alert"
+                      data-testid="thanks-access-error"
+                      className="gp-message"
+                      style={{ color: '#991b1b' }}
+                    >
+                      {thanksAccessError}
+                    </div>
+                  )}
 
                   {hasOrderInfo && (
                     <>

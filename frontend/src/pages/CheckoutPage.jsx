@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 import api, { setSessionId as setApiSessionId } from '../lib/api';
 import { fetchSiteSettings } from '../lib/siteSettingsApi';
 import { getSessionId } from '../utils/getSessionId';
+import { API_BASE_URL } from '../config/apiBaseUrl';
 import { buildCartAccessHeaders } from '../utils/cartAccess';
 import {
   buildOrderPaymentAccessHeaders,
@@ -24,7 +25,7 @@ import { dianCustomerDefaults } from '../checkout/dian/dianCustomerDefaults';
 import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
 
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 const WOMPI_WIDGET_URL = 'https://checkout.wompi.co/widget.js';
 
 function createOrderFromAuthorizedCart({ order, cartAccess, idempotencyKey }) {
@@ -1231,7 +1232,10 @@ function CheckoutPage() {
         setPaymentsConfig(buildSafePaymentsConfig(payments));
       } catch (error) {
         if (!cancel) {
-          console.error('Error cargando configuración global:', error);
+          console.error('Error cargando la configuración global.', {
+            code: error?.response?.data?.error || error?.code || 'REQUEST_FAILED',
+            status: Number(error?.response?.status || 0),
+          });
           setShippingConfig(null);
           setPaymentsConfig(buildSafePaymentsConfig({}));
         }
@@ -1629,6 +1633,10 @@ function CheckoutPage() {
       serverItems = Array.isArray(val?.items) ? val.items : null;
       putSummary = val?.summary || null;
 
+      if (!val?.ok) {
+        throw new Error('CART_VALIDATION_FAILED');
+      }
+
       const filteredFromServer = (serverItems || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
       const filteredFromVal = (val?.items || []).filter(i => Number(i?.quantity ?? i?.qty ?? 0) > 0);
       const uiItems = filteredFromServer.length ? filteredFromServer : filteredFromVal;
@@ -1841,8 +1849,6 @@ function CheckoutPage() {
           const { data } = await api.post('/api/payments/payu/checkout-data', {
             orderId: createdOrderId,
           });
-
-          console.log('PAYU CHECKOUT DATA:', data);
 
           // 👉 REDIRECCIÓN (USANDO TU ARCHIVO payuRedirect.js)
           redirectToPayU(data);

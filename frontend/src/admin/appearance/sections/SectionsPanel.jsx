@@ -1299,10 +1299,10 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
       setError("");
       try {
         const { data } = await api.get("/api/products", {
-          params: { all: 1, q, limit: 24 },
+          params: { page: 1, q, limit: 24, sort: "title" },
         });
 
-        const list = Array.isArray(data) ? data : [];
+        const list = Array.isArray(data?.products) ? data.products : [];
         const mapped = list.map((p) => buildTendenciaProductFromBackend(p)).filter(Boolean);
 
         if (!alive) return;
@@ -1311,7 +1311,7 @@ function ProductsTab({ section, onChange, uploadToCloudinary }) {
         console.error("Error buscando productos para tendencia:", e);
         if (!alive) return;
         setResults([]);
-        setError("No pude buscar productos. Revisa /api/products?all=1&q=...");
+        setError("No pude buscar productos. Revisa la búsqueda paginada.");
       } finally {
         if (!alive) return;
         setSearching(false);
