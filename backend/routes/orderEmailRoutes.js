@@ -5,8 +5,12 @@ const mongoose = require('mongoose');
 const router = express.Router();
 
 const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 const Order = require('../models/Order');
 const { sendMail } = require('../lib/mail/mailer');
+const {
+  buildScopedOrderFilter,
+} = require('../services/orderAdminScopeService');
 
 const OrderEvent =
   mongoose.models.OrderEvent ||
@@ -27,6 +31,15 @@ const OrderEvent =
 function cleanText(value, fallback = '') {
   const text = String(value || '').trim().replace(/\s+/g, ' ');
   return text || fallback;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function moneyCOP(value) {
@@ -153,8 +166,8 @@ function itemsHtml(order = {}) {
             return `
               <tr>
                 <td style="padding:8px;border-bottom:1px solid #f1f5f9;">
-                  <strong>${cleanText(item.title || item.name, 'Producto')}</strong>
-                  ${variant ? `<div style="font-size:12px;color:#64748b;">${variant}</div>` : ''}
+                  <strong>${escapeHtml(cleanText(item.title || item.name, 'Producto'))}</strong>
+                  ${variant ? `<div style="font-size:12px;color:#64748b;">${escapeHtml(variant)}</div>` : ''}
                 </td>
                 <td style="padding:8px;text-align:center;border-bottom:1px solid #f1f5f9;">${qty}</td>
                 <td style="padding:8px;text-align:right;border-bottom:1px solid #f1f5f9;">${moneyCOP(unit * qty)}</td>
@@ -221,15 +234,15 @@ function buildEmailContent(order = {}, type = 'confirmation') {
 
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:680px;margin:0 auto;">
-      <h2 style="margin:0 0 12px;color:#111827;">${config.title}</h2>
-      <p style="margin:0 0 16px;">${config.intro}</p>
+      <h2 style="margin:0 0 12px;color:#111827;">${escapeHtml(config.title)}</h2>
+      <p style="margin:0 0 16px;">${escapeHtml(config.intro)}</p>
       <div style="border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#f8fafc;margin-bottom:16px;">
-        <div><strong>Orden:</strong> #${orderNumber}</div>
-        <div><strong>Estado:</strong> ${status}</div>
-        <div><strong>Origen:</strong> ${sourceLabel}</div>
-        <div><strong>Pago:</strong> ${paymentLabel}</div>
-        <div><strong>Estado del pago:</strong> ${paymentStatus}</div>
-        <div><strong>Total:</strong> ${total}</div>
+        <div><strong>Orden:</strong> #${escapeHtml(orderNumber)}</div>
+        <div><strong>Estado:</strong> ${escapeHtml(status)}</div>
+        <div><strong>Origen:</strong> ${escapeHtml(sourceLabel)}</div>
+        <div><strong>Pago:</strong> ${escapeHtml(paymentLabel)}</div>
+        <div><strong>Estado del pago:</strong> ${escapeHtml(paymentStatus)}</div>
+        <div><strong>Total:</strong> ${escapeHtml(total)}</div>
       </div>
       ${itemsHtml(order)}
       <p style="margin-top:18px;color:#64748b;font-size:13px;">Gracias por tu compra.</p>
@@ -261,7 +274,11 @@ function buildEmailContent(order = {}, type = 'confirmation') {
   };
 }
 
-router.post('/:id/email', requireAdmin, async (req, res) => {
+router.post(
+  '/:id/email',
+  requireAdmin,
+  requirePermission('orders:email'),
+  async (req, res) => {
   const orderId = req.params.id;
   const type = normalizeEmailAction(req.body?.action || req.body?.type || 'confirmation');
 
@@ -275,7 +292,31 @@ router.post('/:id/email', requireAdmin, async (req, res) => {
   }
 
   try {
-    const order = await Order.findById(orderId).lean();
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INVALID_ORDER_ID',
+        message: 'El identificador de la orden no es válido.',
+      });
+    }
+
+    const access = buildScopedOrderFilter(
+      req,
+      { _id: new mongoose.Types.ObjectId(orderId) },
+      { requestedBranchId: '' }
+    );
+
+    if (!access.ok) {
+      return res.status(access.status || 403).json({
+        ok: false,
+        error: access.error || 'ORDER_BRANCH_ACCESS_DENIED',
+        message:
+          access.message ||
+          'No tienes permiso para operar órdenes de esta sede.',
+      });
+    }
+
+    const order = await Order.findOne(access.filter).lean();
 
     if (!order) {
       return res.status(404).json({
@@ -312,7 +353,7 @@ router.post('/:id/email', requireAdmin, async (req, res) => {
         type,
         messageId: sent?.messageId || '',
         response: sent?.response || '',
-        by: req.headers['x-admin-user'] || req.adminUsername || 'admin',
+        by: req.adminUsername || req.adminUserId || 'admin',
       },
     });
 
@@ -332,6 +373,7 @@ router.post('/:id/email', requireAdmin, async (req, res) => {
       message: error.message || 'No se pudo enviar el correo.',
     });
   }
-});
+  }
+);
 
 module.exports = router;

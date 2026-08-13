@@ -12,6 +12,7 @@
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
+    "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:dashboard-admin": "node scripts/testDashboardAdminModule.js",
     "test:products-universal": "node scripts/seedDemonstrationProducts.js",
     "test:products-demo-catalog": "node scripts/seedDemonstrationProducts.js",

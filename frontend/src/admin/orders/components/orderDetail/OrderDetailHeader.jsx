@@ -256,6 +256,7 @@ export default function OrderDetailHeader({
             flexWrap: 'wrap',
           }}
         >
+          {typeof onDownloadPdf === 'function' ? (
           <GhostButton
             onClick={onDownloadPdf}
             disabled={downloadingPdf}
@@ -263,7 +264,9 @@ export default function OrderDetailHeader({
           >
             {downloadingPdf ? 'Generando...' : 'PDF'}
           </GhostButton>
+          ) : null}
 
+          {typeof onOpenInvoice === 'function' ? (
           <PrimaryButton
             onClick={onOpenInvoice}
             disabled={invoiceLoading}
@@ -271,6 +274,7 @@ export default function OrderDetailHeader({
           >
             {invoiceLoading ? 'Cargando...' : 'Factura'}
           </PrimaryButton>
+          ) : null}
 
           <button
             type="button"

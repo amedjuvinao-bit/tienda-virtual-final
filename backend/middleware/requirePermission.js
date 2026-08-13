@@ -180,7 +180,8 @@ function requirePermission(requiredPermissions, options = {}) {
 
   const mode = options.mode === 'any' ? 'any' : 'all';
   const allowOwner = options.allowOwner !== false;
-  const allowLegacyAdmin = options.allowLegacyAdmin !== false;
+  const allowAdmin = options.allowAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
 
   return async function requirePermissionMiddleware(req, res, next) {
     try {
@@ -200,6 +201,10 @@ function requirePermission(requiredPermissions, options = {}) {
       }
 
       if (allowOwner && isOwner(req)) {
+        return next();
+      }
+
+      if (allowAdmin && isAdmin(req) && !isLegacyAdmin(req)) {
         return next();
       }
 
@@ -262,7 +267,7 @@ requirePermission.role = function requireRole(requiredRoles = [], options = {}) 
     .filter(Boolean);
 
   const allowOwner = options.allowOwner !== false;
-  const allowLegacyAdmin = options.allowLegacyAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
 
   if (!roles.length) {
     throw new Error(
@@ -285,6 +290,15 @@ requirePermission.role = function requireRole(requiredRoles = [], options = {}) 
 
       if (allowLegacyAdmin && isLegacyAdmin(req)) {
         return next();
+      }
+
+      if (isLegacyAdmin(req)) {
+        return reject(
+          res,
+          403,
+          'FORBIDDEN',
+          'La autenticación heredada no tiene acceso implícito por rol.'
+        );
       }
 
       if (allowOwner && isOwner(req)) {
@@ -334,7 +348,7 @@ requirePermission.ownerOnly = function requireOwnerOnly() {
         );
       }
 
-      if (!isOwner(req)) {
+      if (isLegacyAdmin(req) || !isOwner(req)) {
         return reject(
           res,
           403,
@@ -371,7 +385,7 @@ requirePermission.adminOrOwner = function requireAdminOrOwner() {
         );
       }
 
-      if (isLegacyAdmin(req) || isOwner(req) || isAdmin(req)) {
+      if (!isLegacyAdmin(req) && (isOwner(req) || isAdmin(req))) {
         return next();
       }
 
@@ -408,8 +422,17 @@ requirePermission.branchAccess = function requireBranchAccess(getBranchId) {
         );
       }
 
-      if (isLegacyAdmin(req) || isOwner(req) || isAdmin(req)) {
+      if (!isLegacyAdmin(req) && (isOwner(req) || isAdmin(req))) {
         return next();
+      }
+
+      if (isLegacyAdmin(req)) {
+        return reject(
+          res,
+          403,
+          'FORBIDDEN',
+          'La autenticación heredada no tiene acceso implícito a sedes.'
+        );
       }
 
       const branchId =

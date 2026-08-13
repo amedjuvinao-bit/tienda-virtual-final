@@ -49,6 +49,7 @@ export default function OrderDetailProfessionalView({
   setEmailMenuOpen,
   emailBtnRef,
   onSendEmail,
+  canUpdateFulfillment = false,
 
   loadingAux = false,
   onRefreshTimeline,
@@ -133,7 +134,10 @@ export default function OrderDetailProfessionalView({
 
             <OrderDetailInventoryAllocations order={order} />
 
-            <OrderDetailFulfillmentPanel order={order} />
+            <OrderDetailFulfillmentPanel
+              order={order}
+              canUpdate={canUpdateFulfillment}
+            />
 
             <OrderDetailPaymentPanel order={order} />
 

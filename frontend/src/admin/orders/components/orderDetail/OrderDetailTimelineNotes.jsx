@@ -102,6 +102,7 @@ export default function OrderDetailTimelineNotes({
             gap: 12,
           }}
         >
+          {typeof onSaveNote === 'function' ? (
           <div
             style={{
               border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -147,6 +148,7 @@ export default function OrderDetailTimelineNotes({
               </PrimaryButton>
             </div>
           </div>
+          ) : null}
 
           {normalizedTags.length > 0 ? (
             <div

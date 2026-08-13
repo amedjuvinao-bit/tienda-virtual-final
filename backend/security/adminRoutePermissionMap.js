@@ -318,16 +318,6 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
     danger: true,
   },
-  {
-    method: 'DELETE',
-    path: '/api/orders/:id',
-    permission: 'orders:delete',
-    description: 'Eliminar orden. Reservado para superadministración.',
-    audit: true,
-    danger: true,
-    reserved: true,
-  },
-
   /* =========================================================
    * CARRITOS
    * ======================================================= */

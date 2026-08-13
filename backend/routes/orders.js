@@ -17,7 +17,6 @@ const Subscriber = require('../models/Subscriber');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
-const { sendMail } = require('../lib/mailer');
 
 // nuevos
 const requireAdmin = require('../middleware/requireAdmin');
@@ -61,6 +60,10 @@ const {
 const {
   SAFE_CART_ACCESS_ERROR,
 } = require('../services/cartAccessService');
+const {
+  applyOrderBranchAccessFilter,
+  buildScopedOrderFilter,
+} = require('../services/orderAdminScopeService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -148,7 +151,7 @@ const OrderNote =
     new mongoose.Schema(
       {
         orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', index: true, required: true },
-        text: { type: String, required: true },
+        text: { type: String, required: true, maxlength: 2000 },
         author: { name: String, id: String },
         pinned: { type: Boolean, default: false },
       },
@@ -183,6 +186,84 @@ function calcSummaryFromItems(items) {
   }
 
   return { totalItems, subtotal };
+}
+
+const ORDER_CUSTOMER_EDITABLE_FIELDS = new Set([
+  'name',
+  'lastname',
+  'id',
+  'documentType',
+  'emailOrPhone',
+  'email',
+  'phone',
+  'address',
+  'city',
+  'municipalityId',
+  'municipality_id',
+  'postalCode',
+  'country',
+  'countryCode',
+  'department',
+  'departmentCode',
+  'deliveryType',
+  'wantsNewsletter',
+]);
+
+const ORDER_BILLING_EDITABLE_FIELDS = new Set([
+  'useSameAddress',
+  'personType',
+  'firstName',
+  'lastName',
+  'name',
+  'lastname',
+  'id',
+  'documentNumber',
+  'documentType',
+  'dv',
+  'businessName',
+  'address',
+  'city',
+  'cityCode',
+  'municipalityCode',
+  'department',
+  'departmentCode',
+  'postalCode',
+  'phone',
+  'email',
+  'extra',
+  'country',
+  'countryCode',
+  'tributeCode',
+]);
+
+const ORDER_PARTY_BOOLEAN_FIELDS = new Set([
+  'useSameAddress',
+  'wantsNewsletter',
+]);
+
+function sanitizeOrderPartyPatch(value, allowedFields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const result = {};
+
+  for (const [field, rawValue] of Object.entries(value)) {
+    if (!allowedFields.has(field)) continue;
+
+    if (ORDER_PARTY_BOOLEAN_FIELDS.has(field)) {
+      if (typeof rawValue === 'boolean') result[field] = rawValue;
+      continue;
+    }
+
+    if (
+      rawValue !== null &&
+      typeof rawValue !== 'string' &&
+      typeof rawValue !== 'number'
+    ) continue;
+
+    result[field] = String(rawValue ?? '').trim().slice(0, 180);
+  }
+
+  return Object.keys(result).length ? result : null;
 }
 
 function getOrderCustomerEmail(orderData = {}) {
@@ -295,11 +376,18 @@ function buildPricingSnapshot(pricing = {}) {
 }
 
 function normalizeTags(arr) {
-  return (Array.isArray(arr) ? arr : String(arr || '')
-    .split(',')
-    .map((t) => String(t).trim()))
-    .map((t) => t.toLowerCase().replace(/\s+/g, ' '))
+  const values = Array.isArray(arr) ? arr : String(arr || '').split(',');
+  const normalized = values
+    .map((tag) =>
+      String(tag || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .slice(0, 24)
+    )
     .filter(Boolean);
+
+  return Array.from(new Set(normalized)).slice(0, 20);
 }
 
 function asObjectId(id) {
@@ -782,172 +870,6 @@ async function resolveOrderBranchData(rawBody = {}, cleaned = {}, { session } = 
   };
 }
 
-function normalizeBranchId(value) {
-  if (!value) return '';
-
-  if (typeof value === 'object') {
-    if (value._id) return normalizeBranchId(value._id);
-    if (value.id) return normalizeBranchId(value.id);
-    if (value.branch) return normalizeBranchId(value.branch);
-  }
-
-  const id = String(value || '').trim();
-
-  return mongoose.Types.ObjectId.isValid(id) ? id : '';
-}
-
-function getAdminRoleCode(req) {
-  return String(
-    req.adminRole ||
-      req.adminProfile?.adminRole ||
-      req.adminProfile?.actualRole ||
-      req.user?.role ||
-      ''
-  )
-    .trim()
-    .toLowerCase();
-}
-
-function canAdminSeeAllBranches(req) {
-  if (req.adminAuthType === 'legacy') return true;
-
-  const role = getAdminRoleCode(req);
-
-  return [
-    'owner',
-    'admin',
-    'administrator',
-    'superadmin',
-    'propietario',
-    'administrador',
-  ].includes(role);
-}
-
-function getAllowedBranchIdsFromRequest(req) {
-  const ids = new Set();
-
-  const defaultBranchId = normalizeBranchId(req.adminDefaultBranch);
-
-  if (defaultBranchId) {
-    ids.add(defaultBranchId);
-  }
-
-  const branches = Array.isArray(req.adminBranches) ? req.adminBranches : [];
-
-  for (const item of branches) {
-    const branchId = normalizeBranchId(item?.branch || item);
-
-    if (branchId) {
-      ids.add(branchId);
-    }
-  }
-
-  return Array.from(ids);
-}
-
-function getRequestedBranchIdFromQuery(req) {
-  const raw =
-    req.query.branchId ||
-    req.query.branch ||
-    req.query.sedeId ||
-    req.query.sede ||
-    '';
-
-  const value = String(raw || '').trim();
-
-  if (!value || value.toLowerCase() === 'all' || value.toLowerCase() === 'todas') {
-    return '';
-  }
-
-  return value;
-}
-
-function applyOrderBranchAccessFilter(req, filter) {
-  const requestedBranchRaw = getRequestedBranchIdFromQuery(req);
-  const requestedBranchId = normalizeBranchId(requestedBranchRaw);
-
-  if (requestedBranchRaw && !requestedBranchId) {
-    return {
-      ok: false,
-      status: 400,
-      error: 'INVALID_BRANCH_ID',
-      message: 'La sede enviada no es válida.',
-    };
-  }
-
-  if (canAdminSeeAllBranches(req)) {
-    if (requestedBranchId) {
-      const branchObjectId = new mongoose.Types.ObjectId(
-        requestedBranchId
-      );
-      filter.$and = [
-        ...(Array.isArray(filter.$and) ? filter.$and : []),
-        {
-          $or: [
-            { branch: branchObjectId },
-            { 'inventoryAllocations.branch': branchObjectId },
-          ],
-        },
-      ];
-    }
-
-    return {
-      ok: true,
-      mode: requestedBranchId ? 'single' : 'all',
-      branchIds: requestedBranchId ? [requestedBranchId] : [],
-    };
-  }
-
-  const allowedBranchIds = getAllowedBranchIdsFromRequest(req);
-
-  if (allowedBranchIds.length === 0) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'NO_BRANCH_ASSIGNED',
-      message: 'Tu usuario no tiene sedes asignadas para consultar órdenes.',
-    };
-  }
-
-  if (requestedBranchId && !allowedBranchIds.includes(requestedBranchId)) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'BRANCH_FORBIDDEN',
-      message: 'No tienes permiso para consultar órdenes de esa sede.',
-    };
-  }
-
-  const branchIdsToUse = requestedBranchId ? [requestedBranchId] : allowedBranchIds;
-
-  const branchObjectIds = branchIdsToUse.map(
-    (id) => new mongoose.Types.ObjectId(id)
-  );
-  filter.$and = [
-    ...(Array.isArray(filter.$and) ? filter.$and : []),
-    {
-      $or: [
-        {
-          branch: {
-            $in: branchObjectIds,
-          },
-        },
-        {
-          'inventoryAllocations.branch': {
-            $in: branchObjectIds,
-          },
-        },
-      ],
-    },
-  ];
-
-  return {
-    ok: true,
-    mode: requestedBranchId ? 'single' : 'assigned',
-    branchIds: branchIdsToUse,
-  };
-}
-
 function deriveIdempotencyKey(cleaned) {
   const payload = {
     sessionId: String(cleaned.sessionId || ''),
@@ -994,6 +916,82 @@ function parseSort(sortQuery) {
     });
 
   return Object.keys(sort).length ? sort : { createdAt: -1 };
+}
+
+function sendOrderScopeError(res, access) {
+  return res.status(access.status || 403).json({
+    error: access.error || 'ORDER_BRANCH_ACCESS_DENIED',
+    message:
+      access.message ||
+      'No tienes permiso para operar órdenes de esa sede.',
+  });
+}
+
+function buildOrderOperationFilter(req, orderId) {
+  const objectId = asObjectId(orderId);
+
+  if (!objectId) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'INVALID_ORDER_ID',
+      message: 'El identificador de la orden no es válido.',
+      filter: null,
+    };
+  }
+
+  return buildScopedOrderFilter(
+    req,
+    { _id: objectId },
+    { requestedBranchId: '' }
+  );
+}
+
+async function ensureOrderOperationAccess(req, res, orderId) {
+  const access = buildOrderOperationFilter(req, orderId);
+
+  if (!access.ok) {
+    sendOrderScopeError(res, access);
+    return false;
+  }
+
+  const exists = await Order.exists(access.filter);
+
+  if (!exists) {
+    res.status(404).json({
+      error: 'ORDER_NOT_FOUND',
+      message: 'Orden no encontrada dentro de tus sedes autorizadas.',
+    });
+    return false;
+  }
+
+  return true;
+}
+
+async function buildAuthorizedSelectionFilter(req, res, orderIds) {
+  const access = buildScopedOrderFilter(
+    req,
+    { _id: { $in: orderIds } },
+    { requestedBranchId: '' }
+  );
+
+  if (!access.ok) {
+    sendOrderScopeError(res, access);
+    return null;
+  }
+
+  const allowedIds = await Order.distinct('_id', access.filter);
+
+  if (allowedIds.length !== orderIds.length) {
+    res.status(403).json({
+      error: 'ORDER_SELECTION_OUT_OF_SCOPE',
+      message:
+        'La selección contiene órdenes fuera de tus sedes autorizadas.',
+    });
+    return null;
+  }
+
+  return access.filter;
 }
 
 /* ============================
@@ -1644,7 +1642,11 @@ router.patch(
         });
       }
 
-      const order = await Order.findById(req.params.id).select(
+      const access = buildOrderOperationFilter(req, req.params.id);
+
+      if (!access.ok) return sendOrderScopeError(res, access);
+
+      const order = await Order.findOne(access.filter).select(
         '+fulfillment.services.bookingUrl +fulfillment.services.internalInstructions'
       );
       if (!order) {
@@ -1772,12 +1774,11 @@ router.get(
     }
 
     const o = await Order.findOne(filter).lean();
+    if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
 
     const invoice = await ElectronicInvoice.findOne({
-      orderId: o?._id,
+      orderId: o._id,
     }).lean();
-
-    if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
 
     res.json({
       ...o,
@@ -1797,6 +1798,8 @@ router.options('/:id/status', (_req, res) => res.sendStatus(204));
 
 router.patch('/:id/status', requireAdmin, requirePermission('orders:status'), async (req, res) => {
   try {
+    if (!(await ensureOrderOperationAccess(req, res, req.params.id))) return;
+
     const result = await transitionOrderStatus(
       {
         orderId: req.params.id,
@@ -1806,7 +1809,6 @@ router.patch('/:id/status', requireAdmin, requirePermission('orders:status'), as
           label:
             req.adminDisplayName ||
             req.adminUsername ||
-            req.headers['x-admin-user'] ||
             'admin',
           source: 'admin',
           ip: req.ip,
@@ -1853,7 +1855,11 @@ router.patch('/:id/printed', requireAdmin, async (req, res) => {
     }
 
     const id = req.params.id;
-    const o = await Order.findById(id);
+    const access = buildOrderOperationFilter(req, id);
+
+    if (!access.ok) return sendOrderScopeError(res, access);
+
+    const o = await Order.findOne(access.filter);
 
     if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
 
@@ -1871,7 +1877,7 @@ router.patch('/:id/printed', requireAdmin, async (req, res) => {
         flag: 'printed',
         before,
         after,
-        by: req.headers['x-admin-user'] || 'admin',
+        by: req.adminUsername || req.adminUserId || 'admin',
       },
     });
 
@@ -1897,7 +1903,11 @@ router.patch('/:id/archived', requireAdmin, async (req, res) => {
     }
 
     const id = req.params.id;
-    const o = await Order.findById(id);
+    const access = buildOrderOperationFilter(req, id);
+
+    if (!access.ok) return sendOrderScopeError(res, access);
+
+    const o = await Order.findOne(access.filter);
 
     if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
 
@@ -1915,7 +1925,7 @@ router.patch('/:id/archived', requireAdmin, async (req, res) => {
         flag: 'archived',
         before,
         after,
-        by: req.headers['x-admin-user'] || 'admin',
+        by: req.adminUsername || req.adminUserId || 'admin',
       },
     });
 
@@ -1933,17 +1943,28 @@ router.patch('/:id/customer-data', requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
 
-    const customer =
-      req.body?.customer && typeof req.body.customer === 'object'
-        ? req.body.customer
-        : null;
+    const customer = sanitizeOrderPartyPatch(
+      req.body?.customer,
+      ORDER_CUSTOMER_EDITABLE_FIELDS
+    );
 
-    const billing =
-      req.body?.billing && typeof req.body.billing === 'object'
-        ? req.body.billing
-        : null;
+    const billing = sanitizeOrderPartyPatch(
+      req.body?.billing,
+      ORDER_BILLING_EDITABLE_FIELDS
+    );
 
-    const order = await Order.findById(id);
+    if (!customer && !billing) {
+      return res.status(400).json({
+        error: 'CUSTOMER_DATA_REQUIRED',
+        message: 'No se recibieron campos editables de cliente o facturación.',
+      });
+    }
+
+    const access = buildOrderOperationFilter(req, id);
+
+    if (!access.ok) return sendOrderScopeError(res, access);
+
+    const order = await Order.findOne(access.filter);
 
     if (!order) {
       return res.status(404).json({
@@ -1975,11 +1996,9 @@ router.patch('/:id/customer-data', requireAdmin, async (req, res) => {
       type: 'customer_data_updated',
       message: 'Datos de facturación actualizados desde panel administrativo',
       meta: {
-        beforeCustomer,
-        beforeBilling,
-        afterCustomer: order.customer,
-        afterBilling: order.billing,
-        by: req.headers['x-admin-user'] || 'admin',
+        customerFields: customer ? Object.keys(customer) : [],
+        billingFields: billing ? Object.keys(billing) : [],
+        by: req.adminUsername || req.adminUserId || 'admin',
       },
     });
 
@@ -2004,7 +2023,11 @@ router.put('/:id/tags', requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const tags = normalizeTags(req.body?.tags || []);
-    const o = await Order.findById(id);
+    const access = buildOrderOperationFilter(req, id);
+
+    if (!access.ok) return sendOrderScopeError(res, access);
+
+    const o = await Order.findOne(access.filter);
 
     if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
 
@@ -2020,7 +2043,7 @@ router.put('/:id/tags', requireAdmin, async (req, res) => {
       meta: {
         before,
         after: o.tags,
-        by: req.headers['x-admin-user'] || 'admin',
+        by: req.adminUsername || req.adminUserId || 'admin',
       },
     });
 
@@ -2687,6 +2710,9 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
 router.get('/:id/notes', requireAdmin, async (req, res) => {
   try {
     const orderId = req.params.id;
+
+    if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
+
     const notes = await OrderNote.find({ orderId }).sort({ pinned: -1, createdAt: -1 }).lean();
 
     res.json({ data: notes });
@@ -2699,10 +2725,14 @@ router.get('/:id/notes', requireAdmin, async (req, res) => {
 router.post('/:id/notes', requireAdmin, async (req, res) => {
   try {
     const orderId = req.params.id;
-    const text = String(req.body?.text || '').trim();
+    const text = String(req.body?.text || '').trim().slice(0, 2000);
     const pinned = !!req.body?.pinned;
-    const author =
-      req.body?.author && typeof req.body.author === 'object' ? req.body.author : undefined;
+    const author = {
+      name: String(req.adminUsername || req.adminProfile?.displayName || 'admin'),
+      id: String(req.adminUserId || ''),
+    };
+
+    if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
 
     if (!text) {
       return res.status(400).json({ error: 'El texto de la nota es obligatorio' });
@@ -2728,10 +2758,28 @@ router.patch('/:id/notes/:noteId', requireAdmin, async (req, res) => {
   try {
     const { id: orderId, noteId } = req.params;
 
+    if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
+
     const patch = {};
 
-    if (typeof req.body?.text === 'string') patch.text = req.body.text;
+    if (typeof req.body?.text === 'string') {
+      const text = req.body.text.trim().slice(0, 2000);
+      if (!text) {
+        return res.status(400).json({
+          error: 'NOTE_TEXT_REQUIRED',
+          message: 'El texto de la nota es obligatorio.',
+        });
+      }
+      patch.text = text;
+    }
     if (typeof req.body?.pinned === 'boolean') patch.pinned = req.body.pinned;
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({
+        error: 'NOTE_PATCH_REQUIRED',
+        message: 'No se recibieron cambios válidos para la nota.',
+      });
+    }
 
     const note = await OrderNote.findOneAndUpdate(
       { _id: noteId, orderId },
@@ -2759,6 +2807,8 @@ router.delete('/:id/notes/:noteId', requireAdmin, async (req, res) => {
   try {
     const { id: orderId, noteId } = req.params;
 
+    if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
+
     const del = await OrderNote.deleteOne({ _id: noteId, orderId });
 
     if (!del.deletedCount) return res.status(404).json({ error: 'Nota no encontrada' });
@@ -2783,6 +2833,9 @@ router.delete('/:id/notes/:noteId', requireAdmin, async (req, res) => {
 router.get('/:id/timeline', requireAdmin, async (req, res) => {
   try {
     const orderId = req.params.id;
+
+    if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
+
     const items = await OrderEvent.find({ orderId }).sort({ _id: -1 }).lean();
 
     res.json({ data: items });
@@ -2792,92 +2845,6 @@ router.get('/:id/timeline', requireAdmin, async (req, res) => {
   }
 });
 
-/* =========================================================
- * Email
- * ======================================================= */
-router.post('/:id/email', requireAdmin, async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const type = String(req.body?.action || req.body?.type || 'confirmation')
-      .toLowerCase()
-      .trim();
-
-    if (!['confirmation', 'invoice'].includes(type)) {
-      return res.status(400).json({
-        error: 'Tipo de email inválido',
-        allowed: ['confirmation', 'invoice'],
-      });
-    }
-
-    const o = await Order.findById(orderId).lean();
-
-    if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
-
-    const to = o.customer?.emailOrPhone || o.customer?.email;
-
-    if (!to || !String(to).includes('@')) {
-      return res.status(422).json({
-        error: 'La orden no tiene un email válido del cliente',
-      });
-    }
-
-    const subject =
-      type === 'invoice'
-        ? `Factura de tu compra #${o.orderNumber}`
-        : `Confirmación de pedido #${o.orderNumber}`;
-
-    const lines = (arr) => arr.map((l) => `<div>${l}</div>`).join('');
-
-    const html = `
-      <div style="font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;line-height:1.4">
-        <h2 style="margin:0 0 8px">Tienda - ${type === 'invoice' ? 'Factura' : 'Confirmación'} de orden</h2>
-        <div>Orden <strong>#${o.orderNumber}</strong> (${o.status})</div>
-        <hr/>
-        <div>${lines((o.cart || o.items || []).map((it) => `${it.title || 'Producto'} x ${it.quantity || it.qty || 1}`))}</div>
-        <hr/>
-        <div>Subtotal: <strong>${o.subtotal ?? 0}</strong></div>
-        <div>Envío: <strong>${o.shipping ?? 0}</strong></div>
-        <div>Total: <strong>${o.total ?? 0}</strong></div>
-        <hr/>
-        <small>Gracias por tu compra.</small>
-      </div>
-    `;
-
-    const text =
-      `Tienda - ${type === 'invoice' ? 'Factura' : 'Confirmación'}\n` +
-      `Orden #${o.orderNumber} (${o.status})\n` +
-      (o.cart || o.items || [])
-        .map((it) => `- ${it.title || 'Producto'} x ${it.quantity || it.qty || 1}`)
-        .join('\n') +
-      `\nSubtotal: ${o.subtotal ?? 0}\nEnvío: ${o.shipping ?? 0}\nTotal: ${o.total ?? 0}`;
-
-    const sent = await sendMail({ to, subject, html, text });
-
-    await OrderEvent.create({
-      orderId,
-      type: 'email_sent',
-      message: `Email ${type} enviado a ${to}`,
-      meta: {
-        to,
-        type,
-        previewUrl: sent.previewUrl,
-        messageId: sent.messageId,
-        isTest: sent.isTest,
-      },
-    });
-
-    return res.json({
-      ok: true,
-      type,
-      to,
-      previewUrl: sent.previewUrl,
-      isTest: sent.isTest,
-    });
-  } catch (e) {
-    console.error('POST /orders/:id/email', e);
-    return res.status(500).json({ error: 'No se pudo enviar el email' });
-  }
-});
 /* =========================================================
  * XML FACTURA ELECTRÓNICA
  * GET /api/orders/:id/invoice-xml
@@ -2934,6 +2901,8 @@ router.get(
   async (req, res) => {
     try {
       const orderId = req.params.id;
+
+      if (!(await ensureOrderOperationAccess(req, res, orderId))) return;
 
       const documentResult = await downloadOfficialInvoiceDocument({
         orderId,
@@ -3011,8 +2980,11 @@ router.get(
   async (req, res) => {
     try {
       const id = req.params.id;
+      const access = buildOrderOperationFilter(req, id);
 
-      const order = await Order.findById(id)
+      if (!access.ok) return sendOrderScopeError(res, access);
+
+      const order = await Order.findOne(access.filter)
         .populate({ path: 'items.product', select: 'title sku price image slug' })
         .lean();
 
@@ -3068,6 +3040,8 @@ router.post(
   requirePermission('orders:refund'),
   async (req, res) => {
   try {
+    if (!(await ensureOrderOperationAccess(req, res, req.params.id))) return;
+
     const result = await processOrderRefund(
       {
         orderId: req.params.id,
@@ -3088,7 +3062,6 @@ router.post(
           req.adminUsername ||
           req.user?.displayName ||
           req.user?.username ||
-          req.headers['x-admin-user'] ||
           'admin',
       },
       {
@@ -3136,6 +3109,13 @@ router.post('/admin/bulk', async (req, res) => {
       });
     }
 
+    const selectionFilter = await buildAuthorizedSelectionFilter(
+      req,
+      res,
+      objIds
+    );
+    if (!selectionFilter) return;
+
     const action = req.body?.action || {};
     const type = String(action.type || '').toLowerCase();
 
@@ -3156,7 +3136,6 @@ router.post('/admin/bulk', async (req, res) => {
             label:
               req.adminDisplayName ||
               req.adminUsername ||
-              req.headers['x-admin-user'] ||
               'admin',
             source: 'admin_bulk',
             ip: req.ip,
@@ -3174,7 +3153,7 @@ router.post('/admin/bulk', async (req, res) => {
       if (tags.length === 0) return res.status(400).json({ error: 'TAGS_REQUIRED' });
 
       const result = await Order.updateMany(
-        { _id: { $in: objIds } },
+        selectionFilter,
         { $addToSet: { tags: { $each: tags } } }
       );
 
@@ -3194,7 +3173,7 @@ router.post('/admin/bulk', async (req, res) => {
       if (tags.length === 0) return res.status(400).json({ error: 'TAGS_REQUIRED' });
 
       const result = await Order.updateMany(
-        { _id: { $in: objIds } },
+        selectionFilter,
         { $pull: { tags: { $in: tags } } }
       );
 
@@ -3235,11 +3214,23 @@ router.post('/admin/export', async (req, res) => {
 
     if (ids.length === 0) return res.status(400).json({ error: 'IDS_REQUIRED' });
 
-    const objIds = ids.map(asObjectId).filter(Boolean);
+    const uniqueIds = Array.from(
+      new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))
+    );
+    const objIds = uniqueIds.map(asObjectId).filter(Boolean);
 
-    if (objIds.length === 0) return res.status(400).json({ error: 'INVALID_IDS' });
+    if (objIds.length !== uniqueIds.length) {
+      return res.status(400).json({ error: 'INVALID_IDS' });
+    }
 
-    const docs = await Order.find({ _id: { $in: objIds } })
+    const selectionFilter = await buildAuthorizedSelectionFilter(
+      req,
+      res,
+      objIds
+    );
+    if (!selectionFilter) return;
+
+    const docs = await Order.find(selectionFilter)
       .sort({ createdAt: -1 })
       .lean();
 

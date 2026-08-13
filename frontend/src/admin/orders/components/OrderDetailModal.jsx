@@ -14,6 +14,10 @@ export default function OrderDetailModal({
   onSaveTags,
   onTogglePrinted,
   onToggleArchived,
+  canAddNotes = false,
+  canSendEmail = false,
+  canUpdateFulfillment = false,
+  canDownloadBilling = false,
   savingId,
 }) {
   const [statusLocal, setStatusLocal] = useState(order?.status || 'pending');
@@ -153,7 +157,7 @@ export default function OrderDetailModal({
   const addNote = async () => {
     const text = String(noteText || '').trim();
 
-    if (!text || !order?._id) return;
+    if (!canAddNotes || !text || !order?._id) return;
 
     try {
       setLoadingAux(true);
@@ -180,7 +184,7 @@ export default function OrderDetailModal({
   };
 
   const sendEmail = async (action) => {
-    if (!order?._id) return;
+    if (!canSendEmail || !order?._id) return;
 
     try {
       setLoadingAux(true);
@@ -216,7 +220,6 @@ export default function OrderDetailModal({
 
       await fetchTimeline();
     } catch (error) {
-      console.error('email error', error);
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
@@ -236,7 +239,7 @@ export default function OrderDetailModal({
   };
 
   const openPdf = async () => {
-    if (!order?._id) return;
+    if (!canDownloadBilling || !order?._id) return;
 
     try {
       setLoadingAux(true);
@@ -256,8 +259,7 @@ export default function OrderDetailModal({
       setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 60_000);
-    } catch (error) {
-      console.error('PDF error', error);
+    } catch {
       showToast({
         type: 'error',
         title: 'No se pudo abrir el PDF',
@@ -269,6 +271,8 @@ export default function OrderDetailModal({
   };
 
   const openElectronicInvoice = () => {
+    if (!canDownloadBilling) return;
+
     if (!electronicInvoiceUrl) {
       showToast({
         type: 'warning',
@@ -349,8 +353,8 @@ export default function OrderDetailModal({
         <OrderDetailProfessionalView
           order={order}
           onClose={onClose}
-          onDownloadPdf={openPdf}
-          onOpenInvoice={openElectronicInvoice}
+          onDownloadPdf={canDownloadBilling ? openPdf : null}
+          onOpenInvoice={canDownloadBilling ? openElectronicInvoice : null}
           downloadingPdf={loadingAux}
           invoiceLoading={false}
           timeline={timeline}
@@ -358,7 +362,7 @@ export default function OrderDetailModal({
           tags={order?.tags || []}
           noteText={noteText}
           setNoteText={setNoteText}
-          onSaveNote={addNote}
+          onSaveNote={canAddNotes ? addNote : null}
           savingNote={loadingAux}
           statusLocal={statusLocal}
           setStatusLocal={setStatusLocal}
@@ -375,7 +379,8 @@ export default function OrderDetailModal({
           emailMenuOpen={emailMenuOpen}
           setEmailMenuOpen={setEmailMenuOpen}
           emailBtnRef={emailBtnRef}
-          onSendEmail={sendEmail}
+          onSendEmail={canSendEmail ? sendEmail : null}
+          canUpdateFulfillment={canUpdateFulfillment}
           loadingAux={loadingAux}
           onRefreshTimeline={fetchTimeline}
         />

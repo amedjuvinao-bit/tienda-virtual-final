@@ -7,6 +7,9 @@ const jwt = require('jsonwebtoken');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
 const { sendMail } = require('../lib/mail/mailer');
+const {
+  isLegacyAdminAuthEnabled,
+} = require('../security/legacyAdminAuthPolicy');
 
 const router = express.Router();
 
@@ -56,7 +59,12 @@ function isJwtConfigured() {
 }
 
 function isLegacyAdminConfigured() {
-  return Boolean(ADMIN_USER && ADMIN_PASSWORD_HASH && JWT_SECRET);
+  return Boolean(
+    isLegacyAdminAuthEnabled() &&
+      ADMIN_USER &&
+      ADMIN_PASSWORD_HASH &&
+      JWT_SECRET
+  );
 }
 
 function getClientIp(req) {

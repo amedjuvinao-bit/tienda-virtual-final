@@ -11,6 +11,9 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
+const {
+  authorizeOrderAdminScope,
+} = require('../services/orderAdminScopeService');
 
 const {
   buildPaymentFailureReleaseReason,
@@ -93,6 +96,21 @@ const OrderEvent =
   );
 
 const WOMPI_INVOICE_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
+
+async function requireAuthorizedOrderScope(req, res, orderId) {
+  const access = await authorizeOrderAdminScope(req, orderId, Order);
+
+  if (access.ok) return true;
+
+  res.status(access.status || 403).json({
+    success: false,
+    error: access.error || 'ORDER_BRANCH_ACCESS_DENIED',
+    message:
+      access.message ||
+      'No tienes permiso para operar órdenes de esta sede.',
+  });
+  return false;
+}
 
 async function withWompiOrderTransaction(orderNumber, work) {
   const session = await mongoose.startSession();
@@ -1915,6 +1933,8 @@ router.post(
         });
       }
 
+      if (!(await requireAuthorizedOrderScope(req, res, orderId))) return;
+
       const invoice = await ElectronicInvoice.findOne({ orderId }).lean();
 
       if (!invoice) {
@@ -2018,7 +2038,7 @@ router.post(
           referenceCode,
           success: deleteSucceeded,
           status: deleteResult.status,
-          by: req.headers['x-admin-user'] || 'admin',
+          by: req.adminUsername || req.adminUserId || 'admin',
         },
       });
 
@@ -2045,6 +2065,14 @@ router.post(
   requirePermission('billing:credit_note'),
   async (req, res) => {
     try {
+      if (
+        !(await requireAuthorizedOrderScope(
+          req,
+          res,
+          req.params.orderId
+        ))
+      ) return;
+
       const invoice = await ElectronicInvoice.findOne({ orderId: req.params.orderId });
       if (!invoice) {
         return res.status(404).json({
@@ -2055,7 +2083,7 @@ router.post(
       }
 
       const result = await createOfficialCreditNote(invoice._id, req.body || {}, {
-        adminUser: req.headers['x-admin-user'] || 'admin',
+        adminUser: req.adminUsername || req.adminUserId || 'admin',
       });
 
       return res.status(result.created ? 201 : 200).json({
@@ -2090,10 +2118,12 @@ router.post(
         });
       }
 
+      if (!(await requireAuthorizedOrderScope(req, res, orderId))) return;
+
       const result = await issueElectronicInvoiceForOrder({
         orderId,
         source: 'admin-retry',
-        initiatedBy: req.headers['x-admin-user'] || 'admin',
+        initiatedBy: req.adminUsername || req.adminUserId || 'admin',
         skipWhenElectronicBillingIsInactive: true,
         allowRetry: true,
       });
@@ -2125,7 +2155,7 @@ router.post(
           providerSuccess: true,
           invoiceNumber: providerInvoiceNumber,
           cufe: providerCufe,
-          by: req.headers['x-admin-user'] || 'admin',
+          by: req.adminUsername || req.adminUserId || 'admin',
         },
       });
 

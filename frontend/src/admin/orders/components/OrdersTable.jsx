@@ -4,6 +4,7 @@ export default function OrdersTable({
   data,
   loading,
   selectedIds,
+  selectionEnabled = false,
 
   toggleSelectAllVisible,
   toggleOne,
@@ -269,6 +270,7 @@ export default function OrdersTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {selectionEnabled ? (
             <label className="orders-theme-action-btn flex h-10 items-center gap-2 rounded-2xl border px-3 text-xs font-bold shadow-sm transition duration-200 hover:-translate-y-0.5">
               <input
                 type="checkbox"
@@ -278,6 +280,7 @@ export default function OrdersTable({
               />
               <span>Seleccionar</span>
             </label>
+            ) : null}
 
             {[
               ['createdAt', 'Fecha'],
@@ -359,12 +362,14 @@ export default function OrdersTable({
                       className="col-span-12 flex items-center gap-3 border-b px-5 py-5 lg:col-span-4 lg:border-b-0 lg:border-r"
                       style={{ borderColor: ADMIN_BORDER }}
                     >
+                      {selectionEnabled ? (
                       <input
                         type="checkbox"
                         className="accent-pink-600"
                         checked={isSelected(o._id)}
                         onChange={() => toggleOne(o._id)}
                       />
+                      ) : null}
 
                       <div className="relative">
                         <div

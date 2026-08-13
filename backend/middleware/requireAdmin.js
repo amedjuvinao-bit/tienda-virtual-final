@@ -28,6 +28,9 @@
 const jwt = require('jsonwebtoken');
 
 const AdminUser = require('../models/AdminUser');
+const {
+  isLegacyAdminAuthEnabled,
+} = require('../security/legacyAdminAuthPolicy');
 
 function parseBearer(authHeader = '') {
   const [type, value] = String(authHeader || '').split(' ');
@@ -258,6 +261,15 @@ async function requireAdmin(req, res, next) {
     }
 
     if (isLegacyToken(decoded)) {
+      if (!isLegacyAdminAuthEnabled()) {
+        return reject(
+          res,
+          403,
+          'LEGACY_ADMIN_DISABLED',
+          'La autenticación administrativa heredada está deshabilitada.'
+        );
+      }
+
       attachLegacyAdmin(req, decoded);
 
       return next();

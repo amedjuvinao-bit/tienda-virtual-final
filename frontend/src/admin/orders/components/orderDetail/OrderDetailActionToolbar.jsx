@@ -58,6 +58,13 @@ export default function OrderDetailActionToolbar({
   onRefreshTimeline,
 }) {
   const currentTags = normalizeTags(order?.tags);
+  const canUpdateStatus = typeof onSaveStatus === 'function';
+  const canUpdateTags = typeof onSaveTags === 'function';
+  const canTogglePrinted = typeof onTogglePrinted === 'function';
+  const canToggleArchived = typeof onToggleArchived === 'function';
+  const canSendEmail = typeof onSendEmail === 'function';
+  const hasQuickActions =
+    canTogglePrinted || canToggleArchived || canSendEmail;
 
   const saveStatus = async () => {
     if (!order?._id || !onSaveStatus) return;
@@ -108,6 +115,10 @@ export default function OrderDetailActionToolbar({
     }
   };
 
+  if (!canUpdateStatus && !canUpdateTags && !hasQuickActions) {
+    return null;
+  }
+
   return (
     <section
       style={{
@@ -122,11 +133,12 @@ export default function OrderDetailActionToolbar({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1.15fr 1fr',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
           gap: 14,
           alignItems: 'stretch',
         }}
       >
+        {canUpdateStatus ? (
         <div
           style={{
             border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -188,7 +200,9 @@ export default function OrderDetailActionToolbar({
             </PrimaryButton>
           </div>
         </div>
+        ) : null}
 
+        {canUpdateTags ? (
         <div
           style={{
             border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -255,7 +269,9 @@ export default function OrderDetailActionToolbar({
             )}
           </div>
         </div>
+        ) : null}
 
+        {hasQuickActions ? (
         <div
           style={{
             border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -275,6 +291,7 @@ export default function OrderDetailActionToolbar({
               marginTop: 8,
             }}
           >
+            {canTogglePrinted ? (
             <ActionButton
               onClick={togglePrinted}
               disabled={disabled}
@@ -282,7 +299,9 @@ export default function OrderDetailActionToolbar({
             >
               {printed ? 'Quitar marca de impresa' : 'Marcar como impresa'}
             </ActionButton>
+            ) : null}
 
+            {canToggleArchived ? (
             <ActionButton
               onClick={toggleArchived}
               disabled={disabled}
@@ -290,7 +309,9 @@ export default function OrderDetailActionToolbar({
             >
               {archived ? 'Desarchivar orden' : 'Archivar orden'}
             </ActionButton>
+            ) : null}
 
+            {canSendEmail ? (
             <div
               ref={emailBtnRef}
               style={{
@@ -327,6 +348,10 @@ export default function OrderDetailActionToolbar({
                     Confirmación de compra
                   </EmailButton>
 
+                  <EmailButton onClick={() => onSendEmail('invoice')}>
+                    Factura / soporte de compra
+                  </EmailButton>
+
                   <EmailButton onClick={() => onSendEmail('status')}>
                     Actualización de estado
                   </EmailButton>
@@ -337,18 +362,14 @@ export default function OrderDetailActionToolbar({
                 </div>
               ) : null}
             </div>
+            ) : null}
           </div>
         </div>
+        ) : null}
       </div>
 
       <style>
         {`
-          @media (max-width: 1100px) {
-            div[style*="grid-template-columns: 1fr 1.15fr 1fr"] {
-              grid-template-columns: 1fr !important;
-            }
-          }
-
           @media (max-width: 640px) {
             div[style*="grid-template-columns: minmax(0, 1fr) auto"] {
               grid-template-columns: 1fr !important;

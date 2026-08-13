@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import api, { setAdminToken } from '../lib/api';
+import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import useAdminPermissions from './security/useAdminPermissions';
 import ElectronicInvoiceBox from './orders/electronicInvoice/ElectronicInvoiceBox';
 import OrdersFilters from './orders/components/OrdersFilters';
 import OrdersTable from './orders/components/OrdersTable';
@@ -220,14 +222,22 @@ function titleForEvent(ev) {
 export default function OrdersAdmin() {
   const [searchParams] = useSearchParams();
   const [showQuickViewsFloating, setShowQuickViewsFloating] = useState(false);
-  
-   // Cargar token admin desde localStorage
-  useEffect(() => {
-     const token = localStorage.getItem('admin_token');
-     if (token) {
-      setAdminToken(token);
-     }
-  }, []);
+  const { isAuthenticated, adminToken, authLoading } = useAuth();
+  const { can } = useAdminPermissions();
+  const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
+  const canView = can('orders:view');
+  const canExport = can('orders:export');
+  const canBulk = can('orders:bulk');
+  const canUpdateStatus = can('orders:status');
+  const canUpdateTags = can('orders:tags');
+  const canMarkPrinted = can('orders:mark_printed');
+  const canArchive = can('orders:archive');
+  const canAddNotes = can('orders:notes');
+  const canSendEmail = can('orders:email');
+  const canUpdateFulfillment = can('orders:update');
+  const canDownloadBilling = can('billing:download');
+  const canViewBranches = can('branches:view');
+  const selectionEnabled = canBulk || canExport;
 
   const [data, setData] = useState([]);
   const [page, setPage] = useState(1);
@@ -243,6 +253,16 @@ export default function OrdersAdmin() {
   const [err, setErr] = useState('');
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
+
+  const requireSessionAndPermission = (allowed, message) => {
+    if (hasSession && allowed) return true;
+    setErr(
+      hasSession
+        ? message
+        : 'Tu sesión administrativa no es válida. Inicia sesión nuevamente.'
+    );
+    return false;
+  };
 
   // ===== ORDENAMIENTO (UI + envío a server) =====
   const [sort, setSort] = useState('createdAt:-1');
@@ -273,6 +293,7 @@ export default function OrdersAdmin() {
   const clearSelection = () => setSelectedIds(new Set());
   const isSelected = (id) => selectedIds.has(id);
   const toggleOne = (id) => {
+    if (!selectionEnabled) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -283,6 +304,7 @@ export default function OrdersAdmin() {
   const allVisibleSelected =
     data.length > 0 && data.every((o) => selectedIds.has(o._id));
   const toggleSelectAllVisible = () => {
+    if (!selectionEnabled) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allVisibleSelected) {
@@ -299,8 +321,14 @@ export default function OrdersAdmin() {
   const [orderSelected, setOrderSelected] = useState(null);
   const [savingId, setSavingId] = useState(null);
   const openOrderDetail = async (order) => {
+    if (
+      !requireSessionAndPermission(
+        canView,
+        'No tienes permiso para consultar órdenes.'
+      )
+    ) return;
+
     try {
-      console.log('CLICK ORDEN', order?._id);
       const id = order?._id;
       if (!id) return;
 
@@ -309,8 +337,7 @@ export default function OrdersAdmin() {
 
       const { data } = await api.get(`/api/orders/${id}`);
       setOrderSelected(data);
-    } catch (error) {
-      console.error('Error cargando detalle de orden:', error);
+    } catch {
       alert('No se pudo cargar el detalle completo de la orden.');
     }
   };
@@ -380,6 +407,13 @@ export default function OrdersAdmin() {
   useEffect(() => {
     let cancel = false;
 
+    if (authLoading || !hasSession || !canView || !canViewBranches) {
+      setBranches([]);
+      return () => {
+        cancel = true;
+      };
+    }
+
     api
       .get('/api/admin/branches', {
         params: {
@@ -403,16 +437,15 @@ export default function OrdersAdmin() {
 
         setBranches(list);
       })
-      .catch((error) => {
+      .catch(() => {
         if (cancel) return;
-        console.warn('No se pudieron cargar las sedes para el filtro de órdenes:', error);
         setBranches([]);
       });
 
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [authLoading, hasSession, canView, canViewBranches]);
 
   const params = useMemo(
     () => ({
@@ -456,6 +489,30 @@ export default function OrdersAdmin() {
 
   useEffect(() => {
     let cancel = false;
+
+    if (authLoading) {
+      return () => {
+        cancel = true;
+      };
+    }
+
+    if (!hasSession || !canView) {
+      setData([]);
+      setTotal(0);
+      setTotalPages(1);
+      setFinancialSummary(null);
+      setSelectedIds(new Set());
+      setLoading(false);
+      setErr(
+        hasSession
+          ? 'No tienes permiso para consultar órdenes.'
+          : 'Tu sesión administrativa no es válida. Inicia sesión nuevamente.'
+      );
+      return () => {
+        cancel = true;
+      };
+    }
+
     setLoading(true);
     setErr('');
     api
@@ -487,12 +544,31 @@ export default function OrdersAdmin() {
       })
       .finally(() => !cancel && setLoading(false));
     return () => { cancel = true; };
-  }, [params, statusFilter, parsedTags, tagsMode]);
+  }, [
+    authLoading,
+    hasSession,
+    canView,
+    params,
+    statusFilter,
+    parsedTags,
+    tagsMode,
+  ]);
+
+  useEffect(() => {
+    if (!selectionEnabled) clearSelection();
+  }, [selectionEnabled]);
 
   const resetAndSearch = () => setPage(1);
 
   // Exportar CSV (Axios con headers, descarga directa)
   const exportCsv = async () => {
+    if (
+      !requireSessionAndPermission(
+        canExport,
+        'No tienes permiso para exportar órdenes.'
+      )
+    ) return;
+
     try {
       const resp = await api.get('/api/orders/admin', {
         params: { ...params, format: 'csv' },
@@ -514,6 +590,13 @@ export default function OrdersAdmin() {
 
   // Exportar seleccionadas (CSV - POST /admin/export)
   const exportSelectedCsv = async () => {
+    if (
+      !requireSessionAndPermission(
+        canExport,
+        'No tienes permiso para exportar órdenes.'
+      )
+    ) return;
+
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     try {
@@ -539,6 +622,13 @@ export default function OrdersAdmin() {
   const [bulkMode, setBulkMode] = useState('add'); // add | remove
 
   const runBulkStatus = async () => {
+    if (
+      !requireSessionAndPermission(
+        canBulk,
+        'No tienes permiso para ejecutar acciones masivas.'
+      )
+    ) return;
+
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     try {
@@ -603,6 +693,13 @@ export default function OrdersAdmin() {
   };
 
   const runBulkTags = async () => {
+    if (
+      !requireSessionAndPermission(
+        canBulk,
+        'No tienes permiso para ejecutar acciones masivas.'
+      )
+    ) return;
+
     const ids = Array.from(selectedIds);
     const tags = parseTagsInput(bulkTags);
     if (ids.length === 0 || tags.length === 0) return;
@@ -637,6 +734,13 @@ export default function OrdersAdmin() {
 
   // Guardar estado (individual)
   const saveStatus = async (id, status) => {
+    if (
+      !requireSessionAndPermission(
+        canUpdateStatus,
+        'No tienes permiso para cambiar el estado de una orden.'
+      )
+    ) return null;
+
     try {
       setSavingId(id);
       const resp = await api.patch(`/api/orders/${id}/status`, { status });
@@ -672,6 +776,13 @@ export default function OrdersAdmin() {
 
   // Guardar tags (individual)
   const saveTags = async (id, tags) => {
+    if (
+      !requireSessionAndPermission(
+        canUpdateTags,
+        'No tienes permiso para editar las etiquetas de una orden.'
+      )
+    ) return null;
+
     try {
       setSavingId(id);
       const resp = await api.put(`/api/orders/${id}/tags`, { tags });
@@ -689,6 +800,13 @@ export default function OrdersAdmin() {
 
   // ===== NUEVO: toggle impresa / archivada =====
   const togglePrinted = async (id, printed) => {
+    if (
+      !requireSessionAndPermission(
+        canMarkPrinted,
+        'No tienes permiso para marcar órdenes como impresas.'
+      )
+    ) return null;
+
     try {
       setSavingId(id);
       const resp = await api.patch(`/api/orders/${id}/printed`, { printed });
@@ -704,6 +822,13 @@ export default function OrdersAdmin() {
   };
 
   const toggleArchived = async (id, archived) => {
+    if (
+      !requireSessionAndPermission(
+        canArchive,
+        'No tienes permiso para archivar órdenes.'
+      )
+    ) return null;
+
     try {
       setSavingId(id);
       const resp = await api.patch(`/api/orders/${id}/archived`, { archived });
@@ -752,6 +877,7 @@ export default function OrdersAdmin() {
 
         setPage={setPage}
         exportCsv={exportCsv}
+        canExport={canExport}
         loading={loading}
         total={total}
         financialSummary={financialSummary}
@@ -905,14 +1031,15 @@ export default function OrdersAdmin() {
           )}
       </section>
       {/* ====== BARRA DE ACCIONES MASIVAS ====== */}
-      {selectedIds.size > 0 && (
+      {selectionEnabled && selectedIds.size > 0 && (
         <div className="mb-2 p-2 rounded-lg border bg-pink-50/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between" style={{ borderColor: ADMIN_BORDER }}>
           <div className="text-xs">
             {selectedIds.size} seleccionada{selectedIds.size === 1 ? '' : 's'}
             <button className="ml-2 underline text-pink-700" onClick={clearSelection}>Limpiar selección</button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* Cambiar estado */}
+            {canBulk && (
+              <>
             <div className="flex items-center gap-1">
               <select
                 className="border rounded px-2 py-1 text-xs h-8"
@@ -933,7 +1060,6 @@ export default function OrdersAdmin() {
               </button>
             </div>
 
-            {/* Añadir / Quitar tags */}
             <div className="flex items-center gap-1">
               <select
                 className="border rounded px-2 py-1 text-xs h-8"
@@ -962,8 +1088,10 @@ export default function OrdersAdmin() {
                 Aplicar tags
               </button>
             </div>
+              </>
+            )}
 
-            {/* Exportar seleccionadas */}
+            {canExport && (
             <div className="flex items-center gap-1">
               <button
                 className="px-2.5 py-1 rounded text-white text-xs h-8 disabled:opacity-50 hover:bg-pink-700"
@@ -974,6 +1102,7 @@ export default function OrdersAdmin() {
                 Exportar seleccionadas (CSV)
               </button>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -1010,6 +1139,7 @@ export default function OrdersAdmin() {
           data={data}
           loading={loading}
           selectedIds={selectedIds}
+          selectionEnabled={selectionEnabled}
           toggleSelectAllVisible={toggleSelectAllVisible}
           toggleOne={toggleOne}
           isSelected={isSelected}
@@ -1088,10 +1218,14 @@ export default function OrdersAdmin() {
         open={showDetail}
         onClose={() => setShowDetail(false)}
         order={orderSelected}
-        onSaveStatus={saveStatus}
-        onSaveTags={saveTags}
-        onTogglePrinted={togglePrinted}     // 👈 pasa handler
-        onToggleArchived={toggleArchived}   // 👈 pasa handler
+        onSaveStatus={canUpdateStatus ? saveStatus : null}
+        onSaveTags={canUpdateTags ? saveTags : null}
+        onTogglePrinted={canMarkPrinted ? togglePrinted : null}
+        onToggleArchived={canArchive ? toggleArchived : null}
+        canAddNotes={canAddNotes}
+        canSendEmail={canSendEmail}
+        canUpdateFulfillment={canUpdateFulfillment}
+        canDownloadBilling={canDownloadBilling}
         savingId={savingId}
         populated={populate}
       />

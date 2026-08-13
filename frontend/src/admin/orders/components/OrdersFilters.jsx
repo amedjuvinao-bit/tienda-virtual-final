@@ -78,6 +78,7 @@ export default function OrdersFilters({
 
   setPage,
   exportCsv,
+  canExport = false,
   loading,
   total,
   financialSummary,
@@ -278,6 +279,7 @@ export default function OrdersFilters({
           </p>
         </div>
 
+        {canExport ? (
         <button
           onClick={exportCsv}
           disabled={loading || total === 0}
@@ -302,6 +304,7 @@ export default function OrdersFilters({
           <Download size={16} strokeWidth={2.5} />
           Exportar CSV
         </button>
+        ) : null}
       </div>
 
       <div className="orf-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>

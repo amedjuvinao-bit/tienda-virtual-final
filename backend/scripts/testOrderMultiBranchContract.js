@@ -36,6 +36,9 @@ function run() {
     'backend/services/orderRefundService.js'
   );
   const ordersRoute = read('backend/routes/orders.js');
+  const orderScopeService = read(
+    'backend/services/orderAdminScopeService.js'
+  );
   const detailView = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailProfessionalView.jsx'
   );
@@ -96,8 +99,11 @@ function run() {
   ok('Las devoluciones regresan a la asignación de origen');
 
   assert(
-    ordersRoute.includes(
-      "{ 'inventoryAllocations.branch': branchObjectId }"
+    ordersRoute.includes('applyOrderBranchAccessFilter')
+  );
+  assert(
+    orderScopeService.includes(
+      "{ 'inventoryAllocations.branch': { $in: branchObjectIds } }"
     )
   );
   assert(

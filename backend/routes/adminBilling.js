@@ -13,6 +13,10 @@ const billingSyncService = require('../services/adminBillingSyncService');
 const billingOperationalMonitoringService = require(
   '../services/billingOperationalMonitoringService'
 );
+const Order = require('../models/Order');
+const {
+  authorizeOrderAdminScope,
+} = require('../services/orderAdminScopeService');
 const {
   sendValidatedInvoiceEmail,
 } = require('../services/electronicInvoiceEmailService');
@@ -326,6 +330,22 @@ router.post(
   requirePermission('billing:create'),
   async (req, res) => {
     try {
+      const access = await authorizeOrderAdminScope(
+        req,
+        req.params.orderId,
+        Order
+      );
+
+      if (!access.ok) {
+        return res.status(access.status || 403).json({
+          ok: false,
+          error: access.error || 'ORDER_BRANCH_ACCESS_DENIED',
+          message:
+            access.message ||
+            'No tienes permiso para operar órdenes de esta sede.',
+        });
+      }
+
       const data = await billingService.generateInvoiceForOrder(req.params.orderId, {
         adminUser: currentAdmin(req),
       });
