@@ -42,6 +42,10 @@ const {
   processOrderRefund,
 } = require('../services/orderRefundService');
 const {
+  confirmRefundPaymentReversal,
+  listOrderRefunds,
+} = require('../services/orderRefundReconciliationService');
+const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
 const {
@@ -3085,6 +3089,64 @@ router.post(
       details: e.details || undefined,
     });
   }
+  }
+);
+
+router.get(
+  '/:id/refunds',
+  requireAdmin,
+  requirePermission('orders:view'),
+  async (req, res) => {
+    try {
+      if (!(await ensureOrderOperationAccess(req, res, req.params.id))) return;
+      const refunds = await listOrderRefunds(req.params.id);
+      return res.json({ ok: true, refunds });
+    } catch (error) {
+      return res.status(Number(error?.statusCode || 500)).json({
+        ok: false,
+        error: error?.code || 'ORDER_REFUNDS_LIST_FAILED',
+        message: error?.message || 'No se pudieron consultar las devoluciones.',
+      });
+    }
+  }
+);
+
+router.options('/:id/refunds/:refundId/confirm-payment', (_req, res) =>
+  res.sendStatus(204)
+);
+
+router.post(
+  '/:id/refunds/:refundId/confirm-payment',
+  requireAdmin,
+  requirePermission('orders:refund'),
+  async (req, res) => {
+    try {
+      if (!(await ensureOrderOperationAccess(req, res, req.params.id))) return;
+      const refund = await confirmRefundPaymentReversal({
+        orderId: req.params.id,
+        refundId: req.params.refundId,
+        reference: req.body?.reference,
+        adminLabel:
+          req.adminDisplayName ||
+          req.adminUsername ||
+          req.user?.displayName ||
+          req.user?.username ||
+          'admin',
+      });
+
+      return res.json({
+        ok: true,
+        message: 'Devolución del dinero confirmada y conciliación actualizada.',
+        refund,
+      });
+    } catch (error) {
+      return res.status(Number(error?.statusCode || 500)).json({
+        ok: false,
+        error: error?.code || 'PAYMENT_REVERSAL_CONFIRMATION_FAILED',
+        message: error?.message || 'No se pudo confirmar la devolución del dinero.',
+        details: error?.details || undefined,
+      });
+    }
   }
 );
 

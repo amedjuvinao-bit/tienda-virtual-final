@@ -3,11 +3,51 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **1. Seguridad y contratos**.
+- Etapa actual: **2. Conciliación comercial y coherencia transaccional**.
 - Estado de la etapa: implementada y cubierta por pruebas automáticas.
-- Siguientes etapas: orquestación de devoluciones, arquitectura/rendimiento, logística, experiencia visual avanzada y cierre integral.
+- Siguientes etapas: arquitectura/rendimiento, logística, experiencia visual avanzada y cierre integral.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 no rediseña todavía la interfaz ni cambia la lógica económica de devoluciones; establece la frontera de confianza necesaria para evolucionar esas áreas sin exponer órdenes, clientes, inventario o facturación.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa.
+
+## Conciliación comercial de devoluciones
+
+Una devolución interna ya no equivale automáticamente a un reembolso comercial terminado. `OrderRefund` conserva cuatro etapas independientes:
+
+| Etapa | Autoridad | Regla de cierre |
+|---|---|---|
+| Inventario | transacción MongoDB de `orderRefundService` | unidades devueltas, existencias y kardex confirmados |
+| Dinero | comprobante de reverso o reintegro | referencia explícita confirmada por un usuario con `orders:refund` |
+| Caja | `cashSessionService` | resumen de la sesión recalculado con la devolución vigente |
+| Facturación | documento oficial Factus | nota crédito enviada/validada o constancia de que no aplica |
+
+Los estados posibles por etapa son `not_required`, `pending`, `action_required`, `processing`, `completed` y `failed`. El resultado general solo es `completed` cuando las cuatro etapas están resueltas. Una orden cambia a `refunded` únicamente si, además, el valor acumulado reembolsado cubre el total de la orden.
+
+### Reverso del dinero
+
+El endpoint `POST /api/orders/:orderId/refunds/:refundId/confirm-payment` exige permiso `orders:refund`, alcance sobre la sede y una referencia verificable. Una repetición con la misma referencia es idempotente; una referencia diferente después del cierre produce conflicto.
+
+No se simula un reembolso automático de Wompi. La integración existente conserva el identificador de transacción, pero la devolución monetaria permanece como `action_required` hasta que el operador confirma el comprobante real. Esto evita tratar un `void` limitado o un procedimiento externo como si fuera un reembolso parcial universal.
+
+### Caja y pagos mixtos
+
+La sesión POS ahora calcula:
+
+- órdenes canceladas y órdenes con devolución;
+- valor bruto, devoluciones registradas y venta neta;
+- pagos netos después de reintegros confirmados;
+- reparto proporcional y acotado de una devolución sobre pagos mixtos.
+
+Una devolución registrada reduce la venta neta, pero no reduce el efectivo esperado ni los pagos cobrados hasta confirmar la salida real del dinero. Ningún método puede terminar con saldo negativo.
+
+### Nota crédito
+
+Cuando existe una factura Factus validada, la conciliación fiscal queda en `action_required`. `POST /api/payments/admin/create-credit-note/:orderId` puede recibir `refundId`; después de crear o reutilizar idempotentemente la nota oficial, la vincula con esa devolución.
+
+Si Factus ya creó el documento y falla únicamente el enlace local, la respuesta conserva `success: true`, usa HTTP 202 y entrega `reconciliationWarning`. Reintentar con la misma clave recupera el vínculo sin duplicar el documento fiscal.
+
+### Interfaz administrativa
+
+El detalle de la orden consulta `GET /api/orders/:orderId/refunds` y presenta un panel con las cuatro etapas. Un usuario con `orders:refund` puede registrar la referencia del reintegro; un perfil de solo lectura ve la trazabilidad, pero no puede confirmar dinero devuelto.
 
 ## Fronteras de confianza
 
@@ -106,6 +146,7 @@ Desde la raíz del repositorio en Windows:
 ```bat
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-security
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
@@ -122,10 +163,16 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Build de producción: aprobado con Vite.
 - Contratos vecinos verificados: estados masivos, multisede, venta completa, facturación, favoritos y carritos.
 
+## Evidencia de la etapa 2
+
+- Conciliación comercial: 10 controles de modelo, estados, caja, pagos mixtos, permisos y vínculo fiscal.
+- Interfaz de conciliación: prueba de visibilidad de las cuatro etapas y bloqueo sin referencia.
+- El contrato se ejecuta en GitHub Actions dentro de `products-ci.yml`.
+- Las pruebas no llaman gateways ni escriben en bases de datos productivas.
+
 ## Trabajo pendiente deliberado
 
-1. Orquestación avanzada de devolución, nota crédito, inventario y caja.
-2. Separación del archivo monolítico de rutas y optimización de consultas/resúmenes.
-3. Flujo logístico avanzado: picking, packing, despacho, transportadora, SLA e incidencias.
-4. Rediseño visual operativo con bandejas, densidad configurable y acciones contextuales.
-5. Pruebas transaccionales/stress con réplica MongoDB y cierre formal de la rama.
+1. Separación del archivo monolítico de rutas y optimización de consultas/resúmenes.
+2. Flujo logístico avanzado: picking, packing, despacho, transportadora, SLA e incidencias.
+3. Rediseño visual operativo con bandejas, densidad configurable y acciones contextuales.
+4. Pruebas transaccionales/stress con réplica MongoDB y cierre formal de la rama.

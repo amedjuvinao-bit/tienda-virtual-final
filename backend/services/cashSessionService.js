@@ -6,6 +6,16 @@ const CashSession = require('../models/CashSession');
 const Branch = require('../models/Branch');
 const AdminUser = require('../models/AdminUser');
 const Order = require('../models/Order');
+const OrderRefund = require('../models/OrderRefund');
+
+const CASH_SALE_STATUSES = new Set([
+  'paid',
+  'processing',
+  'shipped',
+  'delivered',
+  'refunded',
+]);
+const PAYMENT_TOTAL_KEYS = new Set(['cash', 'transfer', 'card', 'mixed', 'other']);
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -36,6 +46,143 @@ function createCashError(message, code = 'CASH_SESSION_ERROR', statusCode = 400,
   error.statusCode = statusCode;
   error.details = details;
   return error;
+}
+
+function normalizePaymentMethod(value) {
+  const method = cleanLower(value || 'other', 40);
+  return PAYMENT_TOTAL_KEYS.has(method) ? method : 'other';
+}
+
+function orderPaymentComponents(order = {}) {
+  const splits = Array.isArray(order.payment?.splitPayments)
+    ? order.payment.splitPayments.filter((split) => cleanMoney(split?.amount) > 0)
+    : [];
+
+  if (cleanLower(order.payment?.method, 40) === 'mixed' && splits.length) {
+    return splits.map((split) => ({
+      method: normalizePaymentMethod(split.method),
+      amount: cleanMoney(split.amount),
+    }));
+  }
+
+  return [{
+    method: normalizePaymentMethod(order.payment?.method),
+    amount: cleanMoney(order.payment?.amount || order.total || 0),
+  }];
+}
+
+function allocateRefundAcrossPayments(components = [], refundAmount = 0) {
+  const total = components.reduce((sum, component) => sum + cleanMoney(component.amount), 0);
+  let remaining = Math.min(cleanMoney(refundAmount), total);
+  const reductions = components.map(() => 0);
+
+  components.forEach((component, index) => {
+    if (!remaining) return;
+    const amount = cleanMoney(component.amount);
+    const isLast = index === components.length - 1;
+    const proportional = total > 0 ? Math.round((refundAmount * amount) / total) : 0;
+    const reduction = Math.min(amount, remaining, isLast ? remaining : proportional);
+    reductions[index] = reduction;
+    remaining -= reduction;
+  });
+
+  if (remaining > 0) {
+    for (let index = 0; index < components.length && remaining > 0; index += 1) {
+      const capacity = cleanMoney(components[index].amount) - reductions[index];
+      const extra = Math.min(capacity, remaining);
+      reductions[index] += extra;
+      remaining -= extra;
+    }
+  }
+
+  return reductions;
+}
+
+function buildCashSessionSalesSummary(orders = [], refunds = []) {
+  const refundsByOrder = new Map();
+  for (const refund of refunds) {
+    const orderId = cleanText(refund.order, 80);
+    const entry = refundsByOrder.get(orderId) || { registered: 0, paymentConfirmed: 0 };
+    const amount = cleanMoney(refund.amount);
+    entry.registered += amount;
+    if (cleanLower(refund.reconciliation?.payment?.state, 40) === 'completed') {
+      entry.paymentConfirmed += amount;
+    }
+    refundsByOrder.set(orderId, entry);
+  }
+
+  const paymentTotals = {
+    cash: 0,
+    transfer: 0,
+    card: 0,
+    mixed: 0,
+    other: 0,
+    total: 0,
+  };
+  const refundedOrders = new Set();
+  let ordersCount = 0;
+  let cancelledOrdersCount = 0;
+  let itemsCount = 0;
+  let grossSales = 0;
+  let discounts = 0;
+  let refundsTotal = 0;
+  let netSales = 0;
+
+  for (const order of orders) {
+    const status = cleanLower(order.status, 40);
+    if (status === 'cancelled') {
+      cancelledOrdersCount += 1;
+      continue;
+    }
+    if (!CASH_SALE_STATUSES.has(status)) continue;
+
+    const orderId = cleanText(order._id, 80);
+    const orderTotal = cleanMoney(order.total || order.payment?.amount || 0);
+    const refund = refundsByOrder.get(orderId) || { registered: 0, paymentConfirmed: 0 };
+    const registeredRefund = Math.min(orderTotal, cleanMoney(refund.registered));
+    const confirmedRefund = Math.min(orderTotal, cleanMoney(refund.paymentConfirmed));
+    if (registeredRefund > 0) refundedOrders.add(orderId);
+
+    ordersCount += 1;
+    grossSales += cleanMoney(order.subtotal || order.total || 0);
+    discounts += cleanMoney(order.discount?.amount || 0);
+    refundsTotal += registeredRefund;
+    netSales += Math.max(0, orderTotal - registeredRefund);
+
+    const orderItems = Array.isArray(order.items) ? order.items : [];
+    itemsCount += orderItems.reduce(
+      (total, item) => total + Number(item.quantity || item.qty || 0),
+      0
+    );
+
+    const components = orderPaymentComponents(order);
+    const reductions = allocateRefundAcrossPayments(components, confirmedRefund);
+    components.forEach((component, index) => {
+      paymentTotals[component.method] += Math.max(
+        0,
+        cleanMoney(component.amount) - cleanMoney(reductions[index])
+      );
+    });
+  }
+
+  paymentTotals.total =
+    paymentTotals.cash +
+    paymentTotals.transfer +
+    paymentTotals.card +
+    paymentTotals.mixed +
+    paymentTotals.other;
+
+  return {
+    ordersCount,
+    cancelledOrdersCount,
+    refundedOrdersCount: refundedOrders.size,
+    itemsCount,
+    grossSales,
+    discounts,
+    refunds: refundsTotal,
+    netSales,
+    paymentTotals,
+  };
 }
 
 function buildBranchSnapshot(branch = {}) {
@@ -164,72 +311,20 @@ async function recalculateCashSession(sessionOrId, options = {}) {
   const ordersQuery = Order.find({
     source: 'pos',
     cashSession: session._id,
-    status: { $in: ['paid', 'processing', 'shipped', 'delivered'] },
+    status: { $in: [...CASH_SALE_STATUSES, 'cancelled'] },
   }).lean();
 
   if (dbSession) ordersQuery.session(dbSession);
 
   const orders = await ordersQuery;
+  const refundsQuery = OrderRefund.find({
+    order: { $in: orders.map((order) => order._id) },
+    status: 'processed',
+  }).lean();
+  if (dbSession) refundsQuery.session(dbSession);
+  const refunds = await refundsQuery;
 
-  const paymentTotals = {
-    cash: 0,
-    transfer: 0,
-    card: 0,
-    mixed: 0,
-    other: 0,
-    total: 0,
-  };
-
-  let ordersCount = 0;
-  let itemsCount = 0;
-  let grossSales = 0;
-  let discounts = 0;
-  let netSales = 0;
-
-  for (const order of orders) {
-    ordersCount += 1;
-    grossSales += cleanMoney(order.subtotal || order.total || 0);
-    discounts += cleanMoney(order.discount?.amount || 0);
-    netSales += cleanMoney(order.total || 0);
-
-    const orderItems = Array.isArray(order.items) ? order.items : [];
-    itemsCount += orderItems.reduce((total, item) => total + Number(item.quantity || item.qty || 0), 0);
-
-    const method = cleanLower(order.payment?.method || 'other', 40);
-    const amount = cleanMoney(order.payment?.amount || order.total || 0);
-
-    if (method === 'mixed' && Array.isArray(order.payment?.splitPayments) && order.payment.splitPayments.length > 0) {
-      for (const split of order.payment.splitPayments) {
-        const splitMethod = cleanLower(split.method || 'other', 40);
-        const splitAmount = cleanMoney(split.amount || 0);
-        if (paymentTotals[splitMethod] === undefined) paymentTotals.other += splitAmount;
-        else paymentTotals[splitMethod] += splitAmount;
-      }
-    } else if (paymentTotals[method] === undefined) {
-      paymentTotals.other += amount;
-    } else {
-      paymentTotals[method] += amount;
-    }
-  }
-
-  paymentTotals.total =
-    paymentTotals.cash +
-    paymentTotals.transfer +
-    paymentTotals.card +
-    paymentTotals.mixed +
-    paymentTotals.other;
-
-  session.salesSummary = {
-    ordersCount,
-    cancelledOrdersCount: 0,
-    refundedOrdersCount: 0,
-    itemsCount,
-    grossSales,
-    discounts,
-    refunds: 0,
-    netSales,
-    paymentTotals,
-  };
+  session.salesSummary = buildCashSessionSalesSummary(orders, refunds);
 
   if (dbSession) await session.save({ session: dbSession });
   else await session.save();
@@ -404,4 +499,7 @@ module.exports = {
   listCashSessions,
   getCashSessionById,
   recalculateCashSession,
+  allocateRefundAcrossPayments,
+  buildCashSessionSalesSummary,
+  orderPaymentComponents,
 };

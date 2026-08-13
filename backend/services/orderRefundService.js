@@ -23,6 +23,9 @@ const {
   hydrateOrderInventoryAllocations,
   applyReturnsToOrderInventoryAllocations,
 } = require('./orderInventoryAllocationService');
+const {
+  refreshOrderRefundReconciliation,
+} = require('./orderRefundReconciliationService');
 
 function createRefundError(message, code, statusCode = 400, details = {}) {
   const error = new Error(message);
@@ -982,6 +985,7 @@ function safeRefundResponse(refund) {
     inventoryRestorations: value?.inventoryRestorations || [],
     totalReturnedUnits: value?.totalReturnedUnits || 0,
     totalRestockedUnits: value?.totalRestockedUnits || 0,
+    reconciliation: value?.reconciliation || {},
     processedAt: value?.processedAt || null,
     createdAt: value?.createdAt || null,
   };
@@ -1082,8 +1086,11 @@ async function processOrderRefund(
           409
         );
       }
+      const reconciled = await refreshOrderRefundReconciliation(existing._id, {
+        session,
+      });
       return {
-        refund: safeRefundResponse(existing),
+        refund: safeRefundResponse(reconciled),
         idempotent: true,
       };
     }
@@ -1155,6 +1162,22 @@ async function processOrderRefund(
       inventoryRestorations: [],
       createdBy: safeAdminId,
       createdByLabel: cleanText(adminLabel || 'admin'),
+      reconciliation: {
+        state: 'action_required',
+        inventory: { state: 'pending' },
+        payment: {
+          state: 'action_required',
+          errorMessage: 'Debes confirmar cómo y cuándo se devolvió el dinero al cliente.',
+        },
+        cash: {
+          state: order.cashSession ? 'pending' : 'not_required',
+        },
+        billing: { state: 'pending' },
+        paymentProvider: cleanLower(order.payment?.provider),
+        paymentMethod: cleanLower(order.payment?.method),
+        paymentTransactionId: cleanText(order.payment?.transactionId),
+        cashSession: order.cashSession || null,
+      },
     });
     await refund.save({ session });
 
@@ -1204,6 +1227,10 @@ async function processOrderRefund(
       { session }
     );
 
+    const reconciledRefund = await refreshOrderRefundReconciliation(refund._id, {
+      session,
+    });
+
     if (OrderEventModel) {
       await OrderEventModel.create(
         [
@@ -1239,7 +1266,7 @@ async function processOrderRefund(
     }
 
     return {
-      refund: safeRefundResponse(refund),
+      refund: safeRefundResponse(reconciledRefund),
       idempotent: false,
     };
   }

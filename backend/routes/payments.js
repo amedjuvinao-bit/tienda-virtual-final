@@ -65,6 +65,9 @@ const {
 const {
   createOfficialCreditNote,
 } = require('../services/electronicCreditNoteService');
+const {
+  linkRefundCreditNote,
+} = require('../services/orderRefundReconciliationService');
 
 const {
   addInvoiceGeneratedEvent,
@@ -2086,12 +2089,40 @@ router.post(
         adminUser: req.adminUsername || req.adminUserId || 'admin',
       });
 
-      return res.status(result.created ? 201 : 200).json({
+      let refundReconciliation = null;
+      let reconciliationWarning = null;
+      if (req.body?.refundId) {
+        try {
+          refundReconciliation = await linkRefundCreditNote({
+            orderId: req.params.orderId,
+            refundId: req.body.refundId,
+            invoice: result.invoice,
+            creditNote: result.creditNote,
+            adminLabel: req.adminUsername || req.adminUserId || 'admin',
+          });
+        } catch (reconciliationError) {
+          // La nota oficial ya puede existir en Factus. Una falla local de
+          // enlace se reporta como conciliación pendiente y se recupera con
+          // la misma clave idempotente, sin fingir que el documento falló.
+          reconciliationWarning = {
+            error:
+              reconciliationError?.code ||
+              'REFUND_CREDIT_NOTE_RECONCILIATION_PENDING',
+            message:
+              reconciliationError?.message ||
+              'La nota fue procesada, pero falta vincularla al reembolso.',
+          };
+        }
+      }
+
+      return res.status(reconciliationWarning ? 202 : result.created ? 201 : 200).json({
         success: true,
         created: result.created,
         reused: result.reused,
         message: result.message,
         invoice: result.invoice,
+        refundReconciliation,
+        reconciliationWarning,
       });
     } catch (error) {
       return res.status(Number(error?.status || 500)).json({

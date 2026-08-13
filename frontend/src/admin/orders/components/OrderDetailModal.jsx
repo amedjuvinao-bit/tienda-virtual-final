@@ -18,6 +18,7 @@ export default function OrderDetailModal({
   canSendEmail = false,
   canUpdateFulfillment = false,
   canDownloadBilling = false,
+  canRefund = false,
   savingId,
 }) {
   const [statusLocal, setStatusLocal] = useState(order?.status || 'pending');
@@ -28,6 +29,9 @@ export default function OrderDetailModal({
   const [notes, setNotes] = useState([]);
   const [noteText, setNoteText] = useState('');
   const [loadingAux, setLoadingAux] = useState(false);
+  const [refunds, setRefunds] = useState([]);
+  const [refundsLoading, setRefundsLoading] = useState(false);
+  const [confirmingRefundId, setConfirmingRefundId] = useState('');
 
   const [emailMenuOpen, setEmailMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -147,12 +151,54 @@ export default function OrderDetailModal({
     }
   };
 
+  const fetchRefunds = async () => {
+    if (!order?._id) return;
+    try {
+      setRefundsLoading(true);
+      const { data } = await api.get(`/api/orders/${order._id}/refunds`);
+      setRefunds(Array.isArray(data?.refunds) ? data.refunds : []);
+    } catch {
+      setRefunds([]);
+    } finally {
+      setRefundsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!open || !order?._id) return;
 
     fetchTimeline();
     fetchNotes();
+    fetchRefunds();
   }, [open, order?._id]);
+
+  const confirmRefundPayment = async (refund, reference) => {
+    if (!canRefund || !order?._id || !refund?._id) return;
+    try {
+      setConfirmingRefundId(refund._id);
+      await api.post(
+        `/api/orders/${order._id}/refunds/${refund._id}/confirm-payment`,
+        { reference }
+      );
+      showToast({
+        type: 'success',
+        title: 'Dinero conciliado',
+        message: 'La devolución quedó registrada y la caja fue recalculada.',
+      });
+      await Promise.all([fetchRefunds(), fetchTimeline()]);
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'No se pudo conciliar',
+        message:
+          error?.response?.data?.message ||
+          'Revisa la referencia del reintegro e intenta nuevamente.',
+        persist: true,
+      });
+    } finally {
+      setConfirmingRefundId('');
+    }
+  };
 
   const addNote = async () => {
     const text = String(noteText || '').trim();
@@ -383,6 +429,11 @@ export default function OrderDetailModal({
           canUpdateFulfillment={canUpdateFulfillment}
           loadingAux={loadingAux}
           onRefreshTimeline={fetchTimeline}
+          refunds={refunds}
+          refundsLoading={refundsLoading}
+          canConfirmRefundPayment={canRefund}
+          confirmingRefundId={confirmingRefundId}
+          onConfirmRefundPayment={confirmRefundPayment}
         />
       </div>
     </div>,

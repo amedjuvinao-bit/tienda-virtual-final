@@ -236,6 +236,7 @@ export default function OrdersAdmin() {
   const canSendEmail = can('orders:email');
   const canUpdateFulfillment = can('orders:update');
   const canDownloadBilling = can('billing:download');
+  const canRefund = can('orders:refund');
   const canViewBranches = can('branches:view');
   const selectionEnabled = canBulk || canExport;
 
@@ -1226,6 +1227,7 @@ export default function OrdersAdmin() {
         canSendEmail={canSendEmail}
         canUpdateFulfillment={canUpdateFulfillment}
         canDownloadBilling={canDownloadBilling}
+        canRefund={canRefund}
         savingId={savingId}
         populated={populate}
       />

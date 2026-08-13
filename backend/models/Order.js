@@ -1140,6 +1140,20 @@ const OrderSchema = new mongoose.Schema(
         ref: 'OrderRefund',
         default: null,
       },
+      reconciliationState: {
+        type: String,
+        enum: ['not_started', 'pending', 'action_required', 'completed', 'failed'],
+        default: 'not_started',
+        index: true,
+      },
+      pendingActions: {
+        type: [String],
+        default: [],
+      },
+      lastReconciledAt: {
+        type: Date,
+        default: null,
+      },
     },
   },
   { timestamps: true }

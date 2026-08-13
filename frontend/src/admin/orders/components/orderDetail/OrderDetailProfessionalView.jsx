@@ -9,6 +9,7 @@ import OrderDetailItemsTable from './OrderDetailItemsTable';
 import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
 import OrderDetailFulfillmentPanel from './OrderDetailFulfillmentPanel';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
+import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
 
@@ -53,6 +54,11 @@ export default function OrderDetailProfessionalView({
 
   loadingAux = false,
   onRefreshTimeline,
+  refunds = [],
+  refundsLoading = false,
+  canConfirmRefundPayment = false,
+  confirmingRefundId = '',
+  onConfirmRefundPayment,
 }) {
   return (
     <div
@@ -140,6 +146,14 @@ export default function OrderDetailProfessionalView({
             />
 
             <OrderDetailPaymentPanel order={order} />
+
+            <OrderDetailRefundReconciliation
+              refunds={refunds}
+              loading={refundsLoading}
+              canConfirmPayment={canConfirmRefundPayment}
+              confirmingId={confirmingRefundId}
+              onConfirmPayment={onConfirmRefundPayment}
+            />
 
             <OrderDetailTimelineNotes
               order={order}
