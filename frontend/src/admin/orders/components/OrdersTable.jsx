@@ -7,6 +7,7 @@ import {
   LayoutList,
   Rows3,
   ShoppingBag,
+  SlidersHorizontal,
   Truck,
 } from 'lucide-react';
 
@@ -104,6 +105,8 @@ export default function OrdersTable({
   toCOP,
   statusBadgeClasses,
   openOrderDetail,
+  controlsOpen = true,
+  onToggleControls,
 }) {
   const [density, setDensity] = useState('comfortable');
   const compact = density === 'compact';
@@ -135,6 +138,23 @@ export default function OrdersTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-controls="orders-control-panel"
+            aria-expanded={controlsOpen}
+            aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
+            onClick={onToggleControls}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[10px] font-black transition hover:border-[var(--admin-primary)]"
+            style={{
+              borderColor: controlsOpen ? 'var(--admin-primary)' : ADMIN_BORDER,
+              background: controlsOpen ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)',
+              color: controlsOpen ? 'var(--admin-primary-soft-text)' : 'var(--admin-card-text)',
+            }}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+          </button>
+
           {selectionEnabled ? (
             <label className="flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[10px] font-black" style={{ borderColor: ADMIN_BORDER }}>
               <input

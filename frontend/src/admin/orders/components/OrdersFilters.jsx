@@ -9,6 +9,7 @@ import {
   FilterX,
   Download,
   Building2,
+  X,
 } from 'lucide-react';
 
 const REQUIRED_STATUS_FILTERS = [
@@ -82,6 +83,9 @@ export default function OrdersFilters({
   loading,
   total,
   financialSummary,
+  controlsOpen = true,
+  onCloseControls,
+  children,
 }) {
   const safeStatusFilters = mergeStatusFilters(STATUS_FILTERS);
   const safeStatusFilter = Array.isArray(statusFilter) ? statusFilter : [];
@@ -206,7 +210,7 @@ export default function OrdersFilters({
   };
 
   return (
-    <section style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section className="orders-filter-fragments">
       <style>{`
         .orf-input::placeholder { color: var(--admin-input-placeholder) !important; }
         .orf-select option { background: var(--admin-input-bg); color: var(--admin-input-text); }
@@ -246,6 +250,7 @@ export default function OrdersFilters({
       `}</style>
 
       <div
+        className="orders-admin-heading"
         style={{
           display: 'flex',
           alignItems: 'flex-end',
@@ -307,7 +312,7 @@ export default function OrdersFilters({
         ) : null}
       </div>
 
-      <div className="orf-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+      <div className="orders-admin-metrics orf-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
         {cards.map(({ key, label, value, helper, Icon, accent }) => (
           <article
             key={key}
@@ -398,15 +403,45 @@ export default function OrdersFilters({
         ))}
       </div>
 
-      <div
-        style={{
-          background: 'var(--admin-card-bg)',
-          border: `1px solid ${ADMIN_BORDER}`,
-          borderRadius: 18,
-          padding: '18px 20px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-        }}
+      {controlsOpen ? (
+        <button
+          type="button"
+          className="orders-control-backdrop"
+          aria-label="Cerrar panel de filtros"
+          onClick={onCloseControls}
+        />
+      ) : null}
+
+      <aside
+        id="orders-control-panel"
+        aria-label="Filtros y estados de órdenes"
+        aria-hidden={!controlsOpen}
+        className={`orders-control-panel ${controlsOpen ? 'is-open' : 'is-closed'}`}
       >
+        <div className="orders-control-mobile-heading">
+          <div>
+            <p>Panel de control</p>
+            <span>Filtros, operación y facturación</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Cerrar panel de filtros"
+            onClick={onCloseControls}
+          >
+            <X size={17} strokeWidth={2.4} />
+          </button>
+        </div>
+
+        <div
+          className="orders-search-filters"
+          style={{
+            background: 'var(--admin-card-bg)',
+            border: `1px solid ${ADMIN_BORDER}`,
+            borderRadius: 16,
+            padding: '14px',
+            boxShadow: '0 8px 24px color-mix(in srgb, var(--admin-primary) 8%, transparent)',
+          }}
+        >
         <div
           style={{
             fontSize: 11,
@@ -429,7 +464,7 @@ export default function OrdersFilters({
             alignItems: 'end',
           }}
         >
-          <Field className="orf-col-4" label="Buscar" gridColumn="span 4">
+          <Field className="orf-col-4 orf-sidebar-wide" label="Buscar" gridColumn="span 4">
             <div style={{ position: 'relative' }}>
               <Search
                 size={16}
@@ -483,7 +518,7 @@ export default function OrdersFilters({
             />
           </Field>
 
-          <Field className="orf-col-4" label="Estado" gridColumn="span 4">
+          <Field className="orf-col-4 orf-sidebar-wide" label="Estado" gridColumn="span 4">
             <select
               className="orf-select orf-field"
               value={currentStatus}
@@ -582,7 +617,7 @@ export default function OrdersFilters({
             </div>
           </Field>
 
-          <Field className="orf-col-3" label="Limpiar" gridColumn="span 3">
+          <Field className="orf-col-3 orf-sidebar-clear" label="Limpiar" gridColumn="span 3">
             <button
               type="button"
               disabled={!hasActiveFilters}
@@ -635,8 +670,11 @@ export default function OrdersFilters({
               <option value="all">Todos los tags</option>
             </select>
           </Field>
+          </div>
         </div>
-      </div>
+
+        {children}
+      </aside>
     </section>
   );
 }

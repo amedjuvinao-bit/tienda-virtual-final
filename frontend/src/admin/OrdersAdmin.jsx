@@ -126,6 +126,13 @@ export default function OrdersAdmin() {
   const [populate, setPopulate] = useState(true);
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
+  const [controlsOpen, setControlsOpen] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return true;
+    }
+
+    return window.matchMedia('(min-width: 1181px)').matches;
+  });
 
   const requireSessionAndPermission = (allowed, message) => {
     if (hasSession && allowed) return true;
@@ -681,7 +688,149 @@ export default function OrdersAdmin() {
   const to = Math.min(total, page * limit);
 
   return (
-    <div className="p-4">
+    <div className={`orders-admin-shell p-4 ${controlsOpen ? 'controls-open' : 'controls-closed'}`}>
+      <style>{`
+        .orders-admin-shell {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+          grid-template-areas:
+            "heading heading"
+            "metrics metrics"
+            "table controls";
+          gap: 16px;
+          align-items: start;
+        }
+        .orders-admin-shell.controls-closed {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-areas:
+            "heading"
+            "metrics"
+            "table";
+        }
+        .orders-filter-fragments { display: contents; }
+        .orders-admin-heading { grid-area: heading; }
+        .orders-admin-metrics { grid-area: metrics; min-width: 0; }
+        .orders-table-workspace { grid-area: table; min-width: 0; }
+        .orders-control-panel {
+          grid-area: controls;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          align-self: start;
+          position: sticky;
+          top: 16px;
+          max-height: calc(100vh - 32px);
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          scrollbar-width: thin;
+          z-index: 20;
+        }
+        .orders-control-panel.is-closed { display: none; }
+        .orders-control-mobile-heading { display: none; }
+        .orders-control-backdrop { display: none; }
+        .orders-control-panel .orf-filters {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        .orders-control-panel .orf-col-2,
+        .orders-control-panel .orf-col-3,
+        .orders-control-panel .orf-col-4,
+        .orders-control-panel .orf-col-6 {
+          grid-column: span 1 !important;
+          min-width: 0;
+        }
+        .orders-control-panel .orf-sidebar-wide,
+        .orders-control-panel .orf-sidebar-clear {
+          grid-column: span 2 !important;
+        }
+        .orders-control-panel > section,
+        .orders-control-panel > div { margin-bottom: 0 !important; }
+
+        @media (max-width: 1180px) {
+          .orders-admin-shell,
+          .orders-admin-shell.controls-open,
+          .orders-admin-shell.controls-closed {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas:
+              "heading"
+              "metrics"
+              "table";
+          }
+          .orders-control-panel {
+            position: fixed;
+            inset: 0 0 0 auto;
+            width: min(92vw, 420px);
+            max-height: none;
+            padding: 16px;
+            background: var(--admin-page-bg, var(--admin-card-bg));
+            border-left: 1px solid var(--admin-card-border);
+            box-shadow: -24px 0 64px rgba(15, 23, 42, 0.2);
+            transform: translateX(0);
+            z-index: 80;
+          }
+          .orders-control-panel.is-closed {
+            display: flex;
+            pointer-events: none;
+            visibility: hidden;
+            transform: translateX(100%);
+          }
+          .orders-control-mobile-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 2px 2px 4px;
+          }
+          .orders-control-mobile-heading p {
+            margin: 0;
+            color: var(--admin-card-text);
+            font-size: 14px;
+            font-weight: 900;
+          }
+          .orders-control-mobile-heading span {
+            color: var(--admin-card-muted-text);
+            font-size: 10px;
+          }
+          .orders-control-mobile-heading button {
+            display: inline-flex;
+            width: 36px;
+            height: 36px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--admin-card-border);
+            border-radius: 10px;
+            background: var(--admin-card-bg);
+            color: var(--admin-card-text);
+          }
+          .orders-control-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            border: 0;
+            background: rgba(15, 23, 42, 0.32);
+            backdrop-filter: blur(2px);
+            z-index: 70;
+          }
+        }
+
+        @media (max-width: 720px) {
+          .orders-admin-shell { padding: 12px !important; gap: 12px; }
+          .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .orders-control-panel .orf-filters {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+          .orders-control-panel .orf-col-2,
+          .orders-control-panel .orf-col-3,
+          .orders-control-panel .orf-col-4,
+          .orders-control-panel .orf-col-6 {
+            grid-column: span 1 !important;
+          }
+          .orders-control-panel .orf-sidebar-wide,
+          .orders-control-panel .orf-sidebar-clear {
+            grid-column: span 2 !important;
+          }
+        }
+      `}</style>
 
       {/* ===== Toolbar (SIEMPRE 2 LÍNEAS EN DESKTOP) ===== */}
       <OrdersFilters
@@ -715,21 +864,25 @@ export default function OrdersAdmin() {
         loading={loading}
         total={total}
         financialSummary={financialSummary}
-      />
+        controlsOpen={controlsOpen}
+        onCloseControls={() => setControlsOpen(false)}
+      >
+        <OrdersQuickViews
+          compact
+          quickView={quickView}
+          onApplyQuickView={applyQuickView}
+          operationalSummary={operationalSummary}
+        />
 
-      <OrdersQuickViews
-        quickView={quickView}
-        onApplyQuickView={applyQuickView}
-        operationalSummary={operationalSummary}
-      />
-
-      <section className="mb-5">
         <OrdersInvoiceFilters
+          compact
           invoiceFilter={invoiceFilter}
           setInvoiceFilter={setInvoiceFilter}
           onApplyInvoiceFilter={applyInvoiceFilter}
         />
-      </section>
+      </OrdersFilters>
+
+      <main className="orders-table-workspace">
 
       <OrdersActiveFilters
         quickView={quickView}
@@ -857,6 +1010,8 @@ export default function OrdersAdmin() {
           toCOP={toCOP}
           statusBadgeClasses={statusBadgeClasses}
           openOrderDetail={openOrderDetail}
+          controlsOpen={controlsOpen}
+          onToggleControls={() => setControlsOpen((open) => !open)}
       />
 
       {/* Paginación */}
@@ -918,6 +1073,7 @@ export default function OrdersAdmin() {
           </button>
         </div>
       </div>
+      </main>
 
       {/* Modal */}
       <OrderDetailModal

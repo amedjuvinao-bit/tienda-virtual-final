@@ -305,6 +305,15 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El contrato se ejecuta en GitHub Actions y no escribe en MongoDB ni llama servicios externos.
 - El recorrido contractual verifica que una orden no se cierra antes del manifiesto y la prueba de entrega.
 
+## Evidencia de la etapa 6
+
+- La bandeja y la consola lateral comparten una sola mesa operativa: la tabla conserva el protagonismo y los filtros, las nueve colas y los siete estados DIAN permanecen disponibles sin duplicar contratos.
+- El botón `Mostrar/Ocultar filtros` amplía la tabla a todo el ancho cuando la consola está cerrada y comunica su estado mediante `aria-expanded` y `aria-controls`.
+- En pantallas de hasta 1.180 px la consola funciona como panel lateral superpuesto, con fondo de enfoque y cierre independiente; en móvil los indicadores se reorganizan en dos columnas.
+- El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
+- Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola.
+- Regresión frontend completa: 28 archivos y 105 pruebas aprobadas; build de producción aprobado con Vite.
+
 ## Trabajo pendiente deliberado
 
 1. Pruebas transaccionales/stress con réplica MongoDB, métricas operativas y alertas.

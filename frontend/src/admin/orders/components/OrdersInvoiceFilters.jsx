@@ -44,6 +44,7 @@ export default function OrdersInvoiceFilters({
   invoiceFilter,
   setInvoiceFilter,
   onApplyInvoiceFilter,
+  compact = false,
 }) {
   const THEME = {
     cardBg: 'var(--admin-card-bg)',
@@ -81,14 +82,17 @@ export default function OrdersInvoiceFilters({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[28px] border p-4 shadow-[0_18px_48px_rgba(15,23,42,0.06)]"
+      className={`relative overflow-hidden border shadow-[0_18px_48px_rgba(15,23,42,0.06)] ${
+        compact ? 'rounded-2xl p-3' : 'rounded-[28px] p-4'
+      }`}
       style={{
         borderColor: THEME.cardBorder,
-        background:
-          'linear-gradient(135deg, rgba(255,255,255,0.46), rgba(255,255,255,0.16))',
+        background: compact
+          ? THEME.cardBg
+          : 'linear-gradient(135deg, rgba(255,255,255,0.46), rgba(255,255,255,0.16))',
         color: THEME.cardText,
-        backdropFilter: 'blur(22px)',
-        WebkitBackdropFilter: 'blur(22px)',
+        backdropFilter: compact ? 'none' : 'blur(22px)',
+        WebkitBackdropFilter: compact ? 'none' : 'blur(22px)',
       }}
     >
       <style>{`
@@ -171,16 +175,20 @@ export default function OrdersInvoiceFilters({
       <div className="relative z-10 mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border"
+            className={`flex shrink-0 items-center justify-center border ${
+              compact ? 'h-8 w-8 rounded-lg' : 'h-11 w-11 rounded-[18px]'
+            }`}
             style={{
-              borderColor: 'rgba(255,255,255,0.76)',
-              background:
-                'linear-gradient(145deg, rgba(255,255,255,0.86), rgba(255,255,255,0.26))',
+              borderColor: compact ? THEME.primarySoftBorder : 'rgba(255,255,255,0.76)',
+              background: compact
+                ? THEME.primarySoftBg
+                : 'linear-gradient(145deg, rgba(255,255,255,0.86), rgba(255,255,255,0.26))',
               color: THEME.primary,
-              boxShadow:
-                'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.24), 0 12px 26px color-mix(in srgb, var(--admin-primary) 16%, transparent)',
-              backdropFilter: 'blur(18px)',
-              WebkitBackdropFilter: 'blur(18px)',
+              boxShadow: compact
+                ? 'none'
+                : 'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.24), 0 12px 26px color-mix(in srgb, var(--admin-primary) 16%, transparent)',
+              backdropFilter: compact ? 'none' : 'blur(18px)',
+              WebkitBackdropFilter: compact ? 'none' : 'blur(18px)',
             }}
           >
             <FileCheck2 size={18} strokeWidth={2.4} />
@@ -237,37 +245,54 @@ export default function OrdersInvoiceFilters({
       </div>
 
       <div
-        className="invoice-crystal-panel relative z-10 rounded-[26px] border p-2.5"
+        className={`invoice-crystal-panel relative z-10 border p-2.5 ${
+          compact ? 'rounded-xl' : 'rounded-[26px]'
+        }`}
         style={{
-          borderColor: 'rgba(255,255,255,0.64)',
-          background:
-            'linear-gradient(135deg, rgba(255,255,255,0.20), rgba(255,255,255,0.06))',
-          boxShadow:
-            'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.20), 0 16px 34px rgba(15,23,42,0.045)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          borderColor: compact ? THEME.cardBorder : 'rgba(255,255,255,0.64)',
+          background: compact
+            ? 'var(--admin-input-bg)'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.20), rgba(255,255,255,0.06))',
+          boxShadow: compact
+            ? 'none'
+            : 'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.20), 0 16px 34px rgba(15,23,42,0.045)',
+          backdropFilter: compact ? 'none' : 'blur(24px)',
+          WebkitBackdropFilter: compact ? 'none' : 'blur(24px)',
         }}
       >
         <div
           className="relative z-10 grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${INVOICE_FILTERS.length}, minmax(0, 1fr))`,
+            gridTemplateColumns: compact
+              ? 'repeat(2, minmax(0, 1fr))'
+              : `repeat(${INVOICE_FILTERS.length}, minmax(0, 1fr))`,
           }}
         >
-          {INVOICE_FILTERS.map((item) => {
+          {INVOICE_FILTERS.map((item, index) => {
             const active = currentFilter === item.key;
+            const spansCompactRow = compact && index === INVOICE_FILTERS.length - 1;
 
             return (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => handleClick(item.key)}
-                className="invoice-crystal-btn group min-h-[54px] rounded-[20px] border px-2.5 py-3 text-center text-[11px] font-black transition duration-300 hover:-translate-y-[2px] active:scale-[0.985]"
+                className={`invoice-crystal-btn group min-h-[48px] rounded-xl border px-2.5 py-2.5 text-center text-[11px] font-black transition duration-300 hover:-translate-y-[2px] active:scale-[0.985] ${
+                  spansCompactRow ? 'col-span-2' : ''
+                }`}
                 style={{
-                  borderColor: active
+                  borderColor: compact
+                    ? active
+                      ? THEME.primary
+                      : THEME.cardBorder
+                    : active
                     ? 'rgba(255,255,255,0.92)'
                     : 'color-mix(in srgb, var(--admin-primary) 38%, rgba(255,255,255,0.72))',
-                  background: active
+                  background: compact
+                    ? active
+                      ? THEME.primarySoftBg
+                      : THEME.cardBg
+                    : active
                     ? `linear-gradient(145deg,
                         color-mix(in srgb, var(--admin-primary) 86%, #ffffff 14%),
                         color-mix(in srgb, var(--admin-primary) 96%, #ffffff 4%)
@@ -276,15 +301,25 @@ export default function OrdersInvoiceFilters({
                         color-mix(in srgb, var(--admin-primary-soft-bg) 68%, rgba(255,255,255,0.20)),
                         rgba(255,255,255,0.10)
                       )`,
-                  color: active ? THEME.primaryText : THEME.cardText,
-                  boxShadow: active
+                  color: compact
+                    ? active
+                      ? THEME.primarySoftText
+                      : THEME.cardText
+                    : active
+                      ? THEME.primaryText
+                      : THEME.cardText,
+                  boxShadow: compact
+                    ? active
+                      ? `inset 0 -2px 0 ${THEME.primary}`
+                      : 'none'
+                    : active
                     ? 'inset 0 1px 0 rgba(255,255,255,0.46), inset 0 -1px 0 rgba(0,0,0,0.08), 0 14px 30px color-mix(in srgb, var(--admin-primary) 34%, transparent), 0 0 18px color-mix(in srgb, var(--admin-primary) 22%, transparent)'
                     : 'inset 0 1px 0 rgba(255,255,255,0.88), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 22%, transparent), 0 10px 22px color-mix(in srgb, var(--admin-primary) 10%, transparent)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
+                  backdropFilter: compact ? 'none' : 'blur(20px)',
+                  WebkitBackdropFilter: compact ? 'none' : 'blur(20px)',
                 }}
               >
-                <span className="invoice-crystal-shine" />
+                {!compact ? <span className="invoice-crystal-shine" /> : null}
 
                 <span className="relative z-10 block truncate">
                   {item.label}

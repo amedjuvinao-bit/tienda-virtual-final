@@ -28,7 +28,12 @@ const TONES = {
   success: { accent: '#047857', soft: 'color-mix(in srgb, #34d399 9%, var(--admin-card-bg))' },
 };
 
-export default function OrdersQuickViews({ quickView, onApplyQuickView, operationalSummary }) {
+export default function OrdersQuickViews({
+  quickView,
+  onApplyQuickView,
+  operationalSummary,
+  compact = false,
+}) {
   const current = quickView || 'all';
   const summary = operationalSummary || {};
   const apply = (key) => {
@@ -43,7 +48,7 @@ export default function OrdersQuickViews({ quickView, onApplyQuickView, operatio
   return (
     <section
       aria-label="Centro de operaciones de órdenes"
-      className="mb-4 rounded-2xl border px-3 py-3 shadow-sm"
+      className={`${compact ? '' : 'mb-4'} rounded-2xl border px-3 py-3 shadow-sm`}
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -76,7 +81,7 @@ export default function OrdersQuickViews({ quickView, onApplyQuickView, operatio
         ) : null}
       </div>
 
-      <label className="block md:hidden">
+      <label className={compact ? 'hidden' : 'block md:hidden'}>
         <span className="sr-only">Cola operativa</span>
         <select
           aria-label="Cola operativa"
@@ -98,7 +103,13 @@ export default function OrdersQuickViews({ quickView, onApplyQuickView, operatio
         </select>
       </label>
 
-      <div className="hidden grid-cols-3 gap-1.5 md:grid lg:grid-cols-5 xl:grid-cols-9">
+      <div
+        className={
+          compact
+            ? 'grid grid-cols-3 gap-1.5'
+            : 'hidden grid-cols-3 gap-1.5 md:grid lg:grid-cols-5 xl:grid-cols-9'
+        }
+      >
         <QueueButton
           active={current === 'all'}
           count={Number(summary.total || 0)}
