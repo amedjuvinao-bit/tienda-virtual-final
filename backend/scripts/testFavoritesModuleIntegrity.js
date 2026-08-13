@@ -13,10 +13,13 @@ const {
 } = require('../services/favoriteAccessService');
 const {
   buildAdminFilter,
+  buildAdminSort,
   buildFavoriteDetail,
   buildFavoritesCsv,
   canonicalizeFavoriteItems,
+  getAdminFavoriteSummary,
   listAdminFavorites,
+  parseAdminFavoritesQuery,
 } = require('../services/favoriteOperationsService');
 const {
   findAdminRoutePermission,
@@ -181,7 +184,8 @@ async function main() {
   await test('el listado excluye documentos vacíos, escapa búsquedas y pagina en MongoDB', async () => {
     const filter = buildAdminFilter({ q: 'cliente.*(vip)', dateFrom: '2026-08-01' });
     assert.deepEqual(filter['items.0'], { $exists: true });
-    assert.equal(filter.sessionId.$regex, 'cliente\\.\\*\\(vip\\)');
+    assert.equal(filter.$or[0].sessionId.$regex, 'cliente\\.\\*\\(vip\\)');
+    assert.equal(filter.$or.length, 4);
     let pipeline;
     const FavoriteModel = {
       aggregate(value) {
@@ -195,7 +199,68 @@ async function main() {
     );
     assert.equal(result.total, 21);
     assert.equal(result.totalPages, 3);
+    assert(pipeline.some((stage) => stage.$set?._itemsCount));
     assert(pipeline.some((stage) => stage.$facet?.data));
+  });
+
+  await test('vistas rápidas y ordenamientos se resuelven en backend', () => {
+    const highIntent = buildAdminFilter({ view: 'high_intent' });
+    const highValue = buildAdminFilter({ view: 'high_value' });
+    const stale = buildAdminFilter(
+      { view: 'stale' },
+      { now: new Date('2026-08-12T12:00:00.000Z') }
+    );
+    assert(highIntent.$expr.$gte);
+    assert(highValue.$expr.$gte);
+    assert(stale.updatedAt.$lte instanceof Date);
+    assert.deepEqual(buildAdminSort('most_items'), {
+      _itemsCount: -1,
+      updatedAt: -1,
+      _id: -1,
+    });
+    assert.throws(
+      () => parseAdminFavoritesQuery({ view: 'inventada' }),
+      /vista rápida/
+    );
+    assert.throws(
+      () => parseAdminFavoritesQuery({ minValue: '-1' }),
+      /valor mínimo/
+    );
+    assert.throws(
+      () => parseAdminFavoritesQuery({ minItems: '5', maxItems: '2' }),
+      /mínimo de productos/
+    );
+    assert.throws(
+      () => parseAdminFavoritesQuery({ minValue: '500000', maxValue: '100000' }),
+      /valor mínimo/
+    );
+    assert.throws(
+      () => parseAdminFavoritesQuery({ dateFrom: '2026-08-13', dateTo: '2026-08-12' }),
+      /fecha inicial/
+    );
+  });
+
+  await test('indicadores globales calculan volumen, valor e intención', async () => {
+    let pipeline;
+    const FavoriteModel = {
+      aggregate(value) {
+        pipeline = value;
+        return Promise.resolve([{
+          totalLists: 8,
+          totalItems: 24,
+          potentialValue: 960000,
+          averageItems: 3,
+          averageListValue: 120000,
+          recentLists: 5,
+          highIntentLists: 4,
+        }]);
+      },
+    };
+    const summary = await getAdminFavoriteSummary({}, { FavoriteModel });
+    assert.equal(summary.totalLists, 8);
+    assert.equal(summary.potentialValue, 960000);
+    assert.equal(summary.highIntentLists, 4);
+    assert(pipeline.some((stage) => stage.$group?.totalLists));
   });
 
   await test('el detalle informa disponibilidad y cambios de precio', async () => {
@@ -236,6 +301,7 @@ async function main() {
     const cases = [
       ['GET', '/api/favorites/admin', 'favorites:view'],
       ['GET', '/api/favorites/admin/export', 'favorites:export'],
+      ['GET', '/api/favorites/admin/summary', 'favorites:view'],
       ['GET', `/api/favorites/admin/${PRODUCT_ID}`, 'favorites:view'],
       ['DELETE', `/api/favorites/admin/${PRODUCT_ID}/items/${OTHER_PRODUCT_ID}`, 'favorites:delete'],
       ['DELETE', `/api/favorites/admin/${PRODUCT_ID}`, 'favorites:delete'],
@@ -243,12 +309,12 @@ async function main() {
     for (const [method, pathname, permission] of cases) {
       assert.equal(findAdminRoutePermission(method, pathname)?.permission, permission);
     }
-    assert(adminSource.includes('can("favorites:delete")'));
-    assert(!adminSource.includes('api.put(`/api/favorites/${'));
-    assert(!adminSource.includes('api.delete(`/api/favorites/${'));
+    assert(adminSource.includes("can('favorites:delete')"));
+    assert(adminSource.includes("can('favorites:export')"));
+    assert(adminSource.includes("favoriteAdminApi"));
   });
 
-  console.log(`\nFavoritos etapa 1: ${passed} comprobaciones superadas.`);
+  console.log(`\nFavoritos etapas 1 y 2: ${passed} comprobaciones superadas.`);
 }
 
 main().catch((error) => {

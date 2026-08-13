@@ -34,6 +34,19 @@ const PRODUCT_FIELDS = [
   'allowBackorder',
 ].join(' ');
 
+const RECENT_FAVORITES_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const STALE_FAVORITES_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const HIGH_INTENT_ITEMS = 3;
+const HIGH_VALUE_THRESHOLD = 200_000;
+
+const FAVORITE_VIEWS = new Set(['all', 'recent', 'high_intent', 'high_value', 'stale']);
+const FAVORITE_SORTS = new Set([
+  'recent_activity',
+  'oldest_activity',
+  'most_items',
+  'highest_value',
+]);
+
 function clean(value, max = 1000) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
 }
@@ -170,18 +183,136 @@ async function canonicalizeFavoriteItems(
   return result;
 }
 
-function buildAdminFilter(query = {}) {
-  const filter = { 'items.0': { $exists: true } };
-  const q = clean(query.q, 180);
-  if (q) filter.sessionId = { $regex: escapeRegex(q), $options: 'i' };
+function numberFilter(value, name) {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    const error = new Error(`El filtro ${name} no es válido.`);
+    error.code = 'FAVORITES_ADMIN_FILTER_INVALID';
+    throw error;
+  }
+  return parsed;
+}
 
-  const from = safeDate(query.dateFrom);
-  const to = safeDate(query.dateTo);
+function invalidAdminFilter(message) {
+  const error = new Error(message);
+  error.code = 'FAVORITES_ADMIN_FILTER_INVALID';
+  return error;
+}
+
+function parseAdminFavoritesQuery(query = {}) {
+  const page = Math.max(1, Math.floor(Number(query.page || 1)) || 1);
+  const limit = Math.max(1, Math.floor(Number(query.limit || 20)) || 20);
+  const view = clean(query.view || 'all', 40).toLowerCase();
+  const sort = clean(query.sort || 'recent_activity', 40).toLowerCase();
+  if (!FAVORITE_VIEWS.has(view)) {
+    const error = new Error('La vista rápida no es válida.');
+    error.code = 'FAVORITES_ADMIN_FILTER_INVALID';
+    throw error;
+  }
+  if (!FAVORITE_SORTS.has(sort)) {
+    const error = new Error('El ordenamiento no es válido.');
+    error.code = 'FAVORITES_ADMIN_FILTER_INVALID';
+    throw error;
+  }
+  const parsed = {
+    page,
+    limit,
+    view,
+    sort,
+    q: clean(query.q, 180),
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
+    minItems: numberFilter(query.minItems, 'mínimo de productos'),
+    maxItems: numberFilter(query.maxItems, 'máximo de productos'),
+    minValue: numberFilter(query.minValue, 'valor mínimo'),
+    maxValue: numberFilter(query.maxValue, 'valor máximo'),
+  };
+
+  const dateFrom = safeDate(parsed.dateFrom);
+  const dateTo = safeDate(parsed.dateTo);
+  if (parsed.dateFrom && !dateFrom) {
+    throw invalidAdminFilter('La fecha inicial no es válida.');
+  }
+  if (parsed.dateTo && !dateTo) {
+    throw invalidAdminFilter('La fecha final no es válida.');
+  }
+  if (dateFrom && dateTo && startOfLocalDay(dateFrom) > endOfLocalDay(dateTo)) {
+    throw invalidAdminFilter('La fecha inicial no puede ser posterior a la final.');
+  }
+  if (parsed.minItems !== null && parsed.maxItems !== null && parsed.minItems > parsed.maxItems) {
+    throw invalidAdminFilter('El mínimo de productos no puede superar el máximo.');
+  }
+  if (parsed.minValue !== null && parsed.maxValue !== null && parsed.minValue > parsed.maxValue) {
+    throw invalidAdminFilter('El valor mínimo no puede superar el máximo.');
+  }
+
+  return parsed;
+}
+
+function itemCountExpression() {
+  return { $size: { $ifNull: ['$items', []] } };
+}
+
+function potentialValueExpression() {
+  return {
+    $sum: {
+      $map: {
+        input: { $ifNull: ['$items', []] },
+        as: 'item',
+        in: { $ifNull: ['$$item.price', 0] },
+      },
+    },
+  };
+}
+
+function buildAdminFilter(query = {}, { now = new Date() } = {}) {
+  const parsed = parseAdminFavoritesQuery(query);
+  const filter = { 'items.0': { $exists: true } };
+  if (parsed.q) {
+    const pattern = { $regex: escapeRegex(parsed.q), $options: 'i' };
+    filter.$or = [
+      { sessionId: pattern },
+      { 'items.title': pattern },
+      { 'items.sku': pattern },
+      { 'items.category': pattern },
+    ];
+  }
+
+  const from = safeDate(parsed.dateFrom);
+  const to = safeDate(parsed.dateTo);
   if (from || to) {
     filter.updatedAt = {};
     if (from) filter.updatedAt.$gte = startOfLocalDay(from);
     if (to) filter.updatedAt.$lte = endOfLocalDay(to);
   }
+
+  const expressions = [];
+  const itemCount = itemCountExpression();
+  const potentialValue = potentialValueExpression();
+  if (parsed.minItems !== null) expressions.push({ $gte: [itemCount, parsed.minItems] });
+  if (parsed.maxItems !== null) expressions.push({ $lte: [itemCount, parsed.maxItems] });
+  if (parsed.minValue !== null) expressions.push({ $gte: [potentialValue, parsed.minValue] });
+  if (parsed.maxValue !== null) expressions.push({ $lte: [potentialValue, parsed.maxValue] });
+
+  if (parsed.view === 'recent') {
+    filter.updatedAt = {
+      ...(filter.updatedAt || {}),
+      $gte: new Date(now.getTime() - RECENT_FAVORITES_WINDOW_MS),
+    };
+  } else if (parsed.view === 'stale') {
+    filter.updatedAt = {
+      ...(filter.updatedAt || {}),
+      $lte: new Date(now.getTime() - STALE_FAVORITES_WINDOW_MS),
+    };
+  } else if (parsed.view === 'high_intent') {
+    expressions.push({ $gte: [itemCount, HIGH_INTENT_ITEMS] });
+  } else if (parsed.view === 'high_value') {
+    expressions.push({ $gte: [potentialValue, HIGH_VALUE_THRESHOLD] });
+  }
+
+  if (expressions.length === 1) filter.$expr = expressions[0];
+  if (expressions.length > 1) filter.$expr = { $and: expressions };
   return filter;
 }
 
@@ -189,16 +320,8 @@ function adminProjection() {
   return {
     _id: 1,
     sessionId: 1,
-    itemsCount: { $size: { $ifNull: ['$items', []] } },
-    potentialValue: {
-      $sum: {
-        $map: {
-          input: { $ifNull: ['$items', []] },
-          as: 'item',
-          in: { $ifNull: ['$$item.price', 0] },
-        },
-      },
-    },
+    itemsCount: '$_itemsCount',
+    potentialValue: '$_potentialValue',
     productPreview: {
       $slice: [
         {
@@ -221,20 +344,37 @@ function adminProjection() {
   };
 }
 
+function buildAdminSort(sort = 'recent_activity') {
+  const sorts = {
+    recent_activity: { updatedAt: -1, _id: -1 },
+    oldest_activity: { updatedAt: 1, _id: 1 },
+    most_items: { _itemsCount: -1, updatedAt: -1, _id: -1 },
+    highest_value: { _potentialValue: -1, updatedAt: -1, _id: -1 },
+  };
+  return sorts[sort] || sorts.recent_activity;
+}
+
 async function listAdminFavorites(
   query = {},
   { FavoriteModel = Favorite, maxLimit = 100 } = {}
 ) {
-  const page = Math.max(1, Math.floor(Number(query.page || 1)) || 1);
+  const parsed = parseAdminFavoritesQuery(query);
+  const page = parsed.page;
   const safeMaxLimit = Math.min(10_000, Math.max(1, Number(maxLimit) || 100));
   const limit = Math.min(
     safeMaxLimit,
-    Math.max(1, Math.floor(Number(query.limit || 20)) || 20)
+    parsed.limit
   );
   const filter = buildAdminFilter(query);
   const [result] = await FavoriteModel.aggregate([
     { $match: filter },
-    { $sort: { updatedAt: -1, _id: -1 } },
+    {
+      $set: {
+        _itemsCount: itemCountExpression(),
+        _potentialValue: potentialValueExpression(),
+      },
+    },
+    { $sort: buildAdminSort(parsed.sort) },
     {
       $facet: {
         data: [
@@ -253,6 +393,53 @@ async function listAdminFavorites(
     total,
     totalPages: Math.max(1, Math.ceil(total / limit)),
     data: result?.data || [],
+  };
+}
+
+async function getAdminFavoriteSummary(
+  query = {},
+  { FavoriteModel = Favorite, now = new Date() } = {}
+) {
+  const filter = buildAdminFilter(query, { now });
+  const [summary] = await FavoriteModel.aggregate([
+    { $match: filter },
+    {
+      $set: {
+        _itemsCount: itemCountExpression(),
+        _potentialValue: potentialValueExpression(),
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalLists: { $sum: 1 },
+        totalItems: { $sum: '$_itemsCount' },
+        potentialValue: { $sum: '$_potentialValue' },
+        averageItems: { $avg: '$_itemsCount' },
+        averageListValue: { $avg: '$_potentialValue' },
+        recentLists: {
+          $sum: {
+            $cond: [
+              { $gte: ['$updatedAt', new Date(now.getTime() - RECENT_FAVORITES_WINDOW_MS)] },
+              1,
+              0,
+            ],
+          },
+        },
+        highIntentLists: {
+          $sum: { $cond: [{ $gte: ['$_itemsCount', HIGH_INTENT_ITEMS] }, 1, 0] },
+        },
+      },
+    },
+  ]);
+  return {
+    totalLists: Number(summary?.totalLists || 0),
+    totalItems: Number(summary?.totalItems || 0),
+    potentialValue: Number(summary?.potentialValue || 0),
+    averageItems: Number(summary?.averageItems || 0),
+    averageListValue: Number(summary?.averageListValue || 0),
+    recentLists: Number(summary?.recentLists || 0),
+    highIntentLists: Number(summary?.highIntentLists || 0),
   };
 }
 
@@ -325,15 +512,22 @@ async function buildFavoriteDetail(
 }
 
 module.exports = {
+  HIGH_INTENT_ITEMS,
+  HIGH_VALUE_THRESHOLD,
+  RECENT_FAVORITES_WINDOW_MS,
+  STALE_FAVORITES_WINDOW_MS,
   adminProjection,
   buildAdminFilter,
+  buildAdminSort,
   buildFavoriteDetail,
   buildFavoritesCsv,
   canonicalFavoriteItem,
   canonicalizeFavoriteItems,
   escapeRegex,
+  getAdminFavoriteSummary,
   itemIdentity,
   listAdminFavorites,
   mapAvailabilityAlert,
+  parseAdminFavoritesQuery,
   readProductId,
 };

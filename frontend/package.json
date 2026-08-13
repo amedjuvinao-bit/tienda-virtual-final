@@ -9,7 +9,7 @@
     "test:product-seo": "vitest run src/lib/productSeo.test.js",
     "test:product-variant-images": "vitest run src/pages/ProductDetail.test.jsx",
     "test:product-pagination": "vitest run src/utils/productPagination.test.js",
-    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/admin/FavoritosAdmin.operations.test.jsx",
+    "test:favorites-module": "vitest run src/utils/favoriteAccess.test.js src/context/FavoritesContext.access.test.jsx src/admin/favoriteAdminApi.test.js src/admin/FavoritosAdmin.operations.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
   "dependencies": {

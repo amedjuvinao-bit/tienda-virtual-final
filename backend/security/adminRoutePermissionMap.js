@@ -441,6 +441,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/favorites/admin/summary',
+    permission: 'favorites:view',
+    description: 'Consultar indicadores administrativos de favoritos.',
+  },
+  {
+    method: 'GET',
     path: '/api/favorites/admin/:id',
     permission: 'favorites:view',
     description: 'Consultar detalle administrativo de favoritos.',

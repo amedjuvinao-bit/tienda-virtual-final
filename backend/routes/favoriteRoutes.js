@@ -16,6 +16,7 @@ const {
   buildFavoriteDetail,
   buildFavoritesCsv,
   canonicalizeFavoriteItems,
+  getAdminFavoriteSummary,
   listAdminFavorites,
 } = require('../services/favoriteOperationsService');
 
@@ -87,8 +88,11 @@ router.get('/admin/export', requireAdmin, async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="favoritos.csv"');
     return res.status(200).send(csv);
   } catch (error) {
-    console.error('Error exportando favoritos:', error?.message);
-    return res.status(500).json({ message: 'No fue posible exportar favoritos.' });
+    const invalid = error?.code === 'FAVORITES_ADMIN_FILTER_INVALID';
+    if (!invalid) console.error('Error exportando favoritos:', error?.message);
+    return res.status(invalid ? 400 : 500).json({
+      message: invalid ? error.message : 'No fue posible exportar favoritos.',
+    });
   }
 });
 
@@ -96,8 +100,25 @@ router.get('/admin', requireAdmin, async (req, res) => {
   try {
     return res.status(200).json(await listAdminFavorites(req.query));
   } catch (error) {
-    console.error('Error listando favoritos administrativos:', error?.message);
-    return res.status(500).json({ message: 'No fue posible listar favoritos.' });
+    const invalid = error?.code === 'FAVORITES_ADMIN_FILTER_INVALID';
+    if (!invalid) console.error('Error listando favoritos administrativos:', error?.message);
+    return res.status(invalid ? 400 : 500).json({
+      message: invalid ? error.message : 'No fue posible listar favoritos.',
+    });
+  }
+});
+
+router.get('/admin/summary', requireAdmin, async (req, res) => {
+  try {
+    return res.status(200).json(await getAdminFavoriteSummary(req.query));
+  } catch (error) {
+    const invalid = error?.code === 'FAVORITES_ADMIN_FILTER_INVALID';
+    if (!invalid) {
+      console.error('Error calculando resumen administrativo de favoritos:', error?.message);
+    }
+    return res.status(invalid ? 400 : 500).json({
+      message: invalid ? error.message : 'No fue posible calcular el resumen de favoritos.',
+    });
   }
 });
 
