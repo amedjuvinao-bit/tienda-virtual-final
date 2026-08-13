@@ -324,6 +324,7 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
         'orders:create',
         'orders:update',
         'orders:status',
+        'orders:fulfillment',
         'orders:mark_printed',
         'orders:archive',
         'orders:tags',
@@ -444,6 +445,7 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
 
         'orders:view',
         'orders:status',
+        'orders:fulfillment',
         'orders:mark_printed',
         'orders:notes',
 

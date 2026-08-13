@@ -102,6 +102,12 @@ function hasShippableItems(order) {
   });
 }
 
+function getPhysicalShipments(order) {
+  return Array.isArray(order?.fulfillment?.shipments)
+    ? order.fulfillment.shipments
+    : [];
+}
+
 function hasIncompleteVirtualFulfillment(order) {
   const digitalDeliveries = Array.isArray(
     order?.fulfillment?.digitalDeliveries
@@ -258,6 +264,39 @@ function validateOrderStatusTransition(order, targetStatus) {
         currentStatus,
         targetStatus,
       }
+    );
+  }
+
+  const physicalShipments = getPhysicalShipments(order);
+  if (
+    targetStatus === 'shipped' &&
+    physicalShipments.length > 0 &&
+    !physicalShipments.every((shipment) =>
+      ['dispatched', 'in_transit', 'delivered'].includes(
+        cleanText(shipment?.status).toLowerCase()
+      )
+    )
+  ) {
+    throw createTransitionError(
+      'Completa picking, packing y despacho desde el flujo logístico antes de marcar la orden como enviada.',
+      'ORDER_LOGISTICS_DISPATCH_REQUIRED',
+      409,
+      { currentStatus, targetStatus }
+    );
+  }
+
+  if (
+    targetStatus === 'delivered' &&
+    physicalShipments.length > 0 &&
+    !physicalShipments.every(
+      (shipment) => cleanText(shipment?.status).toLowerCase() === 'delivered'
+    )
+  ) {
+    throw createTransitionError(
+      'Todos los envíos físicos deben tener evidencia de entrega antes de cerrar la orden.',
+      'ORDER_LOGISTICS_DELIVERY_REQUIRED',
+      409,
+      { currentStatus, targetStatus }
     );
   }
 

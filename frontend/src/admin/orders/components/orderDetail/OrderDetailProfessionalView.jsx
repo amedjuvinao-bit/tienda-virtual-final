@@ -7,6 +7,7 @@ import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailCustomerBilling from './OrderDetailCustomerBilling';
 import OrderDetailItemsTable from './OrderDetailItemsTable';
 import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
+import OrderDetailLogisticsPanel from './OrderDetailLogisticsPanel';
 import OrderDetailFulfillmentPanel from './OrderDetailFulfillmentPanel';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
@@ -139,6 +140,12 @@ export default function OrderDetailProfessionalView({
             <OrderDetailItemsTable order={order} />
 
             <OrderDetailInventoryAllocations order={order} />
+
+            <OrderDetailLogisticsPanel
+              order={order}
+              canManage={canUpdateFulfillment}
+              onRefreshTimeline={onRefreshTimeline}
+            />
 
             <OrderDetailFulfillmentPanel
               order={order}

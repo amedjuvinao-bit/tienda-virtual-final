@@ -194,7 +194,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       'orders:archive',
       'orders:notes',
       'orders:email',
-      'orders:update',
+      'orders:fulfillment',
       'billing:download',
       'branches:view',
     ]);

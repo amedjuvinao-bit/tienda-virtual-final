@@ -1,0 +1,524 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import {
+  getOrderLogistics,
+  initializeOrderLogistics,
+  updateOrderShipment,
+} from '../../orderLogisticsApi';
+import { ORDER_DETAIL_THEME } from './orderDetailTheme';
+
+const STATUS_LABELS = {
+  ready_to_pick: 'Lista para picking',
+  picking: 'Picking en curso',
+  picked: 'Picking completo',
+  packing: 'Empaque en curso',
+  packed: 'Empacada',
+  dispatched: 'Despachada',
+  in_transit: 'En tránsito',
+  delivered: 'Entregada',
+  exception: 'Con incidencia',
+  cancelled: 'Cancelada',
+};
+
+const NEXT_ACTIONS = {
+  ready_to_pick: ['start_picking', 'Iniciar picking'],
+  picking: ['complete_picking', 'Completar picking'],
+  picked: ['start_packing', 'Iniciar empaque'],
+  packing: ['complete_packing', 'Sellar paquetes'],
+  packed: ['dispatch', 'Confirmar despacho'],
+  dispatched: ['mark_in_transit', 'Marcar en tránsito'],
+  in_transit: ['deliver', 'Confirmar entrega'],
+};
+
+const STEPS = [
+  ['ready_to_pick', 'Preparar'],
+  ['picking', 'Picking'],
+  ['packing', 'Empaque'],
+  ['dispatched', 'Despacho'],
+  ['in_transit', 'Tránsito'],
+  ['delivered', 'Entrega'],
+];
+
+const STATUS_POSITION = {
+  ready_to_pick: 0,
+  picking: 1,
+  picked: 2,
+  packing: 3,
+  packed: 3,
+  dispatched: 4,
+  in_transit: 5,
+  delivered: 6,
+};
+
+function toLocalDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function formatDeadline(value) {
+  if (!value) return 'Sin compromiso';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin compromiso';
+  return date.toLocaleString('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function shipmentForm(shipment = {}) {
+  const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
+  const carrier = shipment.carrier || {};
+  const sla = shipment.sla || {};
+  return {
+    priority: shipment.priority || 'normal',
+    carrierCode: carrier.code || '',
+    carrierName: carrier.name || '',
+    serviceLevel: carrier.serviceLevel || '',
+    trackingNumber: carrier.trackingNumber || '',
+    trackingUrl: carrier.trackingUrl || '',
+    pickingDueAt: toLocalDateTime(sla.pickingDueAt),
+    dispatchDueAt: toLocalDateTime(sla.dispatchDueAt),
+    deliveryDueAt: toLocalDateTime(sla.deliveryDueAt),
+    packageCount: Math.max(1, packages.length || 1),
+    weightGrams: Number(packages[0]?.weightGrams || 0),
+    dispatchReference: shipment.dispatchEvidence?.reference || '',
+    deliveryReference: shipment.deliveryEvidence?.reference || '',
+    recipient: shipment.deliveryEvidence?.recipient || '',
+    incidentType: 'delay',
+    severity: 'medium',
+    incidentDescription: '',
+    resolution: '',
+    note: '',
+  };
+}
+
+function planPayload(shipment, form) {
+  const existingPackages = Array.isArray(shipment.packages)
+    ? shipment.packages
+    : [];
+  const packageCount = Math.min(20, Math.max(1, Number(form.packageCount || 1)));
+  const packages = Array.from({ length: packageCount }, (_, index) => ({
+    ...(existingPackages[index] || {}),
+    code:
+      existingPackages[index]?.code ||
+      `${shipment.code}-P${String(index + 1).padStart(2, '0')}`,
+    weightGrams: index === 0 ? Number(form.weightGrams || 0) : Number(existingPackages[index]?.weightGrams || 0),
+  }));
+  return {
+    priority: form.priority,
+    carrier: {
+      code: form.carrierCode,
+      name: form.carrierName,
+      serviceLevel: form.serviceLevel,
+      trackingNumber: form.trackingNumber,
+      trackingUrl: form.trackingUrl,
+    },
+    packages,
+    sla: {
+      pickingDueAt: form.pickingDueAt || null,
+      dispatchDueAt: form.dispatchDueAt || null,
+      deliveryDueAt: form.deliveryDueAt || null,
+    },
+  };
+}
+
+function hasPhysicalFulfillment(order) {
+  if ((order?.inventoryAllocations || []).some((item) => Number(item?.soldQuantity || 0) > Number(item?.returnedQuantity || 0))) {
+    return true;
+  }
+  return (order?.items || order?.cart || []).some((item) => {
+    const type = String(item?.productType || '').toLowerCase();
+    return !['digital', 'service'].includes(type) && item?.requiresShipping !== false;
+  });
+}
+
+function summaryCard(label, value, tone = 'default') {
+  const tones = {
+    default: ['var(--admin-card-bg)', 'var(--admin-card-text)'],
+    primary: ['var(--admin-primary-soft-bg)', 'var(--admin-primary)'],
+    warning: ['#fff7ed', '#c2410c'],
+    danger: ['#fff1f2', '#be123c'],
+    success: ['#ecfdf5', '#047857'],
+  };
+  const [background, color] = tones[tone] || tones.default;
+  return (
+    <div
+      style={{
+        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        borderRadius: 16,
+        padding: '11px 12px',
+        background,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ marginTop: 5, color, fontSize: 18, fontWeight: 950 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+export default function OrderDetailLogisticsPanel({
+  order,
+  canManage = false,
+  onRefreshTimeline,
+}) {
+  const initialShipments = Array.isArray(order?.fulfillment?.shipments)
+    ? order.fulfillment.shipments
+    : [];
+  const [shipments, setShipments] = useState(initialShipments);
+  const [summary, setSummary] = useState(order?.fulfillment?.logisticsSummary || {});
+  const [forms, setForms] = useState({});
+  const [busy, setBusy] = useState('');
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    setShipments(initialShipments);
+    setSummary(order?.fulfillment?.logisticsSummary || {});
+    setForms(
+      Object.fromEntries(
+        initialShipments.map((shipment) => [
+          String(shipment._id),
+          shipmentForm(shipment),
+        ])
+      )
+    );
+    setMessage(null);
+  }, [order?._id, order?.fulfillment?.logisticsSummary?.updatedAt]);
+
+  const physical = useMemo(() => hasPhysicalFulfillment(order), [order]);
+  if (!physical) return null;
+
+  const applyResponse = (data) => {
+    const nextShipments = Array.isArray(data?.shipments) ? data.shipments : [];
+    setShipments(nextShipments);
+    setSummary(data?.summary || {});
+    setForms(
+      Object.fromEntries(
+        nextShipments.map((shipment) => [
+          String(shipment._id),
+          shipmentForm(shipment),
+        ])
+      )
+    );
+  };
+
+  const refresh = async () => {
+    if (!order?._id) return;
+    const data = await getOrderLogistics(order._id);
+    applyResponse(data);
+  };
+
+  const initialize = async () => {
+    if (!canManage || !order?._id) return;
+    try {
+      setBusy('initialize');
+      setMessage(null);
+      const data = await initializeOrderLogistics(order._id);
+      applyResponse(data);
+      setMessage({ type: 'success', text: 'Envíos creados desde las asignaciones confirmadas de inventario.' });
+      await onRefreshTimeline?.();
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.message || 'No fue posible preparar la logística de la orden.',
+      });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const updateForm = (shipmentId, patch) => {
+    setForms((previous) => ({
+      ...previous,
+      [shipmentId]: { ...(previous[shipmentId] || {}), ...patch },
+    }));
+  };
+
+  const runAction = async (shipment, action, extra = {}) => {
+    if (!canManage) return;
+    const shipmentId = String(shipment._id);
+    const form = forms[shipmentId] || shipmentForm(shipment);
+    try {
+      setBusy(`${shipmentId}:${action}`);
+      setMessage(null);
+      const payload = {
+        action,
+        expectedRevision: Number(shipment.revision || 0),
+        note: form.note,
+        ...extra,
+      };
+      if (['update_plan', 'dispatch'].includes(action)) {
+        Object.assign(payload, planPayload(shipment, form));
+      }
+      if (action === 'dispatch') payload.dispatchReference = form.dispatchReference;
+      if (action === 'deliver') {
+        payload.deliveryReference = form.deliveryReference;
+        payload.recipient = form.recipient;
+      }
+      if (action === 'report_incident') {
+        payload.incidentType = form.incidentType;
+        payload.severity = form.severity;
+        payload.description = form.incidentDescription;
+      }
+      if (action === 'resolve_incident') payload.resolution = form.resolution;
+
+      const data = await updateOrderShipment(order._id, shipmentId, payload);
+      applyResponse(data);
+      setMessage({ type: 'success', text: `Envío ${shipment.code} actualizado correctamente.` });
+      await onRefreshTimeline?.();
+    } catch (error) {
+      const code = error?.response?.data?.error;
+      if (code === 'LOGISTICS_REVISION_CONFLICT') {
+        await refresh().catch(() => {});
+      }
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.message || 'No fue posible actualizar el envío.',
+      });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <section
+      aria-label="Centro logístico de la orden"
+      style={{
+        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        borderRadius: 24,
+        background: ORDER_DETAIL_THEME.cardBg,
+        padding: 18,
+        boxShadow: '0 18px 50px rgba(15, 23, 42, 0.07)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ color: 'var(--admin-primary)', fontSize: 10, fontWeight: 950, letterSpacing: '.18em', textTransform: 'uppercase' }}>
+            Operación física multisede
+          </div>
+          <h3 style={{ margin: '5px 0 0', color: ORDER_DETAIL_THEME.cardText, fontSize: 18, fontWeight: 950 }}>
+            Centro logístico
+          </h3>
+          <p style={{ margin: '5px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 12, fontWeight: 650 }}>
+            Picking, empaque, despacho, seguimiento, SLA e incidencias con trazabilidad por sede.
+          </p>
+        </div>
+        {canManage && shipments.length === 0 ? (
+          <button
+            type="button"
+            onClick={initialize}
+            disabled={busy === 'initialize'}
+            style={{ border: 0, borderRadius: 14, minHeight: 40, padding: '0 16px', background: 'var(--admin-primary)', color: '#fff', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}
+          >
+            {busy === 'initialize' ? 'Preparando…' : 'Preparar logística'}
+          </button>
+        ) : null}
+      </div>
+
+      {shipments.length > 0 ? (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(92px, 1fr))', gap: 8, marginTop: 16 }}>
+            {summaryCard('Envíos', summary.shipmentCount || shipments.length, 'primary')}
+            {summaryCard('Listos', summary.readyCount || 0)}
+            {summaryCard('Despachados', summary.dispatchedCount || 0, 'warning')}
+            {summaryCard('Entregados', summary.deliveredCount || 0, 'success')}
+            {summaryCard('Incidencias', summary.exceptionCount || 0, summary.exceptionCount ? 'danger' : 'default')}
+            {summaryCard('SLA vencido', summary.slaBreachedCount || 0, summary.slaBreachedCount ? 'danger' : 'default')}
+          </div>
+
+          <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+            {shipments.map((shipment) => {
+              const shipmentId = String(shipment._id);
+              const form = forms[shipmentId] || shipmentForm(shipment);
+              const status = shipment.status || 'ready_to_pick';
+              const position = STATUS_POSITION[status] ?? -1;
+              const next = NEXT_ACTIONS[status];
+              const isBusy = busy.startsWith(`${shipmentId}:`);
+              const openIncident = (shipment.incidents || []).find((incident) => incident.status === 'open');
+              return (
+                <article
+                  key={shipmentId}
+                  style={{
+                    border: `1px solid ${status === 'exception' ? '#fecdd3' : ORDER_DETAIL_THEME.cardBorder}`,
+                    borderRadius: 20,
+                    padding: 14,
+                    background: status === 'exception' ? 'color-mix(in srgb, #fff1f2 70%, var(--admin-card-bg))' : 'var(--admin-card-bg)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
+                        {shipment.code} · {shipment.branchSnapshot?.name || shipment.branchSnapshot?.code || 'Sede operativa'}
+                      </div>
+                      <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 11 }}>
+                        {shipment.quantity} unidad(es) · {shipment.packages?.length || 0} paquete(s) · revisión {Number(shipment.revision || 0)}
+                      </div>
+                    </div>
+                    <span style={{ alignSelf: 'flex-start', borderRadius: 999, padding: '6px 10px', background: status === 'exception' ? '#ffe4e6' : 'var(--admin-primary-soft-bg)', color: status === 'exception' ? '#be123c' : 'var(--admin-primary)', fontSize: 10, fontWeight: 950 }}>
+                      {STATUS_LABELS[status] || status}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginTop: 12 }}>
+                    {STEPS.map(([step, label], index) => {
+                      const active = status === 'exception' ? index <= (STATUS_POSITION[shipment.resumeStatus] ?? 0) : index <= position;
+                      return (
+                        <div key={step} style={{ borderRadius: 10, padding: '7px 4px', textAlign: 'center', background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-bg)', color: active ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
+                          {label}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
+                    {[
+                      ['Picking', shipment.sla?.pickingDueAt],
+                      ['Despacho', shipment.sla?.dispatchDueAt],
+                      ['Promesa de entrega', shipment.sla?.deliveryDueAt],
+                    ].map(([label, value]) => (
+                      <div key={label} style={{ borderRadius: 12, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, padding: 9 }}>
+                        <div style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
+                        <div style={{ marginTop: 3, color: shipment.sla?.breachedAt ? '#be123c' : ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 850 }}>{formatDeadline(value)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <details style={{ marginTop: 10 }}>
+                    <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 900 }}>
+                      Plan de transportadora, paquetes y SLA
+                    </summary>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
+                      <select aria-label={`Prioridad ${shipment.code}`} value={form.priority} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { priority: event.target.value })} style={inputStyle()}>
+                        <option value="normal">Prioridad normal</option>
+                        <option value="high">Prioridad alta</option>
+                        <option value="urgent">Prioridad urgente</option>
+                      </select>
+                      <input aria-label={`Transportadora ${shipment.code}`} value={form.carrierName} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { carrierName: event.target.value })} placeholder="Transportadora" style={inputStyle()} />
+                      <input aria-label={`Servicio ${shipment.code}`} value={form.serviceLevel} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { serviceLevel: event.target.value })} placeholder="Nivel de servicio" style={inputStyle()} />
+                      <input aria-label={`Guía ${shipment.code}`} value={form.trackingNumber} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { trackingNumber: event.target.value })} placeholder="Número de guía" style={inputStyle()} />
+                      <input type="datetime-local" aria-label={`SLA picking ${shipment.code}`} value={form.pickingDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { pickingDueAt: event.target.value })} style={inputStyle()} />
+                      <input type="datetime-local" aria-label={`SLA despacho ${shipment.code}`} value={form.dispatchDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchDueAt: event.target.value })} style={inputStyle()} />
+                      <input type="datetime-local" aria-label={`SLA entrega ${shipment.code}`} value={form.deliveryDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryDueAt: event.target.value })} style={inputStyle()} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input type="number" min="1" max="20" aria-label={`Paquetes ${shipment.code}`} value={form.packageCount} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { packageCount: event.target.value })} placeholder="Paquetes" style={inputStyle()} />
+                        <input type="number" min="0" aria-label={`Peso ${shipment.code}`} value={form.weightGrams} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { weightGrams: event.target.value })} placeholder="Peso g" style={inputStyle()} />
+                      </div>
+                    </div>
+                    {canManage ? (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                        <button type="button" onClick={() => runAction(shipment, 'update_plan')} disabled={isBusy} style={secondaryButtonStyle()}>
+                          Guardar plan logístico
+                        </button>
+                      </div>
+                    ) : null}
+                  </details>
+
+                  {status === 'packed' ? (
+                    <input aria-label={`Referencia de despacho ${shipment.code}`} value={form.dispatchReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchReference: event.target.value })} placeholder="Referencia de entrega al transportador (obligatoria)" style={{ ...inputStyle(), width: '100%', marginTop: 10 }} />
+                  ) : null}
+                  {status === 'in_transit' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                      <input aria-label={`Evidencia de entrega ${shipment.code}`} value={form.deliveryReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryReference: event.target.value })} placeholder="Referencia de evidencia (obligatoria)" style={inputStyle()} />
+                      <input aria-label={`Recibe ${shipment.code}`} value={form.recipient} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { recipient: event.target.value })} placeholder="Nombre de quien recibe" style={inputStyle()} />
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    {status === 'exception' ? (
+                      <div style={{ flex: '1 1 420px', borderRadius: 14, background: '#fff1f2', padding: 10 }}>
+                        <div style={{ color: '#9f1239', fontSize: 11, fontWeight: 900 }}>{openIncident?.type || 'Incidencia'} · {openIncident?.severity || 'medium'}</div>
+                        <div style={{ marginTop: 4, color: '#881337', fontSize: 11 }}>{openIncident?.description}</div>
+                        {canManage ? (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                            <input aria-label={`Resolución ${shipment.code}`} value={form.resolution} onChange={(event) => updateForm(shipmentId, { resolution: event.target.value })} placeholder="Resolución aplicada" style={{ ...inputStyle(), flex: 1 }} />
+                            <button type="button" onClick={() => runAction(shipment, 'resolve_incident')} disabled={isBusy} style={secondaryButtonStyle()}>Resolver incidencia</button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <details>
+                        <summary style={{ cursor: 'pointer', color: '#be123c', fontSize: 10, fontWeight: 900 }}>Reportar incidencia</summary>
+                        {canManage ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '140px 120px minmax(220px, 1fr) auto', gap: 6, marginTop: 8 }}>
+                            <select aria-label={`Tipo de incidencia ${shipment.code}`} value={form.incidentType} onChange={(event) => updateForm(shipmentId, { incidentType: event.target.value })} style={inputStyle()}>
+                              <option value="delay">Retraso</option><option value="stock_mismatch">Diferencia de inventario</option><option value="damage">Daño</option><option value="address">Dirección</option><option value="carrier">Transportadora</option><option value="customer_unavailable">Cliente ausente</option><option value="other">Otra</option>
+                            </select>
+                            <select aria-label={`Severidad ${shipment.code}`} value={form.severity} onChange={(event) => updateForm(shipmentId, { severity: event.target.value })} style={inputStyle()}>
+                              <option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option>
+                            </select>
+                            <input aria-label={`Descripción de incidencia ${shipment.code}`} value={form.incidentDescription} onChange={(event) => updateForm(shipmentId, { incidentDescription: event.target.value })} placeholder="Describe lo ocurrido" style={inputStyle()} />
+                            <button type="button" onClick={() => runAction(shipment, 'report_incident')} disabled={isBusy} style={dangerButtonStyle()}>Abrir incidencia</button>
+                          </div>
+                        ) : null}
+                      </details>
+                    )}
+                    {canManage && next ? (
+                      <button type="button" onClick={() => runAction(shipment, next[0])} disabled={isBusy} style={primaryButtonStyle()}>
+                        {isBusy ? 'Actualizando…' : next[1]}
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div style={{ marginTop: 14, border: `1px dashed ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 18, padding: 22, textAlign: 'center', color: ORDER_DETAIL_THEME.mutedText, fontSize: 12, fontWeight: 700 }}>
+          La orden física aún no tiene envíos operativos. Se crearán por sede usando únicamente inventario vendido y confirmado.
+        </div>
+      )}
+
+      {message ? (
+        <div role="status" style={{ marginTop: 12, borderRadius: 12, padding: '9px 11px', background: message.type === 'error' ? '#fff1f2' : '#ecfdf5', color: message.type === 'error' ? '#be123c' : '#047857', fontSize: 11, fontWeight: 800 }}>
+          {message.text}
+        </div>
+      ) : null}
+
+      <style>{`
+        @media (max-width: 900px) {
+          section[aria-label="Centro logístico de la orden"] > div:nth-of-type(2) { grid-template-columns: repeat(3, minmax(92px, 1fr)) !important; }
+        }
+        @media (max-width: 620px) {
+          section[aria-label="Centro logístico de la orden"] input,
+          section[aria-label="Centro logístico de la orden"] select { min-width: 0 !important; }
+        }
+      `}</style>
+    </section>
+  );
+}
+
+function inputStyle() {
+  return {
+    border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+    borderRadius: 10,
+    minHeight: 38,
+    padding: '0 10px',
+    background: ORDER_DETAIL_THEME.cardBg,
+    color: ORDER_DETAIL_THEME.cardText,
+    fontSize: 11,
+    fontWeight: 700,
+  };
+}
+
+function primaryButtonStyle() {
+  return { border: 0, borderRadius: 12, minHeight: 38, padding: '0 14px', background: 'var(--admin-primary)', color: '#fff', fontSize: 11, fontWeight: 900, cursor: 'pointer' };
+}
+
+function secondaryButtonStyle() {
+  return { border: '1px solid var(--admin-primary)', borderRadius: 12, minHeight: 36, padding: '0 12px', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)', fontSize: 10, fontWeight: 900, cursor: 'pointer' };
+}
+
+function dangerButtonStyle() {
+  return { border: '1px solid #fecdd3', borderRadius: 10, minHeight: 38, padding: '0 12px', background: '#fff1f2', color: '#be123c', fontSize: 10, fontWeight: 900, cursor: 'pointer' };
+}

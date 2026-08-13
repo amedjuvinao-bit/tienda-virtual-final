@@ -68,7 +68,7 @@ describe('controles de seguridad del detalle de órdenes', () => {
     expect(screen.queryByPlaceholderText(/agregar una nota interna/i)).not.toBeInTheDocument();
   });
 
-  it('permite consultar prestaciones sin editar cuando falta orders:update', () => {
+  it('permite consultar prestaciones sin editar cuando falta orders:fulfillment', () => {
     render(
       <OrderDetailFulfillmentPanel
         order={{

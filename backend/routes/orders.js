@@ -71,6 +71,11 @@ const {
 const {
   listAdminOrders,
 } = require('../controllers/orderAdminQueryController');
+const {
+  getOrderLogistics,
+  initializeLogistics,
+  updateShipment,
+} = require('../controllers/orderLogisticsController');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -975,6 +980,27 @@ async function buildAuthorizedSelectionFilter(req, res, orderIds) {
 /* GET /api/orders/admin: consulta paginada y métricas en un servicio aislado. */
 router.get('/admin', listAdminOrders);
 
+router.get(
+  '/:id/fulfillment/logistics',
+  requireAdmin,
+  requirePermission('orders:view'),
+  getOrderLogistics
+);
+
+router.post(
+  '/:id/fulfillment/logistics/initialize',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  initializeLogistics
+);
+
+router.patch(
+  '/:id/fulfillment/logistics/shipments/:shipmentId',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  updateShipment
+);
+
 /* ============================
  * GET /api/orders/:id/thanks
  * ============================ */
@@ -1009,7 +1035,7 @@ router.get('/:id/thanks', async (req, res) => {
 router.patch(
   '/:id/fulfillment/services/:serviceId',
   requireAdmin,
-  requirePermission('orders:update'),
+  requirePermission('orders:fulfillment'),
   async (req, res) => {
     try {
       const allowedStatuses = new Set([

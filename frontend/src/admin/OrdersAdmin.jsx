@@ -116,7 +116,7 @@ export default function OrdersAdmin() {
   const canArchive = can('orders:archive');
   const canAddNotes = can('orders:notes');
   const canSendEmail = can('orders:email');
-  const canUpdateFulfillment = can('orders:update');
+  const canUpdateFulfillment = can('orders:fulfillment');
   const canDownloadBilling = can('billing:download');
   const canRefund = can('orders:refund');
   const canViewBranches = can('branches:view');

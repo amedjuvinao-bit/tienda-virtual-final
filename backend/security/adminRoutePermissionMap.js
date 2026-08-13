@@ -224,8 +224,28 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   {
     method: 'PATCH',
     path: '/api/orders/:id/fulfillment/services/:serviceId',
-    permission: 'orders:update',
+    permission: 'orders:fulfillment',
     description: 'Actualizar la programación y estado de una prestación.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/fulfillment/logistics',
+    permission: 'orders:view',
+    description: 'Consultar preparación, envíos, seguimiento, SLA e incidencias.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/initialize',
+    permission: 'orders:fulfillment',
+    description: 'Crear envíos por sede desde las asignaciones confirmadas.',
+    audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId',
+    permission: 'orders:fulfillment',
+    description: 'Operar picking, packing, despacho, entrega e incidencias.',
     audit: true,
   },
   {

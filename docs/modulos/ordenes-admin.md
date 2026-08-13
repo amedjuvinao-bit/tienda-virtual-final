@@ -3,11 +3,61 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **3. Arquitectura y rendimiento del listado operativo**.
+- Etapa actual: **4. Logística avanzada multisede**.
 - Estado de la etapa: implementada y cubierta por pruebas automáticas.
-- Siguientes etapas: logística, experiencia visual avanzada y cierre integral.
+- Siguientes etapas: experiencia visual del listado, observabilidad/stress y cierre integral.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora.
+
+## Logística avanzada multisede
+
+### Envíos como unidad operativa
+
+Una orden física puede originar varios envíos. `backend/services/orderLogisticsService.js` agrupa las asignaciones vendidas por sede y crea un envío independiente con:
+
+- asignaciones exactas de inventario y cantidad a preparar;
+- picking, packing, despacho, tránsito y entrega;
+- prioridad, paquetes, peso y referencias de etiqueta;
+- transportadora, nivel de servicio, guía y URL de seguimiento;
+- compromisos SLA para picking, despacho y entrega;
+- manifiesto de despacho y evidencia final de entrega;
+- incidencias tipificadas, severidad, resolución y actor;
+- historial acotado y revisión optimista para evitar sobrescrituras concurrentes.
+
+El flujo permitido es `ready_to_pick → picking → picked → packing → packed → dispatched → in_transit → delivered`. Una incidencia mueve el envío a `exception`, conserva el punto de reanudación y exige una resolución antes de continuar.
+
+Las órdenes anteriores a esta etapa se reconstruyen desde `shippedQuantity` y `deliveredQuantity`: un envío histórico ya despachado o entregado no retrocede a picking. Queda marcado con `initializationSource: legacy_allocation_state` y una nota explícita indica que la referencia externa anterior no estaba disponible.
+
+### Coherencia con inventario, productos y sedes
+
+Los envíos se construyen únicamente desde `inventoryAllocations` confirmadas y con cantidad vendida vigente. Un despacho llama a `advanceOrderInventoryAllocationsForShipment` y marca como enviadas solo las asignaciones incluidas en ese envío; una entrega hace lo mismo para la cantidad entregada. No se modifica `InventoryStock`, porque la venta ya consumió la reserva en su transacción autoritativa.
+
+Un operador de sede solo inicializa y modifica envíos de sus sedes asignadas, incluso cuando la orden contiene mercancía de otras sedes. `owner` y `admin` conservan alcance global. El índice `orders_logistics_branch_status_sla` permite localizar trabajo por sede, estado y vencimiento.
+
+### Coherencia comercial
+
+- Caja y pagos no se modifican durante picking, packing o despacho.
+- La factura y sus documentos DIAN permanecen como snapshots comerciales independientes.
+- La orden solo pasa a `shipped` cuando todos sus envíos activos fueron despachados.
+- La orden solo pasa a `delivered` cuando todos los envíos tienen evidencia de entrega y no quedan entregas digitales o servicios pendientes.
+- Los cambios globales de estado responden `ORDER_LOGISTICS_DISPATCH_REQUIRED` u `ORDER_LOGISTICS_DELIVERY_REQUIRED` si intentan saltarse el flujo.
+- Una devolución posterior continúa usando el contrato de conciliación de inventario, dinero, caja y nota crédito de la etapa 2.
+
+No se afirma que una guía exista en un proveedor externo: nombre, guía, URL, manifiesto y prueba de entrega son referencias operativas ingresadas y auditadas. Una futura integración deberá validar esas referencias con credenciales propias de cada transportadora.
+
+### API y concurrencia
+
+| Endpoint | Propósito | Permiso |
+|---|---|---|
+| `GET /api/orders/:id/fulfillment/logistics` | Consultar resumen y envíos | `orders:view` |
+| `POST /api/orders/:id/fulfillment/logistics/initialize` | Crear/sincronizar envíos autorizados por sede | `orders:fulfillment` |
+| `PATCH /api/orders/:id/fulfillment/logistics/shipments/:shipmentId` | Plan, transición, incidencia o resolución | `orders:fulfillment` |
+
+Cada mutación exige `expectedRevision`. Si otro operador guardó antes, responde `LOGISTICS_REVISION_CONFLICT`; la interfaz recarga el envío en vez de sobrescribir el cambio.
+
+### Centro logístico en el detalle
+
+`OrderDetailLogisticsPanel.jsx` presenta indicadores de envíos, despachos, entregas, incidencias y SLA vencidos. Cada sede tiene progreso visual, compromisos, plan de transportadora/paquetes, acción contextual y gestión de incidentes. Un perfil de solo lectura ve toda la trazabilidad con controles deshabilitados; el permiso `orders:fulfillment` habilita las operaciones.
 
 ## Arquitectura y rendimiento
 
@@ -126,7 +176,7 @@ El mismo alcance protege listado, detalle, estado, cumplimiento, impresión, arc
 | Exportar resultados o selección | `orders:export` |
 | Ejecutar estado/tags masivos | `orders:bulk` |
 | Cambiar estado | `orders:status` |
-| Actualizar prestación de servicio | `orders:update` |
+| Gestionar picking, packing, envíos y prestaciones | `orders:fulfillment` |
 | Marcar como impresa | `orders:mark_printed` |
 | Archivar o desarchivar | `orders:archive` |
 | Editar datos de cliente/facturación | `orders:customer_data` |
@@ -176,7 +226,7 @@ Un usuario con `orders:view` puede consultar listado, detalle, historial, invent
 - impresión y archivo;
 - creación de notas;
 - envío de correo;
-- edición de prestaciones;
+- logística física y edición de prestaciones;
 - descarga de documentos electrónicos.
 
 Las funciones también verifican sesión y permiso antes de ejecutar la solicitud, de modo que ocultar botones no es la única barrera.
@@ -188,12 +238,13 @@ Desde la raíz del repositorio en Windows:
 ```bat
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-security
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-architecture
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm exec -- vitest run && npm run build
 ```
 
 Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
@@ -221,8 +272,16 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El contrato nuevo se ejecuta en GitHub Actions dentro de `products-ci.yml`.
 - Las pruebas de arquitectura usan modelos simulados y no escriben en MongoDB.
 
+## Evidencia de la etapa 4
+
+- Logística backend: 14 controles sobre modelo, compatibilidad histórica, RBAC, sedes, estados, SLA, evidencia, incidencias, concurrencia e inventario selectivo.
+- Centro logístico: 4 pruebas de inicialización autorizada, orden operativo, solo lectura y resolución de incidencias.
+- Seguridad: el permiso `orders:fulfillment` separa logística de la edición general de una orden.
+- CI ejecuta `test:orders-logistics` sin transportadoras externas ni escritura en bases productivas.
+- El recorrido contractual verifica que una orden no se cierra antes del manifiesto y la prueba de entrega.
+
 ## Trabajo pendiente deliberado
 
-1. Flujo logístico avanzado: picking, packing, despacho, transportadora, SLA e incidencias.
-2. Rediseño visual operativo con bandejas, densidad configurable y acciones contextuales.
-3. Pruebas transaccionales/stress con réplica MongoDB y cierre formal de la rama.
+1. Rediseño visual operativo del listado con bandejas, densidad configurable y acciones contextuales.
+2. Pruebas transaccionales/stress con réplica MongoDB, métricas operativas y alertas.
+3. Cierre integral, documentación final y fusión controlada de la rama.
