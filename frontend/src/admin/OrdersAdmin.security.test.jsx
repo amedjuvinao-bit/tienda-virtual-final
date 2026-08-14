@@ -120,6 +120,8 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     };
     state.permissions = new Set();
     localStorage.clear();
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 0 });
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
     Object.values(state.api).forEach((mock) => mock.mockReset());
     state.api.get.mockImplementation(async (url) => {
       if (url === '/api/orders/admin') {
@@ -232,6 +234,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       x: expectedX,
       y: expectedY,
       pinned: false,
+      coordinateSpace: 'viewport',
     });
   });
 
@@ -283,6 +286,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       x: 200,
       y: 170,
       pinned: false,
+      coordinateSpace: 'viewport',
     });
   });
 
@@ -297,6 +301,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     renderOrders();
 
     await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 400 });
     const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
     const toggleContainer = toggle.closest('.orders-control-toggle');
     vi.spyOn(toggleContainer, 'getBoundingClientRect').mockReturnValue({
@@ -320,10 +325,14 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     });
     expect(unpin).toHaveAttribute('aria-pressed', 'true');
     expect(toggleContainer).toHaveClass('is-pinned');
+    expect(toggleContainer.style.position).toBe('absolute');
+    expect(toggleContainer.style.left).toBe('180px');
+    expect(toggleContainer.style.top).toBe('540px');
     expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
       x: 180,
-      y: 140,
+      y: 540,
       pinned: true,
+      coordinateSpace: 'document',
     });
 
     const dispatchPointer = (type, { clientX, clientY }) => {
@@ -342,11 +351,12 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     dispatchPointer('pointerup', { clientX: 390, clientY: 310 });
 
     expect(toggleContainer.style.left).toBe('180px');
-    expect(toggleContainer.style.top).toBe('140px');
+    expect(toggleContainer.style.top).toBe('540px');
     expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
       x: 180,
-      y: 140,
+      y: 540,
       pinned: true,
+      coordinateSpace: 'document',
     });
 
     fireEvent.click(unpin);
@@ -355,10 +365,12 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       screen.getByRole('button', { name: 'Anclar botón de filtros en esta posición' })
     ).toHaveAttribute('aria-pressed', 'false');
     expect(toggleContainer).not.toHaveClass('is-pinned');
+    expect(toggleContainer.style.position).toBe('fixed');
     expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
       x: 180,
       y: 140,
       pinned: false,
+      coordinateSpace: 'viewport',
     });
   });
 
