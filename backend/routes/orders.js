@@ -72,6 +72,9 @@ const {
   listAdminOrders,
 } = require('../controllers/orderAdminQueryController');
 const {
+  getOrderOperationalHealth,
+} = require('../controllers/orderOperationalMonitoringController');
+const {
   getOrderLogistics,
   initializeLogistics,
   updateShipment,
@@ -979,6 +982,8 @@ async function buildAuthorizedSelectionFilter(req, res, orderIds) {
 
 /* GET /api/orders/admin: consulta paginada y métricas en un servicio aislado. */
 router.get('/admin', listAdminOrders);
+
+router.get('/admin/operations/health', getOrderOperationalHealth);
 
 router.get(
   '/:id/fulfillment/logistics',

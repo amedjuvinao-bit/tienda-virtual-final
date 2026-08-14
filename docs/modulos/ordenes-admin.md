@@ -3,11 +3,40 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **5. Centro operativo comercial y logístico**.
-- Estado de la etapa: implementada y cubierta por pruebas automáticas.
-- Siguientes etapas: observabilidad/stress y cierre integral.
+- Etapa actual: **7. Observabilidad y stress transaccional**.
+- Estado de la etapa: implementada; el contrato aislado se valida sin datos reales y la ejecución transaccional queda protegida por CI con MongoDB en réplica.
+- Siguiente etapa: cierre integral, documentación final y fusión controlada.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada.
+
+## Observabilidad y stress transaccional
+
+`GET /api/orders/admin/operations/health` entrega un diagnóstico privado y no cacheable, protegido por `orders:view` y limitado a las sedes autorizadas del usuario. No devuelve órdenes, clientes ni referencias individuales: expone únicamente cantidades agregadas, latencia de la consulta, estado general y alertas independientes.
+
+El diagnóstico calcula en una sola agregación con `$facet`:
+
+- fallos de pago ocurridos durante las últimas 24 horas;
+- órdenes pagadas con inventario vendido que llevan más de dos horas sin preparación;
+- incidencias abiertas y su nivel alto o crítico;
+- compromisos SLA vencidos o que vencen dentro de 24 horas;
+- envíos en despacho o tránsito sin actualización durante más de 48 horas;
+- latencia de la propia consulta operativa;
+- las nueve colas del centro de operaciones dentro del mismo alcance por sede.
+
+Cada señal produce un check `ok`, `warning` o `critical`. El estado global es `healthy`, `degraded` o `critical` según la alerta de mayor severidad. El diagnóstico no consulta Wompi, Factus, correo, transportadoras ni otros servicios externos, y tampoco sincroniza o modifica índices.
+
+`testOrderTransactionalStress.js` usa exclusivamente `ORDERS_STRESS_MONGO_URI`, exige host local, nombre de base `orders_ci_stress` y `replicaSet`. La prueba crea 350 órdenes distribuidas entre pago pendiente, pago fallido, preparación atrasada, picking en riesgo, tránsito sin actualización, incidencia crítica y entrega completa. Después ejecuta 140 consultas con concurrencia 14 y valida:
+
+- rollback completo cuando la persistencia del evento falla después de guardar la orden;
+- inicialización logística idempotente bajo diez solicitudes simultáneas;
+- revisión optimista con un único ganador y nueve conflictos controlados;
+- recorrido transaccional desde preparación hasta entrega;
+- coherencia entre envío, estado comercial y cantidades vendidas, despachadas y entregadas;
+- p50, p95, latencia máxima, duración total y variación de memoria;
+- detección de una corrupción controlada y restauración con cero inconsistencias finales;
+- eliminación obligatoria de la base temporal al terminar, incluso si la prueba falla.
+
+El stress no inicia servidor HTTP, no llama gateways, DIAN, correos o transportadoras y no acepta una URI `mongodb+srv` ni un nombre de base distinto al temporal autorizado.
 
 ## Centro operativo comercial y logístico
 
@@ -256,6 +285,8 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-s
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-architecture
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-observability
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-stress-plan
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics-eligibility-trace
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
@@ -319,6 +350,15 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
 - Regresión frontend completa: 28 archivos y 107 pruebas aprobadas; build de producción aprobado con Vite.
 
+## Evidencia de la etapa 7
+
+- Observabilidad operativa: 11 controles sobre privacidad, RBAC, sedes, agregación, señales, índices, aislamiento, umbrales y estados healthy/critical.
+- Plan de stress: 350 órdenes, siete escenarios, 140 consultas y concurrencia 14; se valida sin abrir una conexión ni leer `.env`.
+- La ejecución real usa MongoDB 7 en réplica dentro de CI y una base `orders_ci_stress` que se elimina al terminar.
+- La prueba transaccional reutiliza la autoridad real de `orderLogisticsService`; no implementa una máquina paralela ni modifica inventario físico.
+- Los umbrales profesionales son p95 máximo de 2.500 ms, duración total máxima de 120 segundos, crecimiento de heap máximo de 256 MB y cero inconsistencias finales.
+- CI conserva por separado el contrato sin base, el plan seguro y la ejecución con réplica para distinguir errores de diseño, aislamiento y comportamiento transaccional.
+
 ## Simulación persistente y trazabilidad visual
 
 El comando `demo:orders-trace` crea recorridos demostrativos permanentes para revisar el módulo desde el panel: pago pendiente con reserva liberada, picking por iniciar, incidencia abierta, tránsito y entrega con evidencia. Cuando existen existencias elegibles en dos sedes distintas, añade una orden multisede y genera un envío independiente para cada sede real.
@@ -352,5 +392,4 @@ La ejecución exige `--confirm-persist`, no limpia las órdenes creadas y no mod
 
 ## Trabajo pendiente deliberado
 
-1. Pruebas transaccionales/stress con réplica MongoDB, métricas operativas y alertas.
-2. Cierre integral, documentación final y fusión controlada de la rama.
+1. Cierre integral, documentación final y fusión controlada de la rama.

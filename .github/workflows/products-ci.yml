@@ -97,6 +97,12 @@ jobs:
       - name: Validar centro operativo de órdenes
         run: npm --prefix backend run test:orders-operations
 
+      - name: Validar observabilidad operativa de órdenes
+        run: npm --prefix backend run test:orders-observability
+
+      - name: Validar aislamiento del plan de estrés de órdenes
+        run: npm --prefix backend run test:orders-stress-plan
+
       - name: Validar simulador persistente de órdenes
         run: npm --prefix backend run test:orders-trace-seed
 
@@ -200,6 +206,14 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_multi_branch?replicaSet=rs0
         run: npm --prefix backend run test:order-multi-branch-inventory
+
+      - name: Validar transacciones, estrés y alertas de órdenes
+        env:
+          ORDERS_STRESS_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stress?replicaSet=rs0
+          ORDERS_STRESS_ORDER_COUNT: 350
+          ORDERS_STRESS_QUERY_REQUESTS: 140
+          ORDERS_STRESS_QUERY_CONCURRENCY: 14
+        run: npm --prefix backend run test:orders-stress
 
       - name: Validar venta integral completa
         env:

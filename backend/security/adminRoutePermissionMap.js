@@ -195,6 +195,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/orders/admin/operations/health',
+    permission: 'orders:view',
+    description: 'Consultar métricas, umbrales y alertas operativas de órdenes.',
+    audit: true,
+  },
+  {
+    method: 'GET',
     path: '/api/orders/admin/export',
     permission: 'orders:export',
     description: 'Exportar órdenes.',
