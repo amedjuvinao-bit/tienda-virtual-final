@@ -170,8 +170,10 @@ function main() {
   assert.ok(adminSource.includes('createPortal(controlToggleButton, document.body)'));
   assert.ok(adminSource.includes('onPointerMove={handleControlTogglePointerMove}'));
   assert.ok(adminSource.includes('grid-area: controls'));
-  assert.ok(adminSource.includes('position: absolute'));
-  assert.ok(adminSource.includes('inset: 0 0 auto'));
+  assert.ok(
+    adminSource.includes("position: controlTogglePinned ? 'absolute' : 'fixed'")
+  );
+  assert.ok(adminSource.includes('inset: auto'));
   assert.ok(adminSource.includes('overflow: visible'));
   assert.ok(!adminSource.includes('overflow-y: auto'));
   assert.ok(boardSource.includes('role="tooltip"'));
