@@ -193,7 +193,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     const showFilters = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
     expect(showFilters).toHaveAttribute('aria-expanded', 'false');
     expect(showFilters).toHaveAttribute('aria-controls', 'orders-control-panel');
-    expect(showFilters.parentElement).toBe(document.body);
+    expect(showFilters.closest('.orders-control-toggle')?.parentElement).toBe(document.body);
 
     fireEvent.click(showFilters);
     const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
@@ -221,15 +221,17 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
 
     await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
     const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    const toggleContainer = toggle.closest('.orders-control-toggle');
     const expectedX = Math.max(12, window.innerWidth - 132 - 12);
     const expectedY = Math.max(12, window.innerHeight - 40 - 12);
 
-    expect(toggle.parentElement).toBe(document.body);
-    expect(toggle.style.left).toBe(`${expectedX}px`);
-    expect(toggle.style.top).toBe(`${expectedY}px`);
+    expect(toggleContainer?.parentElement).toBe(document.body);
+    expect(toggleContainer?.style.left).toBe(`${expectedX}px`);
+    expect(toggleContainer?.style.top).toBe(`${expectedY}px`);
     expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
       x: expectedX,
       y: expectedY,
+      pinned: false,
     });
   });
 
@@ -245,7 +247,8 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
 
     await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
     const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
-    vi.spyOn(toggle, 'getBoundingClientRect').mockReturnValue({
+    const toggleContainer = toggle.closest('.orders-control-toggle');
+    vi.spyOn(toggleContainer, 'getBoundingClientRect').mockReturnValue({
       left: 100,
       top: 100,
       right: 222,
@@ -274,11 +277,88 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     fireEvent.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle.style.left).toBe('200px');
-    expect(toggle.style.top).toBe('170px');
+    expect(toggleContainer.style.left).toBe('200px');
+    expect(toggleContainer.style.top).toBe('170px');
     expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
       x: 200,
       y: 170,
+      pinned: false,
+    });
+  });
+
+  it('ancla el botón en la posición elegida y permite liberarlo nuevamente', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+
+    renderOrders();
+
+    await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    const toggleContainer = toggle.closest('.orders-control-toggle');
+    vi.spyOn(toggleContainer, 'getBoundingClientRect').mockReturnValue({
+      left: 180,
+      top: 140,
+      right: 333,
+      bottom: 176,
+      width: 153,
+      height: 36,
+      x: 180,
+      y: 140,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Anclar botón de filtros en esta posición' })
+    );
+
+    const unpin = screen.getByRole('button', {
+      name: 'Quitar anclaje del botón de filtros',
+    });
+    expect(unpin).toHaveAttribute('aria-pressed', 'true');
+    expect(toggleContainer).toHaveClass('is-pinned');
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: 180,
+      y: 140,
+      pinned: true,
+    });
+
+    const dispatchPointer = (type, { clientX, clientY }) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        button: 0,
+        clientX,
+        clientY,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 9 });
+      fireEvent(toggle, event);
+    };
+
+    dispatchPointer('pointerdown', { clientX: 190, clientY: 150 });
+    dispatchPointer('pointermove', { clientX: 390, clientY: 310 });
+    dispatchPointer('pointerup', { clientX: 390, clientY: 310 });
+
+    expect(toggleContainer.style.left).toBe('180px');
+    expect(toggleContainer.style.top).toBe('140px');
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: 180,
+      y: 140,
+      pinned: true,
+    });
+
+    fireEvent.click(unpin);
+
+    expect(
+      screen.getByRole('button', { name: 'Anclar botón de filtros en esta posición' })
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleContainer).not.toHaveClass('is-pinned');
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: 180,
+      y: 140,
+      pinned: false,
     });
   });
 

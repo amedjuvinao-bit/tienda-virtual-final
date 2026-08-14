@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal } from 'lucide-react';
+import { Pin, SlidersHorizontal } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import useAdminPermissions from './security/useAdminPermissions';
@@ -152,9 +152,11 @@ export default function OrdersAdmin() {
   const [branchId, setBranchId] = useState('');
   const [controlsOpen, setControlsOpen] = useState(false);
   const [controlTogglePosition, setControlTogglePosition] = useState(null);
+  const [controlTogglePinned, setControlTogglePinned] = useState(false);
   const [draggingControlToggle, setDraggingControlToggle] = useState(false);
   const controlToggleRef = useRef(null);
   const controlTogglePositionRef = useRef(null);
+  const controlTogglePinnedRef = useRef(false);
   const controlToggleDragRef = useRef(null);
   const lastControlToggleDragAtRef = useRef(0);
 
@@ -166,9 +168,15 @@ export default function OrdersAdmin() {
       if (Number.isFinite(stored?.x) && Number.isFinite(stored?.y)) {
         const rect = controlToggleRef.current?.getBoundingClientRect();
         const next = clampControlTogglePosition(stored, rect?.width, rect?.height);
+        const nextPinned = stored?.pinned === true;
         controlTogglePositionRef.current = next;
+        controlTogglePinnedRef.current = nextPinned;
         setControlTogglePosition(next);
-        window.localStorage.setItem(CONTROL_TOGGLE_POSITION_KEY, JSON.stringify(next));
+        setControlTogglePinned(nextPinned);
+        window.localStorage.setItem(
+          CONTROL_TOGGLE_POSITION_KEY,
+          JSON.stringify({ ...next, pinned: nextPinned })
+        );
       }
     } catch {
       window.localStorage.removeItem(CONTROL_TOGGLE_POSITION_KEY);
@@ -184,7 +192,10 @@ export default function OrdersAdmin() {
       );
       controlTogglePositionRef.current = next;
       setControlTogglePosition(next);
-      window.localStorage.setItem(CONTROL_TOGGLE_POSITION_KEY, JSON.stringify(next));
+      window.localStorage.setItem(
+        CONTROL_TOGGLE_POSITION_KEY,
+        JSON.stringify({ ...next, pinned: controlTogglePinnedRef.current })
+      );
     };
 
     window.addEventListener('resize', keepToggleInsideViewport);
@@ -197,10 +208,33 @@ export default function OrdersAdmin() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !controlTogglePositionRef.current) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const rect = controlToggleRef.current?.getBoundingClientRect();
+      const next = clampControlTogglePosition(
+        controlTogglePositionRef.current,
+        rect?.width,
+        rect?.height
+      );
+      controlTogglePositionRef.current = next;
+      setControlTogglePosition(next);
+      window.localStorage.setItem(
+        CONTROL_TOGGLE_POSITION_KEY,
+        JSON.stringify({ ...next, pinned: controlTogglePinnedRef.current })
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [controlsOpen, controlTogglePinned]);
+
   const handleControlTogglePointerDown = (event) => {
+    if (controlTogglePinnedRef.current) return;
     if (event.button != null && event.button !== 0) return;
 
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = controlToggleRef.current?.getBoundingClientRect()
+      || event.currentTarget.getBoundingClientRect();
     controlToggleDragRef.current = {
       pointerId: event.pointerId ?? 'primary',
       startX: event.clientX,
@@ -215,6 +249,7 @@ export default function OrdersAdmin() {
   };
 
   const handleControlTogglePointerMove = (event) => {
+    if (controlTogglePinnedRef.current) return;
     const drag = controlToggleDragRef.current;
     if (!drag || drag.pointerId !== (event.pointerId ?? 'primary')) return;
 
@@ -247,7 +282,7 @@ export default function OrdersAdmin() {
     if (drag.moved && !cancelled && controlTogglePositionRef.current && typeof window !== 'undefined') {
       window.localStorage.setItem(
         CONTROL_TOGGLE_POSITION_KEY,
-        JSON.stringify(controlTogglePositionRef.current)
+        JSON.stringify({ ...controlTogglePositionRef.current, pinned: false })
       );
     }
   };
@@ -257,6 +292,30 @@ export default function OrdersAdmin() {
       return;
     }
     setControlsOpen((open) => !open);
+  };
+
+  const handleControlTogglePin = () => {
+    if (typeof window === 'undefined') return;
+
+    const rect = controlToggleRef.current?.getBoundingClientRect();
+    const currentPosition = controlTogglePositionRef.current
+      || clampControlTogglePosition(
+        { x: rect?.left, y: rect?.top },
+        rect?.width,
+        rect?.height
+      );
+    const nextPinned = !controlTogglePinnedRef.current;
+
+    controlToggleDragRef.current = null;
+    setDraggingControlToggle(false);
+    controlTogglePositionRef.current = currentPosition;
+    controlTogglePinnedRef.current = nextPinned;
+    setControlTogglePosition(currentPosition);
+    setControlTogglePinned(nextPinned);
+    window.localStorage.setItem(
+      CONTROL_TOGGLE_POSITION_KEY,
+      JSON.stringify({ ...currentPosition, pinned: nextPinned })
+    );
   };
 
   const requireSessionAndPermission = (allowed, message) => {
@@ -812,30 +871,54 @@ export default function OrdersAdmin() {
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(total, page * limit);
   const controlToggleButton = (
-    <button
+    <div
       ref={controlToggleRef}
-      type="button"
-      aria-controls="orders-control-panel"
-      aria-expanded={controlsOpen}
-      aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
-      title="Arrastra para mover. Haz clic para mostrar u ocultar los filtros."
-      onClick={handleControlToggleClick}
-      onPointerDown={handleControlTogglePointerDown}
-      onPointerMove={handleControlTogglePointerMove}
-      onPointerUp={finishControlToggleDrag}
-      onPointerCancel={finishControlToggleDrag}
-      className={`orders-control-toggle inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition ${
+      className={`orders-control-toggle ${
         draggingControlToggle ? 'is-dragging' : ''
-      }`}
+      } ${controlTogglePinned ? 'is-pinned' : ''}`}
       style={{
         ...(controlTogglePosition
           ? { left: controlTogglePosition.x, top: controlTogglePosition.y, right: 'auto', bottom: 'auto' }
           : {}),
       }}
     >
-      <SlidersHorizontal className="h-3.5 w-3.5" />
-      <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
-    </button>
+      <button
+        type="button"
+        aria-controls="orders-control-panel"
+        aria-expanded={controlsOpen}
+        aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
+        title={controlTogglePinned
+          ? 'Botón anclado. Haz clic para mostrar u ocultar los filtros.'
+          : 'Arrastra para mover. Haz clic para mostrar u ocultar los filtros.'}
+        onClick={handleControlToggleClick}
+        onPointerDown={handleControlTogglePointerDown}
+        onPointerMove={handleControlTogglePointerMove}
+        onPointerUp={finishControlToggleDrag}
+        onPointerCancel={finishControlToggleDrag}
+        className="orders-control-toggle-action"
+      >
+        <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
+        <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+      </button>
+      <button
+        type="button"
+        className="orders-control-toggle-pin"
+        aria-label={controlTogglePinned
+          ? 'Quitar anclaje del botón de filtros'
+          : 'Anclar botón de filtros en esta posición'}
+        aria-pressed={controlTogglePinned}
+        title={controlTogglePinned
+          ? 'Anclado aquí. Pulsa para volver a moverlo.'
+          : 'Anclar el botón en esta posición.'}
+        onClick={handleControlTogglePin}
+      >
+        <Pin
+          aria-hidden="true"
+          className="h-3.5 w-3.5"
+          fill={controlTogglePinned ? 'currentColor' : 'none'}
+        />
+      </button>
+    </div>
   );
 
   return (
@@ -875,8 +958,9 @@ export default function OrdersAdmin() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          position: absolute;
-          inset: 0 0 auto;
+          position: relative;
+          inset: auto;
+          align-self: start;
           width: 100%;
           min-width: 0;
           padding: 14px;
@@ -926,11 +1010,13 @@ export default function OrdersAdmin() {
           right: 22px;
           bottom: 22px;
           z-index: 120;
-          min-width: 122px;
-          justify-content: center;
-          touch-action: none;
+          display: inline-flex;
+          height: 36px;
+          align-items: stretch;
+          overflow: hidden;
+          border: 1px solid;
+          border-radius: 12px;
           user-select: none;
-          cursor: grab;
           border-color: color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,0.72)) !important;
           background: linear-gradient(135deg,
             color-mix(in srgb, var(--admin-card-bg) 82%, transparent),
@@ -942,6 +1028,7 @@ export default function OrdersAdmin() {
             0 10px 26px color-mix(in srgb, var(--admin-primary) 16%, transparent);
           backdrop-filter: blur(18px) saturate(150%);
           -webkit-backdrop-filter: blur(18px) saturate(150%);
+          transition: border-color 160ms ease, box-shadow 160ms ease;
         }
         .orders-control-toggle:hover {
           border-color: color-mix(in srgb, var(--admin-primary) 58%, rgba(255,255,255,0.82)) !important;
@@ -949,12 +1036,55 @@ export default function OrdersAdmin() {
             inset 0 1px 0 rgba(255,255,255,0.9),
             0 12px 30px color-mix(in srgb, var(--admin-primary) 22%, transparent);
         }
+        .orders-control-toggle-action,
+        .orders-control-toggle-pin {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          background: transparent;
+          color: var(--admin-card-text);
+          font: inherit;
+        }
+        .orders-control-toggle-action {
+          min-width: 118px;
+          gap: 8px;
+          padding: 0 12px;
+          touch-action: none;
+          cursor: grab;
+          font-size: 11px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+        .orders-control-toggle-pin {
+          width: 35px;
+          flex: 0 0 35px;
+          border-left: 1px solid color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.72));
+          color: var(--admin-primary);
+          cursor: pointer;
+          transition: background 160ms ease, color 160ms ease;
+        }
+        .orders-control-toggle-pin:hover,
+        .orders-control-toggle-pin:focus-visible,
+        .orders-control-toggle.is-pinned .orders-control-toggle-pin {
+          background: color-mix(in srgb, var(--admin-primary-soft-bg) 82%, transparent);
+        }
+        .orders-control-toggle-action:focus-visible,
+        .orders-control-toggle-pin:focus-visible {
+          outline: 2px solid var(--admin-primary);
+          outline-offset: -3px;
+        }
         .orders-control-toggle svg {
           color: var(--admin-primary);
         }
+        .orders-control-toggle.is-pinned .orders-control-toggle-action {
+          cursor: pointer;
+        }
         .orders-control-toggle.is-dragging {
-          cursor: grabbing;
           transition: none !important;
+        }
+        .orders-control-toggle.is-dragging .orders-control-toggle-action {
+          cursor: grabbing;
         }
         .orders-control-panel .orf-filters {
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -996,7 +1126,7 @@ export default function OrdersAdmin() {
           .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .orders-admin-shell.controls-open .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .orders-control-panel { padding: 12px; }
-          .orders-control-toggle { min-width: 112px; }
+          .orders-control-toggle-action { min-width: 110px; padding-inline: 10px; }
           .orders-control-panel .orf-filters {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }

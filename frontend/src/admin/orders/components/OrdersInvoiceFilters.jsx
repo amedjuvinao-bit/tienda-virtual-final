@@ -172,7 +172,11 @@ export default function OrdersInvoiceFilters({
         }
       `}</style>
 
-      <div className="relative z-10 mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div
+        className={`relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between ${
+          compact ? 'mb-3 gap-2' : 'mb-4 gap-3'
+        }`}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <div
             className={`flex shrink-0 items-center justify-center border ${
@@ -245,7 +249,9 @@ export default function OrdersInvoiceFilters({
       </div>
 
       <div
-        className={`invoice-crystal-panel relative z-10 border p-2.5 ${
+        className={`invoice-crystal-panel relative z-10 border ${
+          compact ? 'p-2' : 'p-2.5'
+        } ${
           compact ? 'rounded-xl' : 'rounded-[26px]'
         }`}
         style={{
@@ -261,7 +267,7 @@ export default function OrdersInvoiceFilters({
         }}
       >
         <div
-          className="relative z-10 grid gap-2"
+          className={`relative z-10 grid ${compact ? 'gap-1.5' : 'gap-2'}`}
           style={{
             gridTemplateColumns: compact
               ? 'repeat(2, minmax(0, 1fr))'
@@ -278,7 +284,9 @@ export default function OrdersInvoiceFilters({
                 type="button"
                 onClick={() => handleClick(item.key)}
                 title={item.label}
-                className={`invoice-crystal-btn group min-h-[48px] rounded-xl border px-2.5 py-2.5 text-center text-[11px] font-black transition duration-300 hover:-translate-y-[2px] active:scale-[0.985] ${
+                className={`invoice-crystal-btn group rounded-xl border px-2.5 text-center text-[11px] font-black transition duration-300 hover:-translate-y-[2px] active:scale-[0.985] ${
+                  compact ? 'min-h-[42px] py-2' : 'min-h-[48px] py-2.5'
+                } ${
                   spansCompactRow ? 'col-span-2' : ''
                 }`}
                 style={{
