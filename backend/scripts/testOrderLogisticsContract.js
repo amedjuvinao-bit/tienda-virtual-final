@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 const {
   initializeOrderLogistics,
+  logisticsEligibility,
   summarizeShipments,
   updateOrderShipment,
 } = require('../services/orderLogisticsService');
@@ -215,6 +216,51 @@ async function main() {
   );
   ok('una orden sin pago confirmado no puede entrar a preparación física');
 
+  const unpaidEligibility = logisticsEligibility(unpaid);
+  assert.strictEqual(unpaidEligibility.canInitialize, false);
+  assert.strictEqual(
+    unpaidEligibility.code,
+    'ORDER_PAYMENT_REQUIRED_FOR_LOGISTICS'
+  );
+  assert.strictEqual(
+    unpaidEligibility.message,
+    'Disponible cuando el pago esté confirmado y exista inventario vendido.'
+  );
+  ok('la consulta logística explica y bloquea la preparación con pago pendiente');
+
+  const released = baseOrder();
+  released.inventoryAllocations[0].soldQuantity = 0;
+  released.inventoryAllocations[0].releasedQuantity =
+    released.inventoryAllocations[0].quantity;
+  released.inventoryAllocations[0].status = 'released';
+  const releasedEligibility = logisticsEligibility(released);
+  assert.strictEqual(releasedEligibility.canInitialize, false);
+  assert.strictEqual(
+    releasedEligibility.code,
+    'ORDER_LOGISTICS_ALLOCATIONS_REQUIRED'
+  );
+  assert.strictEqual(
+    releasedEligibility.message,
+    'Disponible cuando el pago esté confirmado y exista inventario vendido.'
+  );
+  ok('una reserva liberada sin inventario vendido mantiene la logística deshabilitada');
+
+  const validEligibility = logisticsEligibility(baseOrder());
+  assert.strictEqual(validEligibility.canInitialize, true);
+  assert.strictEqual(validEligibility.branchCount, 1);
+  assert.strictEqual(validEligibility.soldQuantity, 1);
+  ok('el pago confirmado con inventario vendido habilita la preparación');
+
+  const refunded = baseOrder();
+  refunded.status = 'refunded';
+  const refundedEligibility = logisticsEligibility(refunded);
+  assert.strictEqual(refundedEligibility.canInitialize, false);
+  assert.strictEqual(
+    refundedEligibility.code,
+    'ORDER_STATUS_BLOCKS_LOGISTICS'
+  );
+  ok('un estado comercial cerrado mantiene bloqueada la preparación logística');
+
   const flowOrder = baseOrder();
   const flowAllocation = flowOrder.inventoryAllocations[0];
   const flowShipment = shipmentFixture(flowOrder, flowAllocation.branch, flowAllocation._id);
@@ -305,6 +351,8 @@ async function main() {
   assert(frontendSource.includes('Plan de transportadora, paquetes y SLA'));
   assert(frontendSource.includes('Reportar incidencia'));
   assert(frontendSource.includes('expectedRevision'));
+  assert(frontendSource.includes('eligibility?.canInitialize'));
+  assert(frontendSource.includes("eligibility?.message || 'Verificando pago e inventario vendido…'"));
   ok('la interfaz expone el flujo operativo, evidencia, SLA, incidencias y concurrencia');
 
   console.log(`\nLogística avanzada de órdenes: ${checks.length}/${checks.length} controles superados.`);

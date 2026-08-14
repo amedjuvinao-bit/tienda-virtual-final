@@ -246,7 +246,7 @@ function summarizeShipments(shipments = [], now = new Date()) {
   };
 }
 
-function logisticsView(order, now = new Date()) {
+function logisticsView(order, now = new Date(), scope = {}) {
   const shipments = Array.isArray(order?.fulfillment?.shipments)
     ? order.fulfillment.shipments
     : [];
@@ -256,6 +256,7 @@ function logisticsView(order, now = new Date()) {
     orderStatus: cleanLower(order?.status),
     fulfillmentStatus: cleanLower(order?.fulfillmentStatus),
     summary: summarizeShipments(shipments, now),
+    eligibility: logisticsEligibility(order, scope),
     shipments,
   };
 }
@@ -303,6 +304,68 @@ function buildShipmentGroups(order) {
   }
 
   return [...groups.values()];
+}
+
+function logisticsEligibility(
+  order,
+  {
+    authorizedBranchIds = [],
+    allowAllBranches = true,
+  } = {}
+) {
+  const unavailable = (code, message, blockingMessage) => ({
+    canInitialize: false,
+    code,
+    message,
+    blockingMessage,
+    branchCount: 0,
+    soldQuantity: 0,
+  });
+
+  if (!isPaymentConfirmed(order)) {
+    return unavailable(
+      'ORDER_PAYMENT_REQUIRED_FOR_LOGISTICS',
+      'Disponible cuando el pago esté confirmado y exista inventario vendido.',
+      'La logística solo puede iniciar después de confirmar el pago.'
+    );
+  }
+
+  if (['cancelled', 'failed', 'refunded'].includes(cleanLower(order?.status))) {
+    return unavailable(
+      'ORDER_STATUS_BLOCKS_LOGISTICS',
+      'El estado comercial actual de la orden no permite preparar logística.',
+      'El estado comercial de la orden no permite iniciar logística.'
+    );
+  }
+
+  const allowedBranches = new Set(
+    (Array.isArray(authorizedBranchIds) ? authorizedBranchIds : [])
+      .map(idValue)
+      .filter(Boolean)
+  );
+  const groups = buildShipmentGroups(order).filter(
+    (group) => allowAllBranches || allowedBranches.has(idValue(group.branch))
+  );
+
+  if (!groups.length) {
+    return unavailable(
+      'ORDER_LOGISTICS_ALLOCATIONS_REQUIRED',
+      'Disponible cuando el pago esté confirmado y exista inventario vendido.',
+      'La orden no tiene asignaciones físicas vendidas para preparar.'
+    );
+  }
+
+  return {
+    canInitialize: true,
+    code: null,
+    message: 'Pago confirmado e inventario vendido disponibles para preparar.',
+    blockingMessage: '',
+    branchCount: groups.length,
+    soldQuantity: groups.reduce(
+      (total, group) => total + Number(group?.quantity || 0),
+      0
+    ),
+  };
 }
 
 function defaultShipmentCode(order, group, index) {
@@ -413,22 +476,19 @@ async function initializeOrderLogistics(
     if (!order) {
       throw createLogisticsError('Orden no encontrada dentro de tus sedes autorizadas.', 'ORDER_NOT_FOUND', 404);
     }
-    if (!isPaymentConfirmed(order)) {
+    await hydrateOrderInventoryAllocations(order, { session });
+    const eligibility = logisticsEligibility(order, {
+      authorizedBranchIds,
+      allowAllBranches,
+    });
+    if (!eligibility.canInitialize) {
       throw createLogisticsError(
-        'La logística solo puede iniciar después de confirmar el pago.',
-        'ORDER_PAYMENT_REQUIRED_FOR_LOGISTICS',
-        409
-      );
-    }
-    if (['cancelled', 'failed', 'refunded'].includes(cleanLower(order.status))) {
-      throw createLogisticsError(
-        'El estado comercial de la orden no permite iniciar logística.',
-        'ORDER_STATUS_BLOCKS_LOGISTICS',
+        eligibility.blockingMessage,
+        eligibility.code,
         409
       );
     }
 
-    await hydrateOrderInventoryAllocations(order, { session });
     const allowedBranches = new Set(
       (Array.isArray(authorizedBranchIds) ? authorizedBranchIds : [])
         .map(idValue)
@@ -830,6 +890,7 @@ module.exports = {
   SHIPMENT_ACTIONS,
   summarizeShipments,
   logisticsView,
+  logisticsEligibility,
   initializeOrderLogistics,
   updateOrderShipment,
   reconcileOrderFromLogistics,

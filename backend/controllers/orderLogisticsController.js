@@ -7,6 +7,9 @@ const {
   buildScopedOrderFilter,
 } = require('../services/orderAdminScopeService');
 const {
+  hydrateOrderInventoryAllocations,
+} = require('../services/orderInventoryAllocationService');
+const {
   initializeOrderLogistics,
   logisticsView,
   updateOrderShipment,
@@ -82,7 +85,11 @@ async function getOrderLogistics(req, res) {
         message: 'Orden no encontrada dentro de tus sedes autorizadas.',
       });
     }
-    return res.json({ ok: true, ...logisticsView(order) });
+    await hydrateOrderInventoryAllocations(order);
+    return res.json({
+      ok: true,
+      ...logisticsView(order, new Date(), serviceScope(access)),
+    });
   } catch (error) {
     return sendServiceError(res, error);
   }
@@ -105,6 +112,7 @@ async function initializeLogistics(req, res) {
       orderStatus: result.orderStatus,
       fulfillmentStatus: result.fulfillmentStatus,
       summary: result.summary,
+      eligibility: result.eligibility,
       shipments: result.shipments,
     });
   } catch (error) {

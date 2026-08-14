@@ -177,13 +177,33 @@ export default function OrderDetailLogisticsPanel({
     : [];
   const [shipments, setShipments] = useState(initialShipments);
   const [summary, setSummary] = useState(order?.fulfillment?.logisticsSummary || {});
+  const [eligibility, setEligibility] = useState(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [forms, setForms] = useState({});
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
 
+  const physical = useMemo(() => hasPhysicalFulfillment(order), [order]);
+
+  const applyResponse = (data) => {
+    const nextShipments = Array.isArray(data?.shipments) ? data.shipments : [];
+    setShipments(nextShipments);
+    setSummary(data?.summary || {});
+    if (data?.eligibility) setEligibility(data.eligibility);
+    setForms(
+      Object.fromEntries(
+        nextShipments.map((shipment) => [
+          String(shipment._id),
+          shipmentForm(shipment),
+        ])
+      )
+    );
+  };
+
   useEffect(() => {
     setShipments(initialShipments);
     setSummary(order?.fulfillment?.logisticsSummary || {});
+    setEligibility(null);
     setForms(
       Object.fromEntries(
         initialShipments.map((shipment) => [
@@ -195,22 +215,35 @@ export default function OrderDetailLogisticsPanel({
     setMessage(null);
   }, [order?._id, order?.fulfillment?.logisticsSummary?.updatedAt]);
 
-  const physical = useMemo(() => hasPhysicalFulfillment(order), [order]);
-  if (!physical) return null;
+  useEffect(() => {
+    if (!canManage || !physical || !order?._id || initialShipments.length > 0) {
+      return undefined;
+    }
 
-  const applyResponse = (data) => {
-    const nextShipments = Array.isArray(data?.shipments) ? data.shipments : [];
-    setShipments(nextShipments);
-    setSummary(data?.summary || {});
-    setForms(
-      Object.fromEntries(
-        nextShipments.map((shipment) => [
-          String(shipment._id),
-          shipmentForm(shipment),
-        ])
-      )
-    );
-  };
+    let active = true;
+    setEligibilityLoading(true);
+    getOrderLogistics(order._id)
+      .then((data) => {
+        if (active) applyResponse(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setEligibility({
+          canInitialize: false,
+          code: 'ORDER_LOGISTICS_ELIGIBILITY_UNAVAILABLE',
+          message: 'No fue posible verificar el pago y el inventario vendido.',
+        });
+      })
+      .finally(() => {
+        if (active) setEligibilityLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [canManage, order?._id, physical, initialShipments.length]);
+
+  if (!physical) return null;
 
   const refresh = async () => {
     if (!order?._id) return;
@@ -219,7 +252,7 @@ export default function OrderDetailLogisticsPanel({
   };
 
   const initialize = async () => {
-    if (!canManage || !order?._id) return;
+    if (!canManage || !order?._id || !eligibility?.canInitialize) return;
     try {
       setBusy('initialize');
       setMessage(null);
@@ -314,14 +347,55 @@ export default function OrderDetailLogisticsPanel({
           </p>
         </div>
         {canManage && shipments.length === 0 ? (
-          <button
-            type="button"
-            onClick={initialize}
-            disabled={busy === 'initialize'}
-            style={{ border: 0, borderRadius: 14, minHeight: 40, padding: '0 16px', background: 'var(--admin-primary)', color: '#fff', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}
+          <div
+            title={eligibility?.message || 'Verificando pago e inventario vendido.'}
+            style={{ maxWidth: 310, textAlign: 'right' }}
           >
-            {busy === 'initialize' ? 'Preparando…' : 'Preparar logística'}
-          </button>
+            <button
+              type="button"
+              onClick={initialize}
+              aria-describedby="orders-logistics-eligibility"
+              disabled={
+                eligibilityLoading ||
+                busy === 'initialize' ||
+                !eligibility?.canInitialize
+              }
+              style={{
+                border: 0,
+                borderRadius: 14,
+                minHeight: 40,
+                padding: '0 16px',
+                background: eligibility?.canInitialize
+                  ? 'var(--admin-primary)'
+                  : 'var(--admin-input-bg)',
+                color: eligibility?.canInitialize
+                  ? '#fff'
+                  : ORDER_DETAIL_THEME.mutedText,
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: eligibility?.canInitialize ? 'pointer' : 'not-allowed',
+                opacity: eligibilityLoading ? 0.7 : 1,
+              }}
+            >
+              {busy === 'initialize' ? 'Preparando…' : 'Preparar logística'}
+            </button>
+            <p
+              id="orders-logistics-eligibility"
+              style={{
+                margin: '6px 0 0',
+                color: eligibility?.canInitialize
+                  ? '#047857'
+                  : ORDER_DETAIL_THEME.mutedText,
+                fontSize: 10,
+                fontWeight: 750,
+                lineHeight: 1.35,
+              }}
+            >
+              {eligibilityLoading
+                ? 'Verificando pago e inventario vendido…'
+                : eligibility?.message || 'Verificando pago e inventario vendido…'}
+            </p>
+          </div>
         ) : null}
       </div>
 

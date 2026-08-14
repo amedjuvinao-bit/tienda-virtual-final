@@ -63,13 +63,33 @@ function responseWith(shipment) {
       exceptionCount: shipment.status === 'exception' ? 1 : 0,
       slaBreachedCount: 0,
     },
+    eligibility: {
+      canInitialize: true,
+      code: null,
+      message: 'Pago confirmado e inventario vendido disponibles para preparar.',
+    },
     shipments: [shipment],
+  };
+}
+
+function eligibilityResponse(overrides = {}) {
+  return {
+    ok: true,
+    summary: { status: 'not_initialized', shipmentCount: 0 },
+    shipments: [],
+    eligibility: {
+      canInitialize: true,
+      code: null,
+      message: 'Pago confirmado e inventario vendido disponibles para preparar.',
+      ...overrides,
+    },
   };
 }
 
 describe('centro logístico avanzado de la orden', () => {
   beforeEach(() => {
     Object.values(logisticsApi).forEach((mock) => mock.mockReset());
+    logisticsApi.getOrderLogistics.mockResolvedValue(eligibilityResponse());
   });
 
   afterEach(() => cleanup());
@@ -95,11 +115,105 @@ describe('centro logístico avanzado de la orden', () => {
         onRefreshTimeline={onRefreshTimeline}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Preparar logística' }));
+    const prepareButton = await screen.findByRole('button', {
+      name: 'Preparar logística',
+    });
+    await waitFor(() => expect(prepareButton).toBeEnabled());
+    fireEvent.click(prepareButton);
 
     expect(await screen.findByText(/SHP-ORD001-BOG/)).toBeInTheDocument();
     expect(logisticsApi.initializeOrderLogistics).toHaveBeenCalledWith(ORDER._id);
     expect(onRefreshTimeline).toHaveBeenCalled();
+  });
+
+  it('deshabilita la preparación y explica el pago pendiente', async () => {
+    logisticsApi.getOrderLogistics.mockResolvedValue(
+      eligibilityResponse({
+        canInitialize: false,
+        code: 'ORDER_PAYMENT_REQUIRED_FOR_LOGISTICS',
+        message: 'Disponible cuando el pago esté confirmado y exista inventario vendido.',
+      })
+    );
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          status: 'pending',
+          payment: { status: 'pending' },
+          inventoryAllocations: [
+            {
+              ...ORDER.inventoryAllocations[0],
+              soldQuantity: 0,
+              releasedQuantity: 2,
+            },
+          ],
+        }}
+        canManage
+      />
+    );
+
+    const button = await screen.findByRole('button', {
+      name: 'Preparar logística',
+    });
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(
+      screen.getByText(
+        'Disponible cuando el pago esté confirmado y exista inventario vendido.'
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(button);
+    expect(logisticsApi.initializeOrderLogistics).not.toHaveBeenCalled();
+  });
+
+  it('deshabilita la preparación cuando la reserva fue liberada', async () => {
+    logisticsApi.getOrderLogistics.mockResolvedValue(
+      eligibilityResponse({
+        canInitialize: false,
+        code: 'ORDER_LOGISTICS_ALLOCATIONS_REQUIRED',
+        message: 'Disponible cuando el pago esté confirmado y exista inventario vendido.',
+      })
+    );
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          inventoryAllocations: [
+            {
+              ...ORDER.inventoryAllocations[0],
+              soldQuantity: 0,
+              releasedQuantity: 2,
+            },
+          ],
+        }}
+        canManage
+      />
+    );
+
+    const button = await screen.findByRole('button', {
+      name: 'Preparar logística',
+    });
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(logisticsApi.initializeOrderLogistics).not.toHaveBeenCalled();
+  });
+
+  it('no presenta centro logístico para una orden únicamente digital', () => {
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          items: [{ productType: 'digital', requiresShipping: false }],
+          inventoryAllocations: [],
+        }}
+        canManage
+      />
+    );
+
+    expect(
+      screen.queryByRole('region', { name: 'Centro logístico de la orden' })
+    ).not.toBeInTheDocument();
+    expect(logisticsApi.getOrderLogistics).not.toHaveBeenCalled();
   });
 
   it('envía revisión optimista y conserva el orden picking antes de packing', async () => {
