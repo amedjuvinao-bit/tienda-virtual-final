@@ -315,7 +315,7 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
 - Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
-- Regresión frontend completa: 28 archivos y 105 pruebas aprobadas; build de producción aprobado con Vite.
+- Regresión frontend completa: 28 archivos y 107 pruebas aprobadas; build de producción aprobado con Vite.
 
 ## Trabajo pendiente deliberado
 
