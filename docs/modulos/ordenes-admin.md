@@ -308,7 +308,7 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 ## Evidencia de la etapa 6
 
 - La bandeja y la consola ocupan columnas independientes: al abrir filtros, métricas y tabla se compactan dentro del espacio disponible sin superposición ni pérdida funcional.
-- El botón `Mostrar/Ocultar filtros` es horizontal, discreto y cristalizado; permanece sobre el contenido con posición fija, puede arrastrarse dentro de la pantalla y conserva localmente la posición elegida sin bloquear el clic accesible.
+- El botón `Mostrar/Ocultar filtros` es horizontal, discreto y cristalizado; se monta directamente sobre `document.body` para que ningún contenedor del panel pueda recortarlo, permanece sobre el contenido con posición fija, se limita al área visible, puede arrastrarse y conserva localmente la posición elegida sin bloquear el clic accesible.
 - La consola tiene altura natural y desplazamiento de página: filtros, nueve colas y siete estados DIAN se muestran completos, incluido el bloque de facturación electrónica, sin recortes ni scroll interno.
 - El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.

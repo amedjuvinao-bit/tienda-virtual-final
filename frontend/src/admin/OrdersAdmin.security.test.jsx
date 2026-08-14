@@ -193,6 +193,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     const showFilters = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
     expect(showFilters).toHaveAttribute('aria-expanded', 'false');
     expect(showFilters).toHaveAttribute('aria-controls', 'orders-control-panel');
+    expect(showFilters.parentElement).toBe(document.body);
 
     fireEvent.click(showFilters);
     const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
@@ -202,6 +203,34 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(
       screen.getByRole('button', { name: 'Mostrar panel de filtros' })
     ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('recupera dentro de la pantalla una posición guardada fuera del viewport', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+    localStorage.setItem(
+      'orders-admin-control-toggle-position-v1',
+      JSON.stringify({ x: 99999, y: 99999 })
+    );
+
+    renderOrders();
+
+    await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    const expectedX = Math.max(12, window.innerWidth - 132 - 12);
+    const expectedY = Math.max(12, window.innerHeight - 40 - 12);
+
+    expect(toggle.parentElement).toBe(document.body);
+    expect(toggle.style.left).toBe(`${expectedX}px`);
+    expect(toggle.style.top).toBe(`${expectedY}px`);
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: expectedX,
+      y: expectedY,
+    });
   });
 
   it('permite mover el botón sin abrir filtros y conserva su posición', async () => {

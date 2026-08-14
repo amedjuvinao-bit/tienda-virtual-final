@@ -1,5 +1,6 @@
 // frontend/src/admin/OrdersAdmin.jsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import api from '../lib/api';
@@ -21,13 +22,21 @@ const CONTROL_TOGGLE_POSITION_KEY = 'orders-admin-control-toggle-position-v1';
 function clampControlTogglePosition(position, width = 132, height = 40) {
   if (typeof window === 'undefined') return position;
 
+  const safeWidth = Number(width) > 0 ? Number(width) : 132;
+  const safeHeight = Number(height) > 0 ? Number(height) : 40;
+  const viewportLeft = Number(window.visualViewport?.offsetLeft) || 0;
+  const viewportTop = Number(window.visualViewport?.offsetTop) || 0;
+  const viewportWidth = Number(window.visualViewport?.width) || window.innerWidth;
+  const viewportHeight = Number(window.visualViewport?.height) || window.innerHeight;
   const margin = 12;
-  const maxX = Math.max(margin, window.innerWidth - width - margin);
-  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  const minX = viewportLeft + margin;
+  const minY = viewportTop + margin;
+  const maxX = Math.max(minX, viewportLeft + viewportWidth - safeWidth - margin);
+  const maxY = Math.max(minY, viewportTop + viewportHeight - safeHeight - margin);
 
   return {
-    x: Math.min(maxX, Math.max(margin, Number(position?.x) || margin)),
-    y: Math.min(maxY, Math.max(margin, Number(position?.y) || margin)),
+    x: Math.min(maxX, Math.max(minX, Number(position?.x) || minX)),
+    y: Math.min(maxY, Math.max(minY, Number(position?.y) || minY)),
   };
 }
 
@@ -159,6 +168,7 @@ export default function OrdersAdmin() {
         const next = clampControlTogglePosition(stored, rect?.width, rect?.height);
         controlTogglePositionRef.current = next;
         setControlTogglePosition(next);
+        window.localStorage.setItem(CONTROL_TOGGLE_POSITION_KEY, JSON.stringify(next));
       }
     } catch {
       window.localStorage.removeItem(CONTROL_TOGGLE_POSITION_KEY);
@@ -178,7 +188,13 @@ export default function OrdersAdmin() {
     };
 
     window.addEventListener('resize', keepToggleInsideViewport);
-    return () => window.removeEventListener('resize', keepToggleInsideViewport);
+    window.addEventListener('pageshow', keepToggleInsideViewport);
+    window.visualViewport?.addEventListener('resize', keepToggleInsideViewport);
+    return () => {
+      window.removeEventListener('resize', keepToggleInsideViewport);
+      window.removeEventListener('pageshow', keepToggleInsideViewport);
+      window.visualViewport?.removeEventListener('resize', keepToggleInsideViewport);
+    };
   }, []);
 
   const handleControlTogglePointerDown = (event) => {
@@ -795,6 +811,32 @@ export default function OrdersAdmin() {
 
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(total, page * limit);
+  const controlToggleButton = (
+    <button
+      ref={controlToggleRef}
+      type="button"
+      aria-controls="orders-control-panel"
+      aria-expanded={controlsOpen}
+      aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
+      title="Arrastra para mover. Haz clic para mostrar u ocultar los filtros."
+      onClick={handleControlToggleClick}
+      onPointerDown={handleControlTogglePointerDown}
+      onPointerMove={handleControlTogglePointerMove}
+      onPointerUp={finishControlToggleDrag}
+      onPointerCancel={finishControlToggleDrag}
+      className={`orders-control-toggle inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition ${
+        draggingControlToggle ? 'is-dragging' : ''
+      }`}
+      style={{
+        ...(controlTogglePosition
+          ? { left: controlTogglePosition.x, top: controlTogglePosition.y, right: 'auto', bottom: 'auto' }
+          : {}),
+      }}
+    >
+      <SlidersHorizontal className="h-3.5 w-3.5" />
+      <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+    </button>
+  );
 
   return (
     <div className={`orders-admin-shell p-4 ${controlsOpen ? 'controls-open' : 'controls-closed'}`}>
@@ -965,30 +1007,9 @@ export default function OrdersAdmin() {
         }
       `}</style>
 
-      <button
-        ref={controlToggleRef}
-        type="button"
-        aria-controls="orders-control-panel"
-        aria-expanded={controlsOpen}
-        aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
-        title="Arrastra para mover. Haz clic para mostrar u ocultar los filtros."
-        onClick={handleControlToggleClick}
-        onPointerDown={handleControlTogglePointerDown}
-        onPointerMove={handleControlTogglePointerMove}
-        onPointerUp={finishControlToggleDrag}
-        onPointerCancel={finishControlToggleDrag}
-        className={`orders-control-toggle inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition ${
-          draggingControlToggle ? 'is-dragging' : ''
-        }`}
-        style={{
-          ...(controlTogglePosition
-            ? { left: controlTogglePosition.x, top: controlTogglePosition.y, right: 'auto', bottom: 'auto' }
-            : {}),
-        }}
-      >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
-        <span>{controlsOpen ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
-      </button>
+      {typeof document === 'undefined'
+        ? controlToggleButton
+        : createPortal(controlToggleButton, document.body)}
 
       {/* ===== Toolbar (SIEMPRE 2 LÍNEAS EN DESKTOP) ===== */}
       <OrdersFilters

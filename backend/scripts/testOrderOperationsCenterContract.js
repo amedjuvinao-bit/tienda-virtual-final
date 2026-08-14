@@ -150,7 +150,7 @@ function main() {
   );
   assert.ok(adminSource.includes('operationalView'));
   assert.ok(adminSource.includes('operationalSummary'));
-  assert.ok(!adminSource.includes('createPortal'));
+  assert.ok(!boardSource.includes('createPortal'));
   assert.ok(boardSource.includes('Centro de operaciones'));
   ok('el tablero dejó de ser flotante y se integra al flujo principal');
 
@@ -167,6 +167,7 @@ function main() {
   assert.ok(adminSource.includes('position: fixed'));
   assert.ok(adminSource.includes('backdrop-filter: blur(18px)'));
   assert.ok(adminSource.includes('CONTROL_TOGGLE_POSITION_KEY'));
+  assert.ok(adminSource.includes('createPortal(controlToggleButton, document.body)'));
   assert.ok(adminSource.includes('onPointerMove={handleControlTogglePointerMove}'));
   assert.ok(adminSource.includes('grid-area: controls'));
   assert.ok(adminSource.includes('overflow: visible'));
