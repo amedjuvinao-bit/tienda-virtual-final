@@ -9,6 +9,8 @@ require('dotenv').config({
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
+require('../models/Branch');
+require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const Order = require('../models/Order');
 const {

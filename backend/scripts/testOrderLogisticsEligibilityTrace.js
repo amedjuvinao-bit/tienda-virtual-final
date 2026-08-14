@@ -3,6 +3,7 @@
 
 const assert = require('assert/strict');
 const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
 
 const Order = require('../models/Order');
@@ -112,6 +113,12 @@ async function main() {
       runId,
       /^ord_elig_validacion-logistica_20260814t041500z_090909$/
     );
+  });
+
+  await test('registra sedes y productos antes de poblar existencias', () => {
+    assert(mongoose.modelNames().includes('Branch'));
+    assert(mongoose.modelNames().includes('Product'));
+    assert(mongoose.modelNames().includes('InventoryStock'));
   });
 
   await test('crea exactamente los escenarios bloqueado y habilitado', () => {
