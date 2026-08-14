@@ -307,9 +307,9 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 
 ## Evidencia de la etapa 6
 
-- La bandeja ocupa siempre el ancho completo de la mesa operativa; los filtros, las nueve colas y los siete estados DIAN permanecen disponibles dentro de una consola superpuesta sin alterar sus contratos.
-- El botón flotante `Mostrar/Ocultar filtros` permanece visible durante el desplazamiento, comunica su estado mediante `aria-expanded` y `aria-controls`, y nunca participa del ancho de la tabla.
-- La consola funciona como panel lateral superpuesto en cualquier resolución. En pantallas de hasta 900 px incorpora fondo de enfoque y en móvil los indicadores se reorganizan en dos columnas.
+- La bandeja y la consola ocupan columnas independientes: al abrir filtros, métricas y tabla se compactan dentro del espacio disponible sin superposición ni pérdida funcional.
+- El botón lateral `Mostrar/Ocultar filtros` usa posicionamiento `sticky`, permanece visible durante el desplazamiento, comunica su estado mediante `aria-expanded` y `aria-controls` y no tapa ninguna fila.
+- La consola tiene altura natural y desplazamiento de página: filtros, nueve colas y siete estados DIAN se muestran completos, incluido el bloque de facturación electrónica, sin recortes ni scroll interno.
 - El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
 - Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.

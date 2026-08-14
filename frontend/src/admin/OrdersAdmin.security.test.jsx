@@ -178,7 +178,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(state.api.put).not.toHaveBeenCalled();
   });
 
-  it('mantiene el botón flotante visible y permite mostrar u ocultar los filtros', async () => {
+  it('mantiene el botón lateral visible y permite mostrar u ocultar los filtros', async () => {
     state.auth = {
       isAuthenticated: true,
       adminToken: 'header.payload.valid-admin-signature',

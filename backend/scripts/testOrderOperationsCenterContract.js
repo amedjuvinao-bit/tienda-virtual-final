@@ -164,10 +164,12 @@ function main() {
   assert.ok(boardSource.includes('Cola operativa'));
   assert.ok(boardSource.includes('xl:grid-cols-9'));
   assert.ok(adminSource.includes('.orders-control-toggle'));
-  assert.ok(adminSource.includes('position: fixed'));
-  assert.ok(adminSource.includes('bottom: 24px'));
-  assert.ok(adminSource.includes('inset: 112px 18px 18px auto'));
-  assert.ok(!adminSource.includes('grid-template-columns: minmax(0, 1fr) minmax(320px, 360px)'));
+  assert.ok(adminSource.includes('position: sticky'));
+  assert.ok(adminSource.includes('grid-area: toggle'));
+  assert.ok(adminSource.includes('grid-area: controls'));
+  assert.ok(adminSource.includes('overflow: visible'));
+  assert.ok(!adminSource.includes('position: fixed'));
+  assert.ok(!adminSource.includes('overflow-y: auto'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');
 
   const workflow = read('.github/workflows/products-ci.yml');
