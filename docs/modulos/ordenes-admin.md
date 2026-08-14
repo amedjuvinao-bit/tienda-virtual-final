@@ -256,6 +256,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-s
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-architecture
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
@@ -316,6 +317,20 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
 - Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
 - Regresión frontend completa: 28 archivos y 107 pruebas aprobadas; build de producción aprobado con Vite.
+
+## Simulación persistente y trazabilidad visual
+
+El comando `demo:orders-trace` crea recorridos demostrativos permanentes para revisar el módulo desde el panel: pago pendiente con reserva liberada, picking por iniciar, incidencia abierta, tránsito y entrega con evidencia. Cuando existen existencias elegibles en dos sedes distintas, añade una orden multisede y genera un envío independiente para cada sede real.
+
+La ejecución exige `--confirm-persist`, genera un identificador `ord_trace_*` buscable y conserva todas las órdenes creadas. La simulación usa únicamente referencias existentes de productos, existencias y sedes; no inventa una segunda sede. Tampoco descuenta inventario, registra caja, llama pasarelas de pago, genera documentos DIAN ni ejecuta limpieza automática. Cada orden queda marcada como `DEMO`, `system_order` y contiene una nota fija que prohíbe facturarla o despacharla físicamente.
+
+Ejemplo desde la raíz del repositorio:
+
+```bat
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run demo:orders-trace -- --confirm-persist --label=trazabilidad-ordenes
+```
+
+El contrato `test:orders-trace-seed` valida confirmación, límites, identificadores, selección de sedes reales, recorridos logísticos, evidencia demostrativa, ausencia de borrados y ausencia de mutaciones sobre inventario, productos, sedes, caja o facturación.
 
 ## Trabajo pendiente deliberado
 
