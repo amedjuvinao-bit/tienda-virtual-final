@@ -77,6 +77,8 @@ export default function OrderDetailHeader({
   onClose,
   onDownloadPdf,
   onOpenInvoice,
+  onManage,
+  managementOpen = false,
   downloadingPdf = false,
   invoiceLoading = false,
 }) {
@@ -91,6 +93,8 @@ export default function OrderDetailHeader({
       style={{
         position: 'relative',
         overflow: 'hidden',
+        flex: '0 0 auto',
+        zIndex: 2,
         borderBottom: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
         background: `
           radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 22%, transparent), transparent 34%),
@@ -112,6 +116,7 @@ export default function OrderDetailHeader({
       />
 
       <div
+        className="order-detail-header-layout"
         style={{
           position: 'relative',
           display: 'grid',
@@ -121,6 +126,7 @@ export default function OrderDetailHeader({
         }}
       >
         <div
+          className="order-detail-header-main"
           style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -248,6 +254,7 @@ export default function OrderDetailHeader({
         </div>
 
         <div
+          className="order-detail-header-actions"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -274,6 +281,16 @@ export default function OrderDetailHeader({
           >
             {invoiceLoading ? 'Cargando...' : 'Factura'}
           </PrimaryButton>
+          ) : null}
+
+          {typeof onManage === 'function' ? (
+            <GhostButton
+              onClick={onManage}
+              title="Abrir acciones administrativas de la orden"
+              icon={<OrderDetailIcons.Settings2 size={15} strokeWidth={2.4} />}
+            >
+              {managementOpen ? 'Cerrar gestión' : 'Gestionar'}
+            </GhostButton>
           ) : null}
 
           <button
@@ -306,6 +323,31 @@ export default function OrderDetailHeader({
           </button>
         </div>
       </div>
+
+      <style>
+        {`
+          @media (max-width: 940px) {
+            .order-detail-header-layout {
+              grid-template-columns: 1fr !important;
+            }
+
+            .order-detail-header-actions {
+              justify-content: flex-start !important;
+              padding-left: 70px;
+            }
+          }
+
+          @media (max-width: 620px) {
+            .order-detail-header-main {
+              gap: 11px !important;
+            }
+
+            .order-detail-header-actions {
+              padding-left: 0;
+            }
+          }
+        `}
+      </style>
     </header>
   );
 }

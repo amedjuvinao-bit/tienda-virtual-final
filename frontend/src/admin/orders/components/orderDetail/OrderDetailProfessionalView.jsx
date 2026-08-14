@@ -15,6 +15,8 @@ import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
 import OrderDetailTabs from './OrderDetailTabs';
+import { OrderDetailIcons } from './OrderDetailIcons';
+import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
 
 export default function OrderDetailProfessionalView({
   order,
@@ -64,6 +66,7 @@ export default function OrderDetailProfessionalView({
   onConfirmRefundPayment,
 }) {
   const [activeTab, setActiveTab] = useState('summary');
+  const [managementOpen, setManagementOpen] = useState(false);
   const hasManagementActions = [
     onSaveStatus,
     onSaveTags,
@@ -74,6 +77,7 @@ export default function OrderDetailProfessionalView({
 
   useEffect(() => {
     setActiveTab('summary');
+    setManagementOpen(false);
   }, [order?._id]);
 
   const managementPanel = hasManagementActions ? (
@@ -102,16 +106,23 @@ export default function OrderDetailProfessionalView({
   ) : null;
 
   const tabs = [
-    { id: 'summary', label: 'Resumen' },
-    { id: 'products', label: 'Productos' },
-    { id: 'operation', label: 'Operación' },
-    { id: 'payment', label: 'Pago y factura' },
-    { id: 'customer', label: 'Cliente y notas' },
-    ...(hasManagementActions ? [{ id: 'management', label: 'Gestionar' }] : []),
+    { id: 'summary', label: 'Resumen', icon: OrderDetailIcons.History },
+    { id: 'products', label: 'Pedido', icon: OrderDetailIcons.Package },
+    { id: 'operation', label: 'Operación', icon: OrderDetailIcons.Settings2 },
+    { id: 'payment', label: 'Pago y factura', icon: OrderDetailIcons.WalletCards },
+    { id: 'customer', label: 'Cliente e historial', icon: OrderDetailIcons.User },
   ];
 
   const tabContent = {
-    summary: <OrderDetailStoryOverview order={order} />,
+    summary: (
+      <OrderDetailStoryOverview
+        order={order}
+        onNavigate={(tabId) => {
+          setManagementOpen(false);
+          setActiveTab(tabId);
+        }}
+      />
+    ),
     products: <OrderDetailItemsTable order={order} />,
     operation: (
       <>
@@ -154,11 +165,16 @@ export default function OrderDetailProfessionalView({
         />
       </>
     ),
-    management: managementPanel,
+  };
+
+  const handleTabChange = (tabId) => {
+    setManagementOpen(false);
+    setActiveTab(tabId);
   };
 
   return (
     <div
+      className="order-detail-professional-shell"
       style={{
         width: 'min(1480px, calc(100vw - 34px))',
         maxHeight: 'calc(100vh - 34px)',
@@ -179,11 +195,15 @@ export default function OrderDetailProfessionalView({
         onOpenInvoice={onOpenInvoice}
         downloadingPdf={downloadingPdf}
         invoiceLoading={invoiceLoading}
+        onManage={hasManagementActions ? () => setManagementOpen((open) => !open) : undefined}
+        managementOpen={managementOpen}
       />
 
       <div
         style={{
           overflowY: 'auto',
+          flex: '1 1 auto',
+          minHeight: 0,
           padding: 18,
           background: `
             radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 8%, transparent), transparent 28%),
@@ -211,8 +231,40 @@ export default function OrderDetailProfessionalView({
             <OrderDetailTabs
               tabs={tabs}
               activeTab={activeTab}
-              onChange={setActiveTab}
+              onChange={handleTabChange}
             />
+
+            {managementOpen && managementPanel ? (
+              <OrderDetailPanel style={{ padding: 18 }}>
+                <SectionTitle
+                  icon={OrderDetailIcons.Settings2}
+                  title="Gestionar orden"
+                  subtitle="Estado, etiquetas y acciones administrativas."
+                  action={(
+                    <button
+                      type="button"
+                      aria-label="Cerrar gestión de la orden"
+                      onClick={() => setManagementOpen(false)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 12,
+                        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+                        background: ORDER_DETAIL_THEME.inputBg,
+                        color: ORDER_DETAIL_THEME.cardText,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <OrderDetailIcons.X size={17} strokeWidth={2.4} />
+                    </button>
+                  )}
+                />
+                {managementPanel}
+              </OrderDetailPanel>
+            ) : null}
 
             <div
               id="order-detail-active-panel"
@@ -248,7 +300,7 @@ export default function OrderDetailProfessionalView({
           }
 
           @media (max-width: 720px) {
-            div[style*="width: min(1480px, calc(100vw - 34px))"] {
+            .order-detail-professional-shell {
               width: calc(100vw - 18px) !important;
               max-height: calc(100vh - 18px) !important;
               border-radius: 22px !important;

@@ -347,13 +347,14 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Una búsqueda corta mantiene métricas, filtros activos y tabla en continuidad, sin espacios vacíos; la consola mantiene su altura natural en la columna lateral y en pantallas estrechas vuelve al flujo normal de una sola columna.
 - Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
-- El detalle conserva tres respuestas inmediatas —qué pasó, estado actual y qué sigue— dentro de `Resumen`, sin añadir una segunda cronología ni repetir todas las etapas en la misma pantalla.
-- Seis pestañas separan estrictamente `Resumen`, `Productos`, `Operación`, `Pago y factura`, `Cliente y notas` y `Gestionar`. Solo se monta el contenido de la tarea elegida; la barra admite teclado y desplazamiento horizontal en pantallas estrechas.
-- La pestaña `Gestionar` conserva estado, etiquetas, impresión, archivo y correo, y solo aparece cuando el usuario posee al menos una de esas capacidades.
+- El detalle conserva tres respuestas inmediatas —qué pasó, estado actual y qué sigue— y completa el resumen con situación comercial, inventario, preparación, últimos movimientos y la acción recomendada. Así la columna principal aprovecha su espacio con datos reales y no deja un vacío frente al resumen lateral.
+- Cinco pestañas separan estrictamente `Resumen`, `Pedido`, `Operación`, `Pago y factura` y `Cliente e historial`. Solo se monta el contenido de la tarea elegida; la barra admite teclado y desplazamiento horizontal en pantallas estrechas.
+- `Gestionar` es una acción independiente en el encabezado: abre estado, etiquetas, impresión, archivo y correo sin confundirse con una sección informativa y solo aparece cuando el usuario posee al menos una de esas capacidades.
+- El encabezado no participa en la contracción del área desplazable: conserva título, metadatos, distintivos y acciones completos, sin quedar cubierto por la navegación.
 - El resumen decorativo lateral conserva íntegramente su diseño anterior, incluidos total, desglose, pago, factura, CUFE, progreso, datos rápidos y trazabilidad.
 - Controles del botón de filtros: 3 pruebas sobre arrastre, anclaje, liberación, persistencia y adaptación horizontal.
-- Historia visual y pestañas del detalle: 6 pruebas sobre orden POS entregada, pago pendiente, preparación logística, tránsito, preservación del resumen decorativo y navegación accesible.
-- Regresión frontend completa: 29 archivos y 118 pruebas aprobadas; build de producción aprobado con Vite.
+- Resumen visual y navegación del detalle: 8 pruebas sobre orden POS entregada, pago pendiente, inventario y acción recomendada, preparación logística, tránsito, preservación del resumen decorativo, navegación accesible y gestión independiente.
+- Regresión frontend completa: 29 archivos y 120 pruebas aprobadas; build de producción aprobado con Vite.
 
 ## Evidencia de la etapa 7
 

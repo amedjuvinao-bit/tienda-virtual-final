@@ -2,11 +2,17 @@ import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
   fmtDate,
   getInvoiceInfo,
+  getOrderBranchInfo,
   getOrderSourceLabel,
+  getOrderSummary,
   normalizeText,
 } from './orderDetailUtils';
 import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
-import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
+import {
+  OrderDetailPanel,
+  PrimaryButton,
+  SectionTitle,
+} from './OrderDetailPrimitives';
 
 const PAID_ORDER_STATUSES = new Set([
   'paid',
@@ -414,6 +420,8 @@ export function buildOrderStory(order) {
     description: activePhase?.description || 'Revisa la etapa actual para completar el recorrido.',
     tone: 'primary',
   };
+  let actionTarget = 'operation';
+  let actionLabel = 'Revisar etapa';
 
   if (fulfillment.hasIncident) {
     current = {
@@ -426,6 +434,8 @@ export function buildOrderStory(order) {
       description: 'Abre el centro logístico, registra la solución y reanuda el envío.',
       tone: 'danger',
     };
+    actionTarget = 'operation';
+    actionLabel = 'Resolver incidencia';
   } else if (isCancelled) {
     current = {
       title: 'Orden cancelada',
@@ -437,6 +447,8 @@ export function buildOrderStory(order) {
       description: 'Comprueba inventario, pago, factura y posibles devoluciones.',
       tone: 'warning',
     };
+    actionTarget = 'payment';
+    actionLabel = 'Revisar cierre';
   } else if (isFailed) {
     current = {
       title: 'Orden fallida',
@@ -448,6 +460,8 @@ export function buildOrderStory(order) {
       description: 'Valida el motivo del fallo antes de reintentar o cerrar la orden.',
       tone: 'danger',
     };
+    actionTarget = 'payment';
+    actionLabel = 'Revisar pago';
   } else if (isRefunded) {
     current = {
       title: 'Orden reembolsada',
@@ -459,6 +473,8 @@ export function buildOrderStory(order) {
       description: 'Comprueba el soporte del reembolso y el ajuste de inventario.',
       tone: 'warning',
     };
+    actionTarget = 'payment';
+    actionLabel = 'Ver conciliación';
   } else if (fulfillment.delivered && invoice.complete) {
     current = {
       title: 'Proceso completado',
@@ -470,6 +486,8 @@ export function buildOrderStory(order) {
       description: 'Puedes consultar PDF, factura, notas o gestionar una devolución.',
       tone: 'success',
     };
+    actionTarget = 'customer';
+    actionLabel = 'Ver historial';
   } else if (fulfillment.delivered && !invoice.complete) {
     current = {
       title: 'Entrega completada con facturación pendiente',
@@ -481,12 +499,16 @@ export function buildOrderStory(order) {
       description: 'Revisa los datos fiscales y finaliza la emisión de la factura.',
       tone: 'warning',
     };
+    actionTarget = 'payment';
+    actionLabel = 'Revisar factura';
   } else if (!payment.complete) {
     next = {
       title: 'Confirmar el pago',
       description: 'La preparación y la facturación deben esperar una transacción aprobada.',
       tone: 'primary',
     };
+    actionTarget = 'payment';
+    actionLabel = 'Revisar pago';
   } else if (
     fulfillment.needsLogisticsInitialization ||
     !fulfillment.operationStarted
@@ -496,12 +518,16 @@ export function buildOrderStory(order) {
       description: 'Crea el envío por sede usando el inventario vendido y confirmado.',
       tone: 'primary',
     };
+    actionTarget = 'operation';
+    actionLabel = 'Preparar logística';
   } else if (fulfillment.dispatched && !fulfillment.delivered) {
     next = {
       title: 'Confirmar la entrega',
       description: 'Registra la evidencia del destinatario cuando el envío llegue.',
       tone: 'primary',
     };
+    actionTarget = 'operation';
+    actionLabel = 'Abrir operación';
   }
 
   return {
@@ -513,8 +539,192 @@ export function buildOrderStory(order) {
         : lastCompleted.description,
     },
     current,
-    next,
+    next: {
+      ...next,
+      targetTab: actionTarget,
+      actionLabel,
+    },
     isFinal: FINAL_ORDER_STATUSES.has(orderStatus),
+  };
+}
+
+function sumAllocationField(allocations, field) {
+  return allocations.reduce(
+    (total, allocation) => total + Number(allocation?.[field] || 0),
+    0
+  );
+}
+
+function getInventoryOverview(order, summary) {
+  const allocations = Array.isArray(order?.inventoryAllocations)
+    ? order.inventoryAllocations
+    : [];
+  const branch = getOrderBranchInfo(order);
+  const reserved = sumAllocationField(allocations, 'reservedQuantity');
+  const sold = sumAllocationField(allocations, 'soldQuantity');
+  const delivered = sumAllocationField(allocations, 'deliveredQuantity');
+  const hasOnlyNonPhysicalItems =
+    summary.items.length > 0 &&
+    summary.items.every((item) => {
+      const type = normalizeText(item?.productType || item?.type);
+      return ['digital', 'service', 'servicio'].includes(type) || item?.requiresShipping === false;
+    });
+  const eventDate = latestDate(
+    allocations.map((allocation) => [
+      allocation?.deliveredAt,
+      allocation?.shippedAt,
+      allocation?.soldAt,
+      allocation?.reservedAt,
+      allocation?.createdAt,
+    ])
+  );
+
+  if (hasOnlyNonPhysicalItems) {
+    return {
+      value: 'No requiere inventario físico',
+      movementTitle: 'Cumplimiento sin inventario físico',
+      movementDescription: 'La orden corresponde a productos digitales o servicios.',
+      eventDate,
+    };
+  }
+
+  if (delivered > 0) {
+    return {
+      value: `${delivered} unidad(es) entregada(s) desde ${branch.name}`,
+      movementTitle: 'Inventario entregado',
+      movementDescription: `La sede ${branch.name} confirmó ${delivered} unidad(es).`,
+      eventDate,
+    };
+  }
+
+  if (sold > 0) {
+    return {
+      value: `${sold} unidad(es) confirmada(s) en ${branch.name}`,
+      movementTitle: 'Inventario vendido',
+      movementDescription: `La sede ${branch.name} confirmó el inventario de la orden.`,
+      eventDate,
+    };
+  }
+
+  if (reserved > 0) {
+    return {
+      value: `Reservado en ${branch.name}`,
+      movementTitle: 'Inventario reservado',
+      movementDescription: `La sede ${branch.name} reservó ${reserved} unidad(es).`,
+      eventDate,
+    };
+  }
+
+  return {
+    value: branch.hasBranch ? `Asignado a ${branch.name}` : 'Pendiente de asignación',
+    movementTitle: 'Inventario pendiente',
+    movementDescription: branch.hasBranch
+      ? `La orden está vinculada a ${branch.name}.`
+      : 'Aún no existe una sede de preparación confirmada.',
+    eventDate,
+  };
+}
+
+function uniqueMovements(movements) {
+  const seen = new Set();
+
+  return movements.filter((movement) => {
+    const key = `${movement.title}-${movement.date ? movement.date.getTime() : 'none'}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function buildOrderOverview(order) {
+  const story = buildOrderStory(order);
+  const summary = getOrderSummary(order);
+  const inventory = getInventoryOverview(order, summary);
+  const paymentPhase = story.phases.find((phase) => phase.id === 'payment');
+  const operationPhase = story.phases.find((phase) => phase.id === 'operation');
+  const paymentComplete = paymentPhase?.state === 'complete';
+
+  const situation = [
+    {
+      id: 'order',
+      label: 'Pedido',
+      value: `${summary.itemsCount} producto(s) · ${summary.totalItems} unidad(es)`,
+      icon: OrderDetailIcons.Package,
+      tone: 'primary',
+    },
+    {
+      id: 'payment',
+      label: 'Pago',
+      value: paymentPhase?.title || 'Sin información de pago',
+      icon: OrderDetailIcons.CircleDollarSign,
+      tone: paymentPhase?.state === 'attention' ? 'danger' : paymentComplete ? 'success' : 'primary',
+    },
+    {
+      id: 'inventory',
+      label: 'Inventario',
+      value: inventory.value,
+      icon: OrderDetailIcons.Store,
+      tone: 'primary',
+    },
+    {
+      id: 'preparation',
+      label: 'Preparación',
+      value: paymentComplete
+        ? operationPhase?.title || 'Pendiente de preparación'
+        : 'Bloqueada hasta confirmar el pago',
+      icon: OrderDetailIcons.PackageCheck,
+      tone: operationPhase?.state === 'attention' ? 'danger' : 'primary',
+    },
+  ];
+
+  const phaseMovements = story.phases
+    .filter((phase) => phase.date && phase.state === 'complete')
+    .map((phase) => ({
+      id: phase.id,
+      title: phase.title,
+      description: phase.description,
+      date: phase.date,
+      icon: phase.icon,
+      tone: 'success',
+    }));
+
+  const inventoryMovement = inventory.eventDate
+    ? [{
+        id: 'inventory',
+        title: inventory.movementTitle,
+        description: inventory.movementDescription,
+        date: inventory.eventDate,
+        icon: OrderDetailIcons.Store,
+        tone: 'success',
+      }]
+    : [];
+
+  const movements = uniqueMovements([...phaseMovements, ...inventoryMovement])
+    .sort((left, right) => (left.date?.getTime() || 0) - (right.date?.getTime() || 0))
+    .slice(-2);
+
+  if (movements.length < 2 && story.current.title !== movements[0]?.title) {
+    movements.push({
+      id: 'current',
+      title: story.current.title,
+      description: story.current.description,
+      date: null,
+      icon: OrderDetailIcons.Zap,
+      tone: story.current.tone,
+    });
+  }
+
+  return {
+    story,
+    situation,
+    movements,
+    action: {
+      title: story.next.title,
+      description: story.next.description,
+      label: story.next.actionLabel,
+      targetTab: story.next.targetTab,
+      tone: story.next.tone,
+    },
   };
 }
 
@@ -584,17 +794,121 @@ function StorySummaryCard({ eyebrow, title, description, icon, tone = 'primary' 
   );
 }
 
-export default function OrderDetailStoryOverview({ order }) {
-  const story = buildOrderStory(order);
+function SituationCard({ label, value, icon, tone = 'primary' }) {
+  return (
+    <article
+      style={{
+        minWidth: 0,
+        minHeight: 78,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 13,
+        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        borderRadius: 17,
+        background: ORDER_DETAIL_THEME.inputBg,
+        padding: '13px 15px',
+      }}
+    >
+      <IconBadge
+        icon={icon}
+        size={38}
+        iconSize={16}
+        variant={tone === 'primary' ? 'primary' : tone}
+      />
+      <div style={{ minWidth: 0 }}>
+        <strong
+          style={{
+            display: 'block',
+            color: ORDER_DETAIL_THEME.cardText,
+            fontSize: 13,
+            fontWeight: 950,
+            lineHeight: 1.2,
+          }}
+        >
+          {label}
+        </strong>
+        <span
+          style={{
+            display: 'block',
+            marginTop: 5,
+            color: ORDER_DETAIL_THEME.mutedText,
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1.35,
+          }}
+        >
+          {value}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function MovementRow({ movement, isLast }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '38px minmax(0, 1fr) auto',
+        gap: 11,
+        alignItems: 'start',
+        padding: '13px 0',
+        borderBottom: isLast ? 'none' : `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+      }}
+    >
+      <IconBadge
+        icon={movement.icon}
+        size={36}
+        iconSize={15}
+        variant={movement.tone === 'primary' ? 'primary' : movement.tone}
+      />
+      <div style={{ minWidth: 0 }}>
+        <strong
+          style={{
+            display: 'block',
+            color: ORDER_DETAIL_THEME.cardText,
+            fontSize: 13,
+            fontWeight: 950,
+            lineHeight: 1.25,
+          }}
+        >
+          {movement.title}
+        </strong>
+        <span
+          style={{
+            display: 'block',
+            marginTop: 4,
+            color: ORDER_DETAIL_THEME.mutedText,
+            fontSize: 11,
+            fontWeight: 650,
+            lineHeight: 1.35,
+          }}
+        >
+          {movement.description}
+        </span>
+      </div>
+      <span
+        style={{
+          maxWidth: 104,
+          color: ORDER_DETAIL_THEME.mutedText,
+          fontSize: 10,
+          fontWeight: 750,
+          lineHeight: 1.35,
+          textAlign: 'right',
+        }}
+      >
+        {movement.date ? fmtDate(movement.date) : 'Estado actual'}
+      </span>
+    </div>
+  );
+}
+
+export default function OrderDetailStoryOverview({ order, onNavigate }) {
+  const overview = buildOrderOverview(order);
+  const { story } = overview;
 
   return (
-    <OrderDetailPanel className="order-story-panel" style={{ padding: 18 }}>
-      <SectionTitle
-        icon={OrderDetailIcons.History}
-        title="Historia de la orden"
-        subtitle="Qué ocurrió, dónde está el proceso y cuál es el siguiente paso."
-      />
-
+    <div className="order-story-overview">
       <div className="order-story-summary-grid">
         <StorySummaryCard
           eyebrow="Qué pasó"
@@ -619,22 +933,124 @@ export default function OrderDetailStoryOverview({ order }) {
         />
       </div>
 
+      <OrderDetailPanel style={{ padding: 18 }}>
+        <SectionTitle title="Situación de la orden" />
+        <div className="order-story-situation-grid">
+          {overview.situation.map((item) => (
+            <SituationCard key={item.id} {...item} />
+          ))}
+        </div>
+      </OrderDetailPanel>
+
+      <div className="order-story-bottom-grid">
+        <OrderDetailPanel style={{ padding: 18 }}>
+          <SectionTitle
+            icon={OrderDetailIcons.History}
+            title="Últimos movimientos"
+            subtitle="Los eventos más recientes que explican el estado actual."
+          />
+          <div>
+            {overview.movements.map((movement, index) => (
+              <MovementRow
+                key={`${movement.id}-${index}`}
+                movement={movement}
+                isLast={index === overview.movements.length - 1}
+              />
+            ))}
+          </div>
+        </OrderDetailPanel>
+
+        <OrderDetailPanel
+          style={{
+            padding: 18,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <SectionTitle
+            icon={OrderDetailIcons.Zap}
+            title="Acción recomendada"
+            subtitle="El siguiente paso coherente para continuar la orden."
+          />
+          <strong
+            style={{
+              color: ORDER_DETAIL_THEME.cardText,
+              fontSize: 16,
+              fontWeight: 950,
+              lineHeight: 1.25,
+            }}
+          >
+            {overview.action.title}
+          </strong>
+          <p
+            style={{
+              margin: '8px 0 20px',
+              color: ORDER_DETAIL_THEME.mutedText,
+              fontSize: 12,
+              fontWeight: 650,
+              lineHeight: 1.55,
+            }}
+          >
+            {overview.action.description}
+          </p>
+          <div className="order-story-action-button" style={{ marginTop: 'auto' }}>
+            <PrimaryButton
+              onClick={
+                typeof onNavigate === 'function'
+                  ? () => onNavigate(overview.action.targetTab)
+                  : undefined
+              }
+              icon={<OrderDetailIcons.ExternalLink size={15} strokeWidth={2.4} />}
+            >
+              {overview.action.label}
+            </PrimaryButton>
+          </div>
+        </OrderDetailPanel>
+      </div>
+
       <style>
         {`
+          .order-story-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+          }
+
           .order-story-summary-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
+            gap: 12px;
+          }
+
+          .order-story-situation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+
+          .order-story-bottom-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.9fr);
+            gap: 16px;
+            align-items: stretch;
+          }
+
+          .order-story-action-button > button {
+            width: 100%;
+            min-height: 48px !important;
+            justify-content: space-between !important;
           }
 
           @media (max-width: 900px) {
-            .order-story-summary-grid {
+            .order-story-summary-grid,
+            .order-story-situation-grid,
+            .order-story-bottom-grid {
               grid-template-columns: 1fr;
             }
           }
 
         `}
       </style>
-    </OrderDetailPanel>
+    </div>
   );
 }

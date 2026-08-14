@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
-import OrderDetailStoryOverview, { buildOrderStory } from './OrderDetailStoryOverview';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import OrderDetailStoryOverview, {
+  buildOrderOverview,
+  buildOrderStory,
+} from './OrderDetailStoryOverview';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailTabs from './OrderDetailTabs';
+import OrderDetailProfessionalView from './OrderDetailProfessionalView';
 
 const BASE_ORDER = {
   _id: 'order-story-001',
@@ -82,6 +86,46 @@ describe('historia narrativa del detalle de la orden', () => {
     ]);
     expect(story.current.title).toBe('Pago pendiente');
     expect(story.next.title).toBe('Confirmar el pago');
+  });
+
+  it('aprovecha el resumen con situación, movimientos y una acción navegable', () => {
+    const onNavigate = vi.fn();
+    const order = {
+      ...BASE_ORDER,
+      status: 'pending',
+      payment: { status: 'pending_gateway' },
+      inventoryAllocations: [
+        {
+          reservedQuantity: 1,
+          reservedAt: '2026-08-14T14:01:00.000Z',
+          branchSnapshot: { name: 'Sede Principal', code: 'PRINCIPAL' },
+        },
+      ],
+      fulfillment: { status: 'pending', shipments: [] },
+    };
+    const overview = buildOrderOverview(order);
+
+    expect(overview.situation.map((item) => item.id)).toEqual([
+      'order',
+      'payment',
+      'inventory',
+      'preparation',
+    ]);
+    expect(overview.situation.find((item) => item.id === 'inventory')?.value).toBe(
+      'Reservado en Sede Principal'
+    );
+    expect(overview.action).toMatchObject({
+      label: 'Revisar pago',
+      targetTab: 'payment',
+    });
+
+    render(<OrderDetailStoryOverview order={order} onNavigate={onNavigate} />);
+    expect(screen.getByText('Situación de la orden')).toBeInTheDocument();
+    expect(screen.getByText('Últimos movimientos')).toBeInTheDocument();
+    expect(screen.getByText('Acción recomendada')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar pago' }));
+    expect(onNavigate).toHaveBeenCalledWith('payment');
   });
 
   it('indica preparar logística cuando hay pago e inventario vendido pero aún no existe envío', () => {
@@ -163,9 +207,10 @@ describe('pestañas del detalle', () => {
   function TabsHarness() {
     const tabs = [
       { id: 'summary', label: 'Resumen' },
-      { id: 'products', label: 'Productos' },
+      { id: 'products', label: 'Pedido' },
       { id: 'operation', label: 'Operación' },
       { id: 'payment', label: 'Pago y factura' },
+      { id: 'customer', label: 'Cliente e historial' },
     ];
     const [activeTab, setActiveTab] = useState('summary');
 
@@ -197,5 +242,29 @@ describe('pestañas del detalle', () => {
       'aria-selected',
       'true'
     );
+  });
+
+  it('mantiene Gestionar como acción independiente y deja visible todo el encabezado', () => {
+    render(
+      <OrderDetailProfessionalView
+        order={{
+          ...BASE_ORDER,
+          status: 'pending',
+          payment: { status: 'pending_gateway' },
+          fulfillment: { status: 'pending', shipments: [] },
+        }}
+        onClose={vi.fn()}
+        statusLocal="pending"
+        setStatusLocal={vi.fn()}
+        onSaveStatus={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('tab', { name: 'Gestionar' })).not.toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveStyle({ flex: '0 0 auto' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar' }));
+    expect(screen.getByRole('heading', { name: 'Gestionar orden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar gestión' })).toBeInTheDocument();
   });
 });

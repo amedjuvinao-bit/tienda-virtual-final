@@ -16,11 +16,9 @@ export default function OrderDetailTabs({ tabs, activeTab, onChange }) {
     <nav
       aria-label="Secciones del detalle de la orden"
       style={{
-        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-        borderRadius: 18,
+        borderBottom: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
         background: ORDER_DETAIL_THEME.cardBg,
-        boxShadow: '0 12px 34px rgba(15, 23, 42, 0.07)',
-        padding: 6,
+        padding: '0 4px',
         overflowX: 'auto',
         scrollbarWidth: 'thin',
       }}
@@ -37,6 +35,7 @@ export default function OrderDetailTabs({ tabs, activeTab, onChange }) {
       >
         {tabs.map((tab, index) => {
           const active = tab.id === activeTab;
+          const TabIcon = tab.icon;
 
           return (
             <button
@@ -69,27 +68,28 @@ export default function OrderDetailTabs({ tabs, activeTab, onChange }) {
                 }
               }}
               style={{
-                minHeight: 40,
-                border: active
-                  ? `1px solid ${ORDER_DETAIL_THEME.cardBorder}`
-                  : '1px solid transparent',
-                borderRadius: 12,
-                background: active
-                  ? ORDER_DETAIL_THEME.primarySoftBg
-                  : 'transparent',
+                minHeight: 52,
+                border: 'none',
+                borderBottom: active
+                  ? `3px solid ${ORDER_DETAIL_THEME.primary}`
+                  : '3px solid transparent',
+                background: 'transparent',
                 color: active
                   ? ORDER_DETAIL_THEME.primary
                   : ORDER_DETAIL_THEME.mutedText,
-                padding: '0 14px',
-                fontSize: 11,
+                padding: '0 18px',
+                fontSize: 12,
                 fontWeight: active ? 950 : 800,
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
-                boxShadow: active
-                  ? 'inset 0 1px 0 rgba(255,255,255,0.7)'
-                  : 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'color 0.16s ease, border-color 0.16s ease',
               }}
             >
+              {TabIcon ? <TabIcon size={16} strokeWidth={active ? 2.5 : 2.2} /> : null}
               {tab.label}
             </button>
           );
