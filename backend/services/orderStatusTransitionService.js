@@ -15,6 +15,9 @@ const {
   advanceOrderInventoryAllocations,
   hydrateOrderInventoryAllocations,
 } = require('./orderInventoryAllocationService');
+const {
+  applyCustomerStatsForOrder,
+} = require('./customerOrderLinkService');
 
 const MAX_BULK_ORDERS = 100;
 
@@ -384,6 +387,7 @@ async function transitionOrderStatus(
     confirmReservation = confirmInventoryReservation,
     releaseReservation = releaseInventoryReservation,
     fulfillmentProcessor = processOrderFulfillmentAfterPayment,
+    customerStatsApplier = applyCustomerStatsForOrder,
   } = {}
 ) {
   const targetStatus = normalizeOrderStatus(status);
@@ -620,6 +624,7 @@ async function transitionOrderStatus(
       }
 
       await order.save({ session });
+      await customerStatsApplier(order, { session });
 
       events.push(
         statusChanged

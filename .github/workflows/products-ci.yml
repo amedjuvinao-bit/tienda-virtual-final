@@ -103,6 +103,9 @@ jobs:
       - name: Validar informes asistidos de órdenes por WhatsApp
         run: npm --prefix backend run test:orders-whatsapp-assisted
 
+      - name: Validar conexión transaccional entre órdenes y clientes
+        run: npm --prefix backend run test:orders-customer-connection
+
       - name: Validar aislamiento del plan de estrés de órdenes
         run: npm --prefix backend run test:orders-stress-plan
 
@@ -289,6 +292,9 @@ jobs:
 
       - name: Validar vista previa asistida de WhatsApp para órdenes
         run: npm --prefix frontend run test:orders-whatsapp-assisted
+
+      - name: Validar corrección y sincronización del cliente desde la orden
+        run: npm --prefix frontend run test:orders-customer-connection
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

@@ -1,5 +1,6 @@
 // frontend/src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.jsx
 
+import { useEffect, useMemo, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
   cleanText,
@@ -41,9 +42,159 @@ function getEmailFromCustomer(customer, order) {
   return '—';
 }
 
-export default function OrderDetailCustomerBilling({ order }) {
+function getEditableForm(order = {}) {
+  const customer = order.customer || {};
+  const billing = order.billing || {};
+
+  return {
+    customer: {
+      name: customer.name || '',
+      lastname: customer.lastname || '',
+      documentType: customer.documentType || billing.documentType || '',
+      id: customer.id || billing.documentNumber || billing.id || '',
+      email:
+        customer.email ||
+        (String(customer.emailOrPhone || '').includes('@')
+          ? customer.emailOrPhone
+          : ''),
+      phone:
+        customer.phone ||
+        (!String(customer.emailOrPhone || '').includes('@')
+          ? customer.emailOrPhone
+          : '') ||
+        billing.phone ||
+        '',
+      address: customer.address || billing.address || '',
+      city: customer.city || billing.city || '',
+      department: customer.department || billing.department || '',
+      country: customer.country || billing.country || 'Colombia',
+      postalCode: customer.postalCode || billing.postalCode || '',
+    },
+    billing: {
+      personType: billing.personType || '',
+      businessName: billing.businessName || '',
+      firstName: billing.firstName || billing.name || customer.name || '',
+      lastName: billing.lastName || billing.lastname || customer.lastname || '',
+      documentType: billing.documentType || customer.documentType || '',
+      documentNumber: billing.documentNumber || billing.id || customer.id || '',
+      email: billing.email || customer.email || '',
+      phone: billing.phone || customer.phone || '',
+      address: billing.address || customer.address || '',
+      city: billing.city || customer.city || '',
+      department: billing.department || customer.department || '',
+      country: billing.country || customer.country || 'Colombia',
+      postalCode: billing.postalCode || customer.postalCode || '',
+    },
+  };
+}
+
+function isDemoOrder(order = {}) {
+  const tags = (Array.isArray(order.tags) ? order.tags : [])
+    .map((tag) => String(tag || '').trim().toLowerCase());
+  const email = String(
+    order?.customer?.email || order?.billing?.email || ''
+  ).toLowerCase();
+
+  return (
+    tags.includes('demo') ||
+    tags.includes('orders-trace') ||
+    (
+      String(order.source || '').toLowerCase() === 'system' &&
+      email.endsWith('@example.com')
+    )
+  );
+}
+
+const fieldStyle = {
+  width: '100%',
+  minWidth: 0,
+  border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+  borderRadius: 12,
+  background: ORDER_DETAIL_THEME.cardBg,
+  color: ORDER_DETAIL_THEME.cardText,
+  padding: '10px 11px',
+  fontSize: 12,
+  fontWeight: 700,
+  outline: 'none',
+};
+
+function EditField({ label, value, onChange, type = 'text', children }) {
+  return (
+    <label style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+      <span
+        style={{
+          color: ORDER_DETAIL_THEME.mutedText,
+          fontSize: 10,
+          fontWeight: 900,
+          letterSpacing: '.06em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </span>
+      {children || (
+        <input
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          style={fieldStyle}
+        />
+      )}
+    </label>
+  );
+}
+
+export default function OrderDetailCustomerBilling({
+  order,
+  onSaveCustomerData,
+  saving = false,
+}) {
   const customer = order?.customer || {};
   const billing = order?.billing || {};
+  const [editing, setEditing] = useState(false);
+  const [syncCustomer, setSyncCustomer] = useState(false);
+  const [form, setForm] = useState(() => getEditableForm(order));
+  const [formError, setFormError] = useState('');
+  const demoOrder = useMemo(() => isDemoOrder(order), [order]);
+
+  useEffect(() => {
+    setEditing(false);
+    setSyncCustomer(false);
+    setForm(getEditableForm(order));
+    setFormError('');
+  }, [order?._id]);
+
+  const setPartyField = (party, field, value) => {
+    setForm((current) => ({
+      ...current,
+      [party]: {
+        ...current[party],
+        [field]: value,
+      },
+    }));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setFormError('');
+
+    const phoneDigits = String(form.customer.phone || '').replace(/\D/g, '');
+    if (form.customer.phone && phoneDigits.length < 10) {
+      setFormError('El celular debe tener al menos 10 dígitos.');
+      return;
+    }
+
+    try {
+      await onSaveCustomerData?.({
+        customer: form.customer,
+        billing: form.billing,
+        syncCustomer: demoOrder ? false : syncCustomer,
+      });
+      setEditing(false);
+    } catch {
+      // El modal presenta el error del servidor; el formulario conserva los datos.
+    }
+  };
 
   const customerName = getCustomerName(order);
   const billingName = getBillingName(order);
@@ -172,7 +323,31 @@ export default function OrderDetailCustomerBilling({ order }) {
           icon={OrderDetailIcons.User}
           title="Cliente"
           subtitle="Información principal de contacto"
-          action={<SoftBadge variant="primary">Comprador</SoftBadge>}
+          action={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SoftBadge variant="primary">Comprador</SoftBadge>
+              {onSaveCustomerData ? (
+                <button
+                  type="button"
+                  onClick={() => setEditing((value) => !value)}
+                  style={{
+                    border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+                    borderRadius: 999,
+                    background: editing
+                      ? ORDER_DETAIL_THEME.primary
+                      : ORDER_DETAIL_THEME.cardBg,
+                    color: editing ? '#fff' : ORDER_DETAIL_THEME.primary,
+                    padding: '7px 11px',
+                    fontSize: 10,
+                    fontWeight: 950,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {editing ? 'Cerrar edición' : 'Corregir datos'}
+                </button>
+              ) : null}
+            </div>
+          }
         />
 
         <div
@@ -189,6 +364,147 @@ export default function OrderDetailCustomerBilling({ order }) {
           <InfoLine label="Ciudad:" value={cleanText(customerCity)} />
         </div>
       </OrderDetailPanel>
+
+      {editing ? (
+        <OrderDetailPanel
+          style={{
+            padding: 18,
+            gridColumn: '1 / -1',
+            order: 2,
+          }}
+        >
+          <SectionTitle
+            icon={OrderDetailIcons.Settings2}
+            title="Corregir datos de la orden"
+            subtitle="Define el alcance antes de guardar; ningún cambio se aplica automáticamente."
+          />
+
+          <form onSubmit={submit} style={{ display: 'grid', gap: 16 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gap: 10,
+                padding: 12,
+                border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+                borderRadius: 16,
+                background: ORDER_DETAIL_THEME.primarySoftBg,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSyncCustomer(false)}
+                style={{
+                  ...fieldStyle,
+                  cursor: 'pointer',
+                  borderColor: !syncCustomer
+                    ? ORDER_DETAIL_THEME.primary
+                    : ORDER_DETAIL_THEME.cardBorder,
+                  color: !syncCustomer
+                    ? ORDER_DETAIL_THEME.primary
+                    : ORDER_DETAIL_THEME.cardText,
+                }}
+              >
+                Solo esta orden
+              </button>
+              <button
+                type="button"
+                disabled={demoOrder}
+                onClick={() => setSyncCustomer(true)}
+                style={{
+                  ...fieldStyle,
+                  cursor: demoOrder ? 'not-allowed' : 'pointer',
+                  opacity: demoOrder ? 0.5 : 1,
+                  borderColor: syncCustomer
+                    ? ORDER_DETAIL_THEME.primary
+                    : ORDER_DETAIL_THEME.cardBorder,
+                  color: syncCustomer
+                    ? ORDER_DETAIL_THEME.primary
+                    : ORDER_DETAIL_THEME.cardText,
+                }}
+              >
+                Esta orden y ficha del cliente
+              </button>
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  color: ORDER_DETAIL_THEME.mutedText,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  lineHeight: 1.45,
+                }}
+              >
+                {demoOrder
+                  ? 'Esta es una orden DEMO: podrás corregir sus datos para probar WhatsApp, pero no se creará un cliente real.'
+                  : syncCustomer
+                    ? 'Los datos de contacto también quedarán disponibles en el módulo Clientes.'
+                    : 'La ficha maestra del cliente no será modificada.'}
+              </div>
+            </div>
+
+            <div className="order-customer-edit-grid">
+              <div style={{ display: 'grid', gap: 12 }}>
+                <strong style={{ fontSize: 12 }}>Contacto del comprador</strong>
+                <div className="order-customer-edit-fields">
+                  <EditField label="Nombre" value={form.customer.name} onChange={(value) => setPartyField('customer', 'name', value)} />
+                  <EditField label="Apellido" value={form.customer.lastname} onChange={(value) => setPartyField('customer', 'lastname', value)} />
+                  <EditField label="Tipo documento" value={form.customer.documentType} onChange={(value) => setPartyField('customer', 'documentType', value)} />
+                  <EditField label="Documento" value={form.customer.id} onChange={(value) => setPartyField('customer', 'id', value)} />
+                  <EditField label="Correo" type="email" value={form.customer.email} onChange={(value) => setPartyField('customer', 'email', value)} />
+                  <EditField label="Celular" type="tel" value={form.customer.phone} onChange={(value) => setPartyField('customer', 'phone', value)} />
+                  <EditField label="Dirección" value={form.customer.address} onChange={(value) => setPartyField('customer', 'address', value)} />
+                  <EditField label="Ciudad" value={form.customer.city} onChange={(value) => setPartyField('customer', 'city', value)} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: 12 }}>
+                <strong style={{ fontSize: 12 }}>Datos de facturación</strong>
+                <div className="order-customer-edit-fields">
+                  <EditField label="Tipo persona" value={form.billing.personType} onChange={(value) => setPartyField('billing', 'personType', value)} />
+                  <EditField label="Razón social" value={form.billing.businessName} onChange={(value) => setPartyField('billing', 'businessName', value)} />
+                  <EditField label="Tipo documento" value={form.billing.documentType} onChange={(value) => setPartyField('billing', 'documentType', value)} />
+                  <EditField label="Documento fiscal" value={form.billing.documentNumber} onChange={(value) => setPartyField('billing', 'documentNumber', value)} />
+                  <EditField label="Correo fiscal" type="email" value={form.billing.email} onChange={(value) => setPartyField('billing', 'email', value)} />
+                  <EditField label="Teléfono fiscal" type="tel" value={form.billing.phone} onChange={(value) => setPartyField('billing', 'phone', value)} />
+                  <EditField label="Dirección fiscal" value={form.billing.address} onChange={(value) => setPartyField('billing', 'address', value)} />
+                  <EditField label="Ciudad fiscal" value={form.billing.city} onChange={(value) => setPartyField('billing', 'city', value)} />
+                </div>
+              </div>
+            </div>
+
+            {formError ? (
+              <div style={{ color: '#be123c', fontSize: 11, fontWeight: 800 }}>
+                {formError}
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                style={{ ...fieldStyle, width: 'auto', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  ...fieldStyle,
+                  width: 'auto',
+                  borderColor: ORDER_DETAIL_THEME.primary,
+                  background: ORDER_DETAIL_THEME.primary,
+                  color: '#fff',
+                  cursor: saving ? 'wait' : 'pointer',
+                }}
+              >
+                {saving ? 'Guardando…' : 'Guardar corrección'}
+              </button>
+            </div>
+          </form>
+        </OrderDetailPanel>
+      ) : null}
 
       <OrderDetailPanel
         style={{
@@ -237,6 +553,25 @@ export default function OrderDetailCustomerBilling({ order }) {
           @media (max-width: 900px) {
             div[style*="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)"] {
               grid-template-columns: 1fr !important;
+            }
+          }
+
+          .order-customer-edit-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+          }
+
+          .order-customer-edit-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+
+          @media (max-width: 720px) {
+            .order-customer-edit-grid,
+            .order-customer-edit-fields {
+              grid-template-columns: 1fr;
             }
           }
         `}

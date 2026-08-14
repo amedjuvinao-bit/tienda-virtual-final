@@ -156,6 +156,7 @@ export default function OrdersAdmin() {
   const canArchive = can('orders:archive');
   const canAddNotes = can('orders:notes');
   const canSendEmail = can('orders:email');
+  const canEditCustomerData = can('orders:customer_data');
   const canUpdateFulfillment = can('orders:fulfillment');
   const canDownloadBilling = can('billing:download');
   const canRefund = can('orders:refund');
@@ -461,6 +462,23 @@ export default function OrdersAdmin() {
     } catch {
       alert('No se pudo cargar el detalle completo de la orden.');
     }
+  };
+
+  const handleCustomerDataUpdated = (updatedOrder) => {
+    if (!updatedOrder?._id) return;
+
+    setOrderSelected((current) =>
+      current?._id === updatedOrder._id
+        ? { ...current, ...updatedOrder }
+        : current
+    );
+    setData((current) =>
+      current.map((item) =>
+        item._id === updatedOrder._id
+          ? { ...item, ...updatedOrder }
+          : item
+      )
+    );
   };
 
   // Debounce búsqueda
@@ -1472,6 +1490,8 @@ export default function OrdersAdmin() {
         onToggleArchived={canArchive ? toggleArchived : null}
         canAddNotes={canAddNotes}
         canSendEmail={canSendEmail}
+        canEditCustomerData={canEditCustomerData}
+        onCustomerDataUpdated={handleCustomerDataUpdated}
         canUpdateFulfillment={canUpdateFulfillment}
         canDownloadBilling={canDownloadBilling}
         canRefund={canRefund}

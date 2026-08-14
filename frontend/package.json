@@ -16,6 +16,7 @@
     "test:orders-operations": "vitest run src/admin/orders/components/OrdersOperationsCenter.test.jsx src/admin/orders/hooks/useOrdersQuickViews.test.jsx",
     "test:orders-detail-story": "vitest run src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",
     "test:orders-whatsapp-assisted": "vitest run src/admin/orders/components/orderDetail/OrderWhatsAppPreview.test.jsx",
+    "test:orders-customer-connection": "vitest run src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
   "dependencies": {

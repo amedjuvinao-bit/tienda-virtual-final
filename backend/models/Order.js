@@ -1210,6 +1210,12 @@ const OrderSchema = new mongoose.Schema(
     },
 
     customer: {
+      customerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Customer',
+        default: null,
+      },
+      customerCode: { type: String, trim: true, uppercase: true, default: '' },
       name: String,
       lastname: String,
       id: String,
@@ -1228,6 +1234,21 @@ const OrderSchema = new mongoose.Schema(
       departmentCode: String,
       deliveryType: String,
       wantsNewsletter: Boolean,
+    },
+
+    customerRelationship: {
+      linkedAt: { type: Date, default: null },
+      statsAppliedAt: { type: Date, default: null },
+      source: {
+        type: String,
+        enum: ['', 'web', 'pos'],
+        default: '',
+      },
+      matchedBy: {
+        type: String,
+        enum: ['', 'customer_id', 'document', 'email', 'phone', 'created'],
+        default: '',
+      },
     },
 
     billing: {
@@ -1353,6 +1374,7 @@ const OrderSchema = new mongoose.Schema(
 /* ========= Índices ========= */
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ sessionId: 1, createdAt: -1 });
+OrderSchema.index({ 'customer.customerId': 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
 OrderSchema.index({ fulfillmentStatus: 1, createdAt: -1 });
 OrderSchema.index({ 'timeline.type': 1, createdAt: -1 });

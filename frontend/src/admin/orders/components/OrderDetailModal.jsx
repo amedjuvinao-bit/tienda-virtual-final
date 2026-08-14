@@ -42,6 +42,8 @@ export default function OrderDetailModal({
   onToggleArchived,
   canAddNotes = false,
   canSendEmail = false,
+  canEditCustomerData = false,
+  onCustomerDataUpdated,
   canUpdateFulfillment = false,
   canDownloadBilling = false,
   canRefund = false,
@@ -65,6 +67,7 @@ export default function OrderDetailModal({
   const [whatsAppPreviewLoading, setWhatsAppPreviewLoading] = useState(false);
   const [whatsAppPreviewError, setWhatsAppPreviewError] = useState('');
   const [toast, setToast] = useState(null);
+  const [savingCustomerData, setSavingCustomerData] = useState(false);
   const emailBtnRef = useRef(null);
 
   const printed = !!order?.printed;
@@ -497,6 +500,48 @@ export default function OrderDetailModal({
     }
   };
 
+  const saveCustomerData = async (payload) => {
+    if (!canEditCustomerData || !order?._id) return null;
+
+    try {
+      setSavingCustomerData(true);
+      const { data } = await api.patch(
+        `/api/orders/${order._id}/customer-data`,
+        payload
+      );
+      const updatedOrder = data?.order || {
+        ...order,
+        customer: data?.customer || order.customer,
+        billing: data?.billing || order.billing,
+        customerRelationship:
+          data?.customerRelationship || order.customerRelationship,
+      };
+
+      onCustomerDataUpdated?.(updatedOrder);
+      showToast({
+        type: 'success',
+        title: 'Datos actualizados',
+        message: payload?.syncCustomer
+          ? 'La orden y la ficha del cliente quedaron sincronizadas.'
+          : 'El cambio quedó guardado únicamente en esta orden.',
+      });
+      await fetchTimeline();
+      return updatedOrder;
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'No se pudieron actualizar los datos',
+        message:
+          error?.response?.data?.message ||
+          'Revisa la información e intenta nuevamente.',
+        persist: true,
+      });
+      throw error;
+    } finally {
+      setSavingCustomerData(false);
+    }
+  };
+
   const normalizedNotes = useMemo(() => {
     return notes.map((note) => ({
       ...note,
@@ -594,6 +639,10 @@ export default function OrderDetailModal({
           canConfirmRefundPayment={canRefund}
           confirmingRefundId={confirmingRefundId}
           onConfirmRefundPayment={confirmRefundPayment}
+          onSaveCustomerData={
+            canEditCustomerData ? saveCustomerData : null
+          }
+          savingCustomerData={savingCustomerData}
         />
       </div>
     </div>,

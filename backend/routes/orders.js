@@ -79,6 +79,12 @@ const {
   initializeLogistics,
   updateShipment,
 } = require('../controllers/orderLogisticsController');
+const {
+  applyCustomerResolutionToOrderData,
+  applyCustomerStatsForOrder,
+  resolveCustomerForOrder,
+  syncCustomerMasterFromOrder,
+} = require('../services/customerOrderLinkService');
 
 /* -------------------------------------------------------
  * RATE LIMIT LIGERO (en memoria) para mutaciones
@@ -1359,8 +1365,11 @@ router.patch('/:id/archived', requireAdmin, async (req, res) => {
  * PATCH /api/orders/:id/customer-data
  * ============================ */
 router.patch('/:id/customer-data', requireAdmin, async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
     const id = req.params.id;
+    const syncCustomer = req.body?.syncCustomer === true;
 
     const customer = sanitizeOrderPartyPatch(
       req.body?.customer,
@@ -1383,55 +1392,97 @@ router.patch('/:id/customer-data', requireAdmin, async (req, res) => {
 
     if (!access.ok) return sendOrderScopeError(res, access);
 
-    const order = await Order.findOne(access.filter);
+    let order = null;
+    let linkedCustomer = null;
 
-    if (!order) {
-      return res.status(404).json({
-        error: 'ORDER_NOT_FOUND',
-      });
-    }
+    await session.withTransaction(async () => {
+      order = await Order.findOne(access.filter).session(session);
 
-    const beforeCustomer = order.customer || {};
-    const beforeBilling = order.billing || {};
+      if (!order) {
+        throw Object.assign(new Error('Orden no encontrada.'), {
+          code: 'ORDER_NOT_FOUND',
+          statusCode: 404,
+        });
+      }
 
-    if (customer) {
-      order.customer = {
-        ...beforeCustomer,
-        ...customer,
-      };
-    }
+      const beforeCustomer = order.customer?.toObject
+        ? order.customer.toObject()
+        : order.customer || {};
+      const beforeBilling = order.billing?.toObject
+        ? order.billing.toObject()
+        : order.billing || {};
 
-    if (billing) {
-      order.billing = {
-        ...beforeBilling,
-        ...billing,
-      };
-    }
+      if (customer) {
+        order.customer = {
+          ...beforeCustomer,
+          ...customer,
+        };
+      }
 
-    await order.save();
+      if (billing) {
+        order.billing = {
+          ...beforeBilling,
+          ...billing,
+        };
+      }
 
-    await OrderEvent.create({
-      orderId: order._id,
-      type: 'customer_data_updated',
-      message: 'Datos de facturación actualizados desde panel administrativo',
-      meta: {
-        customerFields: customer ? Object.keys(customer) : [],
-        billingFields: billing ? Object.keys(billing) : [],
-        by: req.adminUsername || req.adminUserId || 'admin',
-      },
+      if (syncCustomer) {
+        const result = await syncCustomerMasterFromOrder(order, {
+          session,
+          updatedByAdmin:
+            req.adminUserId || req.user?._id || req.user?.id || null,
+        });
+        linkedCustomer = result.customer;
+      }
+
+      await order.save({ session });
+      await applyCustomerStatsForOrder(order, { session });
+
+      await OrderEvent.create(
+        [
+          {
+            orderId: order._id,
+            type: 'customer_data_updated',
+            message: syncCustomer
+              ? 'Datos actualizados en la orden y en la ficha del cliente'
+              : 'Datos actualizados únicamente en la orden',
+            meta: {
+              customerFields: customer ? Object.keys(customer) : [],
+              billingFields: billing ? Object.keys(billing) : [],
+              syncCustomer,
+              customerId: linkedCustomer?._id || order.customer?.customerId || null,
+              by: req.adminUsername || req.adminUserId || 'admin',
+            },
+          },
+        ],
+        { session }
+      );
     });
 
     return res.json({
       ok: true,
       customer: order.customer,
       billing: order.billing,
+      customerRelationship: order.customerRelationship,
+      linkedCustomer: linkedCustomer
+        ? {
+            id: String(linkedCustomer._id),
+            customerCode: linkedCustomer.customerCode || '',
+          }
+        : null,
+      order: order.toObject({ virtuals: true }),
     });
   } catch (e) {
     console.error('PATCH /orders/:id/customer-data', e);
 
-    return res.status(500).json({
-      error: 'CUSTOMER_DATA_UPDATE_ERROR',
+    return res.status(e.statusCode || e.status || 500).json({
+      error: e.code || 'CUSTOMER_DATA_UPDATE_ERROR',
+      message:
+        e.message || 'No fue posible actualizar los datos del cliente.',
+      details: e.details || undefined,
     });
+  } finally {
+    await session.endSession();
   }
 });
 
@@ -1790,8 +1841,19 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
 
       base.status = base.status || 'pending';
 
-      created = await Order.create([{ ...base }], { session });
+      const customerResolution = await resolveCustomerForOrder(base, {
+        session,
+        source: orderSource,
+      });
+      const linkedBase = applyCustomerResolutionToOrderData(
+        base,
+        customerResolution
+      );
+
+      created = await Order.create([{ ...linkedBase }], { session });
       created = created[0];
+
+      await applyCustomerStatsForOrder(created, { session });
 
       if (reservationRequired) {
         inventoryReservation = await createInventoryReservation(

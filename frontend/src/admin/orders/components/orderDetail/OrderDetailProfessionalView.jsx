@@ -68,6 +68,8 @@ export default function OrderDetailProfessionalView({
   canConfirmRefundPayment = false,
   confirmingRefundId = '',
   onConfirmRefundPayment,
+  onSaveCustomerData,
+  savingCustomerData = false,
 }) {
   const [activeTab, setActiveTab] = useState('summary');
   const [managementOpen, setManagementOpen] = useState(false);
@@ -161,7 +163,11 @@ export default function OrderDetailProfessionalView({
     ),
     customer: (
       <>
-        <OrderDetailCustomerBilling order={order} />
+        <OrderDetailCustomerBilling
+          order={order}
+          onSaveCustomerData={onSaveCustomerData}
+          saving={savingCustomerData}
+        />
         <OrderDetailTimelineNotes
           order={order}
           timeline={timeline}

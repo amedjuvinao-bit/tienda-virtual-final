@@ -288,6 +288,33 @@ El informe se genera en `orderCustomerNotificationService.js` y utiliza únicame
 
 La interfaz muestra una vista previa completa antes de abrir el chat. Si no existe un celular válido, el control queda deshabilitado y explica el dato faltante. El backend vuelve a validar teléfono, permiso y sede, por lo que la interfaz no es la autoridad del destinatario ni del contenido.
 
+### Conexión entre órdenes y clientes
+
+Las órdenes reales de checkout crean o reutilizan una ficha de `Customer` dentro de la misma transacción. La identidad se resuelve en orden determinista por `customerId`, documento, correo y celular; la orden conserva `customer.customerId`, `customerCode` y la forma en que se resolvió el vínculo. Las ventas POS rápidas también reutilizan una ficha existente antes de crear otra.
+
+Las órdenes marcadas `DEMO` u `orders-trace` quedan deliberadamente fuera del CRM. Sus datos sí pueden corregirse dentro de la propia orden para validar WhatsApp, pero la opción `Esta orden y ficha del cliente` permanece bloqueada. Así, las pruebas visuales no crean clientes comerciales falsos.
+
+Desde `Cliente e historial`, el permiso `orders:customer_data` habilita `Corregir datos` con dos alcances explícitos:
+
+- `Solo esta orden`: modifica el snapshot usado por WhatsApp, entrega y facturación sin tocar la ficha maestra;
+- `Esta orden y ficha del cliente`: además crea o actualiza el cliente vinculado, rechazando conflictos de correo, celular o documento.
+
+Las estadísticas comerciales usan `customerRelationship.statsAppliedAt` como marca idempotente. Una compra confirmada se contabiliza una sola vez aunque el estado se reconcilie o se reintente.
+
+Para órdenes reales antiguas existe una conciliación conservadora. Por defecto solo presenta un diagnóstico y nunca escribe:
+
+```bat
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run orders:customers-reconcile
+```
+
+Después de revisar el resumen, la aplicación explícita se ejecuta con:
+
+```bat
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run orders:customers-reconcile:apply
+```
+
+La conciliación no borra documentos, excluye órdenes DEMO y no procesa POS histórico para evitar duplicar estadísticas ya contabilizadas.
+
 ## Permisos en la interfaz
 
 Un usuario con `orders:view` puede consultar listado, detalle, historial, inventario asignado y notas existentes. Cada control de mutación se renderiza solo cuando existe su permiso correspondiente:
@@ -313,6 +340,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-l
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-observability
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-whatsapp-assisted
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-customer-connection
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-stress-plan
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics-eligibility-trace
@@ -321,7 +349,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-co
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm exec -- vitest run && npm run build
 ```
 
 Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
