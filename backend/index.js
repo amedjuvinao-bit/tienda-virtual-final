@@ -89,6 +89,9 @@ const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
 const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
+const orderCustomerNotificationRoutes = tryRequire(
+  './routes/orderCustomerNotificationRoutes'
+);
 const orderQuoteRoutes = tryRequire('./routes/orderQuote');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
@@ -133,6 +136,9 @@ if (digitalDeliveryRoutes) {
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
+if (orderCustomerNotificationRoutes) {
+  app.use('/api/orders', orderCustomerNotificationRoutes);
+}
 if (orderQuoteRoutes) app.use('/api/orders', orderQuoteRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);

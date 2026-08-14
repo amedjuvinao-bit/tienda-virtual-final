@@ -50,6 +50,19 @@ const STATUS_POSITION = {
   delivered: 6,
 };
 
+const CUSTOMER_STAGE_LABELS = {
+  initialize: 'Preparación logística iniciada',
+  start_picking: 'Preparación iniciada',
+  complete_picking: 'Productos seleccionados',
+  start_packing: 'Empaque iniciado',
+  complete_packing: 'Pedido empacado',
+  dispatch: 'Pedido despachado',
+  mark_in_transit: 'Pedido en tránsito',
+  deliver: 'Entrega confirmada',
+  report_incident: 'Novedad registrada',
+  resolve_incident: 'Novedad solucionada',
+};
+
 function toLocalDateTime(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -171,6 +184,7 @@ export default function OrderDetailLogisticsPanel({
   order,
   canManage = false,
   onRefreshTimeline,
+  onCustomerStageConfirmed,
 }) {
   const initialShipments = Array.isArray(order?.fulfillment?.shipments)
     ? order.fulfillment.shipments
@@ -260,6 +274,10 @@ export default function OrderDetailLogisticsPanel({
       applyResponse(data);
       setMessage({ type: 'success', text: 'Envíos creados desde las asignaciones confirmadas de inventario.' });
       await onRefreshTimeline?.();
+      await onCustomerStageConfirmed?.({
+        action: 'initialize',
+        label: CUSTOMER_STAGE_LABELS.initialize,
+      });
     } catch (error) {
       setMessage({
         type: 'error',
@@ -309,6 +327,13 @@ export default function OrderDetailLogisticsPanel({
       applyResponse(data);
       setMessage({ type: 'success', text: `Envío ${shipment.code} actualizado correctamente.` });
       await onRefreshTimeline?.();
+      if (CUSTOMER_STAGE_LABELS[action]) {
+        await onCustomerStageConfirmed?.({
+          action,
+          label: CUSTOMER_STAGE_LABELS[action],
+          shipmentCode: shipment.code,
+        });
+      }
     } catch (error) {
       const code = error?.response?.data?.error;
       if (code === 'LOGISTICS_REVISION_CONFLICT') {

@@ -5,6 +5,32 @@ import { createPortal } from 'react-dom';
 import api from '../../../lib/api';
 import { ORDER_DETAIL_THEME } from './orderDetail/orderDetailTheme';
 import OrderDetailProfessionalView from './orderDetail/OrderDetailProfessionalView';
+import OrderWhatsAppPreview from './orderDetail/OrderWhatsAppPreview';
+
+function getWhatsAppAvailability(order = {}) {
+  const candidates = [
+    order?.customer?.phone,
+    order?.billing?.phone,
+    order?.customer?.emailOrPhone,
+  ];
+
+  const hasCandidate = candidates.some((candidate) => {
+    const raw = String(candidate || '').trim();
+    if (!raw || raw.includes('@')) return false;
+    const digits = raw.replace(/\D/g, '').replace(/^00/, '');
+    return (
+      (digits.length === 10 && digits.startsWith('3')) ||
+      (digits.length >= 11 && digits.length <= 15)
+    );
+  });
+
+  return hasCandidate
+    ? { available: true, reason: '' }
+    : {
+        available: false,
+        reason: 'La orden no tiene un celular válido del cliente.',
+      };
+}
 
 export default function OrderDetailModal({
   open,
@@ -34,12 +60,20 @@ export default function OrderDetailModal({
   const [confirmingRefundId, setConfirmingRefundId] = useState('');
 
   const [emailMenuOpen, setEmailMenuOpen] = useState(false);
+  const [whatsAppPreviewOpen, setWhatsAppPreviewOpen] = useState(false);
+  const [whatsAppPreview, setWhatsAppPreview] = useState(null);
+  const [whatsAppPreviewLoading, setWhatsAppPreviewLoading] = useState(false);
+  const [whatsAppPreviewError, setWhatsAppPreviewError] = useState('');
   const [toast, setToast] = useState(null);
   const emailBtnRef = useRef(null);
 
   const printed = !!order?.printed;
   const archived = !!order?.archived;
   const disabled = savingId === order?._id;
+  const whatsAppAvailability = useMemo(
+    () => getWhatsAppAvailability(order),
+    [order]
+  );
 
   const showToast = ({ type = 'info', title = '', message = '', actionLabel = '', onAction = null, persist = false }) => {
     setToast({
@@ -71,8 +105,11 @@ export default function OrderDetailModal({
     setStatusLocal(order?.status || 'pending');
     setTagsStr((Array.isArray(order?.tags) ? order.tags : []).join(', '));
     setEmailMenuOpen(false);
+    setWhatsAppPreviewOpen(false);
+    setWhatsAppPreview(null);
+    setWhatsAppPreviewError('');
     setToast(null);
-  }, [open, order]);
+  }, [open, order?._id]);
 
   useEffect(() => {
     if (!toast || toast.persist) return undefined;
@@ -134,9 +171,12 @@ export default function OrderDetailModal({
 
     try {
       const { data } = await api.get(`/api/orders/${order._id}/timeline`);
-      setTimeline(Array.isArray(data?.data) ? data.data : []);
+      const items = Array.isArray(data?.data) ? data.data : [];
+      setTimeline(items);
+      return items;
     } catch {
       setTimeline([]);
+      return [];
     }
   };
 
@@ -284,6 +324,110 @@ export default function OrderDetailModal({
     }
   };
 
+  const prepareWhatsAppPreview = async () => {
+    if (!canSendEmail || !order?._id) return;
+
+    setWhatsAppPreviewOpen(true);
+    setWhatsAppPreviewLoading(true);
+    setWhatsAppPreviewError('');
+    setWhatsAppPreview(null);
+    setToast(null);
+
+    try {
+      const { data } = await api.get(
+        `/api/orders/${order._id}/customer-notifications/whatsapp/preview`
+      );
+      setWhatsAppPreview(data?.preview || null);
+      if (!data?.preview) {
+        setWhatsAppPreviewError(
+          'El servidor no devolvió una vista previa válida.'
+        );
+      }
+    } catch (error) {
+      setWhatsAppPreviewError(
+        error?.response?.data?.message ||
+          'No fue posible preparar el informe de WhatsApp.'
+      );
+    } finally {
+      setWhatsAppPreviewLoading(false);
+    }
+  };
+
+  const registerWhatsAppOpened = () => {
+    if (!order?._id || !whatsAppPreview?.whatsappUrl) return;
+
+    const sourceEventId = whatsAppPreview.sourceEventId || '';
+    setWhatsAppPreviewOpen(false);
+    showToast({
+      type: 'success',
+      title: 'WhatsApp abierto',
+      message:
+        'El informe quedó preparado. Confirma el envío dentro de WhatsApp.',
+    });
+
+    api
+      .post(
+        `/api/orders/${order._id}/customer-notifications/whatsapp/opened`,
+        { sourceEventId }
+      )
+      .then(() => fetchTimeline())
+      .catch((error) => {
+        showToast({
+          type: 'warning',
+          title: 'WhatsApp abierto sin registro',
+          message:
+            error?.response?.data?.message ||
+            'El chat se abrió, pero no se pudo registrar la acción en la trazabilidad.',
+          persist: true,
+        });
+      });
+  };
+
+  const saveStatusAndOfferWhatsApp = async (orderId, nextStatus) => {
+    if (!onSaveStatus) return null;
+    const previousStatus = String(order?.status || '').toLowerCase();
+    const response = await onSaveStatus(orderId, nextStatus);
+    const changed =
+      response?.data?.changed !== false &&
+      previousStatus !== String(nextStatus || '').toLowerCase();
+
+    if (changed && canSendEmail) {
+      showToast({
+        type: 'success',
+        title: 'Etapa confirmada',
+        message: whatsAppAvailability.available
+          ? 'El cambio quedó guardado. Puedes informar ahora al cliente.'
+          : `El cambio quedó guardado. ${whatsAppAvailability.reason}`,
+        actionLabel: whatsAppAvailability.available
+          ? 'Informar por WhatsApp'
+          : '',
+        onAction: whatsAppAvailability.available
+          ? prepareWhatsAppPreview
+          : null,
+        persist: true,
+      });
+    }
+
+    return response;
+  };
+
+  const offerWhatsAppAfterStage = ({ label = 'Etapa confirmada' } = {}) => {
+    showToast({
+      type: 'success',
+      title: label,
+      message: whatsAppAvailability.available
+        ? 'La trazabilidad quedó actualizada. Puedes informar ahora al cliente.'
+        : `La trazabilidad quedó actualizada. ${whatsAppAvailability.reason}`,
+      actionLabel: whatsAppAvailability.available
+        ? 'Informar por WhatsApp'
+        : '',
+      onAction: whatsAppAvailability.available
+        ? prepareWhatsAppPreview
+        : null,
+      persist: true,
+    });
+  };
+
   const openPdf = async () => {
     if (!canDownloadBilling || !order?._id) return;
 
@@ -395,6 +539,16 @@ export default function OrderDetailModal({
         />
       ) : null}
 
+      <OrderWhatsAppPreview
+        open={whatsAppPreviewOpen}
+        preview={whatsAppPreview}
+        loading={whatsAppPreviewLoading}
+        error={whatsAppPreviewError}
+        onClose={() => setWhatsAppPreviewOpen(false)}
+        onRetry={prepareWhatsAppPreview}
+        onOpenWhatsApp={registerWhatsAppOpened}
+      />
+
       <div className="relative z-[100000]">
         <OrderDetailProfessionalView
           order={order}
@@ -412,7 +566,7 @@ export default function OrderDetailModal({
           savingNote={loadingAux}
           statusLocal={statusLocal}
           setStatusLocal={setStatusLocal}
-          onSaveStatus={onSaveStatus}
+          onSaveStatus={onSaveStatus ? saveStatusAndOfferWhatsApp : null}
           statusSaving={disabled}
           tagsStr={tagsStr}
           setTagsStr={setTagsStr}
@@ -426,6 +580,12 @@ export default function OrderDetailModal({
           setEmailMenuOpen={setEmailMenuOpen}
           emailBtnRef={emailBtnRef}
           onSendEmail={canSendEmail ? sendEmail : null}
+          onPrepareWhatsApp={canSendEmail ? prepareWhatsAppPreview : null}
+          whatsAppAvailable={whatsAppAvailability.available}
+          whatsAppUnavailableReason={whatsAppAvailability.reason}
+          onCustomerStageConfirmed={
+            canSendEmail ? offerWhatsAppAfterStage : null
+          }
           canUpdateFulfillment={canUpdateFulfillment}
           loadingAux={loadingAux}
           onRefreshTimeline={fetchTimeline}

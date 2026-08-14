@@ -325,6 +325,20 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/orders/:id/customer-notifications/whatsapp/preview',
+    permission: 'orders:email',
+    description: 'Preparar la vista previa del estado de una orden para WhatsApp.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/customer-notifications/whatsapp/opened',
+    permission: 'orders:email',
+    description: 'Registrar la apertura asistida del informe de una orden en WhatsApp.',
+    audit: true,
+  },
+  {
+    method: 'GET',
     path: '/api/orders/:id/pdf',
     permission: 'billing:download',
     description: 'Descargar PDF de orden/factura.',

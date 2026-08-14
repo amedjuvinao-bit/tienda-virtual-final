@@ -3,11 +3,31 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **7. Observabilidad y stress transaccional**.
-- Estado de la etapa: implementada; el contrato aislado se valida sin datos reales y la ejecución transaccional queda protegida por CI con MongoDB en réplica.
+- Etapa actual: **8. Comunicación asistida de la trazabilidad**.
+- Estado de la etapa: implementada para WhatsApp asistido; el administrador revisa el informe y confirma el envío dentro de WhatsApp sin que el sistema afirme entrega o lectura.
 - Siguiente etapa: cierre integral, documentación final y fusión controlada.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp.
+
+## Comunicación asistida de la trazabilidad
+
+La opción A no usa credenciales de Meta ni afirma que el mensaje fue entregado. Después de confirmar una etapa comercial o logística, el detalle presenta una acción inmediata `Informar por WhatsApp`. La misma acción permanece disponible dentro de `Gestionar orden` para preparar nuevamente el estado más reciente.
+
+El backend selecciona el último evento apto para el cliente y construye un informe con:
+
+- número de orden y fecha de actualización;
+- qué pasó, estado actual y siguiente paso;
+- sede, transportadora, guía, enlace seguro y promesa de entrega cuando correspondan;
+- nombre comercial configurado en `SiteSettings.store`.
+
+Notas, etiquetas, actores, severidades y descripciones internas de incidencias no se incorporan al mensaje. El teléfono se toma de la orden, se normaliza a formato internacional y se devuelve enmascarado para la interfaz y la auditoría. Un celular colombiano de diez dígitos recibe el prefijo `57`.
+
+| Endpoint | Propósito | Permiso |
+|---|---|---|
+| `GET /api/orders/:id/customer-notifications/whatsapp/preview` | Generar la vista previa desde la última etapa notificable | `orders:email` |
+| `POST /api/orders/:id/customer-notifications/whatsapp/opened` | Registrar que el administrador abrió el chat preparado | `orders:email` |
+
+El enlace `wa.me` se abre exclusivamente después de la decisión del administrador. El registro `whatsapp_opened` significa “preparado/abierto”; nunca equivale a enviado, entregado o leído. `OrderCustomerNotification` conserva una huella idempotente, contador de aperturas, etapa, destino enmascarado y actor, pero no almacena el teléfono completo ni secretos de WhatsApp.
 
 ## Observabilidad y stress transaccional
 
@@ -227,7 +247,7 @@ El mismo alcance protege listado, detalle, estado, cumplimiento, impresión, arc
 | Editar datos de cliente/facturación | `orders:customer_data` |
 | Editar etiquetas | `orders:tags` |
 | Crear, editar o eliminar notas | `orders:notes` |
-| Enviar correo | `orders:email` |
+| Enviar correo o preparar informe asistido de WhatsApp | `orders:email` |
 | Descargar PDF/XML | `billing:download` |
 | Procesar devolución | `orders:refund` |
 | Crear/reintentar documentos electrónicos | permisos específicos `billing:*` |
@@ -262,6 +282,12 @@ Existe una sola ruta autoritativa: `backend/routes/orderEmailRoutes.js`. Los cua
 
 La plantilla escapa contenido dinámico antes de generar HTML y la interfaz presenta exactamente esas cuatro acciones.
 
+### WhatsApp asistido
+
+El informe se genera en `orderCustomerNotificationService.js` y utiliza únicamente eventos permitidos: cambios comerciales, pago, preparación, picking, empaque, despacho, tránsito, entrega, incidencias redactadas de forma segura y actualización fiscal. Cambios de etiquetas, notas o planes internos no disparan el aviso.
+
+La interfaz muestra una vista previa completa antes de abrir el chat. Si no existe un celular válido, el control queda deshabilitado y explica el dato faltante. El backend vuelve a validar teléfono, permiso y sede, por lo que la interfaz no es la autoridad del destinatario ni del contenido.
+
 ## Permisos en la interfaz
 
 Un usuario con `orders:view` puede consultar listado, detalle, historial, inventario asignado y notas existentes. Cada control de mutación se renderiza solo cuando existe su permiso correspondiente:
@@ -286,6 +312,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-a
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-observability
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-whatsapp-assisted
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-stress-plan
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics-eligibility-trace
@@ -294,7 +321,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-co
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm exec -- vitest run && npm run build
 ```
 
 Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
@@ -364,6 +391,14 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - La prueba transaccional reutiliza la autoridad real de `orderLogisticsService`; no implementa una máquina paralela ni modifica inventario físico.
 - Los umbrales profesionales son p95 máximo de 2.500 ms, duración total máxima de 120 segundos, crecimiento de heap máximo de 256 MB y cero inconsistencias finales.
 - CI conserva por separado el contrato sin base, el plan seguro y la ejecución con réplica para distinguir errores de diseño, aislamiento y comportamiento transaccional.
+
+## Evidencia de la etapa 8
+
+- Contrato de WhatsApp asistido: 15 controles sobre teléfonos, privacidad, contenido, etapas, alcance por sede, RBAC, auditoría e idempotencia.
+- Vista previa: 2 pruebas sobre relato, destino enmascarado, enlace preparado, bloqueo y reintento.
+- Regresión conjunta del detalle: 25 pruebas de seguridad, logística, historia de la orden y WhatsApp.
+- El build de producción compila el flujo completo sin requerir credenciales de Meta.
+- CI ejecuta los contratos backend y frontend y nunca abre WhatsApp ni envía mensajes reales.
 
 ## Simulación persistente y trazabilidad visual
 

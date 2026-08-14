@@ -17,6 +17,7 @@
     "test:orders-logistics": "node scripts/testOrderLogisticsContract.js",
     "test:orders-operations": "node scripts/testOrderOperationsCenterContract.js",
     "test:orders-observability": "node scripts/testOrderOperationalMonitoringModule.js",
+    "test:orders-whatsapp-assisted": "node scripts/testOrderWhatsAppAssistedNotification.js",
     "test:orders-stress-plan": "node scripts/testOrderTransactionalStress.js --validate-plan",
     "test:orders-stress": "node scripts/testOrderTransactionalStress.js",
     "test:orders-trace-seed": "node scripts/testPersistentOrdersTraceSeed.js",

@@ -288,6 +288,9 @@ async function main() {
 
   const ordersRoute = read('backend/routes/orders.js');
   const emailRoute = read('backend/routes/orderEmailRoutes.js');
+  const customerNotificationRoute = read(
+    'backend/routes/orderCustomerNotificationRoutes.js'
+  );
   const paymentRoute = read('backend/routes/payments.js');
   const billingRoute = read('backend/routes/adminBilling.js');
   assert.ok(ordersRoute.includes('buildAuthorizedSelectionFilter'));
@@ -305,7 +308,12 @@ async function main() {
   );
   ok('detalle, documentos, reembolsos, correo y acciones masivas comparten alcance');
 
-  const trustedRuntime = [ordersRoute, emailRoute, paymentRoute].join('\n');
+  const trustedRuntime = [
+    ordersRoute,
+    emailRoute,
+    customerNotificationRoute,
+    paymentRoute,
+  ].join('\n');
   assert.ok(!trustedRuntime.includes("req.headers['x-admin-user']"));
   assert.ok(emailRoute.includes('escapeHtml'));
   assert.ok(ordersRoute.includes('ORDER_CUSTOMER_EDITABLE_FIELDS'));
@@ -321,6 +329,8 @@ async function main() {
     ['POST', `/api/orders/${ORDER_ID}/fulfillment/logistics/initialize`, 'orders:fulfillment'],
     ['PATCH', `/api/orders/${ORDER_ID}/fulfillment/logistics/shipments/${ORDER_ID}`, 'orders:fulfillment'],
     ['POST', `/api/orders/${ORDER_ID}/email`, 'orders:email'],
+    ['GET', `/api/orders/${ORDER_ID}/customer-notifications/whatsapp/preview`, 'orders:email'],
+    ['POST', `/api/orders/${ORDER_ID}/customer-notifications/whatsapp/opened`, 'orders:email'],
     ['POST', `/api/orders/${ORDER_ID}/refund`, 'orders:refund'],
     ['GET', `/api/orders/${ORDER_ID}/pdf`, 'billing:download'],
   ];

@@ -31,6 +31,7 @@ import {
   Settings2,
   Package,
   WalletCards,
+  MessageCircle,
 } from 'lucide-react';
 
 export const OrderDetailIcons = {
@@ -64,6 +65,7 @@ export const OrderDetailIcons = {
   Settings2,
   Package,
   WalletCards,
+  MessageCircle,
 };
 
 export function IconBadge({

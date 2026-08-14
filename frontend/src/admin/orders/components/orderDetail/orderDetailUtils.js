@@ -286,6 +286,7 @@ export function titleForEvent(event) {
     note_deleted: 'Nota eliminada',
     tags_updated: 'Etiquetas actualizadas',
     email_sent: 'Correo enviado',
+    whatsapp_opened: 'WhatsApp preparado',
     refund_created: 'Reembolso creado',
     order_retry_updated: 'Orden actualizada',
   };

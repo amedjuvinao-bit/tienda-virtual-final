@@ -77,6 +77,7 @@ vi.mock('./orders/components/OrderDetailModal', () => ({
         {onToggleArchived ? <button type="button">Archivar</button> : null}
         {canAddNotes ? <button type="button">Agregar nota</button> : null}
         {canSendEmail ? <button type="button">Enviar email</button> : null}
+        {canSendEmail ? <button type="button">Informar por WhatsApp</button> : null}
         {canUpdateFulfillment ? <button type="button">Editar prestación</button> : null}
         {canDownloadBilling ? <button type="button">Descargar PDF</button> : null}
       </section>
@@ -455,6 +456,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Cambiar estado' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Enviar email' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Informar por WhatsApp' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument();
     });
   });

@@ -55,6 +55,10 @@ export default function OrderDetailProfessionalView({
   setEmailMenuOpen,
   emailBtnRef,
   onSendEmail,
+  onPrepareWhatsApp,
+  whatsAppAvailable = true,
+  whatsAppUnavailableReason = '',
+  onCustomerStageConfirmed,
   canUpdateFulfillment = false,
 
   loadingAux = false,
@@ -73,6 +77,7 @@ export default function OrderDetailProfessionalView({
     onTogglePrinted,
     onToggleArchived,
     onSendEmail,
+    onPrepareWhatsApp,
   ].some((handler) => typeof handler === 'function');
 
   useEffect(() => {
@@ -100,6 +105,9 @@ export default function OrderDetailProfessionalView({
       setEmailMenuOpen={setEmailMenuOpen}
       emailBtnRef={emailBtnRef}
       onSendEmail={onSendEmail}
+      onPrepareWhatsApp={onPrepareWhatsApp}
+      whatsAppAvailable={whatsAppAvailable}
+      whatsAppUnavailableReason={whatsAppUnavailableReason}
       loadingAux={loadingAux}
       onRefreshTimeline={onRefreshTimeline}
     />
@@ -131,6 +139,7 @@ export default function OrderDetailProfessionalView({
           order={order}
           canManage={canUpdateFulfillment}
           onRefreshTimeline={onRefreshTimeline}
+          onCustomerStageConfirmed={onCustomerStageConfirmed}
         />
         <OrderDetailFulfillmentPanel
           order={order}

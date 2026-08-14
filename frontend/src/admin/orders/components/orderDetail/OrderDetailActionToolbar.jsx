@@ -56,6 +56,10 @@ export default function OrderDetailActionToolbar({
   emailBtnRef,
   onSendEmail,
 
+  onPrepareWhatsApp,
+  whatsAppAvailable = true,
+  whatsAppUnavailableReason = '',
+
   loadingAux = false,
   onRefreshTimeline,
 }) {
@@ -65,8 +69,12 @@ export default function OrderDetailActionToolbar({
   const canTogglePrinted = typeof onTogglePrinted === 'function';
   const canToggleArchived = typeof onToggleArchived === 'function';
   const canSendEmail = typeof onSendEmail === 'function';
+  const canPrepareWhatsApp = typeof onPrepareWhatsApp === 'function';
   const hasQuickActions =
-    canTogglePrinted || canToggleArchived || canSendEmail;
+    canTogglePrinted ||
+    canToggleArchived ||
+    canSendEmail ||
+    canPrepareWhatsApp;
 
   const saveStatus = async () => {
     if (!order?._id || !onSaveStatus) return;
@@ -367,6 +375,41 @@ export default function OrderDetailActionToolbar({
               ) : null}
             </div>
             ) : null}
+
+            {canPrepareWhatsApp ? (
+              <div>
+                <ActionButton
+                  onClick={onPrepareWhatsApp}
+                  disabled={loadingAux || !whatsAppAvailable}
+                  title={
+                    whatsAppAvailable
+                      ? 'Preparar un informe con el estado actual de la orden.'
+                      : whatsAppUnavailableReason
+                  }
+                  icon={(
+                    <OrderDetailIcons.MessageCircle
+                      size={15}
+                      strokeWidth={2.4}
+                    />
+                  )}
+                >
+                  Informar por WhatsApp
+                </ActionButton>
+                {!whatsAppAvailable && whatsAppUnavailableReason ? (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      color: ORDER_DETAIL_THEME.mutedText,
+                      fontSize: 10,
+                      fontWeight: 720,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {whatsAppUnavailableReason}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
         ) : null}
@@ -385,12 +428,19 @@ export default function OrderDetailActionToolbar({
   );
 }
 
-function ActionButton({ children, onClick, disabled = false, icon = null }) {
+function ActionButton({
+  children,
+  onClick,
+  disabled = false,
+  icon = null,
+  title = '',
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       style={{
         width: '100%',
         minHeight: 42,
