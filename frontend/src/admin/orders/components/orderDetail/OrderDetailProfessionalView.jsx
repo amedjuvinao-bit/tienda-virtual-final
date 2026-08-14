@@ -2,7 +2,7 @@
 
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import OrderDetailHeader from './OrderDetailHeader';
-import OrderDetailProgressStepper from './OrderDetailProgressStepper';
+import OrderDetailStoryOverview from './OrderDetailStoryOverview';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailCustomerBilling from './OrderDetailCustomerBilling';
 import OrderDetailItemsTable from './OrderDetailItemsTable';
@@ -13,6 +13,7 @@ import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
+import OrderDetailManagementDisclosure from './OrderDetailManagementDisclosure';
 
 export default function OrderDetailProfessionalView({
   order,
@@ -61,6 +62,39 @@ export default function OrderDetailProfessionalView({
   confirmingRefundId = '',
   onConfirmRefundPayment,
 }) {
+  const hasManagementActions = [
+    onSaveStatus,
+    onSaveTags,
+    onTogglePrinted,
+    onToggleArchived,
+    onSendEmail,
+  ].some((handler) => typeof handler === 'function');
+
+  const managementPanel = hasManagementActions ? (
+    <OrderDetailActionToolbar
+      compact
+      order={order}
+      statusLocal={statusLocal}
+      setStatusLocal={setStatusLocal}
+      onSaveStatus={onSaveStatus}
+      disabled={statusSaving}
+      tagsStr={tagsStr}
+      setTagsStr={setTagsStr}
+      onSaveTags={onSaveTags}
+      savingTags={savingTags}
+      printed={printed}
+      archived={archived}
+      onTogglePrinted={onTogglePrinted}
+      onToggleArchived={onToggleArchived}
+      emailMenuOpen={emailMenuOpen}
+      setEmailMenuOpen={setEmailMenuOpen}
+      emailBtnRef={emailBtnRef}
+      onSendEmail={onSendEmail}
+      loadingAux={loadingAux}
+      onRefreshTimeline={onRefreshTimeline}
+    />
+  ) : null;
+
   return (
     <div
       style={{
@@ -96,6 +130,7 @@ export default function OrderDetailProfessionalView({
         }}
       >
         <div
+          className="order-detail-content-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1fr) 360px',
@@ -111,31 +146,13 @@ export default function OrderDetailProfessionalView({
               minWidth: 0,
             }}
           >
-            <OrderDetailProgressStepper order={order} />
+            <OrderDetailStoryOverview order={order} timeline={timeline} />
 
-            <OrderDetailActionToolbar
-              order={order}
-              statusLocal={statusLocal}
-              setStatusLocal={setStatusLocal}
-              onSaveStatus={onSaveStatus}
-              disabled={statusSaving}
-              tagsStr={tagsStr}
-              setTagsStr={setTagsStr}
-              onSaveTags={onSaveTags}
-              savingTags={savingTags}
-              printed={printed}
-              archived={archived}
-              onTogglePrinted={onTogglePrinted}
-              onToggleArchived={onToggleArchived}
-              emailMenuOpen={emailMenuOpen}
-              setEmailMenuOpen={setEmailMenuOpen}
-              emailBtnRef={emailBtnRef}
-              onSendEmail={onSendEmail}
-              loadingAux={loadingAux}
-              onRefreshTimeline={onRefreshTimeline}
-            />
+            <OrderDetailManagementDisclosure>
+              {managementPanel}
+            </OrderDetailManagementDisclosure>
 
-            <OrderDetailCustomerBilling order={order} />
+            <OrderDetailPaymentPanel order={order} />
 
             <OrderDetailItemsTable order={order} />
 
@@ -152,8 +169,6 @@ export default function OrderDetailProfessionalView({
               canUpdate={canUpdateFulfillment}
             />
 
-            <OrderDetailPaymentPanel order={order} />
-
             <OrderDetailRefundReconciliation
               refunds={refunds}
               loading={refundsLoading}
@@ -161,6 +176,8 @@ export default function OrderDetailProfessionalView({
               confirmingId={confirmingRefundId}
               onConfirmPayment={onConfirmRefundPayment}
             />
+
+            <OrderDetailCustomerBilling order={order} />
 
             <OrderDetailTimelineNotes
               order={order}
@@ -181,8 +198,12 @@ export default function OrderDetailProfessionalView({
       <style>
         {`
           @media (max-width: 1180px) {
-            div[style*="grid-template-columns: minmax(0, 1fr) 360px"] {
+            .order-detail-content-grid {
               grid-template-columns: 1fr !important;
+            }
+
+            .order-detail-summary-rail {
+              position: static !important;
             }
           }
 

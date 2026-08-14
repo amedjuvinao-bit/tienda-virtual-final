@@ -34,6 +34,8 @@ function normalizeTagValue(value) {
 export default function OrderDetailActionToolbar({
   order,
 
+  compact = false,
+
   statusLocal,
   setStatusLocal,
   onSaveStatus,
@@ -122,18 +124,20 @@ export default function OrderDetailActionToolbar({
   return (
     <section
       style={{
-        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-        background: ORDER_DETAIL_THEME.cardBg,
+        border: compact ? 'none' : `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        background: compact ? 'transparent' : ORDER_DETAIL_THEME.cardBg,
         color: ORDER_DETAIL_THEME.cardText,
-        borderRadius: 24,
-        padding: 16,
-        boxShadow: '0 14px 42px rgba(15, 23, 42, 0.08)',
+        borderRadius: compact ? 0 : 24,
+        padding: compact ? 0 : 16,
+        boxShadow: compact ? 'none' : '0 14px 42px rgba(15, 23, 42, 0.08)',
       }}
     >
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: compact
+            ? 'repeat(auto-fit, minmax(230px, 1fr))'
+            : 'repeat(auto-fit, minmax(260px, 1fr))',
           gap: 14,
           alignItems: 'stretch',
         }}

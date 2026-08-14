@@ -341,14 +341,18 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 ## Evidencia de la etapa 6
 
 - La bandeja y la consola ocupan columnas independientes: al abrir filtros, métricas y tabla se compactan dentro del espacio disponible sin superposición ni pérdida funcional.
-- El botón `Mostrar/Ocultar filtros` es horizontal, discreto y cristalizado; se monta directamente sobre `document.body` para que ningún contenedor del panel pueda recortarlo, permanece sobre el contenido con posición fija, se limita al área visible, puede arrastrarse y conserva localmente la posición elegida sin bloquear el clic accesible.
+- El botón `Mostrar/Ocultar filtros` es horizontal, discreto y cristalizado; se monta directamente sobre `document.body` para que ningún contenedor del panel pueda recortarlo. Desanclado permanece fijo en la pantalla y puede arrastrarse; anclado conserva una coordenada del documento, bloquea el arrastre y puede liberarse nuevamente. Ambos modos persisten en el navegador y se ajustan horizontalmente al cambiar el ancho de la pantalla.
 - La consola tiene altura natural y desplazamiento de página: filtros, nueve colas y siete estados DIAN se muestran completos, incluido el bloque de facturación electrónica, sin recortes ni scroll interno.
 - El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
-- La consola no participa en el cálculo vertical de la bandeja en escritorio: una búsqueda corta mantiene métricas, filtros activos y tabla en continuidad, sin espacios vacíos; en pantallas estrechas vuelve al flujo normal de una sola columna.
+- Una búsqueda corta mantiene métricas, filtros activos y tabla en continuidad, sin espacios vacíos; la consola mantiene su altura natural en la columna lateral y en pantallas estrechas vuelve al flujo normal de una sola columna.
 - Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
-- Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
-- Regresión frontend completa: 28 archivos y 107 pruebas aprobadas; build de producción aprobado con Vite.
+- El detalle cuenta la historia mediante tres respuestas inmediatas —qué pasó, estado actual y qué sigue— y cinco hitos rectangulares derivados del pago, documento fiscal, logística, entregas digitales, servicios y ventas POS. Una orden entregada ya no muestra etapas completadas como pendientes.
+- La gestión administrativa conserva estado, etiquetas, impresión, archivo y correo dentro de un bloque `Gestionar orden` plegado por defecto. Pago y facturación aparecen antes del detalle secundario, mientras cliente, notas y auditoría permanecen disponibles más abajo.
+- El resumen lateral elimina el progreso y número de orden duplicados, reduce el peso visual del total, agrupa pago y factura, abrevia el CUFE con copia del valor completo y unifica contexto comercial y trazabilidad.
+- Controles del botón de filtros: 3 pruebas sobre arrastre, anclaje, liberación, persistencia y adaptación horizontal.
+- Historia visual del detalle: 5 pruebas sobre orden POS entregada, pago pendiente, preparación logística, tránsito, gestión plegable, CUFE y ausencia de progreso duplicado.
+- Regresión frontend completa: 29 archivos y 117 pruebas aprobadas; build de producción aprobado con Vite.
 
 ## Evidencia de la etapa 7
 

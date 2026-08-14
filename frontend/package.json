@@ -14,6 +14,7 @@
     "test:orders-architecture": "vitest run src/admin/orders/hooks/useOrdersAdminQuery.test.jsx",
     "test:orders-logistics": "vitest run src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.test.jsx",
     "test:orders-operations": "vitest run src/admin/orders/components/OrdersOperationsCenter.test.jsx src/admin/orders/hooks/useOrdersQuickViews.test.jsx",
+    "test:orders-detail-story": "vitest run src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
   "dependencies": {
