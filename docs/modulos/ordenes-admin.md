@@ -311,6 +311,8 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El botón `Mostrar/Ocultar filtros` es horizontal, discreto y cristalizado; se monta directamente sobre `document.body` para que ningún contenedor del panel pueda recortarlo, permanece sobre el contenido con posición fija, se limita al área visible, puede arrastrarse y conserva localmente la posición elegida sin bloquear el clic accesible.
 - La consola tiene altura natural y desplazamiento de página: filtros, nueve colas y siete estados DIAN se muestran completos, incluido el bloque de facturación electrónica, sin recortes ni scroll interno.
 - El modo compacto de colas usa una matriz 3 × 3 y la facturación electrónica conserva sus siete opciones en una matriz legible dentro de la consola.
+- La consola no participa en el cálculo vertical de la bandeja en escritorio: una búsqueda corta mantiene métricas, filtros activos y tabla en continuidad, sin espacios vacíos; en pantallas estrechas vuelve al flujo normal de una sola columna.
+- Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
 - Centro operativo frontend: 6 pruebas, incluida la apertura y cierre accesible de la consola desde el nivel principal.
 - Regresión frontend completa: 28 archivos y 105 pruebas aprobadas; build de producción aprobado con Vite.

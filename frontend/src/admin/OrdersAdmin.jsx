@@ -843,6 +843,7 @@ export default function OrdersAdmin() {
       <style>{`
         .orders-admin-shell {
           display: grid;
+          position: relative;
           grid-template-columns: minmax(0, 1fr);
           grid-template-areas:
             "heading"
@@ -874,7 +875,8 @@ export default function OrdersAdmin() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          position: static;
+          position: absolute;
+          inset: 0 0 auto;
           width: 100%;
           min-width: 0;
           padding: 14px;
@@ -982,6 +984,10 @@ export default function OrdersAdmin() {
           }
           .orders-admin-shell.controls-open .orders-admin-metrics {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+          }
+          .orders-control-panel {
+            position: static;
+            inset: auto;
           }
         }
 

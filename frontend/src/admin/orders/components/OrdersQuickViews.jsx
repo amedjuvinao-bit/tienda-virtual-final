@@ -137,14 +137,22 @@ function QueueButton({ active, count, Icon, label, onClick, tone }) {
     accent: 'var(--admin-primary)',
     soft: 'var(--admin-primary-soft-bg)',
   };
+  const tooltipId = `orders-queue-${String(label)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')}-tooltip`;
 
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={`${label} · ${count}`}
+      aria-describedby={tooltipId}
       aria-pressed={active}
-      className="flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl border px-2.5 text-left transition hover:border-[var(--admin-primary)]"
+      title={`${label} · ${count}`}
+      className="group relative flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl border px-2.5 text-left transition hover:border-[var(--admin-primary)]"
       style={{
         borderColor: active ? resolvedTone.accent : 'var(--admin-card-border)',
         background: active ? resolvedTone.soft : 'var(--admin-input-bg)',
@@ -157,6 +165,20 @@ function QueueButton({ active, count, Icon, label, onClick, tone }) {
         <span className="truncate text-[10px] font-black">{label}</span>
       </span>
       <strong className="shrink-0 text-xs font-black tabular-nums">{count}</strong>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none absolute bottom-[calc(100%+7px)] left-1/2 z-[150] w-max max-w-[190px] -translate-x-1/2 rounded-lg border px-2.5 py-1.5 text-center text-[10px] font-black leading-tight opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--admin-primary) 32%, rgba(255,255,255,0.86))',
+          background: 'color-mix(in srgb, var(--admin-card-bg) 90%, transparent)',
+          color: 'var(--admin-card-text)',
+          backdropFilter: 'blur(16px) saturate(145%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(145%)',
+        }}
+      >
+        {label} · {count}
+      </span>
     </button>
   );
 }

@@ -170,8 +170,12 @@ function main() {
   assert.ok(adminSource.includes('createPortal(controlToggleButton, document.body)'));
   assert.ok(adminSource.includes('onPointerMove={handleControlTogglePointerMove}'));
   assert.ok(adminSource.includes('grid-area: controls'));
+  assert.ok(adminSource.includes('position: absolute'));
+  assert.ok(adminSource.includes('inset: 0 0 auto'));
   assert.ok(adminSource.includes('overflow: visible'));
   assert.ok(!adminSource.includes('overflow-y: auto'));
+  assert.ok(boardSource.includes('role="tooltip"'));
+  assert.ok(boardSource.includes('group-hover:opacity-100'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');
 
   const workflow = read('.github/workflows/products-ci.yml');

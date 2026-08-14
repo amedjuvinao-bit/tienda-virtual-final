@@ -277,6 +277,7 @@ export default function OrdersInvoiceFilters({
                 key={item.key}
                 type="button"
                 onClick={() => handleClick(item.key)}
+                title={item.label}
                 className={`invoice-crystal-btn group min-h-[48px] rounded-xl border px-2.5 py-2.5 text-center text-[11px] font-black transition duration-300 hover:-translate-y-[2px] active:scale-[0.985] ${
                   spansCompactRow ? 'col-span-2' : ''
                 }`}

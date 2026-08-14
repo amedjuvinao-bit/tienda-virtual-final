@@ -81,6 +81,10 @@ describe('centro operativo avanzado de órdenes', () => {
     expect(screen.getByText('Flujo operativo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Todas · 28/i })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Cola operativa' })).toBeInTheDocument();
+    const slaRisk = screen.getByRole('button', { name: /Riesgo SLA · 2/i });
+    expect(slaRisk).toHaveAttribute('title', 'Riesgo SLA · 2');
+    expect(slaRisk).toHaveAttribute('aria-describedby', 'orders-queue-riesgo-sla-tooltip');
+    expect(screen.getByRole('tooltip', { name: 'Riesgo SLA · 2' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Preparar · 8/i }));
     expect(onApplyQuickView).toHaveBeenCalledWith('prepare');
