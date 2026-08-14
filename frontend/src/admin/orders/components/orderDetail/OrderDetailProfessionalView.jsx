@@ -1,5 +1,6 @@
 // frontend/src/admin/orders/components/orderDetail/OrderDetailProfessionalView.jsx
 
+import { useEffect, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import OrderDetailHeader from './OrderDetailHeader';
 import OrderDetailStoryOverview from './OrderDetailStoryOverview';
@@ -13,7 +14,7 @@ import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
-import OrderDetailManagementDisclosure from './OrderDetailManagementDisclosure';
+import OrderDetailTabs from './OrderDetailTabs';
 
 export default function OrderDetailProfessionalView({
   order,
@@ -62,6 +63,7 @@ export default function OrderDetailProfessionalView({
   confirmingRefundId = '',
   onConfirmRefundPayment,
 }) {
+  const [activeTab, setActiveTab] = useState('summary');
   const hasManagementActions = [
     onSaveStatus,
     onSaveTags,
@@ -69,6 +71,10 @@ export default function OrderDetailProfessionalView({
     onToggleArchived,
     onSendEmail,
   ].some((handler) => typeof handler === 'function');
+
+  useEffect(() => {
+    setActiveTab('summary');
+  }, [order?._id]);
 
   const managementPanel = hasManagementActions ? (
     <OrderDetailActionToolbar
@@ -94,6 +100,62 @@ export default function OrderDetailProfessionalView({
       onRefreshTimeline={onRefreshTimeline}
     />
   ) : null;
+
+  const tabs = [
+    { id: 'summary', label: 'Resumen' },
+    { id: 'products', label: 'Productos' },
+    { id: 'operation', label: 'Operación' },
+    { id: 'payment', label: 'Pago y factura' },
+    { id: 'customer', label: 'Cliente y notas' },
+    ...(hasManagementActions ? [{ id: 'management', label: 'Gestionar' }] : []),
+  ];
+
+  const tabContent = {
+    summary: <OrderDetailStoryOverview order={order} />,
+    products: <OrderDetailItemsTable order={order} />,
+    operation: (
+      <>
+        <OrderDetailInventoryAllocations order={order} />
+        <OrderDetailLogisticsPanel
+          order={order}
+          canManage={canUpdateFulfillment}
+          onRefreshTimeline={onRefreshTimeline}
+        />
+        <OrderDetailFulfillmentPanel
+          order={order}
+          canUpdate={canUpdateFulfillment}
+        />
+      </>
+    ),
+    payment: (
+      <>
+        <OrderDetailPaymentPanel order={order} />
+        <OrderDetailRefundReconciliation
+          refunds={refunds}
+          loading={refundsLoading}
+          canConfirmPayment={canConfirmRefundPayment}
+          confirmingId={confirmingRefundId}
+          onConfirmPayment={onConfirmRefundPayment}
+        />
+      </>
+    ),
+    customer: (
+      <>
+        <OrderDetailCustomerBilling order={order} />
+        <OrderDetailTimelineNotes
+          order={order}
+          timeline={timeline}
+          notes={notes}
+          tags={tags}
+          noteText={noteText}
+          setNoteText={setNoteText}
+          onSaveNote={onSaveNote}
+          savingNote={savingNote}
+        />
+      </>
+    ),
+    management: managementPanel,
+  };
 
   return (
     <div
@@ -146,49 +208,27 @@ export default function OrderDetailProfessionalView({
               minWidth: 0,
             }}
           >
-            <OrderDetailStoryOverview order={order} timeline={timeline} />
-
-            <OrderDetailManagementDisclosure>
-              {managementPanel}
-            </OrderDetailManagementDisclosure>
-
-            <OrderDetailPaymentPanel order={order} />
-
-            <OrderDetailItemsTable order={order} />
-
-            <OrderDetailInventoryAllocations order={order} />
-
-            <OrderDetailLogisticsPanel
-              order={order}
-              canManage={canUpdateFulfillment}
-              onRefreshTimeline={onRefreshTimeline}
+            <OrderDetailTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
             />
 
-            <OrderDetailFulfillmentPanel
-              order={order}
-              canUpdate={canUpdateFulfillment}
-            />
-
-            <OrderDetailRefundReconciliation
-              refunds={refunds}
-              loading={refundsLoading}
-              canConfirmPayment={canConfirmRefundPayment}
-              confirmingId={confirmingRefundId}
-              onConfirmPayment={onConfirmRefundPayment}
-            />
-
-            <OrderDetailCustomerBilling order={order} />
-
-            <OrderDetailTimelineNotes
-              order={order}
-              timeline={timeline}
-              notes={notes}
-              tags={tags}
-              noteText={noteText}
-              setNoteText={setNoteText}
-              onSaveNote={onSaveNote}
-              savingNote={savingNote}
-            />
+            <div
+              id="order-detail-active-panel"
+              role="tabpanel"
+              aria-labelledby={`order-detail-tab-${activeTab}`}
+              tabIndex={0}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                minWidth: 0,
+                outline: 'none',
+              }}
+            >
+              {tabContent[activeTab] || tabContent.summary}
+            </div>
           </main>
 
           <OrderDetailSummaryRail order={order} />

@@ -6,7 +6,7 @@ import {
   normalizeText,
 } from './orderDetailUtils';
 import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
-import { OrderDetailPanel, SectionTitle, SoftBadge } from './OrderDetailPrimitives';
+import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
 
 const PAID_ORDER_STATUSES = new Set([
   'paid',
@@ -518,14 +518,6 @@ export function buildOrderStory(order) {
   };
 }
 
-const STATE_META = {
-  complete: { label: 'Completado', variant: 'success', color: '#16a34a' },
-  current: { label: 'En curso', variant: 'primary', color: ORDER_DETAIL_THEME.primary },
-  attention: { label: 'Requiere atención', variant: 'danger', color: '#dc2626' },
-  skipped: { label: 'No realizado', variant: 'neutral', color: '#94a3b8' },
-  pending: { label: 'Pendiente', variant: 'neutral', color: '#94a3b8' },
-};
-
 function StorySummaryCard({ eyebrow, title, description, icon, tone = 'primary' }) {
   const tones = {
     primary: { color: ORDER_DETAIL_THEME.primary, background: ORDER_DETAIL_THEME.primarySoftBg },
@@ -627,121 +619,6 @@ export default function OrderDetailStoryOverview({ order }) {
         />
       </div>
 
-      <div
-        style={{
-          marginTop: 16,
-          border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-          borderRadius: 18,
-          overflow: 'hidden',
-          background: ORDER_DETAIL_THEME.inputBg,
-        }}
-      >
-        <ol
-          aria-label="Recorrido cronológico de la orden"
-          className="order-story-list"
-          style={{ listStyle: 'none', margin: 0, padding: 0 }}
-        >
-          {story.phases.map((phase) => {
-            const meta = STATE_META[phase.state] || STATE_META.pending;
-
-            return (
-              <li
-                key={phase.id}
-                data-story-state={phase.state}
-                className="order-story-row"
-                style={{
-                  position: 'relative',
-                  display: 'grid',
-                  gridTemplateColumns: '128px minmax(0, 1fr) auto',
-                  gap: 14,
-                  alignItems: 'center',
-                  padding: '13px 15px 13px 18px',
-                  background:
-                    phase.state === 'current' || phase.state === 'attention'
-                      ? ORDER_DETAIL_THEME.cardBg
-                      : 'transparent',
-                  borderBottom: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    inset: '8px auto 8px 0',
-                    width: 4,
-                    borderRadius: '0 5px 5px 0',
-                    background: meta.color,
-                  }}
-                />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                  <IconBadge
-                    icon={phase.icon}
-                    size={34}
-                    iconSize={14}
-                    variant={meta.variant}
-                  />
-                  <span
-                    style={{
-                      color: ORDER_DETAIL_THEME.mutedText,
-                      fontSize: 9,
-                      fontWeight: 950,
-                      letterSpacing: '0.09em',
-                      textTransform: 'uppercase',
-                      lineHeight: 1.25,
-                    }}
-                  >
-                    {phase.label}
-                  </span>
-                </div>
-
-                <div style={{ minWidth: 0 }}>
-                  <strong
-                    style={{
-                      display: 'block',
-                      color: ORDER_DETAIL_THEME.cardText,
-                      fontSize: 12.5,
-                      fontWeight: 950,
-                      lineHeight: 1.25,
-                    }}
-                  >
-                    {phase.title}
-                  </strong>
-                  <span
-                    style={{
-                      display: 'block',
-                      marginTop: 4,
-                      color: ORDER_DETAIL_THEME.mutedText,
-                      fontSize: 10.5,
-                      fontWeight: 650,
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {phase.description}
-                  </span>
-                </div>
-
-                <div style={{ textAlign: 'right', minWidth: 122 }}>
-                  <SoftBadge variant={meta.variant}>{meta.label}</SoftBadge>
-                  <span
-                    style={{
-                      display: 'block',
-                      marginTop: 6,
-                      color: ORDER_DETAIL_THEME.mutedText,
-                      fontSize: 9.5,
-                      fontWeight: 750,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {phaseDate(phase.date)}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
       <style>
         {`
           .order-story-summary-grid {
@@ -750,27 +627,12 @@ export default function OrderDetailStoryOverview({ order }) {
             gap: 10px;
           }
 
-          .order-story-list > li:last-child {
-            border-bottom: 0 !important;
-          }
-
           @media (max-width: 900px) {
             .order-story-summary-grid {
               grid-template-columns: 1fr;
             }
           }
 
-          @media (max-width: 680px) {
-            .order-story-row {
-              grid-template-columns: 1fr !important;
-              gap: 9px !important;
-            }
-
-            .order-story-row > div:last-child {
-              min-width: 0 !important;
-              text-align: left !important;
-            }
-          }
         `}
       </style>
     </OrderDetailPanel>

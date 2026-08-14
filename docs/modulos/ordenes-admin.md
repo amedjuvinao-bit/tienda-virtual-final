@@ -347,12 +347,13 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Una búsqueda corta mantiene métricas, filtros activos y tabla en continuidad, sin espacios vacíos; la consola mantiene su altura natural en la columna lateral y en pantallas estrechas vuelve al flujo normal de una sola columna.
 - Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
-- El detalle cuenta la historia mediante tres respuestas inmediatas —qué pasó, estado actual y qué sigue— y cinco hitos rectangulares derivados del pago, documento fiscal, logística, entregas digitales, servicios y ventas POS. Una orden entregada ya no muestra etapas completadas como pendientes.
-- La gestión administrativa conserva estado, etiquetas, impresión, archivo y correo dentro de un bloque `Gestionar orden` plegado por defecto. Pago y facturación aparecen antes del detalle secundario, mientras cliente, notas y auditoría permanecen disponibles más abajo.
-- El resumen lateral elimina el progreso y número de orden duplicados, reduce el peso visual del total, agrupa pago y factura, abrevia el CUFE con copia del valor completo y unifica contexto comercial y trazabilidad.
+- El detalle conserva tres respuestas inmediatas —qué pasó, estado actual y qué sigue— dentro de `Resumen`, sin añadir una segunda cronología ni repetir todas las etapas en la misma pantalla.
+- Seis pestañas separan estrictamente `Resumen`, `Productos`, `Operación`, `Pago y factura`, `Cliente y notas` y `Gestionar`. Solo se monta el contenido de la tarea elegida; la barra admite teclado y desplazamiento horizontal en pantallas estrechas.
+- La pestaña `Gestionar` conserva estado, etiquetas, impresión, archivo y correo, y solo aparece cuando el usuario posee al menos una de esas capacidades.
+- El resumen decorativo lateral conserva íntegramente su diseño anterior, incluidos total, desglose, pago, factura, CUFE, progreso, datos rápidos y trazabilidad.
 - Controles del botón de filtros: 3 pruebas sobre arrastre, anclaje, liberación, persistencia y adaptación horizontal.
-- Historia visual del detalle: 5 pruebas sobre orden POS entregada, pago pendiente, preparación logística, tránsito, gestión plegable, CUFE y ausencia de progreso duplicado.
-- Regresión frontend completa: 29 archivos y 117 pruebas aprobadas; build de producción aprobado con Vite.
+- Historia visual y pestañas del detalle: 6 pruebas sobre orden POS entregada, pago pendiente, preparación logística, tránsito, preservación del resumen decorativo y navegación accesible.
+- Regresión frontend completa: 29 archivos y 118 pruebas aprobadas; build de producción aprobado con Vite.
 
 ## Evidencia de la etapa 7
 

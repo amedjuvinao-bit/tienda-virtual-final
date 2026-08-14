@@ -1,9 +1,9 @@
-import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import React, { useState } from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import OrderDetailStoryOverview, { buildOrderStory } from './OrderDetailStoryOverview';
-import OrderDetailManagementDisclosure from './OrderDetailManagementDisclosure';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
+import OrderDetailTabs from './OrderDetailTabs';
 
 const BASE_ORDER = {
   _id: 'order-story-001',
@@ -57,9 +57,11 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(story.phases.every((phase) => phase.state === 'complete')).toBe(true);
 
     render(<OrderDetailStoryOverview order={order} />);
-    expect(screen.getByRole('list', { name: 'Recorrido cronológico de la orden' })).toBeInTheDocument();
+    expect(screen.getByText('Qué pasó')).toBeInTheDocument();
+    expect(screen.getByText('Estado actual')).toBeInTheDocument();
+    expect(screen.getByText('Qué sigue')).toBeInTheDocument();
     expect(screen.getByText('Proceso completado')).toBeInTheDocument();
-    expect(screen.getByText('Venta física completada en sede')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Recorrido cronológico de la orden' })).not.toBeInTheDocument();
     expect(screen.queryByText('Paso 5 de 5')).not.toBeInTheDocument();
   });
 
@@ -133,8 +135,8 @@ describe('historia narrativa del detalle de la orden', () => {
   });
 });
 
-describe('resumen lateral simplificado', () => {
-  it('oculta la gestión por defecto y abrevia el CUFE sin perder el valor completo', () => {
+describe('resumen decorativo original', () => {
+  it('conserva total, pago, factura, CUFE, progreso y datos rápidos', () => {
     const cufe = '751f0cb56df79970f4f1f0e03ada10b68e9a856a079d126124b118abd2102405457bcc0f09485a78e710a859200c4662';
     const order = {
       ...BASE_ORDER,
@@ -147,21 +149,53 @@ describe('resumen lateral simplificado', () => {
       },
     };
 
-    render(
+    render(<OrderDetailSummaryRail order={order} />);
+
+    expect(screen.getByText('Resumen del pedido')).toBeInTheDocument();
+    expect(screen.getByText('Progreso del pedido')).toBeInTheDocument();
+    expect(screen.getByText(cufe)).toHaveAttribute('title', cufe);
+    expect(screen.getByText(`#${order.orderNumber}`)).toBeInTheDocument();
+    expect(screen.getByText('Datos rápidos')).toBeInTheDocument();
+  });
+});
+
+describe('pestañas del detalle', () => {
+  function TabsHarness() {
+    const tabs = [
+      { id: 'summary', label: 'Resumen' },
+      { id: 'products', label: 'Productos' },
+      { id: 'operation', label: 'Operación' },
+      { id: 'payment', label: 'Pago y factura' },
+    ];
+    const [activeTab, setActiveTab] = useState('summary');
+
+    return (
       <>
-        <OrderDetailManagementDisclosure>
-          <div>Controles administrativos</div>
-        </OrderDetailManagementDisclosure>
-        <OrderDetailSummaryRail order={order} />
+        <OrderDetailTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
+        <div data-testid="active-tab">{activeTab}</div>
       </>
     );
+  }
 
-    const manageSummary = screen.getByText('Gestionar orden').closest('summary');
-    expect(manageSummary?.parentElement).not.toHaveAttribute('open');
-    expect(screen.getByText('Pago y facturación')).toBeInTheDocument();
-    expect(screen.getByText('751f0cb56df7…200c4662')).toHaveAttribute('title', cufe);
-    expect(screen.getByRole('button', { name: 'Copiar CUFE' })).toHaveAttribute('title', cufe);
-    expect(screen.queryByText('Progreso del pedido')).not.toBeInTheDocument();
-    expect(screen.queryByText(`#${order.orderNumber}`)).not.toBeInTheDocument();
+  it('separa el contenido y permite navegar con clic y teclado', () => {
+    render(<TabsHarness />);
+
+    const summary = screen.getByRole('tab', { name: 'Resumen' });
+    const operation = screen.getByRole('tab', { name: 'Operación' });
+    expect(summary).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(operation);
+    expect(operation).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('active-tab')).toHaveTextContent('operation');
+
+    fireEvent.keyDown(operation, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'Pago y factura' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 });
