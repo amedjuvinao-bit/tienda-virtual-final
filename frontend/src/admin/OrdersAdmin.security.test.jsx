@@ -122,6 +122,8 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     localStorage.clear();
     Object.defineProperty(window, 'scrollX', { configurable: true, value: 0 });
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
     Object.values(state.api).forEach((mock) => mock.mockReset());
     state.api.get.mockImplementation(async (url) => {
       if (url === '/api/orders/admin') {
@@ -371,6 +373,55 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       y: 140,
       pinned: false,
       coordinateSpace: 'viewport',
+    });
+  });
+
+  it('mantiene visible horizontalmente un botón anclado al reducir la pantalla', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+    localStorage.setItem(
+      'orders-admin-control-toggle-position-v1',
+      JSON.stringify({
+        x: 850,
+        y: 540,
+        pinned: true,
+        coordinateSpace: 'document',
+      })
+    );
+
+    renderOrders();
+
+    await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    const toggleContainer = toggle.closest('.orders-control-toggle');
+    vi.spyOn(toggleContainer, 'getBoundingClientRect').mockReturnValue({
+      left: 850,
+      top: 540,
+      right: 1003,
+      bottom: 576,
+      width: 153,
+      height: 36,
+      x: 850,
+      y: 540,
+      toJSON: () => ({}),
+    });
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 814 });
+    fireEvent(window, new Event('resize'));
+
+    expect(toggleContainer).toHaveClass('is-pinned');
+    expect(toggleContainer.style.position).toBe('absolute');
+    expect(toggleContainer.style.left).toBe('649px');
+    expect(toggleContainer.style.top).toBe('540px');
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: 649,
+      y: 540,
+      pinned: true,
+      coordinateSpace: 'document',
     });
   });
 

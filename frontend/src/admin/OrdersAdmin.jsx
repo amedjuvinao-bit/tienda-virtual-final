@@ -40,6 +40,26 @@ function clampControlTogglePosition(position, width = 132, height = 40) {
   };
 }
 
+function clampPinnedControlTogglePosition(position, width = 132) {
+  if (typeof window === 'undefined') return position;
+
+  const safeWidth = Number(width) > 0 ? Number(width) : 132;
+  const documentScrollX = Number(window.scrollX) || 0;
+  const viewportOffsetLeft = Number(window.visualViewport?.offsetLeft) || 0;
+  const viewportWidth = Number(window.visualViewport?.width) || window.innerWidth;
+  const margin = 12;
+  const minX = documentScrollX + viewportOffsetLeft + margin;
+  const maxX = Math.max(
+    minX,
+    documentScrollX + viewportOffsetLeft + viewportWidth - safeWidth - margin
+  );
+
+  return {
+    x: Math.min(maxX, Math.max(minX, Number(position?.x) || minX)),
+    y: Number(position?.y) || 0,
+  };
+}
+
 const toCOP = (n) =>
   Number(n || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
 
@@ -168,14 +188,17 @@ export default function OrdersAdmin() {
       if (Number.isFinite(stored?.x) && Number.isFinite(stored?.y)) {
         const rect = controlToggleRef.current?.getBoundingClientRect();
         const nextPinned = stored?.pinned === true;
-        const next = nextPinned
+        const restoredPosition = nextPinned
           ? stored?.coordinateSpace === 'document'
             ? { x: Number(stored.x), y: Number(stored.y) }
             : {
               x: Number(stored.x) + (Number(window.scrollX) || 0),
               y: Number(stored.y) + (Number(window.scrollY) || 0),
             }
-          : clampControlTogglePosition(stored, rect?.width, rect?.height);
+          : stored;
+        const next = nextPinned
+          ? clampPinnedControlTogglePosition(restoredPosition, rect?.width)
+          : clampControlTogglePosition(restoredPosition, rect?.width, rect?.height);
         controlTogglePositionRef.current = next;
         controlTogglePinnedRef.current = nextPinned;
         setControlTogglePosition(next);
@@ -194,18 +217,24 @@ export default function OrdersAdmin() {
     }
 
     const keepToggleInsideViewport = () => {
-      if (controlTogglePinnedRef.current || !controlTogglePositionRef.current) return;
+      if (!controlTogglePositionRef.current) return;
       const rect = controlToggleRef.current?.getBoundingClientRect();
-      const next = clampControlTogglePosition(
-        controlTogglePositionRef.current,
-        rect?.width,
-        rect?.height
-      );
+      const next = controlTogglePinnedRef.current
+        ? clampPinnedControlTogglePosition(controlTogglePositionRef.current, rect?.width)
+        : clampControlTogglePosition(
+          controlTogglePositionRef.current,
+          rect?.width,
+          rect?.height
+        );
       controlTogglePositionRef.current = next;
       setControlTogglePosition(next);
       window.localStorage.setItem(
         CONTROL_TOGGLE_POSITION_KEY,
-        JSON.stringify({ ...next, pinned: false, coordinateSpace: 'viewport' })
+        JSON.stringify({
+          ...next,
+          pinned: controlTogglePinnedRef.current,
+          coordinateSpace: controlTogglePinnedRef.current ? 'document' : 'viewport',
+        })
       );
     };
 
@@ -222,22 +251,27 @@ export default function OrdersAdmin() {
   useEffect(() => {
     if (
       typeof window === 'undefined'
-      || controlTogglePinnedRef.current
       || !controlTogglePositionRef.current
     ) return undefined;
 
     const frameId = window.requestAnimationFrame(() => {
       const rect = controlToggleRef.current?.getBoundingClientRect();
-      const next = clampControlTogglePosition(
-        controlTogglePositionRef.current,
-        rect?.width,
-        rect?.height
-      );
+      const next = controlTogglePinnedRef.current
+        ? clampPinnedControlTogglePosition(controlTogglePositionRef.current, rect?.width)
+        : clampControlTogglePosition(
+          controlTogglePositionRef.current,
+          rect?.width,
+          rect?.height
+        );
       controlTogglePositionRef.current = next;
       setControlTogglePosition(next);
       window.localStorage.setItem(
         CONTROL_TOGGLE_POSITION_KEY,
-        JSON.stringify({ ...next, pinned: false, coordinateSpace: 'viewport' })
+        JSON.stringify({
+          ...next,
+          pinned: controlTogglePinnedRef.current,
+          coordinateSpace: controlTogglePinnedRef.current ? 'document' : 'viewport',
+        })
       );
     });
 
