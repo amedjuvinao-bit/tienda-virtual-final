@@ -257,6 +257,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-a
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-operations
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics-eligibility-trace
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-refund-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-commercial-reconciliation
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
@@ -331,6 +332,23 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run demo:orders-t
 ```
 
 El contrato `test:orders-trace-seed` valida confirmación, límites, identificadores, selección de sedes reales, recorridos logísticos, evidencia demostrativa, ausencia de borrados y ausencia de mutaciones sobre inventario, productos, sedes, caja o facturación.
+
+### Prueba visual de “Preparar logística”
+
+El comando `demo:orders-logistics-eligibility` crea exactamente dos órdenes DEMO permanentes y devuelve un identificador `ord_elig_*` para buscarlas en el panel:
+
+1. una orden con pago pendiente y reserva liberada, en la que `Preparar logística` debe permanecer deshabilitado con el mensaje `Disponible cuando el pago esté confirmado y exista inventario vendido.`;
+2. una orden con pago confirmado e inventario vendido, todavía sin envíos, en la que `Preparar logística` debe estar habilitado.
+
+Desde la raíz del repositorio en Windows:
+
+```bat
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run demo:orders-logistics-eligibility -- --confirm-persist --label=prueba-preparacion
+```
+
+Después de buscar el identificador impreso por el comando, se abre primero la orden `BLOQUEADA` para comprobar el mensaje. En la orden `HABILITADA` se pulsa `Preparar logística`; debe aparecer un envío por sede y la acción `Iniciar picking`. Al recargar el detalle, el envío debe conservarse y el botón de preparación no debe volver a mostrarse.
+
+La ejecución exige `--confirm-persist`, no limpia las órdenes creadas y no modifica existencias, caja, pasarelas, DIAN ni transportadoras. El contrato `test:orders-logistics-eligibility-trace` valida los dos escenarios contra el modelo y la regla de negocio reales, además de proteger esas restricciones de seguridad dentro de CI.
 
 ## Trabajo pendiente deliberado
 

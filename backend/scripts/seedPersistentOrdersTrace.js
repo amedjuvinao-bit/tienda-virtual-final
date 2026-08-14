@@ -671,6 +671,7 @@ module.exports = {
   buildOrderNumber,
   buildRunId,
   buildTracePlan,
+  loadCandidates,
   normalizeLabel,
   parseArgs,
   run,
