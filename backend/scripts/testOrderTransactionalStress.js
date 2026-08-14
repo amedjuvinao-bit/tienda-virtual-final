@@ -497,7 +497,7 @@ async function executeConcurrentQueries() {
       const durationMs = performance.now() - startedAt;
       durations.push(durationMs);
       assert.strictEqual(result.total, expected[view]);
-      assert.strictEqual(result.operationalSummary.total, expected[view]);
+      assert.strictEqual(result.operationalSummary.total, ORDER_COUNT);
       assert.ok(result.data.length <= 20);
       assert.ok(result.data.every((order) => order.operational));
       completed += 1;
