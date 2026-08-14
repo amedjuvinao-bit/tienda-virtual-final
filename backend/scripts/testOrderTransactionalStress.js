@@ -570,6 +570,7 @@ async function validateTransactionalConcurrency(order) {
       throw new Error('ORDER_STRESS_CONTROLLED_EVENT_FAILURE');
     },
   };
+  const beforeRollback = await Order.findById(order._id).lean();
 
   await assert.rejects(
     initializeOrderLogistics(
@@ -584,8 +585,11 @@ async function validateTransactionalConcurrency(order) {
     /ORDER_STRESS_CONTROLLED_EVENT_FAILURE/
   );
   let stored = await Order.findById(order._id).lean();
-  assert.strictEqual(stored.fulfillment.shipments.length, 0);
-  assert.strictEqual(stored.timeline.length, 0);
+  assert.deepStrictEqual(
+    stored.fulfillment.shipments,
+    beforeRollback.fulfillment.shipments
+  );
+  assert.deepStrictEqual(stored.timeline, beforeRollback.timeline);
 
   const initializationAttempts = await Promise.allSettled(
     Array.from({ length: 10 }, () =>
