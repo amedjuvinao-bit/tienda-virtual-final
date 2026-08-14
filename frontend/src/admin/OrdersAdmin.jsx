@@ -1,5 +1,5 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import api from '../lib/api';
@@ -16,6 +16,20 @@ import useOrdersInvoiceFilters from './orders/hooks/useOrdersInvoiceFilters';
 import useOrdersAdminQuery from './orders/hooks/useOrdersAdminQuery';
 
 const ADMIN_BORDER = 'var(--admin-table-border)';
+const CONTROL_TOGGLE_POSITION_KEY = 'orders-admin-control-toggle-position-v1';
+
+function clampControlTogglePosition(position, width = 132, height = 40) {
+  if (typeof window === 'undefined') return position;
+
+  const margin = 12;
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+
+  return {
+    x: Math.min(maxX, Math.max(margin, Number(position?.x) || margin)),
+    y: Math.min(maxY, Math.max(margin, Number(position?.y) || margin)),
+  };
+}
 
 const toCOP = (n) =>
   Number(n || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
@@ -128,6 +142,106 @@ export default function OrdersAdmin() {
   const [branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [controlTogglePosition, setControlTogglePosition] = useState(null);
+  const [draggingControlToggle, setDraggingControlToggle] = useState(false);
+  const controlToggleRef = useRef(null);
+  const controlTogglePositionRef = useRef(null);
+  const controlToggleDragRef = useRef(null);
+  const lastControlToggleDragAtRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(CONTROL_TOGGLE_POSITION_KEY));
+      if (Number.isFinite(stored?.x) && Number.isFinite(stored?.y)) {
+        const rect = controlToggleRef.current?.getBoundingClientRect();
+        const next = clampControlTogglePosition(stored, rect?.width, rect?.height);
+        controlTogglePositionRef.current = next;
+        setControlTogglePosition(next);
+      }
+    } catch {
+      window.localStorage.removeItem(CONTROL_TOGGLE_POSITION_KEY);
+    }
+
+    const keepToggleInsideViewport = () => {
+      if (!controlTogglePositionRef.current) return;
+      const rect = controlToggleRef.current?.getBoundingClientRect();
+      const next = clampControlTogglePosition(
+        controlTogglePositionRef.current,
+        rect?.width,
+        rect?.height
+      );
+      controlTogglePositionRef.current = next;
+      setControlTogglePosition(next);
+      window.localStorage.setItem(CONTROL_TOGGLE_POSITION_KEY, JSON.stringify(next));
+    };
+
+    window.addEventListener('resize', keepToggleInsideViewport);
+    return () => window.removeEventListener('resize', keepToggleInsideViewport);
+  }, []);
+
+  const handleControlTogglePointerDown = (event) => {
+    if (event.button != null && event.button !== 0) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    controlToggleDragRef.current = {
+      pointerId: event.pointerId ?? 'primary',
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handleControlTogglePointerMove = (event) => {
+    const drag = controlToggleDragRef.current;
+    if (!drag || drag.pointerId !== (event.pointerId ?? 'primary')) return;
+
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return;
+
+    drag.moved = true;
+    setDraggingControlToggle(true);
+    const next = clampControlTogglePosition(
+      { x: drag.originX + deltaX, y: drag.originY + deltaY },
+      drag.width,
+      drag.height
+    );
+    controlTogglePositionRef.current = next;
+    setControlTogglePosition(next);
+    event.preventDefault();
+  };
+
+  const finishControlToggleDrag = (event) => {
+    const drag = controlToggleDragRef.current;
+    if (!drag || drag.pointerId !== (event.pointerId ?? 'primary')) return;
+
+    const cancelled = event.type === 'pointercancel';
+    if (drag.moved && !cancelled) lastControlToggleDragAtRef.current = Date.now();
+    controlToggleDragRef.current = null;
+    setDraggingControlToggle(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+
+    if (drag.moved && !cancelled && controlTogglePositionRef.current && typeof window !== 'undefined') {
+      window.localStorage.setItem(
+        CONTROL_TOGGLE_POSITION_KEY,
+        JSON.stringify(controlTogglePositionRef.current)
+      );
+    }
+  };
+
+  const handleControlToggleClick = () => {
+    if (Date.now() - lastControlToggleDragAtRef.current < 300) {
+      return;
+    }
+    setControlsOpen((open) => !open);
+  };
 
   const requireSessionAndPermission = (allowed, message) => {
     if (hasSession && allowed) return true;
@@ -687,20 +801,20 @@ export default function OrdersAdmin() {
       <style>{`
         .orders-admin-shell {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 44px;
+          grid-template-columns: minmax(0, 1fr);
           grid-template-areas:
-            "heading heading"
-            "metrics metrics"
-            "table toggle";
+            "heading"
+            "metrics"
+            "table";
           gap: 16px;
           align-items: start;
         }
         .orders-admin-shell.controls-open {
-          grid-template-columns: minmax(0, 1fr) 44px minmax(310px, 360px);
+          grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
           grid-template-areas:
-            "heading heading heading"
-            "metrics toggle controls"
-            "table toggle controls";
+            "heading heading"
+            "metrics controls"
+            "table controls";
         }
         .orders-filter-fragments { display: contents; }
         .orders-admin-heading { grid-area: heading; }
@@ -764,25 +878,39 @@ export default function OrdersAdmin() {
         }
         .orders-control-backdrop { display: none; }
         .orders-control-toggle {
-          grid-area: toggle;
-          position: sticky;
-          top: 16px;
-          z-index: 20;
-          align-self: start;
-          width: 44px;
-          height: auto !important;
-          min-width: 0;
-          min-height: 118px;
-          padding: 10px 0 !important;
-          flex-direction: column;
+          position: fixed;
+          right: 22px;
+          bottom: 22px;
+          z-index: 120;
+          min-width: 122px;
           justify-content: center;
-          border-radius: 14px !important;
-          box-shadow: 0 12px 34px color-mix(in srgb, var(--admin-primary) 24%, transparent);
+          touch-action: none;
+          user-select: none;
+          cursor: grab;
+          border-color: color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,0.72)) !important;
+          background: linear-gradient(135deg,
+            color-mix(in srgb, var(--admin-card-bg) 82%, transparent),
+            color-mix(in srgb, var(--admin-primary-soft-bg) 68%, transparent)
+          ) !important;
+          color: var(--admin-card-text) !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.78),
+            0 10px 26px color-mix(in srgb, var(--admin-primary) 16%, transparent);
+          backdrop-filter: blur(18px) saturate(150%);
+          -webkit-backdrop-filter: blur(18px) saturate(150%);
         }
-        .orders-control-toggle span {
-          writing-mode: vertical-rl;
-          transform: rotate(180deg);
-          letter-spacing: 0.06em;
+        .orders-control-toggle:hover {
+          border-color: color-mix(in srgb, var(--admin-primary) 58%, rgba(255,255,255,0.82)) !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.9),
+            0 12px 30px color-mix(in srgb, var(--admin-primary) 22%, transparent);
+        }
+        .orders-control-toggle svg {
+          color: var(--admin-primary);
+        }
+        .orders-control-toggle.is-dragging {
+          cursor: grabbing;
+          transition: none !important;
         }
         .orders-control-panel .orf-filters {
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -803,12 +931,12 @@ export default function OrdersAdmin() {
 
         @media (max-width: 1180px) {
           .orders-admin-shell.controls-open {
-            grid-template-columns: minmax(0, 1fr) 44px;
+            grid-template-columns: minmax(0, 1fr);
             grid-template-areas:
-              "heading heading"
-              "metrics metrics"
-              "controls toggle"
-              "table toggle";
+              "heading"
+              "metrics"
+              "controls"
+              "table";
           }
           .orders-admin-shell.controls-open .orders-admin-metrics {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -820,10 +948,7 @@ export default function OrdersAdmin() {
           .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .orders-admin-shell.controls-open .orders-admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .orders-control-panel { padding: 12px; }
-          .orders-control-toggle {
-            top: 10px;
-            min-height: 104px;
-          }
+          .orders-control-toggle { min-width: 112px; }
           .orders-control-panel .orf-filters {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
@@ -841,16 +966,24 @@ export default function OrdersAdmin() {
       `}</style>
 
       <button
+        ref={controlToggleRef}
         type="button"
         aria-controls="orders-control-panel"
         aria-expanded={controlsOpen}
         aria-label={controlsOpen ? 'Ocultar panel de filtros' : 'Mostrar panel de filtros'}
-        onClick={() => setControlsOpen((open) => !open)}
-        className="orders-control-toggle inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition hover:-translate-y-0.5"
+        title="Arrastra para mover. Haz clic para mostrar u ocultar los filtros."
+        onClick={handleControlToggleClick}
+        onPointerDown={handleControlTogglePointerDown}
+        onPointerMove={handleControlTogglePointerMove}
+        onPointerUp={finishControlToggleDrag}
+        onPointerCancel={finishControlToggleDrag}
+        className={`orders-control-toggle inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-[11px] font-black transition ${
+          draggingControlToggle ? 'is-dragging' : ''
+        }`}
         style={{
-          borderColor: 'var(--admin-primary)',
-          background: 'var(--admin-primary)',
-          color: 'var(--admin-primary-text)',
+          ...(controlTogglePosition
+            ? { left: controlTogglePosition.x, top: controlTogglePosition.y, right: 'auto', bottom: 'auto' }
+            : {}),
         }}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />

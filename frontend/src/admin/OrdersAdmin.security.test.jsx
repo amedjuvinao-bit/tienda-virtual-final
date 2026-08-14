@@ -119,6 +119,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       authLoading: false,
     };
     state.permissions = new Set();
+    localStorage.clear();
     Object.values(state.api).forEach((mock) => mock.mockReset());
     state.api.get.mockImplementation(async (url) => {
       if (url === '/api/orders/admin') {
@@ -178,7 +179,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(state.api.put).not.toHaveBeenCalled();
   });
 
-  it('mantiene el botón lateral visible y permite mostrar u ocultar los filtros', async () => {
+  it('mantiene el botón flotante visible y permite mostrar u ocultar los filtros', async () => {
     state.auth = {
       isAuthenticated: true,
       adminToken: 'header.payload.valid-admin-signature',
@@ -201,6 +202,55 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(
       screen.getByRole('button', { name: 'Mostrar panel de filtros' })
     ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('permite mover el botón sin abrir filtros y conserva su posición', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+
+    renderOrders();
+
+    await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    const toggle = screen.getByRole('button', { name: 'Mostrar panel de filtros' });
+    vi.spyOn(toggle, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      top: 100,
+      right: 222,
+      bottom: 136,
+      width: 122,
+      height: 36,
+      x: 100,
+      y: 100,
+      toJSON: () => ({}),
+    });
+
+    const dispatchPointer = (type, { clientX, clientY }) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        button: 0,
+        clientX,
+        clientY,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 7 });
+      fireEvent(toggle, event);
+    };
+
+    dispatchPointer('pointerdown', { clientX: 110, clientY: 110 });
+    dispatchPointer('pointermove', { clientX: 210, clientY: 180 });
+    dispatchPointer('pointerup', { clientX: 210, clientY: 180 });
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle.style.left).toBe('200px');
+    expect(toggle.style.top).toBe('170px');
+    expect(JSON.parse(localStorage.getItem('orders-admin-control-toggle-position-v1'))).toEqual({
+      x: 200,
+      y: 170,
+    });
   });
 
   it('expone cada capacidad solamente cuando el rol la posee', async () => {

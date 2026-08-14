@@ -164,11 +164,12 @@ function main() {
   assert.ok(boardSource.includes('Cola operativa'));
   assert.ok(boardSource.includes('xl:grid-cols-9'));
   assert.ok(adminSource.includes('.orders-control-toggle'));
-  assert.ok(adminSource.includes('position: sticky'));
-  assert.ok(adminSource.includes('grid-area: toggle'));
+  assert.ok(adminSource.includes('position: fixed'));
+  assert.ok(adminSource.includes('backdrop-filter: blur(18px)'));
+  assert.ok(adminSource.includes('CONTROL_TOGGLE_POSITION_KEY'));
+  assert.ok(adminSource.includes('onPointerMove={handleControlTogglePointerMove}'));
   assert.ok(adminSource.includes('grid-area: controls'));
   assert.ok(adminSource.includes('overflow: visible'));
-  assert.ok(!adminSource.includes('position: fixed'));
   assert.ok(!adminSource.includes('overflow-y: auto'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');
 
