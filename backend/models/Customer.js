@@ -165,14 +165,14 @@ CustomerSchema.pre('validate', function preValidateCustomer(next) {
   this.displayName = cleanText(this.displayName || this.fullName);
 
   this.phone = cleanPhone(this.phone);
-  this.normalizedPhone = cleanPhone(this.normalizedPhone || this.phone);
+  this.normalizedPhone = cleanPhone(this.phone);
 
   this.email = cleanLower(this.email);
-  this.normalizedEmail = cleanLower(this.normalizedEmail || this.email);
+  this.normalizedEmail = cleanLower(this.email);
 
   this.documentType = cleanUpper(this.documentType);
   this.documentNumber = cleanText(this.documentNumber);
-  this.normalizedDocument = onlyDigits(this.normalizedDocument || this.documentNumber);
+  this.normalizedDocument = onlyDigits(this.documentNumber);
 
   this.address = cleanText(this.address);
   this.city = cleanText(this.city);

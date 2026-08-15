@@ -428,6 +428,22 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - El build de producción compila el flujo completo sin requerir credenciales de Meta.
 - CI ejecuta los contratos backend y frontend y nunca abre WhatsApp ni envía mensajes reales.
 
+## Prueba persistente del ciclo real Orden–Cliente
+
+El comando `test:orders-customer-lifecycle-live` verifica el recorrido completo contra la base configurada en `backend/.env`. No usa mocks: selecciona una existencia física activa, crea una orden web y su cliente dentro de una transacción, reserva inventario, confirma el pago administrativo, recorre picking, empaque, despacho, tránsito y entrega, corrige el celular sincronizándolo con la ficha maestra y valida CRM, Kardex, auditoría e idempotencia.
+
+La ejecución es deliberadamente persistente: conserva la orden, el cliente, la salida de inventario y sus eventos para revisión desde los módulos Órdenes y Clientes. Descuenta una unidad real de inventario. No llama Wompi ni otra pasarela, no envía mensajes, no genera documentos DIAN y no contiene operaciones automáticas de borrado.
+
+Desde la raíz del repositorio en Windows:
+
+```bat
+npm --prefix backend run test:orders-customer-lifecycle-live -- --confirm-real-transaction --label=cliente-real
+```
+
+Sin `--confirm-real-transaction` el comando se detiene antes de conectarse. Debe ejecutarse únicamente en una base controlada donde sea aceptable conservar la compra y descontar la unidad seleccionada.
+
+El contrato `test:orders-customer-connection` protege la confirmación obligatoria, la ausencia de borrados, el uso de los servicios oficiales de cliente, inventario, estados y logística, y la actualización de las identidades normalizadas al corregir datos.
+
 ## Simulación persistente y trazabilidad visual
 
 El comando `demo:orders-trace` crea recorridos demostrativos permanentes para revisar el módulo desde el panel: pago pendiente con reserva liberada, picking por iniciar, incidencia abierta, tránsito y entrega con evidencia. Cuando existen existencias elegibles en dos sedes distintas, añade una orden multisede y genera un envío independiente para cada sede real.

@@ -4,6 +4,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const Customer = require('../models/Customer');
 
 const {
   applyCustomerResolutionToOrderData,
@@ -18,6 +19,12 @@ const {
   buildCandidateFilter,
   parseOptions,
 } = require('./reconcileOrderCustomers');
+const {
+  REQUIRED_CONFIRMATION,
+  assertRealTransactionConfirmation,
+  buildIdentity,
+  parseOptions: parseLiveLifecycleOptions,
+} = require('./testRealOrderCustomerLifecycle');
 
 let controls = 0;
 
@@ -140,20 +147,66 @@ async function main() {
   const candidate = buildCandidateFilter(dryRun);
   ok('la conciliación excluye POS para no duplicar estadísticas antiguas', !candidate.filter.source.$in.includes('pos'));
 
+  const changingCustomer = new Customer({
+    fullName: 'Cliente Normalización',
+    phone: '300 111 2233',
+    normalizedPhone: '3000000000',
+    email: 'NUEVO@EXAMPLE.COM',
+    normalizedEmail: 'anterior@example.com',
+    documentType: 'CC',
+    documentNumber: '1.234.567',
+    normalizedDocument: '9999999',
+  });
+  await changingCustomer.validate();
+  ok(
+    'editar una identidad recalcula teléfono, correo y documento normalizados',
+    changingCustomer.normalizedPhone === '3001112233' &&
+      changingCustomer.normalizedEmail === 'nuevo@example.com' &&
+      changingCustomer.normalizedDocument === '1234567'
+  );
+
+  const liveOptions = parseLiveLifecycleOptions([
+    REQUIRED_CONFIRMATION,
+    '--label=contrato',
+  ]);
+  ok(
+    'la prueba persistente exige confirmación explícita',
+    liveOptions.confirmRealTransaction === true &&
+      assert.throws(
+        () => assertRealTransactionConfirmation({}),
+        (error) =>
+          error?.code === 'REAL_ORDER_CUSTOMER_CONFIRMATION_REQUIRED'
+      )
+  );
+  const liveIdentity = buildIdentity(
+    new Date('2026-08-14T12:00:00.000Z'),
+    (size) => Buffer.alloc(size, 1)
+  );
+  ok(
+    'la prueba persistente crea una identidad única y un celular corregido distinto',
+    liveIdentity.email.includes('+') &&
+      liveIdentity.initialPhone !== liveIdentity.correctedPhone
+  );
+
   const orderModel = read('backend/models/Order.js');
   const ordersRoute = read('backend/routes/orders.js');
   const posService = read('backend/services/adminPosService.js');
   const adminUi = read('frontend/src/admin/OrdersAdmin.jsx');
   const customerUi = read('frontend/src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.jsx');
   const reconciliationScript = read('backend/scripts/reconcileOrderCustomers.js');
+  const liveLifecycleScript = read('backend/scripts/testRealOrderCustomerLifecycle.js');
+  const backendPackage = read('backend/package.json');
   const ciWorkflow = read('.github/workflows/products-ci.yml');
   ok('el modelo persiste customerId como referencia a Customer', orderModel.includes("ref: 'Customer'") && orderModel.includes("'customer.customerId'"));
   ok('checkout crea o vincula el cliente dentro de la transacción', ordersRoute.includes('resolveCustomerForOrder(base') && ordersRoute.includes('applyCustomerResolutionToOrderData'));
   ok('POS reutiliza identidades existentes antes de crear cliente rápido', posService.includes('findCustomerMatch(quickCustomerPayload'));
   ok('la edición administrativa distingue orden y ficha maestra', ordersRoute.includes('syncCustomerMasterFromOrder') && ordersRoute.includes('syncCustomer'));
   ok('la interfaz respeta el permiso sensible de datos del cliente', adminUi.includes("can('orders:customer_data')"));
-  ok('la interfaz ofrece los dos alcances y explica el aislamiento DEMO', customerUi.includes('Solo esta orden') && customerUi.includes('Esta orden y ficha del cliente') && customerUi.includes('orden DEMO'));
+  ok('la interfaz ofrece los dos alcances sin exponer mensajes técnicos', customerUi.includes('Solo esta orden') && customerUi.includes('Esta orden y ficha del cliente') && !customerUi.includes('podrás corregir sus datos para probar WhatsApp'));
   ok('la conciliación histórica no contiene operaciones de borrado', !/deleteOne|deleteMany|findOneAndDelete|dropDatabase/.test(reconciliationScript));
+  ok('la prueba real reutiliza las autoridades de cliente, inventario, estado y logística', liveLifecycleScript.includes('resolveCustomerForOrder') && liveLifecycleScript.includes('createInventoryReservation') && liveLifecycleScript.includes('transitionOrderStatus') && liveLifecycleScript.includes('updateOrderShipment'));
+  ok('la prueba real conserva evidencia y no contiene operaciones de borrado', liveLifecycleScript.includes('RESULTADO CONSERVADO PARA REVISIÓN VISUAL') && !/deleteOne|deleteMany|findOneAndDelete|dropDatabase/.test(liveLifecycleScript));
+  ok('package.json publica el comando persistente con confirmación separada', backendPackage.includes('test:orders-customer-lifecycle-live') && !backendPackage.includes(`testRealOrderCustomerLifecycle.js ${REQUIRED_CONFIRMATION}`));
   ok('CI ejecuta los contratos de conexión en backend y frontend', (ciWorkflow.match(/test:orders-customer-connection/g) || []).length === 2);
 
   console.log(`\nConexión Órdenes–Clientes: ${controls}/${controls} controles superados.`);

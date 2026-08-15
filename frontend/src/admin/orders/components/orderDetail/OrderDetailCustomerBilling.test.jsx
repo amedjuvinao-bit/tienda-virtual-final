@@ -74,7 +74,7 @@ describe('OrderDetailCustomerBilling', () => {
     expect(onSaveCustomerData.mock.calls[0][0].syncCustomer).toBe(true);
   });
 
-  it('mantiene una orden DEMO fuera del CRM pero permite corregirla', () => {
+  it('mantiene una orden DEMO fuera del CRM sin exponer mensajes técnicos', () => {
     render(
       <OrderDetailCustomerBilling
         order={{
@@ -90,6 +90,8 @@ describe('OrderDetailCustomerBilling', () => {
     expect(
       screen.getByRole('button', { name: 'Esta orden y ficha del cliente' })
     ).toBeDisabled();
-    expect(screen.getByText(/no se creará un cliente real/i)).toBeInTheDocument();
+    expect(screen.queryByText(/orden DEMO/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/probar WhatsApp/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cliente real/i)).not.toBeInTheDocument();
   });
 });

@@ -425,21 +425,21 @@ export default function OrderDetailCustomerBilling({
               >
                 Esta orden y ficha del cliente
               </button>
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  color: ORDER_DETAIL_THEME.mutedText,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  lineHeight: 1.45,
-                }}
-              >
-                {demoOrder
-                  ? 'Esta es una orden DEMO: podrás corregir sus datos para probar WhatsApp, pero no se creará un cliente real.'
-                  : syncCustomer
+              {!demoOrder && (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    color: ORDER_DETAIL_THEME.mutedText,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {syncCustomer
                     ? 'Los datos de contacto también quedarán disponibles en el módulo Clientes.'
                     : 'La ficha maestra del cliente no será modificada.'}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="order-customer-edit-grid">
