@@ -437,7 +437,7 @@ export default function OrderDetailModal({
     try {
       setLoadingAux(true);
 
-      const response = await api.get(`/api/orders/${order._id}/pdf`, {
+      const response = await api.get(`/api/orders/${order._id}/receipt-pdf`, {
         responseType: 'blob',
       });
 

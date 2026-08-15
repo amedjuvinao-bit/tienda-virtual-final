@@ -231,6 +231,52 @@ function validateProtectedRoutes() {
   ok('Rutas PDF/XML están autenticadas, autorizadas y sirven el archivo oficial');
 }
 
+function validateOrderReceiptSeparation() {
+  const routes = read('backend/routes/orders.js');
+  const orderDetail = read(
+    'frontend/src/admin/orders/components/OrderDetailModal.jsx'
+  );
+  const billingApi = read('frontend/src/admin/billing/api/adminBillingApi.js');
+  const invoiceDocuments = read(
+    'frontend/src/admin/orders/electronicInvoice/InvoiceDocumentsTab.jsx'
+  );
+
+  [
+    "'/:id/receipt-pdf'",
+    "'X-Invoice-Document-Source', 'order-receipt'",
+    'generateOrderPdf({',
+  ].forEach((needle) => {
+    assertIncludes(
+      routes,
+      needle,
+      `El comprobante interno de la orden no conserva ${needle}`
+    );
+  });
+
+  assertIncludes(
+    orderDetail,
+    '/api/orders/${order._id}/receipt-pdf',
+    'El botón PDF del detalle no usa la ruta exclusiva del comprobante interno.'
+  );
+  assertNotIncludes(
+    orderDetail,
+    'api.get(`/api/orders/${order._id}/pdf`',
+    'El botón PDF del detalle no debe intentar descargar la factura oficial.'
+  );
+  assertIncludes(
+    billingApi,
+    '/api/orders/${orderId}/pdf',
+    'Facturación debe conservar la descarga protegida del PDF oficial.'
+  );
+  assertIncludes(
+    invoiceDocuments,
+    '/api/orders/${encodeURIComponent(orderId)}/pdf',
+    'El modal de factura debe conservar el PDF oficial de Factus.'
+  );
+
+  ok('PDF de la orden y PDF oficial de Factus quedan separados sin reemplazarse');
+}
+
 function validateFrontendDownloads() {
   const api = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const page = readBillingFrontendSource();
@@ -282,6 +328,7 @@ async function main() {
     validateNoEagerDownloads,
     validateSyncIdentityAndStatus,
     validateProtectedRoutes,
+    validateOrderReceiptSeparation,
     validateFrontendDownloads,
     validatePackageScript,
   ];

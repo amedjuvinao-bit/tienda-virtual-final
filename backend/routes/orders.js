@@ -2452,7 +2452,57 @@ router.get(
   }
 );
 /* =========================================================
- * PDF
+ * PDF INTERNO DE LA ORDEN
+ * Conserva el comprobante comercial detallado aunque la
+ * factura electrónica todavía no exista o haya fallado.
+ * ======================================================= */
+router.get(
+  '/:id/receipt-pdf',
+  requireAdmin,
+  requirePermission('billing:download'),
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const access = buildOrderOperationFilter(req, id);
+
+      if (!access.ok) return sendOrderScopeError(res, access);
+
+      const order = await Order.findOne(access.filter)
+        .populate({ path: 'items.product', select: 'title sku price image slug' })
+        .lean();
+
+      if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+      const [invoice, settings] = await Promise.all([
+        ElectronicInvoice.findOne({ orderId: order._id }).lean(),
+        SiteSettings.findOne().lean(),
+      ]);
+
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, X-Invoice-Document-Source, X-Invoice-Number'
+      );
+      res.setHeader('X-Invoice-Document-Source', 'order-receipt');
+
+      await generateOrderPdf({
+        order,
+        invoice,
+        settings,
+        res,
+      });
+    } catch (error) {
+      console.error('GET /orders/:id/receipt-pdf', error);
+      return sendInvoiceDocumentError(
+        res,
+        error,
+        'No se pudo descargar el comprobante PDF de la orden.'
+      );
+    }
+  }
+);
+
+/* =========================================================
+ * PDF OFICIAL DE FACTUS
  * ======================================================= */
 router.get(
   '/:id/pdf',
