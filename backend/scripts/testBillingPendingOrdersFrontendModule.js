@@ -59,9 +59,11 @@ function validatePendingOrdersPage() {
     'BillingPendingOrdersPanel',
     'getPendingBillingOrders',
     'Órdenes por facturar',
-    'Ventas pagadas que todavía no tienen registro en ElectronicInvoice',
+    'Ventas pagadas sin factura validada o con una emisión que requiere corrección',
     'Buscar orden o cliente',
-    'Fuente: Order menos órdenes que ya existen en ElectronicInvoice',
+    'Incluye órdenes pagadas sin factura y emisiones rechazadas',
+    'Emisión rechazada',
+    'Reintentar',
     'Ver orden',
     'Generar',
     "return <BillingPendingOrdersPanel />;",
@@ -101,12 +103,15 @@ function validateBackendPendingOrders() {
   assertIncludes(routeFile, '/pending-orders', 'adminBilling.js debe conservar endpoint /pending-orders.');
   assertIncludes(serviceFile, 'listPendingBillableOrders', 'adminBillingService debe exponer listPendingBillableOrders.');
   assertIncludes(serviceFile, 'buildPendingOrdersPaginationPipeline', 'El servicio debe paginar pendientes en MongoDB.');
-  assertIncludes(aggregationFile, '$lookup', 'El servicio debe excluir con $lookup las órdenes que ya tienen ElectronicInvoice.');
+  assertIncludes(aggregationFile, '$lookup', 'El servicio debe consultar ElectronicInvoice dentro de MongoDB.');
+  assertIncludes(aggregationFile, 'ERROR_INVOICE_STATUSES', 'Las emisiones fallidas deben volver a la bandeja de corrección.');
+  assertIncludes(serviceFile, 'billingIssue', 'La respuesta debe informar la novedad fiscal de una orden reintentable.');
+  assertIncludes(serviceFile, 'allowRetry: true', 'La generación administrativa debe reintentar fallos de forma explícita.');
   assertNotIncludes(serviceFile, "ElectronicInvoice.distinct('orderId'", 'No debe cargar todos los orderId facturados en memoria.');
   assertIncludes(serviceFile, 'serializePendingOrder', 'El servicio debe serializar órdenes pendientes.');
   assertNotIncludes(serviceFile, "require('../models/Invoice')", 'No debe usarse modelo Invoice paralelo.');
 
-  ok('Backend pagina Order y excluye ElectronicInvoice dentro de MongoDB');
+  ok('Backend pagina órdenes, excluye facturas válidas y conserva fallos reintentables');
 }
 
 function main() {

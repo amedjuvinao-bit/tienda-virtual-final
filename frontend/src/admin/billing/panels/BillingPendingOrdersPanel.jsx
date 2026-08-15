@@ -26,6 +26,44 @@ import {
   PanelHeader,
 } from '../components/BillingUi';
 
+function collectProviderMessages(value, output = [], depth = 0) {
+  if (depth > 4 || value === null || value === undefined) return output;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const message = String(value).trim();
+    if (message && !output.includes(message)) output.push(message);
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectProviderMessages(item, output, depth + 1));
+    return output;
+  }
+
+  if (typeof value === 'object') {
+    Object.values(value).forEach((item) =>
+      collectProviderMessages(item, output, depth + 1)
+    );
+  }
+
+  return output;
+}
+
+function billingIssueMessage(issue = null) {
+  if (!issue) return '';
+
+  const summary = String(issue.errorMessage || '').trim();
+  const details = collectProviderMessages(issue.providerErrors).slice(0, 3);
+  const genericSummary = /^(error de validaci[oó]n|the given data was invalid\.?|factus rechaz[oó] la factura)\.?$/i.test(summary);
+
+  if (details.length && genericSummary) return details.join(' ');
+  if (details.length && !details.some((message) => summary.includes(message))) {
+    return [summary, ...details].filter(Boolean).join(' ');
+  }
+
+  return summary || details.join(' ') || 'Factus rechazó la emisión y requiere corrección.';
+}
+
 export default function BillingPendingOrdersPanel() {
   const { can } = useAdminPermissions();
   const canGenerate = can('billing:create');
@@ -83,7 +121,9 @@ export default function BillingPendingOrdersPanel() {
       setNotice(number ? `Factura ${number} generada correctamente.` : 'Factura generada correctamente.');
       await loadPendingOrders();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'No se pudo generar la factura.');
+      const message = err?.response?.data?.message || err?.message || 'No se pudo generar la factura.';
+      await loadPendingOrders();
+      setError(message);
     } finally {
       setActionLoading('');
     }
@@ -94,7 +134,7 @@ export default function BillingPendingOrdersPanel() {
       <PanelHeader
         eyebrow="Pendientes de emisión"
         title="Órdenes por facturar"
-        text="Ventas pagadas que todavía no tienen registro en ElectronicInvoice."
+        text="Ventas pagadas sin factura validada o con una emisión que requiere corrección."
       >
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <label
@@ -119,7 +159,7 @@ export default function BillingPendingOrdersPanel() {
 
       <div className="min-w-0 overflow-hidden rounded-[28px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <div className="text-sm font-black">{loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) pendiente(s)`}</div>
+          <div className="text-sm font-black">{loading ? 'Cargando órdenes...' : `${formatNumber(total)} orden(es) por emitir o corregir`}</div>
           <div className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {formatNumber(page)} de {formatNumber(pages)}</div>
         </div>
 
@@ -141,6 +181,7 @@ export default function BillingPendingOrdersPanel() {
               <tbody>
                 {rows.map((order) => {
                   const isGenerating = actionLoading === `generate-${order.id}`;
+                  const issueMessage = billingIssueMessage(order.billingIssue);
 
                   return (
                     <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
@@ -151,6 +192,12 @@ export default function BillingPendingOrdersPanel() {
                       <td className="px-3 py-4 align-top">
                         <p className="break-words font-black leading-5">{order.customerName || 'Cliente'}</p>
                         <p className="mt-1 break-words text-xs font-bold leading-5 [overflow-wrap:anywhere]" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
+                        {issueMessage ? (
+                          <div className="mt-2 rounded-xl border px-2.5 py-2 text-[11px] font-bold leading-4" style={{ borderColor: 'rgba(220, 38, 38, 0.28)', background: 'rgba(220, 38, 38, 0.08)', color: '#b91c1c' }}>
+                            <p className="font-black uppercase tracking-[0.06em]">Emisión rechazada</p>
+                            <p className="mt-1 break-words [overflow-wrap:anywhere]">{issueMessage}</p>
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-4 align-top">
                         <p className="font-black">{normalizeChannelLabel(order.source)}</p>
@@ -171,7 +218,7 @@ export default function BillingPendingOrdersPanel() {
                           <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
                           {canGenerate ? (
                             <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
-                              {isGenerating ? 'Generando...' : 'Generar'}
+                              {isGenerating ? 'Procesando...' : order.billingIssue?.retryable ? 'Reintentar' : 'Generar'}
                             </ActionButton>
                           ) : (
                             <span className="w-full rounded-xl border px-3 py-2 text-center text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
@@ -189,7 +236,7 @@ export default function BillingPendingOrdersPanel() {
         )}
 
         <div className="flex flex-col gap-2 border-t px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Fuente: Order menos órdenes que ya existen en ElectronicInvoice.</p>
+          <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Incluye órdenes pagadas sin factura y emisiones rechazadas que pueden corregirse y reintentarse.</p>
           <div className="flex gap-2">
             <ActionButton disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</ActionButton>
             <ActionButton disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))}>Siguiente</ActionButton>

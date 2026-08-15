@@ -80,6 +80,7 @@ function validateBackendGenerationService() {
 
   assertIncludes(adminServiceFile, 'issueElectronicInvoiceForOrder', 'El módulo admin no delega al motor unificado.');
   assertIncludes(adminServiceFile, "source: 'admin'", 'El módulo admin no registra el origen de la emisión.');
+  assertIncludes(adminServiceFile, 'allowRetry: true', 'El módulo admin no permite reintentar una emisión fallida de forma idempotente.');
 
   ok('Motor unificado reserva la orden y guarda la respuesta oficial en ElectronicInvoice');
 }
@@ -124,6 +125,31 @@ function validateFactusCreationResponse() {
   ok('Respuesta de creación Factus conserva número, CUFE y validación oficiales');
 }
 
+function validateFactusValidationMessage() {
+  const { providerMessage } = require('../lib/dian/providers/factusRangeAwareProvider');
+  const message = providerMessage({
+    status: 422,
+    data: {
+      message: 'Error de validación',
+      errors: {
+        'items.0.taxes.0': ['Los datos fiscales del producto no son válidos.'],
+        authorization: ['Authorization: secreto-no-debe-salir'],
+      },
+    },
+  });
+
+  assert(
+    message.includes('Los datos fiscales del producto no son válidos.'),
+    'El rechazo perdió el detalle accionable devuelto por Factus.'
+  );
+  assert(
+    !message.includes('secreto-no-debe-salir'),
+    'El rechazo expuso un dato sensible devuelto por el proveedor.'
+  );
+
+  ok('Rechazo Factus muestra el detalle seguro en lugar del mensaje genérico');
+}
+
 function validateFrontendGeneration() {
   const apiFile = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const pageFile = readBillingFrontendSource();
@@ -139,7 +165,9 @@ function validateFrontendGeneration() {
     'generateBillingInvoiceForOrder',
     'handleGenerateInvoice',
     'Factura generada correctamente',
-    'Generando...',
+    'Procesando...',
+    'Reintentar',
+    'billingIssue',
     'Generar',
     'await loadPendingOrders()',
     'return <BillingPendingOrdersPanel />;',
@@ -222,6 +250,7 @@ function main() {
     validateBackendGenerationService();
     validateBackendGenerationRoute();
     validateFactusCreationResponse();
+    validateFactusValidationMessage();
     validateFrontendGeneration();
     validateGeneratedIsNotValidated();
     validateGenerateConfirmationBridge();

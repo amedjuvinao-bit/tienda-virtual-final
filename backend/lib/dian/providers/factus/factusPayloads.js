@@ -204,18 +204,9 @@ function buildFactusInvoicePayload(invoiceData = {}) {
 
       unit_measure_code: '94',
       standard_code: '999',
-      taxes: [
-        {
-          code: '01',
-          rate: ivaRate,
-        },
-      ],
-
-      tax_rate: ivaRate,
-      unit_measure_id: 70,
-      standard_code_id: 1,
-      is_excluded: !hasIva,
-      tribute_id: 1,
+      taxes: hasIva
+        ? [{ code: '01', rate: ivaRate }]
+        : [{ is_excluded: true }],
       withholding_taxes: [],
     };
 
@@ -236,18 +227,7 @@ function buildFactusInvoicePayload(invoiceData = {}) {
 
       unit_measure_code: '94',
       standard_code: '999',
-      taxes: [
-        {
-          code: '01',
-          rate: '0.00',
-        },
-      ],
-
-      tax_rate: '0.00',
-      unit_measure_id: 70,
-      standard_code_id: 1,
-      is_excluded: true,
-      tribute_id: 1,
+      taxes: [{ is_excluded: true }],
       withholding_taxes: [],
     });
   }
@@ -375,14 +355,15 @@ function buildFactusCreditNotePayload({
     const gross = toMoney(toNumber(item.quantity, 0) * toNumber(item.price, 0));
     const discount = toMoney(item.discount_amount || 0);
     const taxable = toMoney(Math.max(0, gross - discount));
-    const rate = item.is_excluded === true
+    const taxDefinition = item?.taxes?.[0] || {};
+    const rate = taxDefinition.is_excluded === true || item.is_excluded === true
       ? 0
-      : toNumber(item.tax_rate ?? item?.taxes?.[0]?.rate, 0);
-    const tax = toMoney(taxable * (rate / 100));
+      : toNumber(taxDefinition.rate ?? item.tax_rate, 0);
+    const taxAmount = toMoney(taxable * (rate / 100));
     acc.subtotal = toMoney(acc.subtotal + gross);
     acc.discount = toMoney(acc.discount + discount);
-    acc.tax = toMoney(acc.tax + tax);
-    acc.total = toMoney(acc.total + taxable + tax);
+    acc.tax = toMoney(acc.tax + taxAmount);
+    acc.total = toMoney(acc.total + taxable + taxAmount);
     return acc;
   }, { subtotal: 0, discount: 0, tax: 0, total: 0 });
 

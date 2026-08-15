@@ -93,7 +93,47 @@ async function postInvoiceValidate({ credentials, tokenResult, payload }) {
   return { ok: response.ok, status: response.status, data };
 }
 
+function collectProviderErrorText(value, output = [], depth = 0) {
+  if (depth > 4 || value === undefined || value === null) return output;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const message = cleanText(value, 500)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(
+        /\b(authorization|bearer|access[_ -]?token|client[_ -]?secret|password|technical[_ -]?key|software[_ -]?pin)\b\s*[:=]\s*[^\s,;]+/gi,
+        '$1: [dato protegido]'
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (message && !output.includes(message)) output.push(message);
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectProviderErrorText(item, output, depth + 1));
+    return output;
+  }
+
+  if (typeof value === 'object') {
+    Object.values(value).forEach((item) =>
+      collectProviderErrorText(item, output, depth + 1)
+    );
+  }
+
+  return output;
+}
+
 function providerMessage(result = {}) {
+  const validationMessages = [];
+  [result?.data?.errors, result?.data?.data?.errors].forEach((errors) =>
+    collectProviderErrorText(errors, validationMessages)
+  );
+
+  if (validationMessages.length) {
+    return cleanText(`Factus rechazó la factura: ${validationMessages.join(' ')}`, 1000);
+  }
+
   return (
     result?.data?.message ||
     result?.data?.error ||
@@ -639,6 +679,7 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
 module.exports = {
   cleanupSinglePendingInvoiceInSandbox,
   findInvoiceByReferenceFromFactus,
+  providerMessage,
   sendCreditNoteToFactus,
   sendInvoiceToFactus,
 };

@@ -91,6 +91,7 @@ function validatePendingOrdersPipeline() {
     orderFilter: { status: 'paid' },
     invoiceCollectionName: 'electronicinvoices',
   });
+  const retryableMatch = pipeline.find((stage) => Array.isArray(stage?.$match?.$or))?.$match;
 
   assert(lookup?.from === 'electronicinvoices', 'Órdenes pendientes no consultan ElectronicInvoice con $lookup.');
   assert(
@@ -98,8 +99,14 @@ function validatePendingOrdersPipeline() {
     '$lookup no limita la coincidencia a una factura.'
   );
   assert(
-    pipeline.some((stage) => stage.$match?.['_billingInvoiceMatch.0']?.$exists === false),
-    'No se excluyen dentro de MongoDB las órdenes ya facturadas.'
+    JSON.stringify(retryableMatch).includes('failed') &&
+      JSON.stringify(retryableMatch).includes('rejected') &&
+      JSON.stringify(retryableMatch).includes('error'),
+    'La consulta no conserva emisiones fallidas para su reintento.'
+  );
+  assert(
+    JSON.stringify(retryableMatch).includes('"$exists":false'),
+    'La consulta perdió las órdenes que aún no tienen factura.'
   );
   assert(
     facet?.rows?.some((stage) => stage.$skip === 20) &&
@@ -345,6 +352,13 @@ async function validateRuntimeContracts() {
         payment: { status: 'paid', provider: 'wompi' },
         total: 119,
         items: [{ productId: 'product-1' }],
+        _billingInvoice: {
+          _id: 'invoice-failed-1',
+          status: 'failed',
+          errorMessage: 'Factus rechazó los impuestos de la línea.',
+          providerErrors: { taxes: ['Tarifa inválida.'] },
+          emission: { attempts: 1 },
+        },
       }],
     }];
   };
@@ -374,6 +388,11 @@ async function validateRuntimeContracts() {
     assert(
       pendingOrders.rows[0].orderNumber === '1002',
       'Cambió la serialización de órdenes pendientes.'
+    );
+    assert(
+      pendingOrders.rows[0].billingIssue?.retryable === true &&
+        pendingOrders.rows[0].billingIssue?.invoiceId === 'invoice-failed-1',
+      'La respuesta perdió la emisión fallida reintentable.'
     );
 
     const summary = await billingService.getBillingSummary();

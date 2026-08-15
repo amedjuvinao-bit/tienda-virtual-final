@@ -197,6 +197,16 @@ function validateFactusPayload() {
   assertMoney(payload.items[0].price, 100000, 'Factus no recibió el precio original.');
   assertMoney(payload.items[0].discount_amount, 10000, 'Factus no recibió el descuento de línea.');
   assert(
+    JSON.stringify(payload.items[0].taxes) === JSON.stringify([{ code: '01', rate: '19.00' }]),
+    'El IVA gravado debe viajar únicamente en taxes con código y tarifa.'
+  );
+  ['tax_rate', 'unit_measure_id', 'standard_code_id', 'is_excluded', 'tribute_id'].forEach((field) => {
+    assert(
+      !Object.prototype.hasOwnProperty.call(payload.items[0], field),
+      `El payload Factus V2 no debe conservar el campo heredado ${field}.`
+    );
+  });
+  assert(
     !Object.prototype.hasOwnProperty.call(payload.items[0], 'discount_rate'),
     'Factus no debe recibir simultáneamente discount_rate y discount_amount.'
   );
@@ -206,6 +216,36 @@ function validateFactusPayload() {
   assertMoney(payload.totals.total, 117100, 'El total Factus no coincide.');
   assert(payload.payment_details[0].amount === '117100.00', 'El pago Factus no usa el total exacto.');
   ok('Factus recibe precio, descuento, base, IVA y pago conciliados');
+}
+
+function validateFactusExcludedPayload() {
+  const payload = buildFactusInvoicePayload({
+    order: {
+      _id: '64b000000000000000000011',
+      orderNumber: 'ORD-EXCLUIDA-01',
+      items: [baseItem(100000)],
+      subtotal: 100000,
+      shipping: 10000,
+      total: 110000,
+      taxes: { iva: { enabled: false, percent: 0, amount: 0 } },
+      customer: { name: 'Cliente', email: 'cliente@example.com' },
+    },
+  });
+
+  assert(payload.items.length === 2, 'La prueba excluida debe conservar producto y envío.');
+  payload.items.forEach((item) => {
+    assert(
+      JSON.stringify(item.taxes) === JSON.stringify([{ is_excluded: true }]),
+      'Un concepto excluido debe declarar is_excluded dentro de taxes y no IVA al 0 %.'
+    );
+    assert(
+      !Object.prototype.hasOwnProperty.call(item, 'is_excluded') &&
+        !Object.prototype.hasOwnProperty.call(item, 'tax_rate'),
+      'Un concepto excluido no debe mezclar los campos fiscales heredados con Factus V2.'
+    );
+  });
+
+  ok('Factus V2 recibe productos y envío excluidos con la estructura fiscal oficial');
 }
 
 function validateInvoiceReconciliationGuard() {
@@ -297,6 +337,7 @@ function main() {
     validateFreeShippingCoupon,
     validateCentAllocation,
     validateFactusPayload,
+    validateFactusExcludedPayload,
     validateInvoiceReconciliationGuard,
     validateAtomicCheckoutAndGatewayGuards,
     validatePackageScript,

@@ -303,6 +303,10 @@ function serializePendingOrder(order = {}) {
   const billing = order.billing || {};
   const payment = order.payment || {};
   const items = Array.isArray(order.items) ? order.items : Array.isArray(order.cart) ? order.cart : [];
+  const invoice = order._billingInvoice || {};
+  const invoiceStatus = cleanText(invoice.status, 60).toLowerCase();
+  const hasRetryableInvoice =
+    Boolean(invoice._id) && ['failed', 'rejected', 'error'].includes(invoiceStatus);
 
   return {
     id: String(order._id || ''),
@@ -321,6 +325,20 @@ function serializePendingOrder(order = {}) {
     shipping: money(order.shipping),
     total: money(order.total),
     itemsCount: items.length,
+    billingIssue: hasRetryableInvoice
+      ? {
+          invoiceId: String(invoice._id),
+          status: invoiceStatus,
+          retryable: true,
+          errorMessage: cleanText(invoice.errorMessage, 1000),
+          providerErrors:
+            invoice.providerErrors && typeof invoice.providerErrors === 'object'
+              ? invoice.providerErrors
+              : {},
+          attempts: Number(invoice?.emission?.attempts || 0),
+          failedAt: invoice.failedAt || invoice.updatedAt || null,
+        }
+      : null,
     createdAt: order.createdAt || null,
     updatedAt: order.updatedAt || null,
   };
@@ -384,6 +402,7 @@ async function generateInvoiceForOrder(orderId, options = {}) {
     orderId,
     source: 'admin',
     initiatedBy: options.adminUser || 'admin',
+    allowRetry: true,
     skipWhenElectronicBillingIsInactive: false,
   });
 
