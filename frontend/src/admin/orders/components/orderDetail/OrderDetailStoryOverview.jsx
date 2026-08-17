@@ -285,7 +285,21 @@ function storyPhase({ id, label, title, description, state, date, icon }) {
   return { id, label, title, description, state, date, icon };
 }
 
-export function buildOrderStory(order) {
+function isRefundReconciliationComplete(refunds) {
+  const normalizedRefunds = Array.isArray(refunds) ? refunds.filter(Boolean) : [];
+
+  return normalizedRefunds.length > 0 && normalizedRefunds.every((refund) => {
+    const reconciliation = refund?.reconciliation || {};
+    const terminalStageStates = new Set(['completed', 'not_required']);
+    const stages = ['inventory', 'payment', 'cash', 'billing'];
+
+    return normalizeText(reconciliation.state) === 'completed' && stages.every((stage) =>
+      terminalStageStates.has(normalizeText(reconciliation?.[stage]?.state))
+    );
+  });
+}
+
+export function buildOrderStory(order, refunds = []) {
   const orderStatus = normalizeText(order?.status);
   const payment = getPaymentState(order);
   const invoice = getInvoiceState(order, payment.complete);
@@ -293,6 +307,7 @@ export function buildOrderStory(order) {
   const isCancelled = ['cancelled', 'canceled'].includes(orderStatus);
   const isFailed = orderStatus === 'failed';
   const isRefunded = orderStatus === 'refunded';
+  const refundReconciliationComplete = isRefundReconciliationComplete(refunds);
   const terminalProblem = isCancelled || isFailed;
 
   const paymentState = payment.failed
@@ -468,13 +483,19 @@ export function buildOrderStory(order) {
       description: 'El ciclo comercial terminó con devolución del dinero.',
       tone: 'warning',
     };
-    next = {
-      title: 'Confirmar conciliación final',
-      description: 'Comprueba el soporte del reembolso y el ajuste de inventario.',
-      tone: 'warning',
-    };
+    next = refundReconciliationComplete
+      ? {
+          title: 'Conciliación completada',
+          description: 'Inventario, dinero y documento fiscal quedaron conciliados; no hay acciones pendientes.',
+          tone: 'success',
+        }
+      : {
+          title: 'Confirmar conciliación final',
+          description: 'Comprueba el soporte del reembolso y el ajuste de inventario.',
+          tone: 'warning',
+        };
     actionTarget = 'payment';
-    actionLabel = 'Ver conciliación';
+    actionLabel = refundReconciliationComplete ? 'Ver trazabilidad' : 'Ver conciliación';
   } else if (fulfillment.delivered && invoice.complete) {
     current = {
       title: 'Proceso completado',
@@ -636,8 +657,8 @@ function uniqueMovements(movements) {
   });
 }
 
-export function buildOrderOverview(order) {
-  const story = buildOrderStory(order);
+export function buildOrderOverview(order, refunds = []) {
+  const story = buildOrderStory(order, refunds);
   const summary = getOrderSummary(order);
   const inventory = getInventoryOverview(order, summary);
   const paymentPhase = story.phases.find((phase) => phase.id === 'payment');
@@ -903,8 +924,8 @@ function MovementRow({ movement, isLast }) {
   );
 }
 
-export default function OrderDetailStoryOverview({ order, onNavigate }) {
-  const overview = buildOrderOverview(order);
+export default function OrderDetailStoryOverview({ order, refunds = [], onNavigate }) {
+  const overview = buildOrderOverview(order, refunds);
   const { story } = overview;
 
   return (

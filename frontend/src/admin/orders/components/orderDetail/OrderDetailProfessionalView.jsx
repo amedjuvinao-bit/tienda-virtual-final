@@ -138,6 +138,7 @@ export default function OrderDetailProfessionalView({
     summary: (
       <OrderDetailStoryOverview
         order={order}
+        refunds={refunds}
         onNavigate={(tabId) => {
           setManagementOpen(false);
           setActiveTab(tabId);

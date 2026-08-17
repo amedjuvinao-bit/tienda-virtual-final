@@ -88,6 +88,57 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(story.next.title).toBe('Confirmar el pago');
   });
 
+  it('cierra la historia del reembolso cuando todas las etapas están conciliadas', () => {
+    const order = {
+      ...BASE_ORDER,
+      status: 'refunded',
+      payment: { status: 'paid', paidAt: '2026-08-14T14:02:00.000Z' },
+    };
+    const refunds = [
+      {
+        _id: 'refund-complete-1',
+        reconciliation: {
+          state: 'completed',
+          inventory: { state: 'completed' },
+          payment: { state: 'completed' },
+          cash: { state: 'not_required' },
+          billing: { state: 'completed' },
+        },
+      },
+    ];
+
+    const story = buildOrderStory(order, refunds);
+    expect(story.next).toMatchObject({
+      title: 'Conciliación completada',
+      actionLabel: 'Ver trazabilidad',
+      tone: 'success',
+    });
+
+    render(<OrderDetailStoryOverview order={order} refunds={refunds} />);
+    expect(screen.getAllByText('Conciliación completada')).toHaveLength(2);
+    expect(screen.getAllByText(/no hay acciones pendientes/i)).toHaveLength(2);
+    expect(screen.queryByText('Confirmar conciliación final')).not.toBeInTheDocument();
+  });
+
+  it('mantiene pendiente la conciliación si falta cerrar una etapa del reembolso', () => {
+    const story = buildOrderStory(
+      { ...BASE_ORDER, status: 'refunded' },
+      [
+        {
+          reconciliation: {
+            state: 'action_required',
+            inventory: { state: 'completed' },
+            payment: { state: 'completed' },
+            cash: { state: 'not_required' },
+            billing: { state: 'action_required' },
+          },
+        },
+      ]
+    );
+
+    expect(story.next.title).toBe('Confirmar conciliación final');
+  });
+
   it('aprovecha el resumen con situación, movimientos y una acción navegable', () => {
     const onNavigate = vi.fn();
     const order = {
