@@ -305,7 +305,7 @@ function buildFactusCreditNotePayload({
   reasonText = 'Devolución de factura',
   type = 'total',
   selectedItems = [],
-  billId = 0,
+  billNumber = '',
   referenceCode = '',
   numberingRangeId = 0,
 }) {
@@ -370,7 +370,7 @@ function buildFactusCreditNotePayload({
   const payload = {
     reference_code: trimSafe(referenceCode, 100),
 
-    bill_id: Number(billId || 0),
+    bill_number: trimSafe(billNumber, 160),
 
     correction_concept_code: String(reasonCode),
 
@@ -395,8 +395,8 @@ function buildFactusCreditNotePayload({
     throw new Error('La nota crédito requiere un código de referencia idempotente.');
   }
 
-  if (!Number.isInteger(payload.bill_id) || payload.bill_id <= 0) {
-    throw new Error('La factura relacionada no tiene el ID oficial de Factus.');
+  if (!payload.bill_number) {
+    throw new Error('La factura relacionada no tiene el número oficial de Factus.');
   }
 
   if (!items.length || totals.total <= 0) {

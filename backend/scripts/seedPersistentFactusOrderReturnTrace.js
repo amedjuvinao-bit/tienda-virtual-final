@@ -44,11 +44,17 @@ const {
 
 const PERSIST_FLAG = '--confirm-persist';
 const FACTUS_FLAG = '--confirm-factus-habilitacion';
+const RESUME_ORDER_PREFIX = '--resume-order=';
 const MONGO_URI = String(process.env.MONGODB_URI || '').trim();
 const SEED_SCRIPT = path.resolve(__dirname, 'seedPersistentOrderReturnTrace.js');
 
 function clean(value, max = 220) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
+}
+
+function requestedResumeOrder() {
+  const argument = process.argv.find((value) => value.startsWith(RESUME_ORDER_PREFIX));
+  return clean(argument?.slice(RESUME_ORDER_PREFIX.length), 180);
 }
 
 function wait(milliseconds) {
@@ -249,18 +255,7 @@ async function prepareOrderForFactus(orderNumber) {
   return order;
 }
 
-async function issueFactusInvoice(order) {
-  const service = createElectronicInvoiceIssuanceService();
-  const result = await service.issueElectronicInvoiceForOrder({
-    orderId: order._id,
-    source: 'persistent-rma-factus-trace',
-    initiatedBy: 'QA Factus RMA persistente',
-    skipWhenElectronicBillingIsInactive: false,
-    allowRetry: false,
-  });
-  assert.strictEqual(result?.inProgress, false, 'La factura quedó en procesamiento.');
-
-  const invoice = await ElectronicInvoice.findOne({ orderId: order._id });
+async function verifyFactusInvoice(order, invoice, { recovered = false } = {}) {
   assert(invoice, 'No se guardó la factura electrónica.');
   assert.strictEqual(clean(invoice?.provider?.name, 40).toLowerCase(), 'factus');
   assert.strictEqual(invoice?.provider?.isValidated, true, 'Factus no validó la factura.');
@@ -275,8 +270,31 @@ async function issueFactusInvoice(order) {
     ),
   ]);
   assert(pdf.byteLength > 1000 && xml.byteLength > 500, 'Los documentos de la factura están vacíos.');
-  console.log(`OK 02: factura Factus ${invoice.invoiceNumber} validada con CUFE, PDF y XML`);
+  console.log(
+    `OK 02: factura Factus ${invoice.invoiceNumber} ${recovered ? 'recuperada y ' : ''}validada con CUFE, PDF y XML`
+  );
   return invoice;
+}
+
+async function issueFactusInvoice(order) {
+  const service = createElectronicInvoiceIssuanceService();
+  const result = await service.issueElectronicInvoiceForOrder({
+    orderId: order._id,
+    source: 'persistent-rma-factus-trace',
+    initiatedBy: 'QA Factus RMA persistente',
+    skipWhenElectronicBillingIsInactive: false,
+    allowRetry: false,
+  });
+  assert.strictEqual(result?.inProgress, false, 'La factura quedó en procesamiento.');
+
+  const invoice = await ElectronicInvoice.findOne({ orderId: order._id });
+  return verifyFactusInvoice(order, invoice);
+}
+
+async function recoverFactusInvoice(order) {
+  const invoice = await ElectronicInvoice.findOne({ orderId: order._id });
+  assert(invoice, 'La orden indicada no tiene una factura electrónica para recuperar.');
+  return verifyFactusInvoice(order, invoice, { recovered: true });
 }
 
 async function issueFactusCreditNote({ order, invoice, refund, returnCase }) {
@@ -327,16 +345,21 @@ async function issueFactusCreditNote({ order, invoice, refund, returnCase }) {
   return note;
 }
 
-async function closeAndVerifyTrace(orderNumber) {
+async function closeAndVerifyTrace(orderNumber, { resume = false } = {}) {
   await connectMainDatabase();
-  const order = await prepareOrderForFactus(orderNumber);
+  const order = resume
+    ? await Order.findOne({ orderNumber })
+    : await prepareOrderForFactus(orderNumber);
+  assert(order, `No se encontró la orden persistente ${orderNumber}.`);
   const [returnCase, refund] = await Promise.all([
     OrderReturn.findOne({ order: order._id }),
     OrderRefund.findOne({ order: order._id }),
   ]);
   assert(returnCase && refund, 'La orden no conserva su RMA y reembolso enlazados.');
 
-  const invoice = await issueFactusInvoice(order);
+  const invoice = resume
+    ? await recoverFactusInvoice(order)
+    : await issueFactusInvoice(order);
   const pendingRefund = await refreshOrderRefundReconciliation(refund._id);
   assert.strictEqual(
     pendingRefund?.reconciliation?.billing?.state,
@@ -398,8 +421,18 @@ async function run() {
   console.log('No usa bases temporales y no elimina ningún documento.\n');
 
   await assertFactusHabilitationReady();
-  const orderNumber = createPersistentRmaTrace();
-  await closeAndVerifyTrace(orderNumber);
+  const resumeOrder = requestedResumeOrder();
+  if (process.argv.some((value) => value.startsWith(RESUME_ORDER_PREFIX)) && !resumeOrder) {
+    throw new Error(`${RESUME_ORDER_PREFIX} requiere un número de orden.`);
+  }
+
+  if (resumeOrder) {
+    console.log(`RECUPERACIÓN SEGURA: se continuará la orden ${resumeOrder}.`);
+    console.log('No se crearán una orden ni una factura nuevas.\n');
+  }
+
+  const orderNumber = resumeOrder || createPersistentRmaTrace();
+  await closeAndVerifyTrace(orderNumber, { resume: Boolean(resumeOrder) });
 }
 
 run()

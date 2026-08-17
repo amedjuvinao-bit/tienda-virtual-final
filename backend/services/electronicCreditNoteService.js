@@ -7,7 +7,6 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const {
-  getInvoiceFromFactus,
   sendCreditNoteToFactus,
 } = require('../lib/dian/providers/factusProvider');
 const {
@@ -305,70 +304,6 @@ function extractRemoteDocument(payload = {}, type = 'invoice') {
   return {};
 }
 
-function resolveFactusBillId(invoice = {}) {
-  const raw = toPlain(invoice?.provider?.raw);
-  return firstPositiveInteger(
-    invoice?.provider?.id,
-    raw?.id,
-    raw?.bill?.id,
-    raw?.data?.id,
-    raw?.data?.bill?.id,
-    raw?.response?.data?.id,
-    raw?.response?.data?.bill?.id,
-    raw?.response?.data?.data?.id,
-    raw?.response?.data?.data?.bill?.id,
-    raw?.billingSync?.response?.data?.id,
-    raw?.billingSync?.response?.data?.bill?.id
-  );
-}
-
-async function ensureFactusBillId(invoice, providerConfig = {}) {
-  const storedId = resolveFactusBillId(invoice);
-  if (storedId) return storedId;
-
-  const invoiceNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
-  if (!invoiceNumber) {
-    throw createCreditNoteError(
-      'La factura no tiene número oficial de Factus.',
-      422,
-      'BILLING_CREDIT_NOTE_INVOICE_NUMBER_MISSING'
-    );
-  }
-
-  const result = await getInvoiceFromFactus({ providerConfig, invoiceNumber });
-  if (!result?.success) {
-    throw createCreditNoteError(
-      cleanText(result?.error, 500) || 'Factus no pudo devolver la factura relacionada.',
-      502,
-      'BILLING_CREDIT_NOTE_INVOICE_LOOKUP_FAILED'
-    );
-  }
-
-  const remote = extractRemoteDocument(result.data, 'invoice');
-  const remoteNumber = cleanText(remote.number || remote.invoice_number, 160);
-  if (remoteNumber && remoteNumber.replace(/\s+/g, '').toUpperCase() !== invoiceNumber.replace(/\s+/g, '').toUpperCase()) {
-    throw createCreditNoteError(
-      'Factus devolvió una factura diferente a la factura relacionada.',
-      502,
-      'BILLING_CREDIT_NOTE_INVOICE_IDENTITY_MISMATCH'
-    );
-  }
-
-  const billId = firstPositiveInteger(remote.id, remote?.bill?.id);
-  if (!billId) {
-    throw createCreditNoteError(
-      'Factus no devolvió el ID oficial de la factura requerido para crear la nota crédito.',
-      502,
-      'BILLING_CREDIT_NOTE_BILL_ID_MISSING'
-    );
-  }
-
-  invoice.provider.id = billId;
-  invoice.markModified('provider');
-  await invoice.save();
-  return billId;
-}
-
 function payloadItemsToSnapshot(payload = {}) {
   return (Array.isArray(payload.items) ? payload.items : []).map((item) => {
     const quantity = itemQuantity(item);
@@ -582,7 +517,14 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
 
     const settings = await SiteSettings.findOne();
     const providerConfig = settings?.billing?.electronicProvider || {};
-    const billId = await ensureFactusBillId(invoice, providerConfig);
+    const billNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
+    if (!billNumber) {
+      throw createCreditNoteError(
+        'La factura no tiene número oficial de Factus.',
+        422,
+        'BILLING_CREDIT_NOTE_INVOICE_NUMBER_MISSING'
+      );
+    }
     const result = await sendCreditNoteToFactus({
       electronicInvoice: invoice,
       order,
@@ -592,7 +534,7 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
       reasonCode: request.reasonCode,
       reasonText: request.reasonText,
       selectedItems,
-      billId,
+      billNumber,
       referenceCode,
     });
 
@@ -753,5 +695,4 @@ module.exports = {
   extractRemoteDocument,
   normalizePartialItems,
   normalizeRequest,
-  resolveFactusBillId,
 };

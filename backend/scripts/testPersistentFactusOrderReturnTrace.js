@@ -21,6 +21,7 @@ const packageJson = JSON.parse(
 const required = [
   '--confirm-persist',
   '--confirm-factus-habilitacion',
+  '--resume-order=',
   'FACTUS_API_URLS.habilitacion',
   'FACTUS_API_URLS.production',
   'seedPersistentOrderReturnTrace.js',
@@ -30,6 +31,7 @@ const required = [
   'confirmRefundPaymentReversal',
   'downloadOfficialInvoiceDocument',
   'downloadOfficialCreditNoteDocument',
+  'recoverFactusInvoice',
   "finalRefund?.reconciliation?.state, 'completed'",
   "finalOrder?.status, 'refunded'",
   'Persistencia: CONSERVADA (sin limpieza automática).',

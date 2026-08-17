@@ -42,10 +42,10 @@ function includes(content, expected, message) {
 
 function validateOfficialPayload() {
   const provider = readFactusProviderSource();
-  includes(provider, 'bill_id: Number(billId || 0)', 'La nota no usa bill_id oficial.');
+  includes(provider, 'bill_number: trimSafe(billNumber, 160)', 'La nota no usa bill_number oficial.');
   includes(provider, 'reference_code: trimSafe(referenceCode, 100)', 'La referencia no es estable.');
-  assert(!provider.includes('bill_number: invoiceNumber'), 'No se debe relacionar con bill_number.');
-  ok('Payload V2 relaciona la nota mediante bill_id y reference_code estable');
+  assert(!provider.includes('bill_id:'), 'La nota no debe depender del ID interno de Factus.');
+  ok('Payload V2 relaciona la nota mediante bill_number y reference_code estable');
 }
 
 function validatePayloadMath() {
@@ -72,12 +72,12 @@ function validatePayloadMath() {
     selectedItems: [{ codeReference: 'P1', quantity: 1 }],
     reasonCode: '1',
     reasonText: 'Devolución parcial',
-    billId: 77,
+    billNumber: 'SETP9900077',
     referenceCode: 'NC-TEST-1001',
     numberingRangeId: 8,
   });
 
-  assert(payload.bill_id === 77, 'No conserva bill_id.');
+  assert(payload.bill_number === 'SETP9900077', 'No conserva bill_number.');
   assert(payload.items.length === 1, 'La parcial incluyó líneas no seleccionadas.');
   assert(payload.items[0].discount_amount === '10.00', 'No prorratea el descuento.');
   assert(payload.payment_details[0].amount === '107.10', 'No concilia base, descuento e IVA.');
