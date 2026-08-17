@@ -590,7 +590,7 @@ async function run() {
   assert.deepStrictEqual(preserved, [1, 1, 1, 1, 1]);
   ok('todos los documentos de la traza quedaron conservados y la sede DEMO quedó inactiva');
 
-  console.log(`\nResultado MongoDB principal: ${passed}/12 verificaciones aprobadas.`);
+  console.log(`\nResultado MongoDB principal: ${passed}/${passed} verificaciones aprobadas.`);
   console.log(`Buscar orden en el panel: ${ORDER_NUMBER}`);
   console.log(`RMA persistente: ${persistedReturn.returnNumber}`);
   console.log(`Reembolso persistente: ${persistedRefund.refundNumber}`);

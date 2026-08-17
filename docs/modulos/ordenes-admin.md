@@ -460,8 +460,9 @@ Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PR
 - Interfaz posventa: 3 pruebas sobre creación del expediente, clasificación física completa y separación entre bodega y reembolso.
 - Regresión del detalle: 11 archivos y 48 pruebas aprobadas, incluido listado, seguridad, logística, cliente, historia, WhatsApp y conciliación.
 - Traza RMA persistente sobre MongoDB principal: `npm --prefix backend run demo:orders-returns-trace -- --confirm-persist`. Carga exclusivamente `MONGODB_URI` desde `backend/.env`, exige réplica transaccional y confirmación explícita, y conserva la orden DEMO, solicitud concurrente ganadora, autorización, tránsito, recepción, inspección, kardex, reembolso, reserva y eventos. No ejecuta limpieza automática ni llama Wompi, Factus u otra integración externa. Al terminar desactiva la sede y las existencias DEMO para que sigan auditables sin quedar disponibles para operación comercial. El consecutivo técnico de movimientos avanza porque la evidencia se conserva.
+- Traza RMA con facturación electrónica activa: `npm --prefix backend run demo:orders-returns-factus-trace -- --confirm-persist --confirm-factus-habilitacion`. Se bloquea fuera del sandbox oficial de Factus, exige rangos activos de factura y nota crédito, emite y descarga PDF/XML oficiales, enlaza la nota crédito con el reembolso y conserva orden, RMA, kardex y documentos fiscales en la base principal. El pago de esta traza sigue siendo una simulación interna identificada; Factus sí es externo y real en habilitación. No existe limpieza automática.
 - Build de producción aprobado con Vite.
-- CI ejecuta `test:orders-returns` en backend y frontend sin llamar transportadoras, gateways, Factus ni bases productivas.
+- El contrato local `test:orders-returns-factus-trace` inspecciona los bloqueos y enlaces sin llamar transportadoras, gateways, Factus ni bases productivas.
 
 ## Prueba persistente del ciclo real Orden–Cliente
 
