@@ -439,6 +439,11 @@ async function diagnosePersistentTrace(orderNumber) {
     console.log(`  Código: ${note?.providerErrors?.code || 'sin código'}`);
     console.log(`  Etapa: ${note?.providerErrors?.stage || 'sin etapa'}`);
     console.log(`  HTTP: ${note?.providerErrors?.httpStatus || 'sin HTTP'}`);
+    console.log(
+      `  Detalles: ${Object.keys(note?.providerErrors?.details || {}).length
+        ? JSON.stringify(note.providerErrors.details)
+        : 'sin detalles'}`
+    );
     console.log(`  Mensaje: ${note.errorMessage || 'sin mensaje'}`);
     console.log(`  Número oficial: ${note?.provider?.number || 'no emitido'}`);
   });
@@ -490,7 +495,10 @@ async function run() {
 
 run()
   .catch((error) => {
-    console.error('\nFALLO TRAZA FACTUS + RMA:', error?.code || error?.message || error);
+    const label = error?.code && error?.message
+      ? `${error.code}: ${error.message}`
+      : error?.code || error?.message || error;
+    console.error('\nFALLO TRAZA FACTUS + RMA:', label);
     console.error('Todo documento alcanzado se conserva para diagnóstico; no se ejecutó limpieza.');
     process.exitCode = 1;
   })

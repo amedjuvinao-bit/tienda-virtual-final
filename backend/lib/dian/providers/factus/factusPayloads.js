@@ -386,6 +386,8 @@ function buildFactusCreditNotePayload({
       },
     ],
 
+    customer: buildFactusCustomer(order),
+
     items,
   };
 
@@ -397,6 +399,10 @@ function buildFactusCreditNotePayload({
 
   if (!payload.bill_number) {
     throw new Error('La factura relacionada no tiene el número oficial de Factus.');
+  }
+
+  if (!payload.customer?.identification) {
+    throw new Error('La nota crédito no tiene la identificación fiscal del cliente.');
   }
 
   if (!items.length || totals.total <= 0) {

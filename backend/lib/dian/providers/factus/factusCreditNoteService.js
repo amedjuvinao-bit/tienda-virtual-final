@@ -74,6 +74,28 @@ async function postFactusCreditNoteValidate({ credentials, tokenResult, payload 
   };
 }
 
+function extractFactusValidationErrors(data = {}) {
+  const candidates = [
+    data?.data?.errors,
+    data?.errors,
+    data?.data?.data?.errors,
+  ];
+  return candidates.find((value) => value && typeof value === 'object') || {};
+}
+
+function summarizeFactusValidationErrors(errors = {}) {
+  const messages = [];
+  Object.entries(errors || {}).forEach(([field, value]) => {
+    const values = Array.isArray(value) ? value : [value];
+    values.forEach((message) => {
+      if (message !== undefined && message !== null && message !== '') {
+        messages.push(`${field}: ${String(message)}`);
+      }
+    });
+  });
+  return messages.slice(0, 12).join(' | ');
+}
+
 async function sendCreditNoteToFactus(creditNoteData = {}) {
   try {
     const credentials = getFactusCredentials(creditNoteData);
@@ -130,12 +152,17 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
     });
 
     if (!result.ok) {
+      const validationErrors = extractFactusValidationErrors(result.data);
       const providerMessage =
         result.data?.message ||
         result.data?.error ||
         `HTTP ${result.status}`;
+      const validationSummary = summarizeFactusValidationErrors(validationErrors);
+      const detailedMessage = validationSummary
+        ? `${providerMessage}: ${validationSummary}`
+        : providerMessage;
 
-      const normalizedMessage = String(providerMessage || '').toLowerCase();
+      const normalizedMessage = String(detailedMessage || '').toLowerCase();
 
       const isPendingCreditNoteConflict =
         Number(result.status) === 409 &&
@@ -149,13 +176,14 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
         provider: 'factus',
         stage: 'send_credit_note',
         status: result.status,
-        error: providerMessage,
+        error: detailedMessage,
         code: isPendingCreditNoteConflict
           ? 'FACTUS_PENDING_CREDIT_NOTE'
           : 'FACTUS_CREDIT_NOTE_ERROR',
         canRetry: !isPendingCreditNoteConflict,
         requiresSync: isPendingCreditNoteConflict,
         raw: result.data,
+        validationErrors,
         payload,
       };
     }
@@ -181,6 +209,8 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
 }
 
 module.exports = {
+  extractFactusValidationErrors,
   postFactusCreditNoteValidate,
   sendCreditNoteToFactus,
+  summarizeFactusValidationErrors,
 };

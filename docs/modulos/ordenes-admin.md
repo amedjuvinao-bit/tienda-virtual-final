@@ -465,6 +465,8 @@ Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PR
 - Si una ejecución se interrumpe después de emitir la factura, se continúa la misma traza con `--resume-order=<NUMERO_ORDEN>`. Este modo exige las mismas confirmaciones, recupera y verifica la factura existente y reutiliza la clave idempotente de la nota crédito; no crea una orden ni una factura nuevas.
 
 - El comando `diagnose:orders-returns-factus-trace -- --diagnose-order=<NUMERO_ORDEN>` consulta la evidencia y el último rechazo guardado sin escribir en MongoDB ni llamar a Factus.
+
+- La nota crédito envía `bill_number` y el mismo cliente fiscal usado por la factura. Los rechazos HTTP 422 conservan campos y mensajes de validación para permitir recuperación idempotente sin perder trazabilidad.
 - Build de producción aprobado con Vite.
 - El contrato local `test:orders-returns-factus-trace` inspecciona los bloqueos y enlaces sin llamar transportadoras, gateways, Factus ni bases productivas.
 

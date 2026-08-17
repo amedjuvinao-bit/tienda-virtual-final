@@ -672,6 +672,9 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
               code: error?.code || 'BILLING_CREDIT_NOTE_ERROR',
               stage: error?.providerResult?.stage || '',
               httpStatus: error?.providerResult?.status || null,
+              details: sanitizeProviderPayload(
+                error?.providerResult?.validationErrors || {}
+              ),
             },
             'creditNotes.$.emission.state': 'failed',
             'creditNotes.$.emission.failedAt': failedAt,

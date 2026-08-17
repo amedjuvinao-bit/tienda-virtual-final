@@ -54,6 +54,15 @@ function validatePayloadMath() {
   } = require('../lib/dian/providers/factusProvider');
   const order = {
     orderNumber: 'TEST-1001',
+    billing: {
+      personType: 'natural',
+      documentType: 'CC',
+      documentNumber: '222222222222',
+      firstName: 'Consumidor',
+      lastName: 'Final',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
     items: [{ productId: 'P1', title: 'Producto', quantity: 2, price: 100 }],
     subtotal: 200,
     shipping: 10,
@@ -78,6 +87,7 @@ function validatePayloadMath() {
   });
 
   assert(payload.bill_number === 'SETP9900077', 'No conserva bill_number.');
+  assert(payload.customer.identification === '222222222222', 'No conserva el cliente fiscal.');
   assert(payload.items.length === 1, 'La parcial incluyó líneas no seleccionadas.');
   assert(payload.items[0].discount_amount === '10.00', 'No prorratea el descuento.');
   assert(payload.payment_details[0].amount === '107.10', 'No concilia base, descuento e IVA.');
@@ -141,6 +151,27 @@ function validateSecurityAndPermissions() {
   ok('Rutas están autorizadas, no exponen payloads y comparten un único motor');
 }
 
+function validateProviderErrors() {
+  const provider = readFactusProviderSource();
+  const service = read('backend/services/electronicCreditNoteService.js');
+  const {
+    extractFactusValidationErrors,
+    summarizeFactusValidationErrors,
+  } = require('../lib/dian/providers/factus/factusCreditNoteService');
+  includes(provider, 'extractFactusValidationErrors', 'No extrae errores anidados de Factus.');
+  includes(provider, 'validationErrors', 'No devuelve el detalle de validación del proveedor.');
+  includes(service, 'providerResult?.validationErrors', 'No conserva el detalle del rechazo.');
+  const errors = extractFactusValidationErrors({
+    data: { errors: { customer: ['El cliente es obligatorio.'] } },
+  });
+  assert(errors.customer?.[0] === 'El cliente es obligatorio.', 'No reconoce el error anidado.');
+  assert(
+    summarizeFactusValidationErrors(errors).includes('customer:'),
+    'No resume el campo rechazado.'
+  );
+  ok('Rechazos 422 conservan campos y mensajes de validación sin exponer credenciales');
+}
+
 function validateSyncIdentity() {
   const sync = read('backend/services/adminBillingSyncService.js');
   const service = read('backend/services/electronicCreditNoteService.js');
@@ -182,6 +213,7 @@ async function main() {
     validateServerSideAmounts,
     validateOfficialDocuments,
     validateSecurityAndPermissions,
+    validateProviderErrors,
     validateSyncIdentity,
     validateFrontend,
     validatePackageScript,
