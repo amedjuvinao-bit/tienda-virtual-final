@@ -32,6 +32,34 @@ function getWhatsAppAvailability(order = {}) {
       };
 }
 
+export function shouldCloseOrderDetailFromKeyboard(event = {}) {
+  if (
+    event.key !== 'Escape' ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  ) {
+    return false;
+  }
+
+  const target = event.target;
+  const editingSelector = [
+    'input',
+    'textarea',
+    'select',
+    '[contenteditable="true"]',
+    '[role="textbox"]',
+  ].join(',');
+
+  return !(
+    target &&
+    typeof target.closest === 'function' &&
+    target.closest(editingSelector)
+  );
+}
+
 export default function OrderDetailModal({
   open,
   onClose,
@@ -148,7 +176,7 @@ export default function OrderDetailModal({
     if (!open) return undefined;
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (shouldCloseOrderDetailFromKeyboard(event)) {
         onClose();
       }
     };
