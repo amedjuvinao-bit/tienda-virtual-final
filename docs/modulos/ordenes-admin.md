@@ -3,11 +3,36 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **8. Comunicación asistida de la trazabilidad**.
-- Estado de la etapa: implementada para WhatsApp asistido; el administrador revisa el informe y confirma el envío dentro de WhatsApp sin que el sistema afirme entrega o lectura.
-- Siguiente etapa: cierre integral, documentación final y fusión controlada.
+- Etapa actual: **9. Posventa avanzada RMA**.
+- Estado de la etapa: implementada para devoluciones y cambios físicos con elegibilidad, autorización, recepción, inspección por unidad, disposición de inventario y resolución trazable.
+- Siguiente etapa: integraciones externas de etiquetas/transportadoras y autoservicio del cliente, sin alterar la autoridad RMA ya establecida.
 
-Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp.
+Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
+
+## Posventa avanzada RMA
+
+`OrderReturn` es la autoridad del recorrido físico. Una solicitud reserva las unidades elegibles para impedir expedientes o reembolsos superpuestos y conserva una revisión optimista. La política predeterminada es de 30 días desde la entrega; puede ajustarse con `ORDER_RETURN_WINDOW_DAYS`. Una excepción vencida exige justificación auditable.
+
+El recorrido es `requested → authorized → in_transit → received → resolution_required → resolved`. El tránsito es opcional y una solicitud también puede quedar `rejected` o `cancelled` antes de la recepción. Cada mutación exige `expectedRevision`; un cambio concurrente responde `RETURN_REVISION_CONFLICT` en lugar de sobrescribir a otro operador.
+
+Durante la inspección, cada unidad recibida debe clasificarse exactamente una vez:
+
+- `sellableQuantity`: vuelve a existencias y genera kardex `return_in` con fuente `OrderReturn`;
+- `damagedQuantity`: se acepta comercialmente, pero no vuelve al stock disponible;
+- `quarantineQuantity`: queda aceptada y aislada para decisión posterior;
+- `rejectedQuantity`: no genera reembolso ni reposición.
+
+El reembolso se crea únicamente después de cerrar la inspección y usa `restockQuantity: 0`, porque el inventario ya fue tratado por el RMA. El endpoint histórico de reembolso permite ajustes exclusivamente financieros, pero responde `RETURN_INSPECTION_REQUIRED` si intenta reponer inventario físico. Un cambio solo se cierra cuando enlaza una orden de reemplazo real, diferente, vigente y visible dentro del alcance por sede.
+
+| Endpoint | Propósito | Permiso |
+|---|---|---|
+| `GET /api/orders/:id/returns` | Consultar política, elegibilidad y expedientes | `orders:view` |
+| `POST /api/orders/:id/returns` | Crear solicitud de devolución o cambio | `orders:returns` |
+| `PATCH /api/orders/:id/returns/:returnId` | Autorizar, rechazar, recibir, inspeccionar o cancelar | `orders:returns` |
+| `POST /api/orders/:id/returns/:returnId/refund` | Resolver con reembolso posterior a inspección | `orders:refund` |
+| `POST /api/orders/:id/returns/:returnId/exchange` | Resolver enlazando orden de reemplazo | `orders:returns` |
+
+El encargado de sede y bodega reciben `orders:returns`; bodega no recibe `orders:refund`. El perfil de facturación conserva `orders:refund` y no obtiene autoridad sobre la pieza física. `owner` y `admin` mantienen ambos permisos. La pestaña `Posventa` refleja esa separación: lectura completa para `orders:view`, operación física para `orders:returns` y botón monetario solo para `orders:refund`.
 
 ## Comunicación asistida de la trazabilidad
 
@@ -172,7 +197,7 @@ Una devolución interna ya no equivale automáticamente a un reembolso comercial
 
 | Etapa | Autoridad | Regla de cierre |
 |---|---|---|
-| Inventario | transacción MongoDB de `orderRefundService` | unidades devueltas, existencias y kardex confirmados |
+| Inventario | inspección RMA y transacción MongoDB | solo unidades aptas, existencias y kardex confirmados |
 | Dinero | comprobante de reverso o reintegro | referencia explícita confirmada por un usuario con `orders:refund` |
 | Caja | `cashSessionService` | resumen de la sesión recalculado con la devolución vigente |
 | Facturación | documento oficial Factus | nota crédito enviada/validada o constancia de que no aplica |
@@ -249,7 +274,8 @@ El mismo alcance protege listado, detalle, estado, cumplimiento, impresión, arc
 | Crear, editar o eliminar notas | `orders:notes` |
 | Enviar correo o preparar informe asistido de WhatsApp | `orders:email` |
 | Descargar PDF/XML | `billing:download` |
-| Procesar devolución | `orders:refund` |
+| Solicitar, autorizar, recibir e inspeccionar RMA; resolver cambios | `orders:returns` |
+| Crear y conciliar reembolso monetario | `orders:refund` |
 | Crear/reintentar documentos electrónicos | permisos específicos `billing:*` |
 
 La regla `DELETE /api/orders/:id` fue retirada del mapa porque no existe un endpoint de eliminación de órdenes. Esto evita declarar una capacidad destructiva ficticia.
@@ -352,7 +378,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete
 cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm exec -- vitest run && npm run build
 ```
 
-Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuando existe `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI`; no deben apuntar a datos productivos.
+Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI` y no apuntan a datos productivos. Los recorridos persistentes documentados más adelante son una excepción manual: usan `MONGODB_URI`, exigen `--confirm-persist` y dejan evidencia DEMO identificable.
 
 ## Evidencia de la etapa 1
 
@@ -403,7 +429,7 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Cada cola operativa expone su nombre y contador completos mediante una etiqueta de cristal al pasar el mouse o enfocarla con teclado; los estados DIAN conservan además una etiqueta nativa de respaldo.
 - La tabla operativa original se conserva íntegra, con su distribución, densidad, selección, ordenamiento, prioridad, SLA y acción `Gestionar`; el botón flotante vive fuera de ella y no puede recortarla ni modificarla.
 - El detalle conserva tres respuestas inmediatas —qué pasó, estado actual y qué sigue— y completa el resumen con situación comercial, inventario, preparación, últimos movimientos y la acción recomendada. Así la columna principal aprovecha su espacio con datos reales y no deja un vacío frente al resumen lateral.
-- Cinco pestañas separan estrictamente `Resumen`, `Pedido`, `Operación`, `Pago y factura` y `Cliente e historial`. Solo se monta el contenido de la tarea elegida; la barra admite teclado y desplazamiento horizontal en pantallas estrechas.
+- Seis pestañas separan estrictamente `Resumen`, `Pedido`, `Operación`, `Posventa`, `Pago y factura` y `Cliente e historial`. Solo se monta el contenido de la tarea elegida; la barra admite teclado y desplazamiento horizontal en pantallas estrechas.
 - `Gestionar` es una acción independiente en el encabezado: abre estado, etiquetas, impresión, archivo y correo sin confundirse con una sección informativa y solo aparece cuando el usuario posee al menos una de esas capacidades.
 - El encabezado no participa en la contracción del área desplazable: conserva título, metadatos, distintivos y acciones completos, sin quedar cubierto por la navegación.
 - El resumen decorativo lateral conserva íntegramente su diseño anterior, incluidos total, desglose, pago, factura, CUFE, progreso, datos rápidos y trazabilidad.
@@ -427,6 +453,15 @@ Las integraciones transaccionales que usan MongoDB se ejecutan por separado cuan
 - Regresión conjunta del detalle: 25 pruebas de seguridad, logística, historia de la orden y WhatsApp.
 - El build de producción compila el flujo completo sin requerir credenciales de Meta.
 - CI ejecuta los contratos backend y frontend y nunca abre WhatsApp ni envía mensajes reales.
+
+## Evidencia de la etapa 9
+
+- Contrato RMA backend: 12 controles sobre elegibilidad, ventana, excepción, reserva de cantidades, inspección exacta, inventario, modelos, RBAC, roles, concurrencia y persistencia sin borrados.
+- Interfaz posventa: 3 pruebas sobre creación del expediente, clasificación física completa y separación entre bodega y reembolso.
+- Regresión del detalle: 11 archivos y 48 pruebas aprobadas, incluido listado, seguridad, logística, cliente, historia, WhatsApp y conciliación.
+- Traza RMA persistente sobre MongoDB principal: `npm --prefix backend run demo:orders-returns-trace -- --confirm-persist`. Carga exclusivamente `MONGODB_URI` desde `backend/.env`, exige réplica transaccional y confirmación explícita, y conserva la orden DEMO, solicitud concurrente ganadora, autorización, tránsito, recepción, inspección, kardex, reembolso, reserva y eventos. No ejecuta limpieza automática ni llama Wompi, Factus u otra integración externa. Al terminar desactiva la sede y las existencias DEMO para que sigan auditables sin quedar disponibles para operación comercial. El consecutivo técnico de movimientos avanza porque la evidencia se conserva.
+- Build de producción aprobado con Vite.
+- CI ejecuta `test:orders-returns` en backend y frontend sin llamar transportadoras, gateways, Factus ni bases productivas.
 
 ## Prueba persistente del ciclo real Orden–Cliente
 
@@ -477,4 +512,8 @@ La ejecución exige `--confirm-persist`, no limpia las órdenes creadas y no mod
 
 ## Trabajo pendiente deliberado
 
-1. Cierre integral, documentación final y fusión controlada de la rama.
+1. Integrar generación/compra de etiquetas de retorno con una transportadora real; el RMA actual conserva referencias manuales sin afirmar validación externa.
+2. Crear autoservicio del cliente con autenticación fuerte, políticas visibles y seguimiento del RMA.
+3. Automatizar la creación de la orden de reemplazo; actualmente el cierre exige enlazar una orden real ya creada.
+4. Añadir reglas antifraude y políticas diferenciadas por categoría, mercado o condición comercial.
+5. Fusionar la rama mediante revisión controlada después de validar el recorrido RMA sobre una base de staging con réplica.

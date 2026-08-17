@@ -93,6 +93,7 @@ const orderCustomerNotificationRoutes = tryRequire(
   './routes/orderCustomerNotificationRoutes'
 );
 const orderQuoteRoutes = tryRequire('./routes/orderQuote');
+const orderReturnRoutes = tryRequire('./routes/orderReturnRoutes');
 const orderRoutes = tryRequire('./routes/orders');
 const payuRoutes = tryRequire('./routes/payuProductionWebhook');
 const paymentRoutes = tryRequire('./routes/payments');
@@ -140,6 +141,7 @@ if (orderCustomerNotificationRoutes) {
   app.use('/api/orders', orderCustomerNotificationRoutes);
 }
 if (orderQuoteRoutes) app.use('/api/orders', orderQuoteRoutes);
+if (orderReturnRoutes) app.use('/api/orders', orderReturnRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);

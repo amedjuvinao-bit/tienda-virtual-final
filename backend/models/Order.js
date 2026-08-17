@@ -1368,6 +1368,28 @@ const OrderSchema = new mongoose.Schema(
         default: null,
       },
     },
+
+    returnControl: {
+      revision: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      requestCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastRequestedAt: {
+        type: Date,
+        default: null,
+      },
+      lastReturn: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'OrderReturn',
+        default: null,
+      },
+    },
   },
   { timestamps: true }
 );

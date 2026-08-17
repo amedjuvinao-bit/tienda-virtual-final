@@ -135,6 +135,8 @@ function run() {
     ],
   });
   assert.deepStrictEqual(firstCanonical, secondCanonical);
+  assert.strictEqual(firstCanonical.returnCaseId, undefined);
+  assert.strictEqual(firstCanonical.items[0].restockQuantity, undefined);
   ok('La identidad del reembolso es estable aunque cambie el orden de las líneas');
 
   const indexes = OrderRefund.schema.indexes();
@@ -158,7 +160,7 @@ function run() {
   assert(serviceSource.includes("type: 'return_in'"));
   assert(
     serviceSource.includes(
-      "sourceModel: 'OrderRefund'"
+      "const sourceModel = returnCase ? 'OrderReturn' : 'OrderRefund'"
     )
   );
   assert(

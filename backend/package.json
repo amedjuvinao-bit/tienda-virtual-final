@@ -15,6 +15,8 @@
     "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:orders-architecture": "node scripts/testOrderAdminQueryArchitecture.js",
     "test:orders-logistics": "node scripts/testOrderLogisticsContract.js",
+    "test:orders-returns": "node scripts/testOrderReturnsModule.js",
+    "demo:orders-returns-trace": "node scripts/seedPersistentOrderReturnTrace.js",
     "test:orders-operations": "node scripts/testOrderOperationsCenterContract.js",
     "test:orders-observability": "node scripts/testOrderOperationalMonitoringModule.js",
     "test:orders-whatsapp-assisted": "node scripts/testOrderWhatsAppAssistedNotification.js",

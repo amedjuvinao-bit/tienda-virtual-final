@@ -94,6 +94,9 @@ jobs:
       - name: Validar logística avanzada de órdenes
         run: npm --prefix backend run test:orders-logistics
 
+      - name: Validar devoluciones RMA de órdenes
+        run: npm --prefix backend run test:orders-returns
+
       - name: Validar centro operativo de órdenes
         run: npm --prefix backend run test:orders-operations
 
@@ -295,6 +298,9 @@ jobs:
 
       - name: Validar corrección y sincronización del cliente desde la orden
         run: npm --prefix frontend run test:orders-customer-connection
+
+      - name: Validar interfaz posventa RMA de órdenes
+        run: npm --prefix frontend run test:orders-returns
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

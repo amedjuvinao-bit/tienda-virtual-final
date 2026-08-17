@@ -234,6 +234,13 @@ function normalizeRequestedItems(
     const quantity = toQuantity(
       requested?.quantity ?? requested?.qty ?? requested?.cantidad
     );
+    const hasExplicitRestockQuantity = Object.prototype.hasOwnProperty.call(
+      requested || {},
+      'restockQuantity'
+    );
+    const requestedRestockQuantity = hasExplicitRestockQuantity
+      ? toQuantity(requested?.restockQuantity)
+      : quantity;
 
     if (quantity <= 0) {
       throw createRefundError(
@@ -243,10 +250,19 @@ function normalizeRequestedItems(
         { index, quantity }
       );
     }
+    if (requestedRestockQuantity > quantity) {
+      throw createRefundError(
+        `La cantidad a reponer de la línea ${index + 1} supera la cantidad devuelta.`,
+        'REFUND_RESTOCK_QUANTITY_INVALID',
+        400,
+        { index, quantity, restockQuantity: requestedRestockQuantity }
+      );
+    }
 
     const current = consolidated.get(orderItemId);
     if (current) {
       current.returnedQuantity += quantity;
+      current.requestedRestockQuantity += requestedRestockQuantity;
       return;
     }
 
@@ -270,6 +286,7 @@ function normalizeRequestedItems(
       color: cleanText(line.color),
       purchasedQuantity,
       returnedQuantity: quantity,
+      requestedRestockQuantity,
       restockedQuantity: 0,
       line,
     });
@@ -311,19 +328,37 @@ function normalizeRequestedItems(
   return normalized;
 }
 
-function canonicalRefundPayload({ amount, reason, items }) {
-  return {
+function canonicalRefundPayload({ amount, reason, items, returnCaseId = '' }) {
+  const payload = {
     amount: toMoney(amount),
     reason: cleanText(reason),
     items: [...items]
-      .map((item) => ({
-        orderItemId: item.orderItemId,
-        quantity: item.returnedQuantity,
-      }))
+      .map((item) => {
+        const normalized = {
+          orderItemId: item.orderItemId,
+          quantity: item.returnedQuantity,
+        };
+        const hasRestockQuantity = Number.isFinite(
+          Number(item.requestedRestockQuantity)
+        );
+        if (
+          hasRestockQuantity &&
+          toQuantity(item.requestedRestockQuantity) !==
+            toQuantity(item.returnedQuantity)
+        ) {
+          normalized.restockQuantity = toQuantity(
+            item.requestedRestockQuantity
+          );
+        }
+        return normalized;
+      })
       .sort((a, b) =>
         a.orderItemId.localeCompare(b.orderItemId)
       ),
   };
+  const cleanReturnCaseId = idValue(returnCaseId);
+  if (cleanReturnCaseId) payload.returnCaseId = cleanReturnCaseId;
+  return payload;
 }
 
 function hashPayload(payload) {
@@ -535,6 +570,9 @@ async function buildInventoryDemands({
     if (['digital', 'service'].includes(item.productType)) {
       continue;
     }
+    if (!toQuantity(item.requestedRestockQuantity)) {
+      continue;
+    }
 
     if (item.productType !== 'bundle') {
       const key = inventoryKey(item.product, item.variantKey);
@@ -563,14 +601,14 @@ async function buildInventoryDemands({
       addDemand(
         demands,
         key,
-        item.returnedQuantity,
+        item.requestedRestockQuantity,
         {
           product: item.product,
           variantKey: item.variantKey,
           sourceOrderItemIds: [item.orderItemId],
         }
       );
-      item.restockedQuantity += item.returnedQuantity;
+      item.restockedQuantity += item.requestedRestockQuantity;
       continue;
     }
 
@@ -588,7 +626,7 @@ async function buildInventoryDemands({
       if (!allocationGroups.has(key)) continue;
 
       const quantity =
-        item.returnedQuantity *
+        item.requestedRestockQuantity *
         Math.max(1, toQuantity(component.quantity));
       addDemand(demands, key, quantity, {
         product: componentProduct,
@@ -649,7 +687,7 @@ async function buildInventoryDemands({
       }
       const group = allocationGroups.get(key);
       const quantity =
-        item.returnedQuantity * unitsPerBundle;
+        item.requestedRestockQuantity * unitsPerBundle;
       addDemand(demands, key, quantity, {
         product: group?.product,
         variantKey: group?.variantKey,
@@ -792,7 +830,8 @@ function serializeRefundItem(item) {
 
 async function restoreInventory({
   order,
-  refund,
+  refund = null,
+  returnCase = null,
   requestedItems,
   previousRestoredByStock,
   adminId,
@@ -815,6 +854,11 @@ async function restoreInventory({
   const restorations = [];
   const affectedProducts = new Set();
   const now = new Date();
+  const source = returnCase || refund;
+  const sourceReference = cleanUpper(
+    returnCase?.returnNumber || refund?.refundNumber || 'RETURN'
+  );
+  const sourceModel = returnCase ? 'OrderReturn' : 'OrderRefund';
 
   for (const demand of demands.values()) {
     const group = allocationGroups.get(demand.key);
@@ -903,12 +947,12 @@ async function restoreInventory({
           after,
         },
         reason: 'Entrada automática por devolución de cliente',
-        notes: `Reembolso ${refund.refundNumber} de la orden ${order.orderNumber || order._id}.`,
-        reference: refund.refundNumber,
+        notes: `${returnCase ? 'RMA' : 'Reembolso'} ${sourceReference} de la orden ${order.orderNumber || order._id}.`,
+        reference: sourceReference,
         order: order._id,
         orderNumber: cleanUpper(order.orderNumber),
-        sourceModel: 'OrderRefund',
-        sourceId: refund._id,
+        sourceModel,
+        sourceId: source?._id || null,
         createdBy: adminId,
         updatedBy: adminId,
         postedBy: adminId,
@@ -976,6 +1020,7 @@ function safeRefundResponse(refund) {
     refundNumber: value?.refundNumber,
     order: value?.order,
     orderNumber: value?.orderNumber,
+    returnCase: value?.returnCase || null,
     idempotencyKey: value?.idempotencyKey,
     status: value?.status,
     amount: value?.amount,
@@ -1000,10 +1045,13 @@ async function processOrderRefund(
     idempotencyKey = '',
     adminId = null,
     adminLabel = '',
+    returnCaseId = null,
   } = {},
   {
     session: externalSession = null,
     OrderEventModel = null,
+    additionalReturnedByLine = new Map(),
+    allowInventoryRestock = true,
   } = {}
 ) {
   const orderObjectId = toObjectId(orderId, 'La orden');
@@ -1064,10 +1112,25 @@ async function processOrderRefund(
       items,
       new Map()
     );
+    if (
+      allowInventoryRestock === false &&
+      normalizedItems.some(
+        (item) =>
+          !['digital', 'service'].includes(item.productType) &&
+          item.requestedRestockQuantity > 0
+      )
+    ) {
+      throw createRefundError(
+        'El inventario físico solo puede reponerse desde un RMA recibido e inspeccionado. Para un ajuste exclusivamente financiero, envía restockQuantity en cero.',
+        'RETURN_INSPECTION_REQUIRED',
+        409
+      );
+    }
     const canonical = canonicalRefundPayload({
       amount: refundAmount,
       reason,
       items: normalizedItems,
+      returnCaseId,
     });
     resolvedRequestHash = hashPayload(canonical);
     resolvedIdempotencyKey =
@@ -1099,9 +1162,15 @@ async function processOrderRefund(
       previous.returnedByLine,
       legacy.returnedByLine
     );
+    const allPreviouslyReturnedByLine = mergeQuantityMaps(
+      previouslyReturnedByLine,
+      additionalReturnedByLine instanceof Map
+        ? additionalReturnedByLine
+        : new Map(Object.entries(additionalReturnedByLine || {}))
+    );
     for (const item of normalizedItems) {
       const previouslyReturned = toQuantity(
-        previouslyReturnedByLine.get(item.orderItemId) || 0
+        allPreviouslyReturnedByLine.get(item.orderItemId) || 0
       );
       if (
         previouslyReturned + item.returnedQuantity >
@@ -1149,6 +1218,10 @@ async function processOrderRefund(
       refundNumber: buildRefundNumber(order.orderNumber),
       order: order._id,
       orderNumber: order.orderNumber,
+      returnCase:
+        returnCaseId && mongoose.Types.ObjectId.isValid(idValue(returnCaseId))
+          ? new mongoose.Types.ObjectId(idValue(returnCaseId))
+          : null,
       idempotencyKey: resolvedIdempotencyKey,
       requestHash: resolvedRequestHash,
       status: 'processing',
@@ -1312,4 +1385,5 @@ module.exports = {
   normalizeRequestedItems,
   canonicalRefundPayload,
   getPreviousRefundState,
+  restoreInventory,
 };

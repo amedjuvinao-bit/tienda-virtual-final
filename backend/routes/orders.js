@@ -1242,6 +1242,7 @@ router.patch('/:id/status', requireAdmin, requirePermission('orders:status'), as
       },
       {
         OrderEventModel: OrderEvent,
+        allowInventoryRestock: false,
       }
     );
 

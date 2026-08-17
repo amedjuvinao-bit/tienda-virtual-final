@@ -61,7 +61,7 @@ const ADMIN_PERMISSION_MODULES = [
   {
     key: 'orders',
     label: 'Órdenes',
-    description: 'Administración de pedidos, estados, notas, correos, documentos y reembolsos.',
+    description: 'Administración de pedidos, estados, notas, correos, documentos, RMA y reembolsos.',
     permissions: [
       permission('orders:view', 'Ver órdenes', 'Permite listar órdenes, abrir detalle, ver cliente, productos, totales, estado, historial y documentos asociados.'),
       permission('orders:create', 'Crear órdenes', 'Permite crear órdenes manuales desde el panel o desde POS.', { audit: true, sensitive: true }),
@@ -74,7 +74,8 @@ const ADMIN_PERMISSION_MODULES = [
       permission('orders:customer_data', 'Editar datos del cliente', 'Permite modificar datos del cliente o datos de facturación asociados a la orden.', { audit: true, sensitive: true }),
       permission('orders:notes', 'Gestionar notas', 'Permite crear, editar, fijar o eliminar notas internas de una orden.', { audit: true, sensitive: true }),
       permission('orders:email', 'Enviar correos de orden', 'Permite reenviar confirmaciones, facturas o comunicaciones relacionadas con una orden.', { audit: true, sensitive: true }),
-      permission('orders:refund', 'Reembolsar órdenes', 'Permite registrar reembolsos o devoluciones asociadas a una orden.', { audit: true, sensitive: true, danger: true }),
+      permission('orders:returns', 'Gestionar devoluciones RMA', 'Permite solicitar, autorizar, recibir, inspeccionar y resolver cambios de productos físicos.', { audit: true, sensitive: true, danger: true }),
+      permission('orders:refund', 'Reembolsar órdenes', 'Permite registrar y conciliar devoluciones de dinero asociadas a una orden o RMA inspeccionado.', { audit: true, sensitive: true, danger: true }),
       permission('orders:delete', 'Eliminar órdenes', 'Permiso reservado para eliminación de órdenes.', { audit: true, sensitive: true, danger: true, reserved: true }),
       permission('orders:export', 'Exportar órdenes', 'Permite descargar reportes o archivos CSV de órdenes.', { audit: true }),
       permission('orders:bulk', 'Acciones masivas', 'Permite aplicar acciones masivas sobre varias órdenes.', { audit: true, sensitive: true }),

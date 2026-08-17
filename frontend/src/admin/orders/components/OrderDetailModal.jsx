@@ -47,6 +47,7 @@ export default function OrderDetailModal({
   canUpdateFulfillment = false,
   canDownloadBilling = false,
   canRefund = false,
+  canManageReturns = false,
   savingId,
 }) {
   const [statusLocal, setStatusLocal] = useState(order?.status || 'pending');
@@ -60,6 +61,14 @@ export default function OrderDetailModal({
   const [refunds, setRefunds] = useState([]);
   const [refundsLoading, setRefundsLoading] = useState(false);
   const [confirmingRefundId, setConfirmingRefundId] = useState('');
+  const [returnsData, setReturnsData] = useState({
+    orderId: '',
+    policy: {},
+    eligibility: [],
+    returns: [],
+  });
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnBusyId, setReturnBusyId] = useState('');
 
   const [emailMenuOpen, setEmailMenuOpen] = useState(false);
   const [whatsAppPreviewOpen, setWhatsAppPreviewOpen] = useState(false);
@@ -207,13 +216,130 @@ export default function OrderDetailModal({
     }
   };
 
+  const fetchReturns = async () => {
+    if (!order?._id) return;
+    try {
+      setReturnsLoading(true);
+      const { data } = await api.get(`/api/orders/${order._id}/returns`);
+      setReturnsData({
+        orderId: order._id,
+        policy: data?.policy || {},
+        eligibility: Array.isArray(data?.eligibility) ? data.eligibility : [],
+        returns: Array.isArray(data?.returns) ? data.returns : [],
+      });
+    } catch {
+      setReturnsData({ orderId: order._id, policy: {}, eligibility: [], returns: [] });
+    } finally {
+      setReturnsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!open || !order?._id) return;
 
     fetchTimeline();
     fetchNotes();
     fetchRefunds();
+    fetchReturns();
   }, [open, order?._id]);
+
+  const showReturnError = (error, fallback) => {
+    showToast({
+      type: 'error',
+      title: 'No se pudo actualizar el RMA',
+      message: error?.response?.data?.message || fallback,
+      persist: true,
+    });
+  };
+
+  const createReturnCase = async (payload) => {
+    if (!canManageReturns || !order?._id) return;
+    try {
+      setReturnBusyId('create');
+      await api.post(`/api/orders/${order._id}/returns`, payload);
+      showToast({
+        type: 'success',
+        title: 'RMA creado',
+        message: 'Las unidades quedaron reservadas para el proceso posventa.',
+      });
+      await Promise.all([fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Revisa la elegibilidad y las cantidades seleccionadas.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const updateReturnCase = async (returnCase, action, payload = {}) => {
+    if (!canManageReturns || !order?._id || !returnCase?._id) return;
+    try {
+      setReturnBusyId(String(returnCase._id));
+      await api.patch(
+        `/api/orders/${order._id}/returns/${returnCase._id}`,
+        {
+          ...payload,
+          action,
+          expectedRevision: returnCase.revision,
+        }
+      );
+      showToast({
+        type: 'success',
+        title: 'RMA actualizado',
+        message: 'La etapa quedó registrada con trazabilidad.',
+      });
+      await Promise.all([fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Recarga el expediente y vuelve a intentar.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const refundReturnCase = async (returnCase, amount) => {
+    if (!canRefund || !order?._id || !returnCase?._id) return;
+    try {
+      setReturnBusyId(String(returnCase._id));
+      await api.post(
+        `/api/orders/${order._id}/returns/${returnCase._id}/refund`,
+        { expectedRevision: returnCase.revision, amount }
+      );
+      showToast({
+        type: 'success',
+        title: 'Reembolso creado',
+        message: 'El RMA quedó resuelto; falta conciliar el movimiento de dinero.',
+      });
+      await Promise.all([fetchReturns(), fetchRefunds(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Verifica el monto aceptado y el estado de la inspección.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const exchangeReturnCase = async (returnCase, replacementOrderId, reference) => {
+    if (!canManageReturns || !order?._id || !returnCase?._id) return;
+    try {
+      setReturnBusyId(String(returnCase._id));
+      await api.post(
+        `/api/orders/${order._id}/returns/${returnCase._id}/exchange`,
+        {
+          expectedRevision: returnCase.revision,
+          replacementOrderId,
+          reference,
+        }
+      );
+      showToast({
+        type: 'success',
+        title: 'Cambio vinculado',
+        message: 'El expediente quedó enlazado con una orden de reemplazo real.',
+      });
+      await Promise.all([fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Verifica la orden de reemplazo y la sede autorizada.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
 
   const confirmRefundPayment = async (refund, reference) => {
     if (!canRefund || !order?._id || !refund?._id) return;
@@ -639,6 +765,15 @@ export default function OrderDetailModal({
           canConfirmRefundPayment={canRefund}
           confirmingRefundId={confirmingRefundId}
           onConfirmRefundPayment={confirmRefundPayment}
+          returnsData={returnsData}
+          returnsLoading={returnsLoading}
+          returnBusyId={returnBusyId}
+          canManageReturns={canManageReturns}
+          canRefundReturns={canRefund}
+          onCreateReturn={createReturnCase}
+          onUpdateReturn={updateReturnCase}
+          onRefundReturn={refundReturnCase}
+          onExchangeReturn={exchangeReturnCase}
           onSaveCustomerData={
             canEditCustomerData ? saveCustomerData : null
           }

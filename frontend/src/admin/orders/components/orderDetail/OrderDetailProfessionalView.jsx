@@ -12,6 +12,7 @@ import OrderDetailLogisticsPanel from './OrderDetailLogisticsPanel';
 import OrderDetailFulfillmentPanel from './OrderDetailFulfillmentPanel';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
+import OrderDetailReturnsPanel from './OrderDetailReturnsPanel';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
 import OrderDetailTabs from './OrderDetailTabs';
@@ -68,6 +69,15 @@ export default function OrderDetailProfessionalView({
   canConfirmRefundPayment = false,
   confirmingRefundId = '',
   onConfirmRefundPayment,
+  returnsData = {},
+  returnsLoading = false,
+  returnBusyId = '',
+  canManageReturns = false,
+  canRefundReturns = false,
+  onCreateReturn,
+  onUpdateReturn,
+  onRefundReturn,
+  onExchangeReturn,
   onSaveCustomerData,
   savingCustomerData = false,
 }) {
@@ -119,6 +129,7 @@ export default function OrderDetailProfessionalView({
     { id: 'summary', label: 'Resumen', icon: OrderDetailIcons.History },
     { id: 'products', label: 'Pedido', icon: OrderDetailIcons.Package },
     { id: 'operation', label: 'Operación', icon: OrderDetailIcons.Settings2 },
+    { id: 'returns', label: 'Posventa', icon: OrderDetailIcons.RotateCcw },
     { id: 'payment', label: 'Pago y factura', icon: OrderDetailIcons.WalletCards },
     { id: 'customer', label: 'Cliente e historial', icon: OrderDetailIcons.User },
   ];
@@ -148,6 +159,19 @@ export default function OrderDetailProfessionalView({
           canUpdate={canUpdateFulfillment}
         />
       </>
+    ),
+    returns: (
+      <OrderDetailReturnsPanel
+        data={returnsData}
+        loading={returnsLoading}
+        busyId={returnBusyId}
+        canManage={canManageReturns}
+        canRefund={canRefundReturns}
+        onCreate={onCreateReturn}
+        onAction={onUpdateReturn}
+        onRefund={onRefundReturn}
+        onExchange={onExchangeReturn}
+      />
     ),
     payment: (
       <>

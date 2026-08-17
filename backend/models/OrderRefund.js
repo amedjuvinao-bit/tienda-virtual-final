@@ -216,6 +216,12 @@ const OrderRefundSchema = new Schema(
       default: '',
       index: true,
     },
+    returnCase: {
+      type: Schema.Types.ObjectId,
+      ref: 'OrderReturn',
+      default: null,
+      index: true,
+    },
     idempotencyKey: {
       type: String,
       trim: true,
