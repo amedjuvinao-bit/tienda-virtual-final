@@ -219,6 +219,7 @@ const ORDER_CUSTOMER_EDITABLE_FIELDS = new Set([
   'phone',
   'address',
   'city',
+  'municipalityCode',
   'municipalityId',
   'municipality_id',
   'postalCode',

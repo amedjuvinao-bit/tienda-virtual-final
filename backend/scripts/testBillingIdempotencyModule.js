@@ -152,7 +152,15 @@ async function validateControlledRetry() {
     status: 'paid',
     subtotal: 50000,
     total: 50000,
-    customer: { documentNumber: '987654321', email: 'retry@example.com' },
+    customer: {
+      documentNumber: '987654321',
+      email: 'retry@example.com',
+      city: 'Zona Bananera',
+      municipalityCode: '47980',
+      department: 'Magdalena',
+      departmentCode: '47',
+      countryCode: 'CO',
+    },
     payment: {
       status: 'paid',
       provider: 'payu',
@@ -240,6 +248,11 @@ async function validateConcurrentIssuance() {
       lastname: 'Prueba',
       documentNumber: '123456789',
       email: 'cliente@example.com',
+      city: 'Zona Bananera',
+      municipalityCode: '47980',
+      department: 'Magdalena',
+      departmentCode: '47',
+      countryCode: 'CO',
     },
     payment: {
       status: 'paid',

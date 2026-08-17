@@ -15,6 +15,9 @@ const {
 const {
   isApprovedPayment: isCanonicalWompiApproval,
 } = require('./wompiWebhookIntegrityService');
+const {
+  resolveOrderBillingMunicipality,
+} = require('./orderBillingMunicipalityService');
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
@@ -150,9 +153,12 @@ function getItems(order = {}) {
   return Array.isArray(order.items) ? order.items : Array.isArray(order.cart) ? order.cart : [];
 }
 
-function buildCustomerSnapshot(order = {}) {
+function buildCustomerSnapshot(order = {}, { requireMunicipality = false } = {}) {
   const customer = order.customer || {};
   const billing = order.billing || {};
+  const municipality = resolveOrderBillingMunicipality(order, {
+    required: requireMunicipality,
+  });
   const fullName = [customer.name, customer.lastname].filter(Boolean).join(' ').trim();
   const billingName = [
     billing.firstName || billing.name,
@@ -197,17 +203,25 @@ function buildCustomerSnapshot(order = {}) {
     email: billing.email || customer.email || customer.emailOrPhone || '',
     phone: billing.phone || customer.phone || '',
     address: billing.address || customer.address || '',
-    city: billing.city || customer.city || '',
+    city: municipality?.city || billing.city || customer.city || '',
     municipalityCode:
+      municipality?.municipalityCode ||
       billing.municipalityCode ||
       billing.cityCode ||
+      customer.municipalityCode ||
       customer.municipalityId ||
       customer.municipality_id ||
       '',
-    department: billing.department || customer.department || '',
-    departmentCode: billing.departmentCode || customer.departmentCode || '',
-    country: billing.country || customer.country || 'Colombia',
-    countryCode: billing.countryCode || customer.countryCode || 'CO',
+    department:
+      municipality?.department || billing.department || customer.department || '',
+    departmentCode:
+      municipality?.departmentCode ||
+      billing.departmentCode ||
+      customer.departmentCode ||
+      '',
+    country: municipality?.country || billing.country || customer.country || 'Colombia',
+    countryCode:
+      municipality?.countryCode || billing.countryCode || customer.countryCode || 'CO',
     tributeCode: billing.tributeCode || customer.tributeCode || 'ZZ',
     isFinalConsumer: explicitFinalConsumer,
   };
@@ -630,7 +644,9 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       taxAmount,
       total,
     } = totals;
-    const customerSnapshot = buildCustomerSnapshot(order);
+    const customerSnapshot = buildCustomerSnapshot(order, {
+      requireMunicipality: isExternalProvider && providerName === 'factus',
+    });
     const now = nowFactory();
     const issueDate = now.toISOString().slice(0, 10);
     const issueTime = now.toISOString().slice(11, 19);

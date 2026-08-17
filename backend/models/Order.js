@@ -1225,6 +1225,7 @@ const OrderSchema = new mongoose.Schema(
       phone: String,
       address: String,
       city: String,
+      municipalityCode: String,
       municipalityId: String,
       municipality_id: String,
       postalCode: String,

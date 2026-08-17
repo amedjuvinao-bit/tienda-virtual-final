@@ -19,6 +19,7 @@
     "test:orders-observability": "node scripts/testOrderOperationalMonitoringModule.js",
     "test:orders-whatsapp-assisted": "node scripts/testOrderWhatsAppAssistedNotification.js",
     "test:orders-customer-connection": "node scripts/testOrderCustomerConnection.js",
+    "test:orders-billing-municipality": "node scripts/testOrderBillingMunicipalityModule.js",
     "test:orders-customer-lifecycle-live": "node scripts/testRealOrderCustomerLifecycle.js",
     "orders:customers-reconcile": "node scripts/reconcileOrderCustomers.js",
     "orders:customers-reconcile:apply": "node scripts/reconcileOrderCustomers.js --apply",
