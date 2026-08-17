@@ -463,6 +463,8 @@ Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PR
 - Traza RMA con facturación electrónica activa: `npm --prefix backend run demo:orders-returns-factus-trace -- --confirm-persist --confirm-factus-habilitacion`. Se bloquea fuera del sandbox oficial de Factus, exige rangos activos de factura y nota crédito, emite y descarga PDF/XML oficiales, enlaza la nota crédito con el reembolso y conserva orden, RMA, kardex y documentos fiscales en la base principal. El pago de esta traza sigue siendo una simulación interna identificada; Factus sí es externo y real en habilitación. No existe limpieza automática.
 
 - Si una ejecución se interrumpe después de emitir la factura, se continúa la misma traza con `--resume-order=<NUMERO_ORDEN>`. Este modo exige las mismas confirmaciones, recupera y verifica la factura existente y reutiliza la clave idempotente de la nota crédito; no crea una orden ni una factura nuevas.
+
+- El comando `diagnose:orders-returns-factus-trace -- --diagnose-order=<NUMERO_ORDEN>` consulta la evidencia y el último rechazo guardado sin escribir en MongoDB ni llamar a Factus.
 - Build de producción aprobado con Vite.
 - El contrato local `test:orders-returns-factus-trace` inspecciona los bloqueos y enlaces sin llamar transportadoras, gateways, Factus ni bases productivas.
 

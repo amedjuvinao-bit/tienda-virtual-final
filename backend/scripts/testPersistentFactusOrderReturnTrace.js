@@ -22,6 +22,7 @@ const required = [
   '--confirm-persist',
   '--confirm-factus-habilitacion',
   '--resume-order=',
+  '--diagnose-order=',
   'FACTUS_API_URLS.habilitacion',
   'FACTUS_API_URLS.production',
   'seedPersistentOrderReturnTrace.js',
@@ -32,6 +33,7 @@ const required = [
   'downloadOfficialInvoiceDocument',
   'downloadOfficialCreditNoteDocument',
   'recoverFactusInvoice',
+  'diagnosePersistentTrace',
   "finalRefund?.reconciliation?.state, 'completed'",
   "finalOrder?.status, 'refunded'",
   'Persistencia: CONSERVADA (sin limpieza automática).',
@@ -57,6 +59,10 @@ for (const pattern of prohibited) {
 
 assert.strictEqual(
   packageJson.scripts['demo:orders-returns-factus-trace'],
+  'node scripts/seedPersistentFactusOrderReturnTrace.js'
+);
+assert.strictEqual(
+  packageJson.scripts['diagnose:orders-returns-factus-trace'],
   'node scripts/seedPersistentFactusOrderReturnTrace.js'
 );
 

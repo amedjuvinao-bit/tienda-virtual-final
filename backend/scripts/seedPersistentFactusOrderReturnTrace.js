@@ -45,6 +45,7 @@ const {
 const PERSIST_FLAG = '--confirm-persist';
 const FACTUS_FLAG = '--confirm-factus-habilitacion';
 const RESUME_ORDER_PREFIX = '--resume-order=';
+const DIAGNOSE_ORDER_PREFIX = '--diagnose-order=';
 const MONGO_URI = String(process.env.MONGODB_URI || '').trim();
 const SEED_SCRIPT = path.resolve(__dirname, 'seedPersistentOrderReturnTrace.js');
 
@@ -55,6 +56,11 @@ function clean(value, max = 220) {
 function requestedResumeOrder() {
   const argument = process.argv.find((value) => value.startsWith(RESUME_ORDER_PREFIX));
   return clean(argument?.slice(RESUME_ORDER_PREFIX.length), 180);
+}
+
+function requestedDiagnoseOrder() {
+  const argument = process.argv.find((value) => value.startsWith(DIAGNOSE_ORDER_PREFIX));
+  return clean(argument?.slice(DIAGNOSE_ORDER_PREFIX.length), 180);
 }
 
 function wait(milliseconds) {
@@ -402,7 +408,59 @@ async function closeAndVerifyTrace(orderNumber, { resume = false } = {}) {
   console.log('Persistencia: CONSERVADA (sin limpieza automática).');
 }
 
+async function diagnosePersistentTrace(orderNumber) {
+  await connectMainDatabase();
+  const order = await Order.findOne({ orderNumber }).lean();
+  assert(order, `No se encontró la orden persistente ${orderNumber}.`);
+
+  const [invoice, returnCase, refund] = await Promise.all([
+    ElectronicInvoice.findOne({ orderId: order._id }).lean(),
+    OrderReturn.findOne({ order: order._id }).lean(),
+    OrderRefund.findOne({ order: order._id }).lean(),
+  ]);
+  assert(invoice, 'La orden no tiene una factura electrónica persistente.');
+
+  console.log('\nDIAGNÓSTICO DE SOLO LECTURA — TRAZA FACTUS + RMA');
+  console.log(`Orden: ${order.orderNumber}`);
+  console.log(`RMA: ${returnCase?.returnNumber || 'no encontrado'}`);
+  console.log(`Reembolso: ${refund?.refundNumber || 'no encontrado'}`);
+  console.log(`Factura: ${invoice.invoiceNumber || invoice?.provider?.number || 'sin número'}`);
+  console.log(`Estado factura: ${invoice.status || 'sin estado'}`);
+  console.log(`Conciliación: ${refund?.reconciliation?.state || 'sin estado'}`);
+
+  const notes = Array.isArray(invoice.creditNotes) ? invoice.creditNotes : [];
+  console.log(`Intentos de nota crédito conservados: ${notes.length}`);
+  notes.forEach((note, index) => {
+    console.log(`\nNota ${index + 1}:`);
+    console.log(`  Referencia: ${note.referenceCode || 'sin referencia'}`);
+    console.log(`  Estado: ${note.status || 'sin estado'}`);
+    console.log(`  Emisión: ${note?.emission?.state || 'sin estado'}`);
+    console.log(`  Intentos: ${Number(note?.emission?.attempts || 0)}`);
+    console.log(`  Código: ${note?.providerErrors?.code || 'sin código'}`);
+    console.log(`  Etapa: ${note?.providerErrors?.stage || 'sin etapa'}`);
+    console.log(`  HTTP: ${note?.providerErrors?.httpStatus || 'sin HTTP'}`);
+    console.log(`  Mensaje: ${note.errorMessage || 'sin mensaje'}`);
+    console.log(`  Número oficial: ${note?.provider?.number || 'no emitido'}`);
+  });
+
+  console.log('\nDiagnóstico terminado sin escrituras, emisiones ni limpieza.');
+}
+
 async function run() {
+  assert(
+    MONGO_URI,
+    'No existe MONGODB_URI en backend/.env. No se acepta una base alternativa.'
+  );
+
+  const diagnoseOrder = requestedDiagnoseOrder();
+  if (process.argv.some((value) => value.startsWith(DIAGNOSE_ORDER_PREFIX)) && !diagnoseOrder) {
+    throw new Error(`${DIAGNOSE_ORDER_PREFIX} requiere un número de orden.`);
+  }
+  if (diagnoseOrder) {
+    await diagnosePersistentTrace(diagnoseOrder);
+    return;
+  }
+
   assert(
     process.argv.includes(PERSIST_FLAG),
     `Falta ${PERSIST_FLAG}; la prueba conserva todos sus datos en la base principal.`
@@ -411,11 +469,6 @@ async function run() {
     process.argv.includes(FACTUS_FLAG),
     `Falta ${FACTUS_FLAG}; la prueba emite documentos reales en Factus habilitación.`
   );
-  assert(
-    MONGO_URI,
-    'No existe MONGODB_URI en backend/.env. No se acepta una base alternativa.'
-  );
-
   console.log('\nPRUEBA PERSISTENTE — RMA + FACTUS HABILITACIÓN');
   console.log('Emite una factura y una nota crédito reales únicamente en habilitación.');
   console.log('No usa bases temporales y no elimina ningún documento.\n');

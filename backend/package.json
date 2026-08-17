@@ -19,6 +19,7 @@
     "demo:orders-returns-trace": "node scripts/seedPersistentOrderReturnTrace.js",
     "test:orders-returns-factus-trace": "node scripts/testPersistentFactusOrderReturnTrace.js",
     "demo:orders-returns-factus-trace": "node scripts/seedPersistentFactusOrderReturnTrace.js",
+    "diagnose:orders-returns-factus-trace": "node scripts/seedPersistentFactusOrderReturnTrace.js",
     "test:orders-operations": "node scripts/testOrderOperationsCenterContract.js",
     "test:orders-observability": "node scripts/testOrderOperationalMonitoringModule.js",
     "test:orders-whatsapp-assisted": "node scripts/testOrderWhatsAppAssistedNotification.js",
