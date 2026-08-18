@@ -234,7 +234,7 @@ async function main() {
     frontendPackage.scripts['test:e2e:orders-billing-phase1'],
     'node e2e/ordersBillingPreflight.e2e.js'
   );
-  assert.ok(billingWorkflow.includes('playwright install --with-deps chromium'));
+  assert.ok(billingWorkflow.includes('playwright-core install --with-deps chromium'));
   assert.ok(billingWorkflow.includes('test:e2e:orders-billing-phase1'));
   ok('CI recorre el panel real con navegador y APIs fiscales interceptadas');
 
