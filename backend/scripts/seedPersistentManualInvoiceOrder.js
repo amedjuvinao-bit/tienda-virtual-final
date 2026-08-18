@@ -10,8 +10,19 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const ElectronicInvoice = require('../models/ElectronicInvoice');
+const InventoryReservation = require('../models/InventoryReservation');
 const Order = require('../models/Order');
 const { listPendingBillableOrders } = require('../services/adminBillingService');
+const {
+  confirmInventoryReservation,
+  createInventoryReservation,
+} = require('../services/inventoryReservationService');
+const {
+  applyReservationToOrderDocument,
+} = require('../services/orderInventoryAllocationService');
+const {
+  initializeOrderLogistics,
+} = require('../services/orderLogisticsService');
 const {
   assertPersistentConfirmation,
   loadCandidates,
@@ -31,12 +42,17 @@ function optionValue(argv, name) {
 function parseArgs(argv = process.argv.slice(2)) {
   const rawLimit = optionValue(argv, 'stock-limit');
   const stockLimit = rawLimit === undefined ? DEFAULT_OPTIONS.stockLimit : Number(rawLimit);
+  const resumeOrder = String(optionValue(argv, 'resume-order') || '').trim();
   if (!Number.isInteger(stockLimit) || stockLimit < 20 || stockLimit > 2000) {
     throw new Error('stock-limit debe ser un entero entre 20 y 2000.');
+  }
+  if (resumeOrder.length > 120 || /\s/.test(resumeOrder)) {
+    throw new Error('resume-order debe ser un número de orden o ObjectId válido, sin espacios.');
   }
 
   return {
     confirmPersist: argv.includes('--confirm-persist'),
+    resumeOrder,
     stockLimit,
   };
 }
@@ -82,12 +98,12 @@ function buildItem(candidate) {
     category: product.category || '',
     categories: product.categories || [],
     productType: product.productType || 'physical',
-    requiresShipping: false,
-    fulfillmentKind: 'manual',
+    requiresShipping: true,
+    fulfillmentKind: 'shipment',
     fulfillmentSnapshot: {
       productType: product.productType || 'physical',
-      kind: 'manual',
-      requiresShipping: false,
+      kind: 'shipment',
+      requiresShipping: true,
     },
     lineSubtotal: price,
     discountAmount: 0,
@@ -124,7 +140,7 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
     source: 'manual',
     channel: 'manual',
     saleType: 'manual_order',
-    tags: ['factura-manual', 'prueba-persistente', 'sin-factura'],
+    tags: ['factura-manual', 'prueba-persistente', 'sin-factura', 'operacion-trazable'],
     customer: {
       name: 'Consumidor',
       lastname: 'Final Prueba Manual',
@@ -234,9 +250,9 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
       approvedTransactionId: reference,
       approvedAt: now,
       inventory: {
-        status: 'not_required',
-        lastAttemptAt: now,
-        confirmedAt: now,
+        status: 'pending',
+        lastAttemptAt: null,
+        confirmedAt: null,
       },
       invoice: {
         status: 'pending',
@@ -244,7 +260,7 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
       },
     },
     inventoryControl: {
-      reservationRequired: false,
+      reservationRequired: true,
       reservationId: null,
       discountedAtCheckout: false,
       restockedOnFailure: false,
@@ -252,12 +268,12 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
     },
     timeline: [{
       type: 'system',
-      message: 'Orden persistente creada sin factura electrónica para emisión manual desde el panel.',
+      message: 'Orden persistente creada sin factura electrónica y pendiente de confirmar su operación.',
       by: 'manual-invoice-test-script',
       at: now,
     }],
     notes: [{
-      text: 'PRUEBA PERSISTENTE: pago simulado, sin movimiento de inventario y sin factura automática. Emitir manualmente solo en Factus habilitación.',
+      text: 'PRUEBA PERSISTENTE: pago simulado, inventario y preparación trazables, sin factura automática. Emitir manualmente solo en Factus habilitación.',
       by: 'manual-invoice-test-script',
       pinned: true,
       at: now,
@@ -267,12 +283,189 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
   };
 }
 
+function orderLookup(identifier) {
+  if (mongoose.Types.ObjectId.isValid(identifier)) return { _id: identifier };
+  return { orderNumber: identifier };
+}
+
+function preparePhysicalItems(order) {
+  for (const item of order.items || []) {
+    item.productType = item.productType || 'physical';
+    item.requiresShipping = true;
+    item.fulfillmentKind = 'shipment';
+    item.fulfillmentSnapshot = {
+      ...(item.fulfillmentSnapshot?.toObject?.() || item.fulfillmentSnapshot || {}),
+      productType: item.productType || 'physical',
+      kind: 'shipment',
+      requiresShipping: true,
+    };
+  }
+}
+
+function reservationPayload(order, now) {
+  return {
+    sessionId: order.sessionId,
+    order: order._id,
+    orderNumber: order.orderNumber,
+    paymentReference: order.payment?.reference || '',
+    paymentTransactionId: order.payment?.transactionId || '',
+    source: 'admin',
+    items: (order.items || []).map((item) => item.toObject()),
+    branchPriorityIds: order.branch ? [order.branch] : [],
+    expiresInMinutes: 30,
+    currency: order.payment?.currency || 'COP',
+    metadata: {
+      manualInvoicePersistentTest: true,
+      operationalTraceAt: now,
+    },
+    notes: `Operación persistente para ${order.orderNumber}; factura electrónica pendiente.`,
+  };
+}
+
+async function persistOperationalTrace({ orderDraft = null, orderId = null, now = new Date() } = {}) {
+  if (!orderDraft && !orderId) {
+    throw new Error('Falta la orden nueva o existente que recibirá la operación trazable.');
+  }
+
+  const session = await mongoose.startSession();
+  let persistedOrderId = orderId;
+
+  try {
+    await session.withTransaction(async () => {
+      let order;
+      if (orderDraft) {
+        [order] = await Order.create([orderDraft], { session });
+        persistedOrderId = order._id;
+      } else {
+        order = await Order.findById(orderId).session(session);
+      }
+      if (!order) throw new Error('No se encontró la orden que recibirá la operación trazable.');
+      if (String(order.payment?.status || '').toLowerCase() !== 'paid') {
+        throw new Error('La orden debe tener el pago confirmado antes de reservar inventario.');
+      }
+
+      preparePhysicalItems(order);
+      let reservation = null;
+      const reservationId = order.inventoryControl?.reservationId;
+      const hasAllocations = Array.isArray(order.inventoryAllocations) && order.inventoryAllocations.length > 0;
+
+      if (reservationId) {
+        reservation = await confirmInventoryReservation(
+          reservationId,
+          {
+            order: order._id,
+            orderNumber: order.orderNumber,
+            paymentReference: order.payment?.reference || '',
+            paymentTransactionId: order.payment?.transactionId || '',
+          },
+          { session }
+        );
+      } else if (!hasAllocations) {
+        reservation = await createInventoryReservation(
+          reservationPayload(order, now),
+          { session }
+        );
+        if (!reservation) {
+          throw new Error('El producto no usa inventario administrado y no pudo crear una operación física trazable.');
+        }
+
+        order.inventoryControl.reservationRequired = true;
+        order.inventoryControl.reservationId = reservation._id;
+        applyReservationToOrderDocument(order, reservation);
+        await order.save({ session });
+
+        reservation = await confirmInventoryReservation(
+          reservation._id,
+          {
+            order: order._id,
+            orderNumber: order.orderNumber,
+            paymentReference: order.payment?.reference || '',
+            paymentTransactionId: order.payment?.transactionId || '',
+          },
+          { session }
+        );
+      }
+
+      order = await Order.findById(order._id).session(session);
+      if (reservation) applyReservationToOrderDocument(order, reservation);
+      order.inventoryControl.reservationRequired = true;
+      order.inventoryControl.discountedAtCheckout = true;
+      order.inventoryControl.restockedOnFailure = false;
+      order.inventoryControl.restockedAt = null;
+      if (!order.paymentProcessing) {
+        order.paymentProcessing = {
+          provider: order.payment?.provider || 'manual',
+          approvedTransactionId: order.payment?.transactionId || '',
+          approvedAt: order.payment?.paidAt || now,
+          inventory: {},
+          invoice: {
+            status: 'pending',
+            transactionId: order.payment?.transactionId || '',
+          },
+        };
+      }
+      if (!order.paymentProcessing.inventory) {
+        order.paymentProcessing.inventory = {};
+      }
+      order.paymentProcessing.inventory.status = 'confirmed';
+      order.paymentProcessing.inventory.lastAttemptAt = now;
+      order.paymentProcessing.inventory.confirmedAt = reservation?.confirmedAt || now;
+
+      const traceMessage = 'Inventario confirmado y operación preparada; la factura electrónica continúa pendiente.';
+      if (!Array.isArray(order.timeline)) order.timeline = [];
+      if (!(order.timeline || []).some((entry) => entry.message === traceMessage)) {
+        order.timeline.push({
+          type: 'system',
+          message: traceMessage,
+          by: 'manual-invoice-test-script',
+          at: now,
+        });
+      }
+      await order.save({ session });
+
+      await initializeOrderLogistics(
+        {
+          orderFilter: { _id: order._id },
+          actor: {
+            displayName: 'Prueba persistente de factura manual',
+            role: 'system',
+            source: 'system',
+          },
+          now,
+          allowAllBranches: true,
+        },
+        { session }
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return Order.findById(persistedOrderId).exec();
+}
+
 async function verifyPendingManualInvoiceOrder(order) {
   const invoiceCount = await ElectronicInvoice.countDocuments({
     orderId: order._id,
   }).exec();
   if (invoiceCount !== 0) {
     throw new Error('La orden ya tiene un documento ElectronicInvoice y no sirve para la prueba manual.');
+  }
+
+  const reservation = order.inventoryControl?.reservationId
+    ? await InventoryReservation.findById(order.inventoryControl.reservationId).lean().exec()
+    : null;
+  if (!reservation || reservation.status !== 'confirmed') {
+    throw new Error('La orden no conservó una reserva de inventario confirmada.');
+  }
+  if (!(order.inventoryAllocations || []).length) {
+    throw new Error('La orden no conservó asignaciones de inventario para Operación.');
+  }
+  if (!(order.fulfillment?.shipments || []).length) {
+    throw new Error('La orden no conservó preparación logística para Operación.');
+  }
+  if (order.paymentProcessing?.inventory?.status !== 'confirmed') {
+    throw new Error('La conciliación del inventario no quedó confirmada.');
   }
 
   const pending = await listPendingBillableOrders({
@@ -298,33 +491,53 @@ async function run(options = parseArgs()) {
   }
 
   await mongoose.connect(mongoUri);
-  const candidates = await loadCandidates(options.stockLimit);
-  if (!candidates.length) {
-    throw new Error('No existe un producto con sede activa para construir la orden de prueba.');
-  }
-
   const now = new Date();
-  const identity = buildTraceIdentity({ now });
-  const order = new Order(buildOrderDraft({
-    candidate: candidates[0],
-    now,
-    identity,
-  }));
-  await order.save();
+  let order;
+  let recovered = false;
+
+  if (options.resumeOrder) {
+    const existing = await Order.findOne(orderLookup(options.resumeOrder)).exec();
+    if (!existing) throw new Error(`No existe la orden ${options.resumeOrder}.`);
+    const invoiceCount = await ElectronicInvoice.countDocuments({ orderId: existing._id }).exec();
+    if (invoiceCount !== 0) {
+      throw new Error('La orden indicada ya tiene factura electrónica y no corresponde a esta prueba.');
+    }
+    order = await persistOperationalTrace({ orderId: existing._id, now });
+    recovered = true;
+  } else {
+    const candidates = await loadCandidates(options.stockLimit);
+    if (!candidates.length) {
+      throw new Error('No existe un producto con sede activa para construir la orden de prueba.');
+    }
+    const identity = buildTraceIdentity({ now });
+    order = await persistOperationalTrace({
+      orderDraft: buildOrderDraft({
+        candidate: candidates[0],
+        now,
+        identity,
+      }),
+      now,
+    });
+  }
   const listed = await verifyPendingManualInvoiceOrder(order);
 
-  console.log('\n=== ORDEN PERSISTENTE SIN FACTURA ELECTRÓNICA ===');
+  console.log('\n=== ORDEN PERSISTENTE SIN FACTURA ELECTRÓNICA Y CON OPERACIÓN ===');
   console.log(`Base principal: ${mongoose.connection.name}`);
+  console.log(`Modo: ${recovered ? 'ORDEN EXISTENTE COMPLETADA' : 'ORDEN NUEVA'}`);
   console.log(`Orden: ${order.orderNumber}`);
   console.log(`MongoDB ID: ${order._id}`);
   console.log(`Total: $ ${Number(order.total || 0).toLocaleString('es-CO')}`);
   console.log(`Producto: ${order.items[0]?.title || 'Producto de prueba'}`);
   console.log(`Estado del pago: ${listed.paymentStatus}`);
+  console.log(`Reserva: ${order.inventoryControl.reservationId}`);
+  console.log(`Asignaciones: ${order.inventoryAllocations.length}`);
+  console.log(`Envíos preparados: ${order.fulfillment.shipments.length}`);
   console.log('ElectronicInvoice asociados: 0');
   console.log('Cola de facturación: VERIFICADA');
   console.log('Persistencia: CONSERVADA (sin limpieza automática).');
   console.log(`\nBuscar en Facturación > Órdenes por facturar: ${order.orderNumber}`);
-  console.log('Después abre la orden y pulsa Emitir/Reintentar para generar tú la factura electrónica.');
+  console.log('En Órdenes > Operación verás inventario vendido y preparación pendiente.');
+  console.log('Después pulsa Emitir/Reintentar para generar tú la factura electrónica.');
 
   return {
     orderId: String(order._id),
@@ -355,6 +568,8 @@ module.exports = {
   buildOrderDraft,
   buildTraceIdentity,
   parseArgs,
+  persistOperationalTrace,
+  preparePhysicalItems,
   run,
   verifyPendingManualInvoiceOrder,
 };
