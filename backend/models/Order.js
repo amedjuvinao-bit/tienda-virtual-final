@@ -1235,6 +1235,7 @@ const OrderSchema = new mongoose.Schema(
       departmentCode: String,
       deliveryType: String,
       wantsNewsletter: Boolean,
+      isFinalConsumer: Boolean,
     },
 
     customerRelationship: {
@@ -1254,6 +1255,7 @@ const OrderSchema = new mongoose.Schema(
 
     billing: {
       useSameAddress: Boolean,
+      isFinalConsumer: Boolean,
       personType: String,
       firstName: String,
       lastName: String,

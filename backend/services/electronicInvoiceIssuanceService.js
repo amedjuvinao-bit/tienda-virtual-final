@@ -166,10 +166,11 @@ function buildCustomerSnapshot(order = {}, { requireMunicipality = false } = {})
   ].filter(Boolean).join(' ').trim();
 
   const explicitFinalConsumer =
-    order?.billing?.isFinalConsumer === true ||
-    order?.customer?.isFinalConsumer === true ||
-    order?.pos?.customerMode === 'guest' ||
-    (order?.source === 'pos' && order?.pos?.quickSale === true);
+    typeof order?.billing?.isFinalConsumer === 'boolean'
+      ? order.billing.isFinalConsumer
+      : order?.customer?.isFinalConsumer === true ||
+        order?.pos?.customerMode === 'guest' ||
+        (order?.source === 'pos' && order?.pos?.quickSale === true);
   const documentNumber = cleanText(
     firstValue(
       billing.documentNumber,

@@ -233,6 +233,7 @@ const ORDER_CUSTOMER_EDITABLE_FIELDS = new Set([
 
 const ORDER_BILLING_EDITABLE_FIELDS = new Set([
   'useSameAddress',
+  'isFinalConsumer',
   'personType',
   'firstName',
   'lastName',
@@ -260,6 +261,7 @@ const ORDER_BILLING_EDITABLE_FIELDS = new Set([
 
 const ORDER_PARTY_BOOLEAN_FIELDS = new Set([
   'useSameAddress',
+  'isFinalConsumer',
   'wantsNewsletter',
 ]);
 

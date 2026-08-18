@@ -145,6 +145,22 @@ async function main() {
   assert.equal(finalCustomer.names, 'Consumidor final');
   ok('el consumidor final explícito se normaliza igual en órdenes manuales y POS');
 
+  const correctedIdentifiedOrder = sampleOrder();
+  correctedIdentifiedOrder.customer.isFinalConsumer = true;
+  correctedIdentifiedOrder.billing.isFinalConsumer = false;
+  const correctedIdentifiedPreflight = await buildInvoicePreflight(
+    correctedIdentifiedOrder._id,
+    dependencies(correctedIdentifiedOrder)
+  );
+  const correctedFactusCustomer = buildFactusCustomer(correctedIdentifiedOrder);
+  assert.equal(
+    correctedIdentifiedPreflight.customer.isFinalConsumer,
+    false
+  );
+  assert.equal(correctedIdentifiedPreflight.ready, true);
+  assert.equal(correctedFactusCustomer.identification, '0000000000');
+  ok('la corrección administrativa prevalece sobre una marca histórica de consumidor final');
+
   const validOrder = sampleOrder();
   const preflight = await buildInvoicePreflight(
     validOrder._id,
@@ -203,6 +219,10 @@ async function main() {
     path.join(ROOT, 'backend/routes/adminBilling.js'),
     'utf8'
   );
+  const ordersRouteSource = fs.readFileSync(
+    path.join(ROOT, 'backend/routes/orders.js'),
+    'utf8'
+  );
   const adminServiceSource = fs.readFileSync(
     path.join(ROOT, 'backend/services/adminBillingService.js'),
     'utf8'
@@ -210,6 +230,7 @@ async function main() {
   assert.ok(routeSource.includes("'/orders/:orderId/preflight'"));
   assert.ok(routeSource.includes('preflightFingerprint: req.body?.preflightFingerprint'));
   assert.ok(adminServiceSource.includes('assertPreflightReady(preflight, options.preflightFingerprint)'));
+  assert.ok(ordersRouteSource.includes("'isFinalConsumer'"));
   ok('la ruta de emisión no puede omitir el precontrol confirmado');
 
   const e2eSource = fs.readFileSync(

@@ -123,6 +123,38 @@ describe('OrderDetailCustomerBilling', () => {
     });
   });
 
+  it('permite corregir una orden antigua marcada como consumidor final', async () => {
+    const onSaveCustomerData = vi.fn().mockResolvedValue({});
+    render(
+      <OrderDetailCustomerBilling
+        order={{
+          ...baseOrder,
+          customer: {
+            ...baseOrder.customer,
+            isFinalConsumer: true,
+          },
+        }}
+        onSaveCustomerData={onSaveCustomerData}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos' }));
+
+    const buyerCondition = screen.getByRole('combobox', {
+      name: 'Condición del comprador',
+    });
+    expect(buyerCondition).toHaveValue('final');
+
+    fireEvent.change(buyerCondition, { target: { value: 'identified' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+
+    await waitFor(() => expect(onSaveCustomerData).toHaveBeenCalledTimes(1));
+    expect(onSaveCustomerData.mock.calls[0][0]).toMatchObject({
+      billing: { isFinalConsumer: false },
+      syncCustomer: false,
+    });
+  });
+
   it('permite sincronizar una orden real con la ficha del cliente', async () => {
     const onSaveCustomerData = vi.fn().mockResolvedValue({});
     render(

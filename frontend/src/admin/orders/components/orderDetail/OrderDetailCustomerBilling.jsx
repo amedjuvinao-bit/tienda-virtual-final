@@ -118,6 +118,13 @@ function getEditableForm(order = {}) {
       postalCode: customer.postalCode || billing.postalCode || '',
     },
     billing: {
+      isFinalConsumer:
+        typeof billing.isFinalConsumer === 'boolean'
+          ? billing.isFinalConsumer
+          : customer.isFinalConsumer === true ||
+            order?.pos?.customerMode === 'guest' ||
+            (String(order?.source || '').toLowerCase() === 'pos' &&
+              order?.pos?.quickSale === true),
       personType: billing.personType || '',
       businessName: billing.businessName || '',
       firstName: billing.firstName || billing.name || customer.name || '',
@@ -778,6 +785,23 @@ export default function OrderDetailCustomerBilling({
               <div style={{ display: 'grid', gap: 12 }}>
                 <strong style={{ fontSize: 12 }}>Datos de facturación</strong>
                 <div className="order-customer-edit-fields">
+                  <EditField label="Condición del comprador">
+                    <select
+                      aria-label="Condición del comprador"
+                      value={form.billing.isFinalConsumer ? 'final' : 'identified'}
+                      onChange={(event) =>
+                        setPartyField(
+                          'billing',
+                          'isFinalConsumer',
+                          event.target.value === 'final'
+                        )
+                      }
+                      style={fieldStyle}
+                    >
+                      <option value="identified">Comprador identificado</option>
+                      <option value="final">Consumidor final</option>
+                    </select>
+                  </EditField>
                   <EditField label="Tipo persona">
                     <select
                       aria-label="Tipo de persona"

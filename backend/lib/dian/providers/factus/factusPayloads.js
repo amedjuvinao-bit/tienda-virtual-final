@@ -81,11 +81,12 @@ function buildFactusCustomer(order = {}) {
   const lastName = trimSafe(billing?.lastName || billing?.lastname || customer?.lastname, 100);
   const naturalName = [firstName, lastName].filter(Boolean).join(' ').trim();
   const explicitFinalConsumer =
-    billing?.isFinalConsumer === true ||
-    customer?.isFinalConsumer === true ||
-    order?.pos?.customerMode === 'guest' ||
-    (String(order?.source || '').trim().toLowerCase() === 'pos' &&
-      order?.pos?.quickSale === true);
+    typeof billing?.isFinalConsumer === 'boolean'
+      ? billing.isFinalConsumer
+      : customer?.isFinalConsumer === true ||
+        order?.pos?.customerMode === 'guest' ||
+        (String(order?.source || '').trim().toLowerCase() === 'pos' &&
+          order?.pos?.quickSale === true);
   const isPosConsumerFinal =
     !rawIdentification &&
     String(order?.source || '').trim().toLowerCase() === 'pos' &&
