@@ -67,9 +67,25 @@ function buildTraceIdentity({
 } = {}) {
   const stamp = timestamp(now);
   const suffix = randomBytes(3).toString('hex').toUpperCase();
+  const documentNumber = `10${String(parseInt(suffix, 16)).padStart(8, '0')}`;
   return {
     runId: `manual_invoice_${stamp.toLowerCase()}_${suffix.toLowerCase()}`,
     orderNumber: `FM-${stamp.replace(/[TZ]/g, '')}-${suffix}`,
+    buyer: {
+      documentNumber,
+      documentType: 'CC',
+      firstName: 'Cliente',
+      lastName: `Prueba Habilitación ${suffix}`,
+      email: `factura.habilitacion+${suffix.toLowerCase()}@example.com`,
+      phone: '3000000000',
+      address: 'Calle 93 # 12-34 · Prueba de habilitación',
+      city: 'Bogotá D.C.',
+      municipalityCode: '11001',
+      department: 'Bogotá D.C.',
+      departmentCode: '11',
+      country: 'Colombia',
+      countryCode: 'CO',
+    },
   };
 }
 
@@ -125,6 +141,7 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
   const item = buildItem(candidate);
   const total = Number(item.lineTotal || 0);
   const reference = `${identity.orderNumber}-PAY`;
+  const buyer = identity.buyer || {};
 
   return {
     sessionId: identity.runId.slice(0, 120),
@@ -142,42 +159,45 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
     saleType: 'manual_order',
     tags: ['factura-manual', 'prueba-persistente', 'sin-factura', 'operacion-trazable'],
     customer: {
-      name: 'Consumidor',
-      lastname: 'Final Prueba Manual',
-      id: '222222222222',
-      documentType: 'CC',
-      email: 'factura.manual@example.com',
-      emailOrPhone: 'factura.manual@example.com',
-      phone: '3000000000',
-      address: 'Calle 1 # 1-01',
-      city: 'Bogotá',
-      municipalityCode: '11001',
-      department: 'Bogotá D.C.',
-      departmentCode: '11',
-      country: 'Colombia',
-      countryCode: 'CO',
+      name: buyer.firstName,
+      lastname: buyer.lastName,
+      id: buyer.documentNumber,
+      documentNumber: buyer.documentNumber,
+      documentType: buyer.documentType,
+      isFinalConsumer: false,
+      email: buyer.email,
+      emailOrPhone: buyer.email,
+      phone: buyer.phone,
+      address: buyer.address,
+      city: buyer.city,
+      municipalityCode: buyer.municipalityCode,
+      department: buyer.department,
+      departmentCode: buyer.departmentCode,
+      country: buyer.country,
+      countryCode: buyer.countryCode,
     },
     billing: {
       useSameAddress: true,
       personType: 'natural',
-      firstName: 'Consumidor',
-      lastName: 'Final Prueba Manual',
-      name: 'Consumidor',
-      lastname: 'Final Prueba Manual',
-      documentNumber: '222222222222',
-      documentType: 'CC',
+      isFinalConsumer: false,
+      firstName: buyer.firstName,
+      lastName: buyer.lastName,
+      name: buyer.firstName,
+      lastname: buyer.lastName,
+      documentNumber: buyer.documentNumber,
+      documentType: buyer.documentType,
       businessName: '',
-      address: 'Calle 1 # 1-01',
-      city: 'Bogotá',
-      cityCode: '11001',
-      municipalityCode: '11001',
-      department: 'Bogotá D.C.',
-      departmentCode: '11',
+      address: buyer.address,
+      city: buyer.city,
+      cityCode: buyer.municipalityCode,
+      municipalityCode: buyer.municipalityCode,
+      department: buyer.department,
+      departmentCode: buyer.departmentCode,
       postalCode: '110111',
-      phone: '3000000000',
-      email: 'factura.manual@example.com',
-      country: 'Colombia',
-      countryCode: 'CO',
+      phone: buyer.phone,
+      email: buyer.email,
+      country: buyer.country,
+      countryCode: buyer.countryCode,
       tributeCode: 'ZZ',
     },
     items: [item],
@@ -273,7 +293,7 @@ function buildOrderDraft({ candidate, now = new Date(), identity } = {}) {
       at: now,
     }],
     notes: [{
-      text: 'PRUEBA PERSISTENTE: pago simulado, inventario y preparación trazables, sin factura automática. Emitir manualmente solo en Factus habilitación.',
+      text: 'PRUEBA PERSISTENTE: comprador fiscal identificado, pago simulado, inventario y preparación trazables, sin factura automática. Emitir manualmente solo en Factus habilitación.',
       by: 'manual-invoice-test-script',
       pinned: true,
       at: now,
@@ -542,6 +562,12 @@ async function run(options = parseArgs()) {
   console.log(`MongoDB ID: ${order._id}`);
   console.log(`Total: $ ${Number(order.total || 0).toLocaleString('es-CO')}`);
   console.log(`Producto: ${order.items[0]?.title || 'Producto de prueba'}`);
+  console.log(
+    `Comprador fiscal: ${order.billing?.firstName || ''} ${order.billing?.lastName || ''} · ${order.billing?.documentType || ''} ${order.billing?.documentNumber || ''}`
+  );
+  console.log(
+    `Ubicación fiscal: ${order.billing?.municipalityCode || ''} · ${order.billing?.address || ''}`
+  );
   console.log(`Estado del pago: ${verification.paymentStatus}`);
   console.log(`Reserva: ${order.inventoryControl.reservationId}`);
   console.log(`Asignaciones: ${order.inventoryAllocations.length}`);
