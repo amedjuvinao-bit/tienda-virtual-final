@@ -117,7 +117,8 @@ jobs:
         run: npm --prefix frontend run build
 
       - name: Instalar Chromium para la prueba E2E
-        run: npm --prefix frontend exec -- playwright install --with-deps chromium
+        working-directory: frontend
+        run: ./node_modules/.bin/playwright-core install --with-deps chromium
 
       - name: Recorrer revisión fiscal y emisión administrativa
         run: npm --prefix frontend run test:e2e:orders-billing-phase1
