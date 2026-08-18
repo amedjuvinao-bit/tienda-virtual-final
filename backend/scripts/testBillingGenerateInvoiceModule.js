@@ -172,16 +172,18 @@ function validateFrontendGeneration() {
     'billingIssue',
     'Revisar y emitir',
     'await loadPendingOrders()',
+    'openGeneratedDocument',
+    '/admin/facturacion/documentos?q=',
     'return <BillingPendingOrdersPanel />;',
   ].forEach((needle) => {
     assertIncludes(pageFile, needle, `AdminBillingPage no conecta botón Generar: falta ${needle}`);
   });
 
-  assertNotIncludes(pageFile, 'window.location.assign', 'No debe redirigir automáticamente después de generar factura.');
+  assertNotIncludes(pageFile, 'window.location.assign', 'La navegación debe usar React Router, no recargar la aplicación.');
   assertNotIncludes(pageFile, 'buildGeneratedDocumentUrl', 'No debe construir URL automática a documentos.');
   assertNotIncludes(pageFile, 'getInitialDocumentQuery', 'Documentos no debe cargarse filtrado por URL automáticamente.');
 
-  ok('Frontend conecta botón Generar sin redirigir ni recargar la página');
+  ok('Frontend conecta botón Generar y abre el documento resultante sin recargar la aplicación');
 }
 
 function validateGeneratedIsNotValidated() {

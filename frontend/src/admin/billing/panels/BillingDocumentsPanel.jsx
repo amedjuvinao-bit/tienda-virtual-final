@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Download,
   ExternalLink,
@@ -41,6 +42,8 @@ import {
 } from '../components/BillingUi';
 
 export default function BillingDocumentsPanel() {
+  const location = useLocation();
+  const initialQuery = new URLSearchParams(location.search).get('q')?.trim() || '';
   const { can } = useAdminPermissions();
   const canDownload = can('billing:download');
   const canSync = can('billing:retry');
@@ -48,13 +51,15 @@ export default function BillingDocumentsPanel() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
-  const [query, setQuery] = useState('');
-  const [typingQuery, setTypingQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
+  const [typingQuery, setTypingQuery] = useState(initialQuery);
   const [status, setStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(
+    String(location.state?.billingNotice || '').trim()
+  );
   const [invoiceModalData, setInvoiceModalData] = useState(null);
   const [mailConfiguration, setMailConfiguration] = useState({
     loaded: false,

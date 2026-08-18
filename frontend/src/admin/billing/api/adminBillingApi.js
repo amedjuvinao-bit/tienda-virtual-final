@@ -1,6 +1,8 @@
 // frontend/src/admin/billing/api/adminBillingApi.js
 import api from '../../../lib/api';
 
+export const BILLING_GENERATION_TIMEOUT_MS = 60_000;
+
 function unwrap(response) {
   if (response?.data?.data !== undefined) return response.data.data;
   return response?.data;
@@ -49,7 +51,8 @@ export async function getBillingInvoicePreflight(orderId) {
 export async function generateBillingInvoiceForOrder(orderId, preflightFingerprint) {
   const response = await api.post(
     `/api/admin/billing/orders/${encodeURIComponent(orderId)}/generate`,
-    { preflightFingerprint }
+    { preflightFingerprint },
+    { timeout: BILLING_GENERATION_TIMEOUT_MS }
   );
   return unwrap(response);
 }

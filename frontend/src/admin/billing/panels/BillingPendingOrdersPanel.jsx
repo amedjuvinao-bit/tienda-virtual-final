@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   ExternalLink,
@@ -66,7 +67,17 @@ function billingIssueMessage(issue = null) {
   return summary || details.join(' ') || 'Factus rechazó la emisión y requiere corrección.';
 }
 
+function isUncertainGenerationError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  return (
+    !error?.response ||
+    ['ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK'].includes(code) ||
+    /timeout/i.test(String(error?.message || ''))
+  );
+}
+
 export default function BillingPendingOrdersPanel() {
+  const navigate = useNavigate();
   const { can } = useAdminPermissions();
   const canGenerate = can('billing:create');
   const [rows, setRows] = useState([]);
@@ -145,6 +156,28 @@ export default function BillingPendingOrdersPanel() {
     setPreflightError('');
   };
 
+  const openGeneratedDocument = (order, invoice, message) => {
+    const reference =
+      invoice?.invoiceNumber ||
+      invoice?.provider?.number ||
+      invoice?.number ||
+      order?.orderNumber ||
+      '';
+    const target = reference
+      ? `/admin/facturacion/documentos?q=${encodeURIComponent(reference)}`
+      : '/admin/facturacion/documentos';
+
+    navigate(target, {
+      state: {
+        billingNotice:
+          message ||
+          (reference
+            ? `Factura ${reference} generada correctamente.`
+            : 'Factura generada correctamente.'),
+      },
+    });
+  };
+
   const handleGenerateInvoice = async (reviewedPreflight) => {
     const order = preflightOrder;
     if (!order?.id || !reviewedPreflight?.fingerprint) return;
@@ -159,13 +192,53 @@ export default function BillingPendingOrdersPanel() {
         reviewedPreflight.fingerprint
       );
       const number = result?.invoice?.invoiceNumber || result?.invoice?.provider?.number || '';
-      setNotice(number ? `Factura ${number} generada correctamente.` : 'Factura generada correctamente.');
       setPreflightOrder(null);
       setPreflight(null);
       await loadPendingOrders();
+      openGeneratedDocument(
+        order,
+        result?.invoice,
+        number
+          ? `Factura ${number} generada correctamente.`
+          : 'Factura generada correctamente.'
+      );
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'No se pudo generar la factura.';
       await loadPendingOrders();
+
+      if (isUncertainGenerationError(err)) {
+        try {
+          const recoveredPreflight = await getBillingInvoicePreflight(order.id);
+          const recoveredInvoice = recoveredPreflight?.existingInvoice;
+
+          if (recoveredInvoice?.validated || recoveredInvoice?.inProgress) {
+            setPreflightOrder(null);
+            setPreflight(null);
+            openGeneratedDocument(
+              order,
+              recoveredInvoice,
+              recoveredInvoice.validated
+                ? recoveredInvoice.number
+                  ? `Factura ${recoveredInvoice.number} validada correctamente.`
+                  : 'Factura validada correctamente.'
+                : 'Factus recibió la emisión y todavía la está procesando. No la emitas nuevamente; consulta su estado en Documentos.'
+            );
+            return;
+          }
+
+          setPreflight(recoveredPreflight);
+          setPreflightError(
+            'No se recibió la respuesta final de Factus y no aparece una factura creada. Revisa los datos y vuelve a intentarlo.'
+          );
+          return;
+        } catch {
+          setPreflightError(
+            'No se pudo confirmar el resultado de Factus. No emitas nuevamente hasta comprobar la orden o la pestaña Documentos.'
+          );
+          return;
+        }
+      }
+
+      const message = err?.response?.data?.message || err?.message || 'No se pudo generar la factura.';
       setPreflightError(message);
 
       if (err?.response?.data?.error === 'BILLING_PREFLIGHT_CHANGED') {

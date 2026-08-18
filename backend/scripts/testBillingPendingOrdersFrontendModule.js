@@ -48,6 +48,7 @@ function validateFrontendApi() {
 
   assertIncludes(apiFile, 'getPendingBillingOrders', 'API frontend debe exportar getPendingBillingOrders.');
   assertIncludes(apiFile, '/api/admin/billing/pending-orders', 'API frontend debe consumir pending-orders.');
+  assertIncludes(apiFile, 'BILLING_GENERATION_TIMEOUT_MS', 'La emisión debe esperar el tiempo real del proveedor.');
 
   ok('API frontend de Facturación expone órdenes pendientes por facturar');
 }
@@ -68,6 +69,8 @@ function validatePendingOrdersPage() {
     'Revisar y emitir',
     'BillingInvoicePreflightModal',
     'getBillingInvoicePreflight',
+    'isUncertainGenerationError',
+    'openGeneratedDocument',
     "return <BillingPendingOrdersPanel />;",
   ].forEach((needle) => {
     assertIncludes(pageFile, needle, `AdminBillingPage no conecta Órdenes por facturar correctamente: falta ${needle}`);

@@ -153,6 +153,30 @@ async function main() {
         return json(route, { ok: true, data: { rows: [order], total: 1, page: 1, pages: 1 } });
       }
 
+      if (url.pathname === '/api/admin/billing/documents') {
+        return json(route, {
+          ok: true,
+          data: {
+            rows: [
+              {
+                id: '000000000000000000000002',
+                orderId: ORDER_ID,
+                orderNumber: order.orderNumber,
+                invoiceNumber: 'SETP990015999',
+                status: 'accepted',
+                provider: { name: 'factus', number: 'SETP990015999', status: 'validated' },
+                customer: preflight.customer,
+                emailDelivery: {},
+              },
+            ],
+            total: 1,
+            page: 1,
+            pages: 1,
+            mailConfiguration: { loaded: true, enabled: false, configured: false },
+          },
+        });
+      }
+
       if (url.pathname === `/api/admin/billing/orders/${ORDER_ID}/preflight`) {
         return json(route, { ok: true, data: preflight });
       }
@@ -190,7 +214,9 @@ async function main() {
     assert.equal(await emitButton.isEnabled(), true, 'La confirmación debe habilitar la emisión.');
     await emitButton.click();
 
+    await page.waitForURL('**/admin/facturacion/documentos?q=SETP990015999');
     await page.getByText('Factura SETP990015999 generada correctamente.', { exact: true }).waitFor();
+    await page.getByText('SETP990015999', { exact: true }).first().waitFor();
     assert.deepEqual(generatedPayload, { preflightFingerprint: FINGERPRINT });
     assert.deepEqual(pageErrors, [], `Errores de navegador: ${pageErrors.join(' | ')}`);
 

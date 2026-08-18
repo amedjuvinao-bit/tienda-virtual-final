@@ -161,6 +161,19 @@ export default function BillingInvoicePreflightModal({
             </div>
           ) : (
             <div className="grid gap-4">
+              {emitting ? (
+                <section
+                  className="flex items-start gap-3 rounded-2xl border px-4 py-3"
+                  style={{ borderColor: 'rgba(217, 119, 6, 0.32)', background: 'rgba(217, 119, 6, 0.08)', color: '#a16207' }}
+                >
+                  <LoaderCircle className="mt-0.5 h-5 w-5 shrink-0 animate-spin" />
+                  <div>
+                    <p className="text-sm font-black">Factus está procesando la factura</p>
+                    <p className="mt-1 text-xs font-bold leading-5">Puede tardar hasta un minuto. No cierres esta ventana ni repitas la emisión.</p>
+                  </div>
+                </section>
+              ) : null}
+
               {error ? (
                 <section
                   className="rounded-2xl border px-4 py-3 text-sm font-bold text-red-700"
