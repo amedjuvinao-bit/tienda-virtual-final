@@ -24,7 +24,20 @@ const PAYMENT_PROVIDERS = ['bold', 'wompi', 'mercado-pago', 'payu', 'manual'];
 const PAYMENT_MODES = ['sandbox', 'production'];
 const PAYMENT_STATUSES = ['pending_gateway', 'pending_manual', 'paid', 'failed', 'cancelled'];
 const BILLING_PERSON_TYPES = ['natural', 'juridica'];
-const BILLING_DOCUMENT_TYPES = ['CC', 'NIT', 'CE', 'TI', 'PP', 'PPT', 'RC'];
+const BILLING_DOCUMENT_TYPES = [
+  'RC',
+  'TI',
+  'CC',
+  'TE',
+  'CE',
+  'NIT',
+  'PP',
+  'DIE',
+  'PEP',
+  'PPT',
+  'NIT_EXTRANJERO',
+  'NUIP',
+];
 
 const MAX_LEN = {
   name: 80,

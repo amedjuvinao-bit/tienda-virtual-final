@@ -225,6 +225,43 @@ function validateFactusCompanyCustomer() {
   ok('Payload Factus V2 usa NIT, DV y razón social del comprador');
 }
 
+function validateFactusOfficialDocumentCatalog() {
+  const expectedCodes = {
+    RC: '11',
+    TI: '12',
+    CC: '13',
+    TE: '21',
+    CE: '22',
+    NIT: '31',
+    PP: '41',
+    DIE: '42',
+    PEP: '47',
+    PPT: '48',
+    NIT_EXTRANJERO: '50',
+    NUIP: '91',
+  };
+
+  Object.entries(expectedCodes).forEach(([documentType, expectedCode]) => {
+    const customer = buildFactusCustomer({
+      customer: { name: 'Cliente', lastname: 'Prueba' },
+      billing: {
+        personType: 'natural',
+        documentType,
+        documentNumber: '123456789',
+        municipalityCode: '47001',
+        countryCode: 'CO',
+      },
+    });
+
+    assert(
+      customer.identification_document_code === expectedCode,
+      `${documentType} no se tradujo al código Factus ${expectedCode}.`
+    );
+  });
+
+  ok('Catálogo oficial de identificación se traduce sin valores libres ni fallback incorrecto');
+}
+
 function validateInvoiceSnapshotUsesBillingFirst() {
   const snapshot = buildCustomerSnapshot({
     customer: {
@@ -302,6 +339,7 @@ console.log('\nValidando datos fiscales reales y checkout de Facturación...');
   validateBackendRejectsIncompleteFiscalData,
   validateFactusNaturalCustomer,
   validateFactusCompanyCustomer,
+  validateFactusOfficialDocumentCatalog,
   validateInvoiceSnapshotUsesBillingFirst,
   validateCheckoutIntegration,
   validateScriptRegistration,

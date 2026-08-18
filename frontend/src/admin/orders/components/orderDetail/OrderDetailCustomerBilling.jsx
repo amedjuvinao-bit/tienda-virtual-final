@@ -16,6 +16,26 @@ import {
   SoftBadge,
 } from './OrderDetailPrimitives';
 
+const PERSON_TYPE_OPTIONS = [
+  { value: 'natural', label: 'Persona natural' },
+  { value: 'juridica', label: 'Persona jurídica' },
+];
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: 'RC', label: 'RC · Registro civil' },
+  { value: 'TI', label: 'TI · Tarjeta de identidad' },
+  { value: 'CC', label: 'CC · Cédula de ciudadanía' },
+  { value: 'TE', label: 'TE · Tarjeta de extranjería' },
+  { value: 'CE', label: 'CE · Cédula de extranjería' },
+  { value: 'NIT', label: 'NIT · Identificación tributaria' },
+  { value: 'PP', label: 'PP · Pasaporte' },
+  { value: 'DIE', label: 'DIE · Documento de identificación extranjero' },
+  { value: 'PEP', label: 'PEP · Permiso especial de permanencia' },
+  { value: 'PPT', label: 'PPT · Permiso por protección temporal' },
+  { value: 'NIT_EXTRANJERO', label: 'NIT de otro país' },
+  { value: 'NUIP', label: 'NUIP · Número único de identificación personal' },
+];
+
 function firstValidText(...values) {
   const found = values
     .map((value) => String(value || '').trim())
@@ -375,6 +395,17 @@ export default function OrderDetailCustomerBilling({
     }));
   };
 
+  const setBillingPersonType = (value) => {
+    setForm((current) => ({
+      ...current,
+      billing: {
+        ...current.billing,
+        personType: value,
+        documentType: value === 'juridica' ? 'NIT' : current.billing.documentType,
+      },
+    }));
+  };
+
   const setDepartment = (party, code) => {
     const region = regions.find(
       (item) => String(item?.code || '') === String(code || '')
@@ -696,7 +727,19 @@ export default function OrderDetailCustomerBilling({
                 <div className="order-customer-edit-fields">
                   <EditField label="Nombre" value={form.customer.name} onChange={(value) => setPartyField('customer', 'name', value)} />
                   <EditField label="Apellido" value={form.customer.lastname} onChange={(value) => setPartyField('customer', 'lastname', value)} />
-                  <EditField label="Tipo documento" value={form.customer.documentType} onChange={(value) => setPartyField('customer', 'documentType', value)} />
+                  <EditField label="Tipo documento">
+                    <select
+                      aria-label="Tipo documento del comprador"
+                      value={form.customer.documentType}
+                      onChange={(event) => setPartyField('customer', 'documentType', event.target.value)}
+                      style={fieldStyle}
+                    >
+                      <option value="">Selecciona tipo de documento</option>
+                      {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </EditField>
                   <EditField label="Documento" value={form.customer.id} onChange={(value) => setPartyField('customer', 'id', value)} />
                   <EditField label="Correo" type="email" value={form.customer.email} onChange={(value) => setPartyField('customer', 'email', value)} />
                   <EditField label="Celular" type="tel" value={form.customer.phone} onChange={(value) => setPartyField('customer', 'phone', value)} />
@@ -735,9 +778,35 @@ export default function OrderDetailCustomerBilling({
               <div style={{ display: 'grid', gap: 12 }}>
                 <strong style={{ fontSize: 12 }}>Datos de facturación</strong>
                 <div className="order-customer-edit-fields">
-                  <EditField label="Tipo persona" value={form.billing.personType} onChange={(value) => setPartyField('billing', 'personType', value)} />
+                  <EditField label="Tipo persona">
+                    <select
+                      aria-label="Tipo de persona"
+                      value={form.billing.personType}
+                      onChange={(event) => setBillingPersonType(event.target.value)}
+                      style={fieldStyle}
+                    >
+                      <option value="">Selecciona tipo de persona</option>
+                      {PERSON_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </EditField>
                   <EditField label="Razón social" value={form.billing.businessName} onChange={(value) => setPartyField('billing', 'businessName', value)} />
-                  <EditField label="Tipo documento" value={form.billing.documentType} onChange={(value) => setPartyField('billing', 'documentType', value)} />
+                  <EditField label="Tipo documento">
+                    <select
+                      aria-label="Tipo documento fiscal"
+                      value={form.billing.documentType}
+                      onChange={(event) => setPartyField('billing', 'documentType', event.target.value)}
+                      style={fieldStyle}
+                    >
+                      <option value="">Selecciona tipo de documento</option>
+                      {DOCUMENT_TYPE_OPTIONS
+                        .filter((option) => form.billing.personType !== 'juridica' || option.value === 'NIT')
+                        .map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                  </EditField>
                   <EditField label="Documento fiscal" value={form.billing.documentNumber} onChange={(value) => setPartyField('billing', 'documentNumber', value)} />
                   <EditField label="Correo fiscal" type="email" value={form.billing.email} onChange={(value) => setPartyField('billing', 'email', value)} />
                   <EditField label="Teléfono fiscal" type="tel" value={form.billing.phone} onChange={(value) => setPartyField('billing', 'phone', value)} />

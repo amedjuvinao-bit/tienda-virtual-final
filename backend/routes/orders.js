@@ -263,6 +263,22 @@ const ORDER_PARTY_BOOLEAN_FIELDS = new Set([
   'wantsNewsletter',
 ]);
 
+const ORDER_PERSON_TYPES = new Set(['natural', 'juridica']);
+const ORDER_DOCUMENT_TYPES = new Set([
+  'RC',
+  'TI',
+  'CC',
+  'TE',
+  'CE',
+  'NIT',
+  'PP',
+  'DIE',
+  'PEP',
+  'PPT',
+  'NIT_EXTRANJERO',
+  'NUIP',
+]);
+
 function sanitizeOrderPartyPatch(value, allowedFields) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
@@ -1382,6 +1398,47 @@ router.patch('/:id/customer-data', requireAdmin, async (req, res) => {
       req.body?.billing,
       ORDER_BILLING_EDITABLE_FIELDS
     );
+
+    if (customer?.documentType) {
+      customer.documentType = customer.documentType.toUpperCase();
+      if (!ORDER_DOCUMENT_TYPES.has(customer.documentType)) {
+        return res.status(400).json({
+          error: 'CUSTOMER_DOCUMENT_TYPE_INVALID',
+          message: 'Selecciona un tipo de documento válido para el comprador.',
+        });
+      }
+    }
+
+    if (billing?.personType) {
+      billing.personType = billing.personType.toLowerCase();
+      if (!ORDER_PERSON_TYPES.has(billing.personType)) {
+        return res.status(400).json({
+          error: 'BILLING_PERSON_TYPE_INVALID',
+          message: 'Selecciona un tipo de persona válido.',
+        });
+      }
+    }
+
+    if (billing?.documentType) {
+      billing.documentType = billing.documentType.toUpperCase();
+      if (!ORDER_DOCUMENT_TYPES.has(billing.documentType)) {
+        return res.status(400).json({
+          error: 'BILLING_DOCUMENT_TYPE_INVALID',
+          message: 'Selecciona un tipo de documento fiscal válido.',
+        });
+      }
+    }
+
+    if (
+      billing?.personType === 'juridica' &&
+      billing?.documentType &&
+      billing.documentType !== 'NIT'
+    ) {
+      return res.status(400).json({
+        error: 'BILLING_COMPANY_DOCUMENT_TYPE_INVALID',
+        message: 'Una persona jurídica debe identificarse con NIT.',
+      });
+    }
 
     if (!customer && !billing) {
       return res.status(400).json({

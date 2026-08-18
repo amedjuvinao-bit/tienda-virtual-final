@@ -11,11 +11,16 @@ const FACTUS_DOCUMENT_CODES = Object.freeze({
   RC: '11',
   TI: '12',
   CC: '13',
+  TE: '21',
   CE: '22',
   NIT: '31',
   PP: '41',
   PASAPORTE: '41',
+  DIE: '42',
+  PEP: '47',
   PPT: '48',
+  NIT_EXTRANJERO: '50',
+  NUIP: '91',
 });
 
 function normalizeFactusDocumentCode(value) {

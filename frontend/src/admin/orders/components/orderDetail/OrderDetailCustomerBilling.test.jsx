@@ -68,6 +68,39 @@ const baseOrder = {
 };
 
 describe('OrderDetailCustomerBilling', () => {
+  it('limita tipo de persona y documentos a los catálogos fiscales oficiales', () => {
+    render(
+      <OrderDetailCustomerBilling
+        order={baseOrder}
+        onSaveCustomerData={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir datos' }));
+
+    const personType = screen.getByRole('combobox', { name: 'Tipo de persona' });
+    const customerDocument = screen.getByRole('combobox', {
+      name: 'Tipo documento del comprador',
+    });
+    const billingDocument = screen.getByRole('combobox', {
+      name: 'Tipo documento fiscal',
+    });
+
+    expect(personType).toHaveValue('natural');
+    expect(personType).toContainHTML('Persona jurídica');
+    expect(customerDocument).toHaveValue('CC');
+    expect(billingDocument).toHaveValue('CC');
+    expect(billingDocument).toContainHTML('PPT · Permiso por protección temporal');
+    expect(billingDocument).toContainHTML('NIT de otro país');
+
+    fireEvent.change(personType, { target: { value: 'juridica' } });
+    expect(billingDocument).toHaveValue('NIT');
+    expect(Array.from(billingDocument.options).map((option) => option.value)).toEqual([
+      '',
+      'NIT',
+    ]);
+  });
+
   it('corrige el celular únicamente en la orden por defecto', async () => {
     const onSaveCustomerData = vi.fn().mockResolvedValue({});
     render(
