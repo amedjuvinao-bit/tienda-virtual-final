@@ -78,8 +78,13 @@ const {
   getOrderOperationalHealth,
 } = require('../controllers/orderOperationalMonitoringController');
 const {
+  cancelShipmentLabel,
+  generateShipmentLabel,
   getOrderLogistics,
   initializeLogistics,
+  quoteShipment,
+  shippingProviders,
+  syncShipmentTracking,
   updateShipment,
 } = require('../controllers/orderLogisticsController');
 const {
@@ -1014,6 +1019,13 @@ router.get('/admin', listAdminOrders);
 router.get('/admin/operations/health', getOrderOperationalHealth);
 
 router.get(
+  '/admin/shipping/providers',
+  requireAdmin,
+  requirePermission('orders:view'),
+  shippingProviders
+);
+
+router.get(
   '/:id/fulfillment/logistics',
   requireAdmin,
   requirePermission('orders:view'),
@@ -1032,6 +1044,34 @@ router.patch(
   requireAdmin,
   requirePermission('orders:fulfillment'),
   updateShipment
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/rates',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  quoteShipment
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/label',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  generateShipmentLabel
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/tracking/sync',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  syncShipmentTracking
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/label/cancel',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  cancelShipmentLabel
 );
 
 /* ============================

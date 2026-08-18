@@ -51,6 +51,14 @@ function tryRequire(relPath) {
 }
 
 app.use(cors());
+const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
+if (shippingWebhookRoutes) {
+  app.use(
+    '/api/shipping/webhooks/envia',
+    express.raw({ type: 'application/json', limit: '256kb' }),
+    shippingWebhookRoutes
+  );
+}
 app.use(express.json());
 
 const globalLimiter = rateLimit({
@@ -123,6 +131,7 @@ const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
+const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
@@ -167,6 +176,9 @@ if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+if (adminShippingSettingsRoutes) {
+  app.use('/api/admin/shipping-settings', adminShippingSettingsRoutes);
+}
 if (billingSettingsProtectionRoutes) app.use('/api/site-settings', billingSettingsProtectionRoutes);
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);

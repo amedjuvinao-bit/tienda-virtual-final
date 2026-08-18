@@ -100,6 +100,17 @@ jobs:
       - name: Validar logística avanzada de órdenes
         run: npm --prefix backend run test:orders-logistics
 
+      - name: Validar transportadoras sin llamadas externas
+        env:
+          SHIPPING_PROVIDER: manual
+          ENVIA_MODE: sandbox
+          ENVIA_TOKEN: ''
+          ENVIA_WEBHOOK_SECRET: ''
+          INTEGRATIONS_ENCRYPTION_KEY: shipping-contract-test-key-with-32-characters
+        run: |
+          npm --prefix backend run test:shipping-providers
+          npm --prefix backend run test:shipping-settings
+
       - name: Validar devoluciones RMA de órdenes
         run: npm --prefix backend run test:orders-returns
 

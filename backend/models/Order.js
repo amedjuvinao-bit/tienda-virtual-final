@@ -796,6 +796,57 @@ const LogisticsHistoryEntrySchema = new mongoose.Schema(
   { _id: true }
 );
 
+const ShippingRateSnapshotSchema = new mongoose.Schema(
+  {
+    carrier: { type: String, trim: true, default: '' },
+    service: { type: String, trim: true, default: '' },
+    serviceDescription: { type: String, trim: true, default: '' },
+    deliveryEstimate: { type: String, trim: true, default: '' },
+    totalPrice: { type: Number, min: 0, default: 0 },
+    currency: { type: String, trim: true, uppercase: true, default: 'COP' },
+    quotedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const ShippingTrackingEventSchema = new mongoose.Schema(
+  {
+    code: { type: String, trim: true, default: '' },
+    status: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, maxlength: 500, default: '' },
+    location: { type: String, trim: true, maxlength: 240, default: '' },
+    occurredAt: { type: Date, default: null },
+    receivedAt: { type: Date, default: Date.now },
+    source: { type: String, trim: true, lowercase: true, default: 'provider' },
+  },
+  { _id: false }
+);
+
+const ShippingIntegrationSchema = new mongoose.Schema(
+  {
+    provider: { type: String, trim: true, lowercase: true, default: 'manual' },
+    mode: { type: String, enum: ['manual', 'sandbox', 'production'], default: 'manual' },
+    status: {
+      type: String,
+      enum: ['manual', 'quoted', 'label_generated', 'tracking', 'cancelled', 'error'],
+      default: 'manual',
+    },
+    providerShipmentId: { type: String, trim: true, default: '' },
+    labelUrl: { type: String, trim: true, default: '' },
+    labelFormat: { type: String, trim: true, uppercase: true, default: '' },
+    selectedRate: { type: ShippingRateSnapshotSchema, default: () => ({}) },
+    trackingEvents: { type: [ShippingTrackingEventSchema], default: [] },
+    lastSyncedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
+    lastError: {
+      code: { type: String, trim: true, default: '' },
+      message: { type: String, trim: true, maxlength: 500, default: '' },
+      at: { type: Date, default: null },
+    },
+  },
+  { _id: false }
+);
+
 const PhysicalShipmentSchema = new mongoose.Schema(
   {
     code: { type: String, trim: true, uppercase: true, required: true },
@@ -839,6 +890,10 @@ const PhysicalShipmentSchema = new mongoose.Schema(
       serviceLevel: { type: String, trim: true, default: '' },
       trackingNumber: { type: String, trim: true, default: '' },
       trackingUrl: { type: String, trim: true, default: '' },
+    },
+    shippingIntegration: {
+      type: ShippingIntegrationSchema,
+      default: () => ({}),
     },
     packages: { type: [LogisticsPackageSchema], default: [] },
     sla: {
@@ -1420,6 +1475,15 @@ OrderSchema.index(
     'fulfillment.shipments.sla.dispatchDueAt': 1,
   },
   { name: 'orders_logistics_branch_status_sla' }
+);
+OrderSchema.index(
+  { 'fulfillment.shipments.carrier.trackingNumber': 1 },
+  {
+    name: 'orders_shipping_tracking_number',
+    partialFilterExpression: {
+      'fulfillment.shipments.carrier.trackingNumber': { $gt: '' },
+    },
+  }
 );
 OrderSchema.index(
   { branch: 1, status: 1, createdAt: -1 },

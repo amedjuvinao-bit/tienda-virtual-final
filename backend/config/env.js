@@ -64,6 +64,11 @@ const cloudName = firstEnv([
 ]);
 const cloudinaryFolder = firstEnv(['CLOUDINARY_FOLDER', 'VITE_CLOUDINARY_FOLDER']);
 const cloudinaryUploadPreset = firstEnv(['CLOUDINARY_UPLOAD_PRESET', 'VITE_CLOUDINARY_PRESET']);
+const enviaMode = clean(process.env.ENVIA_MODE).toLowerCase();
+const integrationsEncryption = firstEnv([
+  'INTEGRATIONS_ENCRYPTION_KEY',
+  'BILLING_ENCRYPTION_KEY',
+]);
 
 const env = {
   nodeEnv: clean(process.env.NODE_ENV) || 'development',
@@ -79,6 +84,10 @@ const env = {
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
   cartAccessSecret: clean(process.env.CART_ACCESS_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
+  integrationsEncryptionKey: integrationsEncryption.value,
+  integrationsEncryptionKeySource: integrationsEncryption.value
+    ? integrationsEncryption.name
+    : '',
   cloudinary: {
     cloudName: cloudName.value,
     cloudNameSource: cloudName.name,
@@ -101,6 +110,20 @@ const env = {
     intervalMs: toNumber(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS, 60_000, { min: 30_000 }),
     limit: toNumber(process.env.INVENTORY_RESERVATION_LIMIT || process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT, 50, { min: 1 }),
   },
+  shipping: {
+    defaultProvider: clean(process.env.SHIPPING_PROVIDER).toLowerCase() || 'manual',
+    envia: {
+      mode: enviaMode === 'production'
+        ? 'production'
+        : 'sandbox',
+      token: clean(process.env.ENVIA_TOKEN),
+      webhookSecret: clean(process.env.ENVIA_WEBHOOK_SECRET),
+      timeoutMs: toNumber(process.env.ENVIA_TIMEOUT_MS, 15_000, {
+        min: 1_000,
+        max: 60_000,
+      }),
+    },
+  },
 };
 
 function assertEnv() {
@@ -116,6 +139,13 @@ function assertEnv() {
     errors.push('BILLING_ENCRYPTION_KEY debe tener al menos 32 caracteres. No uses contraseñas cortas para cifrar credenciales fiscales.');
   }
 
+  if (
+    env.integrationsEncryptionKey &&
+    env.integrationsEncryptionKey.length < 32
+  ) {
+    errors.push('INTEGRATIONS_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
+  }
+
   if (env.cartAccessSecret && env.cartAccessSecret.length < 32) {
     errors.push('CART_ACCESS_SECRET debe tener al menos 32 caracteres.');
   }
@@ -125,6 +155,29 @@ function assertEnv() {
     !env.cartAccessSecret
   ) {
     errors.push('Producción requiere CART_ACCESS_SECRET independiente con al menos 32 caracteres.');
+  }
+
+  if (!['manual', 'envia'].includes(env.shipping.defaultProvider)) {
+    errors.push('SHIPPING_PROVIDER debe ser manual o envia.');
+  }
+
+  if (enviaMode && !['sandbox', 'production'].includes(enviaMode)) {
+    errors.push('ENVIA_MODE debe ser sandbox o production.');
+  }
+
+  if (
+    env.shipping.defaultProvider === 'envia' &&
+    !env.shipping.envia.token
+  ) {
+    errors.push('SHIPPING_PROVIDER=envia requiere ENVIA_TOKEN. Usa manual durante el desarrollo sin cuenta externa.');
+  }
+
+  if (
+    env.nodeEnv === 'production' &&
+    env.shipping.defaultProvider === 'envia' &&
+    env.shipping.envia.mode !== 'production'
+  ) {
+    errors.push('Producción no puede usar SHIPPING_PROVIDER=envia con ENVIA_MODE=sandbox.');
   }
 
   if (errors.length) {
@@ -159,6 +212,12 @@ function getSafeEnvSummary() {
     billingEncryptionConfigured: Boolean(
       env.billingEncryptionKey && env.billingEncryptionKey.length >= 32
     ),
+    integrationsEncryptionConfigured: Boolean(
+      env.integrationsEncryptionKey &&
+      env.integrationsEncryptionKey.length >= 32
+    ),
+    integrationsEncryptionKeySource:
+      env.integrationsEncryptionKeySource || 'not_configured',
     cloudinary: {
       backendConfigured: cloudinaryBackendConfigured,
       cloudNameConfigured: Boolean(env.cloudinary.cloudName),
@@ -173,6 +232,14 @@ function getSafeEnvSummary() {
     cloudinaryConfigured: cloudinaryBackendConfigured,
     smtpConfigured: Boolean(env.mail.host && env.mail.user && env.mail.pass),
     inventoryReservation: env.inventoryReservation,
+    shipping: {
+      defaultProvider: env.shipping.defaultProvider,
+      envia: {
+        mode: env.shipping.envia.mode,
+        configured: Boolean(env.shipping.envia.token),
+        webhookConfigured: Boolean(env.shipping.envia.webhookSecret),
+      },
+    },
   };
 }
 

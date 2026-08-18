@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  cancelOrderShipmentLabel,
+  generateOrderShipmentLabel,
   getOrderLogistics,
+  getShippingProviderStatus,
   initializeOrderLogistics,
+  quoteOrderShipment,
+  syncOrderShipmentTracking,
   updateOrderShipment,
 } from '../../orderLogisticsApi';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
@@ -84,6 +89,14 @@ function formatDeadline(value) {
   });
 }
 
+function formatMoney(value, currency = 'COP') {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: currency || 'COP',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
 function shipmentForm(shipment = {}) {
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   const carrier = shipment.carrier || {};
@@ -100,6 +113,10 @@ function shipmentForm(shipment = {}) {
     deliveryDueAt: toLocalDateTime(sla.deliveryDueAt),
     packageCount: Math.max(1, packages.length || 1),
     weightGrams: Number(packages[0]?.weightGrams || 0),
+    lengthCm: Number(packages[0]?.lengthCm || 0),
+    widthCm: Number(packages[0]?.widthCm || 0),
+    heightCm: Number(packages[0]?.heightCm || 0),
+    selectedRate: null,
     dispatchReference: shipment.dispatchEvidence?.reference || '',
     deliveryReference: shipment.deliveryEvidence?.reference || '',
     recipient: shipment.deliveryEvidence?.recipient || '',
@@ -121,7 +138,10 @@ function planPayload(shipment, form) {
     code:
       existingPackages[index]?.code ||
       `${shipment.code}-P${String(index + 1).padStart(2, '0')}`,
-    weightGrams: index === 0 ? Number(form.weightGrams || 0) : Number(existingPackages[index]?.weightGrams || 0),
+    weightGrams: Number(form.weightGrams || 0),
+    lengthCm: Number(form.lengthCm || 0),
+    widthCm: Number(form.widthCm || 0),
+    heightCm: Number(form.heightCm || 0),
   }));
   return {
     priority: form.priority,
@@ -194,6 +214,8 @@ export default function OrderDetailLogisticsPanel({
   const [eligibility, setEligibility] = useState(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [forms, setForms] = useState({});
+  const [providers, setProviders] = useState(null);
+  const [rates, setRates] = useState({});
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
 
@@ -256,6 +278,21 @@ export default function OrderDetailLogisticsPanel({
       active = false;
     };
   }, [canManage, order?._id, physical, initialShipments.length]);
+
+  useEffect(() => {
+    if (!physical) return undefined;
+    let active = true;
+    getShippingProviderStatus()
+      .then((data) => {
+        if (active) setProviders(data?.providers || null);
+      })
+      .catch(() => {
+        if (active) setProviders(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [physical]);
 
   if (!physical) return null;
 
@@ -342,6 +379,95 @@ export default function OrderDetailLogisticsPanel({
       setMessage({
         type: 'error',
         text: error?.response?.data?.message || 'No fue posible actualizar el envío.',
+      });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const idempotencyKey = (shipment, action, rate = null) => {
+    const safe = (value) => String(value || '').replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 50);
+    return [
+      action,
+      safe(order?._id),
+      safe(shipment?._id),
+      `r${Number(shipment?.revision || 0)}`,
+      safe(rate?.carrier),
+      safe(rate?.service),
+    ].filter(Boolean).join(':');
+  };
+
+  const runProviderAction = async (shipment, action) => {
+    if (!canManage || !providers?.envia?.configured) return;
+    const shipmentId = String(shipment._id);
+    const form = forms[shipmentId] || shipmentForm(shipment);
+    try {
+      setBusy(`${shipmentId}:provider:${action}`);
+      setMessage(null);
+      let data;
+      if (action === 'quote') {
+        const planned = await updateOrderShipment(order._id, shipmentId, {
+          action: 'update_plan',
+          expectedRevision: Number(shipment.revision || 0),
+          ...planPayload(shipment, form),
+          note: 'Medidas confirmadas antes de cotizar con Envia.',
+        });
+        applyResponse(planned);
+        data = await quoteOrderShipment(order._id, shipmentId, {
+          provider: 'envia',
+          expectedRevision: Number(planned.shipment?.revision || 0),
+        });
+        setRates((previous) => ({
+          ...previous,
+          [shipmentId]: Array.isArray(data?.rates) ? data.rates : [],
+        }));
+        applyResponse(data);
+        setMessage({ type: 'success', text: `Se recibieron ${data?.rates?.length || 0} tarifa(s) de Envia.` });
+      } else if (action === 'label') {
+        if (!form.selectedRate) {
+          setMessage({ type: 'error', text: 'Selecciona una tarifa antes de generar la guía.' });
+          return;
+        }
+        data = await generateOrderShipmentLabel(
+          order._id,
+          shipmentId,
+          {
+            provider: 'envia',
+            expectedRevision: Number(shipment.revision || 0),
+            rate: form.selectedRate,
+          },
+          idempotencyKey(shipment, 'label', form.selectedRate)
+        );
+        applyResponse(data);
+        setMessage({ type: 'success', text: `Guía de ${shipment.code} generada en ${providers.envia.mode}.` });
+      } else if (action === 'track') {
+        data = await syncOrderShipmentTracking(order._id, shipmentId, {
+          provider: 'envia',
+          expectedRevision: Number(shipment.revision || 0),
+        });
+        applyResponse(data);
+        setMessage({ type: 'success', text: `Seguimiento de ${shipment.code} sincronizado.` });
+      } else if (action === 'cancel') {
+        data = await cancelOrderShipmentLabel(
+          order._id,
+          shipmentId,
+          {
+            provider: 'envia',
+            expectedRevision: Number(shipment.revision || 0),
+          },
+          idempotencyKey(shipment, 'cancel')
+        );
+        applyResponse(data);
+        setMessage({ type: 'success', text: `Cancelación de la guía ${shipment.code} registrada.` });
+      }
+      await onRefreshTimeline?.();
+    } catch (error) {
+      if (error?.response?.data?.error === 'LOGISTICS_REVISION_CONFLICT') {
+        await refresh().catch(() => {});
+      }
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.message || 'No fue posible completar la operación con la transportadora.',
       });
     } finally {
       setBusy('');
@@ -512,7 +638,13 @@ export default function OrderDetailLogisticsPanel({
                         <input type="number" min="1" max="20" aria-label={`Paquetes ${shipment.code}`} value={form.packageCount} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { packageCount: event.target.value })} placeholder="Paquetes" style={inputStyle()} />
                         <input type="number" min="0" aria-label={`Peso ${shipment.code}`} value={form.weightGrams} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { weightGrams: event.target.value })} placeholder="Peso g" style={inputStyle()} />
                       </div>
+                      <input type="number" min="0" aria-label={`Largo ${shipment.code}`} value={form.lengthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { lengthCm: event.target.value })} placeholder="Largo cm" style={inputStyle()} />
+                      <input type="number" min="0" aria-label={`Ancho ${shipment.code}`} value={form.widthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { widthCm: event.target.value })} placeholder="Ancho cm" style={inputStyle()} />
+                      <input type="number" min="0" aria-label={`Alto ${shipment.code}`} value={form.heightCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { heightCm: event.target.value })} placeholder="Alto cm" style={inputStyle()} />
                     </div>
+                    <p style={{ margin: '7px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700 }}>
+                      El peso y las dimensiones indicadas se aplican a cada paquete. Son obligatorios para cotizar externamente.
+                    </p>
                     {canManage ? (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                         <button type="button" onClick={() => runAction(shipment, 'update_plan')} disabled={isBusy} style={secondaryButtonStyle()}>
@@ -521,6 +653,95 @@ export default function OrderDetailLogisticsPanel({
                       </div>
                     ) : null}
                   </details>
+
+                  <div style={{ marginTop: 10, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 14, padding: 11, background: 'var(--admin-bg)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 950 }}>
+                          Transportadoras conectadas
+                        </div>
+                        <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
+                          Manual activo · {providers?.envia?.message || 'Consultando estado de Envia…'}
+                        </div>
+                      </div>
+                      {canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => runProviderAction(shipment, 'quote')}
+                          disabled={isBusy || !providers?.envia?.configured}
+                          title={providers?.envia?.message || 'Consultando configuración.'}
+                          style={{
+                            ...secondaryButtonStyle(),
+                            cursor: providers?.envia?.configured ? 'pointer' : 'not-allowed',
+                            opacity: providers?.envia?.configured ? 1 : 0.55,
+                          }}
+                        >
+                          Cotizar con Envia
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {(rates[shipmentId] || []).length > 0 ? (
+                      <div style={{ display: 'grid', gap: 6, marginTop: 9 }}>
+                        {(rates[shipmentId] || []).map((rate, index) => {
+                          const selected = form.selectedRate === rate;
+                          return (
+                            <button
+                              key={`${rate.carrier}-${rate.service}-${index}`}
+                              type="button"
+                              onClick={() => updateForm(shipmentId, { selectedRate: rate })}
+                              style={{
+                                border: `1px solid ${selected ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.cardBorder}`,
+                                borderRadius: 10,
+                                padding: '8px 10px',
+                                background: selected ? 'var(--admin-primary-soft-bg)' : ORDER_DETAIL_THEME.cardBg,
+                                color: ORDER_DETAIL_THEME.cardText,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: 10,
+                                fontWeight: 850,
+                              }}
+                            >
+                              <span>{rate.carrier} · {rate.serviceDescription || rate.service} · {rate.deliveryEstimate || 'Entrega por confirmar'}</span>
+                              <span>{formatMoney(rate.totalPrice, rate.currency)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {shipment.shippingIntegration?.labelUrl ? (
+                      <div style={{ marginTop: 9, fontSize: 10, fontWeight: 800 }}>
+                        <a href={shipment.shippingIntegration.labelUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--admin-primary)' }}>
+                          Descargar etiqueta PDF
+                        </a>
+                        <span style={{ color: ORDER_DETAIL_THEME.mutedText }}> · {shipment.carrier?.trackingNumber || 'Guía generada'}</span>
+                      </div>
+                    ) : null}
+
+                    {canManage && providers?.envia?.configured ? (
+                      <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 9 }}>
+                        {form.selectedRate && !shipment.shippingIntegration?.labelUrl ? (
+                          <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={primaryButtonStyle()}>
+                            Generar guía {providers.envia.mode === 'production' ? 'Producción' : 'Sandbox'}
+                          </button>
+                        ) : null}
+                        {shipment.carrier?.trackingNumber ? (
+                          <button type="button" onClick={() => runProviderAction(shipment, 'track')} disabled={isBusy} style={secondaryButtonStyle()}>
+                            Sincronizar seguimiento
+                          </button>
+                        ) : null}
+                        {shipment.shippingIntegration?.labelUrl && shipment.shippingIntegration?.status !== 'cancelled' ? (
+                          <button type="button" onClick={() => runProviderAction(shipment, 'cancel')} disabled={isBusy} style={dangerButtonStyle()}>
+                            Cancelar guía
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
                   {status === 'packed' ? (
                     <input aria-label={`Referencia de despacho ${shipment.code}`} value={form.dispatchReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchReference: event.target.value })} placeholder="Referencia de entrega al transportador (obligatoria)" style={{ ...inputStyle(), width: '100%', marginTop: 10 }} />

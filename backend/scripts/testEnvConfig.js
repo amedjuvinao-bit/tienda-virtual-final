@@ -47,6 +47,12 @@ try {
     ok('Cifrado de credenciales fiscales configurado');
   }
 
+  if (!summary.integrationsEncryptionConfigured) {
+    warn('INTEGRATIONS_ENCRYPTION_KEY no esta configurado. El panel de envios no podra guardar tokens o secretos hasta definir una llave de al menos 32 caracteres.');
+  } else {
+    ok(`Cifrado de integraciones configurado desde ${summary.integrationsEncryptionKeySource}`);
+  }
+
   if (!summary.cloudinary.backendConfigured) {
     warn('Cloudinary backend no esta completamente configurado. Para subir imagenes desde el backend se requieren CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.');
   } else {
@@ -67,6 +73,7 @@ try {
   }
 
   info(`Reservas inventario: ${summary.inventoryReservation.enabled ? 'activadas' : 'desactivadas'} | intervalo ${summary.inventoryReservation.intervalMs}ms | limite ${summary.inventoryReservation.limit}`);
+  info(`Transportes: ${summary.shipping.defaultProvider} | Envia ${summary.shipping.envia.mode} ${summary.shipping.envia.configured ? 'configurado' : 'sin token (bloqueado)'}`);
 
   console.log('\n=== Resultado final ===');
   console.log(`OK: ${okCount}`);

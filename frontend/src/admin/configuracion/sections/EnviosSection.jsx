@@ -4,6 +4,7 @@ import InfoCard from '../components/InfoCard';
 import EmptyHint from '../components/EmptyHint';
 import api from '../../../lib/api';
 import { fetchSiteSettings, saveSiteSettings } from '../../../lib/siteSettingsApi';
+import ShippingProvidersCard from './envios/ShippingProvidersCard';
 
 function buildDefaultZone() {
   return {
@@ -822,6 +823,8 @@ export default function EnviosSection() {
           </button>
         </div>
       </InfoCard>
+
+      <ShippingProvidersCard />
 
       <EmptyHint
         title="Cómo funcionará en checkout"

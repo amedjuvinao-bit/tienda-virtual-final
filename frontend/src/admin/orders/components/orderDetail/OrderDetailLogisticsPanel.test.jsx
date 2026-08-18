@@ -3,8 +3,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const logisticsApi = vi.hoisted(() => ({
+  cancelOrderShipmentLabel: vi.fn(),
+  generateOrderShipmentLabel: vi.fn(),
   getOrderLogistics: vi.fn(),
+  getShippingProviderStatus: vi.fn(),
   initializeOrderLogistics: vi.fn(),
+  quoteOrderShipment: vi.fn(),
+  syncOrderShipmentTracking: vi.fn(),
   updateOrderShipment: vi.fn(),
 }));
 
@@ -90,6 +95,19 @@ describe('centro logístico avanzado de la orden', () => {
   beforeEach(() => {
     Object.values(logisticsApi).forEach((mock) => mock.mockReset());
     logisticsApi.getOrderLogistics.mockResolvedValue(eligibilityResponse());
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'manual',
+        manual: { configured: true, enabled: true },
+        envia: {
+          configured: false,
+          enabled: false,
+          mode: 'sandbox',
+          message: 'Envia Sandbox pendiente de ENVIA_TOKEN; no se realizarán llamadas externas.',
+        },
+      },
+    });
   });
 
   afterEach(() => cleanup());
@@ -275,6 +293,28 @@ describe('centro logístico avanzado de la orden', () => {
     expect(screen.getByLabelText(`Paquetes ${SHIPMENT.code}`)).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Iniciar picking' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Guardar plan logístico' })).not.toBeInTheDocument();
+  });
+
+  it('mantiene Envia Sandbox bloqueado sin token y conserva la operación manual', async () => {
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    expect(await screen.findByText(/Manual activo/)).toBeInTheDocument();
+    const quoteButton = screen.getByRole('button', { name: 'Cotizar con Envia' });
+    await waitFor(() => expect(quoteButton).toBeDisabled());
+    fireEvent.click(quoteButton);
+    expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Guardar plan logístico' })).toBeEnabled();
   });
 
   it('hace visible una incidencia y exige resolución antes de reanudar', async () => {

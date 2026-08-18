@@ -3,9 +3,9 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **9. Posventa avanzada RMA**.
-- Estado de la etapa: implementada para devoluciones y cambios físicos con elegibilidad, autorización, recepción, inspección por unidad, disposición de inventario y resolución trazable.
-- Siguiente etapa: integraciones externas de etiquetas/transportadoras y autoservicio del cliente, sin alterar la autoridad RMA ya establecida.
+- Etapa actual: **Evolución Plus · Fase 2: reembolsos automáticos y transportadoras**.
+- Estado de la etapa: reembolsos automáticos implementados y base multitransportadora preparada con operación manual predeterminada, adaptador Envia Sandbox, idempotencia y webhook firmado.
+- Siguiente validación externa: obtener una cuenta de pruebas de Envia, configurar el token Sandbox y ejecutar una cotización controlada; hasta entonces no se realizan llamadas externas.
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 
@@ -133,7 +133,19 @@ Un operador de sede solo inicializa y modifica envíos de sus sedes asignadas, i
 - Los cambios globales de estado responden `ORDER_LOGISTICS_DISPATCH_REQUIRED` u `ORDER_LOGISTICS_DELIVERY_REQUIRED` si intentan saltarse el flujo.
 - Una devolución posterior continúa usando el contrato de conciliación de inventario, dinero, caja y nota crédito de la etapa 2.
 
-No se afirma que una guía exista en un proveedor externo: nombre, guía, URL, manifiesto y prueba de entrega son referencias operativas ingresadas y auditadas. Una futura integración deberá validar esas referencias con credenciales propias de cada transportadora.
+Una guía ingresada manualmente continúa siendo una referencia operativa auditada y no se presenta como validada por un proveedor. Solo las guías creadas por el adaptador configurado guardan proveedor, modo, identificador externo, tarifa, etiqueta y seguimiento como evidencia de integración.
+
+### Capa de transportadoras y Envia Sandbox
+
+`SHIPPING_PROVIDER=manual` conserva el comportamiento existente y evita conexiones externas por defecto. En producción, la autoridad pasa a **Configuración → Envíos → Transportadoras e integración API**: un administrador con `settings:shipping` elige el ambiente, guarda el token y el secreto de firma, prueba la autenticación, registra el webhook y activa el proveedor. Las variables `ENVIA_TOKEN`, `ENVIA_MODE` y `ENVIA_WEBHOOK_SECRET` quedan como compatibilidad para despliegues que todavía no han sido administrados desde el panel.
+
+El despliegue debe definir una sola vez `INTEGRATIONS_ENCRYPTION_KEY` con al menos 32 caracteres. Esa llave nunca se administra desde el navegador: cifra con AES-256-GCM las credenciales guardadas en MongoDB y debe conservarse estable entre reinicios. El panel solo recibe campos de contraseña de escritura única, banderas e indicios finales; las respuestas API eliminan el token, el secreto y el material cifrado.
+
+Guardar un token nuevo, cambiar de ambiente o reemplazar el secreto desactiva Envia y restablece sus verificaciones. Sandbox exige token y prueba autenticada vigentes. Producción añade confirmación explícita, `BACKEND_URL` pública con HTTPS, secreto de firma y webhook de seguimiento registrado. Si falta cualquier requisito, la operación manual continúa activa.
+
+La capa separa construcción del envío, adaptador del proveedor y orquestación de la orden. Antes de cotizar valida teléfono y dirección de sede y cliente, ciudad, departamento, peso y las tres dimensiones de cada paquete. Para Colombia normaliza el departamento al código de Envia y resuelve la ciudad con `POST /locate`; la cotización y la guía reciben el DANE de 8 dígitos exigido por el proveedor, no el nombre visible. Las credenciales permanecen en el backend y el endpoint de estado expone solo banderas seguras.
+
+La generación y cancelación de guías usan `ShippingOperation` con clave idempotente y huella de la solicitud. La llamada externa ocurre fuera de una transacción MongoDB; si el proveedor confirma pero la persistencia local no termina, la operación queda `action_required` y el mismo intento no se repite silenciosamente. `ShippingWebhookEvent` deduplica el identificador firmado del proveedor y conserva el evento recibido para el procesamiento de estados posterior.
 
 ### API y concurrencia
 
@@ -142,12 +154,24 @@ No se afirma que una guía exista en un proveedor externo: nombre, guía, URL, m
 | `GET /api/orders/:id/fulfillment/logistics` | Consultar resumen y envíos | `orders:view` |
 | `POST /api/orders/:id/fulfillment/logistics/initialize` | Crear/sincronizar envíos autorizados por sede | `orders:fulfillment` |
 | `PATCH /api/orders/:id/fulfillment/logistics/shipments/:shipmentId` | Plan, transición, incidencia o resolución | `orders:fulfillment` |
+| `GET /api/orders/admin/shipping/providers` | Estado seguro de operación manual y proveedores | `orders:view` |
+| `POST /api/orders/:id/fulfillment/logistics/shipments/:shipmentId/rates` | Cotizar con el proveedor configurado | `orders:fulfillment` |
+| `POST /api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label` | Generar guía y etiqueta con idempotencia | `orders:fulfillment` |
+| `POST /api/orders/:id/fulfillment/logistics/shipments/:shipmentId/tracking/sync` | Sincronizar eventos de seguimiento | `orders:fulfillment` |
+| `POST /api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label/cancel` | Cancelar una guía con idempotencia | `orders:fulfillment` |
+| `POST /api/shipping/webhooks/envia` | Recibir y deduplicar eventos con HMAC sobre el cuerpo crudo | Firma del proveedor |
+| `GET /api/admin/shipping-settings` | Consultar estado y preparación sin revelar secretos | `settings:shipping` |
+| `PUT /api/admin/shipping-settings` | Guardar ambiente y credenciales cifradas | `settings:shipping` |
+| `POST /api/admin/shipping-settings/test` | Probar autenticación en el ambiente seleccionado | `settings:shipping` |
+| `POST /api/admin/shipping-settings/webhook/register` | Registrar el webhook firmado de seguimiento | `settings:shipping` |
+| `POST /api/admin/shipping-settings/activate` | Activar Sandbox o Producción con sus precondiciones | `settings:shipping` |
+| `POST /api/admin/shipping-settings/disable` | Volver a la operación manual | `settings:shipping` |
 
 Cada mutación exige `expectedRevision`. Si otro operador guardó antes, responde `LOGISTICS_REVISION_CONFLICT`; la interfaz recarga el envío en vez de sobrescribir el cambio.
 
 ### Centro logístico en el detalle
 
-`OrderDetailLogisticsPanel.jsx` presenta indicadores de envíos, despachos, entregas, incidencias y SLA vencidos. Cada sede tiene progreso visual, compromisos, plan de transportadora/paquetes, acción contextual y gestión de incidentes. Un perfil de solo lectura ve toda la trazabilidad con controles deshabilitados; el permiso `orders:fulfillment` habilita las operaciones.
+`OrderDetailLogisticsPanel.jsx` presenta indicadores de envíos, despachos, entregas, incidencias y SLA vencidos. Cada sede tiene progreso visual, compromisos, plan de transportadora/paquetes, acción contextual y gestión de incidentes. La operación manual sigue disponible; Envia muestra su modo y queda bloqueado con explicación cuando falta el token. Con credenciales habilitadas aparecen cotización, selección de tarifa, generación/descarga de etiqueta, sincronización y cancelación. Un perfil de solo lectura ve la trazabilidad con controles deshabilitados; `orders:fulfillment` habilita las operaciones.
 
 ## Arquitectura y rendimiento
 

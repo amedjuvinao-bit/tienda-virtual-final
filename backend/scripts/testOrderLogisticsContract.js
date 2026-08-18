@@ -144,13 +144,14 @@ async function main() {
   const permissionSource = read('backend/security/adminRoutePermissionMap.js');
   const frontendSource = read('frontend/src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.jsx');
 
-  for (const marker of ['PhysicalShipmentSchema', 'LogisticsIncidentSchema', 'LogisticsSummarySchema', 'revision:', 'allocationIds:', 'deliveryEvidence:']) {
+  for (const marker of ['PhysicalShipmentSchema', 'LogisticsIncidentSchema', 'LogisticsSummarySchema', 'ShippingIntegrationSchema', 'revision:', 'allocationIds:', 'deliveryEvidence:']) {
     assert(modelSource.includes(marker), `Falta ${marker}`);
   }
   ok('el modelo conserva envíos multisede, paquetes, evidencia, SLA, incidencias y revisión');
 
   assert(routeSource.includes("requirePermission('orders:fulfillment')"));
   assert(permissionSource.includes('/api/orders/:id/fulfillment/logistics/shipments/:shipmentId'));
+  assert(permissionSource.includes('/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/rates'));
   assert(permissionSource.includes("permission: 'orders:fulfillment'"));
   ok('las mutaciones logísticas tienen permiso granular y mapa RBAC explícito');
 
@@ -353,6 +354,8 @@ async function main() {
   assert(frontendSource.includes('expectedRevision'));
   assert(frontendSource.includes('eligibility?.canInitialize'));
   assert(frontendSource.includes("eligibility?.message || 'Verificando pago e inventario vendido…'"));
+  assert(frontendSource.includes('Cotizar con Envia'));
+  assert(frontendSource.includes('Manual activo'));
   ok('la interfaz expone el flujo operativo, evidencia, SLA, incidencias y concurrencia');
 
   console.log(`\nLogística avanzada de órdenes: ${checks.length}/${checks.length} controles superados.`);

@@ -14,6 +14,15 @@ const {
   logisticsView,
   updateOrderShipment,
 } = require('../services/orderLogisticsService');
+const {
+  cancelOrderShipmentLabel,
+  generateOrderShipmentLabel,
+  quoteOrderShipment,
+  syncOrderShipmentTracking,
+} = require('../services/orderShippingIntegrationService');
+const {
+  getShippingProviderStatus,
+} = require('../services/shippingProviderService');
 
 function buildAccess(req) {
   const orderId = String(req.params?.id || '').trim();
@@ -149,8 +158,60 @@ async function updateShipment(req, res) {
   }
 }
 
+async function shippingProviders(_req, res) {
+  try {
+    return res.json({
+      ok: true,
+      providers: await getShippingProviderStatus(),
+    });
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+}
+
+async function runShippingOperation(req, res, operation) {
+  try {
+    const access = buildAccess(req);
+    if (!access.ok) return sendAccessError(res, access);
+    const result = await operation({
+      orderFilter: access.filter,
+      shipmentId: req.params.shipmentId,
+      expectedRevision: req.body?.expectedRevision,
+      provider: req.body?.provider || 'envia',
+      rate: req.body?.rate,
+      idempotencyKey:
+        req.get('Idempotency-Key') || req.body?.idempotencyKey,
+      ...serviceScope(access),
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+}
+
+async function quoteShipment(req, res) {
+  return runShippingOperation(req, res, quoteOrderShipment);
+}
+
+async function generateShipmentLabel(req, res) {
+  return runShippingOperation(req, res, generateOrderShipmentLabel);
+}
+
+async function syncShipmentTracking(req, res) {
+  return runShippingOperation(req, res, syncOrderShipmentTracking);
+}
+
+async function cancelShipmentLabel(req, res) {
+  return runShippingOperation(req, res, cancelOrderShipmentLabel);
+}
+
 module.exports = {
+  cancelShipmentLabel,
+  generateShipmentLabel,
   getOrderLogistics,
   initializeLogistics,
+  quoteShipment,
+  shippingProviders,
+  syncShipmentTracking,
   updateShipment,
 };

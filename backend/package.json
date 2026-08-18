@@ -15,6 +15,8 @@
     "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:orders-architecture": "node scripts/testOrderAdminQueryArchitecture.js",
     "test:orders-logistics": "node scripts/testOrderLogisticsContract.js",
+    "test:shipping-providers": "node scripts/testShippingProviderContract.js",
+    "test:shipping-settings": "node scripts/testShippingSettingsContract.js",
     "test:orders-returns": "node scripts/testOrderReturnsModule.js",
     "demo:orders-returns-trace": "node scripts/seedPersistentOrderReturnTrace.js",
     "test:orders-returns-factus-trace": "node scripts/testPersistentFactusOrderReturnTrace.js",

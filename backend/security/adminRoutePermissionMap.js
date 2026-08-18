@@ -256,6 +256,40 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'GET',
+    path: '/api/orders/admin/shipping/providers',
+    permission: 'orders:view',
+    description: 'Consultar transportadoras disponibles sin exponer credenciales.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/rates',
+    permission: 'orders:fulfillment',
+    description: 'Cotizar un envío con una transportadora configurada.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label',
+    permission: 'orders:fulfillment',
+    description: 'Generar una guía externa con idempotencia.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/tracking/sync',
+    permission: 'orders:fulfillment',
+    description: 'Sincronizar el seguimiento de una guía externa.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label/cancel',
+    permission: 'orders:fulfillment',
+    description: 'Cancelar una guía externa con idempotencia.',
+    audit: true,
+  },
+  {
     method: 'PATCH',
     path: '/api/orders/:id/printed',
     permission: 'orders:mark_printed',
@@ -808,6 +842,54 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/admin/mail-settings/test',
     permission: 'settings:mail_test',
     description: 'Enviar correo de prueba.',
+    audit: true,
+  },
+
+  /* =========================================================
+   * TRANSPORTADORAS
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/shipping-settings',
+    permission: 'settings:shipping',
+    description: 'Ver configuración segura de transportadoras.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/shipping-settings',
+    permission: 'settings:shipping',
+    description: 'Guardar ambiente y credenciales cifradas de transportadoras.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/test',
+    permission: 'settings:shipping',
+    description: 'Probar la autenticación con la transportadora.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/webhook/register',
+    permission: 'settings:shipping',
+    description: 'Registrar el webhook firmado de seguimiento.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/activate',
+    permission: 'settings:shipping',
+    description: 'Activar la transportadora como proveedor predeterminado.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/disable',
+    permission: 'settings:shipping',
+    description: 'Volver a la operación logística manual.',
     audit: true,
   },
 
