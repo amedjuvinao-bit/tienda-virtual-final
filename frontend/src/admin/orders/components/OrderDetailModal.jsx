@@ -36,6 +36,10 @@ export function isolateOrderDetailKeyboardEvent(event = {}) {
   event.stopPropagation?.();
 }
 
+export function isolateOrderDetailPointerEvent(event = {}) {
+  event.stopPropagation?.();
+}
+
 export default function OrderDetailModal({
   open,
   onClose,
@@ -681,11 +685,12 @@ export default function OrderDetailModal({
       onCopy={isolateOrderDetailKeyboardEvent}
       onCut={isolateOrderDetailKeyboardEvent}
       onPaste={isolateOrderDetailKeyboardEvent}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+      onPointerDown={isolateOrderDetailPointerEvent}
+      onPointerUp={isolateOrderDetailPointerEvent}
+      onMouseDown={isolateOrderDetailPointerEvent}
+      onMouseUp={isolateOrderDetailPointerEvent}
+      onContextMenu={isolateOrderDetailPointerEvent}
+      onClick={isolateOrderDetailPointerEvent}
     >
       <div
         className="absolute inset-0 backdrop-blur-sm"

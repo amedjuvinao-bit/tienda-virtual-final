@@ -1,8 +1,9 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import OrderDetailModal, {
   isolateOrderDetailKeyboardEvent,
+  isolateOrderDetailPointerEvent,
 } from './OrderDetailModal';
 
 vi.mock('../../../lib/api', () => ({
@@ -10,6 +11,8 @@ vi.mock('../../../lib/api', () => ({
     get: vi.fn().mockResolvedValue({ data: {} }),
   },
 }));
+
+afterEach(cleanup);
 
 function keyboardEvent(overrides = {}) {
   return {
@@ -77,10 +80,61 @@ describe('aislamiento de teclado del detalle de la orden', () => {
       expect(onClose).not.toHaveBeenCalled();
       expect(globalKeyDown).not.toHaveBeenCalled();
 
-      fireEvent.click(dialog);
+      fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     } finally {
       window.removeEventListener('keydown', globalKeyDown);
     }
+  });
+
+  it('no cierra al seleccionar con el mouse, usar clic derecho o pegar desde el menú contextual', () => {
+    const onClose = vi.fn();
+    const globalClick = vi.fn();
+    const globalContextMenu = vi.fn();
+    window.addEventListener('click', globalClick);
+    window.addEventListener('contextmenu', globalContextMenu);
+
+    try {
+      render(
+        createElement(OrderDetailModal, {
+          open: true,
+          onClose,
+          order: {
+            _id: 'order-pointer-test',
+            orderNumber: 'ORD-POINTER-TEST',
+            status: 'paid',
+            items: [],
+            customer: {},
+            billing: {},
+          },
+        })
+      );
+
+      const dialog = screen.getByRole('dialog');
+      fireEvent.pointerDown(dialog);
+      fireEvent.mouseDown(dialog);
+      fireEvent.mouseUp(dialog);
+      fireEvent.pointerUp(dialog);
+      fireEvent.contextMenu(dialog);
+      fireEvent.paste(dialog);
+      fireEvent.click(dialog);
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(globalClick).not.toHaveBeenCalled();
+      expect(globalContextMenu).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('click', globalClick);
+      window.removeEventListener('contextmenu', globalContextMenu);
+    }
+  });
+
+  it('aísla cada evento de puntero sin bloquear la selección nativa', () => {
+    const stopPropagation = vi.fn();
+    const preventDefault = vi.fn();
+
+    isolateOrderDetailPointerEvent({ stopPropagation, preventDefault });
+
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 });
