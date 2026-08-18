@@ -367,6 +367,9 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-o
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-observability
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-whatsapp-assisted
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-customer-connection
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-billing-municipality
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-manual-invoice
+npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:billing-invoice-preflight
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-stress-plan
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-trace-seed
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:orders-logistics-eligibility-trace
@@ -375,7 +378,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-co
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm run test:orders-keyboard && npm run test:billing-invoice-preflight && npm exec -- vitest run && npm run build
 ```
 
 Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI` y no apuntan a datos productivos. Los recorridos persistentes documentados más adelante son una excepción manual: usan `MONGODB_URI`, exigen `--confirm-persist` y dejan evidencia DEMO identificable.
@@ -469,6 +472,25 @@ Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PR
 - La nota crédito envía `bill_number` y el mismo cliente fiscal usado por la factura. Los rechazos HTTP 422 conservan campos y mensajes de validación para permitir recuperación idempotente sin perder trazabilidad.
 - Build de producción aprobado con Vite.
 - El contrato local `test:orders-returns-factus-trace` inspecciona los bloqueos y enlaces sin llamar transportadoras, gateways, Factus ni bases productivas.
+
+## Evolución Plus · Fase 1
+
+La emisión administrativa dejó de depender de un `window.confirm` global. En `Facturación > Órdenes por facturar`, la acción ahora abre un precontrol fiscal nativo que presenta exactamente el comprador, documento, municipio DIVIPOLA, dirección, correo, conceptos, impuestos, descuentos, envío y total que se enviarán al proveedor.
+
+El backend reconstruye esa fotografía desde las autoridades reales de Orden, configuración, inventario y totales. Una emisión queda bloqueada cuando encuentra, entre otros casos, comprador identificado con el documento genérico `222222222222`, identidad incompleta, municipio ausente para Factus, totales no conciliados, orden no facturable, factura ya validada o emisión en curso. El modo consumidor final solo se admite cuando la orden lo declara expresamente.
+
+Cada revisión genera una huella SHA-256. El administrador debe marcar la confirmación y el `POST` de emisión debe presentar la misma huella. Antes de contactar a Factus, el servicio vuelve a construir el precontrol; si cualquier dato cambió, devuelve `BILLING_PREFLIGHT_CHANGED` y obliga a revisar otra vez. La emisión automática derivada de una pasarela conserva su motor idempotente separado; esta confirmación adicional protege únicamente la acción humana desde administración.
+
+La fase queda protegida por:
+
+- 8 controles backend de precontrol, normalización, RBAC, huella fiscal y enlace E2E;
+- 3 pruebas visuales del modal, incluidos bloqueo y resistencia a cierres accidentales;
+- 143 pruebas de regresión frontend completa;
+- cierre integral de Facturación con 27 bloques aprobados;
+- build de producción Vite;
+- recorrido E2E Playwright del panel real, con APIs simuladas, que verifica revisión, checkbox, huella y solicitud final sin conectarse a MongoDB ni Factus.
+
+GitHub Actions ejecuta los contratos que antes quedaban solo locales: seguridad, arquitectura, logística, operaciones, historia del detalle, teclado/copiar-pegar, municipio, orden manual y precontrol fiscal. El E2E instala Chromium dentro del runner y usa únicamente respuestas interceptadas; no crea órdenes, facturas ni datos temporales o persistentes.
 
 ## Prueba persistente del ciclo real Orden–Cliente
 

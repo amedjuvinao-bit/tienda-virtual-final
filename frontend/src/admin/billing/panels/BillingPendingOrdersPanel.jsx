@@ -10,6 +10,7 @@ import {
 import useAdminPermissions from '../../security/useAdminPermissions';
 import {
   generateBillingInvoiceForOrder,
+  getBillingInvoicePreflight,
   getPendingBillingOrders,
 } from '../api/adminBillingApi';
 import {
@@ -25,6 +26,7 @@ import {
   MessageBox,
   PanelHeader,
 } from '../components/BillingUi';
+import BillingInvoicePreflightModal from '../components/BillingInvoicePreflightModal';
 
 function collectProviderMessages(value, output = [], depth = 0) {
   if (depth > 4 || value === null || value === undefined) return output;
@@ -77,6 +79,10 @@ export default function BillingPendingOrdersPanel() {
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [preflightOrder, setPreflightOrder] = useState(null);
+  const [preflight, setPreflight] = useState(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -109,21 +115,62 @@ export default function BillingPendingOrdersPanel() {
     loadPendingOrders();
   }, [page, query]);
 
-  const handleGenerateInvoice = async (order) => {
+  const loadInvoicePreflight = async (order) => {
     if (!order?.id) return;
 
     try {
       setNotice('');
       setError('');
+      setPreflightOrder(order);
+      setPreflight(null);
+      setPreflightError('');
+      setPreflightLoading(true);
+      const result = await getBillingInvoicePreflight(order.id);
+      setPreflight(result);
+    } catch (err) {
+      setPreflightError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'No se pudo preparar la revisión fiscal.'
+      );
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
+
+  const closeInvoicePreflight = () => {
+    if (actionLoading) return;
+    setPreflightOrder(null);
+    setPreflight(null);
+    setPreflightError('');
+  };
+
+  const handleGenerateInvoice = async (reviewedPreflight) => {
+    const order = preflightOrder;
+    if (!order?.id || !reviewedPreflight?.fingerprint) return;
+
+    try {
+      setNotice('');
+      setError('');
+      setPreflightError('');
       setActionLoading(`generate-${order.id}`);
-      const result = await generateBillingInvoiceForOrder(order.id);
+      const result = await generateBillingInvoiceForOrder(
+        order.id,
+        reviewedPreflight.fingerprint
+      );
       const number = result?.invoice?.invoiceNumber || result?.invoice?.provider?.number || '';
       setNotice(number ? `Factura ${number} generada correctamente.` : 'Factura generada correctamente.');
+      setPreflightOrder(null);
+      setPreflight(null);
       await loadPendingOrders();
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'No se pudo generar la factura.';
       await loadPendingOrders();
-      setError(message);
+      setPreflightError(message);
+
+      if (err?.response?.data?.error === 'BILLING_PREFLIGHT_CHANGED') {
+        await loadInvoicePreflight(order);
+      }
     } finally {
       setActionLoading('');
     }
@@ -217,8 +264,8 @@ export default function BillingPendingOrdersPanel() {
                         <div className="grid gap-1.5">
                           <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
                           {canGenerate ? (
-                            <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ReceiptText} onClick={() => handleGenerateInvoice(order)} disabled={isGenerating || loading} variant="primary">
-                              {isGenerating ? 'Procesando...' : order.billingIssue?.retryable ? 'Reintentar' : 'Generar'}
+                            <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ReceiptText} onClick={() => loadInvoicePreflight(order)} disabled={isGenerating || loading || preflightLoading} variant="primary">
+                              {isGenerating ? 'Procesando...' : order.billingIssue?.retryable ? 'Revisar y reintentar' : 'Revisar y emitir'}
                             </ActionButton>
                           ) : (
                             <span className="w-full rounded-xl border px-3 py-2 text-center text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
@@ -243,6 +290,18 @@ export default function BillingPendingOrdersPanel() {
           </div>
         </div>
       </div>
+
+      <BillingInvoicePreflightModal
+        open={Boolean(preflightOrder)}
+        order={preflightOrder}
+        preflight={preflight}
+        loading={preflightLoading}
+        emitting={Boolean(actionLoading)}
+        error={preflightError}
+        onClose={closeInvoicePreflight}
+        onRetry={() => loadInvoicePreflight(preflightOrder)}
+        onConfirm={handleGenerateInvoice}
+      />
     </section>
   );
 }

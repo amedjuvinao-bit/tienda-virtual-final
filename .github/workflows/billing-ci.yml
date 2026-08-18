@@ -79,13 +79,18 @@ jobs:
       - name: Validar resiliencia estricta
         run: npm --prefix backend run test:billing-resilience:strict
 
+      - name: Validar emisión administrativa con precontrol fiscal
+        run: |
+          npm --prefix backend run test:billing-invoice-preflight
+          npm --prefix backend run test:billing-generate-invoice
+
       - name: Validar cierre integral
         run: npm --prefix backend run test:billing-module
 
   billing-ui:
     name: Interfaz de facturacion
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Descargar repositorio
@@ -105,8 +110,17 @@ jobs:
       - name: Probar configuracion visual
         run: npm --prefix frontend run test:billing-configuration-ui
 
+      - name: Probar precontrol fiscal visual
+        run: npm --prefix frontend run test:billing-invoice-preflight
+
       - name: Compilar frontend
         run: npm --prefix frontend run build
+
+      - name: Instalar Chromium para la prueba E2E
+        run: npm --prefix frontend exec -- playwright install --with-deps chromium
+
+      - name: Recorrer revisión fiscal y emisión administrativa
+        run: npm --prefix frontend run test:e2e:orders-billing-phase1
 
   billing-stress:
     name: Prueba de choque

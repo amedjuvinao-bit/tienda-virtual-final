@@ -39,8 +39,18 @@ export async function getPendingBillingOrders(params = {}) {
   return unwrap(response);
 }
 
-export async function generateBillingInvoiceForOrder(orderId) {
-  const response = await api.post(`/api/admin/billing/orders/${orderId}/generate`);
+export async function getBillingInvoicePreflight(orderId) {
+  const response = await api.get(
+    `/api/admin/billing/orders/${encodeURIComponent(orderId)}/preflight`
+  );
+  return unwrap(response);
+}
+
+export async function generateBillingInvoiceForOrder(orderId, preflightFingerprint) {
+  const response = await api.post(
+    `/api/admin/billing/orders/${encodeURIComponent(orderId)}/generate`,
+    { preflightFingerprint }
+  );
   return unwrap(response);
 }
 
@@ -171,6 +181,7 @@ export default {
   downloadBillingReportCsv,
   getBillingCreditNotes,
   getPendingBillingOrders,
+  getBillingInvoicePreflight,
   generateBillingInvoiceForOrder,
   syncBillingDocument,
   sendBillingDocumentEmail,

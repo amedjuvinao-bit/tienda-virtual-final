@@ -156,7 +156,9 @@ function validateFrontendGeneration() {
 
   [
     'generateBillingInvoiceForOrder',
-    '/api/admin/billing/orders/${orderId}/generate',
+    '/api/admin/billing/orders/${encodeURIComponent(orderId)}/generate',
+    'getBillingInvoicePreflight',
+    'preflightFingerprint',
   ].forEach((needle) => {
     assertIncludes(apiFile, needle, `API frontend no conecta generar factura: falta ${needle}`);
   });
@@ -166,9 +168,9 @@ function validateFrontendGeneration() {
     'handleGenerateInvoice',
     'Factura generada correctamente',
     'Procesando...',
-    'Reintentar',
+    'Revisar y reintentar',
     'billingIssue',
-    'Generar',
+    'Revisar y emitir',
     'await loadPendingOrders()',
     'return <BillingPendingOrdersPanel />;',
   ].forEach((needle) => {
@@ -206,30 +208,44 @@ function validateGeneratedIsNotValidated() {
   ok('Estado generado permanece pendiente hasta confirmación real del proveedor');
 }
 
-function validateGenerateConfirmationBridge() {
+function validateGeneratePreflight() {
   const mainFile = read('frontend/src/main.jsx');
-  const bridgeFile = read('frontend/src/admin/billing/billingGenerateConfirmBridge.js');
+  const modalFile = read('frontend/src/admin/billing/components/BillingInvoicePreflightModal.jsx');
+  const panelFile = read('frontend/src/admin/billing/panels/BillingPendingOrdersPanel.jsx');
+  const serviceFile = read('backend/services/adminBillingService.js');
+  const routeFile = read('backend/routes/adminBilling.js');
 
-  assertIncludes(
+  assertNotIncludes(
     mainFile,
     './admin/billing/billingGenerateConfirmBridge',
-    'main.jsx debe cargar la confirmación visual de generar factura.'
+    'main.jsx no debe cargar el puente global basado en window.confirm.'
   );
 
   [
-    'installBillingGenerateConfirmBridge',
-    "window.location.pathname === '/admin/facturacion/ordenes'",
-    "normalizeText(button.textContent) === 'Generar'",
-    '¿Seguro que deseas generar factura para la orden',
-    'ElectronicInvoice',
-    'window.confirm',
-    'event.stopImmediatePropagation',
-    'data-billing-generate-confirmed',
+    'Control fiscal obligatorio',
+    'Revisa antes de emitir en Factus',
+    'Comprador que recibirá Factus',
+    'Conceptos que se enviarán',
+    'Confirmar y emitir',
+    'preflight?.fingerprint',
   ].forEach((needle) => {
-    assertIncludes(bridgeFile, needle, `billingGenerateConfirmBridge no protege Generar factura: falta ${needle}`);
+    assertIncludes(modalFile, needle, `La vista previa fiscal no protege la emisión: falta ${needle}`);
   });
 
-  ok('Botón Generar factura exige confirmación visual antes de crear ElectronicInvoice');
+  [
+    'getBillingInvoicePreflight',
+    'generateBillingInvoiceForOrder(',
+    'reviewedPreflight.fingerprint',
+    '<BillingInvoicePreflightModal',
+  ].forEach((needle) => {
+    assertIncludes(panelFile, needle, `El panel no conecta el precontrol fiscal: falta ${needle}`);
+  });
+
+  assertIncludes(serviceFile, 'assertPreflightReady(preflight, options.preflightFingerprint)');
+  assertIncludes(routeFile, "'/orders/:orderId/preflight'");
+  assertIncludes(routeFile, 'preflightFingerprint: req.body?.preflightFingerprint');
+
+  ok('La emisión exige revisar y confirmar la fotografía fiscal exacta');
 }
 
 function validateScriptRegistered() {
@@ -253,7 +269,7 @@ function main() {
     validateFactusValidationMessage();
     validateFrontendGeneration();
     validateGeneratedIsNotValidated();
-    validateGenerateConfirmationBridge();
+    validateGeneratePreflight();
     validateScriptRegistered();
   } catch (error) {
     fail('Error validando generación de factura', error);

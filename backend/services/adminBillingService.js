@@ -16,6 +16,10 @@ const {
   issueElectronicInvoiceForOrder,
 } = require('./electronicInvoiceIssuanceService');
 const {
+  assertPreflightReady,
+  buildInvoicePreflight,
+} = require('./billingInvoicePreflightService');
+const {
   buildCreditNotesPaginationPipeline,
   buildInvoiceSummaryPipeline,
   buildPendingOrdersCountPipeline,
@@ -397,7 +401,14 @@ async function getBillingSettingsSnapshot() {
   };
 }
 
+async function getInvoicePreflight(orderId) {
+  return buildInvoicePreflight(orderId);
+}
+
 async function generateInvoiceForOrder(orderId, options = {}) {
+  const preflight = await buildInvoicePreflight(orderId);
+  assertPreflightReady(preflight, options.preflightFingerprint);
+
   const result = await issueElectronicInvoiceForOrder({
     orderId,
     source: 'admin',
@@ -581,6 +592,7 @@ module.exports = {
   getBillingSummary,
   getBillingSettingsSnapshot,
   generateInvoiceForOrder,
+  getInvoicePreflight,
   getMailConfigurationSnapshot,
   listCreditNotes,
   listElectronicInvoices,

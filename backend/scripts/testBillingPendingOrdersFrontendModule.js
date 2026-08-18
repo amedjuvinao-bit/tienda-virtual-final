@@ -63,9 +63,11 @@ function validatePendingOrdersPage() {
     'Buscar orden o cliente',
     'Incluye órdenes pagadas sin factura y emisiones rechazadas',
     'Emisión rechazada',
-    'Reintentar',
+    'Revisar y reintentar',
     'Ver orden',
-    'Generar',
+    'Revisar y emitir',
+    'BillingInvoicePreflightModal',
+    'getBillingInvoicePreflight',
     "return <BillingPendingOrdersPanel />;",
   ].forEach((needle) => {
     assertIncludes(pageFile, needle, `AdminBillingPage no conecta Órdenes por facturar correctamente: falta ${needle}`);

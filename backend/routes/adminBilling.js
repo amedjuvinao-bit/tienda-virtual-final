@@ -325,6 +325,42 @@ router.get(
   }
 );
 
+router.get(
+  '/orders/:orderId/preflight',
+  requirePermission('billing:create'),
+  async (req, res) => {
+    try {
+      const access = await authorizeOrderAdminScope(
+        req,
+        req.params.orderId,
+        Order
+      );
+
+      if (!access.ok) {
+        return res.status(access.status || 403).json({
+          ok: false,
+          error: access.error || 'ORDER_BRANCH_ACCESS_DENIED',
+          message:
+            access.message ||
+            'No tienes permiso para operar órdenes de esta sede.',
+        });
+      }
+
+      const data = await billingService.getInvoicePreflight(
+        req.params.orderId
+      );
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.json({ ok: true, data });
+    } catch (error) {
+      return sendError(
+        res,
+        error,
+        'No fue posible preparar la vista previa fiscal.'
+      );
+    }
+  }
+);
+
 router.post(
   '/orders/:orderId/generate',
   requirePermission('billing:create'),
@@ -348,6 +384,7 @@ router.post(
 
       const data = await billingService.generateInvoiceForOrder(req.params.orderId, {
         adminUser: currentAdmin(req),
+        preflightFingerprint: req.body?.preflightFingerprint,
       });
 
       res.status(data.created ? 201 : 200).json({ ok: true, data });

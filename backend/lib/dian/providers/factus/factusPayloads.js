@@ -80,11 +80,18 @@ function buildFactusCustomer(order = {}) {
   const firstName = trimSafe(billing?.firstName || billing?.name || customer?.name, 100);
   const lastName = trimSafe(billing?.lastName || billing?.lastname || customer?.lastname, 100);
   const naturalName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const explicitFinalConsumer =
+    billing?.isFinalConsumer === true ||
+    customer?.isFinalConsumer === true ||
+    order?.pos?.customerMode === 'guest' ||
+    (String(order?.source || '').trim().toLowerCase() === 'pos' &&
+      order?.pos?.quickSale === true);
   const isPosConsumerFinal =
     !rawIdentification &&
     String(order?.source || '').trim().toLowerCase() === 'pos' &&
     /consumidor final/i.test(naturalName);
-  const identification = isPosConsumerFinal ? '222222222222' : rawIdentification;
+  const isFinalConsumer = explicitFinalConsumer || isPosConsumerFinal;
+  const identification = isFinalConsumer ? '222222222222' : rawIdentification;
   const businessName = trimSafe(
     billing?.businessName || billing?.company || customer?.businessName || '',
     180
@@ -122,7 +129,7 @@ function buildFactusCustomer(order = {}) {
     factusCustomer.company = businessName;
     if (businessName) factusCustomer.trade_name = businessName;
   } else {
-    factusCustomer.names = naturalName || (isPosConsumerFinal ? 'Consumidor final' : '');
+    factusCustomer.names = naturalName || (isFinalConsumer ? 'Consumidor final' : '');
   }
 
   if (countryCode === 'CO' && municipalityCode) {

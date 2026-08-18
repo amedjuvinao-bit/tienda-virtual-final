@@ -91,6 +91,9 @@ jobs:
       - name: Validar arquitectura y rendimiento de órdenes
         run: npm --prefix backend run test:orders-architecture
 
+      - name: Validar permisos y seguridad de órdenes
+        run: npm --prefix backend run test:orders-security
+
       - name: Validar logística avanzada de órdenes
         run: npm --prefix backend run test:orders-logistics
 
@@ -108,6 +111,15 @@ jobs:
 
       - name: Validar conexión transaccional entre órdenes y clientes
         run: npm --prefix backend run test:orders-customer-connection
+
+      - name: Validar municipio fiscal de órdenes
+        run: npm --prefix backend run test:orders-billing-municipality
+
+      - name: Validar orden manual facturable sin emitir documentos
+        run: npm --prefix backend run test:orders-manual-invoice
+
+      - name: Validar precontrol fiscal previo a emisión
+        run: npm --prefix backend run test:billing-invoice-preflight
 
       - name: Validar aislamiento del plan de estrés de órdenes
         run: npm --prefix backend run test:orders-stress-plan
@@ -207,7 +219,8 @@ jobs:
       - name: Validar estados masivos de órdenes
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_bulk_status?replicaSet=rs0
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:order-bulk-status-inventory
 
@@ -227,7 +240,8 @@ jobs:
       - name: Validar venta integral completa
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_complete_sale?replicaSet=rs0
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:complete-sale-integration
 
@@ -254,7 +268,8 @@ jobs:
       - name: Validar cumplimiento por tipo de producto
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_fulfillment
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:product-fulfillment-integration
 
@@ -296,11 +311,32 @@ jobs:
       - name: Validar vista previa asistida de WhatsApp para órdenes
         run: npm --prefix frontend run test:orders-whatsapp-assisted
 
+      - name: Validar permisos visuales de órdenes
+        run: npm --prefix frontend run test:orders-security
+
+      - name: Validar arquitectura de consultas de órdenes
+        run: npm --prefix frontend run test:orders-architecture
+
+      - name: Validar logística visual de órdenes
+        run: npm --prefix frontend run test:orders-logistics
+
+      - name: Validar centro operativo visual de órdenes
+        run: npm --prefix frontend run test:orders-operations
+
+      - name: Validar relato profesional del detalle de orden
+        run: npm --prefix frontend run test:orders-detail-story
+
+      - name: Validar teclado, copiar y pegar dentro del detalle
+        run: npm --prefix frontend run test:orders-keyboard
+
       - name: Validar corrección y sincronización del cliente desde la orden
         run: npm --prefix frontend run test:orders-customer-connection
 
       - name: Validar interfaz posventa RMA de órdenes
         run: npm --prefix frontend run test:orders-returns
+
+      - name: Validar vista previa fiscal antes de emitir
+        run: npm --prefix frontend run test:billing-invoice-preflight
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

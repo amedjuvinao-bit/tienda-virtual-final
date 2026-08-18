@@ -572,6 +572,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Listar órdenes pendientes por facturar.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/billing/orders/:orderId/preflight',
+    permission: 'billing:create',
+    description: 'Revisar la fotografía fiscal exacta antes de emitir una factura electrónica.',
+    audit: true,
+  },
+  {
     method: 'POST',
     path: '/api/admin/billing/orders/:orderId/generate',
     permission: 'billing:create',

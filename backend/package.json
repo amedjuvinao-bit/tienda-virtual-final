@@ -101,6 +101,7 @@
     "test:billing-documents": "node scripts/testBillingDocumentsFrontendModule.js",
     "test:billing-pending-orders": "node scripts/testBillingPendingOrdersFrontendModule.js",
     "test:billing-generate-invoice": "node scripts/testBillingGenerateInvoiceModule.js",
+    "test:billing-invoice-preflight": "node scripts/testBillingInvoicePreflightModule.js",
     "test:billing-summary": "node scripts/testBillingSummaryFrontendModule.js",
     "test:billing-credit-notes": "node scripts/testBillingCreditNotesModule.js",
     "test:billing-sync": "node scripts/testBillingSyncModule.js",
