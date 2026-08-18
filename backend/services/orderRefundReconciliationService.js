@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const OrderRefund = require('../models/OrderRefund');
+const OrderReturn = require('../models/OrderReturn');
 const { recalculateCashSession } = require('./cashSessionService');
 
 const RESOLVED_STAGE_STATES = new Set(['completed', 'not_required']);
@@ -66,6 +67,8 @@ function pendingActions(reconciliation = {}) {
   const billingState = stageState(reconciliation.billing);
 
   if (paymentState === 'action_required') actions.push('confirm_payment_reversal');
+  if (paymentState === 'failed') actions.push('retry_payment_refund');
+  if (paymentState === 'processing') actions.push('wait_payment_refund');
   if (billingState === 'action_required') actions.push('issue_credit_note');
   if (billingState === 'pending') actions.push('review_pending_invoice');
   if (cashState === 'failed') actions.push('retry_cash_reconciliation');
@@ -74,7 +77,8 @@ function pendingActions(reconciliation = {}) {
 }
 
 function billingStageForInvoice(invoice, currentStage = {}) {
-  if (stageState(currentStage) === 'completed') return currentStage;
+  const currentState = stageState(currentStage);
+  if (currentState === 'completed') return currentStage;
 
   const now = new Date();
   if (!invoice || INVOICE_WITHOUT_FISCAL_EFFECT.has(cleanLower(invoice.status, 40))) {
@@ -89,6 +93,7 @@ function billingStageForInvoice(invoice, currentStage = {}) {
   }
 
   if (isValidatedInvoice(invoice)) {
+    if (['processing', 'failed'].includes(currentState)) return currentStage;
     return {
       state: 'action_required',
       reference: cleanText(invoice.invoiceNumber || invoice?.provider?.number, 220),
@@ -242,6 +247,32 @@ async function refreshOrderRefundReconciliation(refundId, options = {}) {
     { $set: orderUpdate },
     session ? { session } : undefined
   );
+
+  if (refund.returnCase) {
+    const resolutionState =
+      refund.reconciliation.state === 'completed'
+        ? 'completed'
+        : refund.reconciliation.state === 'pending'
+          ? 'pending'
+          : 'action_required';
+    await OrderReturn.updateOne(
+      {
+        _id: refund.returnCase,
+        order: order._id,
+        'resolution.refund': refund._id,
+      },
+      {
+        $set: {
+          'resolution.state': resolutionState,
+          'resolution.completedAt':
+            resolutionState === 'completed'
+              ? refund.reconciliation.completedAt || now
+              : null,
+        },
+      },
+      session ? { session } : undefined
+    );
+  }
 
   return refund;
 }

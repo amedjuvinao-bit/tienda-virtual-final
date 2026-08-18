@@ -138,9 +138,14 @@ function run() {
   assert(ordersRoute.includes('confirmRefundPaymentReversal'));
   const reconciliationSource = source('services/orderRefundReconciliationService.js');
   assert(reconciliationSource.includes('PAYMENT_REVERSAL_REFERENCE_REQUIRED'));
-  assert(!reconciliationSource.includes('fetch('));
-  assert(!reconciliationSource.includes('axios.'));
-  ok('reverso monetario exige evidencia y no simula una devolución automática del gateway');
+  const automationSource = source('services/orderRefundAutomationService.js');
+  const gatewaySource = source('services/wompiRefundGatewayService.js');
+  assert(ordersRoute.includes("'/:id/refunds/:refundId/automate'"));
+  assert(ordersRoute.includes("requirePermission('billing:credit_note')"));
+  assert(automationSource.includes('claimStage'));
+  assert(gatewaySource.includes('/void'));
+  assert(gatewaySource.includes('manualRequired'));
+  ok('el reverso automático usa bloqueo persistente y conserva confirmación manual cuando no aplica');
 
   const paymentsRoute = source('routes/payments.js');
   assert(paymentsRoute.includes("requirePermission('billing:credit_note')"));

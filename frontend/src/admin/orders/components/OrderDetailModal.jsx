@@ -55,6 +55,7 @@ export default function OrderDetailModal({
   canUpdateFulfillment = false,
   canDownloadBilling = false,
   canRefund = false,
+  canAutomateRefund = false,
   canManageReturns = false,
   savingId,
 }) {
@@ -69,6 +70,7 @@ export default function OrderDetailModal({
   const [refunds, setRefunds] = useState([]);
   const [refundsLoading, setRefundsLoading] = useState(false);
   const [confirmingRefundId, setConfirmingRefundId] = useState('');
+  const [automatingRefundId, setAutomatingRefundId] = useState('');
   const [returnsData, setReturnsData] = useState({
     orderId: '',
     policy: {},
@@ -298,7 +300,7 @@ export default function OrderDetailModal({
       showToast({
         type: 'success',
         title: 'Reembolso creado',
-        message: 'El RMA quedó resuelto; falta conciliar el movimiento de dinero.',
+        message: 'La inspección RMA terminó; dinero y documento fiscal siguen visibles hasta cerrar la conciliación.',
       });
       await Promise.all([fetchReturns(), fetchRefunds(), fetchTimeline()]);
     } catch (error) {
@@ -358,6 +360,42 @@ export default function OrderDetailModal({
       });
     } finally {
       setConfirmingRefundId('');
+    }
+  };
+
+  const automateRefund = async (refund) => {
+    if (!canAutomateRefund || !order?._id || !refund?._id) return;
+    try {
+      setAutomatingRefundId(refund._id);
+      const response = await api.post(
+        `/api/orders/${order._id}/refunds/${refund._id}/automate`,
+        {},
+        { timeout: 90000 }
+      );
+      const completed = response?.data?.completed === true;
+      const paymentOutcome = response?.data?.outcomes?.payment || {};
+      showToast({
+        type: completed ? 'success' : 'info',
+        title: completed ? 'Reembolso conciliado' : 'Automatización avanzada',
+        message: completed
+          ? 'Dinero, inventario y documento fiscal quedaron conciliados con trazabilidad.'
+          : paymentOutcome.message ||
+            'Se automatizaron las etapas compatibles; las acciones manuales siguen visibles.',
+        persist: !completed,
+      });
+      await Promise.all([fetchRefunds(), fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'No se pudo automatizar',
+        message:
+          error?.response?.data?.message ||
+          'No se movió ninguna etapa sin confirmación. Revisa el detalle e intenta nuevamente.',
+        persist: true,
+      });
+      await fetchRefunds();
+    } finally {
+      setAutomatingRefundId('');
     }
   };
 
@@ -763,6 +801,9 @@ export default function OrderDetailModal({
           canConfirmRefundPayment={canRefund}
           confirmingRefundId={confirmingRefundId}
           onConfirmRefundPayment={confirmRefundPayment}
+          canAutomateRefund={canAutomateRefund}
+          automatingRefundId={automatingRefundId}
+          onAutomateRefund={automateRefund}
           returnsData={returnsData}
           returnsLoading={returnsLoading}
           returnBusyId={returnBusyId}

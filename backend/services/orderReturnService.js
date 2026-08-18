@@ -941,11 +941,17 @@ async function resolveOrderReturnRefund(
       returnCase.resolvedBy = actorSnapshot(actor);
       returnCase.resolution = {
         type: 'refund',
-        state: 'completed',
+        state:
+          refundResult.refund?.reconciliation?.state === 'completed'
+            ? 'completed'
+            : 'action_required',
         amount: refundAmount,
         reference: refundResult.refund?.refundNumber || '',
         refund: refundResult.refund?._id || null,
-        completedAt: now,
+        completedAt:
+          refundResult.refund?.reconciliation?.state === 'completed'
+            ? now
+            : null,
       };
       returnCase.revision += 1;
       await returnCase.save({ session });

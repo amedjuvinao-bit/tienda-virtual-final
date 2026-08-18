@@ -46,6 +46,9 @@ const {
   listOrderRefunds,
 } = require('../services/orderRefundReconciliationService');
 const {
+  automateOrderRefund,
+} = require('../services/orderRefundAutomationService');
+const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
 const {
@@ -2732,6 +2735,50 @@ router.post(
         ok: false,
         error: error?.code || 'PAYMENT_REVERSAL_CONFIRMATION_FAILED',
         message: error?.message || 'No se pudo confirmar la devolución del dinero.',
+        details: error?.details || undefined,
+      });
+    }
+  }
+);
+
+router.options('/:id/refunds/:refundId/automate', (_req, res) =>
+  res.sendStatus(204)
+);
+
+router.post(
+  '/:id/refunds/:refundId/automate',
+  requireAdmin,
+  requirePermission('orders:refund'),
+  requirePermission('billing:credit_note'),
+  async (req, res) => {
+    try {
+      if (!(await ensureOrderOperationAccess(req, res, req.params.id))) return;
+      const result = await automateOrderRefund(
+        {
+          orderId: req.params.id,
+          refundId: req.params.refundId,
+          adminLabel:
+            req.adminDisplayName ||
+            req.adminUsername ||
+            req.user?.displayName ||
+            req.user?.username ||
+            'admin',
+        },
+        { OrderEventModel: OrderEvent }
+      );
+
+      return res.status(result.completed ? 200 : 202).json({
+        ok: true,
+        message: result.completed
+          ? 'Reembolso conciliado automáticamente.'
+          : 'La automatización avanzó y dejó visibles las acciones que aún requieren intervención.',
+        ...result,
+      });
+    } catch (error) {
+      return res.status(Number(error?.statusCode || 500)).json({
+        ok: false,
+        error: error?.code || 'ORDER_REFUND_AUTOMATION_FAILED',
+        message: error?.message || 'No se pudo automatizar el cierre del reembolso.',
         details: error?.details || undefined,
       });
     }

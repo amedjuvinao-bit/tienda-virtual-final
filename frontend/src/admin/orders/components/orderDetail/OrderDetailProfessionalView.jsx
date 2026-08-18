@@ -69,6 +69,9 @@ export default function OrderDetailProfessionalView({
   canConfirmRefundPayment = false,
   confirmingRefundId = '',
   onConfirmRefundPayment,
+  canAutomateRefund = false,
+  automatingRefundId = '',
+  onAutomateRefund,
   returnsData = {},
   returnsLoading = false,
   returnBusyId = '',
@@ -183,6 +186,9 @@ export default function OrderDetailProfessionalView({
           canConfirmPayment={canConfirmRefundPayment}
           confirmingId={confirmingRefundId}
           onConfirmPayment={onConfirmRefundPayment}
+          canAutomate={canAutomateRefund}
+          automatingId={automatingRefundId}
+          onAutomate={onAutomateRefund}
         />
       </>
     ),

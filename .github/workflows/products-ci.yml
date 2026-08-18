@@ -88,6 +88,9 @@ jobs:
       - name: Validar conciliación comercial de órdenes
         run: npm --prefix backend run test:order-commercial-reconciliation
 
+      - name: Validar automatización segura de reembolsos
+        run: npm --prefix backend run test:order-refund-automation
+
       - name: Validar arquitectura y rendimiento de órdenes
         run: npm --prefix backend run test:orders-architecture
 

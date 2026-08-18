@@ -37,6 +37,9 @@ export default function OrderDetailRefundReconciliation({
   canConfirmPayment = false,
   confirmingId = '',
   onConfirmPayment,
+  canAutomate = false,
+  automatingId = '',
+  onAutomate,
 }) {
   const [references, setReferences] = useState({});
 
@@ -58,6 +61,16 @@ export default function OrderDetailRefundReconciliation({
           const reconciliation = refund?.reconciliation || {};
           const paymentState = reconciliation?.payment?.state || 'pending';
           const reference = references[refund._id] || '';
+          const automationRequired = ['payment', 'billing'].some((key) =>
+            ['action_required', 'failed'].includes(reconciliation?.[key]?.state)
+          );
+          const isAutomating = automatingId === refund._id;
+          const isConfirming = confirmingId === refund._id;
+          const stageMessages = STAGES.flatMap(([key, label]) => {
+            const stage = reconciliation?.[key] || {};
+            if (!stage.errorMessage && !stage.reference && !stage.providerStatus) return [];
+            return [{ key, label, ...stage }];
+          });
 
           return (
             <article
@@ -121,6 +134,52 @@ export default function OrderDetailRefundReconciliation({
                 })}
               </div>
 
+              {stageMessages.length ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 5,
+                    marginTop: 10,
+                    color: ORDER_DETAIL_THEME.mutedText,
+                    fontSize: 11,
+                  }}
+                >
+                  {stageMessages.map((stage) => (
+                    <div key={stage.key}>
+                      <strong style={{ color: ORDER_DETAIL_THEME.cardText }}>
+                        {stage.label}:
+                      </strong>{' '}
+                      {stage.errorMessage || stage.reference || stage.providerStatus}
+                      {stage.attempts ? ` · intento ${stage.attempts}` : ''}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {canAutomate && automationRequired ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button
+                    type="button"
+                    disabled={isAutomating || isConfirming}
+                    onClick={() => onAutomate?.(refund)}
+                    style={{
+                      border: 0,
+                      borderRadius: 12,
+                      padding: '10px 14px',
+                      background: ORDER_DETAIL_THEME.primary,
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      cursor: isAutomating ? 'wait' : 'pointer',
+                      opacity: isAutomating || isConfirming ? 0.6 : 1,
+                    }}
+                  >
+                    {isAutomating ? 'Automatizando…' : 'Automatizar cierre'}
+                  </button>
+                </div>
+              ) : null}
+
               {reconciliation?.billing?.state === 'action_required' ? (
                 <div style={{ marginTop: 12 }}>
                   <InfoLine
@@ -131,7 +190,7 @@ export default function OrderDetailRefundReconciliation({
                 </div>
               ) : null}
 
-              {paymentState === 'action_required' ? (
+              {['action_required', 'failed'].includes(paymentState) ? (
                 <div
                   style={{
                     display: 'grid',
@@ -150,7 +209,7 @@ export default function OrderDetailRefundReconciliation({
                       }))
                     }
                     placeholder="Referencia del reintegro o comprobante"
-                    disabled={!canConfirmPayment || confirmingId === refund._id}
+                    disabled={!canConfirmPayment || isConfirming || isAutomating}
                     style={{
                       minWidth: 0,
                       border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -166,7 +225,8 @@ export default function OrderDetailRefundReconciliation({
                     disabled={
                       !canConfirmPayment ||
                       reference.trim().length < 4 ||
-                      confirmingId === refund._id
+                      isConfirming ||
+                      isAutomating
                     }
                     onClick={() => onConfirmPayment?.(refund, reference.trim())}
                     style={{
@@ -182,7 +242,7 @@ export default function OrderDetailRefundReconciliation({
                         !canConfirmPayment || reference.trim().length < 4 ? 0.5 : 1,
                     }}
                   >
-                    {confirmingId === refund._id ? 'Conciliando…' : 'Confirmar dinero devuelto'}
+                    {isConfirming ? 'Conciliando…' : 'Confirmar dinero devuelto'}
                   </button>
                 </div>
               ) : null}

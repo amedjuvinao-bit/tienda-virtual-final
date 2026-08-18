@@ -417,11 +417,14 @@ export default function OrderDetailReturnsPanel({
                 </div>
               ) : null}
 
-              {returnCase.resolution?.state === 'completed' ? (
+              {returnCase.resolution?.state ? (
                 <div style={{ marginTop: 10, color: ORDER_DETAIL_THEME.mutedText, fontSize: 11 }}>
                   Resolución: <strong style={{ color: ORDER_DETAIL_THEME.cardText }}>{resolutionLabel(returnCase.resolution.type)}</strong>
                   {returnCase.resolution.reference ? ` · ${returnCase.resolution.reference}` : ''}
                   {returnCase.resolution.replacementOrderNumber ? ` · ${returnCase.resolution.replacementOrderNumber}` : ''}
+                  {returnCase.resolution.state !== 'completed'
+                    ? ' · conciliación en curso'
+                    : ''}
                 </div>
               ) : null}
             </article>

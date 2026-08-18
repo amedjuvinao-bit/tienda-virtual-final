@@ -208,7 +208,9 @@ Los estados posibles por etapa son `not_required`, `pending`, `action_required`,
 
 El endpoint `POST /api/orders/:orderId/refunds/:refundId/confirm-payment` exige permiso `orders:refund`, alcance sobre la sede y una referencia verificable. Una repetición con la misma referencia es idempotente; una referencia diferente después del cierre produce conflicto.
 
-No se simula un reembolso automático de Wompi. La integración existente conserva el identificador de transacción, pero la devolución monetaria permanece como `action_required` hasta que el operador confirma el comprobante real. Esto evita tratar un `void` limitado o un procedimiento externo como si fuera un reembolso parcial universal.
+La Fase 2 incorpora automatización segura del cierre. Para una transacción Wompi con tarjeta, pago aprobado, ambiente coincidente y devolución total única, el administrador puede solicitar el `void` oficial. La operación toma primero un bloqueo persistente, consulta el estado remoto y reutiliza un `VOIDED` existente para evitar duplicados.
+
+Los reembolsos parciales, pagos mixtos, efectivo, POS, PayU y cualquier medio sin una operación remota compatible permanecen en `action_required`. El panel explica la causa y conserva el campo para registrar el comprobante real; nunca presenta una devolución manual como automática.
 
 ### Caja y pagos mixtos
 
@@ -223,7 +225,9 @@ Una devolución registrada reduce la venta neta, pero no reduce el efectivo espe
 
 ### Nota crédito
 
-Cuando existe una factura Factus validada, la conciliación fiscal queda en `action_required`. `POST /api/payments/admin/create-credit-note/:orderId` puede recibir `refundId`; después de crear o reutilizar idempotentemente la nota oficial, la vincula con esa devolución.
+Cuando existe una factura Factus validada, la conciliación fiscal queda en `action_required`. `POST /api/payments/admin/create-credit-note/:orderId` puede recibir `refundId`; después de crear o reutilizar idempotentemente la nota oficial, la vincula con esa devolución. La acción `POST /api/orders/:id/refunds/:refundId/automate` ejecuta el mismo contrato fiscal con una clave estable derivada del reembolso y exige simultáneamente `orders:refund` y `billing:credit_note`.
+
+En el detalle administrativo, **Pago y factura > Devoluciones y conciliación > Automatizar cierre** intenta únicamente las etapas compatibles. Inventario, dinero, caja, nota crédito, intentos, referencias, estado del proveedor y fallos continúan guardados en la base principal para trazabilidad.
 
 Si Factus ya creó el documento y falla únicamente el enlace local, la respuesta conserva `success: true`, usa HTTP 202 y entrega `reconciliationWarning`. Reintentar con la misma clave recupera el vínculo sin duplicar el documento fiscal.
 

@@ -46,6 +46,7 @@
     "test:variant-key-authority": "node scripts/testVariantKeyAuthority.js",
     "test:order-refund-contract": "node scripts/testOrderRefundContract.js",
     "test:order-commercial-reconciliation": "node scripts/testOrderCommercialReconciliationContract.js",
+    "test:order-refund-automation": "node scripts/testOrderRefundAutomationContract.js",
     "test:order-refund-inventory": "node scripts/testOrderRefundInventoryIntegration.js",
     "test:order-bulk-status-contract": "node scripts/testOrderBulkStatusContract.js",
     "test:order-bulk-status-inventory": "node scripts/testOrderBulkStatusIntegration.js",

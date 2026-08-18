@@ -144,6 +144,10 @@ const ReconciliationStageSchema = new Schema(
     lastAttemptAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     completedByLabel: { type: String, trim: true, default: '', maxlength: 160 },
+    attempts: { type: Number, default: 0, min: 0 },
+    operationKey: { type: String, trim: true, default: '', maxlength: 160 },
+    providerStatus: { type: String, trim: true, default: '', maxlength: 80 },
+    nextRetryAt: { type: Date, default: null },
   },
   { _id: false }
 );

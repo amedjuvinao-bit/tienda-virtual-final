@@ -52,4 +52,23 @@ describe('conciliación comercial de devoluciones', () => {
 
     expect(onConfirmPayment).toHaveBeenCalledWith(refund, 'REVERSO-4581');
   });
+
+  it('permite automatizar las etapas compatibles sin ocultar la salida manual', () => {
+    const onAutomate = vi.fn();
+    render(
+      <OrderDetailRefundReconciliation
+        refunds={[refund]}
+        canConfirmPayment
+        canAutomate
+        onAutomate={onAutomate}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Automatizar cierre' }));
+
+    expect(onAutomate).toHaveBeenCalledWith(refund);
+    expect(
+      screen.getByRole('button', { name: 'Confirmar dinero devuelto' })
+    ).toBeInTheDocument();
+  });
 });
