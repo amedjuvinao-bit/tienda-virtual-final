@@ -1,5 +1,15 @@
+import { createElement } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { shouldCloseOrderDetailFromKeyboard } from './OrderDetailModal';
+import OrderDetailModal, {
+  isolateOrderDetailKeyboardEvent,
+} from './OrderDetailModal';
+
+vi.mock('../../../lib/api', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}));
 
 function keyboardEvent(overrides = {}) {
   return {
@@ -14,44 +24,63 @@ function keyboardEvent(overrides = {}) {
   };
 }
 
-describe('protección de teclado del detalle de la orden', () => {
-  it('no cierra el modal al copiar, pegar o seleccionar con el teclado', () => {
-    const target = { closest: vi.fn(() => null) };
+describe('aislamiento de teclado del detalle de la orden', () => {
+  it.each([
+    ['Control', { key: 'Control', ctrlKey: true }],
+    ['copiar', { key: 'c', ctrlKey: true }],
+    ['pegar', { key: 'v', ctrlKey: true }],
+    ['seleccionar', { key: 'a', ctrlKey: true }],
+    ['Escape', { key: 'Escape' }],
+  ])('detiene %s dentro del modal sin bloquear su acción normal', (_label, overrides) => {
+    const stopPropagation = vi.fn();
+    const preventDefault = vi.fn();
+    const event = keyboardEvent({
+      ...overrides,
+      stopPropagation,
+      preventDefault,
+    });
 
-    expect(
-      shouldCloseOrderDetailFromKeyboard(
-        keyboardEvent({ key: 'c', ctrlKey: true, target })
-      )
-    ).toBe(false);
-    expect(
-      shouldCloseOrderDetailFromKeyboard(
-        keyboardEvent({ key: 'v', ctrlKey: true, target })
-      )
-    ).toBe(false);
-    expect(
-      shouldCloseOrderDetailFromKeyboard(
-        keyboardEvent({ key: 'a', ctrlKey: true, target })
-      )
-    ).toBe(false);
+    isolateOrderDetailKeyboardEvent(event);
+
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 
-  it('protege Escape cuando el foco permanece en un campo editable', () => {
-    const target = { closest: vi.fn(() => ({ tagName: 'INPUT' })) };
+  it('mantiene abierto el modal real y evita que sus teclas lleguen a manejadores globales', () => {
+    const onClose = vi.fn();
+    const globalKeyDown = vi.fn();
+    window.addEventListener('keydown', globalKeyDown);
 
-    expect(
-      shouldCloseOrderDetailFromKeyboard(
-        keyboardEvent({ key: 'Escape', target })
-      )
-    ).toBe(false);
-  });
+    try {
+      render(
+        createElement(OrderDetailModal, {
+          open: true,
+          onClose,
+          order: {
+            _id: 'order-keyboard-test',
+            orderNumber: 'ORD-KEYBOARD-TEST',
+            status: 'paid',
+            items: [],
+            customer: {},
+            billing: {},
+          },
+        })
+      );
 
-  it('conserva Escape como cierre cuando no se está editando', () => {
-    const target = { closest: vi.fn(() => null) };
+      const dialog = screen.getByRole('dialog');
+      fireEvent.keyDown(dialog, { key: 'Control', ctrlKey: true });
+      fireEvent.keyDown(dialog, { key: 'c', ctrlKey: true });
+      fireEvent.keyDown(dialog, { key: 'v', ctrlKey: true });
+      fireEvent.paste(dialog);
+      fireEvent.keyDown(dialog, { key: 'Escape' });
 
-    expect(
-      shouldCloseOrderDetailFromKeyboard(
-        keyboardEvent({ key: 'Escape', target })
-      )
-    ).toBe(true);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(globalKeyDown).not.toHaveBeenCalled();
+
+      fireEvent.click(dialog);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('keydown', globalKeyDown);
+    }
   });
 });

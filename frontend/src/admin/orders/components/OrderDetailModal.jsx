@@ -32,32 +32,8 @@ function getWhatsAppAvailability(order = {}) {
       };
 }
 
-export function shouldCloseOrderDetailFromKeyboard(event = {}) {
-  if (
-    event.key !== 'Escape' ||
-    event.defaultPrevented ||
-    event.isComposing ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey
-  ) {
-    return false;
-  }
-
-  const target = event.target;
-  const editingSelector = [
-    'input',
-    'textarea',
-    'select',
-    '[contenteditable="true"]',
-    '[role="textbox"]',
-  ].join(',');
-
-  return !(
-    target &&
-    typeof target.closest === 'function' &&
-    target.closest(editingSelector)
-  );
+export function isolateOrderDetailKeyboardEvent(event = {}) {
+  event.stopPropagation?.();
 }
 
 export default function OrderDetailModal({
@@ -171,22 +147,6 @@ export default function OrderDetailModal({
       document.body.style.overflow = previousOverflow || '';
     };
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const handleKeyDown = (event) => {
-      if (shouldCloseOrderDetailFromKeyboard(event)) {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open, onClose]);
 
   useEffect(() => {
     if (!emailMenuOpen) return undefined;
@@ -716,6 +676,11 @@ export default function OrderDetailModal({
       className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center p-2 md:p-4"
       aria-modal="true"
       role="dialog"
+      onKeyDown={isolateOrderDetailKeyboardEvent}
+      onKeyUp={isolateOrderDetailKeyboardEvent}
+      onCopy={isolateOrderDetailKeyboardEvent}
+      onCut={isolateOrderDetailKeyboardEvent}
+      onPaste={isolateOrderDetailKeyboardEvent}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
