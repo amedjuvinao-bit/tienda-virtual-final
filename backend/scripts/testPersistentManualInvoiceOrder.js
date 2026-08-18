@@ -7,6 +7,9 @@ const path = require('path');
 
 const Order = require('../models/Order');
 const {
+  buildFactusCustomer,
+} = require('../lib/dian/providers/factus/factusPayloads');
+const {
   buildOrderDraft,
   buildTraceIdentity,
   parseArgs,
@@ -71,6 +74,9 @@ async function main() {
     });
     assert.equal(identity.orderNumber, 'FM-20260817223027-070707');
     assert.match(identity.runId, /^manual_invoice_20260817t223027z_070707$/);
+    assert.equal(identity.buyer.documentNumber, '1000460551');
+    assert.equal(identity.buyer.municipalityCode, '11001');
+    assert.match(identity.buyer.email, /\+070707@example\.com$/);
   });
 
   await test('construye una orden pagada, fiscalmente completa y sin factura', () => {
@@ -95,11 +101,34 @@ async function main() {
     assert.equal(draft.items[0].fulfillmentKind, 'shipment');
     assert.equal(draft.billing.personType, 'natural');
     assert.equal(draft.billing.documentType, 'CC');
+    assert.notEqual(draft.billing.documentNumber, '222222222222');
+    assert.equal(draft.billing.isFinalConsumer, false);
     assert.equal(draft.billing.municipalityCode, '11001');
     assert.equal(draft.total, 161600);
     assert.equal(draft.electronicInvoice, undefined);
     assert.equal(draft.invoiceNumber, undefined);
     assert(draft.tags.includes('sin-factura'));
+  });
+
+  await test('envía a Factus el comprador identificado con todos sus datos fiscales', () => {
+    const identity = buildTraceIdentity({
+      now: new Date('2026-08-17T22:30:27.000Z'),
+      randomBytes: fixedBytes,
+    });
+    const draft = buildOrderDraft({
+      candidate: candidateFixture(),
+      now: new Date('2026-08-17T22:30:27.000Z'),
+      identity,
+    });
+    const customer = buildFactusCustomer(draft);
+
+    assert.equal(customer.identification_document_code, '13');
+    assert.equal(customer.identification, '1000460551');
+    assert.equal(customer.names, 'Cliente Prueba Habilitación 070707');
+    assert.equal(customer.email, 'factura.habilitacion+070707@example.com');
+    assert.equal(customer.address, 'Calle 93 # 12-34 · Prueba de habilitación');
+    assert.equal(customer.country_code, 'CO');
+    assert.equal(customer.municipality_code, '11001');
   });
 
   await test('cumple el esquema real de Orden antes de tocar MongoDB', async () => {
