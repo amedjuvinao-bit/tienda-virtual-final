@@ -133,6 +133,8 @@ async function main() {
     assert.match(source, /initializeOrderLogistics/);
     assert.match(source, /session\.withTransaction/);
     assert.match(source, /ElectronicInvoice\.countDocuments/);
+    assert.match(source, /expectedInvoiceCount/);
+    assert.match(source, /CONSERVADOS; no se emitieron nuevos/);
     assert.match(source, /listPendingBillableOrders/);
   });
 
