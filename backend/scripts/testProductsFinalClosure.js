@@ -127,7 +127,7 @@ function run() {
       '--name productos-mongodb',
       '--replSet rs0',
       'PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci',
-      'DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret',
+      'DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}',
       'PUBLIC_BACKEND_URL: https://backend.example',
     ],
     'Entorno de integración'
