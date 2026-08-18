@@ -56,7 +56,12 @@ async function main() {
   await test('exige confirmación porque la orden no se elimina', () => {
     assert.equal(parseArgs([]).confirmPersist, false);
     assert.equal(parseArgs(['--confirm-persist']).confirmPersist, true);
+    assert.equal(
+      parseArgs(['--resume-order=FM-20260818014330-4C50A0']).resumeOrder,
+      'FM-20260818014330-4C50A0'
+    );
     assert.throws(() => parseArgs(['--stock-limit=3']), /stock-limit/);
+    assert.throws(() => parseArgs(['--resume-order=orden con espacios']), /resume-order/);
   });
 
   await test('genera un número único y fácil de buscar en el panel', () => {
@@ -82,8 +87,12 @@ async function main() {
     assert.equal(draft.status, 'paid');
     assert.equal(draft.payment.status, 'paid');
     assert(draft.payment.paidAt instanceof Date);
-    assert.equal(draft.paymentProcessing.inventory.status, 'not_required');
+    assert.equal(draft.paymentProcessing.inventory.status, 'pending');
     assert.equal(draft.paymentProcessing.invoice.status, 'pending');
+    assert.equal(draft.inventoryControl.reservationRequired, true);
+    assert.equal(draft.inventoryControl.discountedAtCheckout, false);
+    assert.equal(draft.items[0].requiresShipping, true);
+    assert.equal(draft.items[0].fulfillmentKind, 'shipment');
     assert.equal(draft.billing.personType, 'natural');
     assert.equal(draft.billing.documentType, 'CC');
     assert.equal(draft.billing.municipalityCode, '11001');
@@ -108,7 +117,7 @@ async function main() {
     assert.equal(order.total, 161600);
   });
 
-  await test('no emite Factus, no borra datos y no modifica inventario', () => {
+  await test('usa la autoridad real de inventario y logística sin emitir Factus ni borrar datos', () => {
     const source = fs.readFileSync(
       path.join(__dirname, 'seedPersistentManualInvoiceOrder.js'),
       'utf8'
@@ -117,11 +126,12 @@ async function main() {
       source,
       /\.(?:deleteOne|deleteMany|findOneAndDelete|findByIdAndDelete|drop)\s*\(/
     );
-    assert.doesNotMatch(
-      source,
-      /(?:InventoryStock|Product|Branch|CashSession|ElectronicInvoice)\.(?:create|insertMany|updateOne|updateMany|findOneAndUpdate|bulkWrite)\s*\(/
-    );
     assert.doesNotMatch(source, /sendElectronicInvoiceToProvider|issueElectronicInvoiceForOrder\s*\(/);
+    assert.match(source, /createInventoryReservation/);
+    assert.match(source, /confirmInventoryReservation/);
+    assert.match(source, /applyReservationToOrderDocument/);
+    assert.match(source, /initializeOrderLogistics/);
+    assert.match(source, /session\.withTransaction/);
     assert.match(source, /ElectronicInvoice\.countDocuments/);
     assert.match(source, /listPendingBillableOrders/);
   });
