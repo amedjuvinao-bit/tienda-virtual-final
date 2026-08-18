@@ -444,12 +444,17 @@ async function persistOperationalTrace({ orderDraft = null, orderId = null, now 
   return Order.findById(persistedOrderId).exec();
 }
 
-async function verifyPendingManualInvoiceOrder(order) {
+async function verifyPendingManualInvoiceOrder(
+  order,
+  { expectedInvoiceCount = 0 } = {}
+) {
   const invoiceCount = await ElectronicInvoice.countDocuments({
     orderId: order._id,
   }).exec();
-  if (invoiceCount !== 0) {
-    throw new Error('La orden ya tiene un documento ElectronicInvoice y no sirve para la prueba manual.');
+  if (invoiceCount !== expectedInvoiceCount) {
+    throw new Error(
+      `La cantidad de facturas cambió durante la operación: antes ${expectedInvoiceCount}, después ${invoiceCount}.`
+    );
   }
 
   const reservation = order.inventoryControl?.reservationId
@@ -468,19 +473,26 @@ async function verifyPendingManualInvoiceOrder(order) {
     throw new Error('La conciliación del inventario no quedó confirmada.');
   }
 
-  const pending = await listPendingBillableOrders({
-    q: order.orderNumber,
-    page: 1,
-    limit: 10,
-  });
-  const listed = pending.rows.find(
-    (row) => String(row.id) === String(order._id)
-  );
-  if (!listed) {
-    throw new Error('La orden se guardó, pero no apareció en Órdenes por facturar.');
+  let listed = null;
+  if (invoiceCount === 0) {
+    const pending = await listPendingBillableOrders({
+      q: order.orderNumber,
+      page: 1,
+      limit: 10,
+    });
+    listed = pending.rows.find(
+      (row) => String(row.id) === String(order._id)
+    );
+    if (!listed) {
+      throw new Error('La orden se guardó, pero no apareció en Órdenes por facturar.');
+    }
   }
 
-  return listed;
+  return {
+    invoiceCount,
+    paymentStatus: listed?.paymentStatus || order.payment?.status || '',
+    pendingBillingVerified: invoiceCount === 0,
+  };
 }
 
 async function run(options = parseArgs()) {
@@ -494,14 +506,14 @@ async function run(options = parseArgs()) {
   const now = new Date();
   let order;
   let recovered = false;
+  let expectedInvoiceCount = 0;
 
   if (options.resumeOrder) {
     const existing = await Order.findOne(orderLookup(options.resumeOrder)).exec();
     if (!existing) throw new Error(`No existe la orden ${options.resumeOrder}.`);
-    const invoiceCount = await ElectronicInvoice.countDocuments({ orderId: existing._id }).exec();
-    if (invoiceCount !== 0) {
-      throw new Error('La orden indicada ya tiene factura electrónica y no corresponde a esta prueba.');
-    }
+    expectedInvoiceCount = await ElectronicInvoice.countDocuments({
+      orderId: existing._id,
+    }).exec();
     order = await persistOperationalTrace({ orderId: existing._id, now });
     recovered = true;
   } else {
@@ -519,7 +531,9 @@ async function run(options = parseArgs()) {
       now,
     });
   }
-  const listed = await verifyPendingManualInvoiceOrder(order);
+  const verification = await verifyPendingManualInvoiceOrder(order, {
+    expectedInvoiceCount,
+  });
 
   console.log('\n=== ORDEN PERSISTENTE SIN FACTURA ELECTRÓNICA Y CON OPERACIÓN ===');
   console.log(`Base principal: ${mongoose.connection.name}`);
@@ -528,16 +542,24 @@ async function run(options = parseArgs()) {
   console.log(`MongoDB ID: ${order._id}`);
   console.log(`Total: $ ${Number(order.total || 0).toLocaleString('es-CO')}`);
   console.log(`Producto: ${order.items[0]?.title || 'Producto de prueba'}`);
-  console.log(`Estado del pago: ${listed.paymentStatus}`);
+  console.log(`Estado del pago: ${verification.paymentStatus}`);
   console.log(`Reserva: ${order.inventoryControl.reservationId}`);
   console.log(`Asignaciones: ${order.inventoryAllocations.length}`);
   console.log(`Envíos preparados: ${order.fulfillment.shipments.length}`);
-  console.log('ElectronicInvoice asociados: 0');
-  console.log('Cola de facturación: VERIFICADA');
+  console.log(
+    `ElectronicInvoice asociados: ${verification.invoiceCount} (CONSERVADOS; no se emitieron nuevos)`
+  );
+  console.log(
+    `Cola de facturación: ${verification.pendingBillingVerified ? 'VERIFICADA' : 'NO APLICA (la orden ya está facturada)'}`
+  );
   console.log('Persistencia: CONSERVADA (sin limpieza automática).');
   console.log(`\nBuscar en Facturación > Órdenes por facturar: ${order.orderNumber}`);
   console.log('En Órdenes > Operación verás inventario vendido y preparación pendiente.');
-  console.log('Después pulsa Emitir/Reintentar para generar tú la factura electrónica.');
+  if (verification.invoiceCount === 0) {
+    console.log('Después pulsa Emitir/Reintentar para generar tú la factura electrónica.');
+  } else {
+    console.log('La factura existente quedó intacta; no se creó ni reintentó ningún documento fiscal.');
+  }
 
   return {
     orderId: String(order._id),
