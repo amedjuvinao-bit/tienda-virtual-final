@@ -12,6 +12,9 @@ const {
   buildEnviaShipmentPayload,
   enviaColombiaStateCode,
 } = require('../services/shippingPayloadService');
+const {
+  resolveColombiaAddresses,
+} = require('../services/orderShippingIntegrationService');
 
 const checks = [];
 function ok(message) {
@@ -167,6 +170,37 @@ async function main() {
   assert.deepStrictEqual(locateBody, { city: 'Bogotá', state: 'DC', country: 'CO' });
   assert.strictEqual(located.city, '11001000');
   ok('las ciudades colombianas se resuelven al DANE de 8 dígitos antes de cotizar');
+
+  const invalidLocationProvider = {
+    async resolveColombiaCity() {
+      const error = new Error('Address cannot be validated.');
+      error.code = 'SHIPPING_PROVIDER_REJECTED';
+      error.details = { operation: 'resolve_colombia_city' };
+      throw error;
+    },
+  };
+  await assert.rejects(
+    () => resolveColombiaAddresses(invalidLocationProvider, {
+      origin: {
+        name: 'Sede Principal',
+        country: 'CO',
+        city: 'Santa Marta',
+        state: 'DC',
+      },
+      destination: {
+        country: 'CO',
+        city: 'Bogotá',
+        state: 'DC',
+      },
+    }),
+    (error) =>
+      error.code === 'SHIPPING_CITY_NOT_RESOLVED' &&
+      error.details.address === 'origin' &&
+      error.details.city === 'Santa Marta' &&
+      error.details.state === 'DC' &&
+      error.message.includes('Configuración → Sedes')
+  );
+  ok('un rechazo de ciudad identifica si debe corregirse la sede o la entrega');
 
   const rawBody = Buffer.from(JSON.stringify({ trackingNumber: 'TEST-1' }));
   const timestamp = 1_775_000_000_000;

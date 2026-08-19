@@ -504,8 +504,13 @@ export default function OrderDetailLogisticsPanel({
         type: 'error',
         text: providerError.message || 'No fue posible completar la operación con la transportadora.',
         configureBranch:
-          providerError.error === 'SHIPPING_DATA_INCOMPLETE' &&
-          missing.some((item) => String(item).includes('sede')),
+          (
+            providerError.error === 'SHIPPING_DATA_INCOMPLETE' &&
+            missing.some((item) => String(item).includes('sede'))
+          ) || (
+            providerError.error === 'SHIPPING_CITY_NOT_RESOLVED' &&
+            providerError?.details?.address === 'origin'
+          ),
       });
     } finally {
       setBusy('');

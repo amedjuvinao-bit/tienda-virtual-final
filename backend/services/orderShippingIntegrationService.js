@@ -139,11 +139,33 @@ async function resolveColombiaAddresses(provider, payload) {
     if (address.country !== 'CO' || /^\d{8}$/.test(clean(address.city, 20))) {
       continue;
     }
-    const located = await provider.resolveColombiaCity({
-      city: address.city,
-      state: address.state,
-      country: 'CO',
-    });
+    let located;
+    try {
+      located = await provider.resolveColombiaCity({
+        city: address.city,
+        state: address.state,
+        country: 'CO',
+      });
+    } catch (error) {
+      const rejectedLocation =
+        error?.code === 'SHIPPING_PROVIDER_REJECTED' &&
+        error?.details?.operation === 'resolve_colombia_city';
+      if (!rejectedLocation) throw error;
+      const origin = key === 'origin';
+      const place = origin
+        ? `la sede ${clean(address.name, 120) || 'de origen'}`
+        : 'la dirección de entrega';
+      throw createLogisticsError(
+        `Envia no pudo validar la ciudad y el departamento de ${place}: ${clean(address.city, 120)} (${clean(address.state, 20)}). ${origin ? 'Corrige la ubicación en Configuración → Sedes.' : 'Corrige la dirección del cliente en la orden.'}`,
+        'SHIPPING_CITY_NOT_RESOLVED',
+        422,
+        {
+          address: key,
+          city: clean(address.city, 120),
+          state: clean(address.state, 20),
+        }
+      );
+    }
     const daneCity = clean(located?.city, 20);
     if (!/^\d{8}$/.test(daneCity)) {
       throw createLogisticsError(

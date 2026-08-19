@@ -412,9 +412,9 @@ describe('centro logístico avanzado de la orden', () => {
     logisticsApi.quoteOrderShipment.mockRejectedValue({
       response: {
         data: {
-          error: 'SHIPPING_DATA_INCOMPLETE',
-          message: 'Completa la información necesaria para cotizar: teléfono de la sede.',
-          details: { missing: ['teléfono de la sede'] },
+          error: 'SHIPPING_CITY_NOT_RESOLVED',
+          message: 'Envia no pudo validar la ciudad y el departamento de la sede Sede Principal: Santa Marta (DC). Corrige la ubicación en Configuración → Sedes.',
+          details: { address: 'origin', city: 'Santa Marta', state: 'DC' },
         },
       },
     });
