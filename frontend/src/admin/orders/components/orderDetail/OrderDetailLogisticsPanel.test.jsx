@@ -377,6 +377,71 @@ describe('centro logístico avanzado de la orden', () => {
     expect(screen.queryByRole('button', { name: 'Guardar plan logístico' })).not.toBeInTheDocument();
   });
 
+  it('identifica visualmente cada campo del plan y sus unidades', () => {
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    expect(screen.getByText('Número de paquetes')).toBeInTheDocument();
+    expect(screen.getByText('Peso por paquete (g)')).toBeInTheDocument();
+    expect(screen.getByText('Largo (cm)')).toBeInTheDocument();
+    expect(screen.getByText('Ancho (cm)')).toBeInTheDocument();
+    expect(screen.getByText('Alto (cm)')).toBeInTheDocument();
+  });
+
+  it('ofrece acceso a Sedes cuando faltan datos del origen para cotizar', async () => {
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: { configured: true, enabled: true, mode: 'sandbox', message: 'Envia Sandbox activo.' },
+      },
+    });
+    logisticsApi.updateOrderShipment.mockResolvedValue(
+      responseWith({ ...SHIPMENT, revision: 1 })
+    );
+    logisticsApi.quoteOrderShipment.mockRejectedValue({
+      response: {
+        data: {
+          error: 'SHIPPING_DATA_INCOMPLETE',
+          message: 'Completa la información necesaria para cotizar: teléfono de la sede.',
+          details: { missing: ['teléfono de la sede'] },
+        },
+      },
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    const quoteButton = screen.getByRole('button', { name: 'Cotizar con Envia' });
+    await waitFor(() => expect(quoteButton).toBeEnabled());
+    fireEvent.click(quoteButton);
+
+    const configureLink = await screen.findByRole('link', {
+      name: 'Configurar datos de la sede',
+    });
+    expect(configureLink).toHaveAttribute('href', '/admin/configuracion/sedes');
+  });
+
   it('mantiene Envia Sandbox bloqueado sin token y conserva la operación manual', async () => {
     render(
       <OrderDetailLogisticsPanel

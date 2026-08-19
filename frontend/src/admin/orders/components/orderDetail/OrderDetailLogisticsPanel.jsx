@@ -97,6 +97,17 @@ function formatMoney(value, currency = 'COP') {
   }).format(Number(value || 0));
 }
 
+function planField(label, control) {
+  return (
+    <label style={{ display: 'grid', gap: 5, minWidth: 0 }}>
+      <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
+        {label}
+      </span>
+      {control}
+    </label>
+  );
+}
+
 function shipmentForm(shipment = {}) {
   const packages = Array.isArray(shipment.packages) ? shipment.packages : [];
   const carrier = shipment.carrier || {};
@@ -485,9 +496,16 @@ export default function OrderDetailLogisticsPanel({
       if (error?.response?.data?.error === 'LOGISTICS_REVISION_CONFLICT') {
         await refresh().catch(() => {});
       }
+      const providerError = error?.response?.data || {};
+      const missing = Array.isArray(providerError?.details?.missing)
+        ? providerError.details.missing
+        : [];
       setMessage({
         type: 'error',
-        text: error?.response?.data?.message || 'No fue posible completar la operación con la transportadora.',
+        text: providerError.message || 'No fue posible completar la operación con la transportadora.',
+        configureBranch:
+          providerError.error === 'SHIPPING_DATA_INCOMPLETE' &&
+          missing.some((item) => String(item).includes('sede')),
       });
     } finally {
       setBusy('');
@@ -642,25 +660,25 @@ export default function OrderDetailLogisticsPanel({
                     <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 900 }}>
                       Plan de transportadora, paquetes y SLA
                     </summary>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
-                      <select aria-label={`Prioridad ${shipment.code}`} value={form.priority} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { priority: event.target.value })} style={inputStyle()}>
-                        <option value="normal">Prioridad normal</option>
-                        <option value="high">Prioridad alta</option>
-                        <option value="urgent">Prioridad urgente</option>
-                      </select>
-                      <input aria-label={`Transportadora ${shipment.code}`} value={form.carrierName} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { carrierName: event.target.value })} placeholder="Transportadora" style={inputStyle()} />
-                      <input aria-label={`Servicio ${shipment.code}`} value={form.serviceLevel} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { serviceLevel: event.target.value })} placeholder="Nivel de servicio" style={inputStyle()} />
-                      <input aria-label={`Guía ${shipment.code}`} value={form.trackingNumber} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { trackingNumber: event.target.value })} placeholder="Número de guía" style={inputStyle()} />
-                      <input type="datetime-local" aria-label={`SLA picking ${shipment.code}`} value={form.pickingDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { pickingDueAt: event.target.value })} style={inputStyle()} />
-                      <input type="datetime-local" aria-label={`SLA despacho ${shipment.code}`} value={form.dispatchDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchDueAt: event.target.value })} style={inputStyle()} />
-                      <input type="datetime-local" aria-label={`SLA entrega ${shipment.code}`} value={form.deliveryDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryDueAt: event.target.value })} style={inputStyle()} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                        <input type="number" min="1" max="20" aria-label={`Paquetes ${shipment.code}`} value={form.packageCount} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { packageCount: event.target.value })} placeholder="Paquetes" style={inputStyle()} />
-                        <input type="number" min="0" aria-label={`Peso ${shipment.code}`} value={form.weightGrams} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { weightGrams: event.target.value })} placeholder="Peso g" style={inputStyle()} />
-                      </div>
-                      <input type="number" min="0" aria-label={`Largo ${shipment.code}`} value={form.lengthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { lengthCm: event.target.value })} placeholder="Largo cm" style={inputStyle()} />
-                      <input type="number" min="0" aria-label={`Ancho ${shipment.code}`} value={form.widthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { widthCm: event.target.value })} placeholder="Ancho cm" style={inputStyle()} />
-                      <input type="number" min="0" aria-label={`Alto ${shipment.code}`} value={form.heightCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { heightCm: event.target.value })} placeholder="Alto cm" style={inputStyle()} />
+                    <div className="order-logistics-plan-grid" style={{ gap: 8, marginTop: 10 }}>
+                      {planField('Prioridad', (
+                        <select aria-label={`Prioridad ${shipment.code}`} value={form.priority} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { priority: event.target.value })} style={inputStyle()}>
+                          <option value="normal">Normal</option>
+                          <option value="high">Alta</option>
+                          <option value="urgent">Urgente</option>
+                        </select>
+                      ))}
+                      {planField('Transportadora', <input aria-label={`Transportadora ${shipment.code}`} value={form.carrierName} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { carrierName: event.target.value })} placeholder="Asignada al elegir tarifa" style={inputStyle()} />)}
+                      {planField('Nivel de servicio', <input aria-label={`Servicio ${shipment.code}`} value={form.serviceLevel} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { serviceLevel: event.target.value })} placeholder="Asignado al elegir tarifa" style={inputStyle()} />)}
+                      {planField('Número de guía', <input aria-label={`Guía ${shipment.code}`} value={form.trackingNumber} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { trackingNumber: event.target.value })} placeholder="Se genera después" style={inputStyle()} />)}
+                      {planField('Límite para picking', <input type="datetime-local" aria-label={`SLA picking ${shipment.code}`} value={form.pickingDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { pickingDueAt: event.target.value })} style={inputStyle()} />)}
+                      {planField('Límite para despacho', <input type="datetime-local" aria-label={`SLA despacho ${shipment.code}`} value={form.dispatchDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchDueAt: event.target.value })} style={inputStyle()} />)}
+                      {planField('Promesa de entrega', <input type="datetime-local" aria-label={`SLA entrega ${shipment.code}`} value={form.deliveryDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryDueAt: event.target.value })} style={inputStyle()} />)}
+                      {planField('Número de paquetes', <input type="number" min="1" max="20" aria-label={`Paquetes ${shipment.code}`} value={form.packageCount} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { packageCount: event.target.value })} style={inputStyle()} />)}
+                      {planField('Peso por paquete (g)', <input type="number" min="0" aria-label={`Peso ${shipment.code}`} value={form.weightGrams} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { weightGrams: event.target.value })} style={inputStyle()} />)}
+                      {planField('Largo (cm)', <input type="number" min="0" aria-label={`Largo ${shipment.code}`} value={form.lengthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { lengthCm: event.target.value })} style={inputStyle()} />)}
+                      {planField('Ancho (cm)', <input type="number" min="0" aria-label={`Ancho ${shipment.code}`} value={form.widthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { widthCm: event.target.value })} style={inputStyle()} />)}
+                      {planField('Alto (cm)', <input type="number" min="0" aria-label={`Alto ${shipment.code}`} value={form.heightCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { heightCm: event.target.value })} style={inputStyle()} />)}
                     </div>
                     <p style={{ margin: '7px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700 }}>
                       El peso y las dimensiones indicadas se aplican a cada paquete. Son obligatorios para cotizar externamente.
@@ -681,7 +699,7 @@ export default function OrderDetailLogisticsPanel({
                           Transportadoras conectadas
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
-                          Manual activo · {providers?.envia?.message || 'Consultando estado de Envia…'}
+                          {providers?.defaultProvider === 'envia' ? 'Envia activo' : 'Manual activo'} · {providers?.envia?.message || 'Consultando estado de Envia…'}
                         </div>
                       </div>
                       {canManage ? (
@@ -822,14 +840,22 @@ export default function OrderDetailLogisticsPanel({
       {message ? (
         <div role="status" style={{ marginTop: 12, borderRadius: 12, padding: '9px 11px', background: message.type === 'error' ? '#fff1f2' : '#ecfdf5', color: message.type === 'error' ? '#be123c' : '#047857', fontSize: 11, fontWeight: 800 }}>
           {message.text}
+          {message.configureBranch ? (
+            <a href="/admin/configuracion/sedes" style={{ display: 'inline-block', marginLeft: 8, color: 'inherit', fontWeight: 950, textDecoration: 'underline' }}>
+              Configurar datos de la sede
+            </a>
+          ) : null}
         </div>
       ) : null}
 
       <style>{`
+        .order-logistics-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
         @media (max-width: 900px) {
           section[aria-label="Centro logístico de la orden"] > div:nth-of-type(2) { grid-template-columns: repeat(3, minmax(92px, 1fr)) !important; }
+          .order-logistics-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 620px) {
+          .order-logistics-plan-grid { grid-template-columns: 1fr; }
           section[aria-label="Centro logístico de la orden"] input,
           section[aria-label="Centro logístico de la orden"] select { min-width: 0 !important; }
         }
