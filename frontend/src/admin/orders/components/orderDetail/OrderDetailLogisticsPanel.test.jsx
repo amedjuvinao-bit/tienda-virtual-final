@@ -144,6 +144,45 @@ describe('centro logístico avanzado de la orden', () => {
     expect(onRefreshTimeline).toHaveBeenCalled();
   });
 
+  it('propaga el estado agregado cuando todos los envíos quedan entregados', async () => {
+    const deliveredShipment = {
+      ...SHIPMENT,
+      status: 'delivered',
+      revision: 10,
+      deliveredAt: '2026-08-18T19:30:00.000Z',
+    };
+    logisticsApi.getOrderLogistics.mockResolvedValue({
+      ...responseWith(deliveredShipment),
+      orderStatus: 'delivered',
+      fulfillmentStatus: 'delivered',
+    });
+    const onOrderUpdated = vi.fn();
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={ORDER}
+        canManage
+        onOrderUpdated={onOrderUpdated}
+      />
+    );
+
+    expect(await screen.findByText('Entregada')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(onOrderUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          _id: ORDER._id,
+          status: 'delivered',
+          fulfillmentStatus: 'delivered',
+          fulfillment: expect.objectContaining({
+            status: 'delivered',
+            shipments: [deliveredShipment],
+            logisticsSummary: expect.objectContaining({ status: 'delivered' }),
+          }),
+        })
+      )
+    );
+  });
+
   it('deshabilita la preparación y explica el pago pendiente', async () => {
     logisticsApi.getOrderLogistics.mockResolvedValue(
       eligibilityResponse({

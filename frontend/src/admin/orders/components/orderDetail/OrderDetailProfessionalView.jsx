@@ -60,6 +60,7 @@ export default function OrderDetailProfessionalView({
   whatsAppAvailable = true,
   whatsAppUnavailableReason = '',
   onCustomerStageConfirmed,
+  onOrderUpdated,
   canUpdateFulfillment = false,
 
   loadingAux = false,
@@ -157,6 +158,7 @@ export default function OrderDetailProfessionalView({
           canManage={canUpdateFulfillment}
           onRefreshTimeline={onRefreshTimeline}
           onCustomerStageConfirmed={onCustomerStageConfirmed}
+          onOrderUpdated={onOrderUpdated}
         />
         <OrderDetailFulfillmentPanel
           order={order}

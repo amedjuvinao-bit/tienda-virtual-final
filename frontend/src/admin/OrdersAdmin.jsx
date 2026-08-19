@@ -466,21 +466,25 @@ export default function OrdersAdmin() {
     }
   };
 
-  const handleCustomerDataUpdated = (updatedOrder) => {
+  const handleOrderUpdated = (updatedOrder) => {
     if (!updatedOrder?._id) return;
 
-    setOrderSelected((current) =>
-      current?._id === updatedOrder._id
-        ? { ...current, ...updatedOrder }
-        : current
-    );
-    setData((current) =>
-      current.map((item) =>
-        item._id === updatedOrder._id
-          ? { ...item, ...updatedOrder }
-          : item
-      )
-    );
+    const mergeOrder = (current) => {
+      if (!current || current._id !== updatedOrder._id) return current;
+      return {
+        ...current,
+        ...updatedOrder,
+        fulfillment: updatedOrder.fulfillment
+          ? {
+              ...(current.fulfillment || {}),
+              ...updatedOrder.fulfillment,
+            }
+          : current.fulfillment,
+      };
+    };
+
+    setOrderSelected(mergeOrder);
+    setData((current) => current.map(mergeOrder));
   };
 
   // Debounce búsqueda
@@ -1493,7 +1497,8 @@ export default function OrdersAdmin() {
         canAddNotes={canAddNotes}
         canSendEmail={canSendEmail}
         canEditCustomerData={canEditCustomerData}
-        onCustomerDataUpdated={handleCustomerDataUpdated}
+        onCustomerDataUpdated={handleOrderUpdated}
+        onOrderUpdated={handleOrderUpdated}
         canUpdateFulfillment={canUpdateFulfillment}
         canDownloadBilling={canDownloadBilling}
         canRefund={canRefund}

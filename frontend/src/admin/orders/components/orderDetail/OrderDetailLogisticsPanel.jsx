@@ -205,6 +205,7 @@ export default function OrderDetailLogisticsPanel({
   canManage = false,
   onRefreshTimeline,
   onCustomerStageConfirmed,
+  onOrderUpdated,
 }) {
   const initialShipments = Array.isArray(order?.fulfillment?.shipments)
     ? order.fulfillment.shipments
@@ -223,8 +224,9 @@ export default function OrderDetailLogisticsPanel({
 
   const applyResponse = (data) => {
     const nextShipments = Array.isArray(data?.shipments) ? data.shipments : [];
+    const nextSummary = data?.summary || {};
     setShipments(nextShipments);
-    setSummary(data?.summary || {});
+    setSummary(nextSummary);
     if (data?.eligibility) setEligibility(data.eligibility);
     setForms(
       Object.fromEntries(
@@ -234,6 +236,21 @@ export default function OrderDetailLogisticsPanel({
         ])
       )
     );
+    if (order?._id) {
+      const orderStatus = String(data?.orderStatus || '').trim();
+      const fulfillmentStatus = String(data?.fulfillmentStatus || '').trim();
+      onOrderUpdated?.({
+        _id: order._id,
+        ...(orderStatus ? { status: orderStatus } : {}),
+        ...(fulfillmentStatus ? { fulfillmentStatus } : {}),
+        fulfillment: {
+          ...(order.fulfillment || {}),
+          ...(fulfillmentStatus ? { status: fulfillmentStatus } : {}),
+          shipments: nextShipments,
+          logisticsSummary: nextSummary,
+        },
+      });
+    }
   };
 
   useEffect(() => {

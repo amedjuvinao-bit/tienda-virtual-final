@@ -52,6 +52,7 @@ export default function OrderDetailModal({
   canSendEmail = false,
   canEditCustomerData = false,
   onCustomerDataUpdated,
+  onOrderUpdated,
   canUpdateFulfillment = false,
   canDownloadBilling = false,
   canRefund = false,
@@ -132,6 +133,11 @@ export default function OrderDetailModal({
     setWhatsAppPreviewError('');
     setToast(null);
   }, [open, order?._id]);
+
+  useEffect(() => {
+    if (!open) return;
+    setStatusLocal(order?.status || 'pending');
+  }, [open, order?.status]);
 
   useEffect(() => {
     if (!toast || toast.persist) return undefined;
@@ -793,6 +799,7 @@ export default function OrderDetailModal({
           onCustomerStageConfirmed={
             canSendEmail ? offerWhatsAppAfterStage : null
           }
+          onOrderUpdated={onOrderUpdated}
           canUpdateFulfillment={canUpdateFulfillment}
           loadingAux={loadingAux}
           onRefreshTimeline={fetchTimeline}
