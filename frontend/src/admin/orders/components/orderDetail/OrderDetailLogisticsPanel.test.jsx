@@ -16,6 +16,10 @@ const logisticsApi = vi.hoisted(() => ({
 vi.mock('../../orderLogisticsApi', () => logisticsApi);
 
 import OrderDetailLogisticsPanel from './OrderDetailLogisticsPanel';
+import {
+  deliveryDays,
+  recommendedShippingRate,
+} from './shippingRateRecommendation';
 
 const SHIPMENT = {
   _id: '66c000000000000000000101',
@@ -398,6 +402,179 @@ describe('centro logístico avanzado de la orden', () => {
     expect(screen.getByText('Alto (cm)')).toBeInTheDocument();
   });
 
+  it('recomienda tarifas con criterios deterministas y tiempos normalizados', () => {
+    const rates = [
+      { carrier: 'economica', service: 'ground', deliveryEstimate: '4-5 días', totalPrice: 10000 },
+      { carrier: 'equilibrada', service: 'standard', deliveryEstimate: '1-2 días', totalPrice: 14000 },
+      { carrier: 'express', service: 'next', deliveryEstimate: 'Día siguiente', totalPrice: 30000 },
+    ];
+
+    expect(deliveryDays(rates[0])).toBe(5);
+    expect(deliveryDays(rates[2])).toBe(1);
+    expect(recommendedShippingRate(rates, 'balanced')?.carrier).toBe('equilibrada');
+    expect(recommendedShippingRate(rates, 'cheapest')?.carrier).toBe('economica');
+    expect(recommendedShippingRate(rates, 'fastest')?.carrier).toBe('express');
+  });
+
+  it('presenta una recomendación compacta, permite cambiar criterio y sincroniza después de generar la guía', async () => {
+    const rates = [
+      { carrier: 'economica', service: 'ground', serviceDescription: 'Económico', deliveryEstimate: '4-5 días', totalPrice: 10000, currency: 'COP' },
+      { carrier: 'equilibrada', service: 'standard', serviceDescription: 'Estándar', deliveryEstimate: '1-2 días', totalPrice: 14000, currency: 'COP' },
+      { carrier: 'express', service: 'next', serviceDescription: 'Día siguiente', deliveryEstimate: 'Día siguiente', totalPrice: 30000, currency: 'COP' },
+    ];
+    const planned = { ...SHIPMENT, revision: 1 };
+    const quoted = {
+      ...SHIPMENT,
+      revision: 2,
+      shippingIntegration: { provider: 'envia', mode: 'sandbox', status: 'quoted' },
+    };
+    const generated = {
+      ...quoted,
+      revision: 3,
+      carrier: {
+        code: 'EXPRESS',
+        name: 'express',
+        serviceLevel: 'next',
+        trackingNumber: 'GUIA-123',
+        trackingUrl: 'https://example.com/track/GUIA-123',
+      },
+      shippingIntegration: {
+        provider: 'envia',
+        mode: 'sandbox',
+        status: 'label_generated',
+        labelUrl: 'https://example.com/label.pdf',
+        selectedRate: rates[2],
+      },
+    };
+    const tracked = {
+      ...generated,
+      revision: 4,
+      shippingIntegration: {
+        ...generated.shippingIntegration,
+        status: 'tracking',
+        lastSyncedAt: '2026-08-19T18:00:00.000Z',
+      },
+    };
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: { configured: true, enabled: true, mode: 'sandbox', message: 'Envia Sandbox activo.' },
+      },
+    });
+    logisticsApi.updateOrderShipment.mockResolvedValue({
+      ...responseWith(planned),
+      shipment: planned,
+    });
+    logisticsApi.quoteOrderShipment.mockResolvedValue({
+      ...responseWith(quoted),
+      shipment: quoted,
+      rates,
+    });
+    logisticsApi.generateOrderShipmentLabel.mockResolvedValue({
+      ...responseWith(generated),
+      shipment: generated,
+    });
+    logisticsApi.syncOrderShipmentTracking.mockResolvedValue({
+      ...responseWith(tracked),
+      shipment: tracked,
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    const quoteButton = screen.getByRole('button', { name: 'Buscar mejor tarifa' });
+    await waitFor(() => expect(quoteButton).toBeEnabled());
+    fireEvent.click(quoteButton);
+
+    expect(await screen.findByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('equilibrada');
+    expect(screen.getByText('Ver 2 alternativa(s)')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(`Criterio de tarifa ${SHIPMENT.code}`), {
+      target: { value: 'fastest' },
+    });
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('express');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar y generar guía Sandbox' }));
+
+    await waitFor(() => {
+      expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledWith(
+        ORDER._id,
+        SHIPMENT._id,
+        expect.objectContaining({
+          provider: 'envia',
+          expectedRevision: 2,
+          rate: expect.objectContaining({ carrier: 'express', service: 'next' }),
+        }),
+        expect.any(String)
+      );
+    });
+    await waitFor(() => {
+      expect(logisticsApi.syncOrderShipmentTracking).toHaveBeenCalledWith(
+        ORDER._id,
+        SHIPMENT._id,
+        { provider: 'envia', expectedRevision: 3 }
+      );
+    });
+    expect(await screen.findByText('Guía lista')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Descargar etiqueta' })).toHaveAttribute(
+      'href',
+      'https://example.com/label.pdf'
+    );
+    expect(screen.getByRole('link', { name: 'Ver seguimiento' })).toHaveAttribute(
+      'href',
+      'https://example.com/track/GUIA-123'
+    );
+  });
+
+  it('exige confirmación explícita antes de generar una guía de producción', async () => {
+    const rate = { carrier: 'fedex', service: 'ground', deliveryEstimate: '2-4 días', totalPrice: 3060, currency: 'COP' };
+    const planned = { ...SHIPMENT, revision: 1 };
+    const quoted = { ...SHIPMENT, revision: 2 };
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: { configured: true, enabled: true, mode: 'production', message: 'Envia Producción activo.' },
+      },
+    });
+    logisticsApi.updateOrderShipment.mockResolvedValue({ ...responseWith(planned), shipment: planned });
+    logisticsApi.quoteOrderShipment.mockResolvedValue({ ...responseWith(quoted), shipment: quoted, rates: [rate] });
+    logisticsApi.generateOrderShipmentLabel.mockResolvedValue({
+      ...responseWith({ ...quoted, revision: 3 }),
+      shipment: { ...quoted, revision: 3 },
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: { shipments: [SHIPMENT], logisticsSummary: responseWith(SHIPMENT).summary },
+        }}
+        canManage
+      />
+    );
+
+    const quoteButton = screen.getByRole('button', { name: 'Buscar mejor tarifa' });
+    await waitFor(() => expect(quoteButton).toBeEnabled());
+    fireEvent.click(quoteButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar y generar guía Producción' }));
+
+    expect(await screen.findByText('Esta acción puede generar cobros reales')).toBeInTheDocument();
+    expect(logisticsApi.generateOrderShipmentLabel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, generar guía real' }));
+    await waitFor(() => expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledTimes(1));
+  });
+
   it('ofrece acceso a Sedes cuando faltan datos del origen para cotizar', async () => {
     logisticsApi.getShippingProviderStatus.mockResolvedValue({
       ok: true,
@@ -432,7 +609,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = screen.getByRole('button', { name: 'Cotizar con Envia' });
+    const quoteButton = screen.getByRole('button', { name: 'Buscar mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
@@ -457,7 +634,7 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     expect(await screen.findByText(/Manual activo/)).toBeInTheDocument();
-    const quoteButton = screen.getByRole('button', { name: 'Cotizar con Envia' });
+    const quoteButton = screen.getByRole('button', { name: 'Buscar mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeDisabled());
     fireEvent.click(quoteButton);
     expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
