@@ -51,6 +51,9 @@ const {
   normalizeServiceDelivery,
 } = require('../lib/products/productFulfillmentConfig');
 const {
+  normalizeProductCustoms,
+} = require('../lib/products/productCustomsConfig');
+const {
   ProductFulfillmentInputError,
   resolveBundleComponents,
 } = require('../services/productBundleService');
@@ -848,6 +851,7 @@ router.post(
         warehouseLocation,
         weightGrams,
         dimensionsCm,
+        customs,
         cost,
         averageCost,
         taxRate,
@@ -977,6 +981,7 @@ router.post(
                 h: Math.max(0, Number(dimensionsCm.h || 0)),
               }
             : undefined,
+        customs: normalizeProductCustoms(customs),
 
         cost: cost != null ? Math.max(0, Number(cost)) : undefined,
         averageCost:
@@ -1283,6 +1288,7 @@ router.put(
         warehouseLocation,
         weightGrams,
         dimensionsCm,
+        customs,
         cost,
         averageCost,
         taxRate,
@@ -1455,6 +1461,10 @@ router.put(
           w: Math.max(0, Number(dimensionsCm?.w || 0)),
           h: Math.max(0, Number(dimensionsCm?.h || 0)),
         };
+      }
+
+      if (hasField('customs')) {
+        prod.customs = normalizeProductCustoms(customs);
       }
 
       if (hasField('cost')) {

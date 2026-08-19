@@ -57,6 +57,7 @@ export default function ShippingProvidersCard() {
   const [mode, setMode] = useState('sandbox');
   const [token, setToken] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
+  const [dutiesPaymentEntity, setDutiesPaymentEntity] = useState('recipient');
   const [clearToken, setClearToken] = useState(false);
   const [clearWebhookSecret, setClearWebhookSecret] = useState(false);
   const [confirmProduction, setConfirmProduction] = useState(false);
@@ -69,6 +70,9 @@ export default function ShippingProvidersCard() {
     setMode(response?.settings?.enviaMode || 'sandbox');
     setToken('');
     setWebhookSecret('');
+    setDutiesPaymentEntity(
+      response?.settings?.internationalDutiesPaymentEntity || 'recipient'
+    );
     setClearToken(false);
     setClearWebhookSecret(false);
     setConfirmProduction(false);
@@ -133,6 +137,7 @@ export default function ShippingProvidersCard() {
     runAction('save', () =>
       updateAdminShippingSettings({
         enviaMode: mode,
+        internationalDutiesPaymentEntity: dutiesPaymentEntity,
         ...(token.trim() ? { enviaToken: token.trim() } : {}),
         ...(webhookSecret.trim() ? { webhookSecret: webhookSecret.trim() } : {}),
         ...(clearToken && !token.trim() ? { clearEnviaToken: true } : {}),
@@ -293,6 +298,24 @@ export default function ShippingProvidersCard() {
                 </label>
               )}
             </div>
+
+            <label className="block md:col-span-2">
+              <span className="mb-1 block text-sm font-semibold text-gray-700">
+                Impuestos y aranceles internacionales
+              </span>
+              <select
+                value={dutiesPaymentEntity}
+                onChange={(event) => setDutiesPaymentEntity(event.target.value)}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              >
+                <option value="recipient">Los paga el destinatario (DAP)</option>
+                <option value="sender">Los paga la tienda (DDP)</option>
+                <option value="envia_guaranteed">Envia Guaranteed, cuando esté disponible</option>
+              </select>
+              <span className="mt-1 block text-xs text-gray-500">
+                Se aplica únicamente cuando el origen y el destino están en países distintos.
+              </span>
+            </label>
           </div>
 
           <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">

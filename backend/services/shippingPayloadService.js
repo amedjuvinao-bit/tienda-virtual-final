@@ -1,5 +1,15 @@
 'use strict';
 
+const CountriesISO = require('i18n-iso-countries');
+const enLocale = require('i18n-iso-countries/langs/en.json');
+const esLocale = require('i18n-iso-countries/langs/es.json');
+const {
+  validateProductCustoms,
+} = require('../lib/products/productCustomsConfig');
+
+CountriesISO.registerLocale(enLocale);
+CountriesISO.registerLocale(esLocale);
+
 function clean(value, maxLength = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
 }
@@ -24,9 +34,18 @@ function required(value, label, missing) {
 }
 
 function countryCode(value) {
-  const normalized = clean(value, 10).toUpperCase();
-  if (!normalized || ['COLOMBIA', 'COL'].includes(normalized)) return 'CO';
-  return normalized;
+  const raw = clean(value, 120);
+  const normalized = raw.toUpperCase();
+  if (!normalized) return 'CO';
+  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
+  if (/^[A-Z]{3}$/.test(normalized)) {
+    return CountriesISO.alpha3ToAlpha2(normalized) || normalized;
+  }
+  return (
+    CountriesISO.getAlpha2Code(raw, 'es') ||
+    CountriesISO.getAlpha2Code(raw, 'en') ||
+    normalized
+  );
 }
 
 const COLOMBIA_STATE_CODES = Object.freeze({
@@ -65,6 +84,14 @@ const COLOMBIA_STATE_CODES = Object.freeze({
   '99': 'VD', VID: 'VD', VICHADA: 'VD',
 });
 
+const COLOMBIA_DANE_DEPARTMENT_CODES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(COLOMBIA_STATE_CODES)
+      .filter(([key]) => /^\d{2}$/.test(key))
+      .map(([departmentCode, enviaCode]) => [enviaCode, departmentCode])
+  )
+);
+
 function normalizedLookup(value) {
   return clean(value, 100)
     .normalize('NFD')
@@ -79,7 +106,208 @@ function enviaColombiaStateCode(code, name) {
   return COLOMBIA_STATE_CODES[codeKey] || COLOMBIA_STATE_CODES[nameKey] || codeKey || nameKey;
 }
 
-function buildEnviaShipmentPayload({ order, shipment, branch, rate = null } = {}) {
+function daneColombiaDepartmentCode(value) {
+  const normalized = normalizedLookup(value);
+  if (/^\d{2}$/.test(normalized)) return normalized;
+  return COLOMBIA_DANE_DEPARTMENT_CODES[normalized] || '';
+}
+
+function idValue(value) {
+  return String(value?._id || value || '').trim();
+}
+
+function physicalOrderItems(order) {
+  return (Array.isArray(order?.items) ? order.items : []).filter(
+    (item) =>
+      item?.requiresShipping !== false &&
+      !['digital', 'service'].includes(clean(item?.productType, 30).toLowerCase())
+  );
+}
+
+function internationalOrderItems(order, shipment) {
+  const items = physicalOrderItems(order);
+  const byId = new Map(items.map((item) => [idValue(item), item]));
+  const allocationIds = new Set(
+    (Array.isArray(shipment?.allocationIds) ? shipment.allocationIds : [])
+      .map(idValue)
+      .filter(Boolean)
+  );
+  const allAllocations = Array.isArray(order?.inventoryAllocations)
+    ? order.inventoryAllocations
+    : [];
+  const allocations = allAllocations.filter((allocation) =>
+    allocationIds.has(idValue(allocation))
+  );
+
+  if (allocations.length) {
+    const quantityByItem = new Map();
+    for (const allocation of allocations) {
+      const orderItemId = idValue(allocation?.orderItem);
+      if (!orderItemId || !byId.has(orderItemId)) {
+        throw payloadError(
+          'No fue posible relacionar la asignación de inventario con el producto declarado para aduanas.',
+          'SHIPPING_CUSTOMS_ITEM_ALLOCATION_INVALID',
+          422,
+          { shipment: clean(shipment?.code, 100), allocation: idValue(allocation) }
+        );
+      }
+      if (allocation?.bundleParentProduct) {
+        const missingBundleAllocation = allAllocations.some(
+          (candidate) =>
+            idValue(candidate?.orderItem) === orderItemId &&
+            candidate?.bundleParentProduct &&
+            Math.max(
+              0,
+              numeric(candidate?.soldQuantity) -
+                numeric(candidate?.returnedQuantity)
+            ) > 0 &&
+            !allocationIds.has(idValue(candidate))
+        );
+        if (missingBundleAllocation) {
+          throw payloadError(
+            'Un combo internacional no puede dividir sus componentes entre varios envíos.',
+            'SHIPPING_CUSTOMS_BUNDLE_SPLIT_UNSUPPORTED',
+            422,
+            {
+              shipment: clean(shipment?.code, 100),
+              item: clean(byId.get(orderItemId)?.title, 160),
+            }
+          );
+        }
+        quantityByItem.set(
+          orderItemId,
+          Math.max(
+            1,
+            numeric(
+              byId.get(orderItemId)?.quantity ?? byId.get(orderItemId)?.qty,
+              1
+            )
+          )
+        );
+        continue;
+      }
+      const quantity = Math.max(
+        0,
+        numeric(allocation?.soldQuantity) - numeric(allocation?.returnedQuantity)
+      );
+      if (quantity > 0) {
+        quantityByItem.set(
+          orderItemId,
+          numeric(quantityByItem.get(orderItemId)) + quantity
+        );
+      }
+    }
+    return [...quantityByItem.entries()].map(([orderItemId, quantity]) => ({
+      item: byId.get(orderItemId),
+      quantity,
+    }));
+  }
+
+  if (allocationIds.size) {
+    throw payloadError(
+      'Las asignaciones del envío no coinciden con el inventario vendido de la orden.',
+      'SHIPPING_CUSTOMS_ALLOCATION_INVALID',
+      422,
+      { shipment: clean(shipment?.code, 100) }
+    );
+  }
+
+  const shipments = Array.isArray(order?.fulfillment?.shipments)
+    ? order.fulfillment.shipments.filter(
+        (candidate) => clean(candidate?.status, 30).toLowerCase() !== 'cancelled'
+      )
+    : [];
+  if (shipments.length > 1) {
+    throw payloadError(
+      'El envío internacional no identifica qué productos corresponden a esta sede.',
+      'SHIPPING_CUSTOMS_ALLOCATION_REQUIRED',
+      422,
+      { shipment: clean(shipment?.code, 100) }
+    );
+  }
+  return items.map((item) => ({
+    item,
+    quantity: Math.max(1, numeric(item?.quantity ?? item?.qty, 1)),
+  }));
+}
+
+function buildInternationalCustoms(order, shipment, packages, customsPolicy = {}) {
+  if (packages.length > 1) {
+    throw payloadError(
+      'Los envíos internacionales con varios paquetes requieren asignar los productos a cada paquete antes de cotizar.',
+      'SHIPPING_INTERNATIONAL_PACKAGE_ALLOCATION_REQUIRED',
+      422,
+      { shipment: clean(shipment?.code, 100), packages: packages.length }
+    );
+  }
+
+  const sourceItems = internationalOrderItems(order, shipment);
+  if (!sourceItems.length) {
+    throw payloadError(
+      'El envío internacional no contiene productos físicos para declarar.',
+      'SHIPPING_CUSTOMS_ITEMS_REQUIRED',
+      422,
+      { shipment: clean(shipment?.code, 100) }
+    );
+  }
+
+  const missing = [];
+  const items = sourceItems.map(({ item, quantity }, index) => {
+    const validated = validateProductCustoms(item?.customsSnapshot, {
+      required: true,
+    });
+    if (validated.errors.length) {
+      for (const error of validated.errors) {
+        missing.push({
+          item: clean(item?.title, 160) || `Producto ${index + 1}`,
+          field: error.field,
+          message: error.message,
+        });
+      }
+    }
+    return {
+      description: validated.customs.description,
+      quantity: Math.max(1, Math.floor(numeric(quantity, 1))),
+      price: Math.max(
+        0.01,
+        numeric(item?.unitPrice ?? item?.price ?? item?.priceNumber, 0.01)
+      ),
+      hsCode: validated.customs.hsCode,
+      countryOfManufacture: validated.customs.countryOfManufacture,
+    };
+  });
+  if (missing.length) {
+    throw payloadError(
+      `Completa la información aduanera de los productos: ${[
+        ...new Set(missing.map((entry) => entry.item)),
+      ].join(', ')}.`,
+      'SHIPPING_CUSTOMS_DATA_INCOMPLETE',
+      422,
+      { missing }
+    );
+  }
+
+  const dutiesPaymentEntity = ['recipient', 'sender', 'envia_guaranteed'].includes(
+    clean(customsPolicy?.dutiesPaymentEntity, 40).toLowerCase()
+  )
+    ? clean(customsPolicy.dutiesPaymentEntity, 40).toLowerCase()
+    : 'recipient';
+  return {
+    items,
+    customsSettings: {
+      dutiesPaymentEntity,
+      exportReason: clean(customsPolicy?.exportReason, 40).toLowerCase() || 'sale',
+    },
+  };
+}
+
+function buildEnviaShipmentPayload({
+  order,
+  shipment,
+  branch,
+  rate = null,
+  customsPolicy = {},
+} = {}) {
   const missing = [];
   const customer = order?.customer || {};
   const originAddress = branch?.address || {};
@@ -121,13 +349,16 @@ function buildEnviaShipmentPayload({ order, shipment, branch, rate = null } = {}
       number: '',
       district: clean(originAddress.neighborhood, 120),
       city: required(originAddress.city, 'ciudad de la sede', missing),
-      state: required(
-        originCountry === 'CO'
-          ? enviaColombiaStateCode(originAddress.departmentCode, originAddress.department)
-          : originAddress.departmentCode || originAddress.department,
-        'departamento de la sede',
-        missing
-      ),
+      state: originCountry === 'CO'
+        ? required(
+            enviaColombiaStateCode(
+              originAddress.departmentCode,
+              originAddress.department
+            ),
+            'departamento de la sede',
+            missing
+          )
+        : clean(originAddress.departmentCode || originAddress.department, 120),
       country: originCountry,
       postalCode: clean(originAddress.postalCode, 30),
       reference: clean(shipment?.branchSnapshot?.code, 80),
@@ -141,13 +372,16 @@ function buildEnviaShipmentPayload({ order, shipment, branch, rate = null } = {}
       number: '',
       district: '',
       city: required(customer.city, 'ciudad del cliente', missing),
-      state: required(
-        destinationCountry === 'CO'
-          ? enviaColombiaStateCode(customer.departmentCode, customer.department)
-          : customer.departmentCode || customer.department,
-        'departamento del cliente',
-        missing
-      ),
+      state: destinationCountry === 'CO'
+        ? required(
+            enviaColombiaStateCode(
+              customer.departmentCode,
+              customer.department
+            ),
+            'departamento del cliente',
+            missing
+          )
+        : clean(customer.departmentCode || customer.department, 120),
       country: destinationCountry,
       postalCode: clean(customer.postalCode, 30),
       reference: clean(order?.orderNumber, 100),
@@ -159,7 +393,10 @@ function buildEnviaShipmentPayload({ order, shipment, branch, rate = null } = {}
       ...(clean(rate?.service, 120) ? { service: clean(rate.service, 120) } : {}),
     },
     settings: {
-      currency: 'COP',
+      currency: clean(
+        order?.pricingSnapshot?.currency || order?.payment?.currency || 'COP',
+        10
+      ).toUpperCase(),
       printFormat: 'PDF',
       printSize: 'STOCK_4X6',
       comments: `Orden ${clean(order?.orderNumber, 100)} · ${clean(shipment?.code, 100)}`,
@@ -174,6 +411,17 @@ function buildEnviaShipmentPayload({ order, shipment, branch, rate = null } = {}
       422,
       { missing: uniqueMissing }
     );
+  }
+
+  if (originCountry !== destinationCountry) {
+    const customs = buildInternationalCustoms(
+      order,
+      shipment,
+      normalizedPackages,
+      customsPolicy
+    );
+    payload.packages[0].items = customs.items;
+    payload.customsSettings = customs.customsSettings;
   }
   return payload;
 }
@@ -221,6 +469,9 @@ function normalizeGeneratedLabel(item = {}) {
 
 module.exports = {
   buildEnviaShipmentPayload,
+  buildInternationalCustoms,
+  countryCode,
+  daneColombiaDepartmentCode,
   enviaColombiaStateCode,
   normalizeGeneratedLabel,
   normalizeRate,

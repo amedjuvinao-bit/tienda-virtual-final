@@ -43,6 +43,9 @@ const {
   normalizeSkuValue,
 } = require('../services/productInputValidationService');
 const {
+  normalizeProductCustoms,
+} = require('../lib/products/productCustomsConfig');
+const {
   PRODUCT_COMMERCIAL_CODE_UNIQUE_INDEXES,
 } = require('../lib/products/productCommercialCodeIndexDefinitions');
 
@@ -169,6 +172,21 @@ ProductVariantSchema.pre('validate', function normalizeVariantBeforeValidate(nex
 
 const DimensionsSchema = new mongoose.Schema(
   { l: { type: Number, default: 0, min: 0 }, w: { type: Number, default: 0, min: 0 }, h: { type: Number, default: 0, min: 0 } },
+  { _id: false }
+);
+
+const ProductCustomsSchema = new mongoose.Schema(
+  {
+    description: { type: String, trim: true, maxlength: 250, default: '' },
+    hsCode: { type: String, trim: true, maxlength: 20, default: '' },
+    countryOfManufacture: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 2,
+      default: '',
+    },
+  },
   { _id: false }
 );
 
@@ -545,6 +563,11 @@ const productSchema = new mongoose.Schema(
     warehouseLocation: { type: String, trim: true, default: '' },
     weightGrams: { type: Number, default: 0, min: 0 },
     dimensionsCm: { type: DimensionsSchema, default: () => ({}) },
+    customs: {
+      type: ProductCustomsSchema,
+      default: () => ({}),
+      set: normalizeProductCustoms,
+    },
 
     // contabilidad / finanzas
     cost: { type: Number, default: 0, min: 0 },

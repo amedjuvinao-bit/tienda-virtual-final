@@ -24,6 +24,11 @@ const ShippingSettingsSchema = new mongoose.Schema(
       enum: ['sandbox', 'production'],
       default: 'sandbox',
     },
+    internationalDutiesPaymentEntity: {
+      type: String,
+      enum: ['recipient', 'sender', 'envia_guaranteed'],
+      default: 'recipient',
+    },
     enviaTokenEncrypted: {
       type: String,
       default: '',

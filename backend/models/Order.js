@@ -389,6 +389,10 @@ const OrderItemSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: () => ({}),
     },
+    customsSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
     lineSubtotal: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
     discountRate: { type: Number, min: 0, max: 100, default: 0 },

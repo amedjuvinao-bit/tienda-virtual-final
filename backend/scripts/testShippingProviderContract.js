@@ -2,6 +2,8 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const {
   BASE_URLS,
@@ -11,10 +13,13 @@ const {
 } = require('../services/enviaShippingProvider');
 const {
   buildEnviaShipmentPayload,
+  countryCode,
+  daneColombiaDepartmentCode,
   enviaColombiaStateCode,
 } = require('../services/shippingPayloadService');
 const {
   resolveColombiaAddresses,
+  resolveShippingAddresses,
 } = require('../services/orderShippingIntegrationService');
 
 const checks = [];
@@ -141,7 +146,13 @@ async function main() {
   assert.strictEqual(enviaColombiaStateCode('25', 'Cundinamarca'), 'CU');
   assert.strictEqual(enviaColombiaStateCode('47', 'Magdalena'), 'MA');
   assert.strictEqual(enviaColombiaStateCode('', 'Magdalena'), 'MA');
+  assert.strictEqual(daneColombiaDepartmentCode('MA'), '47');
+  assert.strictEqual(countryCode('Estados Unidos'), 'US');
+  assert.strictEqual(countryCode('USA'), 'US');
+  assert.strictEqual(countryCode('México'), 'MX');
   assert.strictEqual(payload.settings.currency, 'COP');
+  assert.strictEqual(payload.customsSettings, undefined);
+  assert.strictEqual(payload.packages[0].items, undefined);
   assert.throws(
     () => buildEnviaShipmentPayload({
       order,
@@ -151,6 +162,98 @@ async function main() {
     (error) => error.code === 'SHIPPING_DATA_INCOMPLETE'
   );
   ok('el contrato valida origen, destino, peso y dimensiones antes de cotizar');
+
+  const internationalOrder = {
+    ...order,
+    customer: {
+      ...order.customer,
+      city: 'New York',
+      department: 'New York',
+      departmentCode: 'NY',
+      country: 'Estados Unidos',
+      countryCode: 'US',
+      postalCode: '10001',
+    },
+    items: [
+      {
+        _id: 'item-1',
+        title: 'Vestido de algodón',
+        quantity: 2,
+        unitPrice: 45000,
+        productType: 'physical',
+        requiresShipping: true,
+        customsSnapshot: {
+          description: 'Vestido de algodón para mujer',
+          hsCode: '610442',
+          countryOfManufacture: 'Colombia',
+        },
+      },
+    ],
+    inventoryAllocations: [
+      {
+        _id: 'allocation-1',
+        orderItem: 'item-1',
+        soldQuantity: 2,
+        returnedQuantity: 0,
+      },
+    ],
+  };
+  const internationalShipment = {
+    ...shipment,
+    allocationIds: ['allocation-1'],
+  };
+  const internationalOrderSnapshot = JSON.parse(JSON.stringify(internationalOrder));
+  const customsPayload = buildEnviaShipmentPayload({
+    order: internationalOrder,
+    shipment: internationalShipment,
+    branch,
+    customsPolicy: {
+      dutiesPaymentEntity: 'sender',
+      exportReason: 'sale',
+    },
+  });
+  assert.deepStrictEqual(internationalOrder, internationalOrderSnapshot);
+  assert.deepStrictEqual(customsPayload.customsSettings, {
+    dutiesPaymentEntity: 'sender',
+    exportReason: 'sale',
+  });
+  assert.deepStrictEqual(customsPayload.packages[0].items, [
+    {
+      description: 'Vestido de algodón para mujer',
+      quantity: 2,
+      price: 45000,
+      hsCode: '6104.42',
+      countryOfManufacture: 'CO',
+    },
+  ]);
+  assert.throws(
+    () => buildEnviaShipmentPayload({
+      order: {
+        ...internationalOrder,
+        items: [{ ...internationalOrder.items[0], customsSnapshot: {} }],
+      },
+      shipment: internationalShipment,
+      branch,
+    }),
+    (error) =>
+      error.code === 'SHIPPING_CUSTOMS_DATA_INCOMPLETE' &&
+      error.statusCode === 422
+  );
+  assert.throws(
+    () => buildEnviaShipmentPayload({
+      order: internationalOrder,
+      shipment: {
+        ...internationalShipment,
+        packages: [
+          shipment.packages[0],
+          { ...shipment.packages[0], code: 'PKG-002' },
+        ],
+      },
+      branch,
+    }),
+    (error) => error.code === 'SHIPPING_INTERNATIONAL_PACKAGE_ALLOCATION_REQUIRED'
+  );
+  ok('aduanas internacionales usa snapshots por envío y nunca inventa ni muta datos');
 
   let locateBody = null;
   const locator = createEnviaProvider({
@@ -173,6 +276,213 @@ async function main() {
   assert.deepStrictEqual(locateBody, { city: 'Bogotá', state: 'DC', country: 'CO' });
   assert.strictEqual(located.city, '11001000');
   ok('las ciudades colombianas se resuelven al DANE de 8 dígitos antes de cotizar');
+
+  let unnecessaryLocateCalls = 0;
+  const locallyResolved = await resolveColombiaAddresses(
+    {
+      async resolveColombiaCity() {
+        unnecessaryLocateCalls += 1;
+        throw new Error('No debe consultarse Envia para un municipio del catálogo nacional.');
+      },
+    },
+    {
+      origin: {
+        name: 'Sede Principal',
+        country: 'CO',
+        city: 'Ciénaga',
+        state: 'MA',
+      },
+      destination: {
+        country: 'CO',
+        city: 'Bogotá',
+        state: 'DC',
+      },
+    }
+  );
+  assert.strictEqual(locallyResolved.origin.city, '47189000');
+  assert.strictEqual(locallyResolved.destination.city, '11001000');
+  assert.strictEqual(unnecessaryLocateCalls, 0);
+  ok('el catálogo nacional convierte Ciénaga y Bogotá al DANE sin depender de /locate');
+
+  const internationalCalls = [];
+  const internationalProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url, options) => {
+      internationalCalls.push({ url, options });
+      if (url === `${BASE_URLS.sandbox.queries}/state?country_code=US`) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { meta: 'success', data: [{ code: 'NY', name: 'New York' }] };
+          },
+        };
+      }
+      assert.strictEqual(
+        url,
+        `${BASE_URLS.sandbox.geocodes}/zipcode/US/10001`
+      );
+      assert.strictEqual(options.method, 'GET');
+      assert.strictEqual(options.headers.Authorization, undefined);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            success: true,
+            data: {
+              city: 'New York',
+              state: 'NY',
+              country: 'US',
+              zipcode: '10001',
+            },
+          };
+        },
+      };
+    },
+  });
+  const internationalInput = {
+    origin: {
+      name: 'Warehouse',
+      country: 'US',
+      city: 'New York City',
+      state: 'New York',
+      postalCode: '10001',
+    },
+    destination: {
+      country: 'CO',
+      city: '11001000',
+      state: 'DC',
+      postalCode: '110111',
+    },
+  };
+  const internationalSnapshot = JSON.parse(JSON.stringify(internationalInput));
+  const internationalResolved = await resolveShippingAddresses(
+    internationalProvider,
+    internationalInput
+  );
+  assert.deepStrictEqual(internationalInput, internationalSnapshot);
+  assert.strictEqual(internationalResolved.origin.city, 'New York');
+  assert.strictEqual(internationalResolved.origin.state, 'NY');
+  assert.strictEqual(internationalResolved.origin.postalCode, '10001');
+  assert.strictEqual(internationalCalls.length, 2);
+  ok('las direcciones internacionales usan estado y geocódigo oficiales sin mutar la orden');
+
+  const stateFallbackInput = {
+    origin: {
+      name: 'Warehouse',
+      country: 'FR',
+      city: 'Paris',
+      state: 'Île-de-France',
+      postalCode: '75001',
+    },
+    destination: {
+      country: 'CO',
+      city: '11001000',
+      state: 'DC',
+      postalCode: '110111',
+    },
+  };
+  const stateFallbackResult = await resolveShippingAddresses(
+    {
+      async resolveState() {
+        const error = new Error('Catálogo no disponible');
+        error.code = 'SHIPPING_PROVIDER_HTTP_ERROR';
+        error.details = { operation: 'list_states', providerStatus: 404 };
+        throw error;
+      },
+      async resolveAddress() {
+        return [{ city: 'Paris', state: 'Île-de-France', zipcode: '75001' }];
+      },
+    },
+    stateFallbackInput
+  );
+  assert.strictEqual(stateFallbackResult.origin.city, 'Paris');
+  assert.strictEqual(stateFallbackResult.origin.state, 'Île-de-France');
+  ok('los países sin endpoint de estados continúan con el geocódigo oficial');
+
+  const globalRateCalls = [];
+  const globalRatesProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url, options) => {
+      globalRateCalls.push({ url, options });
+      if (url === `${BASE_URLS.sandbox.queries}/carrier?country_code=US`) {
+        assert.strictEqual(options.method, 'GET');
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              meta: 'success',
+              data: [
+                { carrier: 'ups', name: 'UPS' },
+                { carrier: 'fedex', name: 'FedEx' },
+              ],
+            };
+          },
+        };
+      }
+      assert.strictEqual(url, `${BASE_URLS.sandbox.shipping}/ship/rate/`);
+      const carrier = JSON.parse(options.body).shipment.carrier;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return carrier === 'ups'
+            ? { meta: 'rate', data: [{ carrier, service: 'ground', totalPrice: 25 }] }
+            : { meta: 'rate', data: [] };
+        },
+      };
+    },
+  });
+  const globalRates = await globalRatesProvider.quote({
+    origin: { country: 'US' },
+    destination: { country: 'CA' },
+    shipment: { type: 1 },
+  });
+  assert.strictEqual(globalRates.length, 1);
+  assert.strictEqual(globalRates[0].carrier, 'ups');
+  assert.deepStrictEqual(
+    globalRateCalls
+      .filter((call) => call.url.endsWith('/ship/rate/'))
+      .map((call) => JSON.parse(call.options.body).shipment.carrier)
+      .sort(),
+    ['fedex', 'ups']
+  );
+  ok('cada país descubre sus transportadoras y cotiza una por solicitud');
+
+  const checkoutSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/pages/CheckoutPage.jsx'),
+    'utf8'
+  );
+  const branchesSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/admin/configuracion/sections/SedesSection.jsx'),
+    'utf8'
+  );
+  const productFormSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/admin/FormularioProducto.jsx'),
+    'utf8'
+  );
+  const shippingSettingsSource = fs.readFileSync(
+    path.join(
+      __dirname,
+      '../../frontend/src/admin/configuracion/sections/envios/ShippingProvidersCard.jsx'
+    ),
+    'utf8'
+  );
+  assert(checkoutSource.includes("'Estado / provincia'"));
+  assert(checkoutSource.includes('autoComplete="address-level1"'));
+  assert(branchesSource.includes('form.address.postalCode'));
+  assert(branchesSource.includes('autoComplete="postal-code"'));
+  assert(branchesSource.includes("api.get('/api/geo/countries')"));
+  assert(branchesSource.includes("api.get('/api/geo/regions'"));
+  assert(branchesSource.includes("api.get('/api/geo/cities'"));
+  assert(branchesSource.includes('cityCode: event.target.value'));
+  assert(productFormSource.includes('customsHsCode'));
+  assert(productFormSource.includes('customsCountryOfManufacture'));
+  assert(productFormSource.includes("api.get('/api/geo/countries')"));
+  assert(shippingSettingsSource.includes('internationalDutiesPaymentEntity'));
+  ok('checkout, sedes, productos y configuración capturan los datos internacionales');
 
   const quotedCarriers = [];
   const colombiaRates = createEnviaProvider({
@@ -236,7 +546,6 @@ async function main() {
   const emptyDestinationProvider = {
     async resolveColombiaCity() {
       locationCalls += 1;
-      if (locationCalls === 1) return { city: '47001000', state: 'MA' };
       const error = new Error('La transportadora respondió sin datos utilizables.');
       error.code = 'SHIPPING_PROVIDER_EMPTY_RESPONSE';
       error.details = { operation: 'resolve_colombia_city' };
@@ -265,6 +574,7 @@ async function main() {
       error.details.state === 'MA' &&
       error.message.includes('dirección del cliente')
   );
+  assert.strictEqual(locationCalls, 1);
   ok('una búsqueda de ciudad vacía identifica el origen o destino que debe corregirse');
 
   const rawBody = Buffer.from(JSON.stringify({ trackingNumber: 'TEST-1' }));

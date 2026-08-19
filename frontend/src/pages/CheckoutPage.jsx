@@ -1708,8 +1708,8 @@ function CheckoutPage() {
       country: customerCountry,
       countryCode: selectedCountry?.code || '',
       municipalityId: customerCityCode,
-      department: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
-      departmentCode: selectedCountry?.code === 'CO' ? selectedRegion : undefined,
+      department: selectedRegion || undefined,
+      departmentCode: selectedRegion || undefined,
       deliveryType,
       wantsNewsletter
     };
@@ -2122,24 +2122,39 @@ function CheckoutPage() {
                     {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
                   </select>
 
-                  {selectedCountry?.code === 'CO' && (
+                  {selectedCountry?.code && (
                     <div className="co-mt-3">
-                      <label className="co-field-label">Departamento</label>
-                      <select
-                        className="co-input"
-                        value={selectedRegion}
-                        onChange={(e) => {
-                          setSelectedRegion(e.target.value);
-                          setCustomerCity('');
-                          setCustomerCityCode('');
-                          setCitiesList([]);
-                        }}
-                        disabled={regionsLoading}
-                        name="region"
-                      >
-                        <option value="">{regionsLoading ? 'Cargando departamentos...' : 'Selecciona departamento'}</option>
-                        {regions.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
-                      </select>
+                      <label className="co-field-label">
+                        {selectedCountry.code === 'CO' ? 'Departamento' : 'Estado / provincia'}
+                      </label>
+                      {selectedCountry.code === 'CO' ? (
+                        <select
+                          className="co-input"
+                          value={selectedRegion}
+                          onChange={(e) => {
+                            setSelectedRegion(e.target.value);
+                            setCustomerCity('');
+                            setCustomerCityCode('');
+                            setCitiesList([]);
+                          }}
+                          disabled={regionsLoading}
+                          name="region"
+                          autoComplete="address-level1"
+                        >
+                          <option value="">{regionsLoading ? 'Cargando departamentos...' : 'Selecciona departamento'}</option>
+                          {regions.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          className="co-input"
+                          placeholder="Estado, provincia o región"
+                          value={selectedRegion}
+                          onChange={(e) => setSelectedRegion(e.target.value)}
+                          name="region"
+                          autoComplete="address-level1"
+                        />
+                      )}
                     </div>
                   )}
 

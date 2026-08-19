@@ -8,10 +8,12 @@ const BASE_URLS = Object.freeze({
   sandbox: {
     shipping: 'https://api-test.envia.com',
     queries: 'https://queries-test.envia.com',
+    geocodes: 'https://geocodes.envia.com',
   },
   production: {
     shipping: 'https://api.envia.com',
     queries: 'https://queries.envia.com',
+    geocodes: 'https://geocodes.envia.com',
   },
 });
 
@@ -37,6 +39,42 @@ class ShippingProviderError extends Error {
 
 function clean(value) {
   return String(value || '').trim();
+}
+
+function normalizedText(value) {
+  return clean(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+async function settleWithConcurrency(values, limit, worker) {
+  const source = Array.isArray(values) ? values : [];
+  const results = new Array(source.length);
+  let cursor = 0;
+  const run = async () => {
+    while (cursor < source.length) {
+      const index = cursor;
+      cursor += 1;
+      try {
+        results[index] = {
+          status: 'fulfilled',
+          value: await worker(source[index], index),
+        };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(Math.max(1, Number(limit) || 1), source.length) },
+      run
+    )
+  );
+  return results;
 }
 
 function safeProviderMessage(payload) {
@@ -90,13 +128,15 @@ function createEnviaProvider({
     operation,
     {
       queryApi = false,
+      geocodesApi = false,
+      requiresAuth = true,
       method = 'POST',
       normalize = true,
       acceptedStatuses = [],
       allowProviderError = false,
     } = {}
   ) {
-    if (!clean(config?.token)) throw providerNotConfigured(mode);
+    if (requiresAuth && !clean(config?.token)) throw providerNotConfigured(mode);
     if (typeof fetchImpl !== 'function') {
       throw new ShippingProviderError(
         'El runtime no dispone de un cliente HTTP para la transportadora.',
@@ -114,17 +154,19 @@ function createEnviaProvider({
       const options = {
         method,
         headers: {
-          Authorization: `Bearer ${clean(config.token)}`,
           Accept: 'application/json',
         },
         signal: controller.signal,
       };
+      if (requiresAuth) {
+        options.headers.Authorization = `Bearer ${clean(config.token)}`;
+      }
       if (body !== undefined) {
         options.headers['Content-Type'] = 'application/json';
         options.body = JSON.stringify(body);
       }
       const response = await fetchImpl(
-        `${queryApi ? urls.queries : urls.shipping}${path}`,
+        `${geocodesApi ? urls.geocodes : queryApi ? urls.queries : urls.shipping}${path}`,
         options
       );
       const payload = await response.json().catch(() => ({}));
@@ -166,10 +208,66 @@ function createEnviaProvider({
     }
   }
 
+  async function listCarriers(country) {
+    const countryCode = clean(country).toUpperCase();
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      throw new ShippingProviderError(
+        'El país de origen no tiene un código ISO de dos letras válido.',
+        'SHIPPING_COUNTRY_INVALID',
+        422,
+        { provider: 'envia', operation: 'list_carriers', country: countryCode }
+      );
+    }
+    return request(
+      `/carrier?country_code=${encodeURIComponent(countryCode)}`,
+      undefined,
+      'list_carriers',
+      { queryApi: true, method: 'GET' }
+    );
+  }
+
+  async function listStates(country) {
+    const countryCode = clean(country).toUpperCase();
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      throw new ShippingProviderError(
+        'El país no tiene un código ISO de dos letras válido.',
+        'SHIPPING_COUNTRY_INVALID',
+        422,
+        { provider: 'envia', operation: 'list_states', country: countryCode }
+      );
+    }
+    return request(
+      `/state?country_code=${encodeURIComponent(countryCode)}`,
+      undefined,
+      'list_states',
+      { queryApi: true, method: 'GET' }
+    );
+  }
+
+  async function resolveState({ country, state } = {}) {
+    const requested = normalizedText(state);
+    if (!requested) return null;
+    const states = await listStates(country);
+    return states.find((item) => {
+      const code = item?.code || item?.state_code || item?.stateCode;
+      const name = item?.name || item?.state || item?.description;
+      return [code, name].some((value) => normalizedText(value) === requested);
+    }) || null;
+  }
+
   return {
     key: 'envia',
     name: 'Envia.com',
     mode,
+    customsPolicy: {
+      dutiesPaymentEntity:
+        ['recipient', 'sender', 'envia_guaranteed'].includes(
+          clean(config?.internationalDutiesPaymentEntity).toLowerCase()
+        )
+          ? clean(config.internationalDutiesPaymentEntity).toLowerCase()
+          : 'recipient',
+      exportReason: 'sale',
+    },
     configured: Boolean(clean(config?.token)),
     webhookConfigured: Boolean(clean(config?.webhookSecret)),
     async testConnection() {
@@ -197,17 +295,76 @@ function createEnviaProvider({
       );
       return data[0];
     },
+    async resolveAddress({ country, city, postalCode } = {}) {
+      const safeCountry = clean(country).toUpperCase();
+      const safePostalCode = clean(postalCode);
+      const safeCity = clean(city);
+      if (!/^[A-Z]{2}$/.test(safeCountry) || (!safePostalCode && !safeCity)) {
+        throw new ShippingProviderError(
+          'La dirección requiere país y ciudad o código postal para validarse.',
+          'SHIPPING_ADDRESS_LOOKUP_INCOMPLETE',
+          422,
+          { provider: 'envia', operation: 'resolve_address' }
+        );
+      }
+      const path = safePostalCode
+        ? `/zipcode/${encodeURIComponent(safeCountry)}/${encodeURIComponent(safePostalCode)}`
+        : `/locate/${encodeURIComponent(safeCountry)}/${encodeURIComponent(safeCity)}`;
+      const payload = await request(path, undefined, 'resolve_address', {
+        geocodesApi: true,
+        requiresAuth: false,
+        method: 'GET',
+        normalize: false,
+      });
+      const data = Array.isArray(payload?.data)
+        ? payload.data
+        : payload?.data && typeof payload.data === 'object'
+          ? [payload.data]
+          : [];
+      if (payload?.success === false || !data.length) {
+        throw new ShippingProviderError(
+          'Envia no encontró una ubicación válida para la dirección.',
+          'SHIPPING_PROVIDER_EMPTY_RESPONSE',
+          422,
+          { provider: 'envia', operation: 'resolve_address' }
+        );
+      }
+      return data;
+    },
+    listCarriers,
+    listStates,
+    resolveState,
     async quote(payload) {
       const selectedCarrier = clean(payload?.shipment?.carrier);
-      const domesticColombia =
-        clean(payload?.origin?.country).toUpperCase() === 'CO' &&
-        clean(payload?.destination?.country).toUpperCase() === 'CO';
-      if (selectedCarrier || !domesticColombia) {
+      const originCountry = clean(payload?.origin?.country).toUpperCase();
+      if (selectedCarrier || !originCountry) {
         return request('/ship/rate/', payload, 'quote');
       }
 
-      const attempts = await Promise.allSettled(
-        COLOMBIA_PARCEL_CARRIERS.map((carrier) =>
+      let carrierNames = [];
+      try {
+        const carriers = await listCarriers(originCountry);
+        carrierNames = carriers
+          .map((carrier) => clean(carrier?.carrier || carrier?.code || carrier?.name))
+          .filter(Boolean);
+      } catch (error) {
+        if (originCountry !== 'CO') throw error;
+        carrierNames = [...COLOMBIA_PARCEL_CARRIERS];
+      }
+      carrierNames = [...new Set(carrierNames)];
+      if (!carrierNames.length) {
+        throw new ShippingProviderError(
+          `Envia no reportó transportadoras disponibles para ${originCountry}.`,
+          'SHIPPING_PROVIDER_NO_CARRIERS',
+          422,
+          { provider: 'envia', operation: 'quote', country: originCountry }
+        );
+      }
+
+      const attempts = await settleWithConcurrency(
+        carrierNames,
+        5,
+        (carrier) =>
           request(
             '/ship/rate/',
             {
@@ -216,7 +373,6 @@ function createEnviaProvider({
             },
             'quote'
           )
-        )
       );
       const rates = attempts.flatMap((attempt) =>
         attempt.status === 'fulfilled' ? attempt.value : []
@@ -232,13 +388,14 @@ function createEnviaProvider({
       if (authenticationFailure) throw authenticationFailure.reason;
 
       throw new ShippingProviderError(
-        'Envia no devolvió tarifas para esta ruta con las transportadoras colombianas disponibles.',
+        'Envia no devolvió tarifas para esta ruta con las transportadoras disponibles.',
         'SHIPPING_PROVIDER_NO_RATES',
         422,
         {
           provider: 'envia',
           operation: 'quote',
-          carriers: [...COLOMBIA_PARCEL_CARRIERS],
+          country: originCountry,
+          carriers: carrierNames,
         }
       );
     },

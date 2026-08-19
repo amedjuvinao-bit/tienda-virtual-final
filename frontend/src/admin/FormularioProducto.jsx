@@ -556,6 +556,10 @@ export default function FormularioProducto() {
   const [dimL, setDimL] = useState(0);
   const [dimW, setDimW] = useState(0);
   const [dimH, setDimH] = useState(0);
+  const [customsDescription, setCustomsDescription] = useState('');
+  const [customsHsCode, setCustomsHsCode] = useState('');
+  const [customsCountryOfManufacture, setCustomsCountryOfManufacture] = useState('');
+  const [customsCountries, setCustomsCountries] = useState([]);
 
   const [cost, setCost] = useState(0);
   const [averageCost, setAverageCost] = useState(0);
@@ -609,6 +613,28 @@ export default function FormularioProducto() {
       .map(getColorValue)
       .filter(Boolean);
   }, [colorsArr]);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/api/geo/countries')
+      .then(({ data }) => {
+        if (!active) return;
+        setCustomsCountries(
+          (Array.isArray(data) ? data : [])
+            .filter((country) => /^[A-Za-z]{2}$/.test(String(country?.code || '')))
+            .map((country) => ({
+              code: String(country.code).toUpperCase(),
+              name: String(country.name || country.code),
+            }))
+        );
+      })
+      .catch((error) => {
+        console.error('No fue posible cargar el catálogo de países.', error);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return undefined;
@@ -763,6 +789,9 @@ export default function FormularioProducto() {
         setDimL(Number(p.dimensionsCm?.l ?? 0));
         setDimW(Number(p.dimensionsCm?.w ?? 0));
         setDimH(Number(p.dimensionsCm?.h ?? 0));
+        setCustomsDescription(p.customs?.description || '');
+        setCustomsHsCode(p.customs?.hsCode || '');
+        setCustomsCountryOfManufacture(p.customs?.countryOfManufacture || '');
         setCost(Number(p.cost ?? 0));
         setAverageCost(Number(p.averageCost ?? 0));
         setTaxRate(Number(p.taxRate ?? 0));
@@ -1560,6 +1589,13 @@ export default function FormularioProducto() {
       warehouseLocation: trackInventory ? warehouseLocation || '' : '',
       weightGrams: Math.max(0, Number(weightGrams || 0)),
       dimensionsCm: dimensions,
+      customs: ['physical', 'bundle'].includes(productType)
+        ? {
+            description: customsDescription.trim(),
+            hsCode: customsHsCode.trim(),
+            countryOfManufacture: customsCountryOfManufacture,
+          }
+        : {},
       cost: Math.max(0, Number(cost || 0)),
       averageCost: Math.max(0, Number(averageCost || 0)),
       taxRate: Math.min(100, Math.max(0, Number(taxRate || 0))),
@@ -2497,6 +2533,33 @@ export default function FormularioProducto() {
               <div><FieldLabel>Ubicación bodega</FieldLabel><input value={warehouseLocation} onChange={(e) => setWarehouseLocation(e.target.value)} className="w-full px-3 py-2" style={inputStyle} disabled={!trackInventory} placeholder="Estante A-3" /></div>
               <div><FieldLabel>Peso gramos</FieldLabel><input type="number" min="0" value={weightGrams} onChange={(e) => setWeightGrams(e.target.value)} className="w-full px-3 py-2" style={inputStyle} /></div>
               <div className="md:col-span-2"><FieldLabel>Dimensiones cm</FieldLabel><div className="grid grid-cols-3 gap-2"><input type="number" min="0" value={dimL} onChange={(e) => setDimL(e.target.value)} placeholder="Largo" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimW} onChange={(e) => setDimW(e.target.value)} placeholder="Ancho" className="px-3 py-2" style={inputStyle} /><input type="number" min="0" value={dimH} onChange={(e) => setDimH(e.target.value)} placeholder="Alto" className="px-3 py-2" style={inputStyle} /></div></div>
+              {['physical', 'bundle'].includes(productType) && (
+                <div className="grid gap-4 border-t pt-4 md:col-span-3 md:grid-cols-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <div className="md:col-span-3">
+                    <h4 className="text-sm font-black">Aduanas internacionales</h4>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Solo se exige al cotizar entre países distintos. El código HS y el país de fabricación se envían a Envia sin alterar el catálogo comercial.
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <FieldLabel>Descripción aduanera</FieldLabel>
+                    <input value={customsDescription} onChange={(e) => setCustomsDescription(e.target.value)} maxLength={250} className="w-full px-3 py-2" style={inputStyle} placeholder="Ej. Vestido de algodón para mujer" />
+                  </div>
+                  <div>
+                    <FieldLabel>Código HS (6 a 10 dígitos)</FieldLabel>
+                    <input value={customsHsCode} onChange={(e) => setCustomsHsCode(e.target.value)} maxLength={20} inputMode="numeric" className="w-full px-3 py-2" style={inputStyle} placeholder="6104.42" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <FieldLabel>País de fabricación</FieldLabel>
+                    <select value={customsCountryOfManufacture} onChange={(e) => setCustomsCountryOfManufacture(e.target.value)} className="w-full px-3 py-2" style={inputStyle}>
+                      <option value="">Selecciona un país</option>
+                      {customsCountries.map((country) => (
+                        <option key={country.code} value={country.code}>{country.name} ({country.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

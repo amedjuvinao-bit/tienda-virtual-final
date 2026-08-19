@@ -40,6 +40,18 @@ function normalizeMode(value) {
   );
 }
 
+function normalizeDutiesPaymentEntity(value) {
+  const normalized = clean(value || 'recipient', 40).toLowerCase();
+  if (['recipient', 'sender', 'envia_guaranteed'].includes(normalized)) {
+    return normalized;
+  }
+  throw new ShippingSettingsError(
+    'La política de impuestos internacionales no es válida.',
+    'SHIPPING_DUTIES_POLICY_INVALID',
+    400
+  );
+}
+
 function publicWebhookUrl() {
   const base = clean(env.backendUrl, 500).replace(/\/+$/, '');
   return base ? `${base}/api/shipping/webhooks/envia` : '';
@@ -118,6 +130,8 @@ async function getRuntimeShippingConfiguration(
       token,
       webhookSecret,
       timeoutMs: env.shipping.envia.timeoutMs,
+      internationalDutiesPaymentEntity:
+        settings.internationalDutiesPaymentEntity || 'recipient',
     },
   };
 }
@@ -227,6 +241,10 @@ async function updateShippingSettings(
 ) {
   const settings = await getSettings(SettingsModel);
   const nextMode = normalizeMode(input.enviaMode ?? settings.enviaMode);
+  const nextDutiesPaymentEntity = normalizeDutiesPaymentEntity(
+    input.internationalDutiesPaymentEntity ??
+      settings.internationalDutiesPaymentEntity
+  );
   const modeChanged = nextMode !== settings.enviaMode;
   let tokenChanged = false;
   let webhookSecretChanged = false;
@@ -254,6 +272,7 @@ async function updateShippingSettings(
   }
 
   settings.enviaMode = nextMode;
+  settings.internationalDutiesPaymentEntity = nextDutiesPaymentEntity;
   settings.managedFromPanel = true;
   settings.updatedBy = actorId(actor);
   settings.createdBy = settings.createdBy || actorId(actor);

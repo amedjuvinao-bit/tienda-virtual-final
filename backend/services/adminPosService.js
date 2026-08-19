@@ -24,6 +24,9 @@ const {
   normalizeAttributes,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
+const {
+  normalizeProductCustoms,
+} = require('../lib/products/productCustomsConfig');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
 const DEFAULT_CURRENCY = 'COP';
@@ -999,6 +1002,7 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
     requiresShipping: item.fulfillment?.requiresShipping !== false,
     fulfillmentKind: item.fulfillment?.kind || 'shipment',
     fulfillmentSnapshot: item.fulfillment || {},
+    customsSnapshot: normalizeProductCustoms(item.product?.customs),
   }));
   const hasVirtualFulfillment = normalizedPayload.items.some(
     (item) =>
