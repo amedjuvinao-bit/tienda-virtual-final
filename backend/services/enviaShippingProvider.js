@@ -78,7 +78,13 @@ function createEnviaProvider({
     path,
     body,
     operation,
-    { queryApi = false, method = 'POST', normalize = true } = {}
+    {
+      queryApi = false,
+      method = 'POST',
+      normalize = true,
+      acceptedStatuses = [],
+      allowProviderError = false,
+    } = {}
   ) {
     if (!clean(config?.token)) throw providerNotConfigured(mode);
     if (typeof fetchImpl !== 'function') {
@@ -112,7 +118,7 @@ function createEnviaProvider({
         options
       );
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
+      if (!response.ok && !acceptedStatuses.includes(response.status)) {
         throw new ShippingProviderError(
           safeProviderMessage(payload) || `Envia respondió HTTP ${response.status}.`,
           'SHIPPING_PROVIDER_HTTP_ERROR',
@@ -120,7 +126,7 @@ function createEnviaProvider({
           { provider: 'envia', operation, providerStatus: response.status }
         );
       }
-      if (clean(payload?.meta).toLowerCase() === 'error') {
+      if (!allowProviderError && clean(payload?.meta).toLowerCase() === 'error') {
         throw new ShippingProviderError(
           safeProviderMessage(payload) || 'La transportadora rechazó la operación.',
           'SHIPPING_PROVIDER_REJECTED',
@@ -157,10 +163,10 @@ function createEnviaProvider({
     configured: Boolean(clean(config?.token)),
     webhookConfigured: Boolean(clean(config?.webhookSecret)),
     async testConnection() {
-      await request('/carrier?country_code=CO', undefined, 'test_connection', {
-        queryApi: true,
-        method: 'GET',
+      await request('/ship/rate/', {}, 'test_connection', {
         normalize: false,
+        acceptedStatuses: [400, 422],
+        allowProviderError: true,
       });
       return { ok: true, provider: 'envia', mode };
     },

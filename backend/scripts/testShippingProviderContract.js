@@ -63,10 +63,12 @@ async function main() {
     fetchImpl: async (url, options) => {
       connectionUrl = url;
       connectionMethod = options.method;
+      assert.deepStrictEqual(JSON.parse(options.body), {});
       return {
-        ok: true,
+        ok: false,
+        status: 422,
         async json() {
-          return { data: [{ name: 'coordinadora', active: true }] };
+          return { meta: 'error', error: { message: 'Origin is required.' } };
         },
       };
     },
@@ -74,10 +76,27 @@ async function main() {
   await connection.testConnection();
   assert.strictEqual(
     connectionUrl,
-    `${BASE_URLS.sandbox.queries}/carrier?country_code=CO`
+    `${BASE_URLS.sandbox.shipping}/ship/rate/`
   );
-  assert.strictEqual(connectionMethod, 'GET');
-  ok('la conexión se valida con el catálogo autenticado oficial de transportadoras para Colombia');
+  assert.strictEqual(connectionMethod, 'POST');
+
+  const rejectedConnection = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'invalid-secret', timeoutMs: 1000 },
+    fetchImpl: async () => ({
+      ok: false,
+      status: 401,
+      async json() {
+        return {};
+      },
+    }),
+  });
+  await assert.rejects(
+    () => rejectedConnection.testConnection(),
+    (error) =>
+      error.code === 'SHIPPING_PROVIDER_HTTP_ERROR' &&
+      error.details.providerStatus === 401
+  );
+  ok('la conexión usa el host activo de cotización y distingue un token rechazado');
 
   const branch = {
     name: 'Bodega Bogotá',
