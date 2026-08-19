@@ -232,6 +232,41 @@ async function main() {
   );
   ok('un rechazo de ciudad identifica si debe corregirse la sede o la entrega');
 
+  let locationCalls = 0;
+  const emptyDestinationProvider = {
+    async resolveColombiaCity() {
+      locationCalls += 1;
+      if (locationCalls === 1) return { city: '47001000', state: 'MA' };
+      const error = new Error('La transportadora respondió sin datos utilizables.');
+      error.code = 'SHIPPING_PROVIDER_EMPTY_RESPONSE';
+      error.details = { operation: 'resolve_colombia_city' };
+      throw error;
+    },
+  };
+  await assert.rejects(
+    () => resolveColombiaAddresses(emptyDestinationProvider, {
+      origin: {
+        name: 'Sede Principal',
+        country: 'CO',
+        city: 'Santa Marta',
+        state: 'MA',
+      },
+      destination: {
+        country: 'CO',
+        city: 'Ciudad no reconocida',
+        state: 'MA',
+      },
+    }),
+    (error) =>
+      error.code === 'SHIPPING_CITY_NOT_RESOLVED' &&
+      error.statusCode === 422 &&
+      error.details.address === 'destination' &&
+      error.details.city === 'Ciudad no reconocida' &&
+      error.details.state === 'MA' &&
+      error.message.includes('dirección del cliente')
+  );
+  ok('una búsqueda de ciudad vacía identifica el origen o destino que debe corregirse');
+
   const rawBody = Buffer.from(JSON.stringify({ trackingNumber: 'TEST-1' }));
   const timestamp = 1_775_000_000_000;
   const event = 'shipment.updated';

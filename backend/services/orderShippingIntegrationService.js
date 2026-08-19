@@ -147,10 +147,11 @@ async function resolveColombiaAddresses(provider, payload) {
         country: 'CO',
       });
     } catch (error) {
-      const rejectedLocation =
-        error?.code === 'SHIPPING_PROVIDER_REJECTED' &&
+      const unresolvedLocation =
+        ['SHIPPING_PROVIDER_REJECTED', 'SHIPPING_PROVIDER_EMPTY_RESPONSE']
+          .includes(error?.code) &&
         error?.details?.operation === 'resolve_colombia_city';
-      if (!rejectedLocation) throw error;
+      if (!unresolvedLocation) throw error;
       const origin = key === 'origin';
       const place = origin
         ? `la sede ${clean(address.name, 120) || 'de origen'}`
