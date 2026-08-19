@@ -204,7 +204,7 @@ describe("ProductDetail con variantes", () => {
 
     expect(addToCartMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        variantKey: "v2__capacidad=256%20gb__color=dorado__conectividad=wi-fi__ram=12%20gb",
+        variantKey: "v2__capacidad=256%20gb__color=gold__conectividad=wi-fi__ram=12%20gb",
         variantAttributes: expect.arrayContaining([
           expect.objectContaining({ key: "ram", value: "12 GB" }),
           expect.objectContaining({

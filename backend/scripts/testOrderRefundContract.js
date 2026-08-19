@@ -72,7 +72,7 @@ function run() {
     selected[0].orderItemId,
     String(order.items[0]._id)
   );
-  assert.strictEqual(selected[0].variantKey, 'm__azul');
+  assert.strictEqual(selected[0].variantKey, 'm__blue');
   ok('La devolución se vincula a la línea histórica y su variante');
 
   const byProductAndVariant = normalizeRequestedItems(order, [
