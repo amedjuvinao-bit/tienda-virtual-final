@@ -144,6 +144,49 @@ describe('centro logístico avanzado de la orden', () => {
     expect(onRefreshTimeline).toHaveBeenCalled();
   });
 
+  it('conserva la elegibilidad cuando el resumen se sincroniza en la misma orden', async () => {
+    logisticsApi.getOrderLogistics.mockResolvedValue({
+      ...eligibilityResponse(),
+      summary: {
+        status: 'not_initialized',
+        shipmentCount: 0,
+        updatedAt: '2026-08-18T23:25:00.000Z',
+      },
+    });
+    const onOrderUpdated = vi.fn();
+    const view = render(
+      <OrderDetailLogisticsPanel
+        order={ORDER}
+        canManage
+        onOrderUpdated={onOrderUpdated}
+      />
+    );
+
+    const prepareButton = await screen.findByRole('button', {
+      name: 'Preparar logística',
+    });
+    await waitFor(() => expect(prepareButton).toBeEnabled());
+    await waitFor(() => expect(onOrderUpdated).toHaveBeenCalled());
+
+    const synchronized = onOrderUpdated.mock.calls.at(-1)[0];
+    view.rerender(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: synchronized.fulfillment,
+        }}
+        canManage
+        onOrderUpdated={onOrderUpdated}
+      />
+    );
+
+    await waitFor(() => expect(prepareButton).toBeEnabled());
+    expect(
+      screen.getByText('Pago confirmado e inventario vendido disponibles para preparar.')
+    ).toBeInTheDocument();
+    expect(logisticsApi.getOrderLogistics).toHaveBeenCalledTimes(1);
+  });
+
   it('propaga el estado agregado cuando todos los envíos quedan entregados', async () => {
     const deliveredShipment = {
       ...SHIPMENT,

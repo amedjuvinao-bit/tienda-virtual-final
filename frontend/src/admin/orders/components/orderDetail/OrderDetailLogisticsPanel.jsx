@@ -256,7 +256,6 @@ export default function OrderDetailLogisticsPanel({
   useEffect(() => {
     setShipments(initialShipments);
     setSummary(order?.fulfillment?.logisticsSummary || {});
-    setEligibility(null);
     setForms(
       Object.fromEntries(
         initialShipments.map((shipment) => [
@@ -265,8 +264,12 @@ export default function OrderDetailLogisticsPanel({
         ])
       )
     );
-    setMessage(null);
   }, [order?._id, order?.fulfillment?.logisticsSummary?.updatedAt]);
+
+  useEffect(() => {
+    setEligibility(null);
+    setMessage(null);
+  }, [order?._id]);
 
   useEffect(() => {
     if (!canManage || !physical || !order?._id || initialShipments.length > 0) {
