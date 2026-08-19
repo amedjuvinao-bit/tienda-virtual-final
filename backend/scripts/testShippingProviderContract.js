@@ -56,6 +56,29 @@ async function main() {
   assert.strictEqual(rates.length, 1);
   ok('Sandbox usa exclusivamente el host de pruebas y autenticación Bearer');
 
+  let connectionUrl = '';
+  let connectionMethod = '';
+  const connection = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url, options) => {
+      connectionUrl = url;
+      connectionMethod = options.method;
+      return {
+        ok: true,
+        async json() {
+          return { data: [{ name: 'coordinadora', active: true }] };
+        },
+      };
+    },
+  });
+  await connection.testConnection();
+  assert.strictEqual(
+    connectionUrl,
+    `${BASE_URLS.sandbox.queries}/carrier?country_code=CO`
+  );
+  assert.strictEqual(connectionMethod, 'GET');
+  ok('la conexión se valida con el catálogo autenticado oficial de transportadoras para Colombia');
+
   const branch = {
     name: 'Bodega Bogotá',
     contact: { phone: '3000000000', email: 'bodega@example.com' },

@@ -157,7 +157,7 @@ function createEnviaProvider({
     configured: Boolean(clean(config?.token)),
     webhookConfigured: Boolean(clean(config?.webhookSecret)),
     async testConnection() {
-      await request('/locale', undefined, 'test_connection', {
+      await request('/carrier?country_code=CO', undefined, 'test_connection', {
         queryApi: true,
         method: 'GET',
         normalize: false,
