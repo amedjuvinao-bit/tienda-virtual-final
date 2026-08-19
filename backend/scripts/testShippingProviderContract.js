@@ -137,7 +137,9 @@ async function main() {
   assert.strictEqual(payload.destination.country, 'CO');
   assert.strictEqual(payload.origin.state, 'DC');
   assert.strictEqual(payload.destination.state, 'AN');
-  assert.strictEqual(enviaColombiaStateCode('25', 'Cundinamarca'), 'CN');
+  assert.strictEqual(enviaColombiaStateCode('25', 'Cundinamarca'), 'CU');
+  assert.strictEqual(enviaColombiaStateCode('47', 'Magdalena'), 'MA');
+  assert.strictEqual(enviaColombiaStateCode('', 'Magdalena'), 'MA');
   assert.strictEqual(payload.settings.currency, 'COP');
   assert.throws(
     () => buildEnviaShipmentPayload({
