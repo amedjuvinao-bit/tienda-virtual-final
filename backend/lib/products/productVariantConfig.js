@@ -452,7 +452,9 @@ function findProductVariant(product = {}, selector = {}) {
     ? selectorIdentity.variantKey
     : '';
   if (desiredKey) {
-    const byKey = variants.find((variant) => cleanLower(variant.variantKey, 180) === desiredKey);
+    const byKey = variants.find(
+      (variant) => canonicalizeVariantKey(variant.variantKey) === desiredKey
+    );
     if (byKey) return byKey;
   }
 
@@ -462,11 +464,14 @@ function findProductVariant(product = {}, selector = {}) {
   );
   const dynamicSelectorKey = selectorIdentity.variantKey;
   const byAttributes = variants.find(
-    (variant) => variant.variantKey === dynamicSelectorKey
+    (variant) =>
+      canonicalizeVariantKey(variant.variantKey) === dynamicSelectorKey
   );
   if (byAttributes) return byAttributes;
 
-  return variants.find((variant) => variant.variantKey === selectorKey) || null;
+  return variants.find(
+    (variant) => canonicalizeVariantKey(variant.variantKey) === selectorKey
+  ) || null;
 }
 
 function resolveVariantCommercialSnapshot(product = {}, selector = {}) {

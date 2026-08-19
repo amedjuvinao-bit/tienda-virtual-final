@@ -16,6 +16,9 @@ const {
   hydrateOrderInventoryAllocations,
   applyReturnsToOrderInventoryAllocations,
 } = require('./orderInventoryAllocationService');
+const {
+  canonicalizeVariantKey,
+} = require('../lib/products/productVariantConfig');
 
 const ACTIVE_RETURN_STATUSES = [
   'requested',
@@ -268,7 +271,9 @@ function buildReturnEligibility(order = {}, returnedByLine = new Map(), now = ne
         product: idValue(line.product || line.productId),
         title: cleanText(line.title || line.name || 'Producto', 240),
         productType: cleanLower(line.productType || 'physical'),
-        variantKey: cleanLower(line.variantKey || line.variantId || 'default__default'),
+        variantKey:
+          canonicalizeVariantKey(line.variantKey || line.variantId) ||
+          'default__default',
         size: cleanText(line.size || line.talla, 80),
         color: cleanText(line.colorLabel || line.color, 120),
         purchasedQuantity,

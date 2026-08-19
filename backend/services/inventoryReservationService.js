@@ -8,8 +8,8 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const {
+  canonicalizeVariantKey,
   normalizeAttributes,
-  normalizeVariantKey,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
 const {
@@ -564,7 +564,7 @@ function resolveReservationStockVariant(stock, requestedVariantKey = '') {
     color: stock?.variant?.color,
     attributes: stock?.variant?.attributes || [],
   });
-  const requestedKey = normalizeVariantKey(requestedVariantKey);
+  const requestedKey = canonicalizeVariantKey(requestedVariantKey);
 
   if (requestedVariantKey && requestedKey !== stockIdentity.variantKey) {
     throw createServiceError(

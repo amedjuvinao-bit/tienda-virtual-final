@@ -7,6 +7,7 @@ const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const {
   buildVariantKey,
+  canonicalizeVariantKey,
   normalizeAttributes,
   resolveVariantCommercialSnapshot,
   resolveVariantIdentity,
@@ -242,15 +243,18 @@ function readVariantId(raw = {}) {
 }
 
 function getVariantSelector(raw = {}) {
-  const variantKey = cleanLower(readVariantId(raw));
+  const rawVariantKey = cleanLower(readVariantId(raw));
   const size = clean(raw.size || raw.talla || '');
   const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
   const variantAttributes = normalizeAttributes(
     raw.variantAttributes || raw.attributes || raw.selectedAttributes || []
   );
+  const variantKey = rawVariantKey
+    ? canonicalizeVariantKey(rawVariantKey) || rawVariantKey
+    : buildVariantKey(size, color, variantAttributes);
 
   return {
-    variantKey: variantKey || buildVariantKey(size, color, variantAttributes),
+    variantKey,
     size,
     color,
     variantAttributes,

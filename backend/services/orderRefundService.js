@@ -13,6 +13,7 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const {
   assertVariantIdentity,
+  canonicalizeVariantKey,
   normalizeAttributes,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
@@ -139,9 +140,10 @@ function productMatchesLine(line = {}, requested = {}) {
 }
 
 function variantMatchesLine(line = {}, requested = {}) {
-  const requestedVariant = cleanLower(
+  const rawRequestedVariant = cleanText(
     requested.variantKey || requested.variantId || ''
   );
+  const requestedVariant = canonicalizeVariantKey(rawRequestedVariant);
   const requestedSize = cleanLower(
     requested.size || requested.talla || requested.variant?.size || ''
   );
@@ -150,8 +152,8 @@ function variantMatchesLine(line = {}, requested = {}) {
   );
 
   if (
-    requestedVariant &&
-    normalizeVariantKey(line) !== requestedVariant
+    rawRequestedVariant &&
+    (!requestedVariant || normalizeVariantKey(line) !== requestedVariant)
   ) {
     return false;
   }
@@ -390,7 +392,9 @@ function isPaidOrder(order = {}) {
 }
 
 function inventoryKey(product, variantKey) {
-  return `${idValue(product)}:${cleanLower(variantKey || 'default__default')}`;
+  return `${idValue(product)}:${
+    canonicalizeVariantKey(variantKey) || 'default__default'
+  }`;
 }
 
 function addDemand(demands, key, quantity, metadata = {}) {

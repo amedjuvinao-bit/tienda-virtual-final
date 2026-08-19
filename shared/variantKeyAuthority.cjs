@@ -238,10 +238,27 @@ function canonicalizeVariantKey(value) {
   if (!variantKey) return '';
   if (variantKey === DEFAULT_VARIANT_KEY) return variantKey;
   if (variantKey.startsWith('v2__')) {
-    const parsed = parseVariantKey(variantKey);
-    return parsed
-      ? buildVariantKey(parsed.size, parsed.color, parsed.attributes)
-      : variantKey;
+    const attributes = [];
+    const seen = new Set();
+    for (const rawPair of variantKey.slice(4).split('__')) {
+      const separator = rawPair.indexOf('=');
+      if (separator <= 0 || separator === rawPair.length - 1) {
+        return variantKey;
+      }
+      const key = normalizeAttributeKey(
+        safeDecode(rawPair.slice(0, separator))
+      );
+      const decodedValue = cleanText(
+        safeDecode(rawPair.slice(separator + 1)),
+        160
+      );
+      if (!key || !decodedValue || seen.has(key) || attributes.length >= 4) {
+        return variantKey;
+      }
+      seen.add(key);
+      attributes.push({ key, label: key, value: decodedValue });
+    }
+    return buildVariantKey('', '', attributes);
   }
   const separator = variantKey.indexOf('__');
   return buildVariantKey(
@@ -287,7 +304,7 @@ function resolveVariantIdentity(
     cleanAttributes
   );
   const rawProvidedKey = cleanText(variantKey, MAX_VARIANT_KEY_LENGTH);
-  const providedKey = normalizeVariantKey(rawProvidedKey);
+  const providedKey = canonicalizeVariantKey(rawProvidedKey);
 
   if (rawProvidedKey && !providedKey) {
     throw createVariantIdentityError({

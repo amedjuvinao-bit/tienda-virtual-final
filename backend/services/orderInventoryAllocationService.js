@@ -3,7 +3,7 @@
 const Order = require('../models/Order');
 const InventoryReservation = require('../models/InventoryReservation');
 const {
-  normalizeVariantKey,
+  canonicalizeVariantKey,
   resolveVariantIdentity,
 } = require('../../shared/variantKeyAuthority.cjs');
 
@@ -50,7 +50,7 @@ function allocationIdentity(allocation = {}) {
     'stock',
     idValue(allocation.inventoryStock),
     idValue(allocation.product),
-    normalizeVariantKey(allocation.variantKey) || 'default__default',
+    canonicalizeVariantKey(allocation.variantKey) || 'default__default',
     idValue(allocation.bundleParentProduct),
     idValue(allocation.orderItem),
   ].join(':');
@@ -78,7 +78,8 @@ function getAllocationStatus(allocation = {}) {
 function normalizeAllocation(allocation = {}) {
   const plain = asPlain(allocation);
   const variantIdentity = resolveVariantIdentity({
-    variantKey: plain.variantKey,
+    variantKey:
+      canonicalizeVariantKey(plain.variantKey) || plain.variantKey,
     size: plain.size,
     color: plain.color,
     attributes: plain.variantAttributes || [],
@@ -514,7 +515,7 @@ function applyReturnsToOrderInventoryAllocations(
     const productId = idValue(restoration.product);
     const branchId = idValue(restoration.branch);
     const variantKey =
-      normalizeVariantKey(restoration.variantKey) || 'default__default';
+      canonicalizeVariantKey(restoration.variantKey) || 'default__default';
 
     const candidates = allocations.filter((allocation) => {
       if (
@@ -528,7 +529,7 @@ function applyReturnsToOrderInventoryAllocations(
         idValue(allocation.inventoryStock) === stockId &&
         idValue(allocation.product) === productId &&
         idValue(allocation.branch) === branchId &&
-        normalizeVariantKey(allocation.variantKey) === variantKey
+        canonicalizeVariantKey(allocation.variantKey) === variantKey
       );
     });
 

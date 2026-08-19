@@ -10,7 +10,7 @@ import { getColorDisplayName, getColorVisualValue } from "../utils/colorDisplay"
 import { applyProductSeo } from "../lib/productSeo";
 import variantKeyAuthority from '@shared/variant-key-authority';
 
-const { buildVariantKey, normalizeVariantKey } = variantKeyAuthority;
+const { buildVariantKey, canonicalizeVariantKey } = variantKeyAuthority;
 
 function clean(value) {
   return String(value || "").trim();
@@ -149,7 +149,7 @@ function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
     attributes = normalizeVariantAttributes(legacyAttributes);
   }
 
-  const variantKey = normalizeVariantKey(variant.variantKey) ||
+  const variantKey = canonicalizeVariantKey(variant.variantKey) ||
     buildVariantKey(size, rawColor, attributes);
   const images = uniqueStrings([
     clean(variant.image),

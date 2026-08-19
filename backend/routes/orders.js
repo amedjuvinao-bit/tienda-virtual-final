@@ -17,6 +17,9 @@ const Subscriber = require('../models/Subscriber');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const Counter = require('../models/Counter');
+const {
+  canonicalizeVariantKey,
+} = require('../lib/products/productVariantConfig');
 
 // nuevos
 const requireAdmin = require('../middleware/requireAdmin');
@@ -772,6 +775,11 @@ async function getNextOrderNumber({ session } = {}) {
 }
 
 /* ---------- idempotencia ---------- */
+function canonicalVariantKeyOrRaw(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return canonicalizeVariantKey(raw) || raw;
+}
+
 function canonicalizeCart(cart) {
   const safe = (Array.isArray(cart) ? cart : [])
     .map((it) => ({
@@ -779,13 +787,13 @@ function canonicalizeCart(cart) {
       title: String(it?.title || ''),
       color: String(it?.color || ''),
       size: String(it?.size || ''),
-      variantKey: String(
+      variantKey: canonicalVariantKeyOrRaw(
         it?.variantKey ||
           it?.variantId ||
           it?.selectedVariantKey ||
           it?.selectedVariantId ||
           ''
-      ).toLowerCase(),
+      ),
       price: Number(it?.price ?? it?.unitPrice ?? it?.priceNumber ?? 0) || 0,
       quantity: Number(it?.quantity ?? it?.qty ?? 0) || 0,
     }))

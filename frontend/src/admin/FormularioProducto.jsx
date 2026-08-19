@@ -18,7 +18,7 @@ import variantKeyAuthority from '@shared/variant-key-authority';
 
 const {
   buildVariantKey,
-  normalizeVariantKey,
+  canonicalizeVariantKey,
   resolveVariantIdentity,
 } = variantKeyAuthority;
 
@@ -114,7 +114,7 @@ function createCommercialFieldRow(index = 0) {
 function createBundleComponentRow(value = {}) {
   return {
     product: getReferenceId(value.product || value.productId),
-    variantKey: normalizeVariantKey(value.variantKey) || '',
+    variantKey: canonicalizeVariantKey(value.variantKey) || '',
     quantity: Math.max(1, Math.floor(Number(value.quantity || 1))),
   };
 }

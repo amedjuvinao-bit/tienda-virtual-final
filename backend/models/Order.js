@@ -82,7 +82,7 @@ function applyCanonicalVariantIdentity(item) {
     attributes: item.variantAttributes || [],
   });
   item.variantKey = identity.variantKey;
-  item.variantId = item.variantId || identity.variantKey;
+  item.variantId = identity.variantKey;
   item.size = identity.size;
   item.color = identity.color;
   item.colorLabel = visibleColor;
