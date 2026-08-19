@@ -15,6 +15,16 @@ const BASE_URLS = Object.freeze({
   },
 });
 
+const COLOMBIA_PARCEL_CARRIERS = Object.freeze([
+  'coordinadora',
+  'servientrega',
+  'interrapidisimo',
+  'tcc',
+  'deprisa',
+  'dhl',
+  'fedex',
+]);
+
 class ShippingProviderError extends Error {
   constructor(message, code, statusCode = 502, details = {}) {
     super(message);
@@ -188,7 +198,49 @@ function createEnviaProvider({
       return data[0];
     },
     async quote(payload) {
-      return request('/ship/rate/', payload, 'quote');
+      const selectedCarrier = clean(payload?.shipment?.carrier);
+      const domesticColombia =
+        clean(payload?.origin?.country).toUpperCase() === 'CO' &&
+        clean(payload?.destination?.country).toUpperCase() === 'CO';
+      if (selectedCarrier || !domesticColombia) {
+        return request('/ship/rate/', payload, 'quote');
+      }
+
+      const attempts = await Promise.allSettled(
+        COLOMBIA_PARCEL_CARRIERS.map((carrier) =>
+          request(
+            '/ship/rate/',
+            {
+              ...payload,
+              shipment: { ...payload.shipment, carrier },
+            },
+            'quote'
+          )
+        )
+      );
+      const rates = attempts.flatMap((attempt) =>
+        attempt.status === 'fulfilled' ? attempt.value : []
+      );
+      if (rates.length) return rates;
+
+      const authenticationFailure = attempts.find(
+        (attempt) =>
+          attempt.status === 'rejected' &&
+          attempt.reason?.code === 'SHIPPING_PROVIDER_HTTP_ERROR' &&
+          [401, 403].includes(Number(attempt.reason?.details?.providerStatus))
+      );
+      if (authenticationFailure) throw authenticationFailure.reason;
+
+      throw new ShippingProviderError(
+        'Envia no devolvió tarifas para esta ruta con las transportadoras colombianas disponibles.',
+        'SHIPPING_PROVIDER_NO_RATES',
+        422,
+        {
+          provider: 'envia',
+          operation: 'quote',
+          carriers: [...COLOMBIA_PARCEL_CARRIERS],
+        }
+      );
     },
     async generateLabel(payload) {
       return request('/ship/generate/', payload, 'generate_label');
@@ -265,6 +317,7 @@ function verifyEnviaWebhook({
 
 module.exports = {
   BASE_URLS,
+  COLOMBIA_PARCEL_CARRIERS,
   ShippingProviderError,
   createEnviaProvider,
   verifyEnviaWebhook,

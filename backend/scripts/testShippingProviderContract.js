@@ -5,6 +5,7 @@ const crypto = require('crypto');
 
 const {
   BASE_URLS,
+  COLOMBIA_PARCEL_CARRIERS,
   createEnviaProvider,
   verifyEnviaWebhook,
 } = require('../services/enviaShippingProvider');
@@ -172,6 +173,33 @@ async function main() {
   assert.deepStrictEqual(locateBody, { city: 'Bogotá', state: 'DC', country: 'CO' });
   assert.strictEqual(located.city, '11001000');
   ok('las ciudades colombianas se resuelven al DANE de 8 dígitos antes de cotizar');
+
+  const quotedCarriers = [];
+  const colombiaRates = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url, options) => {
+      assert.strictEqual(url, `${BASE_URLS.sandbox.shipping}/ship/rate/`);
+      const carrier = JSON.parse(options.body).shipment.carrier;
+      quotedCarriers.push(carrier);
+      return {
+        ok: true,
+        async json() {
+          return carrier === 'coordinadora'
+            ? { meta: 'rate', data: [{ carrier, service: 'standard', totalPrice: 12000 }] }
+            : { meta: 'rate', data: [] };
+        },
+      };
+    },
+  });
+  const availableRates = await colombiaRates.quote({
+    origin: { country: 'CO' },
+    destination: { country: 'CO' },
+    shipment: { type: 1 },
+  });
+  assert.deepStrictEqual(quotedCarriers.sort(), [...COLOMBIA_PARCEL_CARRIERS].sort());
+  assert.strictEqual(availableRates.length, 1);
+  assert.strictEqual(availableRates[0].carrier, 'coordinadora');
+  ok('la cotización nacional consulta cada transportadora y conserva las tarifas disponibles');
 
   const invalidLocationProvider = {
     async resolveColombiaCity() {
