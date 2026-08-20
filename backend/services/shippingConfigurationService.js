@@ -138,6 +138,7 @@ async function getRuntimeShippingConfiguration(
 
 function readiness(settings, runtime) {
   const webhookUrl = publicWebhookUrl();
+  const production = runtime.envia.mode === 'production';
   const tested = Boolean(
     settings.lastTestStatus === 'success' &&
     settings.lastTestMode === runtime.envia.mode &&
@@ -160,7 +161,7 @@ function readiness(settings, runtime) {
     webhookUrlReady,
     canTest: hasToken,
     canRegisterWebhook:
-      hasToken && tested && hasWebhookSecret && webhookUrlReady,
+      hasToken && tested && webhookUrlReady && (!production || hasWebhookSecret),
     canActivateSandbox: hasToken && tested,
     canActivateProduction:
       hasToken &&
@@ -344,7 +345,9 @@ async function registerShippingWebhook(
   const webhookUrl = publicWebhookUrl();
   if (!state.canRegisterWebhook) {
     throw new ShippingSettingsError(
-      'Para registrar el webhook se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.',
+      runtime.envia.mode === 'production'
+        ? 'Para registrar el webhook en Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.'
+        : 'Para registrar el webhook en Sandbox se requiere conexión aprobada y BACKEND_URL público con HTTPS.',
       'SHIPPING_WEBHOOK_NOT_READY',
       422,
       state

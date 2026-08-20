@@ -7,6 +7,8 @@ const path = require('path');
 process.env.INTEGRATIONS_ENCRYPTION_KEY =
   process.env.INTEGRATIONS_ENCRYPTION_KEY ||
   'shipping-settings-contract-key-32-characters';
+process.env.BACKEND_URL =
+  process.env.BACKEND_URL || 'https://shipping-settings.test';
 
 const {
   decryptShippingSecret,
@@ -18,6 +20,9 @@ const {
 const {
   findAdminRoutePermission,
 } = require('../security/adminRoutePermissionMap');
+const {
+  readiness,
+} = require('../services/shippingConfigurationService');
 
 const projectRoot = path.join(__dirname, '..', '..');
 const read = (relativePath) =>
@@ -78,6 +83,35 @@ function main() {
   assert.match(service, /publicHttpsUrl/);
   assert.match(service, /resetVerification/);
   ok('producción exige confirmación, prueba vigente, HTTPS y webhook registrado');
+
+  const verifiedSettings = {
+    credentialRevision: 3,
+    lastTestCredentialRevision: 3,
+    lastTestStatus: 'success',
+    lastTestMode: 'sandbox',
+  };
+  const sandboxReadiness = readiness(verifiedSettings, {
+    envia: { mode: 'sandbox', token: 'sandbox-token', webhookSecret: '' },
+  });
+  assert.strictEqual(sandboxReadiness.canRegisterWebhook, true);
+
+  const productionSettings = {
+    ...verifiedSettings,
+    lastTestMode: 'production',
+  };
+  const productionWithoutSecret = readiness(productionSettings, {
+    envia: { mode: 'production', token: 'production-token', webhookSecret: '' },
+  });
+  assert.strictEqual(productionWithoutSecret.canRegisterWebhook, false);
+  const productionWithSecret = readiness(productionSettings, {
+    envia: {
+      mode: 'production',
+      token: 'production-token',
+      webhookSecret: 'production-webhook-secret',
+    },
+  });
+  assert.strictEqual(productionWithSecret.canRegisterWebhook, true);
+  ok('Sandbox registra webhooks sin secreto y Producción conserva HMAC obligatorio');
 
   const frontend = read(
     'frontend/src/admin/configuracion/sections/envios/ShippingProvidersCard.jsx'
