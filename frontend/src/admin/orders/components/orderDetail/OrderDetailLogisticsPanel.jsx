@@ -359,7 +359,12 @@ export default function OrderDetailLogisticsPanel({
       setMessage(null);
       const data = await initializeOrderLogistics(order._id);
       applyResponse(data);
-      setMessage({ type: 'success', text: 'Envíos creados desde las asignaciones confirmadas de inventario.' });
+      setMessage({
+        type: 'success',
+        text: providers?.envia?.enabled
+          ? 'Envíos creados por sede. Continúa con la validación automática de datos y tarifas.'
+          : 'Envíos creados por sede. Completa ahora el plan de operación manual.',
+      });
       await onRefreshTimeline?.();
       await onCustomerStageConfirmed?.({
         action: 'initialize',
@@ -451,7 +456,7 @@ export default function OrderDetailLogisticsPanel({
   };
 
   const runProviderAction = async (shipment, action, options = {}) => {
-    if (!canManage || !providers?.envia?.configured) return;
+    if (!canManage || !providers?.envia?.enabled) return;
     const shipmentId = String(shipment._id);
     const form = forms[shipmentId] || shipmentForm(shipment);
     try {
@@ -637,7 +642,11 @@ export default function OrderDetailLogisticsPanel({
                 opacity: eligibilityLoading ? 0.7 : 1,
               }}
             >
-              {busy === 'initialize' ? 'Preparando…' : 'Preparar logística'}
+              {busy === 'initialize'
+                ? 'Preparando…'
+                : providers?.envia?.enabled
+                  ? 'Iniciar envío automático'
+                  : 'Preparar logística manual'}
             </button>
             <p
               id="orders-logistics-eligibility"
@@ -690,6 +699,7 @@ export default function OrderDetailLogisticsPanel({
               const labelCancelled = shipment.shippingIntegration?.status === 'cancelled';
               const hasActiveLabel = Boolean(shipment.shippingIntegration?.labelUrl) && !labelCancelled;
               const providerConfigured = Boolean(providers?.envia?.configured);
+              const providerActive = Boolean(providers?.envia?.enabled);
               const providerMode = providers?.envia?.mode || 'sandbox';
               const guideMode = shipment.shippingIntegration?.mode || providerMode;
               const isProductionGuide = guideMode === 'production';
@@ -699,24 +709,31 @@ export default function OrderDetailLogisticsPanel({
                 isPublicHttpUrl(shipment.carrier?.trackingUrl)
               );
               const assistantStep = hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
-              const assistantTitle = !providerConfigured
-                ? 'Conecta Envia para comenzar'
+              const assistantTitle = !providerActive
+                ? providerConfigured
+                  ? 'Activa Envia para automatizar este envío'
+                  : 'Configura Envia para automatizar este envío'
                 : hasActiveLabel
-                  ? 'Etiqueta lista para imprimir'
+                  ? 'Guía creada: imprime la etiqueta'
                   : shipmentRates.length
-                    ? 'Confirma la opción recomendada'
+                    ? 'Revisa la tarifa recomendada'
                     : labelCancelled
-                      ? 'Busca una nueva opción de envío'
-                      : 'Busca opciones de envío';
-              const assistantDescription = !providerConfigured
-                ? providers?.envia?.message || 'Configura las credenciales de Envia para cotizar automáticamente.'
+                      ? 'Busca una nueva tarifa para continuar'
+                      : 'Confirma los datos y busca la mejor tarifa';
+              const assistantDescription = !providerActive
+                ? providers?.envia?.message || 'Activa la conexión desde Configuración → Envíos. Mientras tanto, la operación manual continúa disponible.'
                 : hasActiveLabel
-                  ? 'Descarga la etiqueta y pégala al paquete. Después continúa con “Iniciar picking”.'
+                  ? 'La contratación del envío terminó. Descarga la etiqueta y después continúa con la preparación física del pedido.'
                   : shipmentRates.length
-                    ? 'Ya elegimos la mejor combinación de precio y tiempo. Puedes cambiarla solo si lo necesitas.'
+                    ? 'El sistema comparó las opciones y seleccionó la mejor combinación de precio y tiempo. Solo cámbiala si realmente lo necesitas.'
                     : labelCancelled
                       ? 'La guía anterior fue cancelada. Cotiza nuevamente para continuar.'
-                      : 'Usaremos la sede, el destino, el peso y las medidas que ya están guardados.';
+                      : 'El sistema validará sede, destino, peso y medidas antes de consultar a Envia.';
+              const waitingForAutomaticLabel = (
+                providerActive &&
+                status === 'ready_to_pick' &&
+                !hasActiveLabel
+              );
               return (
                 <article
                   key={shipmentId}
@@ -725,9 +742,11 @@ export default function OrderDetailLogisticsPanel({
                     borderRadius: 20,
                     padding: 14,
                     background: status === 'exception' ? 'color-mix(in srgb, #fff1f2 70%, var(--admin-card-bg))' : 'var(--admin-card-bg)',
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ order: 1, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                     <div>
                       <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
                         {shipment.code} · {shipment.branchSnapshot?.name || shipment.branchSnapshot?.code || 'Sede operativa'}
@@ -741,7 +760,18 @@ export default function OrderDetailLogisticsPanel({
                     </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginTop: 12 }}>
+                  <div style={{ order: 4, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
+                    <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
+                      Preparación física y entrega
+                    </div>
+                    <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.4 }}>
+                      {waitingForAutomaticLabel
+                        ? 'Primero termina el envío automático y genera la etiqueta. Después el panel habilitará el picking.'
+                        : 'Continúa únicamente con el botón del siguiente paso operativo.'}
+                    </p>
+                  </div>
+
+                  <div style={{ order: 5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginTop: 10 }}>
                     {STEPS.map(([step, label], index) => {
                       const active = status === 'exception' ? index <= (STATUS_POSITION[shipment.resumeStatus] ?? 0) : index <= position;
                       return (
@@ -752,7 +782,7 @@ export default function OrderDetailLogisticsPanel({
                     })}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
+                  <div style={{ order: 6, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
                     {[
                       ['Picking', shipment.sla?.pickingDueAt],
                       ['Despacho', shipment.sla?.dispatchDueAt],
@@ -765,24 +795,30 @@ export default function OrderDetailLogisticsPanel({
                     ))}
                   </div>
 
-                  <details style={{ marginTop: 10 }}>
+                  <details style={{ order: 3, marginTop: 10 }}>
                     <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 900 }}>
-                      Plan de transportadora, paquetes y SLA
+                      {providerActive
+                        ? 'Ver o corregir los datos utilizados por Envia'
+                        : 'Plan manual de transportadora, paquetes y SLA'}
                     </summary>
                     <div className="order-logistics-plan-grid" style={{ gap: 8, marginTop: 10 }}>
-                      {planField('Prioridad', (
-                        <select aria-label={`Prioridad ${shipment.code}`} value={form.priority} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { priority: event.target.value })} style={inputStyle()}>
-                          <option value="normal">Normal</option>
-                          <option value="high">Alta</option>
-                          <option value="urgent">Urgente</option>
-                        </select>
-                      ))}
-                      {planField('Transportadora', <input aria-label={`Transportadora ${shipment.code}`} value={form.carrierName} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { carrierName: event.target.value })} placeholder="Asignada al elegir tarifa" style={inputStyle()} />)}
-                      {planField('Nivel de servicio', <input aria-label={`Servicio ${shipment.code}`} value={form.serviceLevel} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { serviceLevel: event.target.value })} placeholder="Asignado al elegir tarifa" style={inputStyle()} />)}
-                      {planField('Número de guía', <input aria-label={`Guía ${shipment.code}`} value={form.trackingNumber} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { trackingNumber: event.target.value })} placeholder="Se genera después" style={inputStyle()} />)}
-                      {planField('Límite para picking', <input type="datetime-local" aria-label={`SLA picking ${shipment.code}`} value={form.pickingDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { pickingDueAt: event.target.value })} style={inputStyle()} />)}
-                      {planField('Límite para despacho', <input type="datetime-local" aria-label={`SLA despacho ${shipment.code}`} value={form.dispatchDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchDueAt: event.target.value })} style={inputStyle()} />)}
-                      {planField('Promesa de entrega', <input type="datetime-local" aria-label={`SLA entrega ${shipment.code}`} value={form.deliveryDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryDueAt: event.target.value })} style={inputStyle()} />)}
+                      {!providerActive ? (
+                        <>
+                          {planField('Prioridad', (
+                            <select aria-label={`Prioridad ${shipment.code}`} value={form.priority} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { priority: event.target.value })} style={inputStyle()}>
+                              <option value="normal">Normal</option>
+                              <option value="high">Alta</option>
+                              <option value="urgent">Urgente</option>
+                            </select>
+                          ))}
+                          {planField('Transportadora', <input aria-label={`Transportadora ${shipment.code}`} value={form.carrierName} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { carrierName: event.target.value })} placeholder="Nombre de la transportadora" style={inputStyle()} />)}
+                          {planField('Nivel de servicio', <input aria-label={`Servicio ${shipment.code}`} value={form.serviceLevel} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { serviceLevel: event.target.value })} placeholder="Servicio contratado" style={inputStyle()} />)}
+                          {planField('Número de guía', <input aria-label={`Guía ${shipment.code}`} value={form.trackingNumber} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { trackingNumber: event.target.value })} placeholder="Número entregado por la transportadora" style={inputStyle()} />)}
+                          {planField('Límite para picking', <input type="datetime-local" aria-label={`SLA picking ${shipment.code}`} value={form.pickingDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { pickingDueAt: event.target.value })} style={inputStyle()} />)}
+                          {planField('Límite para despacho', <input type="datetime-local" aria-label={`SLA despacho ${shipment.code}`} value={form.dispatchDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchDueAt: event.target.value })} style={inputStyle()} />)}
+                          {planField('Promesa de entrega', <input type="datetime-local" aria-label={`SLA entrega ${shipment.code}`} value={form.deliveryDueAt} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryDueAt: event.target.value })} style={inputStyle()} />)}
+                        </>
+                      ) : null}
                       {planField('Número de paquetes', <input type="number" min="1" max="20" aria-label={`Paquetes ${shipment.code}`} value={form.packageCount} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { packageCount: event.target.value })} style={inputStyle()} />)}
                       {planField('Peso por paquete (g)', <input type="number" min="0" aria-label={`Peso ${shipment.code}`} value={form.weightGrams} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { weightGrams: event.target.value })} style={inputStyle()} />)}
                       {planField('Largo (cm)', <input type="number" min="0" aria-label={`Largo ${shipment.code}`} value={form.lengthCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { lengthCm: event.target.value })} style={inputStyle()} />)}
@@ -790,32 +826,36 @@ export default function OrderDetailLogisticsPanel({
                       {planField('Alto (cm)', <input type="number" min="0" aria-label={`Alto ${shipment.code}`} value={form.heightCm} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { heightCm: event.target.value })} style={inputStyle()} />)}
                     </div>
                     <p style={{ margin: '7px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700 }}>
-                      El peso y las dimensiones indicadas se aplican a cada paquete. Son obligatorios para cotizar externamente.
+                      {providerActive
+                        ? 'Envia utilizará estos datos para calcular las tarifas. La transportadora, el servicio y la guía se completan automáticamente.'
+                        : 'Registra manualmente la transportadora y la guía. El peso y las dimensiones se aplican a cada paquete.'}
                     </p>
                     {canManage ? (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                         <button type="button" onClick={() => runAction(shipment, 'update_plan')} disabled={isBusy} style={secondaryButtonStyle()}>
-                          Guardar plan logístico
+                          {providerActive ? 'Guardar peso y medidas' : 'Guardar plan manual'}
                         </button>
                       </div>
                     ) : null}
                   </details>
 
-                  <div style={{ marginTop: 10, border: '1px solid var(--admin-primary)', borderRadius: 18, padding: 13, background: 'color-mix(in srgb, var(--admin-primary-soft-bg) 35%, var(--admin-card-bg))' }}>
+                  <div style={{ order: 2, marginTop: 12, border: '1px solid var(--admin-primary)', borderRadius: 18, padding: 13, background: 'color-mix(in srgb, var(--admin-primary-soft-bg) 35%, var(--admin-card-bg))' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                          Envío con Envia
+                          {providerActive ? 'Envío automático con Envia' : 'Envío manual activo'}
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
-                          Flujo guiado: busca, confirma y descarga la etiqueta.
+                          {providerActive
+                            ? 'Una sola acción principal en cada etapa: validar, elegir tarifa y obtener la etiqueta.'
+                            : 'Registra la transportadora, la guía y las evidencias dentro del plan manual.'}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ borderRadius: 999, padding: '5px 8px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
                           {providerMode === 'production' ? 'PRODUCCIÓN' : 'MODO PRUEBAS'}
                         </span>
-                        {providerConfigured ? (
+                        {providerActive ? (
                           <span style={{ borderRadius: 999, padding: '5px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
                             PASO {assistantStep} DE 3
                           </span>
@@ -833,13 +873,13 @@ export default function OrderDetailLogisticsPanel({
                       <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 720, lineHeight: 1.45 }}>
                         {assistantDescription}
                       </p>
-                      {!providerConfigured ? (
+                      {!providerActive ? (
                         <a href="/admin/configuracion/envios" style={{ ...secondaryButtonStyle(), display: 'inline-flex', marginTop: 9, textDecoration: 'none' }}>
-                          Configurar Envia
+                          {providerConfigured ? 'Activar Envia' : 'Configurar Envia'}
                         </a>
                       ) : canManage && !hasActiveLabel && shipmentRates.length === 0 ? (
                         <button type="button" onClick={() => runProviderAction(shipment, 'quote')} disabled={isBusy} style={{ ...primaryButtonStyle(), marginTop: 9 }}>
-                          {labelCancelled ? 'Buscar nuevas tarifas' : 'Buscar tarifas automáticamente'}
+                          {labelCancelled ? 'Buscar una nueva tarifa' : 'Validar datos y buscar la mejor tarifa'}
                         </button>
                       ) : null}
                     </div>
@@ -871,7 +911,9 @@ export default function OrderDetailLogisticsPanel({
                             </p>
                             {canManage ? (
                               <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={{ ...primaryButtonStyle(), width: '100%', justifyContent: 'center', marginTop: 10 }}>
-                                {providerMode === 'production' ? 'Generar guía real' : 'Generar guía de prueba'}
+                                {providerMode === 'production'
+                                  ? 'Confirmar tarifa y generar guía real'
+                                  : 'Confirmar tarifa y generar guía de prueba'}
                               </button>
                             ) : null}
                           </div>
@@ -928,6 +970,11 @@ export default function OrderDetailLogisticsPanel({
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 750 }}>
                           Número de guía: {shipment.carrier?.trackingNumber || 'generado'}
                         </div>
+                        <div style={{ marginTop: 7, borderRadius: 10, padding: '7px 9px', background: '#d1fae5', color: '#047857', fontSize: 9, fontWeight: 850 }}>
+                          {isProductionGuide
+                            ? 'Seguimiento automático activo: Envia enviará los cambios de estado al sistema.'
+                            : 'Modo de prueba: la guía valida el proceso, pero no tendrá un recorrido real.'}
+                        </div>
                         <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
                           <a href={shipment.shippingIntegration.labelUrl} target="_blank" rel="noreferrer" style={{ ...primaryButtonStyle(), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
                             Descargar etiqueta
@@ -940,7 +987,7 @@ export default function OrderDetailLogisticsPanel({
                         </div>
                         {!isProductionGuide ? (
                           <p style={{ margin: '8px 0 0', color: '#047857', fontSize: 9, fontWeight: 800 }}>
-                            Es una guía de prueba. El seguimiento público estará disponible únicamente con una guía de producción.
+                            El seguimiento público se habilitará únicamente para las guías reales de producción.
                           </p>
                         ) : null}
                       </div>
@@ -989,16 +1036,16 @@ export default function OrderDetailLogisticsPanel({
                   </div>
 
                   {status === 'packed' ? (
-                    <input aria-label={`Referencia de despacho ${shipment.code}`} value={form.dispatchReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchReference: event.target.value })} placeholder="Referencia de entrega al transportador (obligatoria)" style={{ ...inputStyle(), width: '100%', marginTop: 10 }} />
+                    <input aria-label={`Referencia de despacho ${shipment.code}`} value={form.dispatchReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchReference: event.target.value })} placeholder="Referencia de entrega al transportador (obligatoria)" style={{ ...inputStyle(), order: 7, width: '100%', marginTop: 10 }} />
                   ) : null}
                   {status === 'in_transit' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                    <div style={{ order: 7, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                       <input aria-label={`Evidencia de entrega ${shipment.code}`} value={form.deliveryReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryReference: event.target.value })} placeholder="Referencia de evidencia (obligatoria)" style={inputStyle()} />
                       <input aria-label={`Recibe ${shipment.code}`} value={form.recipient} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { recipient: event.target.value })} placeholder="Nombre de quien recibe" style={inputStyle()} />
                     </div>
                   ) : null}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <div style={{ order: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     {status === 'exception' ? (
                       <div style={{ flex: '1 1 420px', borderRadius: 14, background: '#fff1f2', padding: 10 }}>
                         <div style={{ color: '#9f1239', fontSize: 11, fontWeight: 900 }}>{openIncident?.type || 'Incidencia'} · {openIncident?.severity || 'medium'}</div>
@@ -1027,7 +1074,7 @@ export default function OrderDetailLogisticsPanel({
                         ) : null}
                       </details>
                     )}
-                    {canManage && next ? (
+                    {canManage && next && !waitingForAutomaticLabel ? (
                       <button type="button" onClick={() => runAction(shipment, next[0])} disabled={isBusy} style={primaryButtonStyle()}>
                         {isBusy ? 'Actualizando…' : next[1]}
                       </button>

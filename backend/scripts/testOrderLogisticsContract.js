@@ -349,14 +349,16 @@ async function main() {
   ok('la revisión optimista evita sobrescribir cambios de otro operador');
 
   assert(frontendSource.includes('Centro logístico'));
-  assert(frontendSource.includes('Plan de transportadora, paquetes y SLA'));
+  assert(frontendSource.includes('Plan manual de transportadora, paquetes y SLA'));
   assert(frontendSource.includes('Reportar incidencia'));
   assert(frontendSource.includes('expectedRevision'));
   assert(frontendSource.includes('eligibility?.canInitialize'));
   assert(frontendSource.includes("eligibility?.message || 'Verificando pago e inventario vendido…'"));
-  assert(frontendSource.includes('Buscar tarifas automáticamente'));
-  assert(frontendSource.includes('Flujo guiado: busca, confirma y descarga la etiqueta.'));
-  ok('la interfaz expone el flujo operativo, evidencia, SLA, incidencias y concurrencia');
+  assert(frontendSource.includes('Validar datos y buscar la mejor tarifa'));
+  assert(frontendSource.includes('Envío automático con Envia'));
+  assert(frontendSource.includes('Preparación física y entrega'));
+  assert(frontendSource.includes('waitingForAutomaticLabel'));
+  ok('la interfaz separa el envío automático de la preparación física y conserva evidencia, SLA, incidencias y concurrencia');
 
   console.log(`\nLogística avanzada de órdenes: ${checks.length}/${checks.length} controles superados.`);
 }

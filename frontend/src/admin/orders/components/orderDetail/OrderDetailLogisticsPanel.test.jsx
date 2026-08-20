@@ -128,7 +128,7 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     expect(screen.getByRole('region', { name: 'Centro logístico de la orden' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Preparar logística' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preparar logística manual' })).not.toBeInTheDocument();
 
     view.rerender(
       <OrderDetailLogisticsPanel
@@ -138,7 +138,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
     const prepareButton = await screen.findByRole('button', {
-      name: 'Preparar logística',
+      name: 'Preparar logística manual',
     });
     await waitFor(() => expect(prepareButton).toBeEnabled());
     fireEvent.click(prepareButton);
@@ -146,6 +146,44 @@ describe('centro logístico avanzado de la orden', () => {
     expect(await screen.findByText(/SHP-ORD001-BOG/)).toBeInTheDocument();
     expect(logisticsApi.initializeOrderLogistics).toHaveBeenCalledWith(ORDER._id);
     expect(onRefreshTimeline).toHaveBeenCalled();
+  });
+
+  it('inicia el envío automático con una sola acción cuando Envia está activo', async () => {
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        manual: { configured: true, enabled: true },
+        envia: {
+          configured: true,
+          enabled: true,
+          mode: 'sandbox',
+          message: 'Envia Sandbox activo.',
+        },
+      },
+    });
+    logisticsApi.initializeOrderLogistics.mockResolvedValue(responseWith(SHIPMENT));
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={ORDER}
+        canManage
+      />
+    );
+
+    const startButton = await screen.findByRole('button', {
+      name: 'Iniciar envío automático',
+    });
+    await waitFor(() => expect(startButton).toBeEnabled());
+    fireEvent.click(startButton);
+
+    expect(await screen.findByText('Envío automático con Envia')).toBeInTheDocument();
+    expect(
+      screen.getByText('Envíos creados por sede. Continúa con la validación automática de datos y tarifas.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', {
+      name: 'Validar datos y buscar la mejor tarifa',
+    })).toBeInTheDocument();
   });
 
   it('conserva la elegibilidad cuando el resumen se sincroniza en la misma orden', async () => {
@@ -167,7 +205,7 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     const prepareButton = await screen.findByRole('button', {
-      name: 'Preparar logística',
+      name: 'Preparar logística manual',
     });
     await waitFor(() => expect(prepareButton).toBeEnabled());
     await waitFor(() => expect(onOrderUpdated).toHaveBeenCalled());
@@ -258,7 +296,7 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     const button = await screen.findByRole('button', {
-      name: 'Preparar logística',
+      name: 'Preparar logística manual',
     });
     await waitFor(() => expect(button).toBeDisabled());
     expect(
@@ -296,7 +334,7 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     const button = await screen.findByRole('button', {
-      name: 'Preparar logística',
+      name: 'Preparar logística manual',
     });
     await waitFor(() => expect(button).toBeDisabled());
     expect(logisticsApi.initializeOrderLogistics).not.toHaveBeenCalled();
@@ -378,7 +416,7 @@ describe('centro logístico avanzado de la orden', () => {
     expect(screen.getByLabelText(`Transportadora ${SHIPMENT.code}`)).toBeDisabled();
     expect(screen.getByLabelText(`Paquetes ${SHIPMENT.code}`)).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Iniciar picking' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Guardar plan logístico' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Guardar plan manual' })).not.toBeInTheDocument();
   });
 
   it('identifica visualmente cada campo del plan y sus unidades', () => {
@@ -494,8 +532,14 @@ describe('centro logístico avanzado de la orden', () => {
     );
 
     expect(await screen.findByText('PASO 1 DE 3')).toBeInTheDocument();
-    expect(screen.getByText('Busca opciones de envío')).toBeInTheDocument();
-    const quoteButton = screen.getByRole('button', { name: 'Buscar tarifas automáticamente' });
+    expect(screen.getByText('Confirma los datos y busca la mejor tarifa')).toBeInTheDocument();
+    expect(screen.queryByLabelText(`Transportadora ${SHIPMENT.code}`)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(`Guía ${SHIPMENT.code}`)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar picking' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Primero termina el envío automático y genera la etiqueta. Después el panel habilitará el picking.')
+    ).toBeInTheDocument();
+    const quoteButton = screen.getByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
@@ -507,7 +551,7 @@ describe('centro logístico avanzado de la orden', () => {
     });
     expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('express');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Generar guía de prueba' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar tarifa y generar guía de prueba' }));
 
     await waitFor(() => {
       expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledWith(
@@ -535,8 +579,9 @@ describe('centro logístico avanzado de la orden', () => {
     );
     expect(screen.getByText('PASO 3 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver seguimiento público' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar picking' })).toBeInTheDocument();
     expect(
-      screen.getByText('Es una guía de prueba. El seguimiento público estará disponible únicamente con una guía de producción.')
+      screen.getByText('Modo de prueba: la guía valida el proceso, pero no tendrá un recorrido real.')
     ).toBeInTheDocument();
   });
 
@@ -581,7 +626,7 @@ describe('centro logístico avanzado de la orden', () => {
 
     const trackingLink = await screen.findByRole('link', { name: 'Ver seguimiento público' });
     expect(trackingLink).toHaveAttribute('href', 'https://envia.com/rastreo?label=PROD-123');
-    expect(screen.queryByText(/Es una guía de prueba/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Modo de prueba/)).not.toBeInTheDocument();
   });
 
   it('exige confirmación explícita antes de generar una guía de producción', async () => {
@@ -612,10 +657,10 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = await screen.findByRole('button', { name: 'Buscar tarifas automáticamente' });
+    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
-    fireEvent.click(await screen.findByRole('button', { name: 'Generar guía real' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar tarifa y generar guía real' }));
 
     expect(await screen.findByText('Esta acción puede generar cobros reales')).toBeInTheDocument();
     expect(logisticsApi.generateOrderShipmentLabel).not.toHaveBeenCalled();
@@ -657,7 +702,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = await screen.findByRole('button', { name: 'Buscar tarifas automáticamente' });
+    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
@@ -681,14 +726,54 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    expect(await screen.findByText('Conecta Envia para comenzar')).toBeInTheDocument();
+    expect(await screen.findByText('Configura Envia para automatizar este envío')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Configurar Envia' })).toHaveAttribute(
       'href',
       '/admin/configuracion/envios'
     );
-    expect(screen.queryByRole('button', { name: 'Buscar tarifas automáticamente' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Validar datos y buscar la mejor tarifa' })).not.toBeInTheDocument();
     expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Guardar plan logístico' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Guardar plan manual' })).toBeEnabled();
+  });
+
+  it('no mezcla acciones de Envia cuando la conexión está configurada pero sigue inactiva', async () => {
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'manual',
+        manual: { configured: true, enabled: true },
+        envia: {
+          configured: true,
+          enabled: false,
+          mode: 'sandbox',
+          message: 'Envia Sandbox configurado, pero la operación manual continúa activa.',
+        },
+      },
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    expect(await screen.findByText('Activa Envia para automatizar este envío')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Activar Envia' })).toHaveAttribute(
+      'href',
+      '/admin/configuracion/envios'
+    );
+    expect(screen.getByLabelText(`Transportadora ${SHIPMENT.code}`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {
+      name: 'Validar datos y buscar la mejor tarifa',
+    })).not.toBeInTheDocument();
+    expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
   });
 
   it('hace visible una incidencia y exige resolución antes de reanudar', async () => {
