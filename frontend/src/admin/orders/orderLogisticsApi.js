@@ -61,6 +61,36 @@ export async function syncOrderShipmentTracking(orderId, shipmentId, payload) {
   return data;
 }
 
+export async function scheduleOrderShipmentPickup(
+  orderId,
+  shipmentId,
+  payload,
+  idempotencyKey
+) {
+  const { data } = await api.post(
+    `/api/orders/${orderId}/fulfillment/logistics/shipments/${shipmentId}/pickup`,
+    payload,
+    { headers: { 'Idempotency-Key': idempotencyKey } }
+  );
+  return data;
+}
+
+export async function testOrderShipmentWebhook(orderId, shipmentId, payload) {
+  const { data } = await api.post(
+    `/api/orders/${orderId}/fulfillment/logistics/shipments/${shipmentId}/webhook/test`,
+    payload
+  );
+  return data;
+}
+
+export async function confirmOrderShipmentDropoff(orderId, shipmentId, payload) {
+  const { data } = await api.post(
+    `/api/orders/${orderId}/fulfillment/logistics/shipments/${shipmentId}/handoff/dropoff`,
+    payload
+  );
+  return data;
+}
+
 export async function cancelOrderShipmentLabel(
   orderId,
   shipmentId,

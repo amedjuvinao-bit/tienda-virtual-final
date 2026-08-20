@@ -355,9 +355,9 @@ async function main() {
   assert(frontendSource.includes('eligibility?.canInitialize'));
   assert(frontendSource.includes("eligibility?.message || 'Verificando pago e inventario vendido…'"));
   assert(frontendSource.includes('Validar datos y buscar la mejor tarifa'));
-  assert(frontendSource.includes('Envío automático con Envia'));
+  assert(frontendSource.includes('Contratación y seguimiento con Envia'));
   assert(frontendSource.includes('Preparación física y entrega'));
-  assert(frontendSource.includes('waitingForAutomaticLabel'));
+  assert(frontendSource.includes('waitingForAutomaticHandoff'));
   ok('la interfaz separa el envío automático de la preparación física y conserva evidencia, SLA, incidencias y concurrencia');
 
   console.log(`\nLogística avanzada de órdenes: ${checks.length}/${checks.length} controles superados.`);

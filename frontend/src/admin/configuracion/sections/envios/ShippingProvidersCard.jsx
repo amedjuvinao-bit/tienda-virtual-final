@@ -211,7 +211,7 @@ export default function ShippingProvidersCard() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-bold text-gray-900">Envia.com</p>
-              <p className="text-sm text-gray-500">Cotización, etiquetas, seguimiento y cancelación.</p>
+              <p className="text-sm text-gray-500">Cotización, guía, recolección o entrega en oficina, seguimiento y cancelación.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {ready.tested ? <StatusPill tone="green">Conexión aprobada</StatusPill> : <StatusPill tone="amber">Sin probar</StatusPill>}
@@ -224,6 +224,21 @@ export default function ShippingProvidersCard() {
               Antes de guardar credenciales, el responsable del servidor debe definir una sola vez <code>INTEGRATIONS_ENCRYPTION_KEY</code> con 32 caracteres o más y reiniciar el backend.
             </div>
           )}
+
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
+            <p className="font-semibold">¿Qué queda automático?</p>
+            <p className="mt-1">
+              En cada orden el sistema consulta tarifas, crea la guía y consulta a Envia si la
+              transportadora exige recolección o permite llevar el paquete a un punto de entrega.
+              El administrador solo confirma la opción recomendada e imprime la etiqueta.
+            </p>
+            <p className="mt-2">
+              El webhook es el aviso que Envia envía al servidor cuando cambia el estado de la guía.
+              Con él registrado, el pedido se actualiza sin pulsar “Sincronizar”. En Sandbox también
+              puede probarse con el token guardado; la firma HMAC se exige siempre para los eventos
+              reales de Producción.
+            </p>
+          </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="block">

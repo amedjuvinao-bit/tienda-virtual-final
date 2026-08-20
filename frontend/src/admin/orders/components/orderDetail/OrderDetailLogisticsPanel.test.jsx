@@ -4,12 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const logisticsApi = vi.hoisted(() => ({
   cancelOrderShipmentLabel: vi.fn(),
+  confirmOrderShipmentDropoff: vi.fn(),
   generateOrderShipmentLabel: vi.fn(),
   getOrderLogistics: vi.fn(),
   getShippingProviderStatus: vi.fn(),
   initializeOrderLogistics: vi.fn(),
   quoteOrderShipment: vi.fn(),
+  scheduleOrderShipmentPickup: vi.fn(),
   syncOrderShipmentTracking: vi.fn(),
+  testOrderShipmentWebhook: vi.fn(),
   updateOrderShipment: vi.fn(),
 }));
 
@@ -177,7 +180,7 @@ describe('centro logístico avanzado de la orden', () => {
     await waitFor(() => expect(startButton).toBeEnabled());
     fireEvent.click(startButton);
 
-    expect(await screen.findByText('Envío automático con Envia')).toBeInTheDocument();
+    expect(await screen.findByText('Contratación y seguimiento con Envia')).toBeInTheDocument();
     expect(
       screen.getByText('Envíos creados por sede. Continúa con la validación automática de datos y tarifas.')
     ).toBeInTheDocument();
@@ -454,7 +457,7 @@ describe('centro logístico avanzado de la orden', () => {
     expect(recommendedShippingRate(rates, 'fastest')?.carrier).toBe('express');
   });
 
-  it('guía al administrador en tres pasos, permite cambiar criterio y sincroniza después de generar la guía', async () => {
+  it('guía al administrador en cuatro pasos y exige definir la entrega física antes del picking', async () => {
     const rates = [
       { carrier: 'economica', service: 'ground', serviceDescription: 'Económico', deliveryEstimate: '4-5 días', totalPrice: 10000, currency: 'COP' },
       { carrier: 'equilibrada', service: 'standard', serviceDescription: 'Estándar', deliveryEstimate: '1-2 días', totalPrice: 14000, currency: 'COP' },
@@ -493,6 +496,15 @@ describe('centro logístico avanzado de la orden', () => {
         lastSyncedAt: '2026-08-19T18:00:00.000Z',
       },
     };
+    const droppedOff = {
+      ...tracked,
+      revision: 5,
+      shippingIntegration: {
+        ...tracked.shippingIntegration,
+        handoffMode: 'dropoff',
+        handoffConfirmedAt: '2026-08-19T18:05:00.000Z',
+      },
+    };
     logisticsApi.getShippingProviderStatus.mockResolvedValue({
       ok: true,
       providers: {
@@ -517,6 +529,10 @@ describe('centro logístico avanzado de la orden', () => {
       ...responseWith(tracked),
       shipment: tracked,
     });
+    logisticsApi.confirmOrderShipmentDropoff.mockResolvedValue({
+      ...responseWith(droppedOff),
+      shipment: droppedOff,
+    });
 
     render(
       <OrderDetailLogisticsPanel
@@ -531,20 +547,20 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    expect(await screen.findByText('PASO 1 DE 3')).toBeInTheDocument();
+    expect(await screen.findByText('PASO 1 DE 4')).toBeInTheDocument();
     expect(screen.getByText('Confirma los datos y busca la mejor tarifa')).toBeInTheDocument();
     expect(screen.queryByLabelText(`Transportadora ${SHIPMENT.code}`)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(`Guía ${SHIPMENT.code}`)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Iniciar picking' })).not.toBeInTheDocument();
     expect(
-      screen.getByText('Primero termina el envío automático y genera la etiqueta. Después el panel habilitará el picking.')
+      screen.getByText('Primero termina la contratación y define cómo llegará el paquete a la transportadora. Después el panel habilitará el picking.')
     ).toBeInTheDocument();
     const quoteButton = screen.getByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
     expect(await screen.findByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('equilibrada');
-    expect(await screen.findByText('PASO 2 DE 3')).toBeInTheDocument();
+    expect(await screen.findByText('PASO 2 DE 4')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Cambiar recomendación o ver alternativas'));
     fireEvent.change(screen.getByLabelText(`Criterio de tarifa ${SHIPMENT.code}`), {
       target: { value: 'fastest' },
@@ -577,12 +593,117 @@ describe('centro logístico avanzado de la orden', () => {
       'href',
       'https://example.com/label.pdf'
     );
-    expect(screen.getByText('PASO 3 DE 3')).toBeInTheDocument();
+    expect(screen.getByText('PASO 3 DE 4')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver seguimiento público' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar picking' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir entrega en punto' }));
+    await waitFor(() => expect(logisticsApi.confirmOrderShipmentDropoff).toHaveBeenCalledWith(
+      ORDER._id,
+      SHIPMENT._id,
+      { expectedRevision: 4 }
+    ));
+    expect(await screen.findByText('PASO 4 DE 4')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Iniciar picking' })).toBeInTheDocument();
     expect(
-      screen.getByText('Modo de prueba: la guía valida el proceso, pero no tendrá un recorrido real.')
+      screen.getByText('El seguimiento público se habilitará únicamente para las guías reales de producción.')
     ).toBeInTheDocument();
+  });
+
+  it('programa la recolección junto con la guía cuando la transportadora lo exige', async () => {
+    const pickupRate = {
+      carrier: 'carrier-pickup',
+      service: 'standard',
+      serviceDescription: 'Servicio con recolección',
+      deliveryEstimate: '2-3 días',
+      totalPrice: 18000,
+      currency: 'COP',
+      carrierActions: ['pickup_on_generate'],
+    };
+    const planned = { ...SHIPMENT, revision: 1 };
+    const quoted = {
+      ...SHIPMENT,
+      revision: 2,
+      shippingIntegration: { provider: 'envia', mode: 'sandbox', status: 'quoted' },
+    };
+    const generated = {
+      ...quoted,
+      revision: 3,
+      carrier: {
+        code: 'CARRIER-PICKUP',
+        name: 'carrier-pickup',
+        serviceLevel: 'standard',
+        trackingNumber: 'PICKUP-123',
+      },
+      shippingIntegration: {
+        provider: 'envia',
+        mode: 'sandbox',
+        status: 'label_generated',
+        labelUrl: 'https://example.com/pickup-label.pdf',
+        selectedRate: pickupRate,
+        carrierActions: ['pickup_on_generate'],
+        handoffMode: 'pickup',
+        handoffConfirmedAt: '2026-08-22T12:00:00.000Z',
+        pickup: {
+          status: 'scheduled',
+          confirmation: 'REC-123',
+          requestedDate: '2026-08-22',
+        },
+      },
+    };
+    const tracked = { ...generated, revision: 4 };
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: { configured: true, enabled: true, mode: 'sandbox', message: 'Envia Sandbox activo.' },
+      },
+    });
+    logisticsApi.updateOrderShipment.mockResolvedValue({ ...responseWith(planned), shipment: planned });
+    logisticsApi.quoteOrderShipment.mockResolvedValue({
+      ...responseWith(quoted),
+      shipment: quoted,
+      rates: [pickupRate],
+    });
+    logisticsApi.generateOrderShipmentLabel.mockResolvedValue({
+      ...responseWith(generated),
+      shipment: generated,
+    });
+    logisticsApi.syncOrderShipmentTracking.mockResolvedValue({
+      ...responseWith(tracked),
+      shipment: tracked,
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: { shipments: [SHIPMENT], logisticsSummary: responseWith(SHIPMENT).summary },
+        }}
+        canManage
+      />
+    );
+
+    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
+    await waitFor(() => expect(quoteButton).toBeEnabled());
+    fireEvent.click(quoteButton);
+    const pickupDate = await screen.findByLabelText(`Fecha de recolección al generar ${SHIPMENT.code}`);
+    fireEvent.change(pickupDate, { target: { value: '2026-08-22' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Generar guía de prueba y solicitar recolección' }));
+
+    await waitFor(() => expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledWith(
+      ORDER._id,
+      SHIPMENT._id,
+      expect.objectContaining({
+        provider: 'envia',
+        pickupDate: '2026-08-22',
+        rate: expect.objectContaining({ carrierActions: ['pickup_on_generate'] }),
+      }),
+      expect.any(String)
+    ));
+    expect(await screen.findByText(/Recolección confirmada/)).toHaveTextContent('REC-123');
+    expect(screen.getByText('PASO 4 DE 4')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Elegir entrega en punto' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar picking' })).toBeInTheDocument();
   });
 
   it('muestra seguimiento público únicamente para una guía de producción', async () => {

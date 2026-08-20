@@ -6,12 +6,15 @@ const {
 } = require('./enviaShippingProvider');
 const {
   getRuntimeShippingConfiguration,
+  publicWebhookUrl,
+  readiness,
 } = require('./shippingConfigurationService');
 
 async function getShippingProviderStatus(dependencies = {}) {
   const runtime = await getRuntimeShippingConfiguration(dependencies);
   const envia = createEnviaProvider({ config: runtime.envia });
   const active = runtime.defaultProvider === 'envia' && envia.configured;
+  const state = readiness(runtime.settings, runtime);
   return {
     defaultProvider: runtime.defaultProvider,
     manual: {
@@ -27,6 +30,9 @@ async function getShippingProviderStatus(dependencies = {}) {
       enabled: active,
       configured: envia.configured,
       webhookConfigured: envia.webhookConfigured,
+      webhookRegistered: state.webhookRegistered,
+      webhookUrlReady: state.webhookUrlReady,
+      webhookUrl: publicWebhookUrl(),
       mode: envia.mode,
       message: active
         ? `Envia ${envia.mode === 'sandbox' ? 'Sandbox' : 'Producción'} activo.`

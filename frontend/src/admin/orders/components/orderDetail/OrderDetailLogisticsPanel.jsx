@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   cancelOrderShipmentLabel,
+  confirmOrderShipmentDropoff,
   generateOrderShipmentLabel,
   getOrderLogistics,
   getShippingProviderStatus,
   initializeOrderLogistics,
   quoteOrderShipment,
+  scheduleOrderShipmentPickup,
   syncOrderShipmentTracking,
+  testOrderShipmentWebhook,
   updateOrderShipment,
 } from '../../orderLogisticsApi';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
@@ -84,6 +87,14 @@ function toLocalDateTime(value) {
     .slice(0, 16);
 }
 
+function localDateAfter(days = 1) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 function formatDeadline(value) {
   if (!value) return 'Sin compromiso';
   const date = new Date(value);
@@ -111,6 +122,12 @@ function isPublicHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function carrierActions(value) {
+  return [...new Set((Array.isArray(value) ? value : [])
+    .map((action) => String(action || '').trim().toLowerCase())
+    .filter(Boolean))];
 }
 
 function planField(label, control) {
@@ -145,6 +162,11 @@ function shipmentForm(shipment = {}) {
     heightCm: Number(packages[0]?.heightCm || 0),
     selectedRate: null,
     rateStrategy: 'balanced',
+    pickupDate: shipment.shippingIntegration?.pickup?.requestedDate || localDateAfter(1),
+    pickupTimeStart: shipment.shippingIntegration?.pickup?.timeFrom || '09:00',
+    pickupTimeEnd: shipment.shippingIntegration?.pickup?.timeTo || '14:00',
+    pickupInstructions: shipment.shippingIntegration?.pickup?.instructions || '',
+    testStatus: 'Shipped',
     dispatchReference: shipment.dispatchEvidence?.reference || '',
     deliveryReference: shipment.deliveryEvidence?.reference || '',
     recipient: shipment.deliveryEvidence?.recipient || '',
@@ -246,6 +268,7 @@ export default function OrderDetailLogisticsPanel({
   const [providers, setProviders] = useState(null);
   const [rates, setRates] = useState({});
   const [labelConfirmation, setLabelConfirmation] = useState('');
+  const [pickupConfirmation, setPickupConfirmation] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
 
@@ -299,6 +322,7 @@ export default function OrderDetailLogisticsPanel({
     setEligibility(null);
     setMessage(null);
     setLabelConfirmation('');
+    setPickupConfirmation('');
   }, [order?._id]);
 
   useEffect(() => {
@@ -513,8 +537,14 @@ export default function OrderDetailLogisticsPanel({
             provider: 'envia',
             expectedRevision: Number(shipment.revision || 0),
             rate: form.selectedRate,
+            pickupDate: form.pickupDate,
+            pickupInstructions: form.pickupInstructions,
           },
-          idempotencyKey(shipment, 'label', form.selectedRate)
+          idempotencyKey(
+            shipment,
+            `label-${form.pickupDate || 'without-pickup'}`,
+            form.selectedRate
+          )
         );
         applyResponse(data);
         const generatedShipment = data?.shipment || (data?.shipments || []).find(
@@ -547,6 +577,50 @@ export default function OrderDetailLogisticsPanel({
         });
         applyResponse(data);
         setMessage({ type: 'success', text: `Seguimiento de ${shipment.code} sincronizado.` });
+      } else if (action === 'webhook_test') {
+        data = await testOrderShipmentWebhook(order._id, shipmentId, {
+          provider: 'envia',
+          expectedRevision: Number(shipment.revision || 0),
+          testStatus: form.testStatus,
+        });
+        setMessage({
+          type: 'success',
+          text: `Envia aceptó el evento ${form.testStatus}. La prueba Sandbox llegará autenticada; los eventos reales de Producción exigirán firma HMAC.`,
+        });
+        window.setTimeout(() => refresh().catch(() => {}), 1800);
+      } else if (action === 'dropoff') {
+        data = await confirmOrderShipmentDropoff(order._id, shipmentId, {
+          expectedRevision: Number(shipment.revision || 0),
+        });
+        applyResponse(data);
+        setMessage({
+          type: 'success',
+          text: `Entrega en punto seleccionada para ${shipment.code}. Imprime la etiqueta y continúa con la preparación.`,
+        });
+      } else if (action === 'pickup') {
+        if (providers.envia.mode === 'production' && !options.productionConfirmed) {
+          setPickupConfirmation(shipmentId);
+          return;
+        }
+        setPickupConfirmation('');
+        data = await scheduleOrderShipmentPickup(
+          order._id,
+          shipmentId,
+          {
+            provider: 'envia',
+            expectedRevision: Number(shipment.revision || 0),
+            pickupDate: form.pickupDate,
+            pickupTimeStart: form.pickupTimeStart,
+            pickupTimeEnd: form.pickupTimeEnd,
+            pickupInstructions: form.pickupInstructions,
+          },
+          idempotencyKey(shipment, 'pickup')
+        );
+        applyResponse(data);
+        setMessage({
+          type: 'success',
+          text: `Recolección de ${shipment.code} programada. Prepara el paquete antes de la ventana elegida.`,
+        });
       } else if (action === 'cancel') {
         setLabelConfirmation('');
         data = await cancelOrderShipmentLabel(
@@ -560,7 +634,13 @@ export default function OrderDetailLogisticsPanel({
         );
         applyResponse(data);
         setRates((previous) => ({ ...previous, [shipmentId]: [] }));
-        setMessage({ type: 'success', text: `Cancelación de la guía ${shipment.code} registrada.` });
+        const cancellation = data?.shipment?.shippingIntegration?.cancellation;
+        setMessage({
+          type: 'success',
+          text: cancellation?.status === 'refunded'
+            ? `Guía ${shipment.code} cancelada y saldo reintegrado.`
+            : `Guía ${shipment.code} cancelada. El reintegro del saldo está pendiente de confirmación de Envia.`,
+        });
       }
       await onRefreshTimeline?.();
     } catch (error) {
@@ -703,18 +783,40 @@ export default function OrderDetailLogisticsPanel({
               const providerMode = providers?.envia?.mode || 'sandbox';
               const guideMode = shipment.shippingIntegration?.mode || providerMode;
               const isProductionGuide = guideMode === 'production';
+              const webhookRegistered = Boolean(providers?.envia?.webhookRegistered);
+              const handoffMode = shipment.shippingIntegration?.handoffMode || 'pending';
+              const pickup = shipment.shippingIntegration?.pickup || {};
+              const pickupScheduled = pickup.status === 'scheduled';
+              const pickupFailed = pickup.status === 'failed';
+              const handoffComplete = handoffMode === 'dropoff' || pickupScheduled;
+              const selectedCarrierActions = carrierActions(selectedRate?.carrierActions);
+              const savedCarrierActions = carrierActions(shipment.shippingIntegration?.carrierActions);
+              const activeCarrierActions = hasActiveLabel
+                ? savedCarrierActions
+                : selectedCarrierActions;
+              const pickupOnGenerate = activeCarrierActions.includes('pickup_on_generate');
+              const standalonePickup = activeCarrierActions.includes('pickup');
+              const pickupMandatory = activeCarrierActions.includes('pickup_mandatory');
+              const dropoffAvailable = !pickupMandatory && !pickupOnGenerate;
+              const lastTrackingEvent = (shipment.shippingIntegration?.trackingEvents || []).slice(-1)[0];
               const showPublicTracking = Boolean(
                 hasActiveLabel &&
                 isProductionGuide &&
                 isPublicHttpUrl(shipment.carrier?.trackingUrl)
               );
-              const assistantStep = hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
+              const assistantStep = handoffComplete ? 4 : hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
               const assistantTitle = !providerActive
                 ? providerConfigured
                   ? 'Activa Envia para automatizar este envío'
                   : 'Configura Envia para automatizar este envío'
-                : hasActiveLabel
-                  ? 'Guía creada: imprime la etiqueta'
+                : pickupFailed
+                  ? 'Revisa la recolección antes de preparar'
+                  : pickupScheduled
+                  ? 'Recolección programada: prepara el paquete'
+                  : handoffMode === 'dropoff'
+                    ? 'Entrega en punto elegida: prepara el paquete'
+                    : hasActiveLabel
+                      ? 'Imprime la etiqueta y elige cómo entregar el paquete'
                   : shipmentRates.length
                     ? 'Revisa la tarifa recomendada'
                     : labelCancelled
@@ -722,17 +824,23 @@ export default function OrderDetailLogisticsPanel({
                       : 'Confirma los datos y busca la mejor tarifa';
               const assistantDescription = !providerActive
                 ? providers?.envia?.message || 'Activa la conexión desde Configuración → Envíos. Mientras tanto, la operación manual continúa disponible.'
-                : hasActiveLabel
-                  ? 'La contratación del envío terminó. Descarga la etiqueta y después continúa con la preparación física del pedido.'
+                : pickupFailed
+                  ? 'Envia creó la guía, pero no confirmó la recolección solicitada durante la generación. No entregues el paquete todavía: cancela la guía y vuelve a generarla.'
+                  : pickupScheduled
+                  ? `Envia confirmó la recolección ${pickup.confirmation || ''} para ${pickup.requestedDate || 'la fecha elegida'}, de ${pickup.timeFrom || ''} a ${pickup.timeTo || ''}.`
+                  : handoffMode === 'dropoff'
+                    ? 'No hay otra solicitud que hacer en Envia: lleva el paquete etiquetado al punto autorizado y conserva el comprobante.'
+                    : hasActiveLabel
+                      ? 'La guía por sí sola no mueve el paquete. Elige si lo llevarás a un punto autorizado o si deseas solicitar recolección.'
                   : shipmentRates.length
                     ? 'El sistema comparó las opciones y seleccionó la mejor combinación de precio y tiempo. Solo cámbiala si realmente lo necesitas.'
                     : labelCancelled
                       ? 'La guía anterior fue cancelada. Cotiza nuevamente para continuar.'
                       : 'El sistema validará sede, destino, peso y medidas antes de consultar a Envia.';
-              const waitingForAutomaticLabel = (
+              const waitingForAutomaticHandoff = (
                 providerActive &&
                 status === 'ready_to_pick' &&
-                !hasActiveLabel
+                (!hasActiveLabel || !handoffComplete)
               );
               return (
                 <article
@@ -765,8 +873,8 @@ export default function OrderDetailLogisticsPanel({
                       Preparación física y entrega
                     </div>
                     <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.4 }}>
-                      {waitingForAutomaticLabel
-                        ? 'Primero termina el envío automático y genera la etiqueta. Después el panel habilitará el picking.'
+                      {waitingForAutomaticHandoff
+                        ? 'Primero termina la contratación y define cómo llegará el paquete a la transportadora. Después el panel habilitará el picking.'
                         : 'Continúa únicamente con el botón del siguiente paso operativo.'}
                     </p>
                   </div>
@@ -843,11 +951,11 @@ export default function OrderDetailLogisticsPanel({
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                          {providerActive ? 'Envío automático con Envia' : 'Envío manual activo'}
+                          {providerActive ? 'Contratación y seguimiento con Envia' : 'Envío manual activo'}
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
                           {providerActive
-                            ? 'Una sola acción principal en cada etapa: validar, elegir tarifa y obtener la etiqueta.'
+                            ? 'El panel guía cuatro decisiones: validar, cotizar, crear la guía y entregar el paquete a la transportadora.'
                             : 'Registra la transportadora, la guía y las evidencias dentro del plan manual.'}
                         </div>
                       </div>
@@ -857,7 +965,7 @@ export default function OrderDetailLogisticsPanel({
                         </span>
                         {providerActive ? (
                           <span style={{ borderRadius: 999, padding: '5px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
-                            PASO {assistantStep} DE 3
+                            PASO {assistantStep} DE 4
                           </span>
                         ) : null}
                       </div>
@@ -909,11 +1017,28 @@ export default function OrderDetailLogisticsPanel({
                                 ? recommendationExplanation(form.rateStrategy)
                                 : 'Elegida manualmente entre las opciones recibidas.'}
                             </p>
+                            {pickupOnGenerate ? (
+                              <div style={{ marginTop: 10, border: '1px solid #fdba74', borderRadius: 12, padding: 10, background: '#fff7ed' }}>
+                                <div style={{ color: '#9a3412', fontSize: 10, fontWeight: 950 }}>
+                                  Esta transportadora programa la recolección al crear la guía
+                                </div>
+                                <p style={{ margin: '4px 0 8px', color: '#9a3412', fontSize: 9, fontWeight: 720, lineHeight: 1.45 }}>
+                                  Elige el día en que el paquete estará empacado. Envia enviará la guía y la solicitud de recolección en una sola operación.
+                                </p>
+                                {planField('Fecha de recolección', (
+                                  <input type="date" aria-label={`Fecha de recolección al generar ${shipment.code}`} value={form.pickupDate} onChange={(event) => updateForm(shipmentId, { pickupDate: event.target.value })} style={inputStyle()} />
+                                ))}
+                              </div>
+                            ) : null}
                             {canManage ? (
                               <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={{ ...primaryButtonStyle(), width: '100%', justifyContent: 'center', marginTop: 10 }}>
-                                {providerMode === 'production'
-                                  ? 'Confirmar tarifa y generar guía real'
-                                  : 'Confirmar tarifa y generar guía de prueba'}
+                                {pickupOnGenerate
+                                  ? providerMode === 'production'
+                                    ? 'Generar guía real y solicitar recolección'
+                                    : 'Generar guía de prueba y solicitar recolección'
+                                  : providerMode === 'production'
+                                    ? 'Confirmar tarifa y generar guía real'
+                                    : 'Confirmar tarifa y generar guía de prueba'}
                               </button>
                             ) : null}
                           </div>
@@ -971,10 +1096,18 @@ export default function OrderDetailLogisticsPanel({
                           Número de guía: {shipment.carrier?.trackingNumber || 'generado'}
                         </div>
                         <div style={{ marginTop: 7, borderRadius: 10, padding: '7px 9px', background: '#d1fae5', color: '#047857', fontSize: 9, fontWeight: 850 }}>
-                          {isProductionGuide
-                            ? 'Seguimiento automático activo: Envia enviará los cambios de estado al sistema.'
-                            : 'Modo de prueba: la guía valida el proceso, pero no tendrá un recorrido real.'}
+                          {webhookRegistered
+                            ? isProductionGuide
+                              ? 'Seguimiento automático habilitado: los eventos firmados de Envia actualizarán esta orden.'
+                              : 'Webhook Sandbox habilitado: puedes simular estados desde Opciones avanzadas.'
+                            : 'Seguimiento automático aún no habilitado. Usa “Actualizar estado desde Envia” o registra el webhook en Configuración → Envíos.'}
                         </div>
+                        {(shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status) ? (
+                          <div style={{ marginTop: 7, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
+                            Último estado de Envia: <strong>{shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status}</strong>
+                            {shipment.shippingIntegration?.providerStatusDescription ? ` · ${shipment.shippingIntegration.providerStatusDescription}` : ''}
+                          </div>
+                        ) : null}
                         <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
                           <a href={shipment.shippingIntegration.labelUrl} target="_blank" rel="noreferrer" style={{ ...primaryButtonStyle(), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
                             Descargar etiqueta
@@ -994,6 +1127,68 @@ export default function OrderDetailLogisticsPanel({
                     ) : labelCancelled && shipment.shippingIntegration?.labelUrl ? (
                       <div style={{ marginTop: 9, borderRadius: 12, padding: 9, background: '#fff1f2', color: '#be123c', fontSize: 9, fontWeight: 850 }}>
                         La guía anterior está cancelada y ya no puede utilizarse.
+                        {shipment.shippingIntegration?.cancellation?.status === 'refund_pending'
+                          ? ' El reintegro del saldo sigue pendiente de confirmación.'
+                          : shipment.shippingIntegration?.cancellation?.status === 'refunded'
+                            ? ' Envia confirmó el reintegro del saldo.'
+                            : ''}
+                      </div>
+                    ) : null}
+
+                    {canManage && hasActiveLabel && providerConfigured ? (
+                      <div style={{ marginTop: 10, border: `1px solid ${handoffComplete ? '#86efac' : ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 14, padding: 12, background: handoffComplete ? '#f0fdf4' : ORDER_DETAIL_THEME.cardBg }}>
+                        <div style={{ color: handoffComplete ? '#047857' : ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 950 }}>
+                          Paso final: entrega física a la transportadora
+                        </div>
+                        {pickupFailed ? (
+                          <div style={{ marginTop: 8, borderRadius: 10, padding: 9, background: '#fff7ed', color: '#9a3412', fontSize: 10, fontWeight: 800, lineHeight: 1.5 }}>
+                            La guía existe, pero falta la confirmación de la recolección que debía programarse al generarla. Cancela esta guía desde “Opciones avanzadas” y crea otra antes de iniciar el picking.
+                          </div>
+                        ) : pickupScheduled ? (
+                          <div style={{ marginTop: 7, color: '#047857', fontSize: 10, fontWeight: 800, lineHeight: 1.5 }}>
+                            Recolección confirmada <strong>{pickup.confirmation}</strong> para el {pickup.requestedDate}{pickup.timeFrom && pickup.timeTo ? `, entre ${pickup.timeFrom} y ${pickup.timeTo}` : ''}. Ten el paquete cerrado y etiquetado antes de esa fecha.
+                          </div>
+                        ) : handoffMode === 'dropoff' ? (
+                          <div style={{ marginTop: 7, color: '#047857', fontSize: 10, fontWeight: 800, lineHeight: 1.5 }}>
+                            Entrega en punto seleccionada. Imprime la etiqueta, prepara el paquete y llévalo a un punto autorizado de la transportadora.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 9, marginTop: 9 }}>
+                            {dropoffAvailable ? (
+                              <div style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 12, padding: 10 }}>
+                                <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 950 }}>Llevar a un punto autorizado</div>
+                                <p style={{ margin: '4px 0 8px', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700, lineHeight: 1.45 }}>
+                                  No genera una solicitud adicional. Lleva el paquete etiquetado y conserva el comprobante.
+                                </p>
+                                <button type="button" onClick={() => runProviderAction(shipment, 'dropoff')} disabled={isBusy} style={secondaryButtonStyle()}>
+                                  Elegir entrega en punto
+                                </button>
+                              </div>
+                            ) : null}
+                            {(standalonePickup || pickupMandatory) ? (
+                              <div style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 12, padding: 10 }}>
+                              <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 950 }}>Opción B · Solicitar recolección</div>
+                              <p style={{ margin: '4px 0 8px', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700, lineHeight: 1.45 }}>
+                                Envia consulta si la transportadora admite recolección. En producción puede tener un costo adicional.
+                              </p>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                                {planField('Fecha', <input type="date" aria-label={`Fecha de recolección ${shipment.code}`} value={form.pickupDate} onChange={(event) => updateForm(shipmentId, { pickupDate: event.target.value })} style={inputStyle()} />)}
+                                {planField('Desde', <input type="time" aria-label={`Inicio de recolección ${shipment.code}`} value={form.pickupTimeStart} onChange={(event) => updateForm(shipmentId, { pickupTimeStart: event.target.value })} style={inputStyle()} />)}
+                                {planField('Hasta', <input type="time" aria-label={`Fin de recolección ${shipment.code}`} value={form.pickupTimeEnd} onChange={(event) => updateForm(shipmentId, { pickupTimeEnd: event.target.value })} style={inputStyle()} />)}
+                              </div>
+                              <input aria-label={`Instrucciones de recolección ${shipment.code}`} value={form.pickupInstructions} onChange={(event) => updateForm(shipmentId, { pickupInstructions: event.target.value })} placeholder="Instrucciones internas (opcional)" style={{ ...inputStyle(), width: '100%', marginTop: 6 }} />
+                              <button type="button" onClick={() => runProviderAction(shipment, 'pickup')} disabled={isBusy} style={{ ...primaryButtonStyle(), marginTop: 8 }}>
+                                {isProductionGuide ? 'Solicitar recolección real' : 'Solicitar recolección Sandbox'}
+                              </button>
+                              </div>
+                            ) : null}
+                            {!dropoffAvailable && !standalonePickup && !pickupMandatory ? (
+                              <div style={{ borderRadius: 12, padding: 10, background: '#fff7ed', color: '#9a3412', fontSize: 10, fontWeight: 800 }}>
+                                Esta guía requería programar la recolección al generarla. Cancélala y crea una nueva indicando la fecha.
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     ) : null}
 
@@ -1008,11 +1203,39 @@ export default function OrderDetailLogisticsPanel({
                               Actualizar estado desde Envia
                             </button>
                           ) : null}
+                          {!isProductionGuide && webhookRegistered && shipment.carrier?.trackingNumber ? (
+                            <>
+                              <select aria-label={`Estado de webhook de prueba ${shipment.code}`} value={form.testStatus} onChange={(event) => updateForm(shipmentId, { testStatus: event.target.value })} style={inputStyle()}>
+                                <option value="Picked Up">Recolectado</option>
+                                <option value="Shipped">En tránsito</option>
+                                <option value="Delivered">Entregado</option>
+                                <option value="Canceled">Cancelado</option>
+                              </select>
+                              <button type="button" onClick={() => runProviderAction(shipment, 'webhook_test')} disabled={isBusy} style={secondaryButtonStyle()}>
+                                Simular evento automático
+                              </button>
+                            </>
+                          ) : null}
                           <button type="button" onClick={() => runProviderAction(shipment, 'cancel')} disabled={isBusy} style={dangerButtonStyle()}>
                             Cancelar guía
                           </button>
                         </div>
                       </details>
+                    ) : null}
+
+                    {pickupConfirmation === shipmentId ? (
+                      <div role="alertdialog" aria-label={`Confirmar recolección de producción ${shipment.code}`} style={{ marginTop: 10, border: '1px solid #fdba74', borderRadius: 14, padding: 12, background: '#fff7ed' }}>
+                        <div style={{ color: '#9a3412', fontSize: 11, fontWeight: 950 }}>
+                          La recolección puede generar un cobro real
+                        </div>
+                        <p style={{ margin: '5px 0 0', color: '#9a3412', fontSize: 10, fontWeight: 700, lineHeight: 1.45 }}>
+                          Se solicitará a Envia una recolección para el {form.pickupDate}, de {form.pickupTimeStart} a {form.pickupTimeEnd}. Confirma que el paquete estará listo.
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 7, marginTop: 9 }}>
+                          <button type="button" onClick={() => setPickupConfirmation('')} style={secondaryButtonStyle()}>Volver</button>
+                          <button type="button" onClick={() => runProviderAction(shipment, 'pickup', { productionConfirmed: true })} disabled={isBusy} style={primaryButtonStyle()}>Sí, solicitar recolección</button>
+                        </div>
+                      </div>
                     ) : null}
 
                     {labelConfirmation === shipmentId ? (
@@ -1021,7 +1244,7 @@ export default function OrderDetailLogisticsPanel({
                           Esta acción puede generar cobros reales
                         </div>
                         <p style={{ margin: '5px 0 0', color: '#9a3412', fontSize: 10, fontWeight: 700, lineHeight: 1.45 }}>
-                          Envia creará una guía de producción con la tarifa seleccionada. Confirma solo cuando el paquete y los datos del destinatario estén listos.
+                          Envia creará una guía de producción y descontará de tu saldo la tarifa seleccionada.{pickupOnGenerate ? ` También solicitará la recolección para el ${form.pickupDate}.` : ''} Confirma solo cuando el paquete y los datos del destinatario estén listos.
                         </p>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
                           <button type="button" onClick={() => setLabelConfirmation('')} style={secondaryButtonStyle()}>
@@ -1074,7 +1297,7 @@ export default function OrderDetailLogisticsPanel({
                         ) : null}
                       </details>
                     )}
-                    {canManage && next && !waitingForAutomaticLabel ? (
+                    {canManage && next && !waitingForAutomaticHandoff ? (
                       <button type="button" onClick={() => runAction(shipment, next[0])} disabled={isBusy} style={primaryButtonStyle()}>
                         {isBusy ? 'Actualizando…' : next[1]}
                       </button>

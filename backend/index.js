@@ -112,6 +112,7 @@ const inventoryReservationService = tryRequire('./services/inventoryReservationS
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
 const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
+const shippingWebhookProcessingService = tryRequire('./services/shippingWebhookProcessingService');
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
@@ -187,11 +188,14 @@ const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enable
 const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
 const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
 const BILLING_RECOVERY_INTERVAL_MS = 60 * 1000;
+const SHIPPING_WEBHOOK_RECOVERY_INTERVAL_MS = 60 * 1000;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
 let billingRecoveryTimer = null;
 let billingRecoveryRunning = false;
+let shippingWebhookRecoveryTimer = null;
+let shippingWebhookRecoveryRunning = false;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -304,6 +308,33 @@ function startBillingInvoiceRecoveryJob() {
   });
 }
 
+function startShippingWebhookRecoveryJob() {
+  const recover = shippingWebhookProcessingService?.recoverShippingWebhookEvents;
+  if (typeof recover !== 'function' || shippingWebhookRecoveryTimer) return;
+
+  const runRecovery = async () => {
+    if (shippingWebhookRecoveryRunning || mongoose.connection.readyState !== 1) return;
+    shippingWebhookRecoveryRunning = true;
+    try {
+      const result = await recover({ limit: 25, maxAttempts: 5 });
+      if (result.scanned > 0) {
+        console.log('[shipping-webhook] Recuperación completada:', result);
+      }
+    } catch (error) {
+      console.error('[shipping-webhook] Error en recuperación:', error.message);
+    } finally {
+      shippingWebhookRecoveryRunning = false;
+    }
+  };
+
+  shippingWebhookRecoveryTimer = setInterval(
+    runRecovery,
+    SHIPPING_WEBHOOK_RECOVERY_INTERVAL_MS
+  );
+  shippingWebhookRecoveryTimer.unref?.();
+  runRecovery().catch(() => null);
+}
+
 mongoose
   .connect(env.mongoUri, {
     autoIndex: mongooseIndexPolicy.autoIndex,
@@ -312,6 +343,7 @@ mongoose
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
     startBillingInvoiceRecoveryJob();
+    startShippingWebhookRecoveryJob();
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });

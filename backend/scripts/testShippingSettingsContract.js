@@ -87,8 +87,10 @@ function main() {
   assert.match(frontend, /Probar conexión/);
   assert.match(frontend, /Registrar webhook/);
   assert.match(frontend, /confirmProduction/);
+  assert.match(frontend, /¿Qué queda automático\?/);
+  assert.match(frontend, /El webhook es el aviso/);
   assert.doesNotMatch(frontend, /localStorage/);
-  ok('el panel trata credenciales como escritura única y separa prueba, webhook y activación');
+  ok('el panel protege credenciales y explica la automatización, el webhook y la activación');
 
   const envExample = read('backend/.env.example');
   assert.match(envExample, /^INTEGRATIONS_ENCRYPTION_KEY=/m);

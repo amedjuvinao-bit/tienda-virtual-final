@@ -826,20 +826,66 @@ const ShippingTrackingEventSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const ShippingPickupSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['not_requested', 'scheduled', 'completed', 'cancelled', 'failed'],
+      default: 'not_requested',
+    },
+    confirmation: { type: String, trim: true, default: '' },
+    requestedDate: { type: String, trim: true, default: '' },
+    timeFrom: { type: String, trim: true, default: '' },
+    timeTo: { type: String, trim: true, default: '' },
+    instructions: { type: String, trim: true, maxlength: 500, default: '' },
+    requestedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const ShippingCancellationSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['not_requested', 'pending', 'confirmed', 'refund_pending', 'refunded', 'rejected'],
+      default: 'not_requested',
+    },
+    balanceReturned: { type: Boolean, default: false },
+    balanceReturnDate: { type: Date, default: null },
+    requestedAt: { type: Date, default: null },
+    confirmedAt: { type: Date, default: null },
+    providerMessage: { type: String, trim: true, maxlength: 500, default: '' },
+  },
+  { _id: false }
+);
+
 const ShippingIntegrationSchema = new mongoose.Schema(
   {
     provider: { type: String, trim: true, lowercase: true, default: 'manual' },
     mode: { type: String, enum: ['manual', 'sandbox', 'production'], default: 'manual' },
     status: {
       type: String,
-      enum: ['manual', 'quoted', 'label_generated', 'tracking', 'cancelled', 'error'],
+      enum: ['manual', 'quoted', 'label_generated', 'pickup_scheduled', 'tracking', 'cancelled', 'error'],
       default: 'manual',
     },
     providerShipmentId: { type: String, trim: true, default: '' },
     labelUrl: { type: String, trim: true, default: '' },
     labelFormat: { type: String, trim: true, uppercase: true, default: '' },
+    carrierActions: { type: [{ type: String, trim: true, lowercase: true }], default: [] },
     selectedRate: { type: ShippingRateSnapshotSchema, default: () => ({}) },
     trackingEvents: { type: [ShippingTrackingEventSchema], default: [] },
+    providerStatus: { type: String, trim: true, default: '' },
+    providerStatusDescription: { type: String, trim: true, maxlength: 500, default: '' },
+    lastWebhookAt: { type: Date, default: null },
+    handoffMode: {
+      type: String,
+      enum: ['pending', 'dropoff', 'pickup'],
+      default: 'pending',
+    },
+    handoffConfirmedAt: { type: Date, default: null },
+    pickup: { type: ShippingPickupSchema, default: () => ({}) },
+    cancellation: { type: ShippingCancellationSchema, default: () => ({}) },
     lastSyncedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
     lastError: {

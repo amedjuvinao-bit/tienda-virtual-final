@@ -16,9 +16,12 @@ const {
 } = require('../services/orderLogisticsService');
 const {
   cancelOrderShipmentLabel,
+  confirmOrderShipmentDropoff,
   generateOrderShipmentLabel,
   quoteOrderShipment,
+  scheduleOrderShipmentPickup,
   syncOrderShipmentTracking,
+  testOrderShipmentWebhook,
 } = require('../services/orderShippingIntegrationService');
 const {
   getShippingProviderStatus,
@@ -179,6 +182,12 @@ async function runShippingOperation(req, res, operation) {
       expectedRevision: req.body?.expectedRevision,
       provider: req.body?.provider || 'envia',
       rate: req.body?.rate,
+      pickupDate: req.body?.pickupDate,
+      pickupTimeStart: req.body?.pickupTimeStart,
+      pickupTimeEnd: req.body?.pickupTimeEnd,
+      pickupInstructions: req.body?.pickupInstructions,
+      now: new Date(),
+      testStatus: req.body?.testStatus,
       idempotencyKey:
         req.get('Idempotency-Key') || req.body?.idempotencyKey,
       ...serviceScope(access),
@@ -201,17 +210,32 @@ async function syncShipmentTracking(req, res) {
   return runShippingOperation(req, res, syncOrderShipmentTracking);
 }
 
+async function scheduleShipmentPickup(req, res) {
+  return runShippingOperation(req, res, scheduleOrderShipmentPickup);
+}
+
+async function testShipmentWebhook(req, res) {
+  return runShippingOperation(req, res, testOrderShipmentWebhook);
+}
+
+async function confirmShipmentDropoff(req, res) {
+  return runShippingOperation(req, res, confirmOrderShipmentDropoff);
+}
+
 async function cancelShipmentLabel(req, res) {
   return runShippingOperation(req, res, cancelOrderShipmentLabel);
 }
 
 module.exports = {
   cancelShipmentLabel,
+  confirmShipmentDropoff,
   generateShipmentLabel,
   getOrderLogistics,
   initializeLogistics,
   quoteShipment,
+  scheduleShipmentPickup,
   shippingProviders,
   syncShipmentTracking,
+  testShipmentWebhook,
   updateShipment,
 };

@@ -103,7 +103,11 @@ function normalizeData(payload, operation) {
       { provider: 'envia', operation }
     );
   }
-  const data = Array.isArray(payload?.data) ? payload.data : [];
+  const data = Array.isArray(payload?.data)
+    ? payload.data
+    : payload?.data && typeof payload.data === 'object' && Object.keys(payload.data).length
+      ? [payload.data]
+      : [];
   if (!data.length) {
     throw new ShippingProviderError(
       'La transportadora respondió sin datos utilizables.',
@@ -287,6 +291,33 @@ function createEnviaProvider({
       );
       return payload?.data || payload;
     },
+    async getCarrierActions(carrier) {
+      const safeCarrier = clean(carrier).toLowerCase();
+      if (!safeCarrier) {
+        throw new ShippingProviderError(
+          'La consulta de capacidades exige una transportadora.',
+          'SHIPPING_CARRIER_REQUIRED',
+          422,
+          { provider: 'envia', operation: 'carrier_actions' }
+        );
+      }
+      const payload = await request(
+        `/carrier-action/${encodeURIComponent(safeCarrier)}`,
+        undefined,
+        'carrier_actions',
+        { queryApi: true, method: 'GET', normalize: false }
+      );
+      const data = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+          ? payload
+          : payload?.data
+            ? [payload.data]
+            : [];
+      return data
+        .map((item) => clean(item?.action_name || item?.action || item?.name).toLowerCase())
+        .filter(Boolean);
+    },
     async resolveColombiaCity({ city, state, country = 'CO' } = {}) {
       const data = await request(
         '/locate',
@@ -409,6 +440,21 @@ function createEnviaProvider({
         'track'
       );
     },
+    async schedulePickup(payload) {
+      return request('/ship/pickup/', payload, 'schedule_pickup');
+    },
+    async testWebhook({ carrier, trackingNumber, status = 'Shipped' } = {}) {
+      return request(
+        '/ship/webhooktest/',
+        {
+          carrier: clean(carrier).toLowerCase(),
+          trackingNumber: clean(trackingNumber),
+          status: clean(status) || 'Shipped',
+        },
+        'test_webhook',
+        { normalize: false }
+      );
+    },
     async cancel({ carrier, trackingNumber }) {
       return request(
         '/ship/cancel/',
@@ -472,10 +518,83 @@ function verifyEnviaWebhook({
   return { event, eventId, timestamp: timestampNumber, body };
 }
 
+function verifyEnviaSandboxTestWebhook({
+  rawBody,
+  headers = {},
+  mode,
+  token,
+  now = Date.now(),
+} = {}) {
+  if (clean(mode).toLowerCase() !== 'sandbox') {
+    throw new ShippingProviderError(
+      'Producción exige la firma HMAC completa del webhook.',
+      'UNSIGNED_SHIPPING_WEBHOOK_FORBIDDEN',
+      401
+    );
+  }
+
+  const authorization = clean(headers.authorization);
+  const expectedAuthorization = `Bearer ${clean(token)}`;
+  const authorizationBuffer = Buffer.from(authorization, 'utf8');
+  const expectedBuffer = Buffer.from(expectedAuthorization, 'utf8');
+  if (
+    !clean(token) ||
+    authorizationBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(authorizationBuffer, expectedBuffer)
+  ) {
+    throw new ShippingProviderError(
+      'La prueba de webhook Sandbox no pudo autenticarse con el token configurado.',
+      'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION',
+      401
+    );
+  }
+
+  const body = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : String(rawBody || '');
+  let payload;
+  try {
+    payload = JSON.parse(body || '{}');
+  } catch {
+    throw new ShippingProviderError(
+      'El cuerpo de la prueba de webhook no contiene JSON válido.',
+      'INVALID_SHIPPING_WEBHOOK_JSON',
+      400
+    );
+  }
+  const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+  const carrier = clean(data?.carrier_name || data?.carrier || payload?.carrier);
+  const trackingNumber = clean(
+    data?.tracking_number || data?.trackingNumber || payload?.tracking_number || payload?.trackingNumber
+  );
+  const status = clean(
+    data?.shipment_status || data?.status || payload?.shipment_status || payload?.status
+  );
+  if (!carrier || !trackingNumber || !status) {
+    throw new ShippingProviderError(
+      'La prueba de webhook Sandbox no contiene transportadora, guía y estado.',
+      'INVALID_SANDBOX_WEBHOOK_PAYLOAD',
+      400
+    );
+  }
+
+  const minuteBucket = Math.floor(Number(now) / 60_000);
+  const eventId = `sandbox-test-${crypto
+    .createHash('sha256')
+    .update(`${minuteBucket}.${body}`)
+    .digest('hex')}`;
+  return {
+    event: clean(payload?.type) || 'tracking.test',
+    eventId,
+    timestamp: Number(now),
+    body,
+    sandboxTest: true,
+  };
+}
+
 module.exports = {
   BASE_URLS,
   COLOMBIA_PARCEL_CARRIERS,
   ShippingProviderError,
   createEnviaProvider,
   verifyEnviaWebhook,
+  verifyEnviaSandboxTestWebhook,
 };

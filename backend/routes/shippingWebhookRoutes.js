@@ -4,10 +4,16 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 
 const ShippingWebhookEvent = require('../models/ShippingWebhookEvent');
-const { verifyEnviaWebhook } = require('../services/enviaShippingProvider');
+const {
+  verifyEnviaWebhook,
+  verifyEnviaSandboxTestWebhook,
+} = require('../services/enviaShippingProvider');
 const {
   getRuntimeShippingConfiguration,
 } = require('../services/shippingConfigurationService');
+const {
+  processShippingWebhookEvent,
+} = require('../services/shippingWebhookProcessingService');
 
 const router = express.Router();
 
@@ -24,11 +30,25 @@ router.use(
 router.post('/', async (req, res) => {
   try {
     const runtime = await getRuntimeShippingConfiguration();
-    const verified = verifyEnviaWebhook({
-      rawBody: req.body,
-      headers: req.headers,
-      secret: runtime.envia.webhookSecret,
-    });
+    const signedHeaderNames = [
+      'x-webhook-event',
+      'x-webhook-id',
+      'x-webhook-timestamp',
+      'x-webhook-signature',
+    ];
+    const hasSignedHeaders = signedHeaderNames.some((name) => Boolean(req.headers[name]));
+    const verified = hasSignedHeaders
+      ? verifyEnviaWebhook({
+          rawBody: req.body,
+          headers: req.headers,
+          secret: runtime.envia.webhookSecret,
+        })
+      : verifyEnviaSandboxTestWebhook({
+          rawBody: req.body,
+          headers: req.headers,
+          mode: runtime.envia.mode,
+          token: runtime.envia.token,
+        });
     let payload;
     try {
       payload = JSON.parse(verified.body || '{}');
@@ -41,13 +61,18 @@ router.post('/', async (req, res) => {
     }
 
     try {
-      await ShippingWebhookEvent.create({
+      const event = await ShippingWebhookEvent.create({
         provider: 'envia',
         eventId: verified.eventId,
         eventType: verified.event,
         providerTimestamp: new Date(verified.timestamp),
         status: 'received',
         payload,
+      });
+      setImmediate(() => {
+        processShippingWebhookEvent(event._id).catch((error) => {
+          console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error);
+        });
       });
     } catch (error) {
       if (error?.code === 11000) {

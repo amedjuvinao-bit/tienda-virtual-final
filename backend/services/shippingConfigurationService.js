@@ -429,6 +429,7 @@ module.exports = {
   getRuntimeShippingConfiguration,
   getShippingSettingsView,
   publicWebhookUrl,
+  readiness,
   registerShippingWebhook,
   testShippingConnection,
   updateShippingSettings,

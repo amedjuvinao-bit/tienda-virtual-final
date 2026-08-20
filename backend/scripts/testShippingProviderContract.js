@@ -9,6 +9,7 @@ const {
   BASE_URLS,
   COLOMBIA_PARCEL_CARRIERS,
   createEnviaProvider,
+  verifyEnviaSandboxTestWebhook,
   verifyEnviaWebhook,
 } = require('../services/enviaShippingProvider');
 const {
@@ -18,9 +19,19 @@ const {
   enviaColombiaStateCode,
 } = require('../services/shippingPayloadService');
 const {
+  buildStandalonePickupPayload,
+  pickupOnGeneratePayload,
   resolveColombiaAddresses,
   resolveShippingAddresses,
 } = require('../services/orderShippingIntegrationService');
+const {
+  applyProviderTrackingUpdate,
+  providerStage,
+} = require('../services/shippingTrackingStateService');
+const {
+  processShippingWebhookEvent,
+  webhookTrackingEvent,
+} = require('../services/shippingWebhookProcessingService');
 
 const checks = [];
 function ok(message) {
@@ -64,6 +75,169 @@ async function main() {
   assert.strictEqual(capturedAuthorization, 'Bearer sandbox-secret');
   assert.strictEqual(rates.length, 1);
   ok('Sandbox usa exclusivamente el host de pruebas y autenticación Bearer');
+
+  const automationCalls = [];
+  const automationProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url, options) => {
+      automationCalls.push({ url, options, body: options.body ? JSON.parse(options.body) : null });
+      if (url.endsWith('/carrier-action/fedex')) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { data: [{ action_name: 'pickup_on_generate' }] };
+          },
+        };
+      }
+      if (url.endsWith('/ship/pickup/')) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { data: [{ confirmation: 'PU-001' }] };
+          },
+        };
+      }
+      if (url.endsWith('/ship/webhooktest/')) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { success: true };
+          },
+        };
+      }
+      throw new Error(`URL inesperada: ${url}`);
+    },
+  });
+  assert.deepStrictEqual(await automationProvider.getCarrierActions('FedEx'), ['pickup_on_generate']);
+  const pickupRequest = {
+    origin: { country: 'CO', city: '08001000' },
+    shipment: {
+      type: 1,
+      carrier: 'fedex',
+      pickup: {
+        weightUnit: 'KG',
+        totalWeight: 1,
+        totalPackages: 1,
+        date: '2026-08-21',
+        timeFrom: 9,
+        timeTo: 14,
+        carrier: 'fedex',
+        trackingNumbers: ['TEST-001'],
+      },
+    },
+  };
+  const pickupResult = await automationProvider.schedulePickup(pickupRequest);
+  assert.strictEqual(pickupResult[0].confirmation, 'PU-001');
+  await automationProvider.testWebhook({
+    carrier: 'FedEx',
+    trackingNumber: 'TEST-001',
+    status: 'Delivered',
+  });
+  assert.strictEqual(
+    automationCalls[0].url,
+    `${BASE_URLS.sandbox.queries}/carrier-action/fedex`
+  );
+  assert.strictEqual(automationCalls[0].options.method, 'GET');
+  assert.deepStrictEqual(automationCalls[1].body, pickupRequest);
+  assert.strictEqual('pickupAddress' in automationCalls[1].body, false);
+  assert.strictEqual('pickupDate' in automationCalls[1].body, false);
+  assert.deepStrictEqual(automationCalls[2].body, {
+    carrier: 'fedex',
+    trackingNumber: 'TEST-001',
+    status: 'Delivered',
+  });
+  ok('capacidades, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
+
+  const sandboxTestBody = Buffer.from(JSON.stringify({
+    carrier: 'fedex',
+    tracking_number: 'TEST-001',
+    shipment_status: 'Delivered',
+  }));
+  const verifiedSandboxTest = verifyEnviaSandboxTestWebhook({
+    rawBody: sandboxTestBody,
+    headers: { authorization: 'Bearer sandbox-secret' },
+    mode: 'sandbox',
+    token: 'sandbox-secret',
+    now: 1_800_000,
+  });
+  assert.strictEqual(verifiedSandboxTest.event, 'tracking.test');
+  assert.strictEqual(verifiedSandboxTest.timestamp, 1_800_000);
+  assert.strictEqual(verifiedSandboxTest.sandboxTest, true);
+  assert.match(verifiedSandboxTest.eventId, /^sandbox-test-[a-f0-9]{64}$/);
+  assert.throws(
+    () => verifyEnviaSandboxTestWebhook({
+      rawBody: sandboxTestBody,
+      headers: { authorization: 'Bearer sandbox-secret' },
+      mode: 'production',
+      token: 'sandbox-secret',
+    }),
+    (error) => error.code === 'UNSIGNED_SHIPPING_WEBHOOK_FORBIDDEN'
+  );
+  assert.throws(
+    () => verifyEnviaSandboxTestWebhook({
+      rawBody: sandboxTestBody,
+      headers: { authorization: 'Bearer incorrecto' },
+      mode: 'sandbox',
+      token: 'sandbox-secret',
+    }),
+    (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
+  );
+  ok('la prueba sin firma solo se acepta en Sandbox y autenticada con el token configurado');
+
+  const generateWithPickup = pickupOnGeneratePayload(
+    {
+      packages: [
+        { amount: 2, weight: 1.25 },
+        { amount: 1, weight: 0.5 },
+      ],
+      shipment: { type: 1, carrier: 'fedex', service: 'ground' },
+    },
+    '2026-08-21'
+  );
+  assert.deepStrictEqual(generateWithPickup.shipment.pickup, {
+    date: '2026-08-21',
+    totalPackages: 3,
+    totalWeight: 3,
+  });
+  ok('pickup_on_generate incorpora fecha, número de paquetes y peso total en la guía');
+
+  const standalonePickup = buildStandalonePickupPayload({
+    shipmentPayload: {
+      origin: { country: 'CO', city: '08001000' },
+      packages: [
+        { amount: 2, weight: 1.25 },
+        { amount: 1, weight: 0.5 },
+      ],
+    },
+    carrier: 'fedex',
+    trackingNumber: 'TEST-001',
+    requestedDate: '2026-08-21',
+    timeFrom: '09:30',
+    timeTo: '14:00',
+    instructions: 'Tocar el timbre de la bodega',
+  });
+  assert.deepStrictEqual(standalonePickup, {
+    origin: { country: 'CO', city: '08001000' },
+    shipment: {
+      type: 1,
+      carrier: 'fedex',
+      pickup: {
+        weightUnit: 'KG',
+        totalWeight: 3,
+        totalPackages: 3,
+        date: '2026-08-21',
+        timeFrom: 9.5,
+        timeTo: 14,
+        carrier: 'fedex',
+        trackingNumbers: ['TEST-001'],
+        instructions: 'Tocar el timbre de la bodega',
+      },
+    },
+  });
+  ok('la recolección independiente usa el contrato canónico origin + shipment.pickup');
 
   let connectionUrl = '';
   let connectionMethod = '';
@@ -612,6 +786,136 @@ async function main() {
     (error) => error.code === 'INVALID_SHIPPING_WEBHOOK_SIGNATURE'
   );
   ok('el webhook exige firma HMAC exacta, identificador y ventana temporal');
+
+  const officialWebhook = webhookTrackingEvent({
+    type: 'tracking.simple',
+    created_at: '2026-08-20T12:00:00.000Z',
+    data: {
+      shipment_id: 98765,
+      tracking_number: 'TEST-TRACK-1',
+      carrier_name: 'FedEx',
+      status: 'delivered',
+      status_description: 'Entregado al destinatario',
+      location: 'Bogotá',
+    },
+  });
+  assert.strictEqual(officialWebhook.trackingNumber, 'TEST-TRACK-1');
+  assert.strictEqual(officialWebhook.providerShipmentId, '98765');
+  assert.strictEqual(officialWebhook.event.status, 'delivered');
+
+  const webhookShipment = {
+    _id: 'shipment-1',
+    status: 'packed',
+    allocationIds: ['allocation-1'],
+    carrier: { trackingNumber: 'TEST-TRACK-1' },
+    shippingIntegration: { provider: 'envia', status: 'tracking', trackingEvents: [] },
+    history: [],
+  };
+  const webhookOrder = {
+    status: 'paid',
+    inventoryAllocations: [{
+      _id: 'allocation-1',
+      quantity: 1,
+      reservedQuantity: 1,
+      soldQuantity: 1,
+      returnedQuantity: 0,
+      shippedQuantity: 0,
+      deliveredQuantity: 0,
+    }],
+    fulfillment: {
+      shipments: [webhookShipment],
+      logisticsSummary: {},
+    },
+  };
+  const appliedWebhook = applyProviderTrackingUpdate(
+    webhookOrder,
+    webhookShipment,
+    officialWebhook.event,
+    {
+      provider: 'envia',
+      source: 'webhook',
+      eventId: 'evt-official-1',
+      receivedAt: new Date('2026-08-20T12:00:01.000Z'),
+    }
+  );
+  assert.strictEqual(appliedWebhook.stage, 'delivered');
+  assert.strictEqual(webhookShipment.status, 'delivered');
+  assert.strictEqual(webhookOrder.inventoryAllocations[0].deliveredQuantity, 1);
+  assert.strictEqual(providerStage('Undeliverable address'), 'exception');
+  assert.strictEqual(providerStage('Delivery exception'), 'exception');
+  ok('el webhook oficial actualiza guía, orden e inventario sin intervención manual');
+
+  let durableOrderSaves = 0;
+  const durableShipment = {
+    _id: 'shipment-durable-1',
+    status: 'packed',
+    allocationIds: ['allocation-durable-1'],
+    carrier: { trackingNumber: 'DURABLE-TRACK-1' },
+    shippingIntegration: { provider: 'envia', status: 'tracking', trackingEvents: [] },
+    history: [],
+  };
+  const durableOrder = {
+    _id: 'order-durable-1',
+    status: 'paid',
+    inventoryAllocations: [{
+      _id: 'allocation-durable-1',
+      quantity: 1,
+      reservedQuantity: 1,
+      soldQuantity: 1,
+      shippedQuantity: 0,
+      deliveredQuantity: 0,
+      returnedQuantity: 0,
+    }],
+    fulfillment: { shipments: [durableShipment], logisticsSummary: {} },
+    async save() { durableOrderSaves += 1; },
+  };
+  const durableEvent = {
+    _id: 'webhook-event-1',
+    provider: 'envia',
+    eventId: 'evt-durable-1',
+    eventType: 'tracking.simple',
+    providerTimestamp: new Date('2026-08-20T12:00:00.000Z'),
+    status: 'received',
+    attempts: 0,
+    payload: {
+      type: 'tracking.simple',
+      data: {
+        shipment_id: 12345,
+        tracking_number: 'DURABLE-TRACK-1',
+        carrier_name: 'FedEx',
+        status: 'delivered',
+        status_description: 'Entregado al destinatario',
+      },
+    },
+    async save() {},
+  };
+  const DurableEventModel = {
+    async findOneAndUpdate() {
+      if (!['received', 'failed'].includes(durableEvent.status)) return null;
+      durableEvent.status = 'processing';
+      durableEvent.attempts += 1;
+      return durableEvent;
+    },
+  };
+  const DurableOrderModel = {
+    async findOne() { return durableOrder; },
+  };
+  const durableResult = await processShippingWebhookEvent('webhook-event-1', {
+    EventModel: DurableEventModel,
+    OrderModel: DurableOrderModel,
+    now: new Date('2026-08-20T12:00:01.000Z'),
+  });
+  const duplicateDurableResult = await processShippingWebhookEvent('webhook-event-1', {
+    EventModel: DurableEventModel,
+    OrderModel: DurableOrderModel,
+    now: new Date('2026-08-20T12:00:02.000Z'),
+  });
+  assert.strictEqual(durableResult.processed, true);
+  assert.strictEqual(duplicateDurableResult.skipped, true);
+  assert.strictEqual(durableEvent.status, 'processed');
+  assert.strictEqual(durableEvent.attempts, 1);
+  assert.strictEqual(durableOrderSaves, 1);
+  ok('el procesamiento durable reclama cada webhook una sola vez y permite recuperación segura');
 
   console.log(`\n${checks.length} verificaciones de transportadoras completadas.`);
 }

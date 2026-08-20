@@ -82,12 +82,15 @@ const {
 } = require('../controllers/orderOperationalMonitoringController');
 const {
   cancelShipmentLabel,
+  confirmShipmentDropoff,
   generateShipmentLabel,
   getOrderLogistics,
   initializeLogistics,
   quoteShipment,
+  scheduleShipmentPickup,
   shippingProviders,
   syncShipmentTracking,
+  testShipmentWebhook,
   updateShipment,
 } = require('../controllers/orderLogisticsController');
 const {
@@ -1073,6 +1076,27 @@ router.post(
   requireAdmin,
   requirePermission('orders:fulfillment'),
   syncShipmentTracking
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/pickup',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  scheduleShipmentPickup
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/webhook/test',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  testShipmentWebhook
+);
+
+router.post(
+  '/:id/fulfillment/logistics/shipments/:shipmentId/handoff/dropoff',
+  requireAdmin,
+  requirePermission('orders:fulfillment'),
+  confirmShipmentDropoff
 );
 
 router.post(

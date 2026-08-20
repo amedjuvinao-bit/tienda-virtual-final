@@ -284,6 +284,27 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/pickup',
+    permission: 'orders:fulfillment',
+    description: 'Programar una recolección de transportadora con idempotencia.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/webhook/test',
+    permission: 'orders:fulfillment',
+    description: 'Simular un evento de seguimiento para una guía Sandbox.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/handoff/dropoff',
+    permission: 'orders:fulfillment',
+    description: 'Confirmar que una guía se entregará en un punto autorizado.',
+    audit: true,
+  },
+  {
+    method: 'POST',
     path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label/cancel',
     permission: 'orders:fulfillment',
     description: 'Cancelar una guía externa con idempotencia.',

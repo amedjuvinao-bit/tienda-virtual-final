@@ -15,7 +15,7 @@ const ShippingOperationSchema = new mongoose.Schema(
     mode: { type: String, enum: ['sandbox', 'production'], required: true },
     type: {
       type: String,
-      enum: ['generate_label', 'cancel_label'],
+      enum: ['generate_label', 'schedule_pickup', 'cancel_label'],
       required: true,
     },
     idempotencyKey: { type: String, trim: true, required: true, unique: true },
