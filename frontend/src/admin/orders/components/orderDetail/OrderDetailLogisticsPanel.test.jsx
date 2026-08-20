@@ -612,7 +612,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = screen.getByRole('button', { name: 'Buscar tarifas automáticamente' });
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar tarifas automáticamente' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
     fireEvent.click(await screen.findByRole('button', { name: 'Generar guía real' }));
@@ -657,7 +657,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = screen.getByRole('button', { name: 'Buscar tarifas automáticamente' });
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar tarifas automáticamente' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
