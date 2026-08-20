@@ -104,6 +104,15 @@ function formatMoney(value, currency = 'COP') {
   }).format(Number(value || 0));
 }
 
+function isPublicHttpUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 function planField(label, control) {
   return (
     <label style={{ display: 'grid', gap: 5, minWidth: 0 }}>
@@ -476,7 +485,7 @@ export default function OrderDetailLogisticsPanel({
         setMessage({
           type: recommendedRate ? 'success' : 'warning',
           text: recommendedRate
-            ? `Envia devolvió ${receivedRates.length} tarifa(s) utilizable(s). Seleccionamos una recomendación para tu confirmación.`
+            ? `Encontramos ${receivedRates.length} opción(es) de envío y seleccionamos la más conveniente.`
             : 'Envia no devolvió tarifas válidas para este envío.',
         });
       } else if (action === 'label') {
@@ -522,7 +531,9 @@ export default function OrderDetailLogisticsPanel({
           type: trackingPending ? 'warning' : 'success',
           text: trackingPending
             ? `Guía de ${shipment.code} generada. El seguimiento aún no está disponible; puedes actualizarlo más tarde.`
-            : `Guía de ${shipment.code} generada y seguimiento actualizado.`,
+            : providers.envia.mode === 'production'
+              ? `Guía real de ${shipment.code} generada y seguimiento actualizado.`
+              : `Guía de prueba de ${shipment.code} creada. Descarga la etiqueta para continuar.`,
         });
       } else if (action === 'track') {
         data = await syncOrderShipmentTracking(order._id, shipmentId, {
@@ -678,6 +689,34 @@ export default function OrderDetailLogisticsPanel({
               );
               const labelCancelled = shipment.shippingIntegration?.status === 'cancelled';
               const hasActiveLabel = Boolean(shipment.shippingIntegration?.labelUrl) && !labelCancelled;
+              const providerConfigured = Boolean(providers?.envia?.configured);
+              const providerMode = providers?.envia?.mode || 'sandbox';
+              const guideMode = shipment.shippingIntegration?.mode || providerMode;
+              const isProductionGuide = guideMode === 'production';
+              const showPublicTracking = Boolean(
+                hasActiveLabel &&
+                isProductionGuide &&
+                isPublicHttpUrl(shipment.carrier?.trackingUrl)
+              );
+              const assistantStep = hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
+              const assistantTitle = !providerConfigured
+                ? 'Conecta Envia para comenzar'
+                : hasActiveLabel
+                  ? 'Etiqueta lista para imprimir'
+                  : shipmentRates.length
+                    ? 'Confirma la opción recomendada'
+                    : labelCancelled
+                      ? 'Busca una nueva opción de envío'
+                      : 'Busca opciones de envío';
+              const assistantDescription = !providerConfigured
+                ? providers?.envia?.message || 'Configura las credenciales de Envia para cotizar automáticamente.'
+                : hasActiveLabel
+                  ? 'Descarga la etiqueta y pégala al paquete. Después continúa con “Iniciar picking”.'
+                  : shipmentRates.length
+                    ? 'Ya elegimos la mejor combinación de precio y tiempo. Puedes cambiarla solo si lo necesitas.'
+                    : labelCancelled
+                      ? 'La guía anterior fue cancelada. Cotiza nuevamente para continuar.'
+                      : 'Usaremos la sede, el destino, el peso y las medidas que ya están guardados.';
               return (
                 <article
                   key={shipmentId}
@@ -762,189 +801,171 @@ export default function OrderDetailLogisticsPanel({
                     ) : null}
                   </details>
 
-                  <div style={{ marginTop: 10, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 14, padding: 11, background: 'var(--admin-bg)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ marginTop: 10, border: '1px solid var(--admin-primary)', borderRadius: 18, padding: 13, background: 'color-mix(in srgb, var(--admin-primary-soft-bg) 35%, var(--admin-card-bg))' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 950 }}>
-                          Asistente de envío
+                        <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
+                          Envío con Envia
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
-                          {providers?.defaultProvider === 'envia' ? 'Envia activo' : 'Manual activo'} · {!providers?.envia?.configured
-                            ? providers?.envia?.message || 'Envia todavía no está configurado.'
-                            : hasActiveLabel
-                              ? 'Guía creada; el seguimiento se actualiza al generarla.'
-                              : shipmentRates.length
-                                ? 'Revisa la recomendación y confirma una sola vez.'
-                                : 'Confirma medidas, busca tarifas y elige la recomendación.'}
+                          Flujo guiado: busca, confirma y descarga la etiqueta.
                         </div>
                       </div>
-                      {canManage && !hasActiveLabel ? (
-                        <button
-                          type="button"
-                          onClick={() => runProviderAction(shipment, 'quote')}
-                          disabled={isBusy || !providers?.envia?.configured}
-                          title={providers?.envia?.message || 'Consultando configuración.'}
-                          style={{
-                            ...secondaryButtonStyle(),
-                            cursor: providers?.envia?.configured ? 'pointer' : 'not-allowed',
-                            opacity: providers?.envia?.configured ? 1 : 0.55,
-                          }}
-                        >
-                          {shipmentRates.length ? 'Volver a cotizar' : 'Buscar mejor tarifa'}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ borderRadius: 999, padding: '5px 8px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
+                          {providerMode === 'production' ? 'PRODUCCIÓN' : 'MODO PRUEBAS'}
+                        </span>
+                        {providerConfigured ? (
+                          <span style={{ borderRadius: 999, padding: '5px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
+                            PASO {assistantStep} DE 3
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div role="region" aria-label={`Siguiente paso de envío ${shipment.code}`} style={{ marginTop: 11, borderRadius: 14, padding: 12, background: ORDER_DETAIL_THEME.cardBg, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
+                      <div style={{ color: 'var(--admin-primary)', fontSize: 8, fontWeight: 950, letterSpacing: '.1em', textTransform: 'uppercase' }}>
+                        Qué debes hacer ahora
+                      </div>
+                      <div style={{ marginTop: 5, color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
+                        {assistantTitle}
+                      </div>
+                      <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 720, lineHeight: 1.45 }}>
+                        {assistantDescription}
+                      </p>
+                      {!providerConfigured ? (
+                        <a href="/admin/configuracion/envios" style={{ ...secondaryButtonStyle(), display: 'inline-flex', marginTop: 9, textDecoration: 'none' }}>
+                          Configurar Envia
+                        </a>
+                      ) : canManage && !hasActiveLabel && shipmentRates.length === 0 ? (
+                        <button type="button" onClick={() => runProviderAction(shipment, 'quote')} disabled={isBusy} style={{ ...primaryButtonStyle(), marginTop: 9 }}>
+                          {labelCancelled ? 'Buscar nuevas tarifas' : 'Buscar tarifas automáticamente'}
                         </button>
                       ) : null}
                     </div>
 
                     {shipmentRates.length > 0 && !hasActiveLabel ? (
                       <div style={{ display: 'grid', gap: 9, marginTop: 10 }}>
-                        <label style={{ display: 'grid', gap: 5, maxWidth: 270 }}>
-                          <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
-                            Criterio de recomendación
-                          </span>
-                          <select
-                            aria-label={`Criterio de tarifa ${shipment.code}`}
-                            value={form.rateStrategy}
-                            onChange={(event) => {
-                              const rateStrategy = event.target.value;
-                              updateForm(shipmentId, {
-                                rateStrategy,
-                                selectedRate: recommendedShippingRate(shipmentRates, rateStrategy),
-                              });
-                            }}
-                            style={inputStyle()}
-                          >
-                            <option value="balanced">Mejor equilibrio</option>
-                            <option value="cheapest">Menor costo</option>
-                            <option value="fastest">Entrega más rápida</option>
-                          </select>
-                        </label>
-
                         {selectedRate ? (
-                          <div
-                            aria-label={`Tarifa seleccionada ${shipment.code}`}
-                            style={{
-                              border: '1px solid var(--admin-primary)',
-                              borderRadius: 14,
-                              padding: 12,
-                              background: 'var(--admin-primary-soft-bg)',
-                            }}
-                          >
+                          <div aria-label={`Tarifa seleccionada ${shipment.code}`} style={{ border: '1px solid var(--admin-primary)', borderRadius: 14, padding: 12, background: 'var(--admin-primary-soft-bg)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                               <div>
                                 <span style={{ display: 'inline-block', borderRadius: 999, padding: '4px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                                  {shippingRateKey(selectedRate) === shippingRateKey(recommendedRate) ? 'Recomendada' : 'Seleccionada'}
+                                  {shippingRateKey(selectedRate) === shippingRateKey(recommendedRate) ? 'Opción recomendada' : 'Opción seleccionada'}
                                 </span>
-                                <div style={{ marginTop: 7, color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
+                                <div style={{ marginTop: 7, color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
                                   {selectedRate.carrier} · {selectedRate.serviceDescription || selectedRate.service}
                                 </div>
                                 <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 750 }}>
-                                  {selectedRate.deliveryEstimate || 'Entrega por confirmar'}
+                                  Entrega: {selectedRate.deliveryEstimate || 'por confirmar'}
                                 </div>
                               </div>
-                              <strong style={{ color: 'var(--admin-primary)', fontSize: 17 }}>
+                              <strong style={{ color: 'var(--admin-primary)', fontSize: 18 }}>
                                 {formatMoney(selectedRate.totalPrice, selectedRate.currency)}
                               </strong>
                             </div>
                             <p style={{ margin: '8px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700 }}>
                               {shippingRateKey(selectedRate) === shippingRateKey(recommendedRate)
                                 ? recommendationExplanation(form.rateStrategy)
-                                : 'Elegida manualmente entre las alternativas recibidas.'} Confirma antes de crear la guía.
+                                : 'Elegida manualmente entre las opciones recibidas.'}
                             </p>
+                            {canManage ? (
+                              <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={{ ...primaryButtonStyle(), width: '100%', justifyContent: 'center', marginTop: 10 }}>
+                                {providerMode === 'production' ? 'Generar guía real' : 'Generar guía de prueba'}
+                              </button>
+                            ) : null}
                           </div>
                         ) : null}
 
-                        {alternatives.length > 0 ? (
-                          <details>
-                            <summary style={{ cursor: 'pointer', color: 'var(--admin-primary)', fontSize: 10, fontWeight: 900 }}>
-                              Ver {alternatives.length} alternativa(s)
-                            </summary>
-                            <div style={{ display: 'grid', gap: 6, marginTop: 7 }}>
-                              {alternatives.map((rate, index) => (
-                                <button
-                                  key={`${shippingRateKey(rate)}-${index}`}
-                                  type="button"
-                                  onClick={() => updateForm(shipmentId, { selectedRate: rate })}
-                                  style={{
-                                    border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
-                                    borderRadius: 10,
-                                    padding: '8px 10px',
-                                    background: ORDER_DETAIL_THEME.cardBg,
-                                    color: ORDER_DETAIL_THEME.cardText,
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    gap: 8,
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: 10,
-                                    fontWeight: 850,
-                                  }}
-                                >
-                                  <span>{rate.carrier} · {rate.serviceDescription || rate.service} · {rate.deliveryEstimate || 'Entrega por confirmar'}</span>
-                                  <span>{formatMoney(rate.totalPrice, rate.currency)}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </details>
-                        ) : null}
+                        <details>
+                          <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 900 }}>
+                            Cambiar recomendación o ver alternativas
+                          </summary>
+                          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                            <label style={{ display: 'grid', gap: 5, maxWidth: 270 }}>
+                              <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
+                                ¿Qué prefieres priorizar?
+                              </span>
+                              <select
+                                aria-label={`Criterio de tarifa ${shipment.code}`}
+                                value={form.rateStrategy}
+                                onChange={(event) => {
+                                  const rateStrategy = event.target.value;
+                                  updateForm(shipmentId, {
+                                    rateStrategy,
+                                    selectedRate: recommendedShippingRate(shipmentRates, rateStrategy),
+                                  });
+                                }}
+                                style={inputStyle()}
+                              >
+                                <option value="balanced">Equilibrio entre precio y tiempo</option>
+                                <option value="cheapest">Menor precio</option>
+                                <option value="fastest">Entrega más rápida</option>
+                              </select>
+                            </label>
+                            {alternatives.map((rate, index) => (
+                              <button key={`${shippingRateKey(rate)}-${index}`} type="button" onClick={() => updateForm(shipmentId, { selectedRate: rate })} style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 10, padding: '8px 10px', background: ORDER_DETAIL_THEME.cardBg, color: ORDER_DETAIL_THEME.cardText, display: 'flex', justifyContent: 'space-between', gap: 8, textAlign: 'left', cursor: 'pointer', fontSize: 10, fontWeight: 850 }}>
+                                <span>{rate.carrier} · {rate.serviceDescription || rate.service} · {rate.deliveryEstimate || 'Entrega por confirmar'}</span>
+                                <span>{formatMoney(rate.totalPrice, rate.currency)}</span>
+                              </button>
+                            ))}
+                            <button type="button" onClick={() => runProviderAction(shipment, 'quote')} disabled={isBusy} style={{ ...secondaryButtonStyle(), justifySelf: 'start' }}>
+                              Volver a consultar tarifas
+                            </button>
+                          </div>
+                        </details>
                       </div>
                     ) : null}
 
-                    {shipment.shippingIntegration?.labelUrl ? (
-                      <div style={{ marginTop: 10, border: `1px solid ${labelCancelled ? '#fecdd3' : '#a7f3d0'}`, borderRadius: 14, padding: 12, background: labelCancelled ? '#fff1f2' : '#ecfdf5' }}>
-                        <div style={{ color: labelCancelled ? '#be123c' : '#047857', fontSize: 9, fontWeight: 950, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                          {labelCancelled ? 'Guía cancelada' : 'Guía lista'}
+                    {hasActiveLabel ? (
+                      <div style={{ marginTop: 10, border: '1px solid #86efac', borderRadius: 14, padding: 12, background: '#ecfdf5' }}>
+                        <div style={{ color: '#047857', fontSize: 9, fontWeight: 950, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                          Guía lista
                         </div>
-                        <div style={{ marginTop: 5, color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
+                        <div style={{ marginTop: 5, color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
                           {shipment.carrier?.name || shipment.shippingIntegration?.selectedRate?.carrier || 'Transportadora'} · {shipment.carrier?.serviceLevel || shipment.shippingIntegration?.selectedRate?.service || 'Servicio'}
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 750 }}>
-                          Guía {shipment.carrier?.trackingNumber || 'generada'}
-                          {shipment.shippingIntegration?.lastSyncedAt
-                            ? ` · Actualizada ${formatDeadline(shipment.shippingIntegration.lastSyncedAt)}`
-                            : ' · Seguimiento pendiente'}
+                          Número de guía: {shipment.carrier?.trackingNumber || 'generado'}
                         </div>
-                        {!labelCancelled ? (
-                        <div style={{ display: 'flex', gap: 7, marginTop: 9, flexWrap: 'wrap' }}>
-                          <a href={shipment.shippingIntegration.labelUrl} target="_blank" rel="noreferrer" style={{ ...secondaryButtonStyle(), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+                        <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
+                          <a href={shipment.shippingIntegration.labelUrl} target="_blank" rel="noreferrer" style={{ ...primaryButtonStyle(), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
                             Descargar etiqueta
                           </a>
-                          {shipment.carrier?.trackingUrl ? (
+                          {showPublicTracking ? (
                             <a href={shipment.carrier.trackingUrl} target="_blank" rel="noreferrer" style={{ ...secondaryButtonStyle(), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
-                              Ver seguimiento
+                              Ver seguimiento público
                             </a>
                           ) : null}
                         </div>
+                        {!isProductionGuide ? (
+                          <p style={{ margin: '8px 0 0', color: '#047857', fontSize: 9, fontWeight: 800 }}>
+                            Es una guía de prueba. El seguimiento público estará disponible únicamente con una guía de producción.
+                          </p>
                         ) : null}
+                      </div>
+                    ) : labelCancelled && shipment.shippingIntegration?.labelUrl ? (
+                      <div style={{ marginTop: 9, borderRadius: 12, padding: 9, background: '#fff1f2', color: '#be123c', fontSize: 9, fontWeight: 850 }}>
+                        La guía anterior está cancelada y ya no puede utilizarse.
                       </div>
                     ) : null}
 
-                    {canManage && providers?.envia?.configured ? (
-                      <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 9 }}>
-                        {selectedRate && !hasActiveLabel ? (
-                          <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={primaryButtonStyle()}>
-                            Confirmar y generar guía {providers.envia.mode === 'production' ? 'Producción' : 'Sandbox'}
+                    {canManage && hasActiveLabel && providerConfigured ? (
+                      <details style={{ marginTop: 9 }}>
+                        <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 900 }}>
+                          Opciones avanzadas
+                        </summary>
+                        <div style={{ display: 'flex', gap: 7, marginTop: 7, flexWrap: 'wrap' }}>
+                          {shipment.carrier?.trackingNumber ? (
+                            <button type="button" onClick={() => runProviderAction(shipment, 'track')} disabled={isBusy} style={secondaryButtonStyle()}>
+                              Actualizar estado desde Envia
+                            </button>
+                          ) : null}
+                          <button type="button" onClick={() => runProviderAction(shipment, 'cancel')} disabled={isBusy} style={dangerButtonStyle()}>
+                            Cancelar guía
                           </button>
-                        ) : null}
-                        {hasActiveLabel ? (
-                          <details style={{ alignSelf: 'center' }}>
-                            <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 900 }}>
-                              Más acciones
-                            </summary>
-                            <div style={{ display: 'flex', gap: 7, marginTop: 7, flexWrap: 'wrap' }}>
-                              {shipment.carrier?.trackingNumber ? (
-                                <button type="button" onClick={() => runProviderAction(shipment, 'track')} disabled={isBusy} style={secondaryButtonStyle()}>
-                                  Actualizar estado
-                                </button>
-                              ) : null}
-                              {shipment.shippingIntegration?.status !== 'cancelled' ? (
-                                <button type="button" onClick={() => runProviderAction(shipment, 'cancel')} disabled={isBusy} style={dangerButtonStyle()}>
-                                  Cancelar guía
-                                </button>
-                              ) : null}
-                            </div>
-                          </details>
-                        ) : null}
-                      </div>
+                        </div>
+                      </details>
                     ) : null}
 
                     {labelConfirmation === shipmentId ? (
