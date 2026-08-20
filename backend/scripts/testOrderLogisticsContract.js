@@ -354,8 +354,8 @@ async function main() {
   assert(frontendSource.includes('expectedRevision'));
   assert(frontendSource.includes('eligibility?.canInitialize'));
   assert(frontendSource.includes("eligibility?.message || 'Verificando pago e inventario vendido…'"));
-  assert(frontendSource.includes('Cotizar con Envia'));
-  assert(frontendSource.includes('Manual activo'));
+  assert(frontendSource.includes('Buscar tarifas automáticamente'));
+  assert(frontendSource.includes('Flujo guiado: busca, confirma y descarga la etiqueta.'));
   ok('la interfaz expone el flujo operativo, evidencia, SLA, incidencias y concurrencia');
 
   console.log(`\nLogística avanzada de órdenes: ${checks.length}/${checks.length} controles superados.`);
