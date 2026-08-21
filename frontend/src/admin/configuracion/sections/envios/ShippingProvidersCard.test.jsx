@@ -4,15 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ShippingProvidersCard from './ShippingProvidersCard';
 import {
+  confirmAdminShippingWebhook,
   getAdminShippingSettings,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
 
 vi.mock('../../../api/adminShippingSettingsApi', () => ({
   activateAdminShippingProvider: vi.fn(),
+  confirmAdminShippingWebhook: vi.fn(),
   disableAdminShippingProvider: vi.fn(),
   getAdminShippingSettings: vi.fn(),
-  registerAdminShippingWebhook: vi.fn(),
   testAdminShippingConnection: vi.fn(),
   updateAdminShippingSettings: vi.fn(),
 }));
@@ -32,6 +33,7 @@ function response(overrides = {}) {
     meta: {
       encryptionConfigured: true,
       webhookUrl: 'https://api.tienda.test/api/shipping/webhooks/envia',
+      webhookDashboardUrl: 'https://shipping-test.envia.com/settings/developers',
       readiness: {
         hasToken: false,
         hasWebhookSecret: false,
@@ -40,6 +42,7 @@ function response(overrides = {}) {
         webhookUrlReady: true,
         canTest: false,
         canRegisterWebhook: false,
+        canConfirmWebhook: false,
         canActivateSandbox: false,
         canActivateProduction: false,
         ...overrides.readiness,
@@ -97,10 +100,49 @@ describe('ShippingProvidersCard', () => {
       expect(updateAdminShippingSettings).toHaveBeenCalledWith({
         enviaMode: 'sandbox',
         enviaToken: 'NUEVO-TOKEN',
+        internationalDutiesPaymentEntity: 'recipient',
         webhookSecret: 'NUEVO-SECRETO',
       })
     );
     expect(inputs[0]).toHaveValue('');
     expect(inputs[1]).toHaveValue('');
+  });
+
+  it('guía al portal de Envia y confirma la configuración sin llamar un endpoint inexistente', async () => {
+    const user = userEvent.setup();
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: { hasEnviaToken: true },
+        readiness: {
+          hasToken: true,
+          tested: true,
+          canConfirmWebhook: true,
+          canRegisterWebhook: true,
+        },
+      })
+    );
+    confirmAdminShippingWebhook.mockResolvedValue({
+      ...response({
+        settings: { hasEnviaToken: true },
+        readiness: {
+          hasToken: true,
+          tested: true,
+          webhookRegistered: true,
+          canConfirmWebhook: true,
+        },
+      }),
+      message: 'Webhook confirmado como configurado en el portal de Envia.',
+    });
+
+    render(<ShippingProvidersCard />);
+
+    const portal = await screen.findByRole('link', { name: 'Abrir portal de Envia' });
+    expect(portal).toHaveAttribute(
+      'href',
+      'https://shipping-test.envia.com/settings/developers'
+    );
+    await user.click(screen.getByRole('button', { name: 'Ya lo registré en Envia' }));
+    await waitFor(() => expect(confirmAdminShippingWebhook).toHaveBeenCalledTimes(1));
+    expect((await screen.findAllByText('Webhook confirmado')).length).toBeGreaterThan(0);
   });
 });

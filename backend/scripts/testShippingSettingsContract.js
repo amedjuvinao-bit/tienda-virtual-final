@@ -62,7 +62,7 @@ function main() {
     ['GET', '/api/admin/shipping-settings'],
     ['PUT', '/api/admin/shipping-settings'],
     ['POST', '/api/admin/shipping-settings/test'],
-    ['POST', '/api/admin/shipping-settings/webhook/register'],
+    ['POST', '/api/admin/shipping-settings/webhook/confirm'],
     ['POST', '/api/admin/shipping-settings/activate'],
     ['POST', '/api/admin/shipping-settings/disable'],
   ];
@@ -93,7 +93,7 @@ function main() {
   const sandboxReadiness = readiness(verifiedSettings, {
     envia: { mode: 'sandbox', token: 'sandbox-token', webhookSecret: '' },
   });
-  assert.strictEqual(sandboxReadiness.canRegisterWebhook, true);
+  assert.strictEqual(sandboxReadiness.canConfirmWebhook, true);
 
   const productionSettings = {
     ...verifiedSettings,
@@ -102,7 +102,7 @@ function main() {
   const productionWithoutSecret = readiness(productionSettings, {
     envia: { mode: 'production', token: 'production-token', webhookSecret: '' },
   });
-  assert.strictEqual(productionWithoutSecret.canRegisterWebhook, false);
+  assert.strictEqual(productionWithoutSecret.canConfirmWebhook, false);
   const productionWithSecret = readiness(productionSettings, {
     envia: {
       mode: 'production',
@@ -110,8 +110,8 @@ function main() {
       webhookSecret: 'production-webhook-secret',
     },
   });
-  assert.strictEqual(productionWithSecret.canRegisterWebhook, true);
-  ok('Sandbox registra webhooks sin secreto y Producción conserva HMAC obligatorio');
+  assert.strictEqual(productionWithSecret.canConfirmWebhook, true);
+  ok('Sandbox confirma el webhook del portal sin secreto y Producción conserva HMAC obligatorio');
 
   const frontend = read(
     'frontend/src/admin/configuracion/sections/envios/ShippingProvidersCard.jsx'
@@ -119,7 +119,8 @@ function main() {
   assert.match(frontend, /type="password"/);
   assert.match(frontend, /autoComplete="new-password"/);
   assert.match(frontend, /Probar conexión/);
-  assert.match(frontend, /Registrar webhook/);
+  assert.match(frontend, /Abrir portal de Envia/);
+  assert.match(frontend, /Ya lo registré en Envia/);
   assert.match(frontend, /confirmProduction/);
   assert.match(frontend, /¿Qué queda automático\?/);
   assert.match(frontend, /El webhook es el aviso/);

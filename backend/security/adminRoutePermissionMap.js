@@ -892,7 +892,7 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
-    path: '/api/admin/shipping-settings/webhook/register',
+    path: '/api/admin/shipping-settings/webhook/confirm',
     permission: 'settings:shipping',
     description: 'Registrar el webhook firmado de seguimiento.',
     audit: true,

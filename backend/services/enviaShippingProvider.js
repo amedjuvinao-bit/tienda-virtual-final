@@ -282,15 +282,6 @@ function createEnviaProvider({
       });
       return { ok: true, provider: 'envia', mode };
     },
-    async registerTrackingWebhook(url) {
-      const payload = await request(
-        '/webhooks',
-        { type_id: 3, url: clean(url), active: 1 },
-        'register_webhook',
-        { queryApi: true, normalize: false }
-      );
-      return payload?.data || payload;
-    },
     async getCarrierActions(carrier) {
       const safeCarrier = clean(carrier).toLowerCase();
       if (!safeCarrier) {

@@ -43,10 +43,10 @@ export function testAdminShippingConnection() {
   );
 }
 
-export function registerAdminShippingWebhook() {
+export function confirmAdminShippingWebhook() {
   return request(
-    () => api.post(`${BASE_URL}/webhook/register`),
-    'No se pudo registrar el webhook de seguimiento.'
+    () => api.post(`${BASE_URL}/webhook/confirm`),
+    'No se pudo confirmar la configuración del webhook.'
   );
 }
 

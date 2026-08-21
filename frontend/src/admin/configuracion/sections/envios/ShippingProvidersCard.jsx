@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   activateAdminShippingProvider,
+  confirmAdminShippingWebhook,
   disableAdminShippingProvider,
   getAdminShippingSettings,
-  registerAdminShippingWebhook,
   testAdminShippingConnection,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
@@ -111,10 +111,10 @@ export default function ShippingProvidersCard() {
       ...(production
         ? [
             { label: 'Secreto de webhook guardado', done: savedMode && ready.hasWebhookSecret },
-            { label: 'URL pública HTTPS', done: ready.webhookUrlReady },
-            { label: 'Webhook registrado', done: savedMode && ready.webhookRegistered },
           ]
         : []),
+      { label: 'URL pública HTTPS', done: ready.webhookUrlReady },
+      { label: 'Webhook confirmado', done: savedMode && ready.webhookRegistered },
     ],
     [production, ready, savedMode]
   );
@@ -215,7 +215,7 @@ export default function ShippingProvidersCard() {
             </div>
             <div className="flex flex-wrap gap-2">
               {ready.tested ? <StatusPill tone="green">Conexión aprobada</StatusPill> : <StatusPill tone="amber">Sin probar</StatusPill>}
-              {ready.webhookRegistered && <StatusPill tone="blue">Webhook registrado</StatusPill>}
+              {ready.webhookRegistered && <StatusPill tone="blue">Webhook confirmado</StatusPill>}
             </div>
           </div>
 
@@ -234,9 +234,9 @@ export default function ShippingProvidersCard() {
             </p>
             <p className="mt-2">
               El webhook es el aviso que Envia envía al servidor cuando cambia el estado de la guía.
-              Con él registrado, el pedido se actualiza sin pulsar “Sincronizar”. En Sandbox también
-              puede probarse con el token guardado; la firma HMAC se exige siempre para los eventos
-              reales de Producción.
+              Envia administra esa URL desde su portal: cópiala aquí, agrégala en Desarrolladores →
+              Webhooks y luego confírmala en este panel. Así el pedido se actualiza sin pulsar
+              “Sincronizar”. La firma HMAC se exige para los eventos reales de Producción.
             </p>
           </div>
 
@@ -335,10 +335,23 @@ export default function ShippingProvidersCard() {
 
           <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">URL pública para seguimiento</p>
+            <p className="mt-1 text-sm text-gray-700">
+              1. Copia la URL. 2. Ábrela en el portal de Envia y agrégala como webhook de seguimiento. 3. Regresa y confirma.
+            </p>
             <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
               <code className="min-w-0 flex-1 break-all text-sm text-gray-800">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
               <ActionButton tone="light" disabled={!meta.webhookUrl} onClick={copyWebhookUrl}>Copiar</ActionButton>
             </div>
+            {meta.webhookDashboardUrl && (
+              <a
+                href={meta.webhookDashboardUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
+              >
+                Abrir portal de Envia
+              </a>
+            )}
             {!ready.webhookUrlReady && (
               <p className="mt-2 text-xs text-amber-700">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>
             )}
@@ -378,8 +391,8 @@ export default function ShippingProvidersCard() {
             <ActionButton tone="light" busy={busyAction === 'test'} disabled={!ready.canTest || secretsChanged || mode !== settings.enviaMode} onClick={() => runAction('test', testAdminShippingConnection)}>
               Probar conexión
             </ActionButton>
-            <ActionButton tone="light" busy={busyAction === 'webhook'} disabled={!ready.canRegisterWebhook || production !== (settings.enviaMode === 'production')} onClick={() => runAction('webhook', registerAdminShippingWebhook)}>
-              Registrar webhook
+            <ActionButton tone="light" busy={busyAction === 'webhook'} disabled={!ready.canConfirmWebhook || ready.webhookRegistered || production !== (settings.enviaMode === 'production')} onClick={() => runAction('webhook', confirmAdminShippingWebhook)}>
+              Ya lo registré en Envia
             </ActionButton>
             <ActionButton
               tone="dark"

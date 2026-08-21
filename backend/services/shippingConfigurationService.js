@@ -57,6 +57,12 @@ function publicWebhookUrl() {
   return base ? `${base}/api/shipping/webhooks/envia` : '';
 }
 
+function webhookDashboardUrl(mode = 'sandbox') {
+  return mode === 'production'
+    ? 'https://shipping.envia.com/settings/developers'
+    : 'https://shipping-test.envia.com/settings/developers';
+}
+
 function publicHttpsUrl(value) {
   try {
     const parsed = new URL(value);
@@ -160,6 +166,9 @@ function readiness(settings, runtime) {
     webhookRegistered,
     webhookUrlReady,
     canTest: hasToken,
+    canConfirmWebhook:
+      hasToken && tested && webhookUrlReady && (!production || hasWebhookSecret),
+    // Alias temporal para clientes anteriores. Envia administra la URL desde su portal.
     canRegisterWebhook:
       hasToken && tested && webhookUrlReady && (!production || hasWebhookSecret),
     canActivateSandbox: hasToken && tested,
@@ -201,6 +210,8 @@ async function getShippingSettingsView(dependencies = {}) {
       credentialSource: runtime.credentialSource,
       webhookSecretSource: runtime.webhookSecretSource,
       webhookUrl: publicWebhookUrl(),
+      webhookDashboardUrl: webhookDashboardUrl(runtime.envia.mode),
+      webhookManagement: 'dashboard',
       readiness: readiness(runtime.settings, runtime),
       providers: [
         {
@@ -336,37 +347,24 @@ async function testShippingConnection(
   }
 }
 
-async function registerShippingWebhook(
+async function confirmShippingWebhook(
   actor = null,
-  { SettingsModel = ShippingSettings, provider = null, fetchImpl } = {}
+  { SettingsModel = ShippingSettings } = {}
 ) {
   const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
   const state = readiness(runtime.settings, runtime);
   const webhookUrl = publicWebhookUrl();
-  if (!state.canRegisterWebhook) {
+  if (!state.canConfirmWebhook) {
     throw new ShippingSettingsError(
       runtime.envia.mode === 'production'
-        ? 'Para registrar el webhook en Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.'
-        : 'Para registrar el webhook en Sandbox se requiere conexión aprobada y BACKEND_URL público con HTTPS.',
+        ? 'Antes de confirmar el webhook de Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.'
+        : 'Antes de confirmar el webhook de Sandbox se requiere conexión aprobada y BACKEND_URL público con HTTPS.',
       'SHIPPING_WEBHOOK_NOT_READY',
       422,
       state
     );
   }
-  const envia = provider || createEnviaProvider({
-    config: runtime.envia,
-    fetchImpl,
-  });
-  const result = await envia.registerTrackingWebhook(webhookUrl);
-  const webhookId = clean(result?.id || result?.webhook_id, 160);
-  if (!webhookId) {
-    throw new ShippingSettingsError(
-      'Envia no devolvió el identificador del webhook registrado.',
-      'SHIPPING_WEBHOOK_ID_MISSING',
-      502
-    );
-  }
-  runtime.settings.providerWebhookId = webhookId;
+  runtime.settings.providerWebhookId = 'dashboard-confirmed';
   runtime.settings.providerWebhookMode = runtime.envia.mode;
   runtime.settings.providerWebhookUrl = webhookUrl;
   runtime.settings.webhookRegisteredAt = new Date();
@@ -393,7 +391,7 @@ async function activateShippingProvider(
   if (production ? !state.canActivateProduction : !state.canActivateSandbox) {
     throw new ShippingSettingsError(
       production
-        ? 'Producción exige token probado, secreto, webhook registrado y URL pública HTTPS.'
+        ? 'Producción exige token probado, secreto, webhook confirmado y URL pública HTTPS.'
         : 'Sandbox exige guardar y probar correctamente el token.',
       'SHIPPING_PROVIDER_NOT_READY',
       409,
@@ -433,7 +431,7 @@ module.exports = {
   getShippingSettingsView,
   publicWebhookUrl,
   readiness,
-  registerShippingWebhook,
+  confirmShippingWebhook,
   testShippingConnection,
   updateShippingSettings,
 };

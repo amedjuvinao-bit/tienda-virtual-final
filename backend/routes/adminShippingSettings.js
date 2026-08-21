@@ -6,9 +6,9 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
   activateShippingProvider,
+  confirmShippingWebhook,
   disableShippingProvider,
   getShippingSettingsView,
-  registerShippingWebhook,
   testShippingConnection,
   updateShippingSettings,
 } = require('../services/shippingConfigurationService');
@@ -66,12 +66,12 @@ router.post('/test', async (req, res) => {
   }
 });
 
-router.post('/webhook/register', async (req, res) => {
+router.post('/webhook/confirm', async (req, res) => {
   try {
-    const result = await registerShippingWebhook(actor(req));
-    return res.status(201).json({
+    const result = await confirmShippingWebhook(actor(req));
+    return res.json({
       ok: true,
-      message: 'Webhook firmado de seguimiento registrado en Envia.',
+      message: 'Webhook confirmado como configurado en el portal de Envia.',
       ...result,
     });
   } catch (error) {
