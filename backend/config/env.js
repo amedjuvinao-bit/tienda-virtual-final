@@ -117,6 +117,7 @@ const env = {
         ? 'production'
         : 'sandbox',
       token: clean(process.env.ENVIA_TOKEN),
+      sandboxWebhookToken: clean(process.env.ENVIA_SANDBOX_WEBHOOK_TOKEN),
       webhookSecret: clean(process.env.ENVIA_WEBHOOK_SECRET),
       timeoutMs: toNumber(process.env.ENVIA_TIMEOUT_MS, 15_000, {
         min: 1_000,

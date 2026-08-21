@@ -52,8 +52,10 @@ function main() {
 
   const model = read('backend/models/ShippingSettings.js');
   assert.match(model, /enviaTokenEncrypted[\s\S]*?select:\s*false/);
+  assert.match(model, /sandboxWebhookTokenEncrypted[\s\S]*?select:\s*false/);
   assert.match(model, /webhookSecretEncrypted[\s\S]*?select:\s*false/);
   assert.match(model, /delete settings\.enviaTokenEncrypted/);
+  assert.match(model, /delete settings\.sandboxWebhookTokenEncrypted/);
   assert.match(model, /delete settings\.webhookSecretEncrypted/);
   assert.match(model, /SHIPPING_SETTINGS_KEY = 'main'/);
   ok('el modelo es singleton y excluye secretos de consultas y respuestas');
@@ -91,9 +93,23 @@ function main() {
     lastTestMode: 'sandbox',
   };
   const sandboxReadiness = readiness(verifiedSettings, {
-    envia: { mode: 'sandbox', token: 'sandbox-token', webhookSecret: '' },
+    envia: {
+      mode: 'sandbox',
+      token: 'sandbox-token',
+      sandboxWebhookToken: '',
+      webhookSecret: '',
+    },
   });
-  assert.strictEqual(sandboxReadiness.canConfirmWebhook, true);
+  assert.strictEqual(sandboxReadiness.canConfirmWebhook, false);
+  const sandboxWithWebhookToken = readiness(verifiedSettings, {
+    envia: {
+      mode: 'sandbox',
+      token: 'sandbox-token',
+      sandboxWebhookToken: 'sandbox-webhook-token',
+      webhookSecret: '',
+    },
+  });
+  assert.strictEqual(sandboxWithWebhookToken.canConfirmWebhook, true);
 
   const productionSettings = {
     ...verifiedSettings,
@@ -111,7 +127,7 @@ function main() {
     },
   });
   assert.strictEqual(productionWithSecret.canConfirmWebhook, true);
-  ok('Sandbox confirma el webhook del portal sin secreto y Producción conserva HMAC obligatorio');
+  ok('Sandbox exige su credencial Bearer exclusiva y Producción conserva HMAC obligatorio');
 
   const frontend = read(
     'frontend/src/admin/configuracion/sections/envios/ShippingProvidersCard.jsx'
@@ -124,6 +140,7 @@ function main() {
   assert.match(frontend, /confirmProduction/);
   assert.match(frontend, /¿Qué queda automático\?/);
   assert.match(frontend, /El webhook es el aviso/);
+  assert.match(frontend, /Credencial de autorización del webhook Sandbox/);
   assert.doesNotMatch(frontend, /localStorage/);
   ok('el panel protege credenciales y explica la automatización, el webhook y la activación');
 

@@ -160,7 +160,7 @@ async function main() {
     rawBody: sandboxTestBody,
     headers: { authorization: 'Bearer sandbox-secret' },
     mode: 'sandbox',
-    token: 'sandbox-secret',
+    webhookToken: 'sandbox-secret',
     now: 1_800_000,
   });
   assert.strictEqual(verifiedSandboxTest.event, 'tracking.test');
@@ -172,7 +172,7 @@ async function main() {
       rawBody: sandboxTestBody,
       headers: { authorization: 'Bearer sandbox-secret' },
       mode: 'production',
-      token: 'sandbox-secret',
+      webhookToken: 'sandbox-secret',
     }),
     (error) => error.code === 'UNSIGNED_SHIPPING_WEBHOOK_FORBIDDEN'
   );
@@ -181,11 +181,11 @@ async function main() {
       rawBody: sandboxTestBody,
       headers: { authorization: 'Bearer incorrecto' },
       mode: 'sandbox',
-      token: 'sandbox-secret',
+      webhookToken: 'sandbox-secret',
     }),
     (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
   );
-  ok('la prueba sin firma solo se acepta en Sandbox y autenticada con el token configurado');
+  ok('la prueba sin firma solo se acepta en Sandbox y autenticada con la credencial exclusiva del webhook');
 
   const generateWithPickup = pickupOnGeneratePayload(
     {

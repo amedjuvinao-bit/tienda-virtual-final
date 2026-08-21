@@ -36,6 +36,13 @@ const ShippingSettingsSchema = new mongoose.Schema(
     },
     enviaTokenHint: { type: String, trim: true, default: '' },
     hasEnviaToken: { type: Boolean, default: false },
+    sandboxWebhookTokenEncrypted: {
+      type: String,
+      default: '',
+      select: false,
+    },
+    sandboxWebhookTokenHint: { type: String, trim: true, default: '' },
+    hasSandboxWebhookToken: { type: Boolean, default: false },
     webhookSecretEncrypted: {
       type: String,
       default: '',
@@ -88,6 +95,7 @@ const ShippingSettingsSchema = new mongoose.Schema(
 ShippingSettingsSchema.pre('validate', function (next) {
   this.key = SHIPPING_SETTINGS_KEY;
   this.hasEnviaToken = Boolean(this.enviaTokenEncrypted);
+  this.hasSandboxWebhookToken = Boolean(this.sandboxWebhookTokenEncrypted);
   this.hasWebhookSecret = Boolean(this.webhookSecretEncrypted);
   next();
 });
@@ -97,10 +105,14 @@ ShippingSettingsSchema.methods.toSafeObject = function toSafeObject() {
   settings.hasEnviaToken = Boolean(
     settings.enviaTokenEncrypted || settings.hasEnviaToken
   );
+  settings.hasSandboxWebhookToken = Boolean(
+    settings.sandboxWebhookTokenEncrypted || settings.hasSandboxWebhookToken
+  );
   settings.hasWebhookSecret = Boolean(
     settings.webhookSecretEncrypted || settings.hasWebhookSecret
   );
   delete settings.enviaTokenEncrypted;
+  delete settings.sandboxWebhookTokenEncrypted;
   delete settings.webhookSecretEncrypted;
   delete settings.__v;
   return settings;
@@ -108,7 +120,7 @@ ShippingSettingsSchema.methods.toSafeObject = function toSafeObject() {
 
 ShippingSettingsSchema.statics.getSingleton = async function getSingleton() {
   let settings = await this.findOne({ key: SHIPPING_SETTINGS_KEY }).select(
-    '+enviaTokenEncrypted +webhookSecretEncrypted'
+    '+enviaTokenEncrypted +sandboxWebhookTokenEncrypted +webhookSecretEncrypted'
   );
   if (!settings) {
     settings = await this.create({ key: SHIPPING_SETTINGS_KEY });

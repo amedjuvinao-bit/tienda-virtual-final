@@ -107,10 +107,15 @@ async function getRuntimeShippingConfiguration(
 ) {
   const settings = await getSettings(SettingsModel);
   const databaseToken = decryptOptional(settings.enviaTokenEncrypted);
+  const databaseSandboxWebhookToken = decryptOptional(
+    settings.sandboxWebhookTokenEncrypted
+  );
   const databaseWebhookSecret = decryptOptional(
     settings.webhookSecretEncrypted
   );
   const token = databaseToken || env.shipping.envia.token;
+  const sandboxWebhookToken =
+    databaseSandboxWebhookToken || env.shipping.envia.sandboxWebhookToken;
   const webhookSecret =
     databaseWebhookSecret || env.shipping.envia.webhookSecret;
   const managedFromPanel = settings.managedFromPanel === true;
@@ -124,6 +129,11 @@ async function getRuntimeShippingConfiguration(
       : env.shipping.envia.token
         ? 'environment'
         : 'none',
+    sandboxWebhookTokenSource: databaseSandboxWebhookToken
+      ? 'database'
+      : env.shipping.envia.sandboxWebhookToken
+        ? 'environment'
+        : 'none',
     webhookSecretSource: databaseWebhookSecret
       ? 'database'
       : env.shipping.envia.webhookSecret
@@ -134,6 +144,7 @@ async function getRuntimeShippingConfiguration(
         ? settings.enviaMode || 'sandbox'
         : env.shipping.envia.mode || 'sandbox',
       token,
+      sandboxWebhookToken,
       webhookSecret,
       timeoutMs: env.shipping.envia.timeoutMs,
       internationalDutiesPaymentEntity:
@@ -157,21 +168,31 @@ function readiness(settings, runtime) {
     settings.providerWebhookUrl === webhookUrl
   );
   const hasToken = Boolean(runtime.envia.token);
+  const hasSandboxWebhookToken = Boolean(runtime.envia.sandboxWebhookToken);
   const hasWebhookSecret = Boolean(runtime.envia.webhookSecret);
   const webhookUrlReady = publicHttpsUrl(webhookUrl);
+  const webhookCredentialReady = production
+    ? hasWebhookSecret
+    : hasSandboxWebhookToken;
   return {
     hasToken,
+    hasSandboxWebhookToken,
     hasWebhookSecret,
     tested,
     webhookRegistered,
     webhookUrlReady,
     canTest: hasToken,
     canConfirmWebhook:
-      hasToken && tested && webhookUrlReady && (!production || hasWebhookSecret),
+      hasToken && tested && webhookUrlReady && webhookCredentialReady,
     // Alias temporal para clientes anteriores. Envia administra la URL desde su portal.
     canRegisterWebhook:
-      hasToken && tested && webhookUrlReady && (!production || hasWebhookSecret),
-    canActivateSandbox: hasToken && tested,
+      hasToken && tested && webhookUrlReady && webhookCredentialReady,
+    canActivateSandbox:
+      hasToken &&
+      tested &&
+      hasSandboxWebhookToken &&
+      webhookRegistered &&
+      webhookUrlReady,
     canActivateProduction:
       hasToken &&
       tested &&
@@ -187,14 +208,23 @@ async function getShippingSettingsView(dependencies = {}) {
   safe.defaultProvider = runtime.defaultProvider;
   safe.enviaMode = runtime.envia.mode;
   const hasDatabaseToken = Boolean(runtime.settings.enviaTokenEncrypted);
+  const hasDatabaseSandboxWebhookToken = Boolean(
+    runtime.settings.sandboxWebhookTokenEncrypted
+  );
   const hasDatabaseWebhookSecret = Boolean(
     runtime.settings.webhookSecretEncrypted
   );
   safe.hasEnviaToken = Boolean(runtime.envia.token);
+  safe.hasSandboxWebhookToken = Boolean(runtime.envia.sandboxWebhookToken);
   safe.hasWebhookSecret = Boolean(runtime.envia.webhookSecret);
   safe.enviaTokenHint = hasDatabaseToken
     ? runtime.settings.enviaTokenHint
     : runtime.envia.token
+      ? 'Configurado en el despliegue'
+      : '';
+  safe.sandboxWebhookTokenHint = hasDatabaseSandboxWebhookToken
+    ? runtime.settings.sandboxWebhookTokenHint
+    : runtime.envia.sandboxWebhookToken
       ? 'Configurado en el despliegue'
       : '';
   safe.webhookSecretHint = hasDatabaseWebhookSecret
@@ -208,6 +238,7 @@ async function getShippingSettingsView(dependencies = {}) {
       encryptionConfigured: encryptionConfigured(),
       encryptionKeySource: env.integrationsEncryptionKeySource || '',
       credentialSource: runtime.credentialSource,
+      sandboxWebhookTokenSource: runtime.sandboxWebhookTokenSource,
       webhookSecretSource: runtime.webhookSecretSource,
       webhookUrl: publicWebhookUrl(),
       webhookDashboardUrl: webhookDashboardUrl(runtime.envia.mode),
@@ -246,6 +277,13 @@ function resetVerification(settings, { resetWebhook = false } = {}) {
   }
 }
 
+function resetWebhookConfirmation(settings) {
+  settings.providerWebhookId = '';
+  settings.providerWebhookMode = '';
+  settings.providerWebhookUrl = '';
+  settings.webhookRegisteredAt = null;
+}
+
 async function updateShippingSettings(
   input = {},
   actor = null,
@@ -259,6 +297,7 @@ async function updateShippingSettings(
   );
   const modeChanged = nextMode !== settings.enviaMode;
   let tokenChanged = false;
+  let sandboxWebhookTokenChanged = false;
   let webhookSecretChanged = false;
 
   const token = String(input.enviaToken || '').trim();
@@ -270,6 +309,19 @@ async function updateShippingSettings(
     settings.enviaTokenEncrypted = '';
     settings.enviaTokenHint = '';
     tokenChanged = true;
+  }
+
+  const sandboxWebhookToken = String(input.sandboxWebhookToken || '').trim();
+  if (sandboxWebhookToken) {
+    settings.sandboxWebhookTokenEncrypted = encryptShippingSecret(
+      sandboxWebhookToken
+    );
+    settings.sandboxWebhookTokenHint = secretHint(sandboxWebhookToken);
+    sandboxWebhookTokenChanged = true;
+  } else if (input.clearSandboxWebhookToken === true) {
+    settings.sandboxWebhookTokenEncrypted = '';
+    settings.sandboxWebhookTokenHint = '';
+    sandboxWebhookTokenChanged = true;
   }
 
   const webhookSecret = String(input.webhookSecret || '').trim();
@@ -295,6 +347,8 @@ async function updateShippingSettings(
     resetVerification(settings, {
       resetWebhook: modeChanged || tokenChanged || webhookSecretChanged,
     });
+  } else if (sandboxWebhookTokenChanged) {
+    resetWebhookConfirmation(settings);
   }
   await settings.save();
   return getShippingSettingsView({ SettingsModel });
@@ -358,7 +412,7 @@ async function confirmShippingWebhook(
     throw new ShippingSettingsError(
       runtime.envia.mode === 'production'
         ? 'Antes de confirmar el webhook de Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.'
-        : 'Antes de confirmar el webhook de Sandbox se requiere conexión aprobada y BACKEND_URL público con HTTPS.',
+        : 'Antes de confirmar el webhook de Sandbox se requiere conexión aprobada, credencial de autorización guardada y BACKEND_URL público con HTTPS.',
       'SHIPPING_WEBHOOK_NOT_READY',
       422,
       state
@@ -392,7 +446,7 @@ async function activateShippingProvider(
     throw new ShippingSettingsError(
       production
         ? 'Producción exige token probado, secreto, webhook confirmado y URL pública HTTPS.'
-        : 'Sandbox exige guardar y probar correctamente el token.',
+        : 'Sandbox exige token probado, credencial del webhook, webhook confirmado y URL pública HTTPS.',
       'SHIPPING_PROVIDER_NOT_READY',
       409,
       state

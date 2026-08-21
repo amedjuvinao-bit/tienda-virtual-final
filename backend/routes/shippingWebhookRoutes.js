@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
           rawBody: req.body,
           headers: req.headers,
           mode: runtime.envia.mode,
-          token: runtime.envia.token,
+          webhookToken: runtime.envia.sandboxWebhookToken,
         });
     let payload;
     try {

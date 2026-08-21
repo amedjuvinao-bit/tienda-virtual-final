@@ -24,8 +24,10 @@ function response(overrides = {}) {
       defaultProvider: 'manual',
       enviaMode: 'sandbox',
       hasEnviaToken: false,
+      hasSandboxWebhookToken: false,
       hasWebhookSecret: false,
       enviaTokenHint: '',
+      sandboxWebhookTokenHint: '',
       webhookSecretHint: '',
       lastTestStatus: 'none',
       ...overrides.settings,
@@ -36,6 +38,7 @@ function response(overrides = {}) {
       webhookDashboardUrl: 'https://shipping-test.envia.com/settings/developers',
       readiness: {
         hasToken: false,
+        hasSandboxWebhookToken: false,
         hasWebhookSecret: false,
         tested: false,
         webhookRegistered: false,
@@ -76,22 +79,24 @@ describe('ShippingProvidersCard', () => {
     expect(screen.getByRole('button', { name: 'Probar conexión' })).toBeDisabled();
   });
 
-  it('guarda token y secreto como campos de escritura única', async () => {
+  it('guarda token API y credencial Sandbox como campos de escritura única', async () => {
     const user = userEvent.setup();
     updateAdminShippingSettings.mockResolvedValue({
       ...response({
         settings: {
           hasEnviaToken: true,
-          hasWebhookSecret: true,
+          hasSandboxWebhookToken: true,
           enviaTokenHint: '••••OKEN',
-          webhookSecretHint: '••••CRET',
+          sandboxWebhookTokenHint: '••••CRET',
         },
       }),
       message: 'Configuración guardada.',
     });
     render(<ShippingProvidersCard />);
 
-    const inputs = await screen.findAllByLabelText(/Token de Envia|Secreto de firma/);
+    const inputs = await screen.findAllByLabelText(
+      /Token de Envia|Credencial de autorización del webhook Sandbox/
+    );
     await user.type(inputs[0], 'NUEVO-TOKEN');
     await user.type(inputs[1], 'NUEVO-SECRETO');
     await user.click(screen.getByRole('button', { name: 'Guardar configuración' }));
@@ -101,7 +106,7 @@ describe('ShippingProvidersCard', () => {
         enviaMode: 'sandbox',
         enviaToken: 'NUEVO-TOKEN',
         internationalDutiesPaymentEntity: 'recipient',
-        webhookSecret: 'NUEVO-SECRETO',
+        sandboxWebhookToken: 'NUEVO-SECRETO',
       })
     );
     expect(inputs[0]).toHaveValue('');
@@ -115,6 +120,7 @@ describe('ShippingProvidersCard', () => {
         settings: { hasEnviaToken: true },
         readiness: {
           hasToken: true,
+          hasSandboxWebhookToken: true,
           tested: true,
           canConfirmWebhook: true,
           canRegisterWebhook: true,
@@ -126,6 +132,7 @@ describe('ShippingProvidersCard', () => {
         settings: { hasEnviaToken: true },
         readiness: {
           hasToken: true,
+          hasSandboxWebhookToken: true,
           tested: true,
           webhookRegistered: true,
           canConfirmWebhook: true,

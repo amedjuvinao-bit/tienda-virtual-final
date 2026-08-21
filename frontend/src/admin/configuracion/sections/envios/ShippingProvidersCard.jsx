@@ -56,9 +56,11 @@ export default function ShippingProvidersCard() {
   const [data, setData] = useState(null);
   const [mode, setMode] = useState('sandbox');
   const [token, setToken] = useState('');
+  const [sandboxWebhookToken, setSandboxWebhookToken] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
   const [dutiesPaymentEntity, setDutiesPaymentEntity] = useState('recipient');
   const [clearToken, setClearToken] = useState(false);
+  const [clearSandboxWebhookToken, setClearSandboxWebhookToken] = useState(false);
   const [clearWebhookSecret, setClearWebhookSecret] = useState(false);
   const [confirmProduction, setConfirmProduction] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -69,11 +71,13 @@ export default function ShippingProvidersCard() {
     setData(response);
     setMode(response?.settings?.enviaMode || 'sandbox');
     setToken('');
+    setSandboxWebhookToken('');
     setWebhookSecret('');
     setDutiesPaymentEntity(
       response?.settings?.internationalDutiesPaymentEntity || 'recipient'
     );
     setClearToken(false);
+    setClearSandboxWebhookToken(false);
     setClearWebhookSecret(false);
     setConfirmProduction(false);
   }, []);
@@ -99,8 +103,12 @@ export default function ShippingProvidersCard() {
   const ready = meta.readiness || {};
   const activeEnvia = settings.defaultProvider === 'envia';
   const production = mode === 'production';
-  const writesSecret = Boolean(token.trim() || webhookSecret.trim());
-  const secretsChanged = Boolean(writesSecret || clearToken || clearWebhookSecret);
+  const writesSecret = Boolean(
+    token.trim() || sandboxWebhookToken.trim() || webhookSecret.trim()
+  );
+  const secretsChanged = Boolean(
+    writesSecret || clearToken || clearSandboxWebhookToken || clearWebhookSecret
+  );
   const saveBlocked = writesSecret && !meta.encryptionConfigured;
   const savedMode = mode === settings.enviaMode;
 
@@ -108,6 +116,14 @@ export default function ShippingProvidersCard() {
     () => [
       { label: 'Token guardado', done: savedMode && ready.hasToken },
       { label: 'Conexión autenticada', done: savedMode && ready.tested },
+      ...(!production
+        ? [
+            {
+              label: 'Credencial del webhook guardada',
+              done: savedMode && ready.hasSandboxWebhookToken,
+            },
+          ]
+        : []),
       ...(production
         ? [
             { label: 'Secreto de webhook guardado', done: savedMode && ready.hasWebhookSecret },
@@ -139,8 +155,14 @@ export default function ShippingProvidersCard() {
         enviaMode: mode,
         internationalDutiesPaymentEntity: dutiesPaymentEntity,
         ...(token.trim() ? { enviaToken: token.trim() } : {}),
+        ...(sandboxWebhookToken.trim()
+          ? { sandboxWebhookToken: sandboxWebhookToken.trim() }
+          : {}),
         ...(webhookSecret.trim() ? { webhookSecret: webhookSecret.trim() } : {}),
         ...(clearToken && !token.trim() ? { clearEnviaToken: true } : {}),
+        ...(clearSandboxWebhookToken && !sandboxWebhookToken.trim()
+          ? { clearSandboxWebhookToken: true }
+          : {}),
         ...(clearWebhookSecret && !webhookSecret.trim() ? { clearWebhookSecret: true } : {}),
       })
     );
@@ -236,7 +258,8 @@ export default function ShippingProvidersCard() {
               El webhook es el aviso que Envia envía al servidor cuando cambia el estado de la guía.
               Envia administra esa URL desde su portal: cópiala aquí, agrégala en Desarrolladores →
               Webhooks y luego confírmala en este panel. Así el pedido se actualiza sin pulsar
-              “Sincronizar”. La firma HMAC se exige para los eventos reales de Producción.
+              “Sincronizar”. Sandbox usa una credencial Bearer exclusiva que genera el portal;
+              Producción exige la firma HMAC.
             </p>
           </div>
 
@@ -285,6 +308,50 @@ export default function ShippingProvidersCard() {
               )}
             </div>
 
+            {!production && (
+              <div className="block md:col-span-2">
+                <label
+                  htmlFor="envia-sandbox-webhook-token"
+                  className="mb-1 block text-sm font-semibold text-gray-700"
+                >
+                  Credencial de autorización del webhook Sandbox
+                </label>
+                <input
+                  id="envia-sandbox-webhook-token"
+                  type="password"
+                  autoComplete="new-password"
+                  value={sandboxWebhookToken}
+                  onChange={(event) => {
+                    setSandboxWebhookToken(event.target.value);
+                    if (event.target.value) setClearSandboxWebhookToken(false);
+                  }}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  placeholder={
+                    settings.sandboxWebhookTokenHint ||
+                    'Pegar la credencial generada por Envia'
+                  }
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  {settings.hasSandboxWebhookToken
+                    ? `Guardada: ${settings.sandboxWebhookTokenHint || 'credencial protegida'}. Déjala vacía para conservarla.`
+                    : 'En el portal Sandbox, guarda el webhook y copia la credencial generada en el segundo campo “Url”. No uses aquí el token de la API.'}
+                </span>
+                {meta.sandboxWebhookTokenSource === 'database' && (
+                  <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                    <input
+                      type="checkbox"
+                      checked={clearSandboxWebhookToken}
+                      onChange={(event) =>
+                        setClearSandboxWebhookToken(event.target.checked)
+                      }
+                    />
+                    Eliminar la credencial Sandbox guardada al guardar
+                  </label>
+                )}
+              </div>
+            )}
+
+            {production && (
             <div className="block md:col-span-2">
               <label htmlFor="envia-webhook-secret" className="mb-1 block text-sm font-semibold text-gray-700">Secreto de firma del webhook</label>
               <input
@@ -313,6 +380,7 @@ export default function ShippingProvidersCard() {
                 </label>
               )}
             </div>
+            )}
 
             <label className="block md:col-span-2">
               <span className="mb-1 block text-sm font-semibold text-gray-700">
@@ -336,7 +404,9 @@ export default function ShippingProvidersCard() {
           <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">URL pública para seguimiento</p>
             <p className="mt-1 text-sm text-gray-700">
-              1. Copia la URL. 2. Ábrela en el portal de Envia y agrégala como webhook de seguimiento. 3. Regresa y confirma.
+              {production
+                ? '1. Copia la URL. 2. Ábrela en el portal de Envia y agrégala como webhook de seguimiento. 3. Regresa y confirma.'
+                : '1. Copia esta URL. 2. Crea el webhook en el portal Sandbox. 3. Copia la credencial que Envia genera en el segundo campo “Url” y guárdala arriba. 4. En el portal pulsa Probar; si responde correctamente, regresa y confirma.'}
             </p>
             <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
               <code className="min-w-0 flex-1 break-all text-sm text-gray-800">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
