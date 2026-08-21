@@ -152,9 +152,9 @@ async function main() {
   ok('capacidades, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
   const sandboxTestBody = Buffer.from(JSON.stringify({
-    carrier: 'fedex',
-    tracking_number: 'TEST-001',
-    shipment_status: 'Delivered',
+    carrierName: 'fedex',
+    trackingNumber: 'TEST-001',
+    status: 'Delivered',
   }));
   const verifiedSandboxTest = verifyEnviaSandboxTestWebhook({
     rawBody: sandboxTestBody,
@@ -185,7 +185,7 @@ async function main() {
     }),
     (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
   );
-  ok('la prueba sin firma solo se acepta en Sandbox y autenticada con la credencial exclusiva del webhook');
+  ok('la prueba v1 oficial con carrierName solo se acepta en Sandbox y con la credencial exclusiva del webhook');
 
   const generateWithPickup = pickupOnGeneratePayload(
     {

@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
       throw error;
     }
 
-    return res.status(202).json({ ok: true, accepted: true });
+    return res.status(200).json({ ok: true, accepted: true });
   } catch (error) {
     return res.status(error?.statusCode || 500).json({
       ok: false,

@@ -78,6 +78,13 @@ function main() {
   assert.match(routeSource, /requirePermission\('settings:shipping'\)/);
   ok('las seis operaciones administrativas exigen sesión y permiso de envíos');
 
+  const webhookRouteSource = read('backend/routes/shippingWebhookRoutes.js');
+  assert.match(webhookRouteSource, /res\.status\(200\)\.json\(\{ ok: true, accepted: true \}\)/);
+  const providerSource = read('backend/services/enviaShippingProvider.js');
+  assert.match(providerSource, /data\?\.carrierName/);
+  assert.match(providerSource, /payload\?\.carrierName/);
+  ok('la prueba v1 de Envia acepta carrierName y responde HTTP 200 al portal');
+
   const service = read('backend/services/shippingConfigurationService.js');
   assert.match(service, /SHIPPING_PRODUCTION_CONFIRMATION_REQUIRED/);
   assert.match(service, /canActivateProduction/);

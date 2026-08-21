@@ -552,7 +552,14 @@ function verifyEnviaSandboxTestWebhook({
     );
   }
   const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload;
-  const carrier = clean(data?.carrier_name || data?.carrier || payload?.carrier);
+  const carrier = clean(
+    data?.carrier_name ||
+    data?.carrierName ||
+    data?.carrier ||
+    payload?.carrier_name ||
+    payload?.carrierName ||
+    payload?.carrier
+  );
   const trackingNumber = clean(
     data?.tracking_number || data?.trackingNumber || payload?.tracking_number || payload?.trackingNumber
   );
