@@ -23,12 +23,12 @@ import {
 } from './shippingRateRecommendation';
 
 const STATUS_LABELS = {
-  ready_to_pick: 'Lista para picking',
-  picking: 'Picking en curso',
-  picked: 'Picking completo',
-  packing: 'Empaque en curso',
-  packed: 'Empacada',
-  dispatched: 'Despachada',
+  ready_to_pick: 'Lista para preparar',
+  picking: 'Reuniendo productos',
+  picked: 'Productos reunidos',
+  packing: 'Empacando',
+  packed: 'Paquete listo',
+  dispatched: 'Entregada a la transportadora',
   in_transit: 'En tránsito',
   delivered: 'Entregada',
   exception: 'Con incidencia',
@@ -36,23 +36,30 @@ const STATUS_LABELS = {
 };
 
 const NEXT_ACTIONS = {
-  ready_to_pick: ['start_picking', 'Iniciar picking'],
-  picking: ['complete_picking', 'Completar picking'],
-  picked: ['start_packing', 'Iniciar empaque'],
-  packing: ['complete_packing', 'Sellar paquetes'],
-  packed: ['dispatch', 'Confirmar despacho'],
+  ready_to_pick: ['start_picking', 'Comenzar a reunir productos'],
+  picking: ['complete_picking', 'Confirmar productos reunidos'],
+  picked: ['start_packing', 'Comenzar a empacar'],
+  packing: ['complete_packing', 'Confirmar paquete cerrado'],
+  packed: ['dispatch', 'Confirmar entrega a la transportadora'],
   dispatched: ['mark_in_transit', 'Marcar en tránsito'],
   in_transit: ['deliver', 'Confirmar entrega'],
 };
 
 const STEPS = [
   ['ready_to_pick', 'Preparar'],
-  ['picking', 'Picking'],
-  ['packing', 'Empaque'],
-  ['dispatched', 'Despacho'],
-  ['in_transit', 'Tránsito'],
+  ['picking', 'Reunir productos'],
+  ['packing', 'Empacar'],
+  ['dispatched', 'Transportadora'],
+  ['in_transit', 'En tránsito'],
   ['delivered', 'Entrega'],
 ];
+
+const WEBHOOK_TEST_LABELS = {
+  'Picked Up': 'el paquete fue recolectado',
+  Shipped: 'el paquete está en tránsito',
+  Delivered: 'el paquete fue entregado',
+  Canceled: 'el envío fue cancelado',
+};
 
 const STATUS_POSITION = {
   ready_to_pick: 0,
@@ -585,7 +592,7 @@ export default function OrderDetailLogisticsPanel({
         });
         setMessage({
           type: 'success',
-          text: `Envia aceptó el evento ${form.testStatus}. La prueba Sandbox llegará autenticada; los eventos reales de Producción exigirán firma HMAC.`,
+          text: `Prueba enviada: estamos imitando que Envia informó que ${WEBHOOK_TEST_LABELS[form.testStatus] || form.testStatus}. En un envío real, Envia enviará este aviso automáticamente y el administrador no tendrá que cambiar el estado.`,
         });
         window.setTimeout(() => refresh().catch(() => {}), 1800);
       } else if (action === 'dropoff') {
@@ -682,13 +689,13 @@ export default function OrderDetailLogisticsPanel({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={{ color: 'var(--admin-primary)', fontSize: 10, fontWeight: 950, letterSpacing: '.18em', textTransform: 'uppercase' }}>
-            Operación física multisede
+            Preparación y entrega por sede
           </div>
           <h3 style={{ margin: '5px 0 0', color: ORDER_DETAIL_THEME.cardText, fontSize: 18, fontWeight: 950 }}>
             Centro logístico
           </h3>
           <p style={{ margin: '5px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 12, fontWeight: 650 }}>
-            Picking, empaque, despacho, seguimiento, SLA e incidencias con trazabilidad por sede.
+            Prepara cada paquete, entrégalo a la transportadora y consulta su seguimiento desde la orden.
           </p>
         </div>
         {canManage && shipments.length === 0 ? (
@@ -804,11 +811,25 @@ export default function OrderDetailLogisticsPanel({
                 isProductionGuide &&
                 isPublicHttpUrl(shipment.carrier?.trackingUrl)
               );
+              const automaticTrackingEnabled = Boolean(
+                providerActive &&
+                hasActiveLabel &&
+                webhookRegistered
+              );
+              const nextRequiresCarrierUpdate = Boolean(
+                next && ['mark_in_transit', 'deliver'].includes(next[0])
+              );
               const assistantStep = handoffComplete ? 4 : hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
               const assistantTitle = !providerActive
                 ? providerConfigured
                   ? 'Activa Envia para automatizar este envío'
                   : 'Configura Envia para automatizar este envío'
+                : automaticTrackingEnabled && status === 'delivered'
+                  ? 'Entrega confirmada: el proceso terminó'
+                  : automaticTrackingEnabled && status === 'in_transit'
+                    ? 'El paquete está en camino'
+                    : automaticTrackingEnabled && status === 'dispatched'
+                      ? 'Espera el aviso automático de Envia'
                 : pickupFailed
                   ? 'Revisa la recolección antes de preparar'
                   : pickupScheduled
@@ -824,6 +845,12 @@ export default function OrderDetailLogisticsPanel({
                       : 'Confirma los datos y busca la mejor tarifa';
               const assistantDescription = !providerActive
                 ? providers?.envia?.message || 'Activa la conexión desde Configuración → Envíos. Mientras tanto, la operación manual continúa disponible.'
+                : automaticTrackingEnabled && status === 'delivered'
+                  ? 'Envia informó la entrega y la tienda actualizó la orden. El administrador no debe registrar otro estado.'
+                  : automaticTrackingEnabled && status === 'in_transit'
+                    ? 'No tienes que cambiar el estado manualmente. Envia avisará cuando la transportadora confirme la entrega.'
+                    : automaticTrackingEnabled && status === 'dispatched'
+                      ? 'El paquete ya fue entregado a la transportadora. Envia actualizará esta orden cuando detecte el primer movimiento.'
                 : pickupFailed
                   ? 'Envia creó la guía, pero no confirmó la recolección solicitada durante la generación. No entregues el paquete todavía: cancela la guía y vuelve a generarla.'
                   : pickupScheduled
@@ -870,16 +897,18 @@ export default function OrderDetailLogisticsPanel({
 
                   <div style={{ order: 4, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
                     <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                      Preparación física y entrega
+                      Preparación del paquete
                     </div>
                     <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.4 }}>
                       {waitingForAutomaticHandoff
-                        ? 'Primero termina la contratación y define cómo llegará el paquete a la transportadora. Después el panel habilitará el picking.'
-                        : 'Continúa únicamente con el botón del siguiente paso operativo.'}
+                        ? 'Primero genera la guía y define cómo llegará el paquete a la transportadora. Después podrás comenzar a reunir los productos.'
+                        : automaticTrackingEnabled && nextRequiresCarrierUpdate
+                          ? 'Tu trabajo de preparación terminó. Los siguientes estados llegarán automáticamente desde Envia.'
+                          : 'Pulsa únicamente el botón que describe la siguiente tarea.'}
                     </p>
                   </div>
 
-                  <div style={{ order: 5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginTop: 10 }}>
+                  <div className="order-logistics-step-grid" style={{ order: 5, gap: 5, marginTop: 10 }}>
                     {STEPS.map(([step, label], index) => {
                       const active = status === 'exception' ? index <= (STATUS_POSITION[shipment.resumeStatus] ?? 0) : index <= position;
                       return (
@@ -951,17 +980,17 @@ export default function OrderDetailLogisticsPanel({
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                          {providerActive ? 'Contratación y seguimiento con Envia' : 'Envío manual activo'}
+                          {providerActive ? 'Envío automático con Envia' : 'Envío manual activo'}
                         </div>
                         <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
                           {providerActive
-                            ? 'El panel guía cuatro decisiones: validar, cotizar, crear la guía y entregar el paquete a la transportadora.'
+                            ? 'Tú preparas y entregas el paquete. Envia informa el tránsito y la entrega para que la orden se actualice sola.'
                             : 'Registra la transportadora, la guía y las evidencias dentro del plan manual.'}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ borderRadius: 999, padding: '5px 8px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
-                          {providerMode === 'production' ? 'PRODUCCIÓN' : 'MODO PRUEBAS'}
+                          {providerMode === 'production' ? 'PRODUCCIÓN · OPERACIÓN REAL' : 'SANDBOX · SOLO PRUEBAS'}
                         </span>
                         {providerActive ? (
                           <span style={{ borderRadius: 999, padding: '5px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
@@ -970,6 +999,38 @@ export default function OrderDetailLogisticsPanel({
                         ) : null}
                       </div>
                     </div>
+
+                    {providerActive ? (
+                      <>
+                        <div role="note" style={{ marginTop: 10, borderRadius: 12, padding: '9px 10px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 9, fontWeight: 820, lineHeight: 1.45 }}>
+                          {providerMode === 'production'
+                            ? 'Estás en Producción: crear una guía puede descontar saldo real de Envia y generar una operación real.'
+                            : 'Estás ensayando en Sandbox: no se moverá un paquete real. Los controles de simulación están separados al final.'}
+                        </div>
+                        <div className="order-logistics-responsibility-grid" style={{ gap: 8, marginTop: 10 }}>
+                          <div style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 13, padding: 11, background: ORDER_DETAIL_THEME.cardBg }}>
+                            <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 950 }}>
+                              Lo que hace el administrador
+                            </div>
+                            <ol style={{ margin: '7px 0 0', paddingLeft: 17, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.6 }}>
+                              <li>Revisar la tarifa y generar la guía.</li>
+                              <li>Imprimir la etiqueta y preparar el paquete.</li>
+                              <li>Entregarlo en un punto o solicitar recolección.</li>
+                            </ol>
+                          </div>
+                          <div style={{ border: '1px solid #86efac', borderRadius: 13, padding: 11, background: '#ecfdf5' }}>
+                            <div style={{ color: '#047857', fontSize: 10, fontWeight: 950 }}>
+                              Lo que hará Envia automáticamente
+                            </div>
+                            <ol style={{ margin: '7px 0 0', paddingLeft: 17, color: '#047857', fontSize: 9, fontWeight: 760, lineHeight: 1.6 }}>
+                              <li>Avisar cuando el paquete esté en tránsito.</li>
+                              <li>Avisar cuando la entrega sea confirmada.</li>
+                              <li>Actualizar esta orden sin seleccionar estados.</li>
+                            </ol>
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
 
                     <div role="region" aria-label={`Siguiente paso de envío ${shipment.code}`} style={{ marginTop: 11, borderRadius: 14, padding: 12, background: ORDER_DETAIL_THEME.cardBg, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
                       <div style={{ color: 'var(--admin-primary)', fontSize: 8, fontWeight: 950, letterSpacing: '.1em', textTransform: 'uppercase' }}>
@@ -1098,9 +1159,9 @@ export default function OrderDetailLogisticsPanel({
                         <div style={{ marginTop: 7, borderRadius: 10, padding: '7px 9px', background: '#d1fae5', color: '#047857', fontSize: 9, fontWeight: 850 }}>
                           {webhookRegistered
                             ? isProductionGuide
-                              ? 'Seguimiento automático habilitado: los eventos firmados de Envia actualizarán esta orden.'
-                              : 'Webhook Sandbox habilitado: puedes simular estados desde Opciones avanzadas.'
-                            : 'Seguimiento automático aún no habilitado. Usa “Actualizar estado desde Envia” o registra el webhook en Configuración → Envíos.'}
+                              ? 'Seguimiento automático listo: Envia actualizará esta orden. No selecciones estados manualmente.'
+                              : 'Seguimiento automático listo para probar. La simulación está separada abajo en “Pruebas Sandbox”.'
+                            : 'Seguimiento automático pendiente. Registra el webhook desde Configuración → Envíos.'}
                         </div>
                         {(shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status) ? (
                           <div style={{ marginTop: 7, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
@@ -1142,7 +1203,7 @@ export default function OrderDetailLogisticsPanel({
                         </div>
                         {pickupFailed ? (
                           <div style={{ marginTop: 8, borderRadius: 10, padding: 9, background: '#fff7ed', color: '#9a3412', fontSize: 10, fontWeight: 800, lineHeight: 1.5 }}>
-                            La guía existe, pero falta la confirmación de la recolección que debía programarse al generarla. Cancela esta guía desde “Opciones avanzadas” y crea otra antes de iniciar el picking.
+                            La guía existe, pero falta la confirmación de la recolección que debía programarse al generarla. Cancela esta guía desde “Gestionar guía” y crea otra antes de preparar los productos.
                           </div>
                         ) : pickupScheduled ? (
                           <div style={{ marginTop: 7, color: '#047857', fontSize: 10, fontWeight: 800, lineHeight: 1.5 }}>
@@ -1192,32 +1253,49 @@ export default function OrderDetailLogisticsPanel({
                       </div>
                     ) : null}
 
+                    {canManage && hasActiveLabel && providerConfigured && !isProductionGuide && webhookRegistered && shipment.carrier?.trackingNumber ? (
+                      <details style={{ marginTop: 10, border: '1px dashed #a5b4fc', borderRadius: 13, padding: '9px 10px', background: '#f8faff' }}>
+                        <summary style={{ cursor: 'pointer', color: '#4338ca', fontSize: 10, fontWeight: 950 }}>
+                          Pruebas Sandbox · solo para verificar la integración
+                        </summary>
+                        <div style={{ marginTop: 9 }}>
+                          <div style={{ color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
+                            Esto no forma parte del trabajo diario. Imita un aviso de la transportadora para comprobar que la tienda lo recibe automáticamente.
+                          </div>
+                          <div className="order-logistics-sandbox-grid" style={{ gap: 7, marginTop: 9 }}>
+                            <label style={{ display: 'grid', gap: 5 }}>
+                              <span style={{ color: '#4338ca', fontSize: 9, fontWeight: 900 }}>Estado que deseas imitar</span>
+                              <select aria-label={`Estado de webhook de prueba ${shipment.code}`} value={form.testStatus} onChange={(event) => updateForm(shipmentId, { testStatus: event.target.value })} style={inputStyle()}>
+                                <option value="Picked Up">Paquete recolectado</option>
+                                <option value="Shipped">Paquete en tránsito</option>
+                                <option value="Delivered">Paquete entregado</option>
+                                <option value="Canceled">Envío cancelado</option>
+                              </select>
+                            </label>
+                            <button type="button" onClick={() => runProviderAction(shipment, 'webhook_test')} disabled={isBusy} style={{ ...secondaryButtonStyle(), alignSelf: 'end' }}>
+                              Enviar aviso de prueba
+                            </button>
+                          </div>
+                        </div>
+                      </details>
+                    ) : null}
+
                     {canManage && hasActiveLabel && providerConfigured ? (
                       <details style={{ marginTop: 9 }}>
                         <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 900 }}>
-                          Opciones avanzadas
+                          Gestionar guía o resolver un problema
                         </summary>
+                        <p style={{ margin: '7px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700, lineHeight: 1.45 }}>
+                          Usa estas opciones solo si el seguimiento no cambia o si necesitas anular la guía.
+                        </p>
                         <div style={{ display: 'flex', gap: 7, marginTop: 7, flexWrap: 'wrap' }}>
                           {shipment.carrier?.trackingNumber ? (
                             <button type="button" onClick={() => runProviderAction(shipment, 'track')} disabled={isBusy} style={secondaryButtonStyle()}>
-                              Actualizar estado desde Envia
+                              Consultar estado ahora
                             </button>
                           ) : null}
-                          {!isProductionGuide && webhookRegistered && shipment.carrier?.trackingNumber ? (
-                            <>
-                              <select aria-label={`Estado de webhook de prueba ${shipment.code}`} value={form.testStatus} onChange={(event) => updateForm(shipmentId, { testStatus: event.target.value })} style={inputStyle()}>
-                                <option value="Picked Up">Recolectado</option>
-                                <option value="Shipped">En tránsito</option>
-                                <option value="Delivered">Entregado</option>
-                                <option value="Canceled">Cancelado</option>
-                              </select>
-                              <button type="button" onClick={() => runProviderAction(shipment, 'webhook_test')} disabled={isBusy} style={secondaryButtonStyle()}>
-                                Simular evento automático
-                              </button>
-                            </>
-                          ) : null}
                           <button type="button" onClick={() => runProviderAction(shipment, 'cancel')} disabled={isBusy} style={dangerButtonStyle()}>
-                            Cancelar guía
+                            Cancelar esta guía
                           </button>
                         </div>
                       </details>
@@ -1261,7 +1339,7 @@ export default function OrderDetailLogisticsPanel({
                   {status === 'packed' ? (
                     <input aria-label={`Referencia de despacho ${shipment.code}`} value={form.dispatchReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { dispatchReference: event.target.value })} placeholder="Referencia de entrega al transportador (obligatoria)" style={{ ...inputStyle(), order: 7, width: '100%', marginTop: 10 }} />
                   ) : null}
-                  {status === 'in_transit' ? (
+                  {status === 'in_transit' && !automaticTrackingEnabled ? (
                     <div style={{ order: 7, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                       <input aria-label={`Evidencia de entrega ${shipment.code}`} value={form.deliveryReference} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { deliveryReference: event.target.value })} placeholder="Referencia de evidencia (obligatoria)" style={inputStyle()} />
                       <input aria-label={`Recibe ${shipment.code}`} value={form.recipient} disabled={!canManage} onChange={(event) => updateForm(shipmentId, { recipient: event.target.value })} placeholder="Nombre de quien recibe" style={inputStyle()} />
@@ -1297,7 +1375,15 @@ export default function OrderDetailLogisticsPanel({
                         ) : null}
                       </details>
                     )}
-                    {canManage && next && !waitingForAutomaticHandoff ? (
+                    {automaticTrackingEnabled && status === 'delivered' ? (
+                      <div role="status" style={{ marginLeft: 'auto', borderRadius: 12, padding: '9px 11px', background: '#ecfdf5', color: '#047857', fontSize: 10, fontWeight: 900 }}>
+                        Entrega confirmada automáticamente
+                      </div>
+                    ) : automaticTrackingEnabled && nextRequiresCarrierUpdate ? (
+                      <div role="status" style={{ marginLeft: 'auto', borderRadius: 12, padding: '9px 11px', background: '#eef2ff', color: '#4338ca', fontSize: 10, fontWeight: 900 }}>
+                        Esperando actualización automática de Envia
+                      </div>
+                    ) : canManage && next && !waitingForAutomaticHandoff ? (
                       <button type="button" onClick={() => runAction(shipment, next[0])} disabled={isBusy} style={primaryButtonStyle()}>
                         {isBusy ? 'Actualizando…' : next[1]}
                       </button>
@@ -1327,12 +1413,17 @@ export default function OrderDetailLogisticsPanel({
 
       <style>{`
         .order-logistics-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .order-logistics-step-grid { display: grid; grid-template-columns: repeat(6, minmax(88px, 1fr)); overflow-x: auto; }
+        .order-logistics-responsibility-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .order-logistics-sandbox-grid { display: grid; grid-template-columns: minmax(180px, 1fr) auto; }
         @media (max-width: 900px) {
           section[aria-label="Centro logístico de la orden"] > div:nth-of-type(2) { grid-template-columns: repeat(3, minmax(92px, 1fr)) !important; }
           .order-logistics-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 620px) {
           .order-logistics-plan-grid { grid-template-columns: 1fr; }
+          .order-logistics-responsibility-grid,
+          .order-logistics-sandbox-grid { grid-template-columns: 1fr; }
           section[aria-label="Centro logístico de la orden"] input,
           section[aria-label="Centro logístico de la orden"] select { min-width: 0 !important; }
         }

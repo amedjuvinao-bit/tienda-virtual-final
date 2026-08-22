@@ -159,7 +159,7 @@ function printManualGuide(runId, created) {
     `3. Abre ${ready.order.orderNumber}: el botón debe estar habilitado.`
   );
   console.log(
-    '4. Pulsa "Preparar logística": debe crearse un envío por sede y aparecer "Iniciar picking".'
+    '4. Pulsa "Preparar logística": debe crearse un envío por sede y aparecer "Comenzar a reunir productos".'
   );
   console.log(
     '5. Recarga el detalle: el envío debe conservarse y el botón de preparación ya no debe aparecer.'
