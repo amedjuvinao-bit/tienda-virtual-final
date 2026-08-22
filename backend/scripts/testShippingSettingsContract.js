@@ -79,7 +79,10 @@ function main() {
   ok('las seis operaciones administrativas exigen sesión y permiso de envíos');
 
   const webhookRouteSource = read('backend/routes/shippingWebhookRoutes.js');
-  assert.match(webhookRouteSource, /res\.status\(200\)\.json\(\{ ok: true, accepted: true \}\)/);
+  assert.match(webhookRouteSource, /verified\.sandboxTest === true/);
+  assert.match(webhookRouteSource, /res\.status\(200\)\.json\(\{ received: true \}\)/);
+  assert.match(webhookRouteSource, /setImmediate\(\(\) => \{[\s\S]*?persistVerifiedEvent/);
+  assert.match(webhookRouteSource, /Solicitud aceptada/);
   assert.match(webhookRouteSource, /Solicitud rechazada/);
   const backendEntry = read('backend/index.js');
   assert.match(backendEntry, /express\.raw\(\{ type: '\*\/\*', limit: '256kb' \}\)/);
@@ -94,7 +97,7 @@ function main() {
   assert.match(webhookRouteSource, /apiToken: runtime\.envia\.token/);
   assert.match(webhookRouteSource, /endsWith\('\.trycloudflare\.com'\)/);
   assert.match(webhookRouteSource, /runtime\.envia\.mode === 'sandbox' && temporarySandboxTunnel/);
-  ok('la prueba v1 acepta variaciones del portal, registra rechazos seguros y responde HTTP 200');
+  ok('la prueba v1 responde HTTP 200 antes de persistir y registra aceptaciones y rechazos');
 
   const service = read('backend/services/shippingConfigurationService.js');
   assert.match(service, /SHIPPING_PRODUCTION_CONFIRMATION_REQUIRED/);

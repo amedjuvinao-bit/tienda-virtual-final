@@ -27,6 +27,38 @@ router.use(
   })
 );
 
+async function persistVerifiedEvent(verified, payload) {
+  try {
+    const event = await ShippingWebhookEvent.create({
+      provider: 'envia',
+      eventId: verified.eventId,
+      eventType: verified.event,
+      providerTimestamp: new Date(verified.timestamp),
+      status: 'received',
+      payload,
+    });
+    console.info('[shipping-webhook] Solicitud aceptada:', {
+      eventId: verified.eventId,
+      eventType: verified.event,
+      sandboxTest: verified.sandboxTest === true,
+    });
+    setImmediate(() => {
+      processShippingWebhookEvent(event._id).catch((error) => {
+        console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error);
+      });
+    });
+    return { duplicate: false };
+  } catch (error) {
+    if (error?.code === 11000) {
+      console.info('[shipping-webhook] Solicitud duplicada aceptada:', {
+        eventId: verified.eventId,
+      });
+      return { duplicate: true };
+    }
+    throw error;
+  }
+}
+
 router.post('/', async (req, res) => {
   try {
     const runtime = await getRuntimeShippingConfiguration();
@@ -66,28 +98,21 @@ router.post('/', async (req, res) => {
       });
     }
 
-    try {
-      const event = await ShippingWebhookEvent.create({
-        provider: 'envia',
-        eventId: verified.eventId,
-        eventType: verified.event,
-        providerTimestamp: new Date(verified.timestamp),
-        status: 'received',
-        payload,
-      });
+    if (verified.sandboxTest === true) {
+      const response = res.status(200).json({ received: true });
       setImmediate(() => {
-        processShippingWebhookEvent(event._id).catch((error) => {
-          console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error);
+        persistVerifiedEvent(verified, payload).catch((error) => {
+          console.error('[shipping-webhook] No fue posible guardar la prueba aceptada:', error?.message || error);
         });
       });
-    } catch (error) {
-      if (error?.code === 11000) {
-        return res.status(200).json({ ok: true, duplicate: true });
-      }
-      throw error;
+      return response;
     }
 
-    return res.status(200).json({ ok: true, accepted: true });
+    const persisted = await persistVerifiedEvent(verified, payload);
+    return res.status(200).json({
+      received: true,
+      ...(persisted.duplicate ? { duplicate: true } : {}),
+    });
   } catch (error) {
     console.warn('[shipping-webhook] Solicitud rechazada:', {
       code: error?.code || 'SHIPPING_WEBHOOK_FAILED',
