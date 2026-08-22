@@ -180,12 +180,13 @@ describe('centro logístico avanzado de la orden', () => {
     await waitFor(() => expect(startButton).toBeEnabled());
     fireEvent.click(startButton);
 
-    expect(await screen.findByText('Envío automático con Envia')).toBeInTheDocument();
+    expect(await screen.findByText('Despacha este pedido en 3 pasos')).toBeInTheDocument();
+    expect(screen.getByText('Haz esto ahora')).toBeInTheDocument();
     expect(
       screen.getByText('Envíos creados por sede. Continúa con la validación automática de datos y tarifas.')
     ).toBeInTheDocument();
     expect(screen.getByRole('button', {
-      name: 'Validar datos y buscar la mejor tarifa',
+      name: 'Buscar opciones de envío',
     })).toBeInTheDocument();
   });
 
@@ -457,7 +458,7 @@ describe('centro logístico avanzado de la orden', () => {
     expect(recommendedShippingRate(rates, 'fastest')?.carrier).toBe('express');
   });
 
-  it('guía al administrador en cuatro pasos y exige definir la entrega física antes del picking', async () => {
+  it('guía al administrador en tres pasos y exige definir la entrega física antes del picking', async () => {
     const rates = [
       { carrier: 'economica', service: 'ground', serviceDescription: 'Económico', deliveryEstimate: '4-5 días', totalPrice: 10000, currency: 'COP' },
       { carrier: 'equilibrada', service: 'standard', serviceDescription: 'Estándar', deliveryEstimate: '1-2 días', totalPrice: 14000, currency: 'COP' },
@@ -554,27 +555,31 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    expect(await screen.findByText('PASO 1 DE 4')).toBeInTheDocument();
-    expect(screen.getByText('Confirma los datos y busca la mejor tarifa')).toBeInTheDocument();
+    expect(await screen.findByText('PASO ACTUAL 1 DE 3')).toBeInTheDocument();
+    expect(screen.getByText('Busca el mejor envío para este pedido')).toBeInTheDocument();
+    expect(screen.getByText('Crear la guía')).toBeInTheDocument();
+    expect(screen.getByText('Preparar el paquete')).toBeInTheDocument();
+    expect(screen.getByText('Esperar la entrega')).toBeInTheDocument();
+    expect(screen.getByText('Ver avance detallado del paquete').closest('details')).not.toHaveAttribute('open');
     expect(screen.queryByLabelText(`Transportadora ${SHIPMENT.code}`)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(`Guía ${SHIPMENT.code}`)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Comenzar a reunir productos' })).not.toBeInTheDocument();
     expect(
       screen.getByText('Primero genera la guía y define cómo llegará el paquete a la transportadora. Después podrás comenzar a reunir los productos.')
     ).toBeInTheDocument();
-    const quoteButton = screen.getByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
+    const quoteButton = screen.getByRole('button', { name: 'Buscar opciones de envío' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
     expect(await screen.findByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('equilibrada');
-    expect(await screen.findByText('PASO 2 DE 4')).toBeInTheDocument();
+    expect(await screen.findByText('PASO ACTUAL 1 DE 3')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Cambiar recomendación o ver alternativas'));
     fireEvent.change(screen.getByLabelText(`Criterio de tarifa ${SHIPMENT.code}`), {
       target: { value: 'fastest' },
     });
     expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('express');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar tarifa y generar guía de prueba' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear guía de prueba' }));
 
     await waitFor(() => {
       expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledWith(
@@ -596,8 +601,8 @@ describe('centro logístico avanzado de la orden', () => {
       );
     });
     expect(await screen.findByText('Guía lista')).toBeInTheDocument();
-    expect(screen.getByText('Lo que hace el administrador')).toBeInTheDocument();
-    expect(screen.getByText('Lo que hará Envia automáticamente')).toBeInTheDocument();
+    expect(screen.getByText('Descarga la etiqueta y elige cómo entregar el paquete')).toBeInTheDocument();
+    expect(screen.getByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Descargar etiqueta' })).toHaveAttribute(
       'href',
       'https://example.com/label.pdf'
@@ -617,7 +622,7 @@ describe('centro logístico avanzado de la orden', () => {
       }
     ));
     expect(await screen.findByText(/Prueba enviada: estamos imitando que Envia informó que el paquete fue entregado/)).toBeInTheDocument();
-    expect(screen.getByText('PASO 3 DE 4')).toBeInTheDocument();
+    expect(screen.getByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver seguimiento público' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Comenzar a reunir productos' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Elegir entrega en punto' }));
@@ -626,7 +631,7 @@ describe('centro logístico avanzado de la orden', () => {
       SHIPMENT._id,
       { expectedRevision: 4 }
     ));
-    expect(await screen.findByText('PASO 4 DE 4')).toBeInTheDocument();
+    expect(await screen.findByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comenzar a reunir productos' })).toBeInTheDocument();
     expect(
       screen.getByText('El seguimiento público se habilitará únicamente para las guías reales de producción.')
@@ -707,12 +712,12 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar opciones de envío' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
     const pickupDate = await screen.findByLabelText(`Fecha de recolección al generar ${SHIPMENT.code}`);
     fireEvent.change(pickupDate, { target: { value: '2026-08-22' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Generar guía de prueba y solicitar recolección' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear guía de prueba y pedir recolección' }));
 
     await waitFor(() => expect(logisticsApi.generateOrderShipmentLabel).toHaveBeenCalledWith(
       ORDER._id,
@@ -725,7 +730,7 @@ describe('centro logístico avanzado de la orden', () => {
       expect.any(String)
     ));
     expect(await screen.findByText(/Recolección confirmada/)).toHaveTextContent('REC-123');
-    expect(screen.getByText('PASO 4 DE 4')).toBeInTheDocument();
+    expect(screen.getByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Elegir entrega en punto' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comenzar a reunir productos' })).toBeInTheDocument();
   });
@@ -802,10 +807,10 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar opciones de envío' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
-    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar tarifa y generar guía real' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Crear guía real' }));
 
     expect(await screen.findByText('Esta acción puede generar cobros reales')).toBeInTheDocument();
     expect(logisticsApi.generateOrderShipmentLabel).not.toHaveBeenCalled();
@@ -847,7 +852,7 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    const quoteButton = await screen.findByRole('button', { name: 'Validar datos y buscar la mejor tarifa' });
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar opciones de envío' });
     await waitFor(() => expect(quoteButton).toBeEnabled());
     fireEvent.click(quoteButton);
 
@@ -871,12 +876,12 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    expect(await screen.findByText('Configura Envia para automatizar este envío')).toBeInTheDocument();
+    expect(await screen.findByText('Configura Envia para comenzar')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Configurar Envia' })).toHaveAttribute(
       'href',
       '/admin/configuracion/envios'
     );
-    expect(screen.queryByRole('button', { name: 'Validar datos y buscar la mejor tarifa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar opciones de envío' })).not.toBeInTheDocument();
     expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Guardar plan manual' })).toBeEnabled();
   });
@@ -909,14 +914,14 @@ describe('centro logístico avanzado de la orden', () => {
       />
     );
 
-    expect(await screen.findByText('Activa Envia para automatizar este envío')).toBeInTheDocument();
+    expect(await screen.findByText('Activa Envia para comenzar')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Activar Envia' })).toHaveAttribute(
       'href',
       '/admin/configuracion/envios'
     );
     expect(screen.getByLabelText(`Transportadora ${SHIPMENT.code}`)).toBeInTheDocument();
     expect(screen.queryByRole('button', {
-      name: 'Validar datos y buscar la mejor tarifa',
+      name: 'Buscar opciones de envío',
     })).not.toBeInTheDocument();
     expect(logisticsApi.quoteOrderShipment).not.toHaveBeenCalled();
   });

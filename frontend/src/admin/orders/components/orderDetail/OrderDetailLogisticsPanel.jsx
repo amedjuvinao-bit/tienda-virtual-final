@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, FileCheck2, PackageCheck, Truck } from 'lucide-react';
 
 import {
   cancelOrderShipmentLabel,
@@ -819,51 +820,75 @@ export default function OrderDetailLogisticsPanel({
               const nextRequiresCarrierUpdate = Boolean(
                 next && ['mark_in_transit', 'deliver'].includes(next[0])
               );
-              const assistantStep = handoffComplete ? 4 : hasActiveLabel ? 3 : shipmentRates.length ? 2 : 1;
+              const visualStep = !providerActive
+                ? 0
+                : !hasActiveLabel
+                  ? 1
+                  : !handoffComplete
+                    ? 2
+                    : 3;
+              const visualSteps = [
+                {
+                  title: 'Crear la guía',
+                  description: 'La tienda busca y recomienda la mejor opción.',
+                  Icon: FileCheck2,
+                },
+                {
+                  title: 'Preparar el paquete',
+                  description: 'Descarga la etiqueta y entrega el paquete.',
+                  Icon: PackageCheck,
+                },
+                {
+                  title: 'Esperar la entrega',
+                  description: 'Envia actualiza la orden automáticamente.',
+                  Icon: Truck,
+                },
+              ];
+              const CurrentStepIcon = visualSteps[Math.max(visualStep - 1, 0)].Icon;
               const assistantTitle = !providerActive
                 ? providerConfigured
-                  ? 'Activa Envia para automatizar este envío'
-                  : 'Configura Envia para automatizar este envío'
+                  ? 'Activa Envia para comenzar'
+                  : 'Configura Envia para comenzar'
                 : automaticTrackingEnabled && status === 'delivered'
-                  ? 'Entrega confirmada: el proceso terminó'
+                  ? 'Listo: el pedido ya fue entregado'
                   : automaticTrackingEnabled && status === 'in_transit'
-                    ? 'El paquete está en camino'
+                    ? 'No hagas nada: el paquete va en camino'
                     : automaticTrackingEnabled && status === 'dispatched'
-                      ? 'Espera el aviso automático de Envia'
+                      ? 'No hagas nada: espera la actualización'
                 : pickupFailed
-                  ? 'Revisa la recolección antes de preparar'
+                  ? 'Corrige la recolección antes de continuar'
                   : pickupScheduled
-                  ? 'Recolección programada: prepara el paquete'
+                  ? 'Prepara el paquete para la recolección'
                   : handoffMode === 'dropoff'
-                    ? 'Entrega en punto elegida: prepara el paquete'
+                    ? 'Prepara el paquete y llévalo al punto elegido'
                     : hasActiveLabel
-                      ? 'Imprime la etiqueta y elige cómo entregar el paquete'
+                      ? 'Descarga la etiqueta y elige cómo entregar el paquete'
                   : shipmentRates.length
-                    ? 'Revisa la tarifa recomendada'
+                    ? 'Crea la guía con esta opción'
                     : labelCancelled
-                      ? 'Busca una nueva tarifa para continuar'
-                      : 'Confirma los datos y busca la mejor tarifa';
+                      ? 'Busca otra opción de envío'
+                      : 'Busca el mejor envío para este pedido';
               const assistantDescription = !providerActive
-                ? providers?.envia?.message || 'Activa la conexión desde Configuración → Envíos. Mientras tanto, la operación manual continúa disponible.'
+                ? 'Ve a Configuración de envíos y deja activa la conexión con Envia.'
                 : automaticTrackingEnabled && status === 'delivered'
-                  ? 'Envia informó la entrega y la tienda actualizó la orden. El administrador no debe registrar otro estado.'
+                  ? 'Envia confirmó la entrega y la tienda actualizó la orden por ti.'
                   : automaticTrackingEnabled && status === 'in_transit'
-                    ? 'No tienes que cambiar el estado manualmente. Envia avisará cuando la transportadora confirme la entrega.'
+                    ? 'Envia avisará cuando la transportadora confirme la entrega.'
                     : automaticTrackingEnabled && status === 'dispatched'
-                      ? 'El paquete ya fue entregado a la transportadora. Envia actualizará esta orden cuando detecte el primer movimiento.'
+                      ? 'Envia actualizará esta orden cuando el paquete comience a moverse.'
                 : pickupFailed
-                  ? 'Envia creó la guía, pero no confirmó la recolección solicitada durante la generación. No entregues el paquete todavía: cancela la guía y vuelve a generarla.'
+                  ? 'No entregues el paquete todavía. Cancela esta guía y crea una nueva.'
                   : pickupScheduled
-                  ? `Envia confirmó la recolección ${pickup.confirmation || ''} para ${pickup.requestedDate || 'la fecha elegida'}, de ${pickup.timeFrom || ''} a ${pickup.timeTo || ''}.`
+                  ? `Ten el paquete listo para el ${pickup.requestedDate || 'día elegido'}${pickup.timeFrom && pickup.timeTo ? `, de ${pickup.timeFrom} a ${pickup.timeTo}` : ''}.`
                   : handoffMode === 'dropoff'
-                    ? 'No hay otra solicitud que hacer en Envia: lleva el paquete etiquetado al punto autorizado y conserva el comprobante.'
+                    ? 'Pon la etiqueta, lleva el paquete al punto autorizado y conserva el comprobante.'
                     : hasActiveLabel
-                      ? 'La guía por sí sola no mueve el paquete. Elige si lo llevarás a un punto autorizado o si deseas solicitar recolección.'
+                      ? 'Primero descarga la etiqueta. Después elige si llevarás el paquete o pedirás recolección.'
                   : shipmentRates.length
-                    ? 'El sistema comparó las opciones y seleccionó la mejor combinación de precio y tiempo. Solo cámbiala si realmente lo necesitas.'
+                    ? 'La tienda ya comparó precio y tiempo. Confirma para crear la guía.'
                     : labelCancelled
-                      ? 'La guía anterior fue cancelada. Cotiza nuevamente para continuar.'
-                      : 'El sistema validará sede, destino, peso y medidas antes de consultar a Envia.';
+                      ? 'La guía anterior fue cancelada. Busca una nueva opción para continuar.'
+                      : 'La tienda revisará los datos y comparará las opciones disponibles.';
               const waitingForAutomaticHandoff = (
                 providerActive &&
                 status === 'ready_to_pick' &&
@@ -895,10 +920,10 @@ export default function OrderDetailLogisticsPanel({
                     </span>
                   </div>
 
-                  <div style={{ order: 4, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
-                    <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                      Preparación del paquete
-                    </div>
+                  <details style={{ order: 4, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
+                    <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 900 }}>
+                      Ver avance detallado del paquete
+                    </summary>
                     <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.4 }}>
                       {waitingForAutomaticHandoff
                         ? 'Primero genera la guía y define cómo llegará el paquete a la transportadora. Después podrás comenzar a reunir los productos.'
@@ -906,31 +931,30 @@ export default function OrderDetailLogisticsPanel({
                           ? 'Tu trabajo de preparación terminó. Los siguientes estados llegarán automáticamente desde Envia.'
                           : 'Pulsa únicamente el botón que describe la siguiente tarea.'}
                     </p>
-                  </div>
+                    <div className="order-logistics-step-grid" style={{ gap: 5, marginTop: 10 }}>
+                      {STEPS.map(([step, label], index) => {
+                        const active = status === 'exception' ? index <= (STATUS_POSITION[shipment.resumeStatus] ?? 0) : index <= position;
+                        return (
+                          <div key={step} style={{ borderRadius: 10, padding: '7px 4px', textAlign: 'center', background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-bg)', color: active ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
+                            {label}
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                  <div className="order-logistics-step-grid" style={{ order: 5, gap: 5, marginTop: 10 }}>
-                    {STEPS.map(([step, label], index) => {
-                      const active = status === 'exception' ? index <= (STATUS_POSITION[shipment.resumeStatus] ?? 0) : index <= position;
-                      return (
-                        <div key={step} style={{ borderRadius: 10, padding: '7px 4px', textAlign: 'center', background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-bg)', color: active ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900 }}>
-                          {label}
+                    <div className="order-logistics-deadline-grid" style={{ gap: 8, marginTop: 10 }}>
+                      {[
+                        ['Picking', shipment.sla?.pickingDueAt],
+                        ['Despacho', shipment.sla?.dispatchDueAt],
+                        ['Promesa de entrega', shipment.sla?.deliveryDueAt],
+                      ].map(([label, value]) => (
+                        <div key={label} style={{ borderRadius: 12, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, padding: 9 }}>
+                          <div style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
+                          <div style={{ marginTop: 3, color: shipment.sla?.breachedAt ? '#be123c' : ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 850 }}>{formatDeadline(value)}</div>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ order: 6, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
-                    {[
-                      ['Picking', shipment.sla?.pickingDueAt],
-                      ['Despacho', shipment.sla?.dispatchDueAt],
-                      ['Promesa de entrega', shipment.sla?.deliveryDueAt],
-                    ].map(([label, value]) => (
-                      <div key={label} style={{ borderRadius: 12, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, padding: 9 }}>
-                        <div style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
-                        <div style={{ marginTop: 3, color: shipment.sla?.breachedAt ? '#be123c' : ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 850 }}>{formatDeadline(value)}</div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </details>
 
                   <details style={{ order: 3, marginTop: 10 }}>
                     <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.cardText, fontSize: 11, fontWeight: 900 }}>
@@ -976,82 +1000,105 @@ export default function OrderDetailLogisticsPanel({
                     ) : null}
                   </details>
 
-                  <div style={{ order: 2, marginTop: 12, border: '1px solid var(--admin-primary)', borderRadius: 18, padding: 13, background: 'color-mix(in srgb, var(--admin-primary-soft-bg) 35%, var(--admin-card-bg))' }}>
+                  <div style={{ order: 2, marginTop: 12, border: '2px solid var(--admin-primary)', borderRadius: 22, padding: 16, background: 'color-mix(in srgb, var(--admin-primary-soft-bg) 32%, var(--admin-card-bg))', boxShadow: '0 12px 30px color-mix(in srgb, var(--admin-primary) 13%, transparent)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12, fontWeight: 950 }}>
-                          {providerActive ? 'Envío automático con Envia' : 'Envío manual activo'}
+                        <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 18, fontWeight: 950 }}>
+                          Despacha este pedido en 3 pasos
                         </div>
-                        <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
+                        <div style={{ marginTop: 5, color: ORDER_DETAIL_THEME.mutedText, fontSize: 13, fontWeight: 750, lineHeight: 1.45 }}>
                           {providerActive
-                            ? 'Tú preparas y entregas el paquete. Envia informa el tránsito y la entrega para que la orden se actualice sola.'
-                            : 'Registra la transportadora, la guía y las evidencias dentro del plan manual.'}
+                            ? 'El panel te mostrará una sola tarea a la vez.'
+                            : 'Activa Envia para comenzar el recorrido guiado.'}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ borderRadius: 999, padding: '5px 8px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
-                          {providerMode === 'production' ? 'PRODUCCIÓN · OPERACIÓN REAL' : 'SANDBOX · SOLO PRUEBAS'}
+                        <span style={{ borderRadius: 999, padding: '7px 11px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 11, fontWeight: 950, letterSpacing: '.03em' }}>
+                          {providerMode === 'production' ? 'ENVÍO REAL' : 'PRUEBA SIN ENVÍO REAL'}
                         </span>
-                        {providerActive ? (
-                          <span style={{ borderRadius: 999, padding: '5px 8px', background: 'var(--admin-primary)', color: '#fff', fontSize: 8, fontWeight: 950, letterSpacing: '.05em' }}>
-                            PASO {assistantStep} DE 4
+                        {providerActive && visualStep ? (
+                          <span style={{ borderRadius: 999, padding: '7px 11px', background: 'var(--admin-primary)', color: '#fff', fontSize: 11, fontWeight: 950, letterSpacing: '.03em' }}>
+                            PASO ACTUAL {visualStep} DE 3
                           </span>
                         ) : null}
                       </div>
                     </div>
 
                     {providerActive ? (
-                      <>
-                        <div role="note" style={{ marginTop: 10, borderRadius: 12, padding: '9px 10px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 9, fontWeight: 820, lineHeight: 1.45 }}>
-                          {providerMode === 'production'
-                            ? 'Estás en Producción: crear una guía puede descontar saldo real de Envia y generar una operación real.'
-                            : 'Estás ensayando en Sandbox: no se moverá un paquete real. Los controles de simulación están separados al final.'}
-                        </div>
-                        <div className="order-logistics-responsibility-grid" style={{ gap: 8, marginTop: 10 }}>
-                          <div style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 13, padding: 11, background: ORDER_DETAIL_THEME.cardBg }}>
-                            <div style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 950 }}>
-                              Lo que hace el administrador
-                            </div>
-                            <ol style={{ margin: '7px 0 0', paddingLeft: 17, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 720, lineHeight: 1.6 }}>
-                              <li>Revisar la tarifa y generar la guía.</li>
-                              <li>Imprimir la etiqueta y preparar el paquete.</li>
-                              <li>Entregarlo en un punto o solicitar recolección.</li>
-                            </ol>
-                          </div>
-                          <div style={{ border: '1px solid #86efac', borderRadius: 13, padding: 11, background: '#ecfdf5' }}>
-                            <div style={{ color: '#047857', fontSize: 10, fontWeight: 950 }}>
-                              Lo que hará Envia automáticamente
-                            </div>
-                            <ol style={{ margin: '7px 0 0', paddingLeft: 17, color: '#047857', fontSize: 9, fontWeight: 760, lineHeight: 1.6 }}>
-                              <li>Avisar cuando el paquete esté en tránsito.</li>
-                              <li>Avisar cuando la entrega sea confirmada.</li>
-                              <li>Actualizar esta orden sin seleccionar estados.</li>
-                            </ol>
-                          </div>
-                        </div>
-                      </>
+                      <div role="note" style={{ marginTop: 12, borderRadius: 14, padding: '11px 13px', background: providerMode === 'production' ? '#fff7ed' : '#eef2ff', color: providerMode === 'production' ? '#9a3412' : '#4338ca', fontSize: 13, fontWeight: 820, lineHeight: 1.45 }}>
+                        {providerMode === 'production'
+                          ? 'Modo real: crear la guía puede generar un cobro en Envia.'
+                          : 'Modo de prueba: aquí no se enviará ningún paquete real.'}
+                      </div>
                     ) : null}
 
-                    <div role="region" aria-label={`Siguiente paso de envío ${shipment.code}`} style={{ marginTop: 11, borderRadius: 14, padding: 12, background: ORDER_DETAIL_THEME.cardBg, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
-                      <div style={{ color: 'var(--admin-primary)', fontSize: 8, fontWeight: 950, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                        Qué debes hacer ahora
+                    <div className="order-logistics-main-action" role="region" aria-label={`Siguiente paso de envío ${shipment.code}`} style={{ marginTop: 14, borderRadius: 18, padding: 16, background: ORDER_DETAIL_THEME.cardBg, border: `2px solid ${ORDER_DETAIL_THEME.cardBorder}` }}>
+                      <div className="order-logistics-main-action-icon" aria-hidden="true" style={{ width: 68, height: 68, borderRadius: 20, display: 'grid', placeItems: 'center', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)', flex: '0 0 auto' }}>
+                        <CurrentStepIcon size={36} strokeWidth={2.3} />
                       </div>
-                      <div style={{ marginTop: 5, color: ORDER_DETAIL_THEME.cardText, fontSize: 13, fontWeight: 950 }}>
-                        {assistantTitle}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: 'var(--admin-primary)', fontSize: 13, fontWeight: 950, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                          Haz esto ahora
+                        </div>
+                        <div style={{ marginTop: 6, color: ORDER_DETAIL_THEME.cardText, fontSize: 20, fontWeight: 950, lineHeight: 1.2 }}>
+                          {assistantTitle}
+                        </div>
+                        <p style={{ margin: '7px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 13, fontWeight: 720, lineHeight: 1.5 }}>
+                          {assistantDescription}
+                        </p>
+                        {!providerActive ? (
+                          <a href="/admin/configuracion/envios" style={{ ...secondaryButtonStyle(), display: 'inline-flex', marginTop: 12, minHeight: 44, alignItems: 'center', fontSize: 13, textDecoration: 'none' }}>
+                            {providerConfigured ? 'Activar Envia' : 'Configurar Envia'}
+                          </a>
+                        ) : canManage && !hasActiveLabel && shipmentRates.length === 0 ? (
+                          <button type="button" onClick={() => runProviderAction(shipment, 'quote')} disabled={isBusy} style={{ ...primaryButtonStyle(), marginTop: 12, minHeight: 44, fontSize: 13 }}>
+                            {labelCancelled ? 'Buscar otra opción de envío' : 'Buscar opciones de envío'}
+                          </button>
+                        ) : null}
                       </div>
-                      <p style={{ margin: '4px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 720, lineHeight: 1.45 }}>
-                        {assistantDescription}
-                      </p>
-                      {!providerActive ? (
-                        <a href="/admin/configuracion/envios" style={{ ...secondaryButtonStyle(), display: 'inline-flex', marginTop: 9, textDecoration: 'none' }}>
-                          {providerConfigured ? 'Activar Envia' : 'Configurar Envia'}
-                        </a>
-                      ) : canManage && !hasActiveLabel && shipmentRates.length === 0 ? (
-                        <button type="button" onClick={() => runProviderAction(shipment, 'quote')} disabled={isBusy} style={{ ...primaryButtonStyle(), marginTop: 9 }}>
-                          {labelCancelled ? 'Buscar una nueva tarifa' : 'Validar datos y buscar la mejor tarifa'}
-                        </button>
-                      ) : null}
                     </div>
+
+                    {providerActive ? (
+                      <div className="order-logistics-visual-steps" aria-label="Recorrido del envío en tres pasos" style={{ marginTop: 14 }}>
+                        {visualSteps.map(({ title, description, Icon }, index) => {
+                          const stepNumber = index + 1;
+                          const isComplete = visualStep > stepNumber;
+                          const isActive = visualStep === stepNumber;
+                          return (
+                            <div
+                              key={title}
+                              aria-current={isActive ? 'step' : undefined}
+                              style={{
+                                border: `${isActive ? 2 : 1}px solid ${isActive ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.cardBorder}`,
+                                borderRadius: 17,
+                                padding: 14,
+                                background: isActive
+                                  ? 'var(--admin-primary-soft-bg)'
+                                  : isComplete
+                                    ? '#ecfdf5'
+                                    : ORDER_DETAIL_THEME.cardBg,
+                                minWidth: 0,
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                                <div aria-hidden="true" style={{ width: 48, height: 48, borderRadius: 15, display: 'grid', placeItems: 'center', background: isComplete ? '#d1fae5' : isActive ? 'color-mix(in srgb, var(--admin-primary) 16%, #fff)' : 'var(--admin-bg)', color: isComplete ? '#047857' : isActive ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.mutedText }}>
+                                  {isComplete ? <CheckCircle2 size={29} strokeWidth={2.4} /> : <Icon size={29} strokeWidth={2.2} />}
+                                </div>
+                                <span style={{ color: isComplete ? '#047857' : isActive ? 'var(--admin-primary)' : ORDER_DETAIL_THEME.mutedText, fontSize: 12, fontWeight: 950 }}>
+                                  {isComplete ? 'LISTO' : `PASO ${stepNumber}`}
+                                </span>
+                              </div>
+                              <div style={{ marginTop: 11, color: ORDER_DETAIL_THEME.cardText, fontSize: 15, fontWeight: 950, lineHeight: 1.25 }}>
+                                {title}
+                              </div>
+                              <p style={{ margin: '6px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 12, fontWeight: 720, lineHeight: 1.45 }}>
+                                {description}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
 
                     {shipmentRates.length > 0 && !hasActiveLabel ? (
                       <div style={{ display: 'grid', gap: 9, marginTop: 10 }}>
@@ -1095,11 +1142,11 @@ export default function OrderDetailLogisticsPanel({
                               <button type="button" onClick={() => runProviderAction(shipment, 'label')} disabled={isBusy} style={{ ...primaryButtonStyle(), width: '100%', justifyContent: 'center', marginTop: 10 }}>
                                 {pickupOnGenerate
                                   ? providerMode === 'production'
-                                    ? 'Generar guía real y solicitar recolección'
-                                    : 'Generar guía de prueba y solicitar recolección'
+                                    ? 'Crear guía y pedir recolección'
+                                    : 'Crear guía de prueba y pedir recolección'
                                   : providerMode === 'production'
-                                    ? 'Confirmar tarifa y generar guía real'
-                                    : 'Confirmar tarifa y generar guía de prueba'}
+                                    ? 'Crear guía real'
+                                    : 'Crear guía de prueba'}
                               </button>
                             ) : null}
                           </div>
@@ -1414,7 +1461,9 @@ export default function OrderDetailLogisticsPanel({
       <style>{`
         .order-logistics-plan-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .order-logistics-step-grid { display: grid; grid-template-columns: repeat(6, minmax(88px, 1fr)); overflow-x: auto; }
-        .order-logistics-responsibility-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .order-logistics-main-action { display: flex; align-items: center; gap: 16px; }
+        .order-logistics-visual-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .order-logistics-deadline-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .order-logistics-sandbox-grid { display: grid; grid-template-columns: minmax(180px, 1fr) auto; }
         @media (max-width: 900px) {
           section[aria-label="Centro logístico de la orden"] > div:nth-of-type(2) { grid-template-columns: repeat(3, minmax(92px, 1fr)) !important; }
@@ -1422,7 +1471,10 @@ export default function OrderDetailLogisticsPanel({
         }
         @media (max-width: 620px) {
           .order-logistics-plan-grid { grid-template-columns: 1fr; }
-          .order-logistics-responsibility-grid,
+          .order-logistics-main-action { align-items: flex-start; }
+          .order-logistics-main-action-icon { width: 56px !important; height: 56px !important; border-radius: 17px !important; }
+          .order-logistics-visual-steps,
+          .order-logistics-deadline-grid,
           .order-logistics-sandbox-grid { grid-template-columns: 1fr; }
           section[aria-label="Centro logístico de la orden"] input,
           section[aria-label="Centro logístico de la orden"] select { min-width: 0 !important; }
