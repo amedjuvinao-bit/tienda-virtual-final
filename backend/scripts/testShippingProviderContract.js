@@ -167,6 +167,14 @@ async function main() {
   assert.strictEqual(verifiedSandboxTest.timestamp, 1_800_000);
   assert.strictEqual(verifiedSandboxTest.sandboxTest, true);
   assert.match(verifiedSandboxTest.eventId, /^sandbox-test-[a-f0-9]{64}$/);
+  const verifiedRawAuthorization = verifyEnviaSandboxTestWebhook({
+    rawBody: sandboxTestBody,
+    headers: { authorization: 'sandbox-secret' },
+    mode: 'sandbox',
+    webhookToken: 'sandbox-secret',
+    now: 1_800_001,
+  });
+  assert.strictEqual(verifiedRawAuthorization.sandboxTest, true);
   assert.throws(
     () => verifyEnviaSandboxTestWebhook({
       rawBody: sandboxTestBody,
@@ -185,7 +193,7 @@ async function main() {
     }),
     (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
   );
-  ok('la prueba v1 oficial con carrierName solo se acepta en Sandbox y con la credencial exclusiva del webhook');
+  ok('la prueba v1 oficial acepta carrierName y la credencial exacta con o sin prefijo Bearer');
 
   const generateWithPickup = pickupOnGeneratePayload(
     {

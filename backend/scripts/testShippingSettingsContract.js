@@ -80,10 +80,18 @@ function main() {
 
   const webhookRouteSource = read('backend/routes/shippingWebhookRoutes.js');
   assert.match(webhookRouteSource, /res\.status\(200\)\.json\(\{ ok: true, accepted: true \}\)/);
+  assert.match(webhookRouteSource, /Solicitud rechazada/);
+  const backendEntry = read('backend/index.js');
+  assert.match(backendEntry, /express\.raw\(\{ type: '\*\/\*', limit: '256kb' \}\)/);
+  assert.match(
+    backendEntry,
+    /app\.set\('trust proxy', \['loopback', 'linklocal', 'uniquelocal'\]\)/
+  );
   const providerSource = read('backend/services/enviaShippingProvider.js');
   assert.match(providerSource, /data\?\.carrierName/);
   assert.match(providerSource, /payload\?\.carrierName/);
-  ok('la prueba v1 de Envia acepta carrierName y responde HTTP 200 al portal');
+  assert.match(providerSource, /replace\(\/\^Bearer\\s\+\/i, ''\)/);
+  ok('la prueba v1 acepta variaciones del portal, registra rechazos seguros y responde HTTP 200');
 
   const service = read('backend/services/shippingConfigurationService.js');
   assert.match(service, /SHIPPING_PRODUCTION_CONFIRMATION_REQUIRED/);

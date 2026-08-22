@@ -83,6 +83,10 @@ router.post('/', async (req, res) => {
 
     return res.status(200).json({ ok: true, accepted: true });
   } catch (error) {
+    console.warn('[shipping-webhook] Solicitud rechazada:', {
+      code: error?.code || 'SHIPPING_WEBHOOK_FAILED',
+      status: error?.statusCode || 500,
+    });
     return res.status(error?.statusCode || 500).json({
       ok: false,
       error: error?.code || 'SHIPPING_WEBHOOK_FAILED',

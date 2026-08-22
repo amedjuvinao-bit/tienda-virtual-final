@@ -29,6 +29,10 @@ const {
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
+// Cloudflared entrega la IP real en X-Forwarded-For desde un proxy local.
+// Confiar solo en proxies privados/locales evita rechazos de express-rate-limit
+// sin permitir que un cliente directo suplante libremente esa cabecera.
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 const PORT = env.port;
 const mongooseIndexPolicy = applyMongooseIndexPolicy(mongoose, {
   nodeEnv: env.nodeEnv,
@@ -55,7 +59,7 @@ const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
 if (shippingWebhookRoutes) {
   app.use(
     '/api/shipping/webhooks/envia',
-    express.raw({ type: 'application/json', limit: '256kb' }),
+    express.raw({ type: '*/*', limit: '256kb' }),
     shippingWebhookRoutes
   );
 }

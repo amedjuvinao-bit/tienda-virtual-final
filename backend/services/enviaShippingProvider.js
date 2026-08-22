@@ -525,11 +525,12 @@ function verifyEnviaSandboxTestWebhook({
   }
 
   const authorization = clean(headers.authorization);
-  const expectedAuthorization = `Bearer ${clean(webhookToken)}`;
-  const authorizationBuffer = Buffer.from(authorization, 'utf8');
-  const expectedBuffer = Buffer.from(expectedAuthorization, 'utf8');
+  const suppliedToken = authorization.replace(/^Bearer\s+/i, '');
+  const expectedToken = clean(webhookToken);
+  const authorizationBuffer = Buffer.from(suppliedToken, 'utf8');
+  const expectedBuffer = Buffer.from(expectedToken, 'utf8');
   if (
-    !clean(webhookToken) ||
+    !expectedToken ||
     authorizationBuffer.length !== expectedBuffer.length ||
     !crypto.timingSafeEqual(authorizationBuffer, expectedBuffer)
   ) {
