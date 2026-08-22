@@ -91,6 +91,7 @@ function main() {
   assert.match(providerSource, /data\?\.carrierName/);
   assert.match(providerSource, /payload\?\.carrierName/);
   assert.match(providerSource, /replace\(\/\^Bearer\\s\+\/i, ''\)/);
+  assert.match(webhookRouteSource, /apiToken: runtime\.envia\.token/);
   ok('la prueba v1 acepta variaciones del portal, registra rechazos seguros y responde HTTP 200');
 
   const service = read('backend/services/shippingConfigurationService.js');

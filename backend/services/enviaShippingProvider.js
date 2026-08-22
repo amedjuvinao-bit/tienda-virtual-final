@@ -514,6 +514,7 @@ function verifyEnviaSandboxTestWebhook({
   headers = {},
   mode,
   webhookToken,
+  apiToken,
   now = Date.now(),
 } = {}) {
   if (clean(mode).toLowerCase() !== 'sandbox') {
@@ -526,14 +527,15 @@ function verifyEnviaSandboxTestWebhook({
 
   const authorization = clean(headers.authorization);
   const suppliedToken = authorization.replace(/^Bearer\s+/i, '');
-  const expectedToken = clean(webhookToken);
-  const authorizationBuffer = Buffer.from(suppliedToken, 'utf8');
-  const expectedBuffer = Buffer.from(expectedToken, 'utf8');
-  if (
-    !expectedToken ||
-    authorizationBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(authorizationBuffer, expectedBuffer)
-  ) {
+  const suppliedDigest = crypto.createHash('sha256').update(suppliedToken).digest();
+  const acceptedTokens = [webhookToken, apiToken]
+    .map((value) => clean(value))
+    .filter(Boolean);
+  const authenticated = acceptedTokens.some((expectedToken) => {
+    const expectedDigest = crypto.createHash('sha256').update(expectedToken).digest();
+    return crypto.timingSafeEqual(suppliedDigest, expectedDigest);
+  });
+  if (!suppliedToken || !authenticated) {
     throw new ShippingProviderError(
       'La prueba de webhook Sandbox no pudo autenticarse con la credencial del webhook configurada.',
       'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION',
