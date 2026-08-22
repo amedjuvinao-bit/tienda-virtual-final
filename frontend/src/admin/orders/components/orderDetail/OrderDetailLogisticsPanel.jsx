@@ -820,13 +820,15 @@ export default function OrderDetailLogisticsPanel({
               const nextRequiresCarrierUpdate = Boolean(
                 next && ['mark_in_transit', 'deliver'].includes(next[0])
               );
+              const carrierHasPackage = ['dispatched', 'in_transit', 'delivered'].includes(status);
+              const shipmentDelivered = status === 'delivered';
               const visualStep = !providerActive
                 ? 0
                 : !hasActiveLabel
                   ? 1
-                  : !handoffComplete
-                    ? 2
-                    : 3;
+                  : carrierHasPackage
+                    ? 3
+                    : 2;
               const visualSteps = [
                 {
                   title: 'Crear la guía',
@@ -835,7 +837,7 @@ export default function OrderDetailLogisticsPanel({
                 },
                 {
                   title: 'Preparar el paquete',
-                  description: 'Descarga la etiqueta y entrega el paquete.',
+                  description: 'Empaca, pon la etiqueta y entrégalo.',
                   Icon: PackageCheck,
                 },
                 {
@@ -1018,7 +1020,7 @@ export default function OrderDetailLogisticsPanel({
                         </span>
                         {providerActive && visualStep ? (
                           <span style={{ borderRadius: 999, padding: '7px 11px', background: 'var(--admin-primary)', color: '#fff', fontSize: 11, fontWeight: 950, letterSpacing: '.03em' }}>
-                            PASO ACTUAL {visualStep} DE 3
+                            {shipmentDelivered ? '3 PASOS LISTOS' : `PASO ACTUAL ${visualStep} DE 3`}
                           </span>
                         ) : null}
                       </div>
@@ -1062,8 +1064,8 @@ export default function OrderDetailLogisticsPanel({
                       <div className="order-logistics-visual-steps" aria-label="Recorrido del envío en tres pasos" style={{ marginTop: 14 }}>
                         {visualSteps.map(({ title, description, Icon }, index) => {
                           const stepNumber = index + 1;
-                          const isComplete = visualStep > stepNumber;
-                          const isActive = visualStep === stepNumber;
+                          const isComplete = shipmentDelivered || visualStep > stepNumber;
+                          const isActive = !shipmentDelivered && visualStep === stepNumber;
                           return (
                             <div
                               key={title}
@@ -1212,8 +1214,9 @@ export default function OrderDetailLogisticsPanel({
                         </div>
                         {(shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status) ? (
                           <div style={{ marginTop: 7, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 750 }}>
-                            Último estado de Envia: <strong>{shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status}</strong>
+                            {isProductionGuide ? 'Último estado de Envia' : 'Último aviso de prueba de Envia'}: <strong>{shipment.shippingIntegration?.providerStatus || lastTrackingEvent?.status}</strong>
                             {shipment.shippingIntegration?.providerStatusDescription ? ` · ${shipment.shippingIntegration.providerStatusDescription}` : ''}
+                            {!isProductionGuide ? ' · simulación, no cambia el paquete real' : ''}
                           </div>
                         ) : null}
                         <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>

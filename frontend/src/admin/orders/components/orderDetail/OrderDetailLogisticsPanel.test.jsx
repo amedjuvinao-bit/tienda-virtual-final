@@ -631,11 +631,71 @@ describe('centro logístico avanzado de la orden', () => {
       SHIPMENT._id,
       { expectedRevision: 4 }
     ));
-    expect(await screen.findByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
+    expect(await screen.findByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comenzar a reunir productos' })).toBeInTheDocument();
     expect(
       screen.getByText('El seguimiento público se habilitará únicamente para las guías reales de producción.')
     ).toBeInTheDocument();
+  });
+
+  it('mantiene la preparación activa hasta que la transportadora recibe el paquete', async () => {
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: {
+          configured: true,
+          enabled: true,
+          mode: 'sandbox',
+          webhookRegistered: true,
+          message: 'Envia Sandbox activo.',
+        },
+      },
+    });
+    const preparedForDropoff = {
+      ...SHIPMENT,
+      revision: 5,
+      carrier: { name: 'fedex', trackingNumber: '794853990273' },
+      shippingIntegration: {
+        status: 'label_created',
+        mode: 'sandbox',
+        labelUrl: 'https://example.com/label.pdf',
+        handoffMode: 'dropoff',
+        providerStatus: 'Delivered',
+      },
+    };
+    const orderWithShipment = (shipment) => ({
+      ...ORDER,
+      fulfillment: {
+        shipments: [shipment],
+        logisticsSummary: responseWith(shipment).summary,
+      },
+    });
+
+    const preparationView = render(
+      <OrderDetailLogisticsPanel order={orderWithShipment(preparedForDropoff)} canManage />
+    );
+
+    expect(await screen.findByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
+    expect(screen.getByText('Prepara el paquete y llévalo al punto elegido')).toBeInTheDocument();
+    expect(screen.getByText(/simulación, no cambia el paquete real/)).toBeInTheDocument();
+    preparationView.unmount();
+
+    const dispatched = { ...preparedForDropoff, status: 'dispatched', revision: 6 };
+    const transitView = render(
+      <OrderDetailLogisticsPanel order={orderWithShipment(dispatched)} canManage />
+    );
+
+    expect(await screen.findByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
+    expect(screen.getByText('No hagas nada: espera la actualización')).toBeInTheDocument();
+    transitView.unmount();
+
+    const delivered = { ...preparedForDropoff, status: 'delivered', revision: 7 };
+    render(<OrderDetailLogisticsPanel order={orderWithShipment(delivered)} canManage />);
+
+    expect(await screen.findByText('3 PASOS LISTOS')).toBeInTheDocument();
+    expect(screen.getByText('Listo: el pedido ya fue entregado')).toBeInTheDocument();
+    expect(screen.getAllByText('LISTO')).toHaveLength(3);
   });
 
   it('programa la recolección junto con la guía cuando la transportadora lo exige', async () => {
@@ -730,7 +790,7 @@ describe('centro logístico avanzado de la orden', () => {
       expect.any(String)
     ));
     expect(await screen.findByText(/Recolección confirmada/)).toHaveTextContent('REC-123');
-    expect(screen.getByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
+    expect(screen.getByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Elegir entrega en punto' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comenzar a reunir productos' })).toBeInTheDocument();
   });
