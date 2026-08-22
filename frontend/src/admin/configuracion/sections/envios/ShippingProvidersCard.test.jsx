@@ -113,6 +113,41 @@ describe('ShippingProvidersCard', () => {
     expect(inputs[1]).toHaveValue('');
   });
 
+  it('guarda la credencial visible aunque el navegador llene el campo sin actualizar el estado React', async () => {
+    const user = userEvent.setup();
+    updateAdminShippingSettings.mockResolvedValue({
+      ...response({
+        settings: {
+          hasEnviaToken: true,
+          hasSandboxWebhookToken: true,
+          enviaTokenHint: '••••OKEN',
+          sandboxWebhookTokenHint: '••••A968',
+        },
+      }),
+      message: 'Configuración guardada.',
+    });
+    render(<ShippingProvidersCard />);
+
+    const input = await screen.findByLabelText(
+      'Credencial de autorización del webhook Sandbox'
+    );
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    ).set;
+    nativeValueSetter.call(input, 'CREDENCIAL-PORTAL-A968');
+
+    await user.click(screen.getByRole('button', { name: 'Guardar configuración' }));
+
+    await waitFor(() =>
+      expect(updateAdminShippingSettings).toHaveBeenCalledWith({
+        enviaMode: 'sandbox',
+        internationalDutiesPaymentEntity: 'recipient',
+        sandboxWebhookToken: 'CREDENCIAL-PORTAL-A968',
+      })
+    );
+  });
+
   it('guía al portal de Envia y confirma la configuración sin llamar un endpoint inexistente', async () => {
     const user = userEvent.setup();
     getAdminShippingSettings.mockResolvedValue(

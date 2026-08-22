@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   activateAdminShippingProvider,
   confirmAdminShippingWebhook,
@@ -57,6 +57,7 @@ export default function ShippingProvidersCard() {
   const [mode, setMode] = useState('sandbox');
   const [token, setToken] = useState('');
   const [sandboxWebhookToken, setSandboxWebhookToken] = useState('');
+  const sandboxWebhookTokenRef = useRef(null);
   const [webhookSecret, setWebhookSecret] = useState('');
   const [dutiesPaymentEntity, setDutiesPaymentEntity] = useState('recipient');
   const [clearToken, setClearToken] = useState(false);
@@ -149,23 +150,27 @@ export default function ShippingProvidersCard() {
     }
   };
 
-  const save = () =>
-    runAction('save', () =>
+  const save = () => {
+    const sandboxWebhookTokenFromField = String(
+      sandboxWebhookTokenRef.current?.value || sandboxWebhookToken
+    ).trim();
+    return runAction('save', () =>
       updateAdminShippingSettings({
         enviaMode: mode,
         internationalDutiesPaymentEntity: dutiesPaymentEntity,
         ...(token.trim() ? { enviaToken: token.trim() } : {}),
-        ...(sandboxWebhookToken.trim()
-          ? { sandboxWebhookToken: sandboxWebhookToken.trim() }
+        ...(sandboxWebhookTokenFromField
+          ? { sandboxWebhookToken: sandboxWebhookTokenFromField }
           : {}),
         ...(webhookSecret.trim() ? { webhookSecret: webhookSecret.trim() } : {}),
         ...(clearToken && !token.trim() ? { clearEnviaToken: true } : {}),
-        ...(clearSandboxWebhookToken && !sandboxWebhookToken.trim()
+        ...(clearSandboxWebhookToken && !sandboxWebhookTokenFromField
           ? { clearSandboxWebhookToken: true }
           : {}),
         ...(clearWebhookSecret && !webhookSecret.trim() ? { clearWebhookSecret: true } : {}),
       })
     );
+  };
 
   const copyWebhookUrl = async () => {
     try {
@@ -318,6 +323,7 @@ export default function ShippingProvidersCard() {
                 </label>
                 <input
                   id="envia-sandbox-webhook-token"
+                  ref={sandboxWebhookTokenRef}
                   type="password"
                   autoComplete="new-password"
                   value={sandboxWebhookToken}
