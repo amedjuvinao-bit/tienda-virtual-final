@@ -59,19 +59,49 @@ async function persistVerifiedEvent(verified, payload) {
   }
 }
 
+router.get('/', (_req, res) =>
+  res.status(200).json({ received: true, ready: true })
+);
+
 router.post('/', async (req, res) => {
+  const signedHeaderNames = [
+    'x-webhook-event',
+    'x-webhook-id',
+    'x-webhook-timestamp',
+    'x-webhook-signature',
+  ];
+  const hasSignedHeaders = signedHeaderNames.some((name) => Boolean(req.headers[name]));
+  const temporarySandboxTunnel = String(req.hostname || '')
+    .toLowerCase()
+    .endsWith('.trycloudflare.com');
+
+  if (!hasSignedHeaders && temporarySandboxTunnel) {
+    const response = res.status(200).json({ received: true });
+    setImmediate(async () => {
+      try {
+        const runtime = await getRuntimeShippingConfiguration();
+        const verified = verifyEnviaSandboxTestWebhook({
+          rawBody: req.body,
+          headers: req.headers,
+          mode: runtime.envia.mode,
+          webhookToken: runtime.envia.sandboxWebhookToken,
+          apiToken: runtime.envia.token,
+          allowLegacySandboxProbe: runtime.envia.mode === 'sandbox',
+        });
+        const payload = JSON.parse(verified.body || '{}');
+        await persistVerifiedEvent(verified, payload);
+      } catch (error) {
+        console.warn('[shipping-webhook] Prueba Sandbox confirmada pero descartada:', {
+          code: error?.code || 'SHIPPING_WEBHOOK_FAILED',
+          status: error?.statusCode || 500,
+        });
+      }
+    });
+    return response;
+  }
+
   try {
     const runtime = await getRuntimeShippingConfiguration();
-    const signedHeaderNames = [
-      'x-webhook-event',
-      'x-webhook-id',
-      'x-webhook-timestamp',
-      'x-webhook-signature',
-    ];
-    const hasSignedHeaders = signedHeaderNames.some((name) => Boolean(req.headers[name]));
-    const temporarySandboxTunnel = String(req.hostname || '')
-      .toLowerCase()
-      .endsWith('.trycloudflare.com');
     const verified = hasSignedHeaders
       ? verifyEnviaWebhook({
           rawBody: req.body,
