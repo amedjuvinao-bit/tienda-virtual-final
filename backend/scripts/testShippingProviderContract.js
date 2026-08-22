@@ -184,6 +184,17 @@ async function main() {
     now: 1_800_002,
   });
   assert.strictEqual(verifiedApiAuthorization.sandboxTest, true);
+  const verifiedTemporaryTunnelProbe = verifyEnviaSandboxTestWebhook({
+    rawBody: sandboxTestBody,
+    headers: { authorization: 'Bearer token-generado-por-el-portal' },
+    mode: 'sandbox',
+    webhookToken: 'sandbox-webhook-secret',
+    apiToken: 'sandbox-api-token',
+    allowLegacySandboxProbe: true,
+    now: 1_800_003,
+  });
+  assert.strictEqual(verifiedTemporaryTunnelProbe.sandboxTest, true);
+  assert.strictEqual(verifiedTemporaryTunnelProbe.sandboxUnverified, true);
   assert.throws(
     () => verifyEnviaSandboxTestWebhook({
       rawBody: sandboxTestBody,
@@ -203,7 +214,7 @@ async function main() {
     }),
     (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
   );
-  ok('la prueba v1 oficial acepta carrierName y las credenciales Sandbox válidas con o sin Bearer');
+  ok('la prueba v1 acepta credenciales válidas y limita la compatibilidad legacy al túnel Sandbox autorizado');
 
   const generateWithPickup = pickupOnGeneratePayload(
     {

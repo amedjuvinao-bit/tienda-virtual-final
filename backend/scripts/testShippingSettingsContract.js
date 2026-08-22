@@ -92,6 +92,8 @@ function main() {
   assert.match(providerSource, /payload\?\.carrierName/);
   assert.match(providerSource, /replace\(\/\^Bearer\\s\+\/i, ''\)/);
   assert.match(webhookRouteSource, /apiToken: runtime\.envia\.token/);
+  assert.match(webhookRouteSource, /endsWith\('\.trycloudflare\.com'\)/);
+  assert.match(webhookRouteSource, /runtime\.envia\.mode === 'sandbox' && temporarySandboxTunnel/);
   ok('la prueba v1 acepta variaciones del portal, registra rechazos seguros y responde HTTP 200');
 
   const service = read('backend/services/shippingConfigurationService.js');

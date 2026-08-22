@@ -37,6 +37,9 @@ router.post('/', async (req, res) => {
       'x-webhook-signature',
     ];
     const hasSignedHeaders = signedHeaderNames.some((name) => Boolean(req.headers[name]));
+    const temporarySandboxTunnel = String(req.hostname || '')
+      .toLowerCase()
+      .endsWith('.trycloudflare.com');
     const verified = hasSignedHeaders
       ? verifyEnviaWebhook({
           rawBody: req.body,
@@ -49,6 +52,8 @@ router.post('/', async (req, res) => {
           mode: runtime.envia.mode,
           webhookToken: runtime.envia.sandboxWebhookToken,
           apiToken: runtime.envia.token,
+          allowLegacySandboxProbe:
+            runtime.envia.mode === 'sandbox' && temporarySandboxTunnel,
         });
     let payload;
     try {

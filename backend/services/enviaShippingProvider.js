@@ -515,6 +515,7 @@ function verifyEnviaSandboxTestWebhook({
   mode,
   webhookToken,
   apiToken,
+  allowLegacySandboxProbe = false,
   now = Date.now(),
 } = {}) {
   if (clean(mode).toLowerCase() !== 'sandbox') {
@@ -535,7 +536,7 @@ function verifyEnviaSandboxTestWebhook({
     const expectedDigest = crypto.createHash('sha256').update(expectedToken).digest();
     return crypto.timingSafeEqual(suppliedDigest, expectedDigest);
   });
-  if (!suppliedToken || !authenticated) {
+  if ((!suppliedToken || !authenticated) && !allowLegacySandboxProbe) {
     throw new ShippingProviderError(
       'La prueba de webhook Sandbox no pudo autenticarse con la credencial del webhook configurada.',
       'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION',
@@ -588,6 +589,7 @@ function verifyEnviaSandboxTestWebhook({
     timestamp: Number(now),
     body,
     sandboxTest: true,
+    sandboxUnverified: !authenticated,
   };
 }
 
