@@ -42,7 +42,10 @@ function response(overrides = {}) {
         hasWebhookSecret: false,
         tested: false,
         webhookRegistered: false,
+        webhookVerified: false,
         webhookUrlReady: true,
+        webhookUrlPermanent: true,
+        temporaryWebhookUrl: false,
         canTest: false,
         canRegisterWebhook: false,
         canConfirmWebhook: false,
@@ -148,7 +151,7 @@ describe('ShippingProvidersCard', () => {
     );
   });
 
-  it('guía al portal de Envia y confirma la configuración sin llamar un endpoint inexistente', async () => {
+  it('registra la URL y deja claro que aún falta recibir la prueba real de Envia', async () => {
     const user = userEvent.setup();
     getAdminShippingSettings.mockResolvedValue(
       response({
@@ -170,10 +173,11 @@ describe('ShippingProvidersCard', () => {
           hasSandboxWebhookToken: true,
           tested: true,
           webhookRegistered: true,
+          webhookVerified: false,
           canConfirmWebhook: true,
         },
       }),
-      message: 'Webhook confirmado como configurado en el portal de Envia.',
+      message: 'Registro anotado. Ahora pulsa “Probar” en Envia.',
     });
 
     render(<ShippingProvidersCard />);
@@ -183,8 +187,62 @@ describe('ShippingProvidersCard', () => {
       'href',
       'https://shipping-test.envia.com/settings/developers'
     );
-    await user.click(screen.getByRole('button', { name: 'Ya lo registré en Envia' }));
+    await user.click(screen.getByRole('button', { name: 'Ya registré la URL' }));
     await waitFor(() => expect(confirmAdminShippingWebhook).toHaveBeenCalledTimes(1));
-    expect((await screen.findAllByText('Webhook confirmado')).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText('Esperando prueba de Envia')).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('muestra la confirmación únicamente cuando Envia ya comprobó el webhook', async () => {
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: { hasEnviaToken: true },
+        readiness: {
+          hasToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: true,
+        },
+      })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(
+      await screen.findByText('Webhook comprobado por Envia')
+    ).toBeInTheDocument();
+  });
+
+  it('bloquea Producción cuando BACKEND_URL pertenece a trycloudflare', async () => {
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: {
+          enviaMode: 'production',
+          hasEnviaToken: true,
+          hasWebhookSecret: true,
+        },
+        readiness: {
+          hasToken: true,
+          hasWebhookSecret: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: true,
+          webhookUrlReady: true,
+          webhookUrlPermanent: false,
+          temporaryWebhookUrl: true,
+          canActivateProduction: false,
+        },
+      })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(
+      await screen.findByText(/trycloudflare\.com es temporal/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Activar Producción' })
+    ).toBeDisabled();
   });
 });

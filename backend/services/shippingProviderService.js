@@ -13,8 +13,13 @@ const {
 async function getShippingProviderStatus(dependencies = {}) {
   const runtime = await getRuntimeShippingConfiguration(dependencies);
   const envia = createEnviaProvider({ config: runtime.envia });
-  const active = runtime.defaultProvider === 'envia' && envia.configured;
   const state = readiness(runtime.settings, runtime);
+  const verifiedForMode =
+    envia.mode === 'production'
+      ? state.canActivateProduction
+      : state.canActivateSandbox;
+  const selected = runtime.defaultProvider === 'envia';
+  const active = selected && envia.configured && verifiedForMode;
   return {
     defaultProvider: runtime.defaultProvider,
     manual: {
@@ -31,11 +36,15 @@ async function getShippingProviderStatus(dependencies = {}) {
       configured: envia.configured,
       webhookConfigured: envia.webhookConfigured,
       webhookRegistered: state.webhookRegistered,
+      webhookVerified: state.webhookVerified,
       webhookUrlReady: state.webhookUrlReady,
+      webhookUrlPermanent: state.webhookUrlPermanent,
       webhookUrl: publicWebhookUrl(),
       mode: envia.mode,
       message: active
         ? `Envia ${envia.mode === 'sandbox' ? 'Sandbox' : 'Producción'} activo.`
+        : selected && envia.configured && !verifiedForMode
+          ? `Envia ${envia.mode === 'sandbox' ? 'Sandbox' : 'Producción'} está seleccionado, pero el webhook todavía no fue comprobado por Envia.`
         : envia.configured
           ? `Envia ${envia.mode === 'sandbox' ? 'Sandbox' : 'Producción'} configurado, pero la operación manual continúa activa.`
         : `Envia ${envia.mode === 'sandbox' ? 'Sandbox' : 'Producción'} pendiente de token; no se realizarán llamadas externas.`,
@@ -75,6 +84,21 @@ async function resolveShippingProvider(providerKey = 'envia', dependencies = {})
       409,
       { provider: 'envia', mode: provider.mode }
     );
+  }
+  if (runtime) {
+    const state = readiness(runtime.settings, runtime);
+    const verifiedForMode =
+      provider.mode === 'production'
+        ? state.canActivateProduction
+        : state.canActivateSandbox;
+    if (!verifiedForMode) {
+      throw new ShippingProviderError(
+        `Envia ${provider.mode === 'production' ? 'Producción' : 'Sandbox'} está seleccionado, pero exige una prueba real del webhook antes de operar.`,
+        'SHIPPING_PROVIDER_VERIFICATION_REQUIRED',
+        409,
+        { provider: 'envia', mode: provider.mode, readiness: state }
+      );
+    }
   }
   return provider;
 }

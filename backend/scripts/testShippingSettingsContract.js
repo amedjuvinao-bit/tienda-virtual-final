@@ -21,8 +21,13 @@ const {
   findAdminRoutePermission,
 } = require('../security/adminRoutePermissionMap');
 const {
+  markShippingWebhookVerified,
+  permanentPublicHttpsUrl,
   readiness,
 } = require('../services/shippingConfigurationService');
+const {
+  resolveShippingProvider,
+} = require('../services/shippingProviderService');
 
 const projectRoot = path.join(__dirname, '..', '..');
 const read = (relativePath) =>
@@ -34,7 +39,7 @@ function ok(message) {
   console.log(`OK  ${message}`);
 }
 
-function main() {
+async function main() {
   const token = 'envia-token-super-secreto-1234';
   const encrypted = encryptShippingSecret(token);
   assert.strictEqual(encryptionConfigured(), true);
@@ -54,6 +59,8 @@ function main() {
   assert.match(model, /enviaTokenEncrypted[\s\S]*?select:\s*false/);
   assert.match(model, /sandboxWebhookTokenEncrypted[\s\S]*?select:\s*false/);
   assert.match(model, /webhookSecretEncrypted[\s\S]*?select:\s*false/);
+  assert.match(model, /webhookVerifiedAt/);
+  assert.match(model, /webhookVerificationEventId/);
   assert.match(model, /delete settings\.enviaTokenEncrypted/);
   assert.match(model, /delete settings\.sandboxWebhookTokenEncrypted/);
   assert.match(model, /delete settings\.webhookSecretEncrypted/);
@@ -89,6 +96,7 @@ function main() {
   assert.match(webhookRouteSource, /setImmediate\(\(\) => \{[\s\S]*?persistVerifiedEvent/);
   assert.match(webhookRouteSource, /Solicitud aceptada/);
   assert.match(webhookRouteSource, /Solicitud rechazada/);
+  assert.match(webhookRouteSource, /markShippingWebhookVerified\(verified\)/);
   const backendEntry = read('backend/index.js');
   assert.match(backendEntry, /express\.raw\(\{ type: '\*\/\*', limit: '256kb' \}\)/);
   assert.match(
@@ -108,9 +116,19 @@ function main() {
   assert.match(service, /SHIPPING_PRODUCTION_CONFIRMATION_REQUIRED/);
   assert.match(service, /canActivateProduction/);
   assert.match(service, /webhookRegistered/);
+  assert.match(service, /webhookVerified/);
+  assert.match(service, /permanentPublicHttpsUrl/);
   assert.match(service, /publicHttpsUrl/);
   assert.match(service, /resetVerification/);
-  ok('producción exige confirmación, prueba vigente, HTTPS y webhook registrado');
+  assert.strictEqual(
+    permanentPublicHttpsUrl('https://api.tienda.test/api/shipping/webhooks/envia'),
+    true
+  );
+  assert.strictEqual(
+    permanentPublicHttpsUrl('https://temporal.trycloudflare.com/api/shipping/webhooks/envia'),
+    false
+  );
+  ok('producción exige prueba vigente, HTTPS permanente y webhook comprobado por Envia');
 
   const verifiedSettings = {
     credentialRevision: 3,
@@ -153,7 +171,97 @@ function main() {
     },
   });
   assert.strictEqual(productionWithSecret.canConfirmWebhook, true);
+  assert.strictEqual(productionWithSecret.canActivateProduction, false);
+
+  const productionVerified = readiness(
+    {
+      ...productionSettings,
+      providerWebhookId: 'evt-production-proof',
+      providerWebhookMode: 'production',
+      providerWebhookUrl:
+        'https://shipping-settings.test/api/shipping/webhooks/envia',
+      webhookRegisteredAt: new Date(),
+      webhookVerifiedAt: new Date(),
+      webhookVerificationMode: 'production',
+      webhookVerificationUrl:
+        'https://shipping-settings.test/api/shipping/webhooks/envia',
+    },
+    {
+      envia: {
+        mode: 'production',
+        token: 'production-token',
+        webhookSecret: 'production-webhook-secret',
+      },
+    }
+  );
+  assert.strictEqual(productionVerified.webhookVerified, true);
+  assert.strictEqual(productionVerified.webhookUrlPermanent, true);
+  assert.strictEqual(productionVerified.canActivateProduction, true);
   ok('Sandbox exige su credencial Bearer exclusiva y Producción conserva HMAC obligatorio');
+
+  const storedSettings = {
+    managedFromPanel: true,
+    enviaMode: 'production',
+    providerWebhookId: 'dashboard-confirmed',
+    providerWebhookMode: 'production',
+    providerWebhookUrl:
+      'https://shipping-settings.test/api/shipping/webhooks/envia',
+    webhookRegisteredAt: new Date('2026-08-22T12:00:00.000Z'),
+    async save() {
+      return this;
+    },
+  };
+  const verifiedAt = new Date('2026-08-22T12:05:00.000Z');
+  const verification = await markShippingWebhookVerified(
+    { eventId: 'evt-real-provider-proof', sandboxTest: false },
+    {
+      SettingsModel: {
+        getSingleton: async () => storedSettings,
+      },
+      now: verifiedAt,
+    }
+  );
+  assert.strictEqual(verification.verified, true);
+  assert.strictEqual(storedSettings.webhookVerifiedAt, verifiedAt);
+  assert.strictEqual(
+    storedSettings.webhookVerificationEventId,
+    'evt-real-provider-proof'
+  );
+  assert.strictEqual(storedSettings.webhookVerificationMode, 'production');
+  ok('un evento auténtico recibido desde Envia deja evidencia durable de la conexión');
+
+  const guardedSettings = {
+    managedFromPanel: true,
+    defaultProvider: 'envia',
+    enviaMode: 'production',
+    enviaTokenEncrypted: encryptShippingSecret('production-token'),
+    webhookSecretEncrypted: encryptShippingSecret('production-webhook-secret'),
+    credentialRevision: 1,
+    lastTestStatus: 'success',
+    lastTestMode: 'production',
+    lastTestCredentialRevision: 1,
+    providerWebhookId: 'dashboard-confirmed',
+    providerWebhookMode: 'production',
+    providerWebhookUrl:
+      'https://shipping-settings.test/api/shipping/webhooks/envia',
+    webhookRegisteredAt: new Date(),
+  };
+  const guardedModel = {
+    getSingleton: async () => guardedSettings,
+  };
+  await assert.rejects(
+    () => resolveShippingProvider('envia', { SettingsModel: guardedModel }),
+    (error) => error.code === 'SHIPPING_PROVIDER_VERIFICATION_REQUIRED'
+  );
+  guardedSettings.webhookVerifiedAt = new Date();
+  guardedSettings.webhookVerificationMode = 'production';
+  guardedSettings.webhookVerificationUrl =
+    'https://shipping-settings.test/api/shipping/webhooks/envia';
+  const guardedProvider = await resolveShippingProvider('envia', {
+    SettingsModel: guardedModel,
+  });
+  assert.strictEqual(guardedProvider.configured, true);
+  ok('las operaciones reales permanecen bloqueadas hasta comprobar el webhook');
 
   const frontend = read(
     'frontend/src/admin/configuracion/sections/envios/ShippingProvidersCard.jsx'
@@ -162,7 +270,9 @@ function main() {
   assert.match(frontend, /autoComplete="new-password"/);
   assert.match(frontend, /Probar conexión/);
   assert.match(frontend, /Abrir portal de Envia/);
-  assert.match(frontend, /Ya lo registré en Envia/);
+  assert.match(frontend, /Ya registré la URL/);
+  assert.match(frontend, /Prueba recibida desde Envia/);
+  assert.match(frontend, /trycloudflare\.com es temporal/);
   assert.match(frontend, /confirmProduction/);
   assert.match(frontend, /¿Qué queda automático\?/);
   assert.match(frontend, /El webhook es el aviso/);
@@ -178,4 +288,7 @@ function main() {
   console.log(`\n${checks.length} verificaciones de configuración de transportadoras completadas.`);
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -94,6 +94,19 @@ function publicHttpsUrl(value) {
   }
 }
 
+function temporaryTunnelUrl(value) {
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return host.endsWith('.trycloudflare.com');
+  } catch {
+    return false;
+  }
+}
+
+function permanentPublicHttpsUrl(value) {
+  return publicHttpsUrl(value) && !temporaryTunnelUrl(value);
+}
+
 async function getSettings(SettingsModel = ShippingSettings) {
   return SettingsModel.getSingleton();
 }
@@ -171,6 +184,16 @@ function readiness(settings, runtime) {
   const hasSandboxWebhookToken = Boolean(runtime.envia.sandboxWebhookToken);
   const hasWebhookSecret = Boolean(runtime.envia.webhookSecret);
   const webhookUrlReady = publicHttpsUrl(webhookUrl);
+  const webhookUrlPermanent = permanentPublicHttpsUrl(webhookUrl);
+  const eligibleWebhookUrl = production
+    ? webhookUrlPermanent
+    : webhookUrlReady;
+  const webhookVerified = Boolean(
+    webhookRegistered &&
+    settings.webhookVerifiedAt &&
+    settings.webhookVerificationMode === runtime.envia.mode &&
+    settings.webhookVerificationUrl === webhookUrl
+  );
   const webhookCredentialReady = production
     ? hasWebhookSecret
     : hasSandboxWebhookToken;
@@ -180,25 +203,30 @@ function readiness(settings, runtime) {
     hasWebhookSecret,
     tested,
     webhookRegistered,
+    webhookVerified,
     webhookUrlReady,
+    webhookUrlPermanent,
+    temporaryWebhookUrl: webhookUrlReady && !webhookUrlPermanent,
     canTest: hasToken,
     canConfirmWebhook:
-      hasToken && tested && webhookUrlReady && webhookCredentialReady,
+      hasToken && tested && eligibleWebhookUrl && webhookCredentialReady,
     // Alias temporal para clientes anteriores. Envia administra la URL desde su portal.
     canRegisterWebhook:
-      hasToken && tested && webhookUrlReady && webhookCredentialReady,
+      hasToken && tested && eligibleWebhookUrl && webhookCredentialReady,
     canActivateSandbox:
       hasToken &&
       tested &&
       hasSandboxWebhookToken &&
       webhookRegistered &&
+      webhookVerified &&
       webhookUrlReady,
     canActivateProduction:
       hasToken &&
       tested &&
       hasWebhookSecret &&
       webhookRegistered &&
-      webhookUrlReady,
+      webhookVerified &&
+      webhookUrlPermanent,
   };
 }
 
@@ -274,6 +302,10 @@ function resetVerification(settings, { resetWebhook = false } = {}) {
     settings.providerWebhookMode = '';
     settings.providerWebhookUrl = '';
     settings.webhookRegisteredAt = null;
+    settings.webhookVerifiedAt = null;
+    settings.webhookVerificationEventId = '';
+    settings.webhookVerificationMode = '';
+    settings.webhookVerificationUrl = '';
   }
 }
 
@@ -282,6 +314,10 @@ function resetWebhookConfirmation(settings) {
   settings.providerWebhookMode = '';
   settings.providerWebhookUrl = '';
   settings.webhookRegisteredAt = null;
+  settings.webhookVerifiedAt = null;
+  settings.webhookVerificationEventId = '';
+  settings.webhookVerificationMode = '';
+  settings.webhookVerificationUrl = '';
 }
 
 async function updateShippingSettings(
@@ -411,20 +447,68 @@ async function confirmShippingWebhook(
   if (!state.canConfirmWebhook) {
     throw new ShippingSettingsError(
       runtime.envia.mode === 'production'
-        ? 'Antes de confirmar el webhook de Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL público con HTTPS.'
+        ? 'Antes de registrar el webhook de Producción se requiere conexión aprobada, secreto guardado y BACKEND_URL HTTPS permanente.'
         : 'Antes de confirmar el webhook de Sandbox se requiere conexión aprobada, credencial de autorización guardada y BACKEND_URL público con HTTPS.',
       'SHIPPING_WEBHOOK_NOT_READY',
       422,
       state
     );
   }
+  if (state.webhookVerified) {
+    return getShippingSettingsView({ SettingsModel });
+  }
   runtime.settings.providerWebhookId = 'dashboard-confirmed';
   runtime.settings.providerWebhookMode = runtime.envia.mode;
   runtime.settings.providerWebhookUrl = webhookUrl;
   runtime.settings.webhookRegisteredAt = new Date();
+  runtime.settings.webhookVerifiedAt = null;
+  runtime.settings.webhookVerificationEventId = '';
+  runtime.settings.webhookVerificationMode = '';
+  runtime.settings.webhookVerificationUrl = '';
   runtime.settings.updatedBy = actorId(actor);
   await runtime.settings.save();
   return getShippingSettingsView({ SettingsModel });
+}
+
+async function markShippingWebhookVerified(
+  verified = {},
+  { SettingsModel = ShippingSettings, now = new Date() } = {}
+) {
+  const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
+  const webhookUrl = publicWebhookUrl();
+  const production = runtime.envia.mode === 'production';
+
+  if (!publicHttpsUrl(webhookUrl)) {
+    return { verified: false, reason: 'webhook_url_not_public' };
+  }
+  if (production && !permanentPublicHttpsUrl(webhookUrl)) {
+    return { verified: false, reason: 'temporary_production_url' };
+  }
+  if (production && verified.sandboxTest === true) {
+    return { verified: false, reason: 'sandbox_event_in_production' };
+  }
+  if (!production && verified.sandboxTest !== true) {
+    return { verified: false, reason: 'production_event_in_sandbox' };
+  }
+
+  const eventId = clean(verified.eventId, 300);
+  runtime.settings.providerWebhookId = eventId || 'provider-verified';
+  runtime.settings.providerWebhookMode = runtime.envia.mode;
+  runtime.settings.providerWebhookUrl = webhookUrl;
+  runtime.settings.webhookRegisteredAt =
+    runtime.settings.webhookRegisteredAt || now;
+  runtime.settings.webhookVerifiedAt = now;
+  runtime.settings.webhookVerificationEventId = eventId;
+  runtime.settings.webhookVerificationMode = runtime.envia.mode;
+  runtime.settings.webhookVerificationUrl = webhookUrl;
+  await runtime.settings.save();
+
+  return {
+    verified: true,
+    mode: runtime.envia.mode,
+    webhookUrl,
+    verifiedAt: now,
+  };
 }
 
 async function activateShippingProvider(
@@ -445,8 +529,8 @@ async function activateShippingProvider(
   if (production ? !state.canActivateProduction : !state.canActivateSandbox) {
     throw new ShippingSettingsError(
       production
-        ? 'Producción exige token probado, secreto, webhook confirmado y URL pública HTTPS.'
-        : 'Sandbox exige token probado, credencial del webhook, webhook confirmado y URL pública HTTPS.',
+        ? 'Producción exige token probado, secreto, URL HTTPS permanente y una prueba real recibida desde Envia.'
+        : 'Sandbox exige token probado, credencial del webhook y una prueba recibida desde Envia.',
       'SHIPPING_PROVIDER_NOT_READY',
       409,
       state
@@ -483,6 +567,9 @@ module.exports = {
   disableShippingProvider,
   getRuntimeShippingConfiguration,
   getShippingSettingsView,
+  markShippingWebhookVerified,
+  permanentPublicHttpsUrl,
+  publicHttpsUrl,
   publicWebhookUrl,
   readiness,
   confirmShippingWebhook,

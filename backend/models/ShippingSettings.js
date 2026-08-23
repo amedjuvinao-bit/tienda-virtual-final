@@ -72,6 +72,14 @@ const ShippingSettingsSchema = new mongoose.Schema(
     },
     providerWebhookUrl: { type: String, trim: true, default: '' },
     webhookRegisteredAt: { type: Date, default: null },
+    webhookVerifiedAt: { type: Date, default: null },
+    webhookVerificationEventId: { type: String, trim: true, default: '' },
+    webhookVerificationMode: {
+      type: String,
+      enum: ['', 'sandbox', 'production'],
+      default: '',
+    },
+    webhookVerificationUrl: { type: String, trim: true, default: '' },
     productionActivatedAt: { type: Date, default: null },
     productionActivatedBy: {
       type: mongoose.Schema.Types.ObjectId,

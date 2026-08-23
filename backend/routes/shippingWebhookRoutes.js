@@ -10,6 +10,7 @@ const {
 } = require('../services/enviaShippingProvider');
 const {
   getRuntimeShippingConfiguration,
+  markShippingWebhookVerified,
 } = require('../services/shippingConfigurationService');
 const {
   processShippingWebhookEvent,
@@ -42,6 +43,7 @@ async function persistVerifiedEvent(verified, payload) {
       eventType: verified.event,
       sandboxTest: verified.sandboxTest === true,
     });
+    await markShippingWebhookVerified(verified);
     setImmediate(() => {
       processShippingWebhookEvent(event._id).catch((error) => {
         console.error('[shipping-webhook] No fue posible procesar el evento:', error?.message || error);
@@ -53,6 +55,7 @@ async function persistVerifiedEvent(verified, payload) {
       console.info('[shipping-webhook] Solicitud duplicada aceptada:', {
         eventId: verified.eventId,
       });
+      await markShippingWebhookVerified(verified);
       return { duplicate: true };
     }
     throw error;

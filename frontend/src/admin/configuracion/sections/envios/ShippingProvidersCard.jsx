@@ -112,6 +112,36 @@ export default function ShippingProvidersCard() {
   );
   const saveBlocked = writesSecret && !meta.encryptionConfigured;
   const savedMode = mode === settings.enviaMode;
+  const waitingWebhookProof = Boolean(
+    savedMode && ready.webhookRegistered && !ready.webhookVerified
+  );
+
+  useEffect(() => {
+    if (!waitingWebhookProof) return undefined;
+    let active = true;
+
+    const refreshWebhookProof = async () => {
+      try {
+        const response = await getAdminShippingSettings();
+        if (!active) return;
+        setData(response);
+        if (response?.meta?.readiness?.webhookVerified) {
+          setFeedback({
+            type: 'success',
+            text: 'Envia confirmó la conexión: la prueba real del webhook fue recibida.',
+          });
+        }
+      } catch {
+        // La consulta principal seguirá mostrando cualquier error relevante.
+      }
+    };
+
+    const intervalId = window.setInterval(refreshWebhookProof, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [waitingWebhookProof]);
 
   const checklist = useMemo(
     () => [
@@ -130,8 +160,12 @@ export default function ShippingProvidersCard() {
             { label: 'Secreto de webhook guardado', done: savedMode && ready.hasWebhookSecret },
           ]
         : []),
-      { label: 'URL pública HTTPS', done: ready.webhookUrlReady },
-      { label: 'Webhook confirmado', done: savedMode && ready.webhookRegistered },
+      {
+        label: production ? 'URL HTTPS permanente' : 'URL pública HTTPS',
+        done: production ? ready.webhookUrlPermanent : ready.webhookUrlReady,
+      },
+      { label: 'URL registrada en Envia', done: savedMode && ready.webhookRegistered },
+      { label: 'Prueba recibida desde Envia', done: savedMode && ready.webhookVerified },
     ],
     [production, ready, savedMode]
   );
@@ -242,7 +276,11 @@ export default function ShippingProvidersCard() {
             </div>
             <div className="flex flex-wrap gap-2">
               {ready.tested ? <StatusPill tone="green">Conexión aprobada</StatusPill> : <StatusPill tone="amber">Sin probar</StatusPill>}
-              {ready.webhookRegistered && <StatusPill tone="blue">Webhook confirmado</StatusPill>}
+              {ready.webhookVerified ? (
+                <StatusPill tone="green">Webhook comprobado por Envia</StatusPill>
+              ) : ready.webhookRegistered ? (
+                <StatusPill tone="amber">Esperando prueba de Envia</StatusPill>
+              ) : null}
             </div>
           </div>
 
@@ -262,7 +300,8 @@ export default function ShippingProvidersCard() {
             <p className="mt-2">
               El webhook es el aviso que Envia envía al servidor cuando cambia el estado de la guía.
               Envia administra esa URL desde su portal: cópiala aquí, agrégala en Desarrolladores →
-              Webhooks y luego confírmala en este panel. Así el pedido se actualiza sin pulsar
+              Webhooks y pulsa “Probar” en Envia. Este panel se aprobará automáticamente cuando
+              reciba esa prueba. Así el pedido se actualiza sin pulsar
               “Sincronizar”. Sandbox usa una credencial Bearer exclusiva que genera el portal;
               Producción exige la firma HMAC.
             </p>
@@ -411,8 +450,8 @@ export default function ShippingProvidersCard() {
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">URL pública para seguimiento</p>
             <p className="mt-1 text-sm text-gray-700">
               {production
-                ? '1. Copia la URL. 2. Ábrela en el portal de Envia y agrégala como webhook de seguimiento. 3. Regresa y confirma.'
-                : '1. Copia esta URL. 2. Crea el webhook en el portal Sandbox. 3. Copia la credencial que Envia genera en el segundo campo “Url” y guárdala arriba. 4. En el portal pulsa Probar; si responde correctamente, regresa y confirma.'}
+                ? '1. Copia la URL permanente. 2. Agrégala en el portal de Producción. 3. Pulsa Probar en Envia. 4. Regresa: la confirmación aparecerá automáticamente.'
+                : '1. Copia esta URL. 2. Crea el webhook en el portal Sandbox. 3. Copia la credencial que Envia genera en el segundo campo “Url” y guárdala arriba. 4. Pulsa Probar en Envia; este panel detectará la respuesta automáticamente.'}
             </p>
             <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
               <code className="min-w-0 flex-1 break-all text-sm text-gray-800">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
@@ -431,6 +470,11 @@ export default function ShippingProvidersCard() {
             {!ready.webhookUrlReady && (
               <p className="mt-2 text-xs text-amber-700">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>
             )}
+            {production && ready.temporaryWebhookUrl && (
+              <p className="mt-2 text-xs font-semibold text-red-700">
+                Producción bloqueada: trycloudflare.com es temporal. Publica el backend en una dirección HTTPS permanente.
+              </p>
+            )}
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -448,6 +492,18 @@ export default function ShippingProvidersCard() {
             </p>
           )}
 
+          {ready.webhookVerified && settings.webhookVerifiedAt && (
+            <p className="mt-2 text-sm font-semibold text-emerald-700">
+              Webhook comprobado por Envia · {formatDate(settings.webhookVerifiedAt)}
+            </p>
+          )}
+
+          {(production ? ready.canActivateProduction : ready.canActivateSandbox) && !activeEnvia && (
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+              Todo está comprobado. Ya puedes activar Envia {production ? 'Producción' : 'Sandbox'}.
+            </div>
+          )}
+
           {production && (
             <label className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
               <input
@@ -456,7 +512,7 @@ export default function ShippingProvidersCard() {
                 onChange={(event) => setConfirmProduction(event.target.checked)}
                 className="mt-0.5 h-4 w-4 accent-red-600"
               />
-              Confirmo que este ambiente realizará cotizaciones y guías reales y que el webhook fue validado.
+              Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
             </label>
           )}
 
@@ -468,7 +524,7 @@ export default function ShippingProvidersCard() {
               Probar conexión
             </ActionButton>
             <ActionButton tone="light" busy={busyAction === 'webhook'} disabled={!ready.canConfirmWebhook || ready.webhookRegistered || production !== (settings.enviaMode === 'production')} onClick={() => runAction('webhook', confirmAdminShippingWebhook)}>
-              Ya lo registré en Envia
+              Ya registré la URL
             </ActionButton>
             <ActionButton
               tone="dark"

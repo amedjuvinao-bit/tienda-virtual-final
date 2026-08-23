@@ -71,7 +71,7 @@ router.post('/webhook/confirm', async (req, res) => {
     const result = await confirmShippingWebhook(actor(req));
     return res.json({
       ok: true,
-      message: 'Webhook confirmado como configurado en el portal de Envia.',
+      message: 'Registro anotado. Ahora pulsa “Probar” en Envia; este panel se aprobará cuando reciba esa prueba real.',
       ...result,
     });
   } catch (error) {
