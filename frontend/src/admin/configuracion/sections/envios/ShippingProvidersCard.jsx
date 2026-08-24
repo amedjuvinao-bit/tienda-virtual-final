@@ -176,6 +176,29 @@ export default function ShippingProvidersCard() {
     [production, ready, savedMode]
   );
 
+  const completedSteps = checklist.filter((item) => item.done).length;
+  const progressPercent = checklist.length
+    ? Math.round((completedSteps / checklist.length) * 100)
+    : 0;
+  const credentialsReady = Boolean(
+    savedMode &&
+      ready.hasToken &&
+      (production ? ready.hasWebhookSecret : ready.hasSandboxWebhookToken)
+  );
+  const nextStep = !savedMode
+    ? 'Guarda el ambiente seleccionado para continuar.'
+    : !credentialsReady
+      ? 'Completa y guarda las credenciales de esta conexión.'
+      : !ready.tested
+        ? 'Pulsa “Probar conexión” para validar el token con Envia.'
+        : !ready.webhookRegistered
+          ? 'Copia la URL, regístrala en Envia y confirma “Ya registré la URL”.'
+          : !ready.webhookVerified
+            ? 'En el portal de Envia pulsa “Probar”. Esta pantalla detectará la respuesta sola.'
+            : !selectedEnvia
+              ? `Todo está listo. Activa Envia ${production ? 'Producción' : 'Sandbox'}.`
+              : 'Envia está conectado y ya puede operar desde las órdenes.';
+
   const runAction = async (name, action) => {
     try {
       setBusyAction(name);
@@ -223,329 +246,353 @@ export default function ShippingProvidersCard() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
-        Cargando proveedores de transporte…
+      <div className="rounded-[28px] border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
+        Cargando la configuración de entrega…
       </div>
     );
   }
 
+  const fieldClass =
+    'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-pink-400 focus:ring-4 focus:ring-pink-100';
+  const operationLabel = activeEnvia
+    ? `Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
+    : 'Operación manual';
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-lg font-bold text-gray-900">Transportadoras e integración API</p>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">
-            El usuario administrador guarda las credenciales aquí. Nunca se muestran nuevamente y el servidor las cifra antes de almacenarlas.
-          </p>
+    <section className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
+      <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-pink-950 px-5 py-5 text-white md:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-300">
+              Entrega del paquete
+            </p>
+            <h3 className="mt-1 text-2xl font-black">¿Quién llevará el pedido?</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-300">
+              La operación manual seguirá protegiendo la tienda hasta que Envia complete todos los controles.
+            </p>
+          </div>
+          <div className="min-w-[240px] rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-300">Funcionando ahora</p>
+            <p className="mt-1 text-lg font-black">{operationLabel}</p>
+            <div className="mt-2">
+              <StatusPill tone={activeEnvia ? 'green' : pendingEnvia ? 'amber' : 'gray'}>
+                {activeEnvia
+                  ? `Activo: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
+                  : pendingEnvia
+                    ? `Pendiente: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
+                    : 'Activo: Operación manual'}
+              </StatusPill>
+            </div>
+          </div>
         </div>
-        <StatusPill tone={activeEnvia ? 'green' : pendingEnvia ? 'amber' : 'gray'}>
-          {activeEnvia
-            ? `Activo: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
-            : pendingEnvia
-              ? `Pendiente: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
-              : 'Activo: Operación manual'}
-        </StatusPill>
       </div>
 
-      {feedback && (
-        <div
-          role="status"
-          className={`mt-4 rounded-xl border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}
-        >
-          {feedback.text}
-        </div>
-      )}
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-[0.85fr_2fr]">
-        <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'border-emerald-300 bg-emerald-50/50' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between gap-3">
-            <p className="font-bold text-gray-900">Operación manual</p>
-            {!activeEnvia && (
-              <StatusPill tone="green">
-                {pendingEnvia ? 'Activa por seguridad' : 'Activa'}
-              </StatusPill>
-            )}
+      <div className="p-4 md:p-5">
+        {feedback && (
+          <div
+            role="status"
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}
+          >
+            {feedback.text}
           </div>
-          <p className="mt-2 text-sm leading-6 text-gray-600">
-            Funciona sin cuentas externas. El operador registra transportadora, guía, novedades y evidencias desde cada orden.
-          </p>
-          {selectedEnvia && (
-            <div className="mt-4">
-              <ActionButton
-                tone="red"
-                busy={busyAction === 'disable'}
-                onClick={() => runAction('disable', disableAdminShippingProvider)}
-              >
-                {activeEnvia ? 'Desactivar API y volver a manual' : 'Cancelar Envia y seguir manual'}
-              </ActionButton>
-            </div>
-          )}
-        </div>
+        )}
 
-        <div className={`rounded-2xl border p-4 ${activeEnvia ? 'border-pink-300 bg-pink-50/30' : pendingEnvia ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200'}`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        {pendingEnvia && (
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-bold text-gray-900">Envia.com</p>
-              <p className="text-sm text-gray-500">Cotización, guía, recolección o entrega en oficina, seguimiento y cancelación.</p>
+              <p className="text-sm font-black text-amber-950">Envia todavía no está transportando pedidos</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">
+                Envia está seleccionada, pero todavía no opera. La tienda continúa en operación manual hasta recibir y comprobar la prueba del webhook.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {ready.tested ? <StatusPill tone="green">Conexión aprobada</StatusPill> : <StatusPill tone="amber">Sin probar</StatusPill>}
-              {ready.webhookVerified ? (
-                <StatusPill tone="green">Webhook comprobado por Envia</StatusPill>
-              ) : ready.webhookRegistered ? (
-                <StatusPill tone="amber">Esperando prueba de Envia</StatusPill>
-              ) : null}
-            </div>
+            <StatusPill tone="green">Activa por seguridad</StatusPill>
           </div>
+        )}
 
-          {pendingEnvia && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">
-              Envia está seleccionada, pero todavía no opera. La tienda continúa en operación manual hasta recibir y comprobar la prueba del webhook.
+        <div className="mb-5 rounded-2xl border border-pink-200 bg-pink-50/70 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-pink-600">Haz esto ahora</p>
+              <p className="mt-1 text-base font-black text-gray-950">{nextStep}</p>
             </div>
-          )}
-
-          {!meta.encryptionConfigured && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-              Antes de guardar credenciales, el responsable del servidor debe definir una sola vez <code>INTEGRATIONS_ENCRYPTION_KEY</code> con 32 caracteres o más y reiniciar el backend.
-            </div>
-          )}
-
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
-            <p className="font-semibold">¿Qué queda automático?</p>
-            <p className="mt-1">
-              En cada orden el sistema consulta tarifas, crea la guía y consulta a Envia si la
-              transportadora exige recolección o permite llevar el paquete a un punto de entrega.
-              El administrador solo confirma la opción recomendada e imprime la etiqueta.
-            </p>
-            <p className="mt-2">
-              El webhook es el aviso que Envia envía al servidor cuando cambia el estado de la guía.
-              Envia administra esa URL desde su portal: cópiala aquí, agrégala en Desarrolladores →
-              Webhooks y pulsa “Probar” en Envia. Este panel se aprobará automáticamente cuando
-              reciba esa prueba. Así el pedido se actualiza sin pulsar
-              “Sincronizar”. Sandbox usa una credencial Bearer exclusiva que genera el portal;
-              Producción exige la firma HMAC.
-            </p>
-          </div>
-
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-gray-700">Ambiente</span>
-              <select
-                value={mode}
-                onChange={(event) => {
-                  setMode(event.target.value);
-                  setConfirmProduction(false);
-                }}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-              >
-                <option value="sandbox">Sandbox — pruebas</option>
-                <option value="production">Producción — operaciones reales</option>
-              </select>
-            </label>
-
-            <div className="block">
-              <label htmlFor="envia-token" className="mb-1 block text-sm font-semibold text-gray-700">Token de Envia</label>
-              <input
-                id="envia-token"
-                type="password"
-                autoComplete="new-password"
-                value={token}
-                onChange={(event) => {
-                  setToken(event.target.value);
-                  if (event.target.value) setClearToken(false);
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                placeholder={settings.enviaTokenHint || 'Pegar nuevo token'}
-              />
-              <span className="mt-1 block text-xs text-gray-500">
-                {settings.hasEnviaToken ? `Guardado: ${settings.enviaTokenHint || 'credencial protegida'}. Déjalo vacío para conservarlo.` : 'Todavía no hay token guardado.'}
-              </span>
-              {meta.credentialSource === 'database' && (
-                <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
-                  <input
-                    type="checkbox"
-                    checked={clearToken}
-                    onChange={(event) => setClearToken(event.target.checked)}
-                  />
-                  Eliminar el token guardado al guardar
-                </label>
-              )}
-            </div>
-
-            {!production && (
-              <div className="block md:col-span-2">
-                <label
-                  htmlFor="envia-sandbox-webhook-token"
-                  className="mb-1 block text-sm font-semibold text-gray-700"
-                >
-                  Credencial de autorización del webhook Sandbox
-                </label>
-                <input
-                  id="envia-sandbox-webhook-token"
-                  ref={sandboxWebhookTokenRef}
-                  type="password"
-                  autoComplete="new-password"
-                  value={sandboxWebhookToken}
-                  onChange={(event) => {
-                    setSandboxWebhookToken(event.target.value);
-                    if (event.target.value) setClearSandboxWebhookToken(false);
-                  }}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                  placeholder={
-                    settings.sandboxWebhookTokenHint ||
-                    'Pegar la credencial generada por Envia'
-                  }
+            <div className="min-w-[190px]">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-600">
+                <span>Preparación de Envia</span>
+                <span>{completedSteps}/{checklist.length}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-pink-500 to-violet-500 transition-all"
+                  style={{ width: `${progressPercent}%` }}
                 />
-                <span className="mt-1 block text-xs text-gray-500">
-                  {settings.hasSandboxWebhookToken
-                    ? `Guardada: ${settings.sandboxWebhookTokenHint || 'credencial protegida'}. Déjala vacía para conservarla.`
-                    : 'En el portal Sandbox, guarda el webhook y copia la credencial generada en el segundo campo “Url”. No uses aquí el token de la API.'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {!meta.encryptionConfigured && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+            Antes de guardar credenciales, el responsable del servidor debe definir una sola vez <code>INTEGRATIONS_ENCRYPTION_KEY</code> con 32 caracteres o más y reiniciar el backend.
+          </div>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid content-start gap-3">
+            <details
+              open={!credentialsReady || secretsChanged}
+              className="group overflow-hidden rounded-2xl border border-gray-200 bg-white"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
+                <span className="flex items-center gap-3">
+                  <span className={`rounded-lg px-2 py-1 text-xs font-black ${credentialsReady ? 'bg-emerald-50 text-emerald-700' : 'bg-pink-50 text-pink-600'}`}>01</span>
+                  <span>
+                    <span className="block text-sm font-black text-gray-950">Cuenta y credenciales</span>
+                    <span className="block text-xs text-gray-500">Ambiente, token y autorización segura</span>
+                  </span>
                 </span>
-                {meta.sandboxWebhookTokenSource === 'database' && (
-                  <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
-                    <input
-                      type="checkbox"
-                      checked={clearSandboxWebhookToken}
-                      onChange={(event) =>
-                        setClearSandboxWebhookToken(event.target.checked)
-                      }
-                    />
-                    Eliminar la credencial Sandbox guardada al guardar
+                <span className="text-xs font-bold text-gray-500 group-open:hidden">Abrir</span>
+                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Cerrar</span>
+              </summary>
+
+              <div className="border-t border-gray-100 bg-gray-50/60 p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-gray-700">Ambiente</span>
+                    <select
+                      value={mode}
+                      onChange={(event) => {
+                        setMode(event.target.value);
+                        setConfirmProduction(false);
+                      }}
+                      className={fieldClass}
+                    >
+                      <option value="sandbox">Sandbox — pruebas</option>
+                      <option value="production">Producción — operaciones reales</option>
+                    </select>
                   </label>
+
+                  <div className="block">
+                    <label htmlFor="envia-token" className="mb-1 block text-sm font-bold text-gray-700">Token de Envia</label>
+                    <input
+                      id="envia-token"
+                      type="password"
+                      autoComplete="new-password"
+                      value={token}
+                      onChange={(event) => {
+                        setToken(event.target.value);
+                        if (event.target.value) setClearToken(false);
+                      }}
+                      className={fieldClass}
+                      placeholder={settings.enviaTokenHint || 'Pegar nuevo token'}
+                    />
+                    <span className="mt-1 block text-xs text-gray-500">
+                      {settings.hasEnviaToken ? `Guardado: ${settings.enviaTokenHint || 'credencial protegida'}. Déjalo vacío para conservarlo.` : 'Todavía no hay token guardado.'}
+                    </span>
+                    {meta.credentialSource === 'database' && (
+                      <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                        <input type="checkbox" checked={clearToken} onChange={(event) => setClearToken(event.target.checked)} />
+                        Eliminar el token guardado al guardar
+                      </label>
+                    )}
+                  </div>
+
+                  {!production && (
+                    <div className="block md:col-span-2">
+                      <label htmlFor="envia-sandbox-webhook-token" className="mb-1 block text-sm font-bold text-gray-700">
+                        Credencial de autorización del webhook Sandbox
+                      </label>
+                      <input
+                        id="envia-sandbox-webhook-token"
+                        ref={sandboxWebhookTokenRef}
+                        type="password"
+                        autoComplete="new-password"
+                        value={sandboxWebhookToken}
+                        onChange={(event) => {
+                          setSandboxWebhookToken(event.target.value);
+                          if (event.target.value) setClearSandboxWebhookToken(false);
+                        }}
+                        className={fieldClass}
+                        placeholder={settings.sandboxWebhookTokenHint || 'Pegar la credencial generada por Envia'}
+                      />
+                      <span className="mt-1 block text-xs text-gray-500">
+                        {settings.hasSandboxWebhookToken
+                          ? `Guardada: ${settings.sandboxWebhookTokenHint || 'credencial protegida'}. Déjala vacía para conservarla.`
+                          : 'En el portal Sandbox, guarda el webhook y copia la credencial generada en el segundo campo “Url”. No uses aquí el token de la API.'}
+                      </span>
+                      {meta.sandboxWebhookTokenSource === 'database' && (
+                        <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                          <input type="checkbox" checked={clearSandboxWebhookToken} onChange={(event) => setClearSandboxWebhookToken(event.target.checked)} />
+                          Eliminar la credencial Sandbox guardada al guardar
+                        </label>
+                      )}
+                    </div>
+                  )}
+
+                  {production && (
+                    <div className="block md:col-span-2">
+                      <label htmlFor="envia-webhook-secret" className="mb-1 block text-sm font-bold text-gray-700">Secreto de firma del webhook</label>
+                      <input
+                        id="envia-webhook-secret"
+                        type="password"
+                        autoComplete="new-password"
+                        value={webhookSecret}
+                        onChange={(event) => {
+                          setWebhookSecret(event.target.value);
+                          if (event.target.value) setClearWebhookSecret(false);
+                        }}
+                        className={fieldClass}
+                        placeholder={settings.webhookSecretHint || 'Pegar secreto HMAC para producción'}
+                      />
+                      <span className="mt-1 block text-xs text-gray-500">
+                        {settings.hasWebhookSecret ? `Guardado: ${settings.webhookSecretHint || 'secreto protegido'}. Déjalo vacío para conservarlo.` : 'Requerido para validar eventos reales en producción.'}
+                      </span>
+                      {meta.webhookSecretSource === 'database' && (
+                        <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                          <input type="checkbox" checked={clearWebhookSecret} onChange={(event) => setClearWebhookSecret(event.target.checked)} />
+                          Eliminar el secreto guardado al guardar
+                        </label>
+                      )}
+                    </div>
+                  )}
+
+                  <label className="block md:col-span-2">
+                    <span className="mb-1 block text-sm font-bold text-gray-700">Impuestos internacionales</span>
+                    <select value={dutiesPaymentEntity} onChange={(event) => setDutiesPaymentEntity(event.target.value)} className={fieldClass}>
+                      <option value="recipient">Los paga el destinatario (DAP)</option>
+                      <option value="sender">Los paga la tienda (DDP)</option>
+                      <option value="envia_guaranteed">Envia Guaranteed, cuando esté disponible</option>
+                    </select>
+                    <span className="mt-1 block text-xs text-gray-500">Solo se usa cuando el origen y el destino están en países distintos.</span>
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ActionButton tone="pink" busy={busyAction === 'save'} disabled={saveBlocked} onClick={save}>Guardar configuración</ActionButton>
+                  <ActionButton
+                    tone="light"
+                    busy={busyAction === 'test'}
+                    disabled={!ready.canTest || secretsChanged || mode !== settings.enviaMode}
+                    onClick={() => runAction('test', testAdminShippingConnection)}
+                  >
+                    Probar conexión
+                  </ActionButton>
+                </div>
+                {secretsChanged && <p className="mt-2 text-xs text-gray-500">Guarda los cambios antes de probar o activar.</p>}
+              </div>
+            </details>
+
+            <details
+              open={ready.tested && !ready.webhookVerified}
+              className="group overflow-hidden rounded-2xl border border-gray-200 bg-white"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
+                <span className="flex items-center gap-3">
+                  <span className={`rounded-lg px-2 py-1 text-xs font-black ${ready.webhookVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-pink-50 text-pink-600'}`}>02</span>
+                  <span>
+                    <span className="block text-sm font-black text-gray-950">Avisos automáticos de Envia</span>
+                    <span className="block text-xs text-gray-500">Registra una sola URL y comprueba el webhook</span>
+                  </span>
+                </span>
+                <span className="text-xs font-bold text-gray-500 group-open:hidden">Abrir</span>
+                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Cerrar</span>
+              </summary>
+
+              <div className="border-t border-gray-100 bg-gray-50/60 p-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">URL para registrar en Envia</p>
+                  <code className="mt-2 block break-all rounded-lg bg-gray-950 px-3 py-2 text-xs text-white">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <ActionButton tone="light" disabled={!meta.webhookUrl} onClick={copyWebhookUrl}>Copiar URL</ActionButton>
+                    {meta.webhookDashboardUrl && (
+                      <a href={meta.webhookDashboardUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100">
+                        Abrir portal de Envia
+                      </a>
+                    )}
+                    <ActionButton
+                      tone="light"
+                      busy={busyAction === 'webhook'}
+                      disabled={!ready.canConfirmWebhook || ready.webhookRegistered || production !== (settings.enviaMode === 'production')}
+                      onClick={() => runAction('webhook', confirmAdminShippingWebhook)}
+                    >
+                      Ya registré la URL
+                    </ActionButton>
+                  </div>
+                </div>
+
+                {ready.webhookRegistered && !ready.webhookVerified && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                    Esperando prueba de Envia
+                  </div>
+                )}
+                {ready.webhookVerified && (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+                    Webhook comprobado por Envia{settings.webhookVerifiedAt ? ` · ${formatDate(settings.webhookVerifiedAt)}` : ''}
+                  </div>
+                )}
+                {!ready.webhookUrlReady && <p className="mt-2 text-xs text-amber-700">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>}
+                {production && ready.temporaryWebhookUrl && (
+                  <p className="mt-2 text-xs font-semibold text-red-700">
+                    Producción bloqueada: trycloudflare.com es temporal. Publica el backend en una dirección HTTPS permanente.
+                  </p>
+                )}
+              </div>
+            </details>
+
+            <details className="group overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
+                <span>
+                  <span className="block text-sm font-black text-gray-950">¿Qué hará Envia automáticamente?</span>
+                  <span className="block text-xs text-gray-500">Explicación sencilla del proceso</span>
+                </span>
+                <span className="text-xs font-bold text-gray-500 group-open:hidden">Ver explicación</span>
+                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Ocultar</span>
+              </summary>
+              <div className="border-t border-gray-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+                <p className="font-bold">¿Qué queda automático?</p>
+                <p className="mt-1">
+                  En cada orden el sistema consulta tarifas, crea la guía y pregunta si el paquete se recoge o se lleva a un punto autorizado. El administrador solo confirma la opción recomendada e imprime la etiqueta.
+                </p>
+                <p className="mt-2">
+                  El webhook es el aviso que Envia envía cuando cambia el estado de la guía. Por eso el pedido se actualiza solo, sin pulsar “Sincronizar”.
+                </p>
+              </div>
+            </details>
+          </div>
+
+          <aside className="grid content-start gap-3 lg:sticky lg:top-4">
+            <div className="rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-black text-gray-950">Estado de la conexión</p>
+                <span className="text-xs font-bold text-gray-500">{progressPercent}%</span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {checklist.map((item) => (
+                  <div key={item.label} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-semibold ${item.done ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+                    <span>{item.label}</span>
+                    <span aria-hidden="true">{item.done ? 'Listo' : 'Pendiente'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {ready.tested && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-sm font-black text-emerald-900">Conexión aprobada</p>
+                {settings.lastTestMessage && (
+                  <p className={`mt-1 text-xs leading-5 ${settings.lastTestStatus === 'success' ? 'text-emerald-800' : 'text-red-700'}`}>
+                    {settings.lastTestMessage}{settings.lastTestAt ? ` · ${formatDate(settings.lastTestAt)}` : ''}
+                  </p>
                 )}
               </div>
             )}
 
             {production && (
-            <div className="block md:col-span-2">
-              <label htmlFor="envia-webhook-secret" className="mb-1 block text-sm font-semibold text-gray-700">Secreto de firma del webhook</label>
-              <input
-                id="envia-webhook-secret"
-                type="password"
-                autoComplete="new-password"
-                value={webhookSecret}
-                onChange={(event) => {
-                  setWebhookSecret(event.target.value);
-                  if (event.target.value) setClearWebhookSecret(false);
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                placeholder={settings.webhookSecretHint || 'Pegar secreto HMAC para producción'}
-              />
-              <span className="mt-1 block text-xs text-gray-500">
-                {settings.hasWebhookSecret ? `Guardado: ${settings.webhookSecretHint || 'secreto protegido'}. Déjalo vacío para conservarlo.` : 'Requerido para validar eventos reales en producción.'}
-              </span>
-              {meta.webhookSecretSource === 'database' && (
-                <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
-                  <input
-                    type="checkbox"
-                    checked={clearWebhookSecret}
-                    onChange={(event) => setClearWebhookSecret(event.target.checked)}
-                  />
-                  Eliminar el secreto guardado al guardar
-                </label>
-              )}
-            </div>
+              <label className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-900">
+                <input type="checkbox" checked={confirmProduction} onChange={(event) => setConfirmProduction(event.target.checked)} className="mt-0.5 h-4 w-4 accent-red-600" />
+                Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
+              </label>
             )}
 
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-semibold text-gray-700">
-                Impuestos y aranceles internacionales
-              </span>
-              <select
-                value={dutiesPaymentEntity}
-                onChange={(event) => setDutiesPaymentEntity(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-              >
-                <option value="recipient">Los paga el destinatario (DAP)</option>
-                <option value="sender">Los paga la tienda (DDP)</option>
-                <option value="envia_guaranteed">Envia Guaranteed, cuando esté disponible</option>
-              </select>
-              <span className="mt-1 block text-xs text-gray-500">
-                Se aplica únicamente cuando el origen y el destino están en países distintos.
-              </span>
-            </label>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">URL pública para seguimiento</p>
-            <p className="mt-1 text-sm text-gray-700">
-              {production
-                ? '1. Copia la URL permanente. 2. Agrégala en el portal de Producción. 3. Pulsa Probar en Envia. 4. Regresa: la confirmación aparecerá automáticamente.'
-                : '1. Copia esta URL. 2. Crea el webhook en el portal Sandbox. 3. Copia la credencial que Envia genera en el segundo campo “Url” y guárdala arriba. 4. Pulsa Probar en Envia; este panel detectará la respuesta automáticamente.'}
-            </p>
-            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <code className="min-w-0 flex-1 break-all text-sm text-gray-800">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
-              <ActionButton tone="light" disabled={!meta.webhookUrl} onClick={copyWebhookUrl}>Copiar</ActionButton>
-            </div>
-            {meta.webhookDashboardUrl && (
-              <a
-                href={meta.webhookDashboardUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
-              >
-                Abrir portal de Envia
-              </a>
-            )}
-            {!ready.webhookUrlReady && (
-              <p className="mt-2 text-xs text-amber-700">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>
-            )}
-            {production && ready.temporaryWebhookUrl && (
-              <p className="mt-2 text-xs font-semibold text-red-700">
-                Producción bloqueada: trycloudflare.com es temporal. Publica el backend en una dirección HTTPS permanente.
-              </p>
-            )}
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {checklist.map((item) => (
-              <div key={item.label} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
-                <span aria-hidden="true" className={item.done ? 'text-emerald-600' : 'text-gray-300'}>{item.done ? '●' : '○'}</span>
-                {item.label}
-              </div>
-            ))}
-          </div>
-
-          {settings.lastTestMessage && (
-            <p className={`mt-3 text-sm ${settings.lastTestStatus === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
-              {settings.lastTestMessage}{settings.lastTestAt ? ` · ${formatDate(settings.lastTestAt)}` : ''}
-            </p>
-          )}
-
-          {ready.webhookVerified && settings.webhookVerifiedAt && (
-            <p className="mt-2 text-sm font-semibold text-emerald-700">
-              Webhook comprobado por Envia · {formatDate(settings.webhookVerifiedAt)}
-            </p>
-          )}
-
-          {(production ? ready.canActivateProduction : ready.canActivateSandbox) && !selectedEnvia && (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
-              Todo está comprobado. Ya puedes activar Envia {production ? 'Producción' : 'Sandbox'}.
-            </div>
-          )}
-
-          {production && (
-            <label className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-              <input
-                type="checkbox"
-                checked={confirmProduction}
-                onChange={(event) => setConfirmProduction(event.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-red-600"
-              />
-              Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
-            </label>
-          )}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ActionButton tone="pink" busy={busyAction === 'save'} disabled={saveBlocked} onClick={save}>
-              Guardar configuración
-            </ActionButton>
-            <ActionButton tone="light" busy={busyAction === 'test'} disabled={!ready.canTest || secretsChanged || mode !== settings.enviaMode} onClick={() => runAction('test', testAdminShippingConnection)}>
-              Probar conexión
-            </ActionButton>
-            <ActionButton tone="light" busy={busyAction === 'webhook'} disabled={!ready.canConfirmWebhook || ready.webhookRegistered || production !== (settings.enviaMode === 'production')} onClick={() => runAction('webhook', confirmAdminShippingWebhook)}>
-              Ya registré la URL
-            </ActionButton>
             <ActionButton
               tone="dark"
               busy={busyAction === 'activate'}
@@ -559,13 +606,24 @@ export default function ShippingProvidersCard() {
             >
               Activar {production ? 'Producción' : 'Sandbox'}
             </ActionButton>
-          </div>
 
-          {secretsChanged && (
-            <p className="mt-2 text-xs text-gray-500">Guarda los cambios antes de probar o activar.</p>
-          )}
+            <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'border-emerald-200 bg-emerald-50/70' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-black text-gray-950">Operación manual</p>
+                {!activeEnvia && <StatusPill tone="green">{pendingEnvia ? 'Protección actual' : 'Activa'}</StatusPill>}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-gray-600">El operador registra transportadora, guía y novedades desde la orden.</p>
+              {selectedEnvia && (
+                <div className="mt-3">
+                  <ActionButton tone="red" busy={busyAction === 'disable'} onClick={() => runAction('disable', disableAdminShippingProvider)}>
+                    {activeEnvia ? 'Desactivar API y volver a manual' : 'Cancelar Envia y seguir manual'}
+                  </ActionButton>
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
