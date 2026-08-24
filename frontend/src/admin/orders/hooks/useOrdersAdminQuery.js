@@ -22,24 +22,66 @@ function summaryParamsKey(params = {}) {
   return stableParamsKey(summaryParams);
 }
 
-function requestOrders(params) {
+function acquireOrdersRequest(params) {
   const key = stableParamsKey(params);
-  const current = inflightOrderQueries.get(key);
-  if (current) return current;
+  let entry = inflightOrderQueries.get(key);
 
-  const request = api
-    .get('/api/orders/admin', { params })
-    .finally(() => {
-      if (inflightOrderQueries.get(key) === request) {
-        inflightOrderQueries.delete(key);
+  if (!entry) {
+    const controller = new AbortController();
+    entry = {
+      abortTimer: null,
+      controller,
+      subscribers: 0,
+      promise: null,
+    };
+    entry.promise = api
+      .get('/api/orders/admin', { params, signal: controller.signal })
+      .finally(() => {
+        if (inflightOrderQueries.get(key) === entry) {
+          inflightOrderQueries.delete(key);
+        }
+      });
+    inflightOrderQueries.set(key, entry);
+  }
+
+  if (entry.abortTimer) {
+    clearTimeout(entry.abortTimer);
+    entry.abortTimer = null;
+  }
+  entry.subscribers += 1;
+
+  let released = false;
+  return {
+    promise: entry.promise,
+    release() {
+      if (released) return;
+      released = true;
+      entry.subscribers = Math.max(0, entry.subscribers - 1);
+
+      if (entry.subscribers === 0 && !entry.controller.signal.aborted) {
+        // StrictMode desmonta y monta el mismo efecto inmediatamente. Esperar un
+        // turno permite reutilizar esa lectura y cancela solo filtros obsoletos.
+        entry.abortTimer = setTimeout(() => {
+          entry.abortTimer = null;
+          if (
+            entry.subscribers === 0 &&
+            inflightOrderQueries.get(key) === entry &&
+            !entry.controller.signal.aborted
+          ) {
+            entry.controller.abort();
+            inflightOrderQueries.delete(key);
+          }
+        }, 0);
       }
-    });
-
-  inflightOrderQueries.set(key, request);
-  return request;
+    },
+  };
 }
 
 export function clearOrdersAdminQueryInflight() {
+  inflightOrderQueries.forEach((entry) => {
+    if (entry.abortTimer) clearTimeout(entry.abortTimer);
+    if (!entry.controller.signal.aborted) entry.controller.abort();
+  });
   inflightOrderQueries.clear();
 }
 
@@ -88,10 +130,12 @@ export default function useOrdersAdminQuery({
     setLoading(true);
     setErr('');
 
-    requestOrders({
+    const request = acquireOrdersRequest({
       ...params,
       includeSummary: includeSummary ? 1 : 0,
-    })
+    });
+
+    request.promise
       .then((response) => {
         if (requestSequence.current !== sequence) return;
 
@@ -122,7 +166,7 @@ export default function useOrdersAdminQuery({
         if (requestSequence.current === sequence) setLoading(false);
       });
 
-    return undefined;
+    return request.release;
   }, [authLoading, hasSession, canView, params]);
 
   return {

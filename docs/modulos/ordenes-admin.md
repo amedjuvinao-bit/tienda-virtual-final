@@ -4,11 +4,12 @@
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
 - Etapa 1: **cerrada en GitHub con Órdenes CI en verde**.
-- Etapa actual: **Cierre del módulo · Etapa 2: conciliación integral de devoluciones**.
+- Etapa 2: **cerrada en GitHub con Órdenes CI en verde**.
+- Etapa actual: **Cierre del módulo · Etapa 3: consultas administrativas escalables**.
 - Estado de la etapa: implementación local en validación; todavía no se ha publicado.
 - Siguiente validación externa: desplegar el backend en una dirección HTTPS permanente, configurar las credenciales reales desde el panel y recibir una prueba auténtica del webhook de Envia Producción antes de activar operaciones con costo.
 
-La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md).
+La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md). El cierre de consultas, paginación y concurrencia de la Etapa 3 está en [`ordenes-etapa-3-cierre.md`](./ordenes-etapa-3-cierre.md).
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 

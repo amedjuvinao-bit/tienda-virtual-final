@@ -52,6 +52,9 @@ describe('useOrdersAdminQuery', () => {
     );
 
     expect(apiState.get).toHaveBeenCalledTimes(1);
+    const strictModeSignal = apiState.get.mock.calls[0][1].signal;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(strictModeSignal.aborted).toBe(false);
 
     await act(async () => {
       pending.resolve({
@@ -88,6 +91,11 @@ describe('useOrdersAdminQuery', () => {
 
     rerender({ params: { page: 1, limit: 20, q: 'actual' } });
     expect(apiState.get).toHaveBeenCalledTimes(2);
+    const obsoleteSignal = apiState.get.mock.calls[0][1].signal;
+    const currentSignal = apiState.get.mock.calls[1][1].signal;
+
+    await waitFor(() => expect(obsoleteSignal.aborted).toBe(true));
+    expect(currentSignal.aborted).toBe(false);
 
     await act(async () => {
       newRequest.resolve({
