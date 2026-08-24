@@ -139,7 +139,10 @@ function run() {
   );
   assertIncludes(
     workflow,
-    ['npm --prefix frontend run build', 'playwright install --with-deps chromium'],
+    [
+      'npm --prefix frontend run build',
+      'node frontend/node_modules/playwright/cli.js install --with-deps chromium',
+    ],
     'Compilación y navegador'
   );
   ok(`El CI ejecuta ${requiredFrontendSuites.length} suites visuales y recorridos E2E`);
