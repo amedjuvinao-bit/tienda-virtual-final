@@ -31,6 +31,66 @@ function badgeVariant(state) {
   return 'warning';
 }
 
+function nextReconciliationStep(reconciliation = {}) {
+  const state = (key) => reconciliation?.[key]?.state || 'pending';
+
+  if (['action_required', 'failed'].includes(state('payment'))) {
+    return {
+      title: 'Confirma el dinero devuelto',
+      detail: 'Registra la referencia del reverso o comprobante para recalcular la caja.',
+      variant: state('payment') === 'failed' ? 'danger' : 'warning',
+    };
+  }
+  if (state('payment') === 'processing') {
+    return {
+      title: 'Espera la respuesta del medio de pago',
+      detail: 'Ya existe una devolución monetaria en procesamiento. No la repitas.',
+      variant: 'warning',
+    };
+  }
+  if (['action_required', 'failed'].includes(state('billing'))) {
+    return {
+      title: 'Emite o recupera la nota crédito',
+      detail: 'Continúa desde Facturación electrónica y vincula el documento oficial.',
+      variant: state('billing') === 'failed' ? 'danger' : 'warning',
+    };
+  }
+  if (state('billing') === 'pending') {
+    return {
+      title: 'Revisa el estado de la factura',
+      detail: 'La obligación fiscal se definirá cuando la factura tenga un resultado definitivo.',
+      variant: 'warning',
+    };
+  }
+  if (state('cash') === 'failed') {
+    return {
+      title: 'Reconcilia nuevamente la caja',
+      detail: 'El reintegro está registrado, pero el resumen de caja todavía debe recalcularse.',
+      variant: 'danger',
+    };
+  }
+  if (['pending', 'failed'].includes(state('inventory'))) {
+    return {
+      title: 'Termina la devolución de inventario',
+      detail: 'Confirma la inspección y las unidades que realmente regresan a existencias.',
+      variant: state('inventory') === 'failed' ? 'danger' : 'warning',
+    };
+  }
+  if (reconciliation?.state === 'completed') {
+    return {
+      title: 'Conciliación cerrada',
+      detail: 'Inventario, dinero, caja y documento fiscal quedaron coherentes.',
+      variant: 'success',
+    };
+  }
+
+  return {
+    title: 'Actualizando conciliación',
+    detail: 'El sistema está verificando qué obligación sigue pendiente.',
+    variant: 'warning',
+  };
+}
+
 export default function OrderDetailRefundReconciliation({
   refunds = [],
   loading = false,
@@ -59,6 +119,7 @@ export default function OrderDetailRefundReconciliation({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {refunds.map((refund) => {
           const reconciliation = refund?.reconciliation || {};
+          const nextStep = nextReconciliationStep(reconciliation);
           const paymentState = reconciliation?.payment?.state || 'pending';
           const reference = references[refund._id] || '';
           const automationRequired = ['payment', 'billing'].some((key) =>
@@ -103,6 +164,41 @@ export default function OrderDetailRefundReconciliation({
               </div>
 
               <div
+                aria-live="polite"
+                className="refund-reconciliation-next-step"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto minmax(0, 1fr)',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 12,
+                  border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+                  borderRadius: 14,
+                  background: ORDER_DETAIL_THEME.cardBg,
+                  padding: 11,
+                }}
+              >
+                <SoftBadge variant={nextStep.variant}>Siguiente paso</SoftBadge>
+                <div>
+                  <strong style={{ display: 'block', fontSize: 12 }}>
+                    {nextStep.title}
+                  </strong>
+                  <span
+                    style={{
+                      display: 'block',
+                      marginTop: 2,
+                      color: ORDER_DETAIL_THEME.mutedText,
+                      fontSize: 11,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {nextStep.detail}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="refund-reconciliation-stages"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
@@ -192,6 +288,7 @@ export default function OrderDetailRefundReconciliation({
 
               {['action_required', 'failed'].includes(paymentState) ? (
                 <div
+                  className="refund-reconciliation-action"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0, 1fr) auto',
@@ -254,13 +351,14 @@ export default function OrderDetailRefundReconciliation({
       <style>
         {`
           @media (max-width: 820px) {
-            div[style*="grid-template-columns: repeat(4, minmax(0, 1fr))"] {
+            .refund-reconciliation-stages {
               grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             }
           }
           @media (max-width: 560px) {
-            div[style*="grid-template-columns: repeat(4, minmax(0, 1fr))"],
-            div[style*="grid-template-columns: minmax(0, 1fr) auto"] {
+            .refund-reconciliation-stages,
+            .refund-reconciliation-next-step,
+            .refund-reconciliation-action {
               grid-template-columns: 1fr !important;
             }
           }

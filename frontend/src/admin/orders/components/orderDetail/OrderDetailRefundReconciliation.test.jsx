@@ -29,6 +29,7 @@ describe('conciliación comercial de devoluciones', () => {
     expect(screen.getByText('Caja')).toBeInTheDocument();
     expect(screen.getByText('Nota crédito')).toBeInTheDocument();
     expect(screen.getAllByText('Requiere acción')).toHaveLength(3);
+    expect(screen.getByText('Confirma el dinero devuelto')).toBeInTheDocument();
   });
 
   it('exige referencia antes de confirmar la salida del dinero', () => {
@@ -70,5 +71,47 @@ describe('conciliación comercial de devoluciones', () => {
     expect(
       screen.getByRole('button', { name: 'Confirmar dinero devuelto' })
     ).toBeInTheDocument();
+  });
+
+  it('indica la nota crédito como única tarea siguiente cuando el dinero ya cerró', () => {
+    render(
+      <OrderDetailRefundReconciliation
+        refunds={[
+          {
+            ...refund,
+            reconciliation: {
+              ...refund.reconciliation,
+              payment: { state: 'completed', reference: 'REVERSO-4581' },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Emite o recupera la nota crédito')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Confirmar dinero devuelto' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('declara el cierre únicamente cuando las cuatro autoridades terminaron', () => {
+    render(
+      <OrderDetailRefundReconciliation
+        refunds={[
+          {
+            ...refund,
+            reconciliation: {
+              state: 'completed',
+              inventory: { state: 'completed' },
+              payment: { state: 'completed' },
+              cash: { state: 'not_required' },
+              billing: { state: 'completed' },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Conciliación cerrada')).toBeInTheDocument();
   });
 });

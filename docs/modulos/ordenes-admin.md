@@ -3,11 +3,12 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **Cierre del módulo · Etapa 1: base técnica y aceptación**.
-- Estado de la etapa: implementación local preparada; el cierre remoto permanece pendiente hasta publicar con autorización y obtener Órdenes CI en verde.
+- Etapa 1: **cerrada en GitHub con Órdenes CI en verde**.
+- Etapa actual: **Cierre del módulo · Etapa 2: conciliación integral de devoluciones**.
+- Estado de la etapa: implementación local en validación; todavía no se ha publicado.
 - Siguiente validación externa: desplegar el backend en una dirección HTTPS permanente, configurar las credenciales reales desde el panel y recibir una prueba auténtica del webhook de Envia Producción antes de activar operaciones con costo.
 
-La matriz por roles, dispositivos, puertas técnicas y exclusiones de producción está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). Esta etapa añade un CI exclusivo de Órdenes, un recorrido E2E operativo por perfiles y conserva separado el recorrido fiscal hacia Facturación.
+La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md).
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 
@@ -426,8 +427,10 @@ Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PR
 ## Evidencia de la etapa 2
 
 - Conciliación comercial: 10 controles de modelo, estados, caja, pagos mixtos, permisos y vínculo fiscal.
-- Interfaz de conciliación: prueba de visibilidad de las cuatro etapas y bloqueo sin referencia.
-- El contrato se ejecuta en GitHub Actions dentro de `products-ci.yml`.
+- Interfaz de conciliación: 5 pruebas sobre las cuatro etapas, referencia obligatoria, automatización segura, tarea siguiente y cierre real.
+- Integración MongoDB aislada: devolución total con caja y factura, idempotencia monetaria y devolución parcial sin cambio de estado indebido.
+- Recorrido Playwright del perfil de Facturación: confirma el dinero una sola vez y conserva visible la obligación de nota crédito.
+- El contrato histórico continúa en `products-ci.yml`; las puertas completas y la base temporal exclusiva se ejecutan en `orders-ci.yml`.
 - Las pruebas no llaman gateways ni escriben en bases de datos productivas.
 
 ## Evidencia de la etapa 3

@@ -41,6 +41,9 @@ jobs:
       - name: Validar cierre de la etapa 1
         run: npm --prefix backend run test:orders-stage1-closure
 
+      - name: Validar cierre de la etapa 2
+        run: npm --prefix backend run test:orders-stage2-closure
+
       - name: Validar permisos y arquitectura
         run: |
           npm --prefix backend run test:orders-security
@@ -131,6 +134,11 @@ jobs:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0
         run: npm --prefix backend run test:order-refund-inventory
 
+      - name: Validar conciliación comercial completa
+        env:
+          ORDERS_STAGE2_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stage2_reconciliation?replicaSet=rs0
+        run: npm --prefix backend run test:order-commercial-reconciliation-integration
+
       - name: Validar estados masivos
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_bulk_status?replicaSet=rs0
@@ -213,6 +221,9 @@ jobs:
 
       - name: Validar consola por rol y dispositivo
         run: npm --prefix frontend run test:e2e:orders-stage1
+
+      - name: Validar conciliación visual de devolución
+        run: npm --prefix frontend run test:e2e:orders-stage2
 
       - name: Validar traspaso de orden a facturación
         run: npm --prefix frontend run test:e2e:orders-billing-phase1
