@@ -56,10 +56,21 @@ describe('EnviosSection', () => {
 
     expect(await screen.findByText('¿Cuánto cobrará la tienda?')).toBeInTheDocument();
     expect(screen.queryByTestId('shipping-provider-card')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cobro en checkout/i })).toHaveClass(
+      'shipping-nav-option'
+    );
+    expect(screen.getByRole('button', { name: /Cobro en checkout/i })).toHaveAttribute(
+      'data-active',
+      'true'
+    );
 
     await user.click(screen.getByRole('button', { name: /Entrega del paquete/i }));
     expect(screen.getByTestId('shipping-provider-card')).toBeInTheDocument();
     expect(screen.queryByText('¿Cuánto cobrará la tienda?')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Entrega del paquete/i })).toHaveAttribute(
+      'data-active',
+      'true'
+    );
 
     await user.click(screen.getByRole('button', { name: /Cobro en checkout/i }));
     expect(screen.getByText('¿Cuánto cobrará la tienda?')).toBeInTheDocument();

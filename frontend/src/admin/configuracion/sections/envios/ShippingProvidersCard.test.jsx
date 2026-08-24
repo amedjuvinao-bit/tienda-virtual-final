@@ -77,6 +77,7 @@ describe('ShippingProvidersCard', () => {
     render(<ShippingProvidersCard />);
 
     expect(await screen.findByText('Activo: Operación manual')).toBeInTheDocument();
+    expect(screen.getByText('¿Quién llevará el pedido?').closest('.shipping-provider-hero')).not.toBeNull();
     expect(screen.getByText(/Guardado: ••••1234/)).toBeInTheDocument();
     expect(screen.queryByDisplayValue('token-real')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Probar conexión' })).toBeDisabled();
@@ -186,6 +187,9 @@ describe('ShippingProvidersCard', () => {
     expect(portal).toHaveAttribute(
       'href',
       'https://shipping-test.envia.com/settings/developers'
+    );
+    expect(screen.getByText('https://api.tienda.test/api/shipping/webhooks/envia')).toHaveClass(
+      'shipping-code'
     );
     await user.click(screen.getByRole('button', { name: 'Ya registré la URL' }));
     await waitFor(() => expect(confirmAdminShippingWebhook).toHaveBeenCalledTimes(1));

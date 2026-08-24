@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../../lib/api';
 import { fetchSiteSettings, saveSiteSettings } from '../../../lib/siteSettingsApi';
 import ShippingProvidersCard from './envios/ShippingProvidersCard';
+import './envios/ShippingCenter.css';
 
 function buildDefaultZone() {
   return {
@@ -441,21 +442,21 @@ export default function EnviosSection() {
   };
 
   const inputClass =
-    'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-pink-400 focus:ring-4 focus:ring-pink-100';
+    'shipping-field w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition';
 
   return (
-    <div className="grid gap-4">
-      <section className="overflow-hidden rounded-[28px] border border-pink-100 bg-white shadow-[0_18px_50px_-32px_rgba(219,39,119,0.45)]">
-        <div className="bg-gradient-to-r from-pink-50 via-white to-violet-50 px-5 py-5 md:px-6">
+    <div className="shipping-center grid gap-4">
+      <section className="shipping-glass-hero overflow-hidden rounded-[28px] border">
+        <div className="px-5 py-5 md:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="max-w-2xl">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-600">
+              <p className="shipping-accent text-xs font-bold uppercase tracking-[0.18em]">
                 Centro de envíos
               </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-gray-950">
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
                 Configura el envío sin mezclar procesos
               </h2>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
+              <p className="shipping-muted mt-1 text-sm leading-6">
                 Primero decide cuánto pagará el cliente. Después elige cómo se entregará el paquete.
               </p>
             </div>
@@ -464,18 +465,15 @@ export default function EnviosSection() {
               <button
                 type="button"
                 onClick={() => setActiveView('rates')}
-                className={`group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                  activeView === 'rates'
-                    ? 'border-pink-400 bg-gray-950 text-white shadow-lg shadow-pink-200'
-                    : 'border-white bg-white/90 text-gray-700 hover:border-pink-200'
-                }`}
+                data-active={activeView === 'rates'}
+                className="shipping-nav-option group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition"
               >
-                <span className={`rounded-lg px-2 py-1 text-xs font-black ${activeView === 'rates' ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600'}`}>
+                <span className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">
                   01
                 </span>
                 <span>
                   <span className="block text-sm font-bold">Cobro en checkout</span>
-                  <span className={`block text-xs ${activeView === 'rates' ? 'text-gray-300' : 'text-gray-500'}`}>
+                  <span className="shipping-muted block text-xs">
                     Tarifas, ciudades y envío gratis
                   </span>
                 </span>
@@ -484,18 +482,15 @@ export default function EnviosSection() {
               <button
                 type="button"
                 onClick={() => setActiveView('carrier')}
-                className={`group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                  activeView === 'carrier'
-                    ? 'border-pink-400 bg-gray-950 text-white shadow-lg shadow-pink-200'
-                    : 'border-white bg-white/90 text-gray-700 hover:border-pink-200'
-                }`}
+                data-active={activeView === 'carrier'}
+                className="shipping-nav-option group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition"
               >
-                <span className={`rounded-lg px-2 py-1 text-xs font-black ${activeView === 'carrier' ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600'}`}>
+                <span className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">
                   02
                 </span>
                 <span>
                   <span className="block text-sm font-bold">Entrega del paquete</span>
-                  <span className={`block text-xs ${activeView === 'carrier' ? 'text-gray-300' : 'text-gray-500'}`}>
+                  <span className="shipping-muted block text-xs">
                     Manual o automática con Envia
                   </span>
                 </span>
@@ -506,15 +501,15 @@ export default function EnviosSection() {
       </section>
 
       {activeView === 'rates' ? (
-        <section className="rounded-[28px] border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+        <section className="shipping-surface rounded-[28px] border p-4 shadow-sm md:p-5">
           <div className="mb-5 flex flex-col gap-3 border-b border-gray-100 pb-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="text-xl font-black text-gray-950">¿Cuánto cobrará la tienda?</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <h3 className="text-xl font-black">¿Cuánto cobrará la tienda?</h3>
+              <p className="shipping-muted mt-1 text-sm">
                 Estas reglas solo calculan el valor que verá el cliente en el checkout.
               </p>
             </div>
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <label className="shipping-page-surface flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3">
               <span>
                 <span className="block text-sm font-bold text-gray-900">Cobrar envío</span>
                 <span className="block text-xs text-gray-500">Desactívalo solo si todos los envíos serán gratis</span>
@@ -523,7 +518,7 @@ export default function EnviosSection() {
                 type="checkbox"
                 checked={form.active}
                 onChange={() => handleChange('active', !form.active)}
-                className="h-5 w-5 accent-pink-500"
+                className="h-5 w-5"
               />
             </label>
           </div>
@@ -534,9 +529,10 @@ export default function EnviosSection() {
                 <button
                   type="button"
                   onClick={() => handleChange('mode', 'fixed')}
-                  className={`rounded-2xl border p-4 text-left transition ${form.mode === 'fixed' ? 'border-pink-400 bg-pink-50 shadow-sm' : 'border-gray-200 hover:border-pink-200'}`}
+                  data-active={form.mode === 'fixed'}
+                  className="shipping-choice rounded-2xl border p-4 text-left transition"
                 >
-                  <span className="text-sm font-black text-gray-950">Una sola tarifa</span>
+                  <span className="text-sm font-black">Una sola tarifa</span>
                   <span className="mt-1 block text-xs leading-5 text-gray-500">
                     El mismo precio para todas las ciudades.
                   </span>
@@ -544,9 +540,10 @@ export default function EnviosSection() {
                 <button
                   type="button"
                   onClick={() => handleChange('mode', 'zones')}
-                  className={`rounded-2xl border p-4 text-left transition ${form.mode === 'zones' ? 'border-pink-400 bg-pink-50 shadow-sm' : 'border-gray-200 hover:border-pink-200'}`}
+                  data-active={form.mode === 'zones'}
+                  className="shipping-choice rounded-2xl border p-4 text-left transition"
                 >
-                  <span className="text-sm font-black text-gray-950">Precio por ciudad</span>
+                  <span className="text-sm font-black">Precio por ciudad</span>
                   <span className="mt-1 block text-xs leading-5 text-gray-500">
                     Define valores distintos según el destino.
                   </span>
@@ -583,10 +580,10 @@ export default function EnviosSection() {
               </div>
 
               {form.mode === 'zones' && (
-                <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50/70">
-                  <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="shipping-page-surface mt-5 overflow-hidden rounded-2xl border">
+                  <div className="shipping-surface flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-black text-gray-950">Ciudades con precio especial</p>
+                      <p className="text-sm font-black">Ciudades con precio especial</p>
                       <p className="text-xs text-gray-500">
                         {form.zones.length} {form.zones.length === 1 ? 'regla creada' : 'reglas creadas'}
                       </p>
@@ -594,7 +591,7 @@ export default function EnviosSection() {
                     <button
                       type="button"
                       onClick={handleAddZone}
-                      className="rounded-xl bg-gray-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-pink-600"
+                      className="shipping-primary-action rounded-xl border px-4 py-2 text-sm font-bold transition"
                     >
                       + Agregar ciudad
                     </button>
@@ -602,7 +599,7 @@ export default function EnviosSection() {
 
                   <div className="max-h-[520px] overflow-y-auto p-3">
                     {form.zones.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center">
+                      <div className="shipping-surface rounded-xl border border-dashed p-6 text-center">
                         <p className="text-sm font-bold text-gray-800">Aún no hay ciudades</p>
                         <p className="mt-1 text-xs text-gray-500">Agrega la primera y define su precio.</p>
                       </div>
@@ -623,7 +620,7 @@ export default function EnviosSection() {
                             : [];
 
                           return (
-                            <article key={zone.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                            <article key={zone.id} className="shipping-surface rounded-2xl border p-4 shadow-sm">
                               <div className="mb-3 flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-sm font-black text-gray-900">Destino {index + 1}</p>
@@ -632,7 +629,7 @@ export default function EnviosSection() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveZone(zone.id)}
-                                  className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                                  className="shipping-danger-text rounded-lg px-2.5 py-1.5 text-xs font-bold"
                                 >
                                   Eliminar
                                 </button>
@@ -734,8 +731,8 @@ export default function EnviosSection() {
             </div>
 
             <aside className="grid content-start gap-3 xl:sticky xl:top-4">
-              <div className="rounded-2xl bg-gray-950 p-4 text-white shadow-lg">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-pink-300">Así funcionará</p>
+              <div className="shipping-preview rounded-2xl p-4">
+                <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">Así funcionará</p>
                 <p className="mt-2 text-sm font-semibold leading-6">
                   {loadingConfig ? 'Cargando configuración...' : previewRules}
                 </p>
@@ -768,7 +765,7 @@ export default function EnviosSection() {
                 </div>
               )}
 
-              <div className="rounded-2xl border border-gray-200 p-4">
+              <div className="shipping-surface rounded-2xl border p-4">
                 <label className="flex cursor-pointer items-start justify-between gap-3">
                   <span>
                     <span className="block text-sm font-black text-gray-900">Envío gratis</span>
@@ -778,7 +775,7 @@ export default function EnviosSection() {
                     type="checkbox"
                     checked={form.freeShipping.enabled}
                     onChange={() => handleNestedChange('freeShipping', 'enabled', !form.freeShipping.enabled)}
-                    className="mt-0.5 h-5 w-5 accent-pink-500"
+                    className="mt-0.5 h-5 w-5"
                   />
                 </label>
                 {form.freeShipping.enabled && (
@@ -799,7 +796,7 @@ export default function EnviosSection() {
                 type="button"
                 onClick={handleSave}
                 disabled={loading}
-                className="w-full rounded-2xl bg-pink-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-pink-200 transition hover:bg-pink-600 disabled:opacity-60"
+                className="shipping-primary-action w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:opacity-60"
               >
                 {loading ? 'Guardando...' : 'Guardar tarifas'}
               </button>

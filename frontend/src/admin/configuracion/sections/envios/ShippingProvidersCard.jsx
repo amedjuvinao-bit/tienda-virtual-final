@@ -7,17 +7,21 @@ import {
   testAdminShippingConnection,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
+import './ShippingCenter.css';
 
 function StatusPill({ tone = 'gray', children }) {
   const tones = {
-    gray: 'border-gray-200 bg-gray-50 text-gray-700',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
-    red: 'border-red-200 bg-red-50 text-red-700',
-    blue: 'border-blue-200 bg-blue-50 text-blue-700',
+    gray: 'neutral',
+    green: 'success',
+    amber: 'warning',
+    red: 'danger',
+    blue: 'primary',
   };
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>
+    <span
+      data-tone={tones[tone]}
+      className="shipping-status inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold"
+    >
       {children}
     </span>
   );
@@ -25,10 +29,10 @@ function StatusPill({ tone = 'gray', children }) {
 
 function ActionButton({ children, busy, disabled, tone = 'dark', ...props }) {
   const tones = {
-    dark: 'bg-gray-900 text-white hover:bg-gray-800',
-    pink: 'bg-pink-500 text-white hover:bg-pink-600',
-    light: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
-    red: 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
+    dark: 'shipping-primary-action border',
+    pink: 'shipping-primary-action border',
+    light: 'shipping-secondary-action border',
+    red: 'shipping-danger-action border',
   };
   return (
     <button
@@ -246,33 +250,33 @@ export default function ShippingProvidersCard() {
 
   if (loading) {
     return (
-      <div className="rounded-[28px] border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
+      <div className="shipping-center shipping-surface shipping-muted rounded-[28px] border p-6 text-sm shadow-sm">
         Cargando la configuración de entrega…
       </div>
     );
   }
 
   const fieldClass =
-    'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-pink-400 focus:ring-4 focus:ring-pink-100';
+    'shipping-field w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition';
   const operationLabel = activeEnvia
     ? `Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
     : 'Operación manual';
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm">
-      <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-pink-950 px-5 py-5 text-white md:px-6">
+    <section className="shipping-center shipping-surface overflow-hidden rounded-[28px] border shadow-sm">
+      <div className="shipping-provider-hero px-5 py-5 md:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-pink-300">
+            <p className="shipping-accent text-xs font-bold uppercase tracking-[0.18em]">
               Entrega del paquete
             </p>
             <h3 className="mt-1 text-2xl font-black">¿Quién llevará el pedido?</h3>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-300">
+            <p className="shipping-muted mt-1 max-w-2xl text-sm leading-6">
               La operación manual seguirá protegiendo la tienda hasta que Envia complete todos los controles.
             </p>
           </div>
-          <div className="min-w-[240px] rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-300">Funcionando ahora</p>
+          <div className="shipping-current-operation min-w-[240px] rounded-2xl border px-4 py-3 backdrop-blur">
+            <p className="shipping-muted text-xs font-bold uppercase tracking-wide">Funcionando ahora</p>
             <p className="mt-1 text-lg font-black">{operationLabel}</p>
             <div className="mt-2">
               <StatusPill tone={activeEnvia ? 'green' : pendingEnvia ? 'amber' : 'gray'}>
@@ -291,17 +295,17 @@ export default function ShippingProvidersCard() {
         {feedback && (
           <div
             role="status"
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${feedback.type === 'success' ? 'shipping-alert-success' : 'shipping-alert-danger'}`}
           >
             {feedback.text}
           </div>
         )}
 
         {pendingEnvia && (
-          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="shipping-alert-warning mb-4 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-black text-amber-950">Envia todavía no está transportando pedidos</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">
+              <p className="text-sm font-black">Envia todavía no está transportando pedidos</p>
+              <p className="mt-1 text-sm leading-6">
                 Envia está seleccionada, pero todavía no opera. La tienda continúa en operación manual hasta recibir y comprobar la prueba del webhook.
               </p>
             </div>
@@ -309,20 +313,20 @@ export default function ShippingProvidersCard() {
           </div>
         )}
 
-        <div className="mb-5 rounded-2xl border border-pink-200 bg-pink-50/70 p-4">
+        <div className="shipping-soft-surface mb-5 rounded-2xl border p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-pink-600">Haz esto ahora</p>
-              <p className="mt-1 text-base font-black text-gray-950">{nextStep}</p>
+              <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">Haz esto ahora</p>
+              <p className="mt-1 text-base font-black">{nextStep}</p>
             </div>
             <div className="min-w-[190px]">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-600">
+              <div className="shipping-muted flex items-center justify-between text-xs font-bold">
                 <span>Preparación de Envia</span>
                 <span>{completedSteps}/{checklist.length}</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+              <div className="shipping-progress-track mt-2 h-2 overflow-hidden rounded-full">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-pink-500 to-violet-500 transition-all"
+                  className="shipping-progress-value h-full rounded-full transition-all"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -331,7 +335,7 @@ export default function ShippingProvidersCard() {
         </div>
 
         {!meta.encryptionConfigured && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+          <div className="shipping-alert-warning mb-4 rounded-xl border p-3 text-sm leading-6">
             Antes de guardar credenciales, el responsable del servidor debe definir una sola vez <code>INTEGRATIONS_ENCRYPTION_KEY</code> con 32 caracteres o más y reiniciar el backend.
           </div>
         )}
@@ -340,21 +344,21 @@ export default function ShippingProvidersCard() {
           <div className="grid content-start gap-3">
             <details
               open={!credentialsReady || secretsChanged}
-              className="group overflow-hidden rounded-2xl border border-gray-200 bg-white"
+              className="shipping-details group overflow-hidden rounded-2xl border"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
                 <span className="flex items-center gap-3">
-                  <span className={`rounded-lg px-2 py-1 text-xs font-black ${credentialsReady ? 'bg-emerald-50 text-emerald-700' : 'bg-pink-50 text-pink-600'}`}>01</span>
+                  <span data-active={!credentialsReady} className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">01</span>
                   <span>
-                    <span className="block text-sm font-black text-gray-950">Cuenta y credenciales</span>
-                    <span className="block text-xs text-gray-500">Ambiente, token y autorización segura</span>
+                    <span className="block text-sm font-black">Cuenta y credenciales</span>
+                    <span className="shipping-muted block text-xs">Ambiente, token y autorización segura</span>
                   </span>
                 </span>
-                <span className="text-xs font-bold text-gray-500 group-open:hidden">Abrir</span>
-                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Cerrar</span>
+                <span className="shipping-muted text-xs font-bold group-open:hidden">Abrir</span>
+                <span className="shipping-muted hidden text-xs font-bold group-open:inline">Cerrar</span>
               </summary>
 
-              <div className="border-t border-gray-100 bg-gray-50/60 p-4">
+              <div className="shipping-details-body border-t p-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
                     <span className="mb-1 block text-sm font-bold text-gray-700">Ambiente</span>
@@ -389,7 +393,7 @@ export default function ShippingProvidersCard() {
                       {settings.hasEnviaToken ? `Guardado: ${settings.enviaTokenHint || 'credencial protegida'}. Déjalo vacío para conservarlo.` : 'Todavía no hay token guardado.'}
                     </span>
                     {meta.credentialSource === 'database' && (
-                      <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                      <label className="shipping-danger-text mt-2 flex items-center gap-2 text-xs">
                         <input type="checkbox" checked={clearToken} onChange={(event) => setClearToken(event.target.checked)} />
                         Eliminar el token guardado al guardar
                       </label>
@@ -420,7 +424,7 @@ export default function ShippingProvidersCard() {
                           : 'En el portal Sandbox, guarda el webhook y copia la credencial generada en el segundo campo “Url”. No uses aquí el token de la API.'}
                       </span>
                       {meta.sandboxWebhookTokenSource === 'database' && (
-                        <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                        <label className="shipping-danger-text mt-2 flex items-center gap-2 text-xs">
                           <input type="checkbox" checked={clearSandboxWebhookToken} onChange={(event) => setClearSandboxWebhookToken(event.target.checked)} />
                           Eliminar la credencial Sandbox guardada al guardar
                         </label>
@@ -447,7 +451,7 @@ export default function ShippingProvidersCard() {
                         {settings.hasWebhookSecret ? `Guardado: ${settings.webhookSecretHint || 'secreto protegido'}. Déjalo vacío para conservarlo.` : 'Requerido para validar eventos reales en producción.'}
                       </span>
                       {meta.webhookSecretSource === 'database' && (
-                        <label className="mt-2 flex items-center gap-2 text-xs text-red-700">
+                        <label className="shipping-danger-text mt-2 flex items-center gap-2 text-xs">
                           <input type="checkbox" checked={clearWebhookSecret} onChange={(event) => setClearWebhookSecret(event.target.checked)} />
                           Eliminar el secreto guardado al guardar
                         </label>
@@ -483,28 +487,28 @@ export default function ShippingProvidersCard() {
 
             <details
               open={ready.tested && !ready.webhookVerified}
-              className="group overflow-hidden rounded-2xl border border-gray-200 bg-white"
+              className="shipping-details group overflow-hidden rounded-2xl border"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
                 <span className="flex items-center gap-3">
-                  <span className={`rounded-lg px-2 py-1 text-xs font-black ${ready.webhookVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-pink-50 text-pink-600'}`}>02</span>
+                  <span data-active={!ready.webhookVerified} className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">02</span>
                   <span>
-                    <span className="block text-sm font-black text-gray-950">Avisos automáticos de Envia</span>
-                    <span className="block text-xs text-gray-500">Registra una sola URL y comprueba el webhook</span>
+                    <span className="block text-sm font-black">Avisos automáticos de Envia</span>
+                    <span className="shipping-muted block text-xs">Registra una sola URL y comprueba el webhook</span>
                   </span>
                 </span>
-                <span className="text-xs font-bold text-gray-500 group-open:hidden">Abrir</span>
-                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Cerrar</span>
+                <span className="shipping-muted text-xs font-bold group-open:hidden">Abrir</span>
+                <span className="shipping-muted hidden text-xs font-bold group-open:inline">Cerrar</span>
               </summary>
 
-              <div className="border-t border-gray-100 bg-gray-50/60 p-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">URL para registrar en Envia</p>
-                  <code className="mt-2 block break-all rounded-lg bg-gray-950 px-3 py-2 text-xs text-white">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
+              <div className="shipping-details-body border-t p-4">
+                <div className="shipping-surface rounded-xl border p-3">
+                  <p className="shipping-muted text-xs font-bold uppercase tracking-wide">URL para registrar en Envia</p>
+                  <code className="shipping-code mt-2 block break-all rounded-lg px-3 py-2 text-xs">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <ActionButton tone="light" disabled={!meta.webhookUrl} onClick={copyWebhookUrl}>Copiar URL</ActionButton>
                     {meta.webhookDashboardUrl && (
-                      <a href={meta.webhookDashboardUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100">
+                      <a href={meta.webhookDashboardUrl} target="_blank" rel="noreferrer" className="shipping-link-action rounded-xl border px-4 py-2 text-sm font-semibold">
                         Abrir portal de Envia
                       </a>
                     )}
@@ -520,34 +524,34 @@ export default function ShippingProvidersCard() {
                 </div>
 
                 {ready.webhookRegistered && !ready.webhookVerified && (
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                  <div className="shipping-alert-warning mt-3 rounded-xl border p-3 text-sm font-semibold">
                     Esperando prueba de Envia
                   </div>
                 )}
                 {ready.webhookVerified && (
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+                  <div className="shipping-alert-success mt-3 rounded-xl border p-3 text-sm font-semibold">
                     Webhook comprobado por Envia{settings.webhookVerifiedAt ? ` · ${formatDate(settings.webhookVerifiedAt)}` : ''}
                   </div>
                 )}
-                {!ready.webhookUrlReady && <p className="mt-2 text-xs text-amber-700">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>}
+                {!ready.webhookUrlReady && <p className="shipping-warning-text mt-2 text-xs">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>}
                 {production && ready.temporaryWebhookUrl && (
-                  <p className="mt-2 text-xs font-semibold text-red-700">
+                  <p className="shipping-danger-text mt-2 text-xs font-semibold">
                     Producción bloqueada: trycloudflare.com es temporal. Publica el backend en una dirección HTTPS permanente.
                   </p>
                 )}
               </div>
             </details>
 
-            <details className="group overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <details className="shipping-details group overflow-hidden rounded-2xl border">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
                 <span>
-                  <span className="block text-sm font-black text-gray-950">¿Qué hará Envia automáticamente?</span>
-                  <span className="block text-xs text-gray-500">Explicación sencilla del proceso</span>
+                  <span className="block text-sm font-black">¿Qué hará Envia automáticamente?</span>
+                  <span className="shipping-muted block text-xs">Explicación sencilla del proceso</span>
                 </span>
-                <span className="text-xs font-bold text-gray-500 group-open:hidden">Ver explicación</span>
-                <span className="hidden text-xs font-bold text-gray-500 group-open:inline">Ocultar</span>
+                <span className="shipping-muted text-xs font-bold group-open:hidden">Ver explicación</span>
+                <span className="shipping-muted hidden text-xs font-bold group-open:inline">Ocultar</span>
               </summary>
-              <div className="border-t border-gray-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+              <div className="shipping-explanation border-t p-4 text-sm leading-6">
                 <p className="font-bold">¿Qué queda automático?</p>
                 <p className="mt-1">
                   En cada orden el sistema consulta tarifas, crea la guía y pregunta si el paquete se recoge o se lleva a un punto autorizado. El administrador solo confirma la opción recomendada e imprime la etiqueta.
@@ -560,14 +564,14 @@ export default function ShippingProvidersCard() {
           </div>
 
           <aside className="grid content-start gap-3 lg:sticky lg:top-4">
-            <div className="rounded-2xl border border-gray-200 p-4">
+            <div className="shipping-surface rounded-2xl border p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-gray-950">Estado de la conexión</p>
-                <span className="text-xs font-bold text-gray-500">{progressPercent}%</span>
+                <p className="text-sm font-black">Estado de la conexión</p>
+                <span className="shipping-muted text-xs font-bold">{progressPercent}%</span>
               </div>
               <div className="mt-3 grid gap-2">
                 {checklist.map((item) => (
-                  <div key={item.label} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-semibold ${item.done ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+                  <div key={item.label} data-complete={item.done} className="shipping-check-item flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-semibold">
                     <span>{item.label}</span>
                     <span aria-hidden="true">{item.done ? 'Listo' : 'Pendiente'}</span>
                   </div>
@@ -576,10 +580,10 @@ export default function ShippingProvidersCard() {
             </div>
 
             {ready.tested && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-sm font-black text-emerald-900">Conexión aprobada</p>
+              <div className="shipping-alert-success rounded-2xl border p-4">
+                <p className="text-sm font-black">Conexión aprobada</p>
                 {settings.lastTestMessage && (
-                  <p className={`mt-1 text-xs leading-5 ${settings.lastTestStatus === 'success' ? 'text-emerald-800' : 'text-red-700'}`}>
+                  <p className={`mt-1 text-xs leading-5 ${settings.lastTestStatus === 'success' ? 'shipping-success-text' : 'shipping-danger-text'}`}>
                     {settings.lastTestMessage}{settings.lastTestAt ? ` · ${formatDate(settings.lastTestAt)}` : ''}
                   </p>
                 )}
@@ -587,8 +591,8 @@ export default function ShippingProvidersCard() {
             )}
 
             {production && (
-              <label className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-900">
-                <input type="checkbox" checked={confirmProduction} onChange={(event) => setConfirmProduction(event.target.checked)} className="mt-0.5 h-4 w-4 accent-red-600" />
+              <label className="shipping-alert-danger flex items-start gap-3 rounded-2xl border p-4 text-xs leading-5">
+                <input type="checkbox" checked={confirmProduction} onChange={(event) => setConfirmProduction(event.target.checked)} className="mt-0.5 h-4 w-4" />
                 Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
               </label>
             )}
@@ -607,12 +611,12 @@ export default function ShippingProvidersCard() {
               Activar {production ? 'Producción' : 'Sandbox'}
             </ActionButton>
 
-            <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'border-emerald-200 bg-emerald-50/70' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'shipping-alert-success' : 'shipping-page-surface'}`}>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-gray-950">Operación manual</p>
+                <p className="text-sm font-black">Operación manual</p>
                 {!activeEnvia && <StatusPill tone="green">{pendingEnvia ? 'Protección actual' : 'Activa'}</StatusPill>}
               </div>
-              <p className="mt-2 text-xs leading-5 text-gray-600">El operador registra transportadora, guía y novedades desde la orden.</p>
+              <p className="shipping-muted mt-2 text-xs leading-5">El operador registra transportadora, guía y novedades desde la orden.</p>
               {selectedEnvia && (
                 <div className="mt-3">
                   <ActionButton tone="red" busy={busyAction === 'disable'} onClick={() => runAction('disable', disableAdminShippingProvider)}>
