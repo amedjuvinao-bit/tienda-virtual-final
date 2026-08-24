@@ -209,6 +209,12 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     fireEvent.click(showFilters);
     const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
     expect(hideFilters).toHaveAttribute('aria-expanded', 'true');
+    expect(document.querySelector('.orders-admin-shell')).toHaveClass('controls-open');
+    expect(
+      Array.from(document.querySelectorAll('style'))
+        .map((style) => style.textContent)
+        .join('\n')
+    ).toContain('grid-template-rows: auto min-content auto');
 
     fireEvent.click(hideFilters);
     expect(

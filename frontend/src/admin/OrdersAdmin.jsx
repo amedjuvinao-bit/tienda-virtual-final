@@ -1034,6 +1034,7 @@ export default function OrdersAdmin() {
         }
         .orders-admin-shell.controls-open {
           grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+          grid-template-rows: auto min-content auto;
           grid-template-areas:
             "heading heading"
             "metrics controls"
@@ -1203,6 +1204,7 @@ export default function OrdersAdmin() {
         @media (max-width: 1180px) {
           .orders-admin-shell.controls-open {
             grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto auto auto auto;
             grid-template-areas:
               "heading"
               "metrics"
