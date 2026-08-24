@@ -20,6 +20,7 @@
     "test:orders-keyboard": "vitest run src/admin/orders/components/OrderDetailModal.keyboard.test.js",
     "test:orders-whatsapp-assisted": "vitest run src/admin/orders/components/orderDetail/OrderWhatsAppPreview.test.jsx",
     "test:orders-customer-connection": "vitest run src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.test.jsx",
+    "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },

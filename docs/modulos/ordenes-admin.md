@@ -4,8 +4,8 @@
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
 - Etapa actual: **Evolución Plus · Fase 2: reembolsos automáticos y transportadoras**.
-- Estado de la etapa: reembolsos automáticos implementados y base multitransportadora preparada con operación manual predeterminada, adaptador Envia Sandbox, idempotencia y webhook firmado.
-- Siguiente validación externa: obtener una cuenta de pruebas de Envia, configurar el token Sandbox y ejecutar una cotización controlada; hasta entonces no se realizan llamadas externas.
+- Estado de la etapa: reembolsos automáticos implementados; Envia Sandbox validado con cotización, guía, etiqueta y seguimiento; Producción permanece bloqueada hasta comprobar el webhook sobre una URL HTTPS permanente.
+- Siguiente validación externa: desplegar el backend en una dirección HTTPS permanente, configurar las credenciales reales desde el panel y recibir una prueba auténtica del webhook de Envia Producción antes de activar operaciones con costo.
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 
@@ -135,13 +135,15 @@ Un operador de sede solo inicializa y modifica envíos de sus sedes asignadas, i
 
 Una guía ingresada manualmente continúa siendo una referencia operativa auditada y no se presenta como validada por un proveedor. Solo las guías creadas por el adaptador configurado guardan proveedor, modo, identificador externo, tarifa, etiqueta y seguimiento como evidencia de integración.
 
-### Capa de transportadoras y Envia Sandbox
+### Capa de transportadoras y Envia
 
 `SHIPPING_PROVIDER=manual` conserva el comportamiento existente y evita conexiones externas por defecto. En producción, la autoridad pasa a **Configuración → Envíos → Transportadoras e integración API**: un administrador con `settings:shipping` elige el ambiente, guarda el token y el secreto de firma, prueba la autenticación, registra el webhook y activa el proveedor. Las variables `ENVIA_TOKEN`, `ENVIA_MODE` y `ENVIA_WEBHOOK_SECRET` quedan como compatibilidad para despliegues que todavía no han sido administrados desde el panel.
 
 El despliegue debe definir una sola vez `INTEGRATIONS_ENCRYPTION_KEY` con al menos 32 caracteres. Esa llave nunca se administra desde el navegador: cifra con AES-256-GCM las credenciales guardadas en MongoDB y debe conservarse estable entre reinicios. El panel solo recibe campos de contraseña de escritura única, banderas e indicios finales; las respuestas API eliminan el token, el secreto y el material cifrado.
 
-Guardar un token nuevo, cambiar de ambiente o reemplazar el secreto desactiva Envia y restablece sus verificaciones. Sandbox exige token y prueba autenticada vigentes. Producción añade confirmación explícita, `BACKEND_URL` pública con HTTPS, secreto de firma y webhook de seguimiento registrado. Si falta cualquier requisito, la operación manual continúa activa.
+Guardar un token nuevo, cambiar de ambiente o reemplazar el secreto desactiva Envia y restablece sus verificaciones. Sandbox exige token, credencial Bearer exclusiva del webhook y una prueba auténtica recibida desde Envia. Producción añade confirmación explícita, `BACKEND_URL` HTTPS permanente, secreto HMAC y una prueba auténtica recibida desde Envia para la misma URL y ambiente. Los dominios temporales `trycloudflare.com` se rechazan en Producción. Si falta cualquier requisito, la operación manual continúa activa y las operaciones externas quedan bloqueadas.
+
+El botón `Ya registré la URL` solo guarda que el administrador completó el registro en el portal. No aprueba la conexión. El panel consulta el estado cada tres segundos mientras espera y muestra `Webhook comprobado por Envia` únicamente después de que el backend recibe y valida el evento real. La evidencia conserva fecha, identificador, ambiente y URL; cambiar cualquiera de esos datos invalida la aprobación anterior.
 
 La capa separa construcción del envío, adaptador del proveedor y orquestación de la orden. Antes de cotizar valida teléfono y dirección de sede y cliente, ciudad, departamento, peso y las tres dimensiones de cada paquete. Para Colombia normaliza el departamento al código de Envia y resuelve la ciudad con `POST /locate`; la cotización y la guía reciben el DANE de 8 dígitos exigido por el proveedor, no el nombre visible. Las credenciales permanecen en el backend y el endpoint de estado expone solo banderas seguras.
 
@@ -163,7 +165,7 @@ La generación y cancelación de guías usan `ShippingOperation` con clave idemp
 | `GET /api/admin/shipping-settings` | Consultar estado y preparación sin revelar secretos | `settings:shipping` |
 | `PUT /api/admin/shipping-settings` | Guardar ambiente y credenciales cifradas | `settings:shipping` |
 | `POST /api/admin/shipping-settings/test` | Probar autenticación en el ambiente seleccionado | `settings:shipping` |
-| `POST /api/admin/shipping-settings/webhook/register` | Registrar el webhook firmado de seguimiento | `settings:shipping` |
+| `POST /api/admin/shipping-settings/webhook/confirm` | Anotar que la URL fue registrada y esperar la prueba real de Envia | `settings:shipping` |
 | `POST /api/admin/shipping-settings/activate` | Activar Sandbox o Producción con sus precondiciones | `settings:shipping` |
 | `POST /api/admin/shipping-settings/disable` | Volver a la operación manual | `settings:shipping` |
 
@@ -406,7 +408,7 @@ npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-co
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-bulk-status-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:order-multi-branch-contract
 npm --prefix C:\MisProyectosReact\tienda-virtual-final\backend run test:complete-sale-contract
-cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm run test:orders-keyboard && npm run test:billing-invoice-preflight && npm exec -- vitest run && npm run build
+cd /d C:\MisProyectosReact\tienda-virtual-final\frontend && npm run test:orders-security && npm run test:orders-architecture && npm run test:orders-logistics && npm run test:shipping-settings-ui && npm run test:orders-operations && npm run test:orders-whatsapp-assisted && npm run test:orders-customer-connection && npm run test:orders-keyboard && npm run test:billing-invoice-preflight && npm exec -- vitest run && npm run build
 ```
 
 Las pruebas automáticas de CI que usan MongoDB se ejecutan por separado con `PRODUCTS_TEST_MONGO_URI` o `MONGODB_REPLICA_URI` y no apuntan a datos productivos. Los recorridos persistentes documentados más adelante son una excepción manual: usan `MONGODB_URI`, exigen `--confirm-persist` y dejan evidencia DEMO identificable.
@@ -519,6 +521,26 @@ La fase queda protegida por:
 - recorrido E2E Playwright del panel real, con APIs simuladas, que verifica revisión, checkbox, huella y solicitud final sin conectarse a MongoDB ni Factus.
 
 GitHub Actions ejecuta los contratos que antes quedaban solo locales: seguridad, arquitectura, logística, operaciones, historia del detalle, teclado/copiar-pegar, municipio, orden manual y precontrol fiscal. El E2E instala Chromium dentro del runner y usa únicamente respuestas interceptadas; no crea órdenes, facturas ni datos temporales o persistentes.
+
+## Evolución Plus · Fase 2
+
+La automatización de reembolsos y transportadoras conserva un cierre seguro por defecto. Wompi solo intenta un `void` oficial cuando la operación, el ambiente, el valor y el estado remoto cumplen el contrato; efectivo, pagos mixtos, devoluciones parciales y medios no compatibles permanecen como acciones manuales auditables.
+
+Envia se administra desde **Configuración → Envíos** sin exponer credenciales al navegador. Sandbox quedó validado con cotización, selección de tarifa, creación y descarga de etiqueta, entrega física a la transportadora, simulación separada y actualización de seguimiento. El detalle de la orden presenta tres pasos visuales y muestra una sola tarea operativa a la vez.
+
+La preparación para Producción exige simultáneamente:
+
+- token real probado en el ambiente guardado;
+- `INTEGRATIONS_ENCRYPTION_KEY` estable y de al menos 32 caracteres;
+- secreto HMAC del webhook;
+- `BACKEND_URL` HTTPS permanente, nunca `trycloudflare.com`;
+- URL registrada en el portal de Envia;
+- evento auténtico recibido y validado para esa misma URL y ambiente;
+- confirmación explícita antes de crear guías o solicitar recolecciones con costo.
+
+La fase está protegida por 21 verificaciones del adaptador de transportadoras, 10 verificaciones de configuración y seguridad, 6 pruebas del panel de Envia, las pruebas del centro logístico y el build de producción. GitHub Actions ejecuta tanto los contratos del backend como `test:shipping-settings-ui`; ninguna de esas pruebas llama a Envia ni crea guías reales.
+
+El cierre externo de Producción permanece pendiente hasta disponer del alojamiento HTTPS permanente y de las credenciales reales. Esa validación no debe simularse ni realizarse con un Quick Tunnel.
 
 ## Prueba persistente del ciclo real Orden–Cliente
 

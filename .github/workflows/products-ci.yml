@@ -334,6 +334,9 @@ jobs:
       - name: Validar logística visual de órdenes
         run: npm --prefix frontend run test:orders-logistics
 
+      - name: Validar configuración visual de transportadoras
+        run: npm --prefix frontend run test:shipping-settings-ui
+
       - name: Validar centro operativo visual de órdenes
         run: npm --prefix frontend run test:orders-operations
 
