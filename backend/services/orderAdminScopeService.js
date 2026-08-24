@@ -7,13 +7,27 @@ const PRIVILEGED_ORDER_ROLES = new Set([
   'admin',
 ]);
 
-function normalizeBranchId(value) {
+function normalizeBranchId(value, visited = new Set()) {
   if (!value) return '';
 
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value.toHexString();
+  }
+
   if (typeof value === 'object') {
-    if (value._id) return normalizeBranchId(value._id);
-    if (value.id) return normalizeBranchId(value.id);
-    if (value.branch) return normalizeBranchId(value.branch);
+    if (visited.has(value)) return '';
+    visited.add(value);
+
+    for (const key of ['_id', 'id', 'branch']) {
+      const nestedValue = value[key];
+
+      // Los ObjectId de BSON exponen un getter `_id` que devuelve el mismo
+      // objeto. Ignorarlo evita una recursión infinita sin relajar el alcance.
+      if (!nestedValue || nestedValue === value) continue;
+
+      const normalized = normalizeBranchId(nestedValue, visited);
+      if (normalized) return normalized;
+    }
   }
 
   const id = String(value || '').trim();

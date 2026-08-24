@@ -151,7 +151,7 @@ function run() {
       "query === 'anterior'",
       "query === 'actual'",
       "secondPageRequest.includeSummary",
-      "getByRole('button', { name: 'Siguiente'",
+      "name: 'Siguiente página'",
       "getByText('#ORD-ANTERIOR'",
       "getByText('#ORD-ACTUAL'",
     ],

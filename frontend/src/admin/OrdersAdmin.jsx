@@ -1476,6 +1476,7 @@ export default function OrdersAdmin() {
 
         <div className="flex items-center gap-2">
           <button
+            aria-label="Página anterior"
             className="group inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-45"
             style={{
               borderColor: 'var(--admin-button-soft-border)',
@@ -1490,6 +1491,7 @@ export default function OrdersAdmin() {
           </button>
 
           <button
+            aria-label="Siguiente página"
             className="group inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-semibold shadow-sm transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-45"
             style={{
               borderColor: 'var(--admin-primary)',

@@ -5,12 +5,14 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const express = require('express');
+const mongoose = require('mongoose');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const {
   applyOrderBranchAccessFilter,
   authorizeOrderAdminScope,
+  normalizeBranchId,
 } = require('../services/orderAdminScopeService');
 const {
   findAdminRoutePermission,
@@ -134,6 +136,14 @@ async function main() {
     checks.push(message);
     console.log(`OK ${checks.length}: ${message}`);
   };
+
+  const objectIdBranch = new mongoose.Types.ObjectId(BRANCH_A);
+  assert.strictEqual(normalizeBranchId(objectIdBranch), BRANCH_A);
+  assert.strictEqual(normalizeBranchId({ _id: objectIdBranch }), BRANCH_A);
+  const circularBranch = {};
+  circularBranch._id = circularBranch;
+  assert.strictEqual(normalizeBranchId(circularBranch), '');
+  ok('los ObjectId y referencias circulares se normalizan sin recursión infinita');
 
   const assignedFilter = {};
   const assigned = applyOrderBranchAccessFilter(

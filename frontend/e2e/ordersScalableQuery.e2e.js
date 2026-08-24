@@ -225,7 +225,9 @@ async function runScenario(browser) {
 
   await page.goto(`${BASE_URL}/admin/ordenes`, { waitUntil: 'networkidle' });
   await page.getByText('#ORD-PAGE-1-01', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Siguiente página', exact: true })
+    .click();
   await page.getByText('#ORD-PAGE-2-01', { exact: true }).waitFor();
   await page.getByText('Página 2 de 3', { exact: false }).waitFor();
 

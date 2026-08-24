@@ -171,6 +171,12 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     renderOrders();
 
     const open = await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' });
+    expect(
+      screen.getByRole('button', { name: 'Página anterior' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Siguiente página' })
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Exportar CSV' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Seleccionar' })).not.toBeInTheDocument();
 
