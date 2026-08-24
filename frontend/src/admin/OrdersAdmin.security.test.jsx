@@ -214,7 +214,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       Array.from(document.querySelectorAll('style'))
         .map((style) => style.textContent)
         .join('\n')
-    ).toContain('grid-template-rows: auto min-content auto');
+    ).toContain('inset: 0 0 auto 0');
 
     fireEvent.click(hideFilters);
     expect(

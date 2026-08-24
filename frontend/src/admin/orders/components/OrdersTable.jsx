@@ -231,11 +231,11 @@ export default function OrdersTable({
       {!loading && data.length > 0 ? (
         <table className="block w-full table-fixed xl:table" aria-label="Órdenes operativas">
           <colgroup className="hidden xl:table-column-group">
-            <col style={{ width: '29%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '32%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '31%' }} />
             <col style={{ width: '13%' }} />
-            <col style={{ width: '9%' }} />
+            <col style={{ width: '12%' }} />
           </colgroup>
           <thead className="hidden xl:table-header-group">
             <tr style={{ background: 'var(--admin-input-bg)' }}>
@@ -418,11 +418,11 @@ function OrderRow({
         <button
           type="button"
           onClick={() => openOrderDetail(order)}
-          className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-black transition hover:shadow-md"
+          className="inline-flex h-9 w-full items-center justify-center whitespace-nowrap rounded-lg px-1.5 text-[10px] font-black transition hover:shadow-md"
           style={{ background: 'var(--admin-primary)', color: 'var(--admin-primary-text)' }}
         >
           Gestionar
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="hidden h-3.5 w-3.5 2xl:block" />
         </button>
       </td>
     </tr>
