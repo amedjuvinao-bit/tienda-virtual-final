@@ -214,6 +214,66 @@ describe('ShippingProvidersCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('mantiene manual activo cuando Envia está seleccionada pero el webhook sigue pendiente', async () => {
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: {
+          defaultProvider: 'envia',
+          hasEnviaToken: true,
+          hasSandboxWebhookToken: true,
+        },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: false,
+          canActivateSandbox: false,
+        },
+      })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(await screen.findByText('Pendiente: Envia Sandbox')).toBeInTheDocument();
+    expect(screen.getByText('Activa por seguridad')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Envia está seleccionada, pero todavía no opera/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Activo: Envia Sandbox')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cancelar Envia y seguir manual' })
+    ).toBeInTheDocument();
+  });
+
+  it('muestra Envia como activa solo después de comprobar todas las condiciones', async () => {
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: {
+          defaultProvider: 'envia',
+          hasEnviaToken: true,
+          hasSandboxWebhookToken: true,
+        },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: true,
+          canActivateSandbox: true,
+        },
+      })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(await screen.findByText('Activo: Envia Sandbox')).toBeInTheDocument();
+    expect(screen.queryByText('Activa por seguridad')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Desactivar API y volver a manual' })
+    ).toBeInTheDocument();
+  });
+
   it('bloquea Producción cuando BACKEND_URL pertenece a trycloudflare', async () => {
     getAdminShippingSettings.mockResolvedValue(
       response({

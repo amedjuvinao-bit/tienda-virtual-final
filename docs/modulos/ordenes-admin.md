@@ -538,7 +538,7 @@ La preparación para Producción exige simultáneamente:
 - evento auténtico recibido y validado para esa misma URL y ambiente;
 - confirmación explícita antes de crear guías o solicitar recolecciones con costo.
 
-La fase está protegida por 21 verificaciones del adaptador de transportadoras, 10 verificaciones de configuración y seguridad, 6 pruebas del panel de Envia, las pruebas del centro logístico y el build de producción. GitHub Actions ejecuta tanto los contratos del backend como `test:shipping-settings-ui`; ninguna de esas pruebas llama a Envia ni crea guías reales.
+La fase está protegida por 21 verificaciones del adaptador de transportadoras, 10 verificaciones de configuración y seguridad, 8 pruebas del panel de Envia, las pruebas del centro logístico y el build de producción. GitHub Actions ejecuta tanto los contratos del backend como `test:shipping-settings-ui`; ninguna de esas pruebas llama a Envia ni crea guías reales.
 
 El cierre externo de Producción permanece pendiente hasta disponer del alojamiento HTTPS permanente y de las credenciales reales. Esa validación no debe simularse ni realizarse con un Quick Tunnel.
 

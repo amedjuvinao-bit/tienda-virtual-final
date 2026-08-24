@@ -102,7 +102,13 @@ export default function ShippingProvidersCard() {
   const settings = data?.settings || {};
   const meta = data?.meta || {};
   const ready = meta.readiness || {};
-  const activeEnvia = settings.defaultProvider === 'envia';
+  const selectedEnvia = settings.defaultProvider === 'envia';
+  const savedProductionMode = settings.enviaMode === 'production';
+  const activeEnvia = Boolean(
+    selectedEnvia &&
+    (savedProductionMode ? ready.canActivateProduction : ready.canActivateSandbox)
+  );
+  const pendingEnvia = selectedEnvia && !activeEnvia;
   const production = mode === 'production';
   const writesSecret = Boolean(
     token.trim() || sandboxWebhookToken.trim() || webhookSecret.trim()
@@ -232,8 +238,12 @@ export default function ShippingProvidersCard() {
             El usuario administrador guarda las credenciales aquí. Nunca se muestran nuevamente y el servidor las cifra antes de almacenarlas.
           </p>
         </div>
-        <StatusPill tone={activeEnvia ? 'green' : 'gray'}>
-          Activo: {activeEnvia ? `Envia ${settings.enviaMode === 'production' ? 'Producción' : 'Sandbox'}` : 'Operación manual'}
+        <StatusPill tone={activeEnvia ? 'green' : pendingEnvia ? 'amber' : 'gray'}>
+          {activeEnvia
+            ? `Activo: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
+            : pendingEnvia
+              ? `Pendiente: Envia ${savedProductionMode ? 'Producción' : 'Sandbox'}`
+              : 'Activo: Operación manual'}
         </StatusPill>
       </div>
 
@@ -250,25 +260,29 @@ export default function ShippingProvidersCard() {
         <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'border-emerald-300 bg-emerald-50/50' : 'border-gray-200'}`}>
           <div className="flex items-center justify-between gap-3">
             <p className="font-bold text-gray-900">Operación manual</p>
-            {!activeEnvia && <StatusPill tone="green">Activa</StatusPill>}
+            {!activeEnvia && (
+              <StatusPill tone="green">
+                {pendingEnvia ? 'Activa por seguridad' : 'Activa'}
+              </StatusPill>
+            )}
           </div>
           <p className="mt-2 text-sm leading-6 text-gray-600">
             Funciona sin cuentas externas. El operador registra transportadora, guía, novedades y evidencias desde cada orden.
           </p>
-          {activeEnvia && (
+          {selectedEnvia && (
             <div className="mt-4">
               <ActionButton
                 tone="red"
                 busy={busyAction === 'disable'}
                 onClick={() => runAction('disable', disableAdminShippingProvider)}
               >
-                Desactivar API y volver a manual
+                {activeEnvia ? 'Desactivar API y volver a manual' : 'Cancelar Envia y seguir manual'}
               </ActionButton>
             </div>
           )}
         </div>
 
-        <div className={`rounded-2xl border p-4 ${activeEnvia ? 'border-pink-300 bg-pink-50/30' : 'border-gray-200'}`}>
+        <div className={`rounded-2xl border p-4 ${activeEnvia ? 'border-pink-300 bg-pink-50/30' : pendingEnvia ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-bold text-gray-900">Envia.com</p>
@@ -283,6 +297,12 @@ export default function ShippingProvidersCard() {
               ) : null}
             </div>
           </div>
+
+          {pendingEnvia && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">
+              Envia está seleccionada, pero todavía no opera. La tienda continúa en operación manual hasta recibir y comprobar la prueba del webhook.
+            </div>
+          )}
 
           {!meta.encryptionConfigured && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
@@ -498,7 +518,7 @@ export default function ShippingProvidersCard() {
             </p>
           )}
 
-          {(production ? ready.canActivateProduction : ready.canActivateSandbox) && !activeEnvia && (
+          {(production ? ready.canActivateProduction : ready.canActivateSandbox) && !selectedEnvia && (
             <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
               Todo está comprobado. Ya puedes activar Envia {production ? 'Producción' : 'Sandbox'}.
             </div>
@@ -530,6 +550,7 @@ export default function ShippingProvidersCard() {
               tone="dark"
               busy={busyAction === 'activate'}
               disabled={
+                activeEnvia ||
                 secretsChanged ||
                 mode !== settings.enviaMode ||
                 (production ? !ready.canActivateProduction || !confirmProduction : !ready.canActivateSandbox)
