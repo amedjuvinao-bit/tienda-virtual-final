@@ -1917,13 +1917,6 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
       const orderSource = getValidSource(req.body?.source || cleaned.source, hasAdminUser);
       const createdByAdminSnapshot = buildAdminSnapshot(req);
 
-      console.log('🧾 MODO FACTURACIÓN:', {
-        dianEnabled: billingMode.dianEnabled,
-        dianMode: billingMode.dianMode,
-        isDianActive: billingMode.isDianActive,
-        isInternalMode: billingMode.isInternalMode,
-      });
-
       const taxesSnapshot = {
         iva: {
           enabled: pricing.tax.enabled,

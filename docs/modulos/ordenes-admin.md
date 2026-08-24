@@ -3,9 +3,11 @@
 ## Estado del trabajo
 
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
-- Etapa actual: **Evolución Plus · Fase 2: reembolsos automáticos y transportadoras**.
-- Estado de la etapa: reembolsos automáticos implementados; Envia Sandbox validado con cotización, guía, etiqueta y seguimiento; Producción permanece bloqueada hasta comprobar el webhook sobre una URL HTTPS permanente.
+- Etapa actual: **Cierre del módulo · Etapa 1: base técnica y aceptación**.
+- Estado de la etapa: implementación local preparada; el cierre remoto permanece pendiente hasta publicar con autorización y obtener Órdenes CI en verde.
 - Siguiente validación externa: desplegar el backend en una dirección HTTPS permanente, configurar las credenciales reales desde el panel y recibir una prueba auténtica del webhook de Envia Producción antes de activar operaciones con costo.
+
+La matriz por roles, dispositivos, puertas técnicas y exclusiones de producción está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). Esta etapa añade un CI exclusivo de Órdenes, un recorrido E2E operativo por perfiles y conserva separado el recorrido fiscal hacia Facturación.
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 

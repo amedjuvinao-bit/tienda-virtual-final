@@ -1315,10 +1315,23 @@ export default function OrdersAdmin() {
       />
       {/* ====== BARRA DE ACCIONES MASIVAS ====== */}
       {selectionEnabled && selectedIds.size > 0 && (
-        <div className="mb-2 p-2 rounded-lg border bg-pink-50/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between" style={{ borderColor: ADMIN_BORDER }}>
+        <div
+          className="mb-2 flex flex-col gap-2 rounded-lg border p-2 md:flex-row md:items-center md:justify-between"
+          style={{
+            borderColor: 'var(--admin-primary-soft-border)',
+            background: 'var(--admin-primary-soft-bg)',
+            color: 'var(--admin-card-text)',
+          }}
+        >
           <div className="text-xs">
             {selectedIds.size} seleccionada{selectedIds.size === 1 ? '' : 's'}
-            <button className="ml-2 underline text-pink-700" onClick={clearSelection}>Limpiar selección</button>
+            <button
+              className="ml-2 underline"
+              style={{ color: 'var(--admin-primary)' }}
+              onClick={clearSelection}
+            >
+              Limpiar selección
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {canBulk && (
@@ -1334,8 +1347,11 @@ export default function OrdersAdmin() {
                 {STATUS_OPTIONS.map(op => <option key={op.code} value={op.code}>{op.label}</option>)}
               </select>
               <button
-                className="px-2.5 py-1 rounded text-white text-xs h-8 disabled:opacity-50 hover:bg-pink-700"
-                style={{ backgroundColor: '#ec4899' }}
+                className="h-8 rounded px-2.5 py-1 text-xs disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--admin-primary)',
+                  color: 'var(--admin-primary-text)',
+                }}
                 onClick={runBulkStatus}
                 disabled={bulkBusy}
               >
@@ -1363,8 +1379,11 @@ export default function OrdersAdmin() {
                 disabled={bulkBusy}
               />
               <button
-                className="px-2.5 py-1 rounded text-white text-xs h-8 disabled:opacity-50 hover:bg-pink-700"
-                style={{ backgroundColor: '#ec4899' }}
+                className="h-8 rounded px-2.5 py-1 text-xs disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--admin-primary)',
+                  color: 'var(--admin-primary-text)',
+                }}
                 onClick={runBulkTags}
                 disabled={bulkBusy || !bulkTags.trim()}
               >
@@ -1377,8 +1396,11 @@ export default function OrdersAdmin() {
             {canExport && (
             <div className="flex items-center gap-1">
               <button
-                className="px-2.5 py-1 rounded text-white text-xs h-8 disabled:opacity-50 hover:bg-pink-700"
-                style={{ backgroundColor: '#ec4899' }}
+                className="h-8 rounded px-2.5 py-1 text-xs disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--admin-primary)',
+                  color: 'var(--admin-primary-text)',
+                }}
                 onClick={exportSelectedCsv}
                 disabled={bulkBusy || selectedIds.size === 0}
               >

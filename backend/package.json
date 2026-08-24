@@ -12,6 +12,7 @@
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
+    "test:orders-stage1-closure": "node scripts/testOrdersStage1Closure.js",
     "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:orders-architecture": "node scripts/testOrderAdminQueryArchitecture.js",
     "test:orders-logistics": "node scripts/testOrderLogisticsContract.js",

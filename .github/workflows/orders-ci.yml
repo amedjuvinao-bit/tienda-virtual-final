@@ -1,0 +1,218 @@
+name: Órdenes CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/ordenes-admin-avanzado
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ordenes-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  orders-contracts:
+    name: Contratos de órdenes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar cierre de la etapa 1
+        run: npm --prefix backend run test:orders-stage1-closure
+
+      - name: Validar permisos y arquitectura
+        run: |
+          npm --prefix backend run test:orders-security
+          npm --prefix backend run test:orders-architecture
+
+      - name: Validar operación, logística y devoluciones
+        run: |
+          npm --prefix backend run test:orders-logistics
+          npm --prefix backend run test:orders-returns
+          npm --prefix backend run test:orders-operations
+          npm --prefix backend run test:orders-observability
+
+      - name: Validar transportadoras sin llamadas externas
+        env:
+          SHIPPING_PROVIDER: manual
+          ENVIA_MODE: sandbox
+          ENVIA_TOKEN: ''
+          ENVIA_WEBHOOK_SECRET: ''
+          INTEGRATIONS_ENCRYPTION_KEY: shipping-contract-test-key-with-32-characters
+        run: |
+          npm --prefix backend run test:shipping-providers
+          npm --prefix backend run test:shipping-settings
+
+      - name: Validar clientes, comunicación y datos fiscales
+        run: |
+          npm --prefix backend run test:orders-whatsapp-assisted
+          npm --prefix backend run test:orders-customer-connection
+          npm --prefix backend run test:orders-billing-municipality
+          npm --prefix backend run test:orders-manual-invoice
+          npm --prefix backend run test:billing-invoice-preflight
+
+      - name: Validar dinero, inventario y estados masivos
+        run: |
+          npm --prefix backend run test:order-refund-contract
+          npm --prefix backend run test:order-commercial-reconciliation
+          npm --prefix backend run test:order-refund-automation
+          npm --prefix backend run test:order-bulk-status-contract
+          npm --prefix backend run test:order-multi-branch-contract
+          npm --prefix backend run test:complete-sale-contract
+
+      - name: Validar plan transaccional aislado
+        run: npm --prefix backend run test:orders-stress-plan
+
+  orders-mongodb:
+    name: Integración transaccional de órdenes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Iniciar MongoDB transaccional
+        run: |
+          docker run --detach \
+            --name orders-mongodb \
+            --publish 27017:27017 \
+            mongo:7 \
+            --replSet rs0 \
+            --bind_ip_all
+
+          for attempt in {1..30}; do
+            if docker exec orders-mongodb mongosh --quiet --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs orders-mongodb
+          exit 1
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Habilitar transacciones MongoDB
+        run: node backend/scripts/initMongoReplicaSet.js
+
+      - name: Validar reembolsos e inventario
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0
+        run: npm --prefix backend run test:order-refund-inventory
+
+      - name: Validar estados masivos
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_bulk_status?replicaSet=rs0
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:order-bulk-status-inventory
+
+      - name: Validar operación multisede
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_multi_branch?replicaSet=rs0
+        run: npm --prefix backend run test:order-multi-branch-inventory
+
+      - name: Validar transacciones, concurrencia y alertas
+        env:
+          ORDERS_STRESS_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stress?replicaSet=rs0
+          ORDERS_STRESS_ORDER_COUNT: 350
+          ORDERS_STRESS_QUERY_REQUESTS: 140
+          ORDERS_STRESS_QUERY_CONCURRENCY: 14
+        run: npm --prefix backend run test:orders-stress
+
+      - name: Validar venta integral completa
+        env:
+          PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_complete_sale?replicaSet=rs0
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
+          PUBLIC_BACKEND_URL: https://backend.example
+        run: npm --prefix backend run test:complete-sale-integration
+
+      - name: Detener MongoDB
+        if: always()
+        run: docker rm --force orders-mongodb
+
+  orders-ui:
+    name: Interfaz y recorridos de órdenes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Validar seguridad y arquitectura visual
+        run: |
+          npm --prefix frontend run test:orders-security
+          npm --prefix frontend run test:orders-architecture
+
+      - name: Validar operación y detalle profesional
+        run: |
+          npm --prefix frontend run test:orders-operations
+          npm --prefix frontend run test:orders-detail-story
+          npm --prefix frontend run test:orders-keyboard
+
+      - name: Validar logística, envíos y posventa
+        run: |
+          npm --prefix frontend run test:orders-logistics
+          npm --prefix frontend run test:shipping-settings-ui
+          npm --prefix frontend run test:orders-returns
+
+      - name: Validar cliente, WhatsApp y precontrol fiscal
+        run: |
+          npm --prefix frontend run test:orders-whatsapp-assisted
+          npm --prefix frontend run test:orders-customer-connection
+          npm --prefix frontend run test:billing-invoice-preflight
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
+
+      - name: Instalar navegador E2E
+        run: cd frontend && npx playwright install --with-deps chromium
+
+      - name: Validar consola por rol y dispositivo
+        run: npm --prefix frontend run test:e2e:orders-stage1
+
+      - name: Validar traspaso de orden a facturación
+        run: npm --prefix frontend run test:e2e:orders-billing-phase1

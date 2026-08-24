@@ -140,7 +140,7 @@ export default function OrdersTable({
               <input
                 aria-label="Seleccionar órdenes visibles"
                 type="checkbox"
-                className="accent-pink-600"
+                style={{ accentColor: 'var(--admin-primary)' }}
                 checked={data.length > 0 && data.every((order) => selectedIds.has(order._id))}
                 onChange={toggleSelectAllVisible}
               />
@@ -332,7 +332,8 @@ function OrderRow({
             <input
               aria-label={`Seleccionar orden ${order.orderNumber || order._id}`}
               type="checkbox"
-              className="mt-1 shrink-0 accent-pink-600"
+              className="mt-1 shrink-0"
+              style={{ accentColor: 'var(--admin-primary)' }}
               checked={isSelected(order._id)}
               onChange={() => toggleOne(order._id)}
             />
