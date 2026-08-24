@@ -783,7 +783,7 @@ export default function OrderDetailModal({
           statusSaving={disabled}
           tagsStr={tagsStr}
           setTagsStr={setTagsStr}
-          onSaveTags={saveTags}
+          onSaveTags={onSaveTags ? saveTags : null}
           savingTags={savingTags}
           printed={printed}
           archived={archived}

@@ -87,6 +87,27 @@ describe('aislamiento de teclado del detalle de la orden', () => {
     }
   });
 
+  it('oculta Gestionar cuando el perfil no tiene acciones administrativas', () => {
+    render(
+      createElement(OrderDetailModal, {
+        open: true,
+        onClose: vi.fn(),
+        order: {
+          _id: 'order-read-only-test',
+          orderNumber: 'ORD-READ-ONLY-TEST',
+          status: 'paid',
+          items: [],
+          customer: {},
+          billing: {},
+        },
+      })
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Gestionar', exact: true })
+    ).not.toBeInTheDocument();
+  });
+
   it('no cierra al seleccionar con el mouse, usar clic derecho o pegar desde el menú contextual', () => {
     const onClose = vi.fn();
     const globalClick = vi.fn();
