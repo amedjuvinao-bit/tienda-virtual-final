@@ -241,7 +241,8 @@ async function runScenario(browser) {
     'Paginar no debe recalcular los indicadores.'
   );
   await page
-    .locator('.orders-admin-metrics')
+    .locator('.orders-admin-metrics .orf-card-metric')
+    .filter({ hasText: 'Total órdenes' })
     .getByText('41', { exact: true })
     .waitFor();
 
