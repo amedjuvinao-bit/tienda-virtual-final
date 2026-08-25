@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import OrderDetailModal, {
   isolateOrderDetailKeyboardEvent,
   isolateOrderDetailPointerEvent,
+  synchronizeOrderDetailState,
 } from './OrderDetailModal';
 
 vi.mock('../../../lib/api', () => ({
@@ -28,6 +29,64 @@ function keyboardEvent(overrides = {}) {
 }
 
 describe('aislamiento de teclado del detalle de la orden', () => {
+  it('sincroniza todas las vistas después de una mutación operativa', async () => {
+    const onOrderUpdated = vi.fn();
+    const loadOrder = vi.fn().mockResolvedValue({
+      _id: 'order-refresh-test',
+      status: 'delivered',
+      fulfillmentStatus: 'delivered',
+      fulfillment: { status: 'delivered' },
+    });
+    const refreshTimeline = vi.fn().mockResolvedValue([]);
+    const refreshRefunds = vi.fn().mockResolvedValue([]);
+    const refreshReturns = vi.fn().mockResolvedValue({ eligibility: [{}] });
+    const optimistic = {
+      _id: 'order-refresh-test',
+      status: 'delivered',
+    };
+
+    const result = await synchronizeOrderDetailState({
+      updatedOrder: optimistic,
+      orderId: optimistic._id,
+      onOrderUpdated,
+      loadOrder,
+      refreshRelated: [refreshTimeline, refreshRefunds, refreshReturns],
+    });
+
+    expect(onOrderUpdated).toHaveBeenNthCalledWith(1, optimistic);
+    expect(loadOrder).toHaveBeenCalledWith(optimistic._id);
+    expect(refreshTimeline).toHaveBeenCalledTimes(1);
+    expect(refreshRefunds).toHaveBeenCalledTimes(1);
+    expect(refreshReturns).toHaveBeenCalledTimes(1);
+    expect(onOrderUpdated).toHaveBeenNthCalledWith(2, result);
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'delivered',
+        fulfillmentStatus: 'delivered',
+      })
+    );
+  });
+
+  it('conserva la actualización optimista si falla la recarga completa', async () => {
+    const onOrderUpdated = vi.fn();
+    const optimistic = {
+      _id: 'order-refresh-fallback',
+      status: 'delivered',
+    };
+
+    const result = await synchronizeOrderDetailState({
+      updatedOrder: optimistic,
+      orderId: optimistic._id,
+      onOrderUpdated,
+      loadOrder: vi.fn().mockRejectedValue(new Error('sin conexión')),
+      refreshRelated: [vi.fn().mockRejectedValue(new Error('auxiliar'))],
+    });
+
+    expect(result).toBe(optimistic);
+    expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+    expect(onOrderUpdated).toHaveBeenCalledWith(optimistic);
+  });
+
   it.each([
     ['Control', { key: 'Control', ctrlKey: true }],
     ['copiar', { key: 'c', ctrlKey: true }],

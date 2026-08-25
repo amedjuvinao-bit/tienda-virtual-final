@@ -74,6 +74,13 @@ describe('OrderDetailReturnsPanel', () => {
 
     fireEvent.change(screen.getByLabelText('Aptas Tenis Plus'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Cuarentena Tenis Plus'), { target: { value: '1' } });
+
+    expect(screen.getByText('Aptas')).toBeInTheDocument();
+    expect(screen.getByText('Vuelven al inventario disponible.')).toBeInTheDocument();
+    expect(screen.getByText('Averiadas')).toBeInTheDocument();
+    expect(screen.getByText('En cuarentena')).toBeInTheDocument();
+    expect(screen.getByText('Rechazadas')).toBeInTheDocument();
+    expect(screen.getByText(/La suma de Aptas, Averiadas, En cuarentena y Rechazadas debe ser exactamente 2/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar inspección' }));
 
     expect(onAction).toHaveBeenCalledWith(

@@ -87,6 +87,46 @@ function Metric({ label, value, tone = '' }) {
   );
 }
 
+function InspectionField({
+  label,
+  helper,
+  ariaLabel,
+  value,
+  max,
+  onChange,
+}) {
+  return (
+    <label
+      style={{
+        display: 'flex',
+        minWidth: 0,
+        flexDirection: 'column',
+        gap: 4,
+        padding: 9,
+        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+        background: ORDER_DETAIL_THEME.inputBg,
+        borderRadius: 13,
+      }}
+    >
+      <strong style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 11 }}>
+        {label}
+      </strong>
+      <span style={{ minHeight: 26, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, lineHeight: 1.35 }}>
+        {helper}
+      </span>
+      <input
+        aria-label={ariaLabel}
+        type="number"
+        min="0"
+        max={max}
+        value={value}
+        onChange={onChange}
+        style={inputStyle({ marginTop: 2 })}
+      />
+    </label>
+  );
+}
+
 function WorkflowGuide() {
   const steps = [
     ['1', 'Autorizar', 'Valida política y cantidades'],
@@ -473,14 +513,52 @@ export default function OrderDetailReturnsPanel({
                   {(returnCase.items || []).map((item) => {
                     const lineId = itemId(item);
                     const values = draft.inspections?.[lineId] || {};
+                    const receivedQuantity = positiveInteger(item.receivedQuantity);
                     return (
-                      <div key={lineId} className="order-return-inspection" style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) repeat(4, 82px) minmax(140px, 1fr)', gap: 7, marginTop: 7, alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, fontWeight: 800 }}>{item.title} · recibidas {item.receivedQuantity}</span>
-                        <input aria-label={`Aptas ${item.title}`} type="number" min="0" value={values.sellableQuantity ?? item.receivedQuantity} onChange={(event) => setInspection(id, lineId, { sellableQuantity: event.target.value })} style={inputStyle()} />
-                        <input aria-label={`Averiadas ${item.title}`} type="number" min="0" value={values.damagedQuantity || ''} onChange={(event) => setInspection(id, lineId, { damagedQuantity: event.target.value })} style={inputStyle()} />
-                        <input aria-label={`Cuarentena ${item.title}`} type="number" min="0" value={values.quarantineQuantity || ''} onChange={(event) => setInspection(id, lineId, { quarantineQuantity: event.target.value })} style={inputStyle()} />
-                        <input aria-label={`Rechazadas ${item.title}`} type="number" min="0" value={values.rejectedQuantity || ''} onChange={(event) => setInspection(id, lineId, { rejectedQuantity: event.target.value })} style={inputStyle()} />
-                        <input aria-label={`Nota inspección ${item.title}`} value={values.inspectionNote || ''} onChange={(event) => setInspection(id, lineId, { inspectionNote: event.target.value })} placeholder="Nota de inspección" style={inputStyle()} />
+                      <div key={lineId} className="order-return-inspection" style={{ marginTop: 9, padding: 10, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.cardBg, borderRadius: 14 }}>
+                        <strong style={{ display: 'block', color: ORDER_DETAIL_THEME.cardText, fontSize: 11 }}>{item.title}</strong>
+                        <div style={{ marginTop: 4, color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, lineHeight: 1.45 }}>
+                          Clasifica las {receivedQuantity} unidad(es) recibida(s). La suma de Aptas, Averiadas, En cuarentena y Rechazadas debe ser exactamente {receivedQuantity}.
+                        </div>
+                        <div className="order-return-inspection-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(105px, 1fr)) minmax(170px, 1.4fr)', gap: 8, marginTop: 9, alignItems: 'stretch' }}>
+                          <InspectionField
+                            label="Aptas"
+                            helper="Vuelven al inventario disponible."
+                            ariaLabel={`Aptas ${item.title}`}
+                            value={values.sellableQuantity ?? receivedQuantity}
+                            max={receivedQuantity}
+                            onChange={(event) => setInspection(id, lineId, { sellableQuantity: event.target.value })}
+                          />
+                          <InspectionField
+                            label="Averiadas"
+                            helper="Se acepta la devolución, pero no se venden."
+                            ariaLabel={`Averiadas ${item.title}`}
+                            value={values.damagedQuantity || ''}
+                            max={receivedQuantity}
+                            onChange={(event) => setInspection(id, lineId, { damagedQuantity: event.target.value })}
+                          />
+                          <InspectionField
+                            label="En cuarentena"
+                            helper="Quedan separadas para una revisión posterior."
+                            ariaLabel={`Cuarentena ${item.title}`}
+                            value={values.quarantineQuantity || ''}
+                            max={receivedQuantity}
+                            onChange={(event) => setInspection(id, lineId, { quarantineQuantity: event.target.value })}
+                          />
+                          <InspectionField
+                            label="Rechazadas"
+                            helper="No se acepta la devolución de estas unidades."
+                            ariaLabel={`Rechazadas ${item.title}`}
+                            value={values.rejectedQuantity || ''}
+                            max={receivedQuantity}
+                            onChange={(event) => setInspection(id, lineId, { rejectedQuantity: event.target.value })}
+                          />
+                          <label style={{ display: 'flex', minWidth: 0, flexDirection: 'column', gap: 4, padding: 9, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg, borderRadius: 13 }}>
+                            <strong style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 11 }}>Nota de inspección</strong>
+                            <span style={{ minHeight: 26, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, lineHeight: 1.35 }}>Explica el daño o la decisión tomada.</span>
+                            <input aria-label={`Nota inspección ${item.title}`} value={values.inspectionNote || ''} onChange={(event) => setInspection(id, lineId, { inspectionNote: event.target.value })} placeholder="Ej.: empaque abierto" style={inputStyle({ marginTop: 2 })} />
+                          </label>
+                        </div>
                       </div>
                     );
                   })}
@@ -541,9 +619,9 @@ export default function OrderDetailReturnsPanel({
         @media (max-width: 840px) {
           .order-return-workflow,
           .order-return-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .order-return-inspection-fields { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .order-return-policy-grid,
-          .order-return-request-line,
-          .order-return-inspection { grid-template-columns: 1fr 1fr !important; }
+          .order-return-request-line { grid-template-columns: 1fr 1fr !important; }
         }
         @media (max-width: 560px) {
           .order-return-workflow,
@@ -551,7 +629,7 @@ export default function OrderDetailReturnsPanel({
           .order-return-policy-grid,
           .order-return-form-grid,
           .order-return-request-line,
-          .order-return-inspection { grid-template-columns: 1fr !important; }
+          .order-return-inspection-fields { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </OrderDetailPanel>

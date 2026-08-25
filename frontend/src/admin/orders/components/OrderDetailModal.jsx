@@ -40,6 +40,32 @@ export function isolateOrderDetailPointerEvent(event = {}) {
   event.stopPropagation?.();
 }
 
+export async function synchronizeOrderDetailState({
+  updatedOrder,
+  orderId,
+  onOrderUpdated,
+  loadOrder,
+  refreshRelated = [],
+} = {}) {
+  if (updatedOrder?._id) onOrderUpdated?.(updatedOrder);
+
+  const tasks = [
+    typeof loadOrder === 'function'
+      ? Promise.resolve().then(() => loadOrder(orderId))
+      : Promise.resolve(null),
+    ...refreshRelated
+      .filter((refresh) => typeof refresh === 'function')
+      .map((refresh) => Promise.resolve().then(refresh)),
+  ];
+  const [orderResult] = await Promise.allSettled(tasks);
+  const freshOrder = orderResult?.status === 'fulfilled'
+    ? orderResult.value
+    : null;
+
+  if (freshOrder?._id) onOrderUpdated?.(freshOrder);
+  return freshOrder || updatedOrder || null;
+}
+
 export default function OrderDetailModal({
   open,
   onClose,
@@ -235,6 +261,22 @@ export default function OrderDetailModal({
     }
   };
 
+  const synchronizeAfterMutation = (
+    updatedOrder = null,
+    refreshRelated = [fetchTimeline, fetchRefunds, fetchReturns]
+  ) =>
+    synchronizeOrderDetailState({
+      updatedOrder,
+      orderId: order?._id,
+      onOrderUpdated,
+      loadOrder: async (orderId) => {
+        if (!orderId) return null;
+        const { data } = await api.get(`/api/orders/${orderId}`);
+        return data?._id ? data : null;
+      },
+      refreshRelated,
+    });
+
   useEffect(() => {
     if (!open || !order?._id) return;
 
@@ -263,7 +305,7 @@ export default function OrderDetailModal({
         title: 'RMA creado',
         message: 'Las unidades quedaron reservadas para el proceso posventa.',
       });
-      await Promise.all([fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Revisa la elegibilidad y las cantidades seleccionadas.');
     } finally {
@@ -288,7 +330,7 @@ export default function OrderDetailModal({
         title: 'RMA actualizado',
         message: 'La etapa quedó registrada con trazabilidad.',
       });
-      await Promise.all([fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Recarga el expediente y vuelve a intentar.');
     } finally {
@@ -309,7 +351,7 @@ export default function OrderDetailModal({
         title: 'Reembolso creado',
         message: 'La inspección RMA terminó; dinero y documento fiscal siguen visibles hasta cerrar la conciliación.',
       });
-      await Promise.all([fetchReturns(), fetchRefunds(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Verifica el monto aceptado y el estado de la inspección.');
     } finally {
@@ -334,7 +376,7 @@ export default function OrderDetailModal({
         title: 'Cambio vinculado',
         message: 'El expediente quedó enlazado con una orden de reemplazo real.',
       });
-      await Promise.all([fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Verifica la orden de reemplazo y la sede autorizada.');
     } finally {
@@ -359,7 +401,7 @@ export default function OrderDetailModal({
         message: `Se creó la orden #${response?.data?.replacementOrder?.orderNumber || 'de reemplazo'} y su inventario quedó reservado.`,
         persist: true,
       });
-      await Promise.all([fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Verifica el inventario disponible para el cambio.');
     } finally {
@@ -381,7 +423,7 @@ export default function OrderDetailModal({
         message: `${response?.data?.storeCredit?.creditNumber || 'El saldo'} quedó trazable y asociado al cliente.`,
         persist: true,
       });
-      await Promise.all([fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showReturnError(error, 'Verifica el monto aceptado y la política de saldo a favor.');
     } finally {
@@ -420,7 +462,7 @@ export default function OrderDetailModal({
         title: 'Dinero conciliado',
         message: 'La devolución quedó registrada y la caja fue recalculada.',
       });
-      await Promise.all([fetchRefunds(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showToast({
         type: 'error',
@@ -455,7 +497,7 @@ export default function OrderDetailModal({
             'Se automatizaron las etapas compatibles; las acciones manuales siguen visibles.',
         persist: !completed,
       });
-      await Promise.all([fetchRefunds(), fetchReturns(), fetchTimeline()]);
+      await synchronizeAfterMutation();
     } catch (error) {
       showToast({
         type: 'error',
@@ -865,7 +907,7 @@ export default function OrderDetailModal({
           onCustomerStageConfirmed={
             canSendEmail ? offerWhatsAppAfterStage : null
           }
-          onOrderUpdated={onOrderUpdated}
+          onOrderUpdated={synchronizeAfterMutation}
           canUpdateFulfillment={canUpdateFulfillment}
           loadingAux={loadingAux}
           onRefreshTimeline={fetchTimeline}
