@@ -55,6 +55,7 @@ function run() {
   );
   const e2e = read('frontend/e2e/ordersReturnsStage4.e2e.js');
   const integration = read('backend/scripts/testOrderReturnsStage4Integration.js');
+  const factusPayloads = read('backend/lib/dian/providers/factus/factusPayloads.js');
   const documentation = read('docs/modulos/ordenes-etapa-4-cierre.md');
 
   assert.strictEqual(
@@ -84,6 +85,7 @@ function run() {
       'npm --prefix backend run test:orders-stage4-returns',
       'npm --prefix frontend run test:orders-stage4',
       'npm --prefix frontend run test:e2e:orders-stage4',
+      'npm --prefix backend run test:billing-credit-notes-official',
     ],
     'Órdenes CI'
   );
@@ -182,6 +184,18 @@ function run() {
     'Servicio de posventa'
   );
   ok('saldo y cambio automático son transaccionales, idempotentes y reservan inventario');
+
+  includesAll(
+    factusPayloads,
+    [
+      'buildFactusCreditNoteCustomer(electronicInvoice)',
+      'customer: buildFactusCreditNoteCustomer(electronicInvoice)',
+      'La factura original no conserva la identificación fiscal necesaria',
+      'La identidad fiscal de la nota crédito no coincide con la factura original',
+    ],
+    'Cliente fiscal de la nota crédito'
+  );
+  ok('la nota crédito conserva el cliente fiscal inmutable de la factura original');
 
   includesAll(
     customerPage,

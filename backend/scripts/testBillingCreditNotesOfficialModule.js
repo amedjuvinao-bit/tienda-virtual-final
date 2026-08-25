@@ -76,6 +76,20 @@ function validatePayloadMath() {
     taxes: { iva: { enabled: true, percent: 19, amount: 34.2 } },
   };
   const payload = buildFactusCreditNotePayload({
+    electronicInvoice: {
+      customer: {
+        personType: 'natural',
+        documentType: 'CC',
+        documentNumber: '1014942842',
+        firstName: 'Cliente Prueba',
+        lastName: 'Habilitación',
+        email: 'cliente.prueba@example.com',
+        address: 'Calle 93 # 12-34',
+        municipalityCode: '11001',
+        countryCode: 'CO',
+        tributeCode: 'ZZ',
+      },
+    },
     order,
     type: 'partial',
     selectedItems: [{ codeReference: 'P1', quantity: 1 }],
@@ -87,11 +101,69 @@ function validatePayloadMath() {
   });
 
   assert(payload.bill_number === 'SETP9900077', 'No conserva bill_number.');
-  assert(payload.customer.identification === '222222222222', 'No conserva el cliente fiscal.');
+  assert(payload.customer.identification === '1014942842', 'No conserva el cliente fiscal de la factura original.');
+  assert(payload.customer.names === 'Cliente Prueba Habilitación', 'No conserva el nombre fiscal de la factura original.');
   assert(payload.items.length === 1, 'La parcial incluyó líneas no seleccionadas.');
   assert(payload.items[0].discount_amount === '10.00', 'No prorratea el descuento.');
   assert(payload.payment_details[0].amount === '107.10', 'No concilia base, descuento e IVA.');
   ok('Cálculo parcial prorratea descuento e IVA sin confiar en el navegador');
+}
+
+function validateImmutableInvoiceCustomer() {
+  const {
+    buildFactusCreditNotePayload,
+  } = require('../lib/dian/providers/factusProvider');
+  const order = {
+    billing: {
+      isFinalConsumer: false,
+      personType: 'natural',
+      documentType: 'CC',
+      documentNumber: '1014942842',
+      firstName: 'Cliente modificado',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
+    items: [{ productId: 'P1', title: 'Producto', quantity: 1, price: 100 }],
+    pricing: { version: 2, subtotalAfterDiscount: 100, shipping: 0 },
+    taxes: { iva: { enabled: false, percent: 0, amount: 0 } },
+  };
+  const common = {
+    order,
+    type: 'total',
+    reasonCode: '2',
+    reasonText: 'Anulación total',
+    billNumber: 'SETP9900078',
+    referenceCode: 'NC-TEST-1002',
+    numberingRangeId: 8,
+  };
+
+  const payload = buildFactusCreditNotePayload({
+    ...common,
+    electronicInvoice: {
+      customer: {
+        personType: 'natural',
+        documentType: 'CC',
+        documentNumber: '222222222222',
+        firstName: 'Consumidor',
+        lastName: 'Final',
+        countryCode: 'CO',
+      },
+    },
+  });
+  assert(payload.customer.identification === '222222222222', 'Cambió el comprador fiscal de la factura original.');
+  assert(payload.customer.names === 'Consumidor Final', 'Cambió el nombre fiscal de la factura original.');
+
+  let missingSnapshotError = null;
+  try {
+    buildFactusCreditNotePayload({ ...common, electronicInvoice: {} });
+  } catch (error) {
+    missingSnapshotError = error;
+  }
+  assert(
+    missingSnapshotError?.message.includes('factura original'),
+    'Permitió emitir una nota sin identidad fiscal inmutable.'
+  );
+  ok('Nota crédito usa exclusivamente el cliente fiscal inmutable de la factura original');
 }
 
 function validateDianReasons() {
@@ -208,6 +280,7 @@ async function main() {
   const steps = [
     validateOfficialPayload,
     validatePayloadMath,
+    validateImmutableInvoiceCustomer,
     validateDianReasons,
     validateIdempotencyAndLock,
     validateServerSideAmounts,

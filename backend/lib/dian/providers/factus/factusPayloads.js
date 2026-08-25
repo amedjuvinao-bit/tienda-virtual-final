@@ -140,6 +140,53 @@ function buildFactusCustomer(order = {}) {
   return factusCustomer;
 }
 
+function buildFactusCreditNoteCustomer(electronicInvoice = {}) {
+  const snapshot = electronicInvoice?.customer || {};
+  const documentCode = normalizeFactusDocumentCode(snapshot.documentType || 'CC');
+  const expectedIdentification = normalizeFactusIdentification(
+    snapshot.documentNumber || '',
+    documentCode,
+    snapshot.dv
+  );
+
+  if (!expectedIdentification) {
+    throw new Error(
+      'La factura original no conserva la identificación fiscal necesaria para emitir la nota crédito.'
+    );
+  }
+
+  const customer = buildFactusCustomer({
+    billing: {
+      documentType: snapshot.documentType || 'CC',
+      documentNumber: snapshot.documentNumber || '',
+      dv: snapshot.dv || '',
+      personType: snapshot.personType || 'natural',
+      firstName: snapshot.firstName || '',
+      lastName: snapshot.lastName || '',
+      businessName: snapshot.businessName || '',
+      email: snapshot.email || '',
+      phone: snapshot.phone || '',
+      address: snapshot.address || '',
+      city: snapshot.city || '',
+      municipalityCode: snapshot.municipalityCode || '',
+      department: snapshot.department || '',
+      departmentCode: snapshot.departmentCode || '',
+      country: snapshot.country || 'Colombia',
+      countryCode: snapshot.countryCode || 'CO',
+      tributeCode: snapshot.tributeCode || 'ZZ',
+      isFinalConsumer: expectedIdentification === '222222222222',
+    },
+  });
+
+  if (customer.identification !== expectedIdentification) {
+    throw new Error(
+      'La identidad fiscal de la nota crédito no coincide con la factura original.'
+    );
+  }
+
+  return customer;
+}
+
 function allocateFactusDiscounts(orderItems = [], totalDiscount = 0) {
   const lines = orderItems.map((item) => {
     const quantity = Math.max(0, toNumber(item?.quantity ?? item?.qty ?? 0, 0));
@@ -399,7 +446,7 @@ function buildFactusCreditNotePayload({
       },
     ],
 
-    customer: buildFactusCustomer(order),
+    customer: buildFactusCreditNoteCustomer(electronicInvoice),
 
     items,
   };

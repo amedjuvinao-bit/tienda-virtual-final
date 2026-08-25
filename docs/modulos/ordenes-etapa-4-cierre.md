@@ -15,6 +15,7 @@ Esta etapa no reemplaza la conciliación de reembolsos ni la logística ya cerra
 - El cliente solo puede pedir cantidades entregadas, disponibles y dentro de la ventana configurada.
 - El cliente no puede omitir la política ni ejecutar recepción, inspección, reembolso o movimientos de inventario.
 - Una etiqueta HTTPS real de la transportadora se abre directamente; cuando no existe, se genera un PDF interno que identifica el RMA y no finge ser una guía comprada.
+- Cuando una resolución exige nota crédito, el comprador fiscal se toma del snapshot inmutable de la factura original. Los cambios posteriores en la orden no pueden sustituirlo por consumidor final ni por otra identidad.
 
 ## Política versionada
 
@@ -99,4 +100,3 @@ No debe usarse una compra real, una guía con costo ni una base productiva para 
 ## Estado local
 
 Implementación preparada localmente y **sin publicación**. La etapa solo se considerará cerrada remotamente cuando el usuario autorice el commit y GitHub ejecute todas las puertas en verde.
-
