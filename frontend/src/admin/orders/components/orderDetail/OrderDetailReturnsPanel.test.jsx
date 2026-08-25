@@ -109,4 +109,57 @@ describe('OrderDetailReturnsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Crear reembolso' })).toBeDisabled();
   });
+
+  it('guarda una política versionada y conserva los colores heredados', () => {
+    const onSavePolicy = vi.fn();
+    render(
+      <OrderDetailReturnsPanel
+        data={{
+          orderId: 'order-1',
+          policy: {
+            revision: 4,
+            windowDays: 30,
+            allowedResolutions: ['refund', 'exchange', 'store_credit'],
+            customerPortalEnabled: true,
+            returnShippingPaidBy: 'case_by_case',
+            storeCreditExpirationDays: 365,
+          },
+          eligibility: [],
+          returns: [],
+        }}
+        canManagePolicy
+        onSavePolicy={onSavePolicy}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Configurar política' }));
+    fireEvent.change(screen.getByLabelText('Ventana de devoluciones'), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar política' }));
+
+    expect(onSavePolicy).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 4,
+      windowDays: 45,
+    }));
+    expect(document.body.innerHTML).toContain('var(--admin-');
+  });
+
+  it('ofrece creación automática para un cambio inspeccionado', () => {
+    const onAutomaticExchange = vi.fn();
+    const exchange = {
+      ...receivedReturn,
+      status: 'resolution_required',
+      requestedResolution: 'exchange',
+      revision: 6,
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-1', policy: { automaticExchangeEnabled: true }, eligibility: [], returns: [exchange] }}
+        canManage
+        onAutomaticExchange={onAutomaticExchange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crear orden de cambio' }));
+    expect(onAutomaticExchange).toHaveBeenCalledWith(exchange, 'Cambio automático por RMA');
+  });
 });

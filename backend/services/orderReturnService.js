@@ -4,8 +4,10 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const Order = require('../models/Order');
+const Counter = require('../models/Counter');
 const OrderRefund = require('../models/OrderRefund');
 const OrderReturn = require('../models/OrderReturn');
+const StoreCredit = require('../models/StoreCredit');
 const {
   normalizeRequestedItems,
   getPreviousRefundState,
@@ -16,6 +18,13 @@ const {
   hydrateOrderInventoryAllocations,
   applyReturnsToOrderInventoryAllocations,
 } = require('./orderInventoryAllocationService');
+const {
+  createInventoryReservation,
+  confirmInventoryReservation,
+} = require('./inventoryReservationService');
+const {
+  getOrderReturnPolicy,
+} = require('./orderReturnPolicyService');
 const {
   canonicalizeVariantKey,
 } = require('../lib/products/productVariantConfig');
@@ -99,8 +108,10 @@ function actorSnapshot(actor = {}) {
   };
 }
 
-function returnWindowDays() {
-  const configured = Math.floor(Number(process.env.ORDER_RETURN_WINDOW_DAYS || 30));
+function returnWindowDays(policy = {}) {
+  const configured = Math.floor(
+    Number(policy.windowDays || process.env.ORDER_RETURN_WINDOW_DAYS || 30)
+  );
   return Number.isFinite(configured) ? Math.min(365, Math.max(1, configured)) : 30;
 }
 
@@ -250,8 +261,13 @@ async function loadReturnUsage(orderId, { session = null, excludeReturnId = null
   return { returnedByLine, restoredByStock, unrefundedReturnByLine };
 }
 
-function buildReturnEligibility(order = {}, returnedByLine = new Map(), now = new Date()) {
-  const windowDays = returnWindowDays();
+function buildReturnEligibility(
+  order = {},
+  returnedByLine = new Map(),
+  now = new Date(),
+  policy = {}
+) {
+  const windowDays = returnWindowDays(policy);
   return orderLines(order)
     .filter(isPhysicalLine)
     .map((line) => {
@@ -400,9 +416,12 @@ function safeReturnView(returnCase) {
     status: value?.status,
     revision: Number(value?.revision || 0),
     requestedResolution: value?.requestedResolution,
+    requestSource: value?.requestSource || 'admin',
+    customerSnapshot: value?.customerSnapshot || {},
     items: value?.items || [],
     reasonSummary: value?.reasonSummary || '',
     eligibility: value?.eligibility || {},
+    policySnapshot: value?.policySnapshot || {},
     shipping: value?.shipping || {},
     inventoryRestorations: value?.inventoryRestorations || [],
     inventoryProcessedAt: value?.inventoryProcessedAt || null,
@@ -428,6 +447,65 @@ function safeReturnView(returnCase) {
   };
 }
 
+function safeCustomerReturnView(returnCase) {
+  const value = safeReturnView(returnCase);
+  return {
+    _id: value._id,
+    returnNumber: value.returnNumber,
+    orderNumber: value.orderNumber,
+    status: value.status,
+    revision: value.revision,
+    requestedResolution: value.requestedResolution,
+    requestSource: value.requestSource,
+    items: (value.items || []).map((item) => ({
+      _id: item._id,
+      orderItemId: item.orderItemId,
+      title: item.title,
+      variantKey: item.variantKey,
+      size: item.size,
+      color: item.color,
+      requestedQuantity: item.requestedQuantity,
+      authorizedQuantity: item.authorizedQuantity,
+      receivedQuantity: item.receivedQuantity,
+      acceptedQuantity: item.acceptedQuantity,
+      rejectedQuantity: item.rejectedQuantity,
+      reasonCode: item.reasonCode,
+      reasonText: item.reasonText,
+    })),
+    reasonSummary: value.reasonSummary,
+    eligibility: value.eligibility,
+    shipping: {
+      method: value.shipping?.method || 'pending',
+      carrierName: value.shipping?.carrierName || '',
+      trackingNumber: value.shipping?.trackingNumber || '',
+      trackingUrl: value.shipping?.trackingUrl || '',
+      labelUrl: value.shipping?.labelUrl || '',
+      labelType: value.shipping?.labelType || 'none',
+      instructions: value.shipping?.instructions || '',
+    },
+    estimatedRefundAmount: value.estimatedRefundAmount,
+    resolution: {
+      type: value.resolution?.type || null,
+      state: value.resolution?.state || 'pending',
+      amount: Number(value.resolution?.amount || 0),
+      reference: value.resolution?.reference || '',
+      storeCreditNumber: value.resolution?.storeCreditNumber || '',
+      replacementOrderNumber: value.resolution?.replacementOrderNumber || '',
+      completedAt: value.resolution?.completedAt || null,
+    },
+    rejectionReason: value.rejectionReason,
+    cancellationReason: value.cancellationReason,
+    requestedAt: value.requestedAt,
+    authorizedAt: value.authorizedAt,
+    inTransitAt: value.inTransitAt,
+    receivedAt: value.receivedAt,
+    resolvedAt: value.resolvedAt,
+    cancelledAt: value.cancelledAt,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+
 async function createOrderEvent(OrderEventModel, payload, session) {
   if (!OrderEventModel) return;
   await OrderEventModel.create([payload], { session });
@@ -436,15 +514,50 @@ async function createOrderEvent(OrderEventModel, payload, session) {
 async function listOrderReturns({ orderFilter, now = new Date() } = {}) {
   const order = await Order.findOne(orderFilter).lean();
   if (!order) throw createReturnError('Orden no encontrada.', 'ORDER_NOT_FOUND', 404);
-  const usage = await loadReturnUsage(order._id);
+  const [usage, policy] = await Promise.all([
+    loadReturnUsage(order._id),
+    getOrderReturnPolicy(),
+  ]);
   const [returns, eligibility] = await Promise.all([
     OrderReturn.find({ order: order._id }).sort({ createdAt: -1, _id: -1 }).lean(),
-    Promise.resolve(buildReturnEligibility(order, usage.returnedByLine, now)),
+    Promise.resolve(buildReturnEligibility(order, usage.returnedByLine, now, policy)),
   ]);
   return {
-    policy: { windowDays: returnWindowDays() },
+    policy,
     eligibility,
     returns: returns.map(safeReturnView),
+  };
+}
+
+async function listCustomerOrderReturns({ orderFilter, now = new Date() } = {}) {
+  const result = await listOrderReturns({ orderFilter, now });
+  return {
+    policy: {
+      enabled: result.policy.enabled,
+      customerPortalEnabled: result.policy.customerPortalEnabled,
+      windowDays: result.policy.windowDays,
+      allowedResolutions: result.policy.allowedResolutions,
+      requireReasonText: result.policy.requireReasonText,
+      returnShippingPaidBy: result.policy.returnShippingPaidBy,
+      instructions: result.policy.instructions,
+      policyText: result.policy.policyText,
+    },
+    eligibility: (result.eligibility || []).map((item) => ({
+      orderItemId: item.orderItemId,
+      title: item.title,
+      variantKey: item.variantKey,
+      size: item.size,
+      color: item.color,
+      purchasedQuantity: item.purchasedQuantity,
+      deliveredQuantity: item.deliveredQuantity,
+      availableQuantity: item.availableQuantity,
+      deliveredAt: item.deliveredAt,
+      eligibleUntil: item.eligibleUntil,
+      eligible: item.eligible,
+      expired: item.expired,
+      blocker: item.blocker,
+    })),
+    returns: (result.returns || []).map(safeCustomerReturnView),
   };
 }
 
@@ -457,6 +570,8 @@ async function createOrderReturn(
     overrideEligibility = false,
     overrideReason = '',
     actor = {},
+    requestSource = 'admin',
+    customerSnapshot = {},
     now = new Date(),
   } = {},
   { OrderEventModel = null } = {}
@@ -472,25 +587,85 @@ async function createOrderReturn(
     await session.withTransaction(async () => {
       const order = await Order.findOne(orderFilter).session(session);
       if (!order) throw createReturnError('Orden no encontrada.', 'ORDER_NOT_FOUND', 404);
-      const usage = await loadReturnUsage(order._id, { session });
-      const eligibility = buildReturnEligibility(order, usage.returnedByLine, now);
+      const [usage, policy] = await Promise.all([
+        loadReturnUsage(order._id, { session }),
+        getOrderReturnPolicy({ session }),
+      ]);
+      const source = cleanLower(requestSource, 40) === 'customer'
+        ? 'customer'
+        : 'admin';
+      if (source === 'customer') {
+        if (!policy.enabled || !policy.customerPortalEnabled) {
+          throw createReturnError(
+            'El autoservicio de devoluciones no está disponible.',
+            'RETURN_CUSTOMER_PORTAL_DISABLED',
+            409
+          );
+        }
+        if (!policy.allowedResolutions.includes(resolution)) {
+          throw createReturnError(
+            'La opción solicitada no está disponible en la política de devoluciones.',
+            'RETURN_RESOLUTION_NOT_ALLOWED',
+            409
+          );
+        }
+        if (overrideEligibility) {
+          throw createReturnError(
+            'El cliente no puede omitir la política de devoluciones.',
+            'RETURN_OVERRIDE_NOT_ALLOWED',
+            403
+          );
+        }
+      }
+      const eligibility = buildReturnEligibility(
+        order,
+        usage.returnedByLine,
+        now,
+        policy
+      );
       const normalizedItems = normalizeReturnRequest(order, items, eligibility, {
         overrideEligibility,
         overrideReason,
       });
+      if (
+        source === 'customer' &&
+        policy.requireReasonText &&
+        normalizedItems.some((item) => cleanText(item.reasonText, 500).length < 5)
+      ) {
+        throw createReturnError(
+          'Describe brevemente el motivo de cada producto.',
+          'RETURN_REASON_TEXT_REQUIRED',
+          400
+        );
+      }
       const deliveredAt = earliestDate(
         normalizedItems.map((item) =>
           eligibility.find((entry) => entry.orderItemId === item.orderItemId)?.deliveredAt
         )
       );
-      const windowDays = returnWindowDays();
+      const windowDays = returnWindowDays(policy);
+      const autoAuthorized = source === 'customer' && policy.autoAuthorize === true;
       const returnCase = new OrderReturn({
         returnNumber: buildReturnNumber(order.orderNumber),
         order: order._id,
         orderNumber: order.orderNumber,
-        status: 'requested',
+        status: autoAuthorized ? 'authorized' : 'requested',
         revision: 0,
         requestedResolution: resolution,
+        requestSource: source,
+        customerSnapshot: {
+          customer: order.customer?.customerId || customerSnapshot.customer || null,
+          name: cleanText(
+            customerSnapshot.name ||
+              [order.customer?.name, order.customer?.lastname].filter(Boolean).join(' '),
+            180
+          ),
+          email: cleanLower(
+            customerSnapshot.email || order.customer?.email || order.customer?.emailOrPhone,
+            220
+          ),
+          phone: cleanText(customerSnapshot.phone || order.customer?.phone, 80),
+        },
         items: normalizedItems,
         reasonSummary: cleanText(reasonSummary, 800),
         eligibility: {
@@ -502,10 +677,30 @@ async function createOrderReturn(
           overridden: overrideEligibility === true,
           overrideReason: overrideEligibility ? cleanText(overrideReason, 500) : '',
         },
+        policySnapshot: {
+          revision: policy.revision,
+          windowDays,
+          autoAuthorized,
+          returnShippingPaidBy: policy.returnShippingPaidBy,
+        },
+        shipping: {
+          method: autoAuthorized ? 'drop_off' : 'pending',
+          labelType: autoAuthorized ? 'internal_rma' : 'none',
+          instructions: policy.instructions,
+        },
         requestedAt: now,
         requestedBy: actorSnapshot(actor),
+        authorizedAt: autoAuthorized ? now : null,
+        authorizedBy: autoAuthorized
+          ? actorSnapshot({ label: 'Política automática', role: 'system' })
+          : {},
         resolution: { type: resolution, state: 'pending' },
       });
+      if (autoAuthorized) {
+        for (const item of returnCase.items) {
+          item.authorizedQuantity = item.requestedQuantity;
+        }
+      }
       await returnCase.save({ session });
       // Serializa solicitudes concurrentes de la misma orden. Si dos transacciones
       // intentan reservar las mismas unidades, MongoDB fuerza el reintento de una
@@ -528,8 +723,10 @@ async function createOrderReturn(
         OrderEventModel,
         {
           orderId: order._id,
-          type: 'return_requested',
-          message: `RMA ${returnCase.returnNumber} solicitado para ${normalizedItems.reduce(
+          type: autoAuthorized ? 'return_auto_authorized' : 'return_requested',
+          message: `RMA ${returnCase.returnNumber} ${
+            autoAuthorized ? 'solicitado y autorizado' : 'solicitado'
+          } para ${normalizedItems.reduce(
             (sum, item) => sum + item.requestedQuantity,
             0
           )} unidad(es).`,
@@ -537,6 +734,8 @@ async function createOrderReturn(
             returnId: returnCase._id,
             returnNumber: returnCase.returnNumber,
             requestedResolution: resolution,
+            requestSource: source,
+            autoAuthorized,
             overrideEligibility: overrideEligibility === true,
             items: normalizedItems.map((item) => ({
               orderItemId: item.orderItemId,
@@ -605,7 +804,16 @@ function applyAuthorization(returnCase, payload, actor, now) {
     trackingNumber: cleanText(payload.shipping?.trackingNumber, 180),
     trackingUrl: cleanText(payload.shipping?.trackingUrl, 1000),
     labelUrl: cleanText(payload.shipping?.labelUrl, 1000),
-    instructions: cleanText(payload.shipping?.instructions, 1600),
+    labelType: cleanLower(
+      payload.shipping?.labelUrl
+        ? 'carrier'
+        : payload.shipping?.labelType || 'internal_rma',
+      40
+    ),
+    instructions: cleanText(
+      payload.shipping?.instructions || returnCase.shipping?.instructions,
+      1600
+    ),
   };
   returnCase.status = 'authorized';
   returnCase.authorizedAt = now;
@@ -720,6 +928,14 @@ async function updateOrderReturn(
         returnCase.shipping.carrierName = cleanText(payload.shipping?.carrierName || returnCase.shipping?.carrierName, 160);
         returnCase.shipping.trackingNumber = cleanText(payload.shipping?.trackingNumber || returnCase.shipping?.trackingNumber, 180);
         returnCase.shipping.trackingUrl = cleanText(payload.shipping?.trackingUrl || returnCase.shipping?.trackingUrl, 1000);
+        returnCase.shipping.labelUrl = cleanText(payload.shipping?.labelUrl || returnCase.shipping?.labelUrl, 1000);
+        returnCase.shipping.labelType = returnCase.shipping.labelUrl
+          ? 'carrier'
+          : 'internal_rma';
+        returnCase.shipping.instructions = cleanText(
+          payload.shipping?.instructions || returnCase.shipping?.instructions,
+          1600
+        );
         returnCase.status = 'in_transit';
         returnCase.inTransitAt = now;
       } else if (cleanAction === 'receive') {
@@ -1093,18 +1309,513 @@ async function resolveOrderReturnExchange(
   }
 }
 
+function customerStoreCreditKey(order = {}) {
+  const customerId = idValue(order.customer?.customerId);
+  if (customerId) return `customer:${customerId}`;
+  const identity = [
+    cleanLower(order.customer?.email || order.customer?.emailOrPhone, 220),
+    cleanText(order.customer?.phone, 80),
+    cleanText(order.customer?.id, 100),
+  ].join('|');
+  return `guest:${crypto.createHash('sha256').update(identity).digest('hex')}`;
+}
+
+function customerEmailHash(order = {}) {
+  const email = cleanLower(order.customer?.email || order.customer?.emailOrPhone, 220);
+  return email.includes('@')
+    ? crypto.createHash('sha256').update(email).digest('hex')
+    : '';
+}
+
+function safeStoreCreditView(storeCredit) {
+  const value = typeof storeCredit?.toObject === 'function'
+    ? storeCredit.toObject()
+    : storeCredit;
+  return {
+    _id: value?._id,
+    creditNumber: value?.creditNumber || '',
+    currency: value?.currency || 'COP',
+    originalAmount: Number(value?.originalAmount || 0),
+    balance: Number(value?.balance || 0),
+    status: value?.status || 'active',
+    issuedAt: value?.issuedAt || null,
+    expiresAt: value?.expiresAt || null,
+  };
+}
+
+async function resolveOrderReturnStoreCredit(
+  {
+    orderFilter,
+    returnId,
+    expectedRevision,
+    amount,
+    actor = {},
+    now = new Date(),
+  } = {},
+  { OrderEventModel = null } = {}
+) {
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      const order = await Order.findOne(orderFilter).session(session);
+      if (!order) throw createReturnError('Orden no encontrada.', 'ORDER_NOT_FOUND', 404);
+      const returnCase = await OrderReturn.findOne({
+        _id: objectId(returnId, 'El RMA'),
+        order: order._id,
+      }).session(session);
+      if (!returnCase) throw createReturnError('RMA no encontrado.', 'RETURN_NOT_FOUND', 404);
+
+      const existingCredit = await StoreCredit.findOne({
+        sourceReturn: returnCase._id,
+      }).session(session);
+      if (
+        returnCase.status === 'resolved' &&
+        returnCase.resolution?.type === 'store_credit' &&
+        existingCredit
+      ) {
+        result = {
+          returnCase: safeReturnView(returnCase),
+          storeCredit: safeStoreCreditView(existingCredit),
+          idempotent: true,
+        };
+        return;
+      }
+
+      assertExpectedRevision(returnCase, expectedRevision);
+      if (
+        returnCase.status !== 'resolution_required' ||
+        returnCase.requestedResolution !== 'store_credit'
+      ) {
+        throw createReturnError(
+          'El RMA no está listo para saldo a favor.',
+          'RETURN_STORE_CREDIT_NOT_READY',
+          409
+        );
+      }
+      const policy = await getOrderReturnPolicy({ session });
+      if (!policy.storeCreditEnabled) {
+        throw createReturnError(
+          'El saldo a favor está desactivado en la política.',
+          'RETURN_STORE_CREDIT_DISABLED',
+          409
+        );
+      }
+      const maximum = toMoney(
+        returnCase.items.reduce(
+          (sum, item) =>
+            sum + toMoney(item.unitAmount) * toQuantity(item.acceptedQuantity),
+          0
+        )
+      );
+      const creditAmount = amount === undefined || amount === null || amount === ''
+        ? maximum
+        : toMoney(amount);
+      if (creditAmount <= 0 || creditAmount > maximum) {
+        throw createReturnError(
+          'El saldo debe ser mayor a cero y no superar el valor aceptado.',
+          'RETURN_STORE_CREDIT_AMOUNT_INVALID',
+          400,
+          { maximum, requestedAmount: creditAmount }
+        );
+      }
+      const expiresAt = new Date(
+        now.getTime() + policy.storeCreditExpirationDays * 24 * 60 * 60 * 1000
+      );
+      const [storeCredit] = await StoreCredit.create(
+        [
+          {
+            creditNumber: `SC-${returnCase.returnNumber}-${crypto
+              .randomBytes(3)
+              .toString('hex')
+              .toUpperCase()}`,
+            customer: order.customer?.customerId || null,
+            customerKey: customerStoreCreditKey(order),
+            customerEmailHash: customerEmailHash(order),
+            currency: order.payment?.currency || 'COP',
+            originalAmount: creditAmount,
+            balance: creditAmount,
+            status: 'active',
+            expiresAt,
+            sourceOrder: order._id,
+            sourceOrderNumber: order.orderNumber,
+            sourceReturn: returnCase._id,
+            issuedAt: now,
+            issuedBy: actorSnapshot(actor),
+          },
+        ],
+        { session }
+      );
+      returnCase.status = 'resolved';
+      returnCase.resolvedAt = now;
+      returnCase.resolvedBy = actorSnapshot(actor);
+      returnCase.resolution = {
+        type: 'store_credit',
+        state: 'completed',
+        amount: creditAmount,
+        reference: storeCredit.creditNumber,
+        storeCredit: storeCredit._id,
+        storeCreditNumber: storeCredit.creditNumber,
+        completedAt: now,
+      };
+      returnCase.revision += 1;
+      await returnCase.save({ session });
+      await createOrderEvent(
+        OrderEventModel,
+        {
+          orderId: order._id,
+          type: 'return_resolved_store_credit',
+          message: `RMA ${returnCase.returnNumber} resuelto con saldo a favor ${storeCredit.creditNumber}.`,
+          meta: {
+            returnId: returnCase._id,
+            storeCreditId: storeCredit._id,
+            storeCreditNumber: storeCredit.creditNumber,
+            amount: creditAmount,
+            expiresAt,
+            revision: returnCase.revision,
+            by: actorSnapshot(actor),
+          },
+        },
+        session
+      );
+      result = {
+        returnCase: safeReturnView(returnCase),
+        storeCredit: safeStoreCreditView(storeCredit),
+        idempotent: false,
+      };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+async function nextOrderNumber(session) {
+  const counter = await Counter.findOneAndUpdate(
+    { _id: 'orderNumber' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true, session }
+  ).lean();
+  return String(counter.seq).padStart(6, '0');
+}
+
+function buildReplacementItems(order, returnCase) {
+  const lines = new Map(
+    orderLines(order).map((line) => [idValue(line._id || line.orderItemId), line])
+  );
+  return (returnCase.items || [])
+    .filter((item) => toQuantity(item.acceptedQuantity) > 0)
+    .map((returnItem) => {
+      const original = lines.get(idValue(returnItem.orderItemId)) || {};
+      const plain = typeof original.toObject === 'function'
+        ? original.toObject({ depopulate: true })
+        : { ...original };
+      delete plain._id;
+      const quantity = toQuantity(returnItem.acceptedQuantity);
+      return {
+        ...plain,
+        product: returnItem.product || original.product || original.productId,
+        productId: idValue(returnItem.product || original.product || original.productId),
+        title: returnItem.title || original.title || 'Producto de cambio',
+        size: returnItem.size || original.size || '',
+        color: returnItem.color || original.color || '',
+        variantKey: returnItem.variantKey || original.variantKey || 'default__default',
+        qty: quantity,
+        quantity,
+        price: 0,
+        unitPrice: 0,
+        priceNumber: 0,
+        lineSubtotal: 0,
+        discountAmount: 0,
+        taxableBase: 0,
+        taxAmount: 0,
+        lineTotal: 0,
+      };
+    });
+}
+
+async function resolveOrderReturnAutomaticExchange(
+  {
+    orderFilter,
+    returnId,
+    expectedRevision,
+    reference = 'Cambio automático por RMA',
+    actor = {},
+    now = new Date(),
+  } = {},
+  { OrderEventModel = null } = {}
+) {
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      const order = await Order.findOne(orderFilter).session(session);
+      if (!order) throw createReturnError('Orden original no encontrada.', 'ORDER_NOT_FOUND', 404);
+      const returnCase = await OrderReturn.findOne({
+        _id: objectId(returnId, 'El RMA'),
+        order: order._id,
+      }).session(session);
+      if (!returnCase) throw createReturnError('RMA no encontrado.', 'RETURN_NOT_FOUND', 404);
+      if (
+        returnCase.status === 'resolved' &&
+        returnCase.resolution?.type === 'exchange' &&
+        returnCase.resolution?.replacementOrder
+      ) {
+        const replacementOrder = await Order.findById(
+          returnCase.resolution.replacementOrder
+        ).session(session).lean();
+        result = {
+          returnCase: safeReturnView(returnCase),
+          replacementOrder,
+          idempotent: true,
+        };
+        return;
+      }
+      assertExpectedRevision(returnCase, expectedRevision);
+      if (
+        returnCase.status !== 'resolution_required' ||
+        returnCase.requestedResolution !== 'exchange'
+      ) {
+        throw createReturnError(
+          'El RMA no está listo para cambio.',
+          'RETURN_EXCHANGE_NOT_READY',
+          409
+        );
+      }
+      const policy = await getOrderReturnPolicy({ session });
+      if (!policy.automaticExchangeEnabled) {
+        throw createReturnError(
+          'La creación automática de cambios está desactivada.',
+          'RETURN_AUTOMATIC_EXCHANGE_DISABLED',
+          409
+        );
+      }
+      const items = buildReplacementItems(order, returnCase);
+      if (!items.length) {
+        throw createReturnError(
+          'No hay unidades aceptadas para crear el cambio.',
+          'RETURN_EXCHANGE_ITEMS_REQUIRED',
+          409
+        );
+      }
+      const orderNumber = await nextOrderNumber(session);
+      const totalItems = items.reduce((sum, item) => sum + toQuantity(item.quantity), 0);
+      const [replacementOrder] = await Order.create(
+        [
+          {
+            sessionId: `exchange:${returnCase._id}`,
+            orderNumber,
+            status: 'paid',
+            fulfillmentStatus: 'pending',
+            branch: order.branch || null,
+            branchSnapshot: order.branchSnapshot || {},
+            source: 'system',
+            channel: 'system',
+            saleType: 'system_order',
+            customer: order.customer || {},
+            billing: order.billing || {},
+            items,
+            cart: items,
+            summary: { itemsCount: items.length, totalItems, subtotal: 0 },
+            subtotal: 0,
+            shipping: 0,
+            total: 0,
+            taxes: {
+              iva: {
+                enabled: false,
+                percent: 0,
+                code: '01',
+                name: 'IVA',
+                taxableBase: 0,
+                amount: 0,
+              },
+            },
+            discount: {
+              type: 'none',
+              value: 0,
+              amount: 0,
+              reason: `Cambio sin cobro por ${returnCase.returnNumber}`,
+            },
+            pricing: {
+              version: 2,
+              currency: order.payment?.currency || 'COP',
+              subtotal: 0,
+              productDiscount: 0,
+              subtotalAfterDiscount: 0,
+              originalShipping: 0,
+              shippingDiscount: 0,
+              shipping: 0,
+              totalDiscount: 0,
+              taxableBase: 0,
+              taxAmount: 0,
+              total: 0,
+            },
+            payment: {
+              active: false,
+              provider: 'manual',
+              providerLabel: 'Cambio RMA',
+              mode: order.payment?.mode || 'sandbox',
+              currency: order.payment?.currency || 'COP',
+              status: 'paid',
+              methodType: 'store_credit',
+              method: 'exchange',
+              methodLabel: 'Cambio sin cobro',
+              reference: returnCase.returnNumber,
+              amountInCents: 0,
+              amount: 0,
+              paidAt: now,
+            },
+            inventoryControl: {
+              reservationRequired: true,
+              reservationId: null,
+              discountedAtCheckout: false,
+              restockedOnFailure: false,
+              restockedAt: null,
+            },
+            tags: ['exchange'],
+            timeline: [
+              {
+                type: 'system',
+                message: `Orden creada automáticamente desde ${returnCase.returnNumber}.`,
+                by: 'system',
+                at: now,
+              },
+            ],
+          },
+        ],
+        { session }
+      );
+
+      const reservation = await createInventoryReservation(
+        {
+          sessionId: replacementOrder.sessionId,
+          order: replacementOrder._id,
+          orderNumber: replacementOrder.orderNumber,
+          paymentReference: returnCase.returnNumber,
+          source: 'admin',
+          items: replacementOrder.items,
+          branchPriorityIds: order.branch ? [String(order.branch)] : [],
+          expiresInMinutes: 60,
+          currency: order.payment?.currency || 'COP',
+          metadata: {
+            source: 'rma_automatic_exchange',
+            returnId: String(returnCase._id),
+            originalOrderId: String(order._id),
+          },
+          notes: `Reserva automática para cambio ${returnCase.returnNumber}.`,
+        },
+        { session }
+      );
+      if (reservation) {
+        await confirmInventoryReservation(
+          reservation._id,
+          {
+            order: replacementOrder._id,
+            orderNumber: replacementOrder.orderNumber,
+            paymentReference: returnCase.returnNumber,
+          },
+          { session }
+        );
+        await Order.updateOne(
+          { _id: replacementOrder._id },
+          {
+            $set: {
+              'inventoryControl.reservationId': reservation._id,
+              'inventoryControl.discountedAtCheckout': true,
+            },
+          },
+          { session }
+        );
+      } else {
+        await Order.updateOne(
+          { _id: replacementOrder._id },
+          {
+            $set: {
+              'inventoryControl.reservationRequired': false,
+              'inventoryControl.discountedAtCheckout': true,
+            },
+          },
+          { session }
+        );
+      }
+
+      returnCase.status = 'resolved';
+      returnCase.resolvedAt = now;
+      returnCase.resolvedBy = actorSnapshot(actor);
+      returnCase.resolution = {
+        type: 'exchange',
+        state: 'completed',
+        amount: 0,
+        reference: cleanText(reference, 240) || 'Cambio automático por RMA',
+        replacementOrder: replacementOrder._id,
+        replacementOrderNumber: replacementOrder.orderNumber,
+        completedAt: now,
+      };
+      returnCase.revision += 1;
+      await returnCase.save({ session });
+      await createOrderEvent(
+        OrderEventModel,
+        {
+          orderId: order._id,
+          type: 'return_resolved_automatic_exchange',
+          message: `RMA ${returnCase.returnNumber} creó la orden de cambio ${replacementOrder.orderNumber}.`,
+          meta: {
+            returnId: returnCase._id,
+            replacementOrderId: replacementOrder._id,
+            replacementOrderNumber: replacementOrder.orderNumber,
+            reservationId: reservation?._id || null,
+            revision: returnCase.revision,
+            by: actorSnapshot(actor),
+          },
+        },
+        session
+      );
+      await createOrderEvent(
+        OrderEventModel,
+        {
+          orderId: replacementOrder._id,
+          type: 'exchange_order_created',
+          message: `Orden de cambio creada desde ${order.orderNumber} y ${returnCase.returnNumber}.`,
+          meta: {
+            originalOrderId: order._id,
+            returnId: returnCase._id,
+            returnNumber: returnCase.returnNumber,
+          },
+        },
+        session
+      );
+      const refreshedReplacement = await Order.findById(replacementOrder._id)
+        .session(session)
+        .lean();
+      result = {
+        returnCase: safeReturnView(returnCase),
+        replacementOrder: refreshedReplacement,
+        idempotent: false,
+      };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
 module.exports = {
   ACTIVE_RETURN_STATUSES,
   buildReturnEligibility,
   createOrderReturn,
   createReturnError,
   lineUnitAmount,
+  listCustomerOrderReturns,
   listOrderReturns,
   loadReturnUsage,
   normalizeReturnRequest,
+  resolveOrderReturnAutomaticExchange,
   resolveOrderReturnExchange,
   resolveOrderReturnRefund,
+  resolveOrderReturnStoreCredit,
+  safeCustomerReturnView,
   safeReturnView,
+  safeStoreCreditView,
   updateOrderReturn,
   validateInspection,
 };

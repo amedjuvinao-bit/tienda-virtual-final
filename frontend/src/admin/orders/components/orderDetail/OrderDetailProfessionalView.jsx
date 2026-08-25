@@ -77,11 +77,15 @@ export default function OrderDetailProfessionalView({
   returnsLoading = false,
   returnBusyId = '',
   canManageReturns = false,
+  canManageReturnPolicy = false,
   canRefundReturns = false,
   onCreateReturn,
   onUpdateReturn,
   onRefundReturn,
   onExchangeReturn,
+  onAutomaticExchangeReturn,
+  onStoreCreditReturn,
+  onSaveReturnPolicy,
   onSaveCustomerData,
   savingCustomerData = false,
 }) {
@@ -172,11 +176,15 @@ export default function OrderDetailProfessionalView({
         loading={returnsLoading}
         busyId={returnBusyId}
         canManage={canManageReturns}
+        canManagePolicy={canManageReturnPolicy}
         canRefund={canRefundReturns}
         onCreate={onCreateReturn}
         onAction={onUpdateReturn}
         onRefund={onRefundReturn}
         onExchange={onExchangeReturn}
+        onAutomaticExchange={onAutomaticExchangeReturn}
+        onStoreCredit={onStoreCreditReturn}
+        onSavePolicy={onSaveReturnPolicy}
       />
     ),
     payment: (

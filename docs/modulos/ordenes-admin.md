@@ -5,11 +5,11 @@
 - Rama de evolución: `feature/ordenes-admin-avanzado`.
 - Etapa 1: **cerrada en GitHub con Órdenes CI en verde**.
 - Etapa 2: **cerrada en GitHub con Órdenes CI en verde**.
-- Etapa actual: **Cierre del módulo · Etapa 3: consultas administrativas escalables**.
+- Etapa actual del cronograma Plus: **Etapa 4: autoservicio, política y resoluciones avanzadas de posventa**.
 - Estado de la etapa: implementación local en validación; todavía no se ha publicado.
 - Siguiente validación externa: desplegar el backend en una dirección HTTPS permanente, configurar las credenciales reales desde el panel y recibir una prueba auténtica del webhook de Envia Producción antes de activar operaciones con costo.
 
-La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md). El cierre de consultas, paginación y concurrencia de la Etapa 3 está en [`ordenes-etapa-3-cierre.md`](./ordenes-etapa-3-cierre.md).
+La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md). El cierre de consultas, paginación y concurrencia de la Etapa 3 está en [`ordenes-etapa-3-cierre.md`](./ordenes-etapa-3-cierre.md). El cierre Plus de autoservicio y resoluciones RMA está en [`ordenes-etapa-4-cierre.md`](./ordenes-etapa-4-cierre.md).
 
 Este documento registra las decisiones verificables del módulo. La etapa 1 estableció la frontera de confianza. La etapa 2 conecta devolución, inventario, dinero, caja y documento fiscal sin afirmar éxitos que todavía dependan de una acción externa. La etapa 3 separa la lectura administrativa del archivo principal y elimina cargas repetidas que no escalan con el volumen de órdenes. La etapa 4 incorpora preparación y entrega física trazable por sede sin duplicar movimientos de inventario ni simular integraciones de transportadora. La etapa 5 transforma el listado en una mesa operativa que prioriza acciones reales con la misma autoridad logística. La etapa 6 consolida la consola visual sin alterar la tabla original. La etapa 7 añade diagnóstico agregado, alertas y una prueba profesional de transacciones y concurrencia sobre una base temporal aislada. La etapa 8 permite convertir cada hito confirmado en un informe seguro para el cliente, con vista previa y apertura asistida de WhatsApp. La etapa 9 separa el expediente físico RMA del movimiento monetario y evita reponer unidades no inspeccionadas.
 
@@ -35,6 +35,12 @@ El reembolso se crea únicamente después de cerrar la inspección y usa `restoc
 | `PATCH /api/orders/:id/returns/:returnId` | Autorizar, rechazar, recibir, inspeccionar o cancelar | `orders:returns` |
 | `POST /api/orders/:id/returns/:returnId/refund` | Resolver con reembolso posterior a inspección | `orders:refund` |
 | `POST /api/orders/:id/returns/:returnId/exchange` | Resolver enlazando orden de reemplazo | `orders:returns` |
+| `GET /api/orders/returns/policy` | Consultar la política versionada | `orders:view` |
+| `PUT /api/orders/returns/policy` | Editar política, portal y resoluciones | `settings:store` |
+| `POST /api/orders/:id/returns/:returnId/exchange/automatic` | Crear y reservar la orden de cambio | `orders:returns` |
+| `POST /api/orders/:id/returns/:returnId/store-credit` | Emitir saldo a favor trazable | `orders:refund` |
+
+El cliente dispone además de `/devoluciones/:orderId`, protegido con una credencial firmada y limitada a su orden. Puede solicitar, consultar, cancelar antes de la recepción y descargar la etiqueta disponible; no recibe permisos administrativos ni puede inspeccionar, reponer inventario o resolver dinero.
 
 El encargado de sede y bodega reciben `orders:returns`; bodega no recibe `orders:refund`. El perfil de facturación conserva `orders:refund` y no obtiene autoridad sobre la pieza física. `owner` y `admin` mantienen ambos permisos. La pestaña `Posventa` refleja esa separación: lectura completa para `orders:view`, operación física para `orders:returns` y botón monetario solo para `orders:refund`.
 
@@ -598,7 +604,6 @@ La ejecución exige `--confirm-persist`, no limpia las órdenes creadas y no mod
 ## Trabajo pendiente deliberado
 
 1. Integrar generación/compra de etiquetas de retorno con una transportadora real; el RMA actual conserva referencias manuales sin afirmar validación externa.
-2. Crear autoservicio del cliente con autenticación fuerte, políticas visibles y seguimiento del RMA.
-3. Automatizar la creación de la orden de reemplazo; actualmente el cierre exige enlazar una orden real ya creada.
-4. Añadir reglas antifraude y políticas diferenciadas por categoría, mercado o condición comercial.
-5. Fusionar la rama mediante revisión controlada después de validar el recorrido RMA sobre una base de staging con réplica.
+2. Integrar el consumo del saldo a favor en checkout; esta etapa emite y audita el saldo, pero no lo presenta como medio de pago.
+3. Añadir reglas antifraude y políticas diferenciadas por categoría, mercado o condición comercial.
+4. Fusionar la rama mediante revisión controlada después de validar el recorrido RMA sobre una base de staging con réplica.

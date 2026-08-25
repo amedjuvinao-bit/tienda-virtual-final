@@ -162,6 +162,7 @@ export default function OrdersAdmin() {
   const canRefund = can('orders:refund');
   const canAutomateRefund = canRefund && can('billing:credit_note');
   const canManageReturns = can('orders:returns');
+  const canManageReturnPolicy = can('settings:store');
   const canViewBranches = can('branches:view');
   const selectionEnabled = canBulk || canExport;
 
@@ -1592,6 +1593,7 @@ export default function OrdersAdmin() {
         canRefund={canRefund}
         canAutomateRefund={canAutomateRefund}
         canManageReturns={canManageReturns}
+        canManageReturnPolicy={canManageReturnPolicy}
         savingId={savingId}
         populated={populate}
       />

@@ -10,6 +10,7 @@ import {
   buildOrderPaymentAccessHeaders,
   getOrderPaymentAccess,
 } from '../utils/orderPaymentAccess';
+import { storeOrderReturnAccess } from '../utils/orderReturnAccess';
 
 const API_BASE = API_BASE_URL;
 
@@ -878,6 +879,15 @@ export default function GraciasPage() {
     s.buttonStyle === "pill" ? 999 :
     s.buttonStyle === "rounded" ? Math.min(s.buttonRadiusPx, 18) : 8;
 
+  const openReturnsPortal = () => {
+    const returnAccess = thanksOrderData?.returnAccess;
+    if (!returnAccess?.enabled || !returnAccess?.token || !returnAccess?.orderId) return;
+    storeOrderReturnAccess(returnAccess);
+    navigate(`/devoluciones/${returnAccess.orderId}`, {
+      state: { returnAccess },
+    });
+  };
+
   useEffect(() => {
     let cancel = false;
 
@@ -1278,6 +1288,23 @@ export default function GraciasPage() {
                       Si realizaste una compra, te enviaremos los detalles por correo.
                     </div>
                   )}
+
+                  {thanksOrderData?.returnAccess?.enabled ? (
+                    <button
+                      type="button"
+                      className="gp-cta-btn"
+                      onClick={openReturnsPortal}
+                      style={{
+                        marginBottom: 10,
+                        backgroundColor: s.panelBg,
+                        color: s.buttonBg,
+                        border: `1px solid ${s.buttonBg}`,
+                        borderRadius: `${buttonRadius}px`,
+                      }}
+                    >
+                      Gestionar cambios o devoluciones
+                    </button>
+                  ) : null}
 
                   {thanksConfig.showContinueButton && (
                     <button

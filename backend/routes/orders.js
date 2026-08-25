@@ -71,6 +71,13 @@ const {
   SAFE_CART_ACCESS_ERROR,
 } = require('../services/cartAccessService');
 const {
+  getOrderReturnAccessSecret,
+  issueOrderReturnAccess,
+} = require('../services/orderReturnAccessService');
+const {
+  getOrderReturnPolicy,
+} = require('../services/orderReturnPolicyService');
+const {
   applyOrderBranchAccessFilter,
   buildScopedOrderFilter,
 } = require('../services/orderAdminScopeService');
@@ -1120,7 +1127,23 @@ router.get('/:id/thanks', async (req, res) => {
       return res.status(404).json(SAFE_PAYMENT_ACCESS_ERROR);
     }
 
-    return res.json(buildPublicThanksResponse({ order: access.order }));
+    const policy = await getOrderReturnPolicy();
+    const returnAccess = policy.enabled && policy.customerPortalEnabled
+      ? issueOrderReturnAccess({
+          order: access.order,
+          secret: getOrderReturnAccessSecret(),
+          ttlMs:
+            Math.min(400, Math.max(35, policy.windowDays + 35)) *
+            24 * 60 * 60 * 1000,
+        })
+      : null;
+
+    return res.json({
+      ...buildPublicThanksResponse({ order: access.order }),
+      returnAccess: returnAccess
+        ? { enabled: true, ...returnAccess }
+        : { enabled: false },
+    });
   } catch (error) {
     console.error('GET /orders/:id/thanks', error);
     if (error?.code === 'PAYMENT_ACCESS_SECRET_MISCONFIGURED') {

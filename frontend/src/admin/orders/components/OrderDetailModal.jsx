@@ -58,6 +58,7 @@ export default function OrderDetailModal({
   canRefund = false,
   canAutomateRefund = false,
   canManageReturns = false,
+  canManageReturnPolicy = false,
   savingId,
 }) {
   const [statusLocal, setStatusLocal] = useState(order?.status || 'pending');
@@ -336,6 +337,71 @@ export default function OrderDetailModal({
       await Promise.all([fetchReturns(), fetchTimeline()]);
     } catch (error) {
       showReturnError(error, 'Verifica la orden de reemplazo y la sede autorizada.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const automaticExchangeReturnCase = async (returnCase, reference) => {
+    if (!canManageReturns || !order?._id || !returnCase?._id) return;
+    try {
+      setReturnBusyId(String(returnCase._id));
+      const response = await api.post(
+        `/api/orders/${order._id}/returns/${returnCase._id}/exchange/automatic`,
+        {
+          expectedRevision: returnCase.revision,
+          reference,
+        }
+      );
+      showToast({
+        type: 'success',
+        title: 'Orden de cambio creada',
+        message: `Se creó la orden #${response?.data?.replacementOrder?.orderNumber || 'de reemplazo'} y su inventario quedó reservado.`,
+        persist: true,
+      });
+      await Promise.all([fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Verifica el inventario disponible para el cambio.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const storeCreditReturnCase = async (returnCase, amount) => {
+    if (!canRefund || !order?._id || !returnCase?._id) return;
+    try {
+      setReturnBusyId(String(returnCase._id));
+      const response = await api.post(
+        `/api/orders/${order._id}/returns/${returnCase._id}/store-credit`,
+        { expectedRevision: returnCase.revision, amount }
+      );
+      showToast({
+        type: 'success',
+        title: 'Saldo a favor emitido',
+        message: `${response?.data?.storeCredit?.creditNumber || 'El saldo'} quedó trazable y asociado al cliente.`,
+        persist: true,
+      });
+      await Promise.all([fetchReturns(), fetchTimeline()]);
+    } catch (error) {
+      showReturnError(error, 'Verifica el monto aceptado y la política de saldo a favor.');
+    } finally {
+      setReturnBusyId('');
+    }
+  };
+
+  const saveReturnPolicy = async (policy) => {
+    if (!canManageReturnPolicy) return;
+    try {
+      setReturnBusyId('policy');
+      await api.put('/api/orders/returns/policy', policy);
+      showToast({
+        type: 'success',
+        title: 'Política actualizada',
+        message: 'Las próximas solicitudes usarán esta versión de la política.',
+      });
+      await fetchReturns();
+    } catch (error) {
+      showReturnError(error, 'Recarga la política y vuelve a intentar.');
     } finally {
       setReturnBusyId('');
     }
@@ -815,11 +881,15 @@ export default function OrderDetailModal({
           returnsLoading={returnsLoading}
           returnBusyId={returnBusyId}
           canManageReturns={canManageReturns}
+          canManageReturnPolicy={canManageReturnPolicy}
           canRefundReturns={canRefund}
           onCreateReturn={createReturnCase}
           onUpdateReturn={updateReturnCase}
           onRefundReturn={refundReturnCase}
           onExchangeReturn={exchangeReturnCase}
+          onAutomaticExchangeReturn={automaticExchangeReturnCase}
+          onStoreCreditReturn={storeCreditReturnCase}
+          onSaveReturnPolicy={saveReturnPolicy}
           onSaveCustomerData={
             canEditCustomerData ? saveCustomerData : null
           }

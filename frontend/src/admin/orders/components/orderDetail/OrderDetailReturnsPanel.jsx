@@ -62,7 +62,9 @@ function statusMeta(status) {
 
 function resolutionLabel(value) {
   if (value === 'no_refund') return 'Sin reembolso';
-  return value === 'exchange' ? 'Cambio' : 'Reembolso';
+  if (value === 'exchange') return 'Cambio';
+  if (value === 'store_credit') return 'Saldo a favor';
+  return 'Reembolso';
 }
 
 function Metric({ label, value, tone = '' }) {
@@ -114,20 +116,32 @@ export default function OrderDetailReturnsPanel({
   loading = false,
   busyId = '',
   canManage = false,
+  canManagePolicy = false,
   canRefund = false,
   onCreate,
   onAction,
   onRefund,
   onExchange,
+  onAutomaticExchange,
+  onStoreCredit,
+  onSavePolicy,
 }) {
   const eligibility = Array.isArray(data?.eligibility) ? data.eligibility : [];
   const returns = Array.isArray(data?.returns) ? data.returns : [];
+  const policy = data?.policy || {};
   const [createOpen, setCreateOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [policyDraft, setPolicyDraft] = useState(policy);
   const [resolution, setResolution] = useState('refund');
   const [reasonSummary, setReasonSummary] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
   const [requestItems, setRequestItems] = useState({});
   const [drafts, setDrafts] = useState({});
+  const allowedCreateResolutions = (
+    Array.isArray(policy.allowedResolutions) && policy.allowedResolutions.length
+      ? policy.allowedResolutions
+      : ['refund', 'exchange']
+  ).filter((value) => policy.storeCreditEnabled !== false || value !== 'store_credit');
 
   useEffect(() => {
     setCreateOpen(false);
@@ -137,6 +151,27 @@ export default function OrderDetailReturnsPanel({
     setRequestItems({});
     setDrafts({});
   }, [data?.orderId]);
+
+  useEffect(() => {
+    setPolicyDraft(policy);
+  }, [policy?.revision, data?.orderId]);
+
+  useEffect(() => {
+    if (!allowedCreateResolutions.includes(resolution)) {
+      setResolution(allowedCreateResolutions[0] || 'refund');
+    }
+  }, [allowedCreateResolutions.join('|'), resolution]);
+
+  const patchPolicy = (patch) => {
+    setPolicyDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const togglePolicyResolution = (value) => {
+    const current = new Set(policyDraft.allowedResolutions || []);
+    if (current.has(value)) current.delete(value);
+    else current.add(value);
+    patchPolicy({ allowedResolutions: Array.from(current) });
+  };
 
   const requestable = useMemo(
     () => eligibility.filter((item) => positiveInteger(item.availableQuantity) > 0),
@@ -239,6 +274,47 @@ export default function OrderDetailReturnsPanel({
 
       <WorkflowGuide />
 
+      <div style={{ marginTop: 12, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.cardBg, borderRadius: 16, padding: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <strong style={{ display: 'block', fontSize: 12 }}>Política activa · {policy.windowDays || 30} días</strong>
+            <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 10 }}>
+              Portal cliente {policy.customerPortalEnabled === false ? 'desactivado' : 'activo'} · envío {policy.returnShippingPaidBy === 'store' ? 'pagado por la tienda' : policy.returnShippingPaidBy === 'customer' ? 'pagado por el cliente' : 'según el caso'} · versión {policy.revision || 0}
+            </span>
+          </div>
+          {canManagePolicy ? (
+            <GhostButton disabled={busyId === 'policy'} onClick={() => setPolicyOpen((open) => !open)}>
+              {policyOpen ? 'Cerrar política' : 'Configurar política'}
+            </GhostButton>
+          ) : null}
+        </div>
+        {policyOpen ? (
+          <div style={{ marginTop: 11, display: 'grid', gap: 9 }}>
+            <div className="order-return-policy-grid" style={{ display: 'grid', gridTemplateColumns: '140px minmax(190px, 1fr) minmax(190px, 1fr)', gap: 8 }}>
+              <label style={{ fontSize: 10, fontWeight: 850 }}>Ventana (días)<input aria-label="Ventana de devoluciones" type="number" min="1" max="365" value={policyDraft.windowDays || 30} onChange={(event) => patchPolicy({ windowDays: positiveInteger(event.target.value) })} style={inputStyle({ marginTop: 4 })} /></label>
+              <label style={{ fontSize: 10, fontWeight: 850 }}>Costo del retorno<select aria-label="Responsable del envío de retorno" value={policyDraft.returnShippingPaidBy || 'case_by_case'} onChange={(event) => patchPolicy({ returnShippingPaidBy: event.target.value })} style={inputStyle({ marginTop: 4 })}><option value="case_by_case">Según el caso</option><option value="store">Lo paga la tienda</option><option value="customer">Lo paga el cliente</option></select></label>
+              <label style={{ fontSize: 10, fontWeight: 850 }}>Vigencia saldo (días)<input aria-label="Vigencia del saldo a favor" type="number" min="30" max="1825" value={policyDraft.storeCreditExpirationDays || 365} onChange={(event) => patchPolicy({ storeCreditExpirationDays: positiveInteger(event.target.value) })} style={inputStyle({ marginTop: 4 })} /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, fontWeight: 800 }}>
+              <label><input type="checkbox" checked={policyDraft.enabled !== false} onChange={(event) => patchPolicy({ enabled: event.target.checked })} /> Política activa</label>
+              <label><input type="checkbox" checked={policyDraft.customerPortalEnabled !== false} onChange={(event) => patchPolicy({ customerPortalEnabled: event.target.checked })} /> Autoservicio cliente</label>
+              <label><input type="checkbox" checked={policyDraft.autoAuthorize === true} onChange={(event) => patchPolicy({ autoAuthorize: event.target.checked })} /> Autorizar automáticamente</label>
+              <label><input type="checkbox" checked={policyDraft.requireReasonText === true} onChange={(event) => patchPolicy({ requireReasonText: event.target.checked })} /> Exigir detalle</label>
+              <label><input type="checkbox" checked={policyDraft.storeCreditEnabled !== false} onChange={(event) => patchPolicy({ storeCreditEnabled: event.target.checked, allowedResolutions: event.target.checked ? policyDraft.allowedResolutions : (policyDraft.allowedResolutions || []).filter((value) => value !== 'store_credit') })} /> Emitir saldo a favor</label>
+              <label><input type="checkbox" checked={policyDraft.automaticExchangeEnabled !== false} onChange={(event) => patchPolicy({ automaticExchangeEnabled: event.target.checked })} /> Cambio automático</label>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, fontWeight: 800 }}>
+              {['refund', 'exchange', 'store_credit'].map((value) => (
+                <label key={value}><input type="checkbox" checked={(policyDraft.allowedResolutions || []).includes(value)} onChange={() => togglePolicyResolution(value)} /> {resolutionLabel(value)}</label>
+              ))}
+            </div>
+            <textarea aria-label="Texto público de la política" rows="2" value={policyDraft.policyText || ''} onChange={(event) => patchPolicy({ policyText: event.target.value })} placeholder="Resumen visible para el cliente" style={inputStyle()} />
+            <textarea aria-label="Instrucciones de devolución" rows="2" value={policyDraft.instructions || ''} onChange={(event) => patchPolicy({ instructions: event.target.value })} placeholder="Instrucciones después de autorizar" style={inputStyle()} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton disabled={busyId === 'policy' || !(policyDraft.allowedResolutions || []).length} onClick={() => onSavePolicy?.({ ...policyDraft, expectedRevision: policy.revision || 0 })}>Guardar política</PrimaryButton></div>
+          </div>
+        ) : null}
+      </div>
+
       {canManage && requestable.length > 0 ? (
         <div style={{ marginTop: 14 }}>
           <PrimaryButton onClick={() => setCreateOpen((open) => !open)} disabled={Boolean(busyId)}>
@@ -251,8 +327,9 @@ export default function OrderDetailReturnsPanel({
         <div style={{ marginTop: 14, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg, borderRadius: 18, padding: 14 }}>
           <div className="order-return-form-grid" style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 10 }}>
             <select aria-label="Resolución solicitada" value={resolution} onChange={(event) => setResolution(event.target.value)} style={inputStyle()}>
-              <option value="refund">Reembolso</option>
-              <option value="exchange">Cambio</option>
+              {allowedCreateResolutions.map((value) => (
+                <option key={value} value={value}>{resolutionLabel(value)}</option>
+              ))}
             </select>
             <input aria-label="Resumen de la devolución" value={reasonSummary} onChange={(event) => setReasonSummary(event.target.value)} placeholder="Resumen para el expediente" style={inputStyle()} />
           </div>
@@ -311,7 +388,7 @@ export default function OrderDetailReturnsPanel({
                 <div>
                   <strong style={{ display: 'block', fontSize: 14 }}>{returnCase.returnNumber}</strong>
                   <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 11 }}>
-                    {resolutionLabel(returnCase.requestedResolution)} · {fmtDate(returnCase.requestedAt || returnCase.createdAt)}
+                    {resolutionLabel(returnCase.requestedResolution)} · {returnCase.requestSource === 'customer' ? 'Solicitado por cliente' : 'Creado por administrador'} · {fmtDate(returnCase.requestedAt || returnCase.createdAt)}
                   </span>
                 </div>
                 <SoftBadge variant={variant}>{statusLabel}</SoftBadge>
@@ -349,8 +426,17 @@ export default function OrderDetailReturnsPanel({
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8 }}>
                     <input aria-label={`Motivo rechazo ${returnCase.returnNumber}`} value={draft.reason || ''} onChange={(event) => setDraft(id, { reason: event.target.value })} placeholder="Motivo si se rechaza" style={inputStyle()} />
                     <GhostButton disabled={busy || String(draft.reason || '').trim().length < 5} onClick={() => onAction?.(returnCase, 'reject', { reason: String(draft.reason || '').trim() })}>Rechazar</GhostButton>
-                    <PrimaryButton disabled={busy || !(returnCase.items || []).some((item) => positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) > 0)} onClick={() => onAction?.(returnCase, 'authorize', { items: (returnCase.items || []).map((item) => ({ orderItemId: itemId(item), authorizedQuantity: positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) })), shipping: { method: 'pending' } })}>Autorizar</PrimaryButton>
+                    <PrimaryButton disabled={busy || !(returnCase.items || []).some((item) => positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) > 0)} onClick={() => onAction?.(returnCase, 'authorize', { items: (returnCase.items || []).map((item) => ({ orderItemId: itemId(item), authorizedQuantity: positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) })), shipping: { method: draft.carrierName ? 'carrier' : 'drop_off', carrierName: draft.carrierName || '', trackingNumber: draft.trackingNumber || '', labelUrl: draft.labelUrl || '', instructions: draft.instructions || policy.instructions || '' } })}>Autorizar</PrimaryButton>
                   </div>
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 850 }}>Logística y etiqueta de retorno</summary>
+                    <div className="order-return-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>
+                      <input aria-label={`Transportadora ${returnCase.returnNumber}`} value={draft.carrierName || ''} onChange={(event) => setDraft(id, { carrierName: event.target.value })} placeholder="Transportadora (opcional)" style={inputStyle()} />
+                      <input aria-label={`Guía ${returnCase.returnNumber}`} value={draft.trackingNumber || ''} onChange={(event) => setDraft(id, { trackingNumber: event.target.value })} placeholder="Número de guía (opcional)" style={inputStyle()} />
+                      <input aria-label={`URL etiqueta ${returnCase.returnNumber}`} value={draft.labelUrl || ''} onChange={(event) => setDraft(id, { labelUrl: event.target.value })} placeholder="URL HTTPS de etiqueta de transportadora" style={inputStyle()} />
+                      <input aria-label={`Instrucciones ${returnCase.returnNumber}`} value={draft.instructions || policy.instructions || ''} onChange={(event) => setDraft(id, { instructions: event.target.value })} placeholder="Instrucciones para el cliente" style={inputStyle()} />
+                    </div>
+                  </details>
                 </div>
               ) : null}
 
@@ -359,6 +445,8 @@ export default function OrderDetailReturnsPanel({
                   <div className="order-return-form-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
                     <input aria-label={`Transportadora ${returnCase.returnNumber}`} value={draft.carrierName || returnCase.shipping?.carrierName || ''} onChange={(event) => setDraft(id, { carrierName: event.target.value })} placeholder="Transportadora" style={inputStyle()} />
                     <input aria-label={`Guía ${returnCase.returnNumber}`} value={draft.trackingNumber || returnCase.shipping?.trackingNumber || ''} onChange={(event) => setDraft(id, { trackingNumber: event.target.value })} placeholder="Número de guía" style={inputStyle()} />
+                    <input aria-label={`URL etiqueta ${returnCase.returnNumber}`} value={draft.labelUrl || returnCase.shipping?.labelUrl || ''} onChange={(event) => setDraft(id, { labelUrl: event.target.value })} placeholder="URL HTTPS de etiqueta" style={inputStyle()} />
+                    <input aria-label={`Instrucciones ${returnCase.returnNumber}`} value={draft.instructions || returnCase.shipping?.instructions || policy.instructions || ''} onChange={(event) => setDraft(id, { instructions: event.target.value })} placeholder="Instrucciones para el cliente" style={inputStyle()} />
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                     {(returnCase.items || []).filter((item) => positiveInteger(item.authorizedQuantity) > 0).map((item) => (
@@ -372,7 +460,7 @@ export default function OrderDetailReturnsPanel({
                   <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                     <GhostButton disabled={busy || String(draft.cancellationReason || '').trim().length < 5} onClick={() => onAction?.(returnCase, 'cancel', { reason: String(draft.cancellationReason || '').trim() })}>Cancelar RMA</GhostButton>
                     {returnCase.status === 'authorized' ? (
-                      <GhostButton disabled={busy} onClick={() => onAction?.(returnCase, 'mark_in_transit', { shipping: { carrierName: draft.carrierName || returnCase.shipping?.carrierName, trackingNumber: draft.trackingNumber || returnCase.shipping?.trackingNumber } })}>Marcar en tránsito</GhostButton>
+                      <GhostButton disabled={busy} onClick={() => onAction?.(returnCase, 'mark_in_transit', { shipping: { carrierName: draft.carrierName || returnCase.shipping?.carrierName, trackingNumber: draft.trackingNumber || returnCase.shipping?.trackingNumber, labelUrl: draft.labelUrl || returnCase.shipping?.labelUrl, instructions: draft.instructions || returnCase.shipping?.instructions || policy.instructions } })}>Marcar en tránsito</GhostButton>
                     ) : null}
                     <PrimaryButton disabled={busy || !(returnCase.items || []).some((item) => positiveInteger(draft.received?.[itemId(item)] ?? item.authorizedQuantity) > 0)} onClick={() => onAction?.(returnCase, 'receive', { items: (returnCase.items || []).map((item) => ({ orderItemId: itemId(item), receivedQuantity: positiveInteger(draft.received?.[itemId(item)] ?? item.authorizedQuantity) })) })}>Registrar recepción</PrimaryButton>
                   </div>
@@ -409,11 +497,28 @@ export default function OrderDetailReturnsPanel({
                 </div>
               ) : null}
 
+              {returnCase.status === 'resolution_required' && returnCase.requestedResolution === 'store_credit' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, marginTop: 11 }}>
+                  <input aria-label={`Monto saldo a favor ${returnCase.returnNumber}`} type="number" min="1" max={returnCase.estimatedRefundAmount} value={draft.amount ?? returnCase.estimatedRefundAmount} disabled={!canRefund} onChange={(event) => setDraft(id, { amount: event.target.value })} style={inputStyle()} />
+                  <PrimaryButton disabled={!canRefund || busy || positiveInteger(draft.amount ?? returnCase.estimatedRefundAmount) <= 0} onClick={() => onStoreCredit?.(returnCase, Number(draft.amount ?? returnCase.estimatedRefundAmount))}>Emitir saldo a favor</PrimaryButton>
+                </div>
+              ) : null}
+
               {canManage && returnCase.status === 'resolution_required' && returnCase.requestedResolution === 'exchange' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto', gap: 8, marginTop: 11 }}>
-                  <input aria-label={`Orden reemplazo ${returnCase.returnNumber}`} value={draft.replacementOrderId || ''} onChange={(event) => setDraft(id, { replacementOrderId: event.target.value })} placeholder="ID de la orden de reemplazo" style={inputStyle()} />
-                  <input aria-label={`Referencia cambio ${returnCase.returnNumber}`} value={draft.reference || ''} onChange={(event) => setDraft(id, { reference: event.target.value })} placeholder="Referencia o motivo del cambio" style={inputStyle()} />
-                  <PrimaryButton disabled={busy || String(draft.replacementOrderId || '').trim().length < 12 || String(draft.reference || '').trim().length < 4} onClick={() => onExchange?.(returnCase, String(draft.replacementOrderId || '').trim(), String(draft.reference || '').trim())}>Vincular cambio</PrimaryButton>
+                <div style={{ marginTop: 11, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 15, padding: 11, background: ORDER_DETAIL_THEME.cardBg }}>
+                  <strong style={{ display: 'block', fontSize: 12 }}>Siguiente paso: crear la orden de cambio</strong>
+                  <span style={{ display: 'block', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, marginTop: 3 }}>La opción automática crea una orden sin cobro y reserva el inventario aceptado.</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, marginTop: 9 }}>
+                    <input aria-label={`Referencia cambio ${returnCase.returnNumber}`} value={draft.reference || 'Cambio automático por RMA'} onChange={(event) => setDraft(id, { reference: event.target.value })} placeholder="Referencia o motivo del cambio" style={inputStyle()} />
+                    <PrimaryButton disabled={busy || policy.automaticExchangeEnabled === false} onClick={() => onAutomaticExchange?.(returnCase, String(draft.reference || 'Cambio automático por RMA').trim())}>Crear orden de cambio</PrimaryButton>
+                  </div>
+                  <details style={{ marginTop: 9 }}>
+                    <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 850 }}>Ya existe una orden de reemplazo</summary>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, marginTop: 8 }}>
+                      <input aria-label={`Orden reemplazo ${returnCase.returnNumber}`} value={draft.replacementOrderId || ''} onChange={(event) => setDraft(id, { replacementOrderId: event.target.value })} placeholder="ID interno de la orden existente" style={inputStyle()} />
+                      <GhostButton disabled={busy || String(draft.replacementOrderId || '').trim().length < 12 || String(draft.reference || '').trim().length < 4} onClick={() => onExchange?.(returnCase, String(draft.replacementOrderId || '').trim(), String(draft.reference || '').trim())}>Vincular existente</GhostButton>
+                    </div>
+                  </details>
                 </div>
               ) : null}
 
@@ -436,12 +541,14 @@ export default function OrderDetailReturnsPanel({
         @media (max-width: 840px) {
           .order-return-workflow,
           .order-return-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .order-return-policy-grid,
           .order-return-request-line,
           .order-return-inspection { grid-template-columns: 1fr 1fr !important; }
         }
         @media (max-width: 560px) {
           .order-return-workflow,
           .order-return-metrics,
+          .order-return-policy-grid,
           .order-return-form-grid,
           .order-return-request-line,
           .order-return-inspection { grid-template-columns: 1fr !important; }

@@ -27,7 +27,7 @@ const RETURN_REASON_CODES = [
   'other',
 ];
 
-const RETURN_RESOLUTION_TYPES = ['refund', 'exchange'];
+const RETURN_RESOLUTION_TYPES = ['refund', 'exchange', 'store_credit'];
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -58,6 +58,16 @@ const ActorSnapshotSchema = new Schema(
     id: { type: Schema.Types.ObjectId, ref: 'AdminUser', default: null },
     label: { type: String, trim: true, default: '', maxlength: 160 },
     role: { type: String, trim: true, lowercase: true, default: '', maxlength: 80 },
+  },
+  { _id: false }
+);
+
+const CustomerSnapshotSchema = new Schema(
+  {
+    customer: { type: Schema.Types.ObjectId, ref: 'Customer', default: null },
+    name: { type: String, trim: true, default: '', maxlength: 180 },
+    email: { type: String, trim: true, lowercase: true, default: '', maxlength: 220 },
+    phone: { type: String, trim: true, default: '', maxlength: 80 },
   },
   { _id: false }
 );
@@ -130,6 +140,16 @@ const OrderReturnSchema = new Schema(
       default: 'refund',
       required: true,
     },
+    requestSource: {
+      type: String,
+      enum: ['admin', 'customer'],
+      default: 'admin',
+      index: true,
+    },
+    customerSnapshot: {
+      type: CustomerSnapshotSchema,
+      default: () => ({}),
+    },
     items: { type: [ReturnItemSchema], default: [] },
     reasonSummary: { type: String, trim: true, default: '', maxlength: 800 },
     eligibility: {
@@ -138,6 +158,16 @@ const OrderReturnSchema = new Schema(
       eligibleUntil: { type: Date, default: null },
       overridden: { type: Boolean, default: false },
       overrideReason: { type: String, trim: true, default: '', maxlength: 500 },
+    },
+    policySnapshot: {
+      revision: { type: Number, min: 0, default: 0 },
+      windowDays: { type: Number, min: 1, max: 365, default: 30 },
+      autoAuthorized: { type: Boolean, default: false },
+      returnShippingPaidBy: {
+        type: String,
+        enum: ['store', 'customer', 'case_by_case'],
+        default: 'case_by_case',
+      },
     },
     shipping: {
       method: {
@@ -149,6 +179,11 @@ const OrderReturnSchema = new Schema(
       trackingNumber: { type: String, trim: true, default: '', maxlength: 180 },
       trackingUrl: { type: String, trim: true, default: '', maxlength: 1000 },
       labelUrl: { type: String, trim: true, default: '', maxlength: 1000 },
+      labelType: {
+        type: String,
+        enum: ['none', 'internal_rma', 'carrier'],
+        default: 'none',
+      },
       instructions: { type: String, trim: true, default: '', maxlength: 1600 },
     },
     inventoryRestorations: { type: [InventoryRestorationSchema], default: [] },
@@ -164,6 +199,8 @@ const OrderReturnSchema = new Schema(
       amount: { type: Number, min: 0, default: 0, set: cleanMoney },
       reference: { type: String, trim: true, default: '', maxlength: 240 },
       refund: { type: Schema.Types.ObjectId, ref: 'OrderRefund', default: null },
+      storeCredit: { type: Schema.Types.ObjectId, ref: 'StoreCredit', default: null },
+      storeCreditNumber: { type: String, trim: true, uppercase: true, default: '' },
       replacementOrder: { type: Schema.Types.ObjectId, ref: 'Order', default: null },
       replacementOrderNumber: { type: String, trim: true, uppercase: true, default: '' },
       completedAt: { type: Date, default: null },

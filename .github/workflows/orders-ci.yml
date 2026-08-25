@@ -47,6 +47,9 @@ jobs:
       - name: Validar cierre de la etapa 3
         run: npm --prefix backend run test:orders-stage3-closure
 
+      - name: Validar cierre de la etapa 4
+        run: npm --prefix backend run test:orders-stage4-closure
+
       - name: Validar permisos y arquitectura
         run: |
           npm --prefix backend run test:orders-security
@@ -148,6 +151,11 @@ jobs:
           ORDERS_STAGE3_ORDER_COUNT: 1200
         run: npm --prefix backend run test:orders-query-scale
 
+      - name: Validar devoluciones, saldo y cambios automáticos
+        env:
+          ORDERS_STAGE4_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stage4_returns?replicaSet=rs0
+        run: npm --prefix backend run test:orders-stage4-returns
+
       - name: Validar estados masivos
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_bulk_status?replicaSet=rs0
@@ -216,6 +224,9 @@ jobs:
           npm --prefix frontend run test:shipping-settings-ui
           npm --prefix frontend run test:orders-returns
 
+      - name: Validar autoservicio y resoluciones de la etapa 4
+        run: npm --prefix frontend run test:orders-stage4
+
       - name: Validar cliente, WhatsApp y precontrol fiscal
         run: |
           npm --prefix frontend run test:orders-whatsapp-assisted
@@ -236,6 +247,9 @@ jobs:
 
       - name: Validar paginación y filtros concurrentes
         run: npm --prefix frontend run test:e2e:orders-stage3
+
+      - name: Validar autoservicio de cambios y devoluciones
+        run: npm --prefix frontend run test:e2e:orders-stage4
 
       - name: Validar traspaso de orden a facturación
         run: npm --prefix frontend run test:e2e:orders-billing-phase1
