@@ -1,5 +1,5 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { Pin, SlidersHorizontal } from 'lucide-react';
@@ -177,11 +177,72 @@ export default function OrdersAdmin() {
   const [controlTogglePosition, setControlTogglePosition] = useState(null);
   const [controlTogglePinned, setControlTogglePinned] = useState(false);
   const [draggingControlToggle, setDraggingControlToggle] = useState(false);
+  const ordersShellRef = useRef(null);
+  const controlPanelRef = useRef(null);
   const controlToggleRef = useRef(null);
   const controlTogglePositionRef = useRef(null);
   const controlTogglePinnedRef = useRef(false);
   const controlToggleDragRef = useRef(null);
   const lastControlToggleDragAtRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const shell = ordersShellRef.current;
+    const panel = controlPanelRef.current;
+    if (!shell) return undefined;
+
+    const clearReservedHeight = () => {
+      shell.style.removeProperty('--orders-control-panel-min-height');
+    };
+
+    if (!controlsOpen || !panel || typeof window === 'undefined') {
+      clearReservedHeight();
+      return undefined;
+    }
+
+    let frameId = null;
+    const applyReservedHeight = () => {
+      const desktopLayout = window.matchMedia
+        ? window.matchMedia('(min-width: 1181px)').matches
+        : window.innerWidth > 1180;
+
+      if (!desktopLayout) {
+        clearReservedHeight();
+        return;
+      }
+
+      const shellRect = shell.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const panelHeight = Math.max(panel.scrollHeight || 0, panelRect.height || 0);
+      if (panelHeight <= 0) return;
+
+      const panelTop = Math.max(0, panelRect.top - shellRect.top);
+      shell.style.setProperty(
+        '--orders-control-panel-min-height',
+        `${Math.ceil(panelTop + panelHeight + 16)}px`
+      );
+    };
+    const syncReservedHeight = () => {
+      if (frameId != null) window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(applyReservedHeight);
+    };
+
+    applyReservedHeight();
+    const ResizeObserverCtor = window.ResizeObserver;
+    const observer = typeof ResizeObserverCtor === 'function'
+      ? new ResizeObserverCtor(syncReservedHeight)
+      : null;
+    observer?.observe(panel);
+    const heading = shell.querySelector('.orders-admin-heading');
+    if (heading) observer?.observe(heading);
+    window.addEventListener('resize', syncReservedHeight);
+
+    return () => {
+      if (frameId != null) window.cancelAnimationFrame(frameId);
+      observer?.disconnect();
+      window.removeEventListener('resize', syncReservedHeight);
+      clearReservedHeight();
+    };
+  }, [controlsOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1019,7 +1080,7 @@ export default function OrdersAdmin() {
   );
 
   return (
-    <div className={`orders-admin-shell p-4 ${controlsOpen ? 'controls-open' : 'controls-closed'}`}>
+    <div ref={ordersShellRef} className={`orders-admin-shell p-4 ${controlsOpen ? 'controls-open' : 'controls-closed'}`}>
       <style>{`
         .orders-admin-shell {
           display: grid;
@@ -1031,9 +1092,11 @@ export default function OrdersAdmin() {
             "table";
           gap: 16px;
           align-items: start;
+          align-content: start;
         }
         .orders-admin-shell.controls-open {
           grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+          min-height: var(--orders-control-panel-min-height, auto);
           grid-template-areas:
             "heading heading"
             "metrics controls"
@@ -1277,6 +1340,7 @@ export default function OrdersAdmin() {
         total={total}
         financialSummary={financialSummary}
         controlsOpen={controlsOpen}
+        controlPanelRef={controlPanelRef}
         onCloseControls={() => setControlsOpen(false)}
       >
         <OrdersQuickViews

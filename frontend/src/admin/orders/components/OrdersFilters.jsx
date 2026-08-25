@@ -84,6 +84,7 @@ export default function OrdersFilters({
   total,
   financialSummary,
   controlsOpen = true,
+  controlPanelRef,
   onCloseControls,
   children,
 }) {
@@ -413,6 +414,7 @@ export default function OrdersFilters({
       ) : null}
 
       <aside
+        ref={controlPanelRef}
         id="orders-control-panel"
         aria-label="Filtros y estados de órdenes"
         aria-hidden={!controlsOpen}

@@ -32,10 +32,17 @@ vi.mock('./security/useAdminPermissions', () => ({
 vi.mock('../lib/api', () => ({ default: state.api }));
 
 vi.mock('./orders/components/OrdersFilters', () => ({
-  default: ({ canExport }) => (
+  default: ({ canExport, controlsOpen, controlPanelRef }) => (
     <section>
       <h1>Órdenes</h1>
       {canExport ? <button type="button">Exportar CSV</button> : null}
+      <aside
+        ref={controlPanelRef}
+        id="orders-control-panel"
+        className={controlsOpen ? 'is-open' : 'is-closed'}
+      >
+        Panel de control
+      </aside>
     </section>
   ),
 }));
@@ -125,6 +132,19 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: query === '(min-width: 1181px)' && window.innerWidth >= 1181,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
     Object.values(state.api).forEach((mock) => mock.mockReset());
     state.api.get.mockImplementation(async (url) => {
       if (url === '/api/orders/admin') {
@@ -167,6 +187,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       authLoading: false,
     };
     state.permissions = new Set(['orders:view']);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
 
     renderOrders();
 
@@ -197,6 +218,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       authLoading: false,
     };
     state.permissions = new Set(['orders:view']);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
 
     renderOrders();
 
@@ -205,6 +227,32 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(showFilters).toHaveAttribute('aria-expanded', 'false');
     expect(showFilters).toHaveAttribute('aria-controls', 'orders-control-panel');
     expect(showFilters.closest('.orders-control-toggle')?.parentElement).toBe(document.body);
+
+    const shell = document.querySelector('.orders-admin-shell');
+    const panel = document.querySelector('#orders-control-panel');
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 700,
+      left: 0,
+      right: 1000,
+      width: 1000,
+      height: 600,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({
+      top: 200,
+      bottom: 900,
+      left: 640,
+      right: 1000,
+      width: 360,
+      height: 700,
+      x: 640,
+      y: 200,
+      toJSON: () => ({}),
+    });
+    Object.defineProperty(panel, 'scrollHeight', { configurable: true, value: 700 });
 
     fireEvent.click(showFilters);
     const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
@@ -215,11 +263,20 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
         .map((style) => style.textContent)
         .join('\n')
     ).toContain('inset: 0 0 auto 0');
+    expect(
+      Array.from(document.querySelectorAll('style'))
+        .map((style) => style.textContent)
+        .join('\n')
+    ).toContain('min-height: var(--orders-control-panel-min-height, auto)');
+    await waitFor(() => {
+      expect(shell.style.getPropertyValue('--orders-control-panel-min-height')).toBe('816px');
+    });
 
     fireEvent.click(hideFilters);
     expect(
       screen.getByRole('button', { name: 'Mostrar panel de filtros' })
     ).toHaveAttribute('aria-expanded', 'false');
+    expect(shell.style.getPropertyValue('--orders-control-panel-min-height')).toBe('');
   });
 
   it('recupera dentro de la pantalla una posición guardada fuera del viewport', async () => {
