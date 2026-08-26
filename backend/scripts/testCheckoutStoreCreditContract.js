@@ -14,6 +14,10 @@ const {
   issueStoreCreditAccess,
   verifyStoreCreditAccess,
 } = require('../services/storeCreditCheckoutService');
+const {
+  DEMO: STORE_CREDIT_DEMO,
+  parseArgs: parseStoreCreditDemoArgs,
+} = require('./seedCheckoutStoreCreditDemo');
 
 const SECRET = 'checkout-store-credit-contract-secret-2026';
 let passed = 0;
@@ -234,6 +238,16 @@ async function run() {
   assert(checkoutServiceSource.includes('$set: { balance: after }'));
   assert(!checkoutServiceSource.includes('$inc: { balance: -take'));
   ok('la reserva guarda el saldo restante sin aplicar setters a un incremento negativo');
+
+  assert.strictEqual(parseStoreCreditDemoArgs([]).confirmPersist, false);
+  assert.strictEqual(
+    parseStoreCreditDemoArgs(['--confirm-persist']).confirmPersist,
+    true
+  );
+  assert.strictEqual(STORE_CREDIT_DEMO.documentNumber, '1010123456');
+  assert.strictEqual(STORE_CREDIT_DEMO.email, 'saldo.checkout@example.com');
+  assert.strictEqual(STORE_CREDIT_DEMO.creditAmount, 300000);
+  ok('el script DEMO exige confirmación y entrega credenciales estables para Checkout');
 
   console.log(
     `\nContrato de saldo a favor en Checkout: ${passed}/${passed} controles aprobados`
