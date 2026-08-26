@@ -18,6 +18,7 @@ const {
 const SIMPLE_ID = '68a4a78a59706e44cade0401';
 const VARIANT_ID = '68a4a78a59706e44cade0402';
 const ZERO_ID = '68a4a78a59706e44cade0403';
+const BUNDLE_ID = '68a4a78a59706e44cade0404';
 const MISSING_ID = '68a4a78a59706e44cade0499';
 const CART_ID = '64b64b64b64b64b64b64c401';
 const CART_SECRET = 'canonical-cart-test-secret-12345678901234567890';
@@ -85,6 +86,22 @@ const products = new Map([
       trackInventory: true,
       allowBackorder: false,
       variants: [],
+    },
+  ],
+  [
+    BUNDLE_ID,
+    {
+      _id: BUNDLE_ID,
+      title: 'Combo digital ilimitado',
+      price: 249000,
+      image: '/uploads/combo-digital.webp',
+      active: true,
+      visible: true,
+      productType: 'bundle',
+      trackInventory: false,
+      allowBackorder: false,
+      variants: [],
+      bundleComponents: [],
     },
   ],
 ]);
@@ -405,6 +422,21 @@ async function main() {
     assert.equal(result.ok, false);
     assert.equal(result.items[0].invalidReason, 'OUT_OF_STOCK');
     assert.equal(result.items[0].qty, 0);
+  });
+
+  await check('un combo sin componentes físicos no se convierte en stock cero', async () => {
+    const unlimitedBundleService = createCartCanonicalValidationService({
+      ProductModel: makeProductModel(products),
+      InventoryStockModel: makeInventoryStockModel(stocks),
+      bundleAvailability: async () => Infinity,
+    });
+    const result = await unlimitedBundleService.validateItems([
+      item(BUNDLE_ID),
+    ], { mode: 'strict' });
+    assert.equal(result.ok, true);
+    assert.equal(result.items[0].inventoryTracked, false);
+    assert.equal(result.items[0].availableStock, null);
+    assertNoInvalidNumbers(result);
   });
 
   await check('stock insuficiente informa cantidad real y no fabrica disponibilidad', async () => {
