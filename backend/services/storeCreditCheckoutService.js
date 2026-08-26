@@ -314,14 +314,18 @@ async function reserveStoreCreditForOrder(
     const before = cleanMoney(credit.balance);
     const take = cleanMoney(Math.min(before, remaining));
     if (take <= 0) continue;
+    const after = cleanMoney(before - take);
     const updated = await StoreCreditModel.findOneAndUpdate(
       {
         _id: credit._id,
         status: 'active',
         expiresAt: { $gt: now },
-        balance: { $gte: take },
+        balance: before,
       },
-      { $inc: { balance: -take, revision: 1 } },
+      {
+        $set: { balance: after },
+        $inc: { revision: 1 },
+      },
       { new: true, session, runValidators: true }
     );
     if (!updated) {
@@ -331,7 +335,6 @@ async function reserveStoreCreditForOrder(
         409
       );
     }
-    const after = cleanMoney(updated.balance);
     if (after <= 0) {
       updated.status = 'depleted';
       await updated.save({ session });

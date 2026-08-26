@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const mongoose = require('mongoose');
 
 const Order = require('../models/Order');
@@ -224,6 +226,14 @@ async function run() {
   assert.strictEqual(usage.allocations.length, 1);
   assert.strictEqual(usage.amount, 100000);
   ok('cada uso conserva la fuente y el movimiento de saldo');
+
+  const checkoutServiceSource = fs.readFileSync(
+    path.join(__dirname, '../services/storeCreditCheckoutService.js'),
+    'utf8'
+  );
+  assert(checkoutServiceSource.includes('$set: { balance: after }'));
+  assert(!checkoutServiceSource.includes('$inc: { balance: -take'));
+  ok('la reserva guarda el saldo restante sin aplicar setters a un incremento negativo');
 
   console.log(
     `\nContrato de saldo a favor en Checkout: ${passed}/${passed} controles aprobados`
