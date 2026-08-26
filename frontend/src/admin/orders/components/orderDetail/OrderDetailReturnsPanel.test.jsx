@@ -150,6 +150,87 @@ describe('OrderDetailReturnsPanel', () => {
     expect(document.body.innerHTML).toContain('var(--admin-');
   });
 
+  it('guarda umbrales antifraude y una política especial', () => {
+    const onSavePolicy = vi.fn();
+    render(
+      <OrderDetailReturnsPanel
+        data={{
+          orderId: 'order-risk',
+          policy: {
+            revision: 7,
+            windowDays: 30,
+            allowedResolutions: ['refund', 'exchange'],
+            riskControls: {
+              enabled: true,
+              reviewRequestCount: 3,
+              blockRequestCount: 8,
+            },
+            rules: [],
+          },
+          eligibility: [],
+          returns: [],
+        }}
+        canManagePolicy
+        onSavePolicy={onSavePolicy}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Configurar política' }));
+    fireEvent.change(screen.getByLabelText('Solicitudes para revisión'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar política especial' }));
+    fireEvent.change(screen.getByLabelText('Nombre regla 1'), { target: { value: 'Tecnología sensible' } });
+    fireEvent.change(screen.getByLabelText('Valores regla 1'), { target: { value: 'tecnología, tablets' } });
+    fireEvent.blur(screen.getByLabelText('Valores regla 1'));
+    fireEvent.change(screen.getByLabelText('Resultado regla 1'), { target: { value: 'manual_review' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar política' }));
+
+    expect(onSavePolicy).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 7,
+      riskControls: expect.objectContaining({ reviewRequestCount: 4 }),
+      rules: [expect.objectContaining({
+        name: 'Tecnología sensible',
+        requireManualReview: true,
+        scope: { type: 'category', values: ['tecnología', 'tablets'] },
+      })],
+    }));
+  });
+
+  it('obliga a documentar la revisión antifraude antes de autorizar', () => {
+    const onAction = vi.fn();
+    const riskReturn = {
+      ...receivedReturn,
+      status: 'requested',
+      riskAssessment: {
+        level: 'high',
+        decision: 'manual_review',
+        score: 35,
+        signals: [{ code: 'policy_manual_review', message: 'La política especial exige revisión manual.' }],
+        history: { requestCount: 2, unitCount: 3, amount: 240000, lookbackDays: 90 },
+      },
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-risk', eligibility: [], returns: [riskReturn] }}
+        canManage
+        onAction={onAction}
+      />
+    );
+
+    expect(screen.getByText('Revisión antifraude requerida')).toBeInTheDocument();
+    const authorize = screen.getByRole('button', { name: 'Autorizar' });
+    expect(authorize).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Conclusión antifraude RMA-ORD-1'), {
+      target: { value: 'Identidad y compra verificadas.' },
+    });
+    fireEvent.click(authorize);
+
+    expect(onAction).toHaveBeenCalledWith(
+      riskReturn,
+      'authorize',
+      expect.objectContaining({ riskReviewNote: 'Identidad y compra verificadas.' })
+    );
+  });
+
   it('ofrece creación automática para un cambio inspeccionado', () => {
     const onAutomaticExchange = vi.fn();
     const exchange = {

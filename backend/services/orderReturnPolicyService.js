@@ -3,6 +3,10 @@
 const mongoose = require('mongoose');
 
 const OrderReturnPolicy = require('../models/OrderReturnPolicy');
+const {
+  normalizePolicyRules,
+  normalizeRiskControls,
+} = require('./orderReturnRiskService');
 
 const POLICY_KEY = 'default';
 const RESOLUTION_TYPES = new Set(OrderReturnPolicy.RESOLUTION_TYPES || []);
@@ -49,6 +53,8 @@ function defaultPolicy(env = process.env) {
     storeCreditEnabled: true,
     storeCreditExpirationDays: 365,
     automaticExchangeEnabled: true,
+    riskControls: normalizeRiskControls({}),
+    rules: [],
     revision: 0,
     updatedBy: {},
     updatedAt: null,
@@ -97,6 +103,8 @@ function safePolicyView(value = {}, env = process.env) {
       1825
     ),
     automaticExchangeEnabled: source?.automaticExchangeEnabled !== false,
+    riskControls: normalizeRiskControls(source?.riskControls || fallback.riskControls),
+    rules: normalizePolicyRules(source?.rules || fallback.rules),
     revision: integer(source?.revision, 0, 0, Number.MAX_SAFE_INTEGER),
     updatedBy: source?.updatedBy || {},
     updatedAt: source?.updatedAt || null,
@@ -131,6 +139,17 @@ function normalizePolicyPatch(payload = {}, current = defaultPolicy()) {
     payload.returnShippingPaidBy || current.returnShippingPaidBy,
     40
   );
+  const riskControls = normalizeRiskControls(
+    payload.riskControls !== undefined
+      ? payload.riskControls
+      : current.riskControls
+  );
+  if (riskControls.blockRequestCount <= riskControls.reviewRequestCount) {
+    riskControls.blockRequestCount = Math.min(
+      100,
+      riskControls.reviewRequestCount + 1
+    );
+  }
 
   return {
     enabled: payload.enabled !== undefined ? payload.enabled === true : current.enabled !== false,
@@ -170,6 +189,10 @@ function normalizePolicyPatch(payload = {}, current = defaultPolicy()) {
       payload.automaticExchangeEnabled !== undefined
         ? payload.automaticExchangeEnabled === true
         : current.automaticExchangeEnabled !== false,
+    riskControls,
+    rules: normalizePolicyRules(
+      payload.rules !== undefined ? payload.rules : current.rules
+    ),
   };
 }
 

@@ -97,6 +97,8 @@ No debe usarse una compra real, una guía con costo ni una base productiva para 
 - E2E Playwright del autoservicio;
 - **Órdenes CI** verde después de una publicación autorizada.
 
-## Estado local
+## Continuidad
 
-Implementación preparada localmente y **sin publicación**. La etapa solo se considerará cerrada remotamente cuando el usuario autorice el commit y GitHub ejecute todas las puertas en verde.
+La evolución posterior de seguridad comercial y reglas diferenciadas se documenta en [`ordenes-antifraude-politicas-cierre.md`](./ordenes-antifraude-politicas-cierre.md). No altera el cierre funcional de esta etapa ni mezcla tareas que dependan de un despliegue productivo.
+
+Ese bloque posterior permanece local y sin publicación hasta recibir autorización expresa.

@@ -125,6 +125,9 @@ function ReturnCaseCard({ returnCase, access, orderId, onChanged, onError }) {
           <div key={String(item.orderItemId || item._id)}>
             <strong>{item.title}</strong>
             <span>{item.requestedQuantity} unidad(es) · {REASONS.find(([code]) => code === item.reasonCode)?.[1] || 'Otro motivo'}</span>
+            {item.policyRuleName && item.policyRuleName !== 'Política general' ? (
+              <span>Política aplicada: {item.policyRuleName} · {item.policyWindowDays || 30} días</span>
+            ) : null}
           </div>
         ))}
       </div>
@@ -223,6 +226,26 @@ export default function OrderReturnsPage() {
       reasonText: String(items[item.orderItemId]?.reasonText || '').trim(),
     }))
     .filter((item) => item.quantity > 0);
+  const selectedEligibility = selectedItems.map((item) => (
+    eligibleItems.find((entry) => entry.orderItemId === item.orderItemId)
+  )).filter(Boolean);
+  const selectedRequiresReview = selectedEligibility.some(
+    (item) => item.policyManualReview === true
+  );
+  const globalResolutions = Array.isArray(data?.policy?.allowedResolutions)
+    ? data.policy.allowedResolutions
+    : [];
+  const selectedResolutions = selectedEligibility.length
+    ? globalResolutions.filter((option) => selectedEligibility.every(
+        (item) => !Array.isArray(item.allowedResolutions) || item.allowedResolutions.includes(option)
+      ))
+    : globalResolutions;
+
+  useEffect(() => {
+    if (selectedResolutions.length && !selectedResolutions.includes(resolution)) {
+      setResolution(selectedResolutions[0]);
+    }
+  }, [selectedResolutions.join('|'), resolution]);
 
   const setItem = (id, patch) => {
     setItems((current) => ({
@@ -235,8 +258,10 @@ export default function OrderReturnsPage() {
     event.preventDefault();
     if (!selectedItems.length || busy) return;
     if (
-      data?.policy?.requireReasonText &&
-      selectedItems.some((item) => item.reasonText.length < 5)
+      selectedItems.some((item) => (
+        selectedEligibility.find((entry) => entry.orderItemId === item.orderItemId)?.requireReasonText &&
+        item.reasonText.length < 5
+      ))
     ) {
       setError('Describe brevemente el motivo de cada producto seleccionado.');
       return;
@@ -312,7 +337,7 @@ export default function OrderReturnsPage() {
                   <label>
                     <span className="orp-muted">¿Cómo quieres resolverlo?</span>
                     <select className="orp-input" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-                      {(data.policy?.allowedResolutions || []).map((option) => (
+                      {selectedResolutions.map((option) => (
                         <option key={option} value={option}>{resolutionLabel(option)}</option>
                       ))}
                     </select>
@@ -321,19 +346,31 @@ export default function OrderReturnsPage() {
                     const draft = items[item.orderItemId] || {};
                     return (
                       <div className="orp-line" key={item.orderItemId}>
-                        <div><strong>{item.title}</strong><span>Disponible {item.availableQuantity} · hasta {formatDate(item.eligibleUntil)}</span></div>
+                        <div>
+                          <strong>{item.title}</strong>
+                          <span>Disponible {item.availableQuantity} · hasta {formatDate(item.eligibleUntil)}</span>
+                          {item.policyRuleName && item.policyRuleName !== 'Política general' ? (
+                            <span>Política: {item.policyRuleName} · {item.policyWindowDays || data.policy?.windowDays || 30} días{item.policyManualReview ? ' · requiere revisión' : ''}</span>
+                          ) : null}
+                        </div>
                         <input className="orp-input" aria-label={`Cantidad ${item.title}`} type="number" min="0" max={item.availableQuantity} value={draft.quantity || ''} onChange={(event) => setItem(item.orderItemId, { quantity: Math.min(item.availableQuantity, quantity(event.target.value)) })} />
                         <select className="orp-input" aria-label={`Motivo ${item.title}`} value={draft.reasonCode || 'other'} onChange={(event) => setItem(item.orderItemId, { reasonCode: event.target.value })}>
                           {REASONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                         </select>
                         {quantity(draft.quantity) > 0 ? (
-                          <input className="orp-input orp-detail" aria-label={`Detalle ${item.title}`} value={draft.reasonText || ''} onChange={(event) => setItem(item.orderItemId, { reasonText: event.target.value })} placeholder={data.policy?.requireReasonText ? 'Describe el motivo (obligatorio)' : 'Detalle adicional (opcional)'} />
+                          <input className="orp-input orp-detail" aria-label={`Detalle ${item.title}`} value={draft.reasonText || ''} onChange={(event) => setItem(item.orderItemId, { reasonText: event.target.value })} placeholder={item.requireReasonText ? 'Describe el motivo (obligatorio)' : 'Detalle adicional (opcional)'} />
                         ) : null}
                       </div>
                     );
                   })}
+                  {selectedRequiresReview ? (
+                    <div className="orp-policy">Tu solicitud será revisada por el equipo antes de autorizar la devolución.</div>
+                  ) : null}
+                  {selectedItems.length && !selectedResolutions.length ? (
+                    <div role="alert" className="orp-alert error">Los productos seleccionados no comparten una solución disponible.</div>
+                  ) : null}
                   <textarea className="orp-input" rows="3" value={reasonSummary} onChange={(event) => setReasonSummary(event.target.value)} placeholder="Comentario general (opcional)" />
-                  <div className="orp-actions"><button className="orp-button primary" type="submit" disabled={!selectedItems.length || busy}>{busy ? 'Enviando…' : 'Enviar solicitud'}</button></div>
+                  <div className="orp-actions"><button className="orp-button primary" type="submit" disabled={!selectedItems.length || !selectedResolutions.length || busy}>{busy ? 'Enviando…' : 'Enviar solicitud'}</button></div>
                 </form>
               ) : (
                 <div className="orp-empty">Todavía no hay productos entregados disponibles para devolución.</div>

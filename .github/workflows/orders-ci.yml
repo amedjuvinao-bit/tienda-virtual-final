@@ -50,6 +50,9 @@ jobs:
       - name: Validar cierre de la etapa 4
         run: npm --prefix backend run test:orders-stage4-closure
 
+      - name: Validar antifraude y políticas avanzadas de devolución
+        run: npm --prefix backend run test:orders-return-risk
+
       - name: Validar permisos y arquitectura
         run: |
           npm --prefix backend run test:orders-security
@@ -157,6 +160,11 @@ jobs:
           ORDERS_STAGE4_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stage4_returns?replicaSet=rs0
         run: npm --prefix backend run test:orders-stage4-returns
 
+      - name: Validar persistencia antifraude y políticas especiales
+        env:
+          ORDERS_RETURN_RISK_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_return_risk?replicaSet=rs0
+        run: npm --prefix backend run test:orders-return-risk-integration
+
       - name: Validar estados masivos
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_bulk_status?replicaSet=rs0
@@ -227,6 +235,9 @@ jobs:
 
       - name: Validar autoservicio y resoluciones de la etapa 4
         run: npm --prefix frontend run test:orders-stage4
+
+      - name: Validar experiencia antifraude y políticas especiales
+        run: npm --prefix frontend run test:orders-return-risk
 
       - name: Validar cliente, WhatsApp y precontrol fiscal
         run: |

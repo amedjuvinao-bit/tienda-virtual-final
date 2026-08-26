@@ -151,4 +151,33 @@ describe('OrderReturnsPage', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('explica una política especial sin mostrar señales internas de fraude', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ...payload(),
+        eligibility: [{
+          ...payload().eligibility[0],
+          policyRuleName: 'Tecnología de alto valor',
+          policyWindowDays: 10,
+          policyManualReview: true,
+          requireReasonText: true,
+          allowedResolutions: ['exchange'],
+        }],
+      }),
+    })));
+
+    render(
+      <MemoryRouter initialEntries={[`/devoluciones/${ORDER_ID}`]}>
+        <Routes><Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByText(/Política: Tecnología de alto valor · 10 días · requiere revisión/);
+    fireEvent.change(screen.getByLabelText('Cantidad Tenis Plus'), { target: { value: '1' } });
+    expect(screen.getByText(/Tu solicitud será revisada por el equipo/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('score');
+    expect(document.body.textContent).not.toContain('frequent_return_requests');
+  });
 });

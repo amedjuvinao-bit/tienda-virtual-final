@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import { fmtDate, toCOP } from './orderDetailUtils';
 import { OrderDetailIcons } from './OrderDetailIcons';
+import OrderReturnPolicyAdvancedEditor from './OrderReturnPolicyAdvancedEditor';
 import {
   EmptyState,
   GhostButton,
@@ -65,6 +66,13 @@ function resolutionLabel(value) {
   if (value === 'exchange') return 'Cambio';
   if (value === 'store_credit') return 'Saldo a favor';
   return 'Reembolso';
+}
+
+function riskLevelLabel(value) {
+  if (value === 'blocked') return 'crítico';
+  if (value === 'high') return 'alto';
+  if (value === 'medium') return 'medio';
+  return 'bajo';
 }
 
 function Metric({ label, value, tone = '' }) {
@@ -227,10 +235,23 @@ export default function OrderDetailReturnsPanel({
         reasonCode: draft.reasonCode || 'other',
         reasonText: String(draft.reasonText || '').trim(),
         expired: item.expired === true,
+        policyReturnable: item.policyReturnable !== false,
+        policyManualReview: item.policyManualReview === true,
+        allowedResolutions: Array.isArray(item.allowedResolutions)
+          ? item.allowedResolutions
+          : allowedCreateResolutions,
       };
     })
     .filter((item) => item.quantity > 0);
-  const needsOverride = selectedItems.some((item) => item.expired);
+  const needsOverride = selectedItems.some(
+    (item) => item.expired || !item.policyReturnable
+  );
+  const selectedNeedsManualReview = selectedItems.some(
+    (item) => item.policyManualReview
+  );
+  const resolutionAllowedForSelection = selectedItems.every(
+    (item) => item.allowedResolutions.includes(resolution)
+  );
 
   const setRequestItem = (id, patch) => {
     setRequestItems((current) => ({
@@ -276,13 +297,23 @@ export default function OrderDetailReturnsPanel({
   };
 
   const submitCreate = async () => {
-    if (!selectedItems.length || (needsOverride && overrideReason.trim().length < 8)) return;
+    if (
+      !selectedItems.length ||
+      !resolutionAllowedForSelection ||
+      (needsOverride && overrideReason.trim().length < 8)
+    ) return;
     await onCreate?.({
       requestedResolution: resolution,
       reasonSummary: reasonSummary.trim(),
       overrideEligibility: needsOverride,
       overrideReason: needsOverride ? overrideReason.trim() : '',
-      items: selectedItems.map(({ expired, ...item }) => item),
+      items: selectedItems.map(({
+        expired,
+        policyReturnable,
+        policyManualReview,
+        allowedResolutions,
+        ...item
+      }) => item),
     });
   };
 
@@ -319,7 +350,7 @@ export default function OrderDetailReturnsPanel({
           <div>
             <strong style={{ display: 'block', fontSize: 12 }}>Política activa · {policy.windowDays || 30} días</strong>
             <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 10 }}>
-              Portal cliente {policy.customerPortalEnabled === false ? 'desactivado' : 'activo'} · envío {policy.returnShippingPaidBy === 'store' ? 'pagado por la tienda' : policy.returnShippingPaidBy === 'customer' ? 'pagado por el cliente' : 'según el caso'} · versión {policy.revision || 0}
+              Portal cliente {policy.customerPortalEnabled === false ? 'desactivado' : 'activo'} · envío {policy.returnShippingPaidBy === 'store' ? 'pagado por la tienda' : policy.returnShippingPaidBy === 'customer' ? 'pagado por el cliente' : 'según el caso'} · antifraude {policy.riskControls?.enabled === false ? 'desactivado' : 'activo'} · {(policy.rules || []).length} regla(s) especial(es) · versión {policy.revision || 0}
             </span>
           </div>
           {canManagePolicy ? (
@@ -348,6 +379,11 @@ export default function OrderDetailReturnsPanel({
                 <label key={value}><input type="checkbox" checked={(policyDraft.allowedResolutions || []).includes(value)} onChange={() => togglePolicyResolution(value)} /> {resolutionLabel(value)}</label>
               ))}
             </div>
+            <OrderReturnPolicyAdvancedEditor
+              value={policyDraft}
+              disabled={busyId === 'policy'}
+              onChange={setPolicyDraft}
+            />
             <textarea aria-label="Texto público de la política" rows="2" value={policyDraft.policyText || ''} onChange={(event) => patchPolicy({ policyText: event.target.value })} placeholder="Resumen visible para el cliente" style={inputStyle()} />
             <textarea aria-label="Instrucciones de devolución" rows="2" value={policyDraft.instructions || ''} onChange={(event) => patchPolicy({ instructions: event.target.value })} placeholder="Instrucciones después de autorizar" style={inputStyle()} />
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton disabled={busyId === 'policy' || !(policyDraft.allowedResolutions || []).length} onClick={() => onSavePolicy?.({ ...policyDraft, expectedRevision: policy.revision || 0 })}>Guardar política</PrimaryButton></div>
@@ -385,7 +421,13 @@ export default function OrderDetailReturnsPanel({
                     <span style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 10 }}>
                       Disponible {item.availableQuantity} de {item.deliveredQuantity} · hasta {fmtDate(item.eligibleUntil)}
                     </span>
-                    {item.expired ? <div style={{ marginTop: 5 }}><SoftBadge variant="danger">Fuera de política</SoftBadge></div> : null}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                      {item.policyRuleKey && item.policyRuleKey !== 'default' ? (
+                        <SoftBadge variant="primary">{item.policyRuleName || 'Política especial'} · {item.policyWindowDays || policy.windowDays || 30} días</SoftBadge>
+                      ) : null}
+                      {item.policyManualReview ? <SoftBadge variant="warning">Revisión manual</SoftBadge> : null}
+                      {item.expired || item.policyReturnable === false ? <SoftBadge variant="danger">Requiere excepción</SoftBadge> : null}
+                    </div>
                   </div>
                   <input aria-label={`Cantidad ${item.title}`} type="number" min="0" max={item.availableQuantity} value={draft.quantity || ''} onChange={(event) => setRequestItem(item.orderItemId, { quantity: Math.min(item.availableQuantity, positiveInteger(event.target.value)) })} style={inputStyle()} />
                   <select aria-label={`Motivo ${item.title}`} value={draft.reasonCode || 'other'} disabled={!quantity} onChange={(event) => setRequestItem(item.orderItemId, { reasonCode: event.target.value })} style={inputStyle()}>
@@ -401,8 +443,20 @@ export default function OrderDetailReturnsPanel({
             <input aria-label="Justificación fuera de política" value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} placeholder="Justificación obligatoria para excepción de política" style={inputStyle({ marginTop: 10, borderColor: ORDER_DETAIL_THEME.warning })} />
           ) : null}
 
+          {selectedNeedsManualReview ? (
+            <div style={{ marginTop: 10, padding: '10px 12px', border: `1px solid ${ORDER_DETAIL_THEME.warning}`, background: ORDER_DETAIL_THEME.cardBg, borderRadius: 13, color: ORDER_DETAIL_THEME.cardText, fontSize: 11 }}>
+              La política seleccionada exige revisión manual. El expediente se creará solicitado y no se autorizará automáticamente.
+            </div>
+          ) : null}
+
+          {selectedItems.length && !resolutionAllowedForSelection ? (
+            <div role="alert" style={{ marginTop: 10, color: ORDER_DETAIL_THEME.danger, fontSize: 11, fontWeight: 850 }}>
+              La solución elegida no está permitida para todos los productos seleccionados.
+            </div>
+          ) : null}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-            <PrimaryButton onClick={submitCreate} disabled={!selectedItems.length || Boolean(busyId) || (needsOverride && overrideReason.trim().length < 8)}>
+            <PrimaryButton onClick={submitCreate} disabled={!selectedItems.length || !resolutionAllowedForSelection || Boolean(busyId) || (needsOverride && overrideReason.trim().length < 8)}>
               Crear expediente RMA
             </PrimaryButton>
           </div>
@@ -421,6 +475,8 @@ export default function OrderDetailReturnsPanel({
           const busy = busyId === id || busyId === 'create';
           const requestedUnits = (returnCase.items || []).reduce((sum, item) => sum + positiveInteger(item.requestedQuantity), 0);
           const acceptedUnits = (returnCase.items || []).reduce((sum, item) => sum + positiveInteger(item.acceptedQuantity), 0);
+          const risk = returnCase.riskAssessment || {};
+          const needsRiskReview = risk.decision === 'manual_review';
 
           return (
             <article key={id} style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg, borderRadius: 19, padding: 14 }}>
@@ -441,6 +497,29 @@ export default function OrderDetailReturnsPanel({
                 <Metric label="Revisión" value={`v${returnCase.revision || 0}`} />
               </div>
 
+              {risk.decision && risk.decision !== 'clear' ? (
+                <div style={{ marginTop: 10, padding: 11, border: `1px solid ${risk.level === 'blocked' ? ORDER_DETAIL_THEME.danger : ORDER_DETAIL_THEME.warning}`, background: ORDER_DETAIL_THEME.cardBg, borderRadius: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <strong style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 12 }}>
+                      {risk.decision === 'approved' ? 'Revisión antifraude aprobada' : 'Revisión antifraude requerida'}
+                    </strong>
+                    <SoftBadge variant={risk.decision === 'approved' ? 'success' : 'warning'}>
+                      Riesgo {riskLevelLabel(risk.level)} · {Number(risk.score || 0)}/100
+                    </SoftBadge>
+                  </div>
+                  <div style={{ display: 'grid', gap: 5, marginTop: 8 }}>
+                    {(risk.signals || []).map((signal) => (
+                      <span key={signal.code} style={{ color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, lineHeight: 1.4 }}>
+                        • {signal.message}
+                      </span>
+                    ))}
+                  </div>
+                  <span style={{ display: 'block', marginTop: 7, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9 }}>
+                    Historial: {risk.history?.requestCount || 0} solicitud(es), {risk.history?.unitCount || 0} unidad(es), {toCOP(risk.history?.amount || 0)} en {risk.history?.lookbackDays || 90} días.
+                  </span>
+                </div>
+              ) : null}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 10 }}>
                 {(returnCase.items || []).map((item) => (
                   <div key={itemId(item)} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) repeat(4, 72px)', gap: 7, alignItems: 'center', padding: '8px 10px', borderRadius: 13, background: ORDER_DETAIL_THEME.cardBg, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, fontSize: 11 }}>
@@ -455,6 +534,18 @@ export default function OrderDetailReturnsPanel({
 
               {canManage && returnCase.status === 'requested' ? (
                 <div style={{ marginTop: 11 }}>
+                  {needsRiskReview ? (
+                    <label style={{ display: 'block', marginBottom: 9, color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 850 }}>
+                      Conclusión de la revisión antifraude
+                      <input
+                        aria-label={`Conclusión antifraude ${returnCase.returnNumber}`}
+                        value={draft.riskReviewNote || ''}
+                        onChange={(event) => setDraft(id, { riskReviewNote: event.target.value })}
+                        placeholder="Explica qué verificaste antes de autorizar (obligatorio)"
+                        style={inputStyle({ marginTop: 5, borderColor: ORDER_DETAIL_THEME.warning })}
+                      />
+                    </label>
+                  ) : null}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                     {(returnCase.items || []).map((item) => (
                       <label key={itemId(item)} style={{ flex: '1 1 180px', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 800 }}>
@@ -466,7 +557,7 @@ export default function OrderDetailReturnsPanel({
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8 }}>
                     <input aria-label={`Motivo rechazo ${returnCase.returnNumber}`} value={draft.reason || ''} onChange={(event) => setDraft(id, { reason: event.target.value })} placeholder="Motivo si se rechaza" style={inputStyle()} />
                     <GhostButton disabled={busy || String(draft.reason || '').trim().length < 5} onClick={() => onAction?.(returnCase, 'reject', { reason: String(draft.reason || '').trim() })}>Rechazar</GhostButton>
-                    <PrimaryButton disabled={busy || !(returnCase.items || []).some((item) => positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) > 0)} onClick={() => onAction?.(returnCase, 'authorize', { items: (returnCase.items || []).map((item) => ({ orderItemId: itemId(item), authorizedQuantity: positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) })), shipping: { method: draft.carrierName ? 'carrier' : 'drop_off', carrierName: draft.carrierName || '', trackingNumber: draft.trackingNumber || '', labelUrl: draft.labelUrl || '', instructions: draft.instructions || policy.instructions || '' } })}>Autorizar</PrimaryButton>
+                    <PrimaryButton disabled={busy || (needsRiskReview && String(draft.riskReviewNote || '').trim().length < 8) || !(returnCase.items || []).some((item) => positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) > 0)} onClick={() => onAction?.(returnCase, 'authorize', { riskReviewNote: String(draft.riskReviewNote || '').trim(), items: (returnCase.items || []).map((item) => ({ orderItemId: itemId(item), authorizedQuantity: positiveInteger(draft.authorized?.[itemId(item)] ?? item.requestedQuantity) })), shipping: { method: draft.carrierName ? 'carrier' : 'drop_off', carrierName: draft.carrierName || '', trackingNumber: draft.trackingNumber || '', labelUrl: draft.labelUrl || '', instructions: draft.instructions || policy.instructions || '' } })}>Autorizar</PrimaryButton>
                   </div>
                   <details style={{ marginTop: 8 }}>
                     <summary style={{ cursor: 'pointer', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 850 }}>Logística y etiqueta de retorno</summary>

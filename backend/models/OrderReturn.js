@@ -28,6 +28,8 @@ const RETURN_REASON_CODES = [
 ];
 
 const RETURN_RESOLUTION_TYPES = ['refund', 'exchange', 'store_credit'];
+const RETURN_RISK_LEVELS = ['low', 'medium', 'high', 'blocked'];
+const RETURN_RISK_DECISIONS = ['clear', 'manual_review', 'blocked', 'approved'];
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -99,8 +101,49 @@ const ReturnItemSchema = new Schema(
     },
     reasonText: { type: String, trim: true, default: '', maxlength: 500 },
     inspectionNote: { type: String, trim: true, default: '', maxlength: 1000 },
+    policyRuleKey: { type: String, trim: true, lowercase: true, default: 'default', maxlength: 80 },
+    policyRuleName: { type: String, trim: true, default: 'Política general', maxlength: 160 },
+    policyWindowDays: { type: Number, min: 1, max: 365, default: 30 },
+    policyManualReview: { type: Boolean, default: false },
   },
   { _id: true }
+);
+
+const RiskSignalSchema = new Schema(
+  {
+    code: { type: String, trim: true, lowercase: true, required: true, maxlength: 80 },
+    severity: {
+      type: String,
+      enum: ['info', 'warning', 'high', 'blocked'],
+      default: 'warning',
+    },
+    message: { type: String, trim: true, required: true, maxlength: 320 },
+    value: { type: Number, min: 0, default: 0 },
+    threshold: { type: Number, min: 0, default: 0 },
+  },
+  { _id: false }
+);
+
+const ReturnRiskAssessmentSchema = new Schema(
+  {
+    level: { type: String, enum: RETURN_RISK_LEVELS, default: 'low' },
+    decision: { type: String, enum: RETURN_RISK_DECISIONS, default: 'clear' },
+    score: { type: Number, min: 0, max: 100, default: 0 },
+    signals: { type: [RiskSignalSchema], default: [] },
+    history: {
+      lookbackDays: { type: Number, min: 7, max: 730, default: 90 },
+      requestCount: { type: Number, min: 0, default: 0 },
+      unitCount: { type: Number, min: 0, default: 0 },
+      amount: { type: Number, min: 0, default: 0 },
+      activeCount: { type: Number, min: 0, default: 0 },
+      rejectedCount: { type: Number, min: 0, default: 0 },
+    },
+    evaluatedAt: { type: Date, default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewNote: { type: String, trim: true, default: '', maxlength: 800 },
+    reviewedBy: { type: ActorSnapshotSchema, default: () => ({}) },
+  },
+  { _id: false }
 );
 
 const InventoryRestorationSchema = new Schema(
@@ -168,6 +211,18 @@ const OrderReturnSchema = new Schema(
         enum: ['store', 'customer', 'case_by_case'],
         default: 'case_by_case',
       },
+      matchedRules: {
+        type: [{
+          key: { type: String, trim: true, lowercase: true, default: 'default' },
+          name: { type: String, trim: true, default: 'Política general' },
+        }],
+        default: [],
+      },
+      requiresManualReview: { type: Boolean, default: false },
+    },
+    riskAssessment: {
+      type: ReturnRiskAssessmentSchema,
+      default: () => ({}),
     },
     shipping: {
       method: {
@@ -227,6 +282,9 @@ const OrderReturnSchema = new Schema(
 OrderReturnSchema.index({ order: 1, status: 1, createdAt: -1 });
 OrderReturnSchema.index({ order: 1, 'items.orderItemId': 1, status: 1 });
 OrderReturnSchema.index({ status: 1, 'eligibility.eligibleUntil': 1 });
+OrderReturnSchema.index({ 'customerSnapshot.customer': 1, requestedAt: -1 });
+OrderReturnSchema.index({ 'customerSnapshot.email': 1, requestedAt: -1 });
+OrderReturnSchema.index({ 'customerSnapshot.phone': 1, requestedAt: -1 });
 
 OrderReturnSchema.pre('validate', function normalizeOrderReturn(next) {
   this.returnNumber = cleanUpper(this.returnNumber);
@@ -250,3 +308,5 @@ module.exports =
 module.exports.RETURN_STATUSES = RETURN_STATUSES;
 module.exports.RETURN_REASON_CODES = RETURN_REASON_CODES;
 module.exports.RETURN_RESOLUTION_TYPES = RETURN_RESOLUTION_TYPES;
+module.exports.RETURN_RISK_LEVELS = RETURN_RISK_LEVELS;
+module.exports.RETURN_RISK_DECISIONS = RETURN_RISK_DECISIONS;

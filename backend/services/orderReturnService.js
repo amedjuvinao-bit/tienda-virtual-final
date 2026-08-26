@@ -26,6 +26,10 @@ const {
   getOrderReturnPolicy,
 } = require('./orderReturnPolicyService');
 const {
+  evaluateOrderReturnRisk,
+  resolveEffectiveReturnPolicy,
+} = require('./orderReturnRiskService');
+const {
   canonicalizeVariantKey,
 } = require('../lib/products/productVariantConfig');
 
@@ -267,10 +271,10 @@ function buildReturnEligibility(
   now = new Date(),
   policy = {}
 ) {
-  const windowDays = returnWindowDays(policy);
   return orderLines(order)
     .filter(isPhysicalLine)
     .map((line) => {
+      const effectivePolicy = resolveEffectiveReturnPolicy(policy, order, line);
       const orderItemId = idValue(line._id || line.orderItemId);
       const purchasedQuantity = lineQuantity(line);
       const delivery = deliveryForLine(order, line);
@@ -278,7 +282,10 @@ function buildReturnEligibility(
       const deliveredQuantity = Math.min(purchasedQuantity, delivery.deliveredQuantity);
       const availableQuantity = Math.max(0, deliveredQuantity - alreadyCommitted);
       const eligibleUntil = delivery.deliveredAt
-        ? new Date(delivery.deliveredAt.getTime() + windowDays * 24 * 60 * 60 * 1000)
+        ? new Date(
+            delivery.deliveredAt.getTime() +
+              effectivePolicy.windowDays * 24 * 60 * 60 * 1000
+          )
         : null;
       const expired = Boolean(eligibleUntil && now.getTime() > eligibleUntil.getTime());
 
@@ -297,15 +304,28 @@ function buildReturnEligibility(
         alreadyCommitted,
         availableQuantity,
         unitAmount: lineUnitAmount(line),
+        category: cleanText(line.category || line.productSnapshot?.category, 160),
+        categories: Array.isArray(line.categories) ? line.categories : [],
+        sku: cleanText(line.sku || line.productSnapshot?.sku || line.variantSku, 160),
         deliveredAt: delivery.deliveredAt,
         eligibleUntil,
-        eligible: availableQuantity > 0 && !expired,
+        eligible: availableQuantity > 0 && !expired && effectivePolicy.returnable,
         expired,
+        policyRuleKey: effectivePolicy.ruleKey,
+        policyRuleName: effectivePolicy.ruleName,
+        policyWindowDays: effectivePolicy.windowDays,
+        policyManualReview: effectivePolicy.requireManualReview,
+        policyReturnable: effectivePolicy.returnable,
+        allowedResolutions: effectivePolicy.allowedResolutions,
+        requireReasonText: effectivePolicy.requireReasonText,
+        returnShippingPaidBy: effectivePolicy.returnShippingPaidBy,
         blocker:
           deliveredQuantity <= 0
             ? 'ITEM_NOT_DELIVERED'
             : availableQuantity <= 0
               ? 'ITEM_ALREADY_RETURNED'
+              : !effectivePolicy.returnable
+                ? 'RETURN_POLICY_BLOCKED'
               : expired
                 ? 'RETURN_WINDOW_EXPIRED'
                 : '',
@@ -323,7 +343,11 @@ function normalizeReturnRequest(
   order,
   rawItems,
   eligibility,
-  { overrideEligibility = false, overrideReason = '' } = {}
+  {
+    overrideEligibility = false,
+    overrideReason = '',
+    requestedResolution = 'refund',
+  } = {}
 ) {
   if (!Array.isArray(rawItems) || !rawItems.length) {
     throw createReturnError(
@@ -367,6 +391,18 @@ function normalizeReturnRequest(
         }
       );
     }
+    if (!policy.policyReturnable && !overrideEligibility) {
+      throw createReturnError(
+        `${item.title} está excluido por la política especial ${policy.policyRuleName}.`,
+        'RETURN_POLICY_BLOCKED',
+        409,
+        {
+          orderItemId: item.orderItemId,
+          policyRuleKey: policy.policyRuleKey,
+          policyRuleName: policy.policyRuleName,
+        }
+      );
+    }
     if (policy.expired && !overrideEligibility) {
       throw createReturnError(
         `La ventana de devolución de ${item.title} ya venció.`,
@@ -377,6 +413,22 @@ function normalizeReturnRequest(
     }
     if (!RETURN_REASON_CODES.has(reasonCode)) {
       throw createReturnError('El motivo de devolución no es válido.', 'RETURN_REASON_INVALID', 400);
+    }
+    if (
+      !overrideEligibility &&
+      Array.isArray(policy.allowedResolutions) &&
+      !policy.allowedResolutions.includes(cleanLower(requestedResolution, 40))
+    ) {
+      throw createReturnError(
+        `${item.title} no permite la resolución seleccionada según ${policy.policyRuleName}.`,
+        'RETURN_RESOLUTION_NOT_ALLOWED_BY_RULE',
+        409,
+        {
+          orderItemId: item.orderItemId,
+          policyRuleKey: policy.policyRuleKey,
+          allowedResolutions: policy.allowedResolutions,
+        }
+      );
     }
 
     return {
@@ -392,6 +444,10 @@ function normalizeReturnRequest(
       requestedQuantity: item.returnedQuantity,
       reasonCode,
       reasonText: cleanText(input.reasonText, 500),
+      policyRuleKey: policy.policyRuleKey || 'default',
+      policyRuleName: policy.policyRuleName || 'Política general',
+      policyWindowDays: policy.policyWindowDays || returnWindowDays(),
+      policyManualReview: policy.policyManualReview === true,
     };
   });
 }
@@ -422,6 +478,7 @@ function safeReturnView(returnCase) {
     reasonSummary: value?.reasonSummary || '',
     eligibility: value?.eligibility || {},
     policySnapshot: value?.policySnapshot || {},
+    riskAssessment: value?.riskAssessment || {},
     shipping: value?.shipping || {},
     inventoryRestorations: value?.inventoryRestorations || [],
     inventoryProcessedAt: value?.inventoryProcessedAt || null,
@@ -471,6 +528,8 @@ function safeCustomerReturnView(returnCase) {
       rejectedQuantity: item.rejectedQuantity,
       reasonCode: item.reasonCode,
       reasonText: item.reasonText,
+      policyRuleName: item.policyRuleName || 'Política general',
+      policyWindowDays: Number(item.policyWindowDays || 30),
     })),
     reasonSummary: value.reasonSummary,
     eligibility: value.eligibility,
@@ -556,6 +615,11 @@ async function listCustomerOrderReturns({ orderFilter, now = new Date() } = {}) 
       eligible: item.eligible,
       expired: item.expired,
       blocker: item.blocker,
+      policyRuleName: item.policyRuleName,
+      policyWindowDays: item.policyWindowDays,
+      policyManualReview: item.policyManualReview,
+      allowedResolutions: item.allowedResolutions,
+      requireReasonText: item.requireReasonText,
     })),
     returns: (result.returns || []).map(safeCustomerReturnView),
   };
@@ -626,11 +690,14 @@ async function createOrderReturn(
       const normalizedItems = normalizeReturnRequest(order, items, eligibility, {
         overrideEligibility,
         overrideReason,
+        requestedResolution: resolution,
       });
       if (
         source === 'customer' &&
-        policy.requireReasonText &&
-        normalizedItems.some((item) => cleanText(item.reasonText, 500).length < 5)
+        normalizedItems.some((item) =>
+          eligibility.find((entry) => entry.orderItemId === item.orderItemId)?.requireReasonText &&
+          cleanText(item.reasonText, 500).length < 5
+        )
       ) {
         throw createReturnError(
           'Describe brevemente el motivo de cada producto.',
@@ -643,8 +710,54 @@ async function createOrderReturn(
           eligibility.find((entry) => entry.orderItemId === item.orderItemId)?.deliveredAt
         )
       );
+      const selectedEligibility = normalizedItems.map((item) =>
+        eligibility.find((entry) => entry.orderItemId === item.orderItemId)
+      ).filter(Boolean);
+      const eligibleUntil = earliestDate(
+        selectedEligibility.map((entry) => entry.eligibleUntil)
+      );
       const windowDays = returnWindowDays(policy);
-      const autoAuthorized = source === 'customer' && policy.autoAuthorize === true;
+      const riskAssessment = await evaluateOrderReturnRisk({
+        order,
+        items: normalizedItems,
+        policy,
+        effectivePolicies: selectedEligibility.map((entry) => ({
+          ruleKey: entry.policyRuleKey,
+          ruleName: entry.policyRuleName,
+          requireManualReview: entry.policyManualReview,
+        })),
+        overrideEligibility,
+        session,
+        now,
+      });
+      if (riskAssessment.decision === 'blocked') {
+        if (source === 'customer') {
+          throw createReturnError(
+            'La solicitud alcanzó un límite de seguridad y no puede crearse automáticamente.',
+            'RETURN_RISK_BLOCKED',
+            409
+          );
+        }
+        riskAssessment.decision = 'manual_review';
+      }
+      const autoAuthorized =
+        source === 'customer' &&
+        policy.autoAuthorize === true &&
+        riskAssessment.decision === 'clear';
+      const matchedRules = Array.from(
+        new Map(
+          selectedEligibility.map((entry) => [
+            entry.policyRuleKey || 'default',
+            {
+              key: entry.policyRuleKey || 'default',
+              name: entry.policyRuleName || 'Política general',
+            },
+          ])
+        ).values()
+      );
+      const returnPayers = Array.from(
+        new Set(selectedEligibility.map((entry) => entry.returnShippingPaidBy).filter(Boolean))
+      );
       const returnCase = new OrderReturn({
         returnNumber: buildReturnNumber(order.orderNumber),
         order: order._id,
@@ -664,16 +777,15 @@ async function createOrderReturn(
             customerSnapshot.email || order.customer?.email || order.customer?.emailOrPhone,
             220
           ),
-          phone: cleanText(customerSnapshot.phone || order.customer?.phone, 80),
+          phone: cleanText(customerSnapshot.phone || order.customer?.phone, 80)
+            .replace(/[^0-9+]/g, ''),
         },
         items: normalizedItems,
         reasonSummary: cleanText(reasonSummary, 800),
         eligibility: {
           windowDays,
           deliveredAt,
-          eligibleUntil: deliveredAt
-            ? new Date(deliveredAt.getTime() + windowDays * 24 * 60 * 60 * 1000)
-            : null,
+          eligibleUntil,
           overridden: overrideEligibility === true,
           overrideReason: overrideEligibility ? cleanText(overrideReason, 500) : '',
         },
@@ -681,8 +793,12 @@ async function createOrderReturn(
           revision: policy.revision,
           windowDays,
           autoAuthorized,
-          returnShippingPaidBy: policy.returnShippingPaidBy,
+          returnShippingPaidBy:
+            returnPayers.length === 1 ? returnPayers[0] : 'case_by_case',
+          matchedRules,
+          requiresManualReview: riskAssessment.decision === 'manual_review',
         },
+        riskAssessment,
         shipping: {
           method: autoAuthorized ? 'drop_off' : 'pending',
           labelType: autoAuthorized ? 'internal_rma' : 'none',
@@ -736,6 +852,9 @@ async function createOrderReturn(
             requestedResolution: resolution,
             requestSource: source,
             autoAuthorized,
+            riskDecision: riskAssessment.decision,
+            riskLevel: riskAssessment.level,
+            riskSignals: riskAssessment.signals.map((entry) => entry.code),
             overrideEligibility: overrideEligibility === true,
             items: normalizedItems.map((item) => ({
               orderItemId: item.orderItemId,
@@ -797,6 +916,20 @@ function applyAuthorization(returnCase, payload, actor, now) {
     total += quantity;
   }
   if (!total) throw createReturnError('Autoriza al menos una unidad.', 'RETURN_AUTHORIZED_ITEMS_REQUIRED', 400);
+  if (returnCase.riskAssessment?.decision === 'manual_review') {
+    const reviewNote = cleanText(payload.riskReviewNote, 800);
+    if (reviewNote.length < 8) {
+      throw createReturnError(
+        'Documenta la revisión de riesgo antes de autorizar.',
+        'RETURN_RISK_REVIEW_REQUIRED',
+        400
+      );
+    }
+    returnCase.riskAssessment.decision = 'approved';
+    returnCase.riskAssessment.reviewedAt = now;
+    returnCase.riskAssessment.reviewNote = reviewNote;
+    returnCase.riskAssessment.reviewedBy = actorSnapshot(actor);
+  }
   returnCase.shipping = {
     ...(returnCase.shipping?.toObject?.() || returnCase.shipping || {}),
     method: cleanLower(payload.shipping?.method || 'pending', 40),

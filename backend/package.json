@@ -17,6 +17,8 @@
     "test:orders-stage3-closure": "node scripts/testOrdersStage3Closure.js",
     "test:orders-stage4-closure": "node scripts/testOrdersStage4Closure.js",
     "test:orders-stage4-returns": "node scripts/testOrderReturnsStage4Integration.js",
+    "test:orders-return-risk": "node scripts/testOrderReturnRiskPolicy.js",
+    "test:orders-return-risk-integration": "node scripts/testOrderReturnRiskIntegration.js",
     "test:orders-security": "node scripts/testOrdersSecurityContracts.js",
     "test:orders-architecture": "node scripts/testOrderAdminQueryArchitecture.js",
     "test:orders-query-scale": "node scripts/testOrderAdminQueryScaleIntegration.js",
