@@ -70,4 +70,14 @@ check('el borrado es transaccional y luego recrea el catálogo canónico', () =>
   assert(source.includes("DEMONSTRATION_CATALOG_RESEED_FAILED"));
 });
 
-console.log(`\nReinicio controlado del catálogo: ${checks}/5 controles aprobados.`);
+check('el reinicio no depende de la autenticación administrativa heredada', () => {
+  const seedSource = fs.readFileSync(
+    path.join(__dirname, 'seedDemonstrationProducts.js'),
+    'utf8'
+  );
+  assert(source.includes("PRODUCT_TEST_SKIP_ADMIN_ENDPOINT: '1'"));
+  assert(seedSource.includes("process.env.PRODUCT_TEST_SKIP_ADMIN_ENDPOINT === '1'"));
+  assert(seedSource.includes('await validateAdminEndpoint()'));
+});
+
+console.log(`\nReinicio controlado del catálogo: ${checks}/6 controles aprobados.`);

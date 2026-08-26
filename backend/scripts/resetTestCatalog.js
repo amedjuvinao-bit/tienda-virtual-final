@@ -75,7 +75,14 @@ async function resetTestCatalog() {
   const seed = spawnSync(
     process.execPath,
     [path.join(__dirname, 'seedDemonstrationProducts.js')],
-    { cwd: path.join(__dirname, '..'), stdio: 'inherit', env: process.env }
+    {
+      cwd: path.join(__dirname, '..'),
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        PRODUCT_TEST_SKIP_ADMIN_ENDPOINT: '1',
+      },
+    }
   );
   if (seed.error) throw seed.error;
   if (seed.status !== 0) throw new Error('DEMONSTRATION_CATALOG_RESEED_FAILED');
