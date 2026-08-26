@@ -52,6 +52,8 @@
     "test:dashboard-admin": "node scripts/testDashboardAdminModule.js",
     "test:products-universal": "node scripts/seedDemonstrationProducts.js",
     "test:products-demo-catalog": "node scripts/seedDemonstrationProducts.js",
+    "demo:catalog:reset": "node scripts/resetTestCatalog.js",
+    "test:demo-catalog-reset": "node scripts/testResetTestCatalogContract.js",
     "test:product-inventory-sync": "node scripts/testProductInventorySyncModule.js",
     "test:product-inventory-transaction-contract": "node scripts/testProductInventoryTransactionContract.js",
     "test:product-inventory-transaction": "node scripts/testProductInventoryTransactionIntegration.js",
