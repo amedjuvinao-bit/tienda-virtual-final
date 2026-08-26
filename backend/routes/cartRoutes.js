@@ -22,6 +22,7 @@ const {
   isValidCartAccessToken,
   isValidCartSessionId,
   issueCartAccess,
+  rotateCartAccess,
   stripCartSecrets,
   verifyCartAccess,
 } = require('../services/cartAccessService');
@@ -892,6 +893,65 @@ router.post('/validate', rateLimit, async (req, res) => {
   } catch (error) {
     console.error('Error en /api/cart/validate:', error);
     res.status(500).json({ message: 'Error validando carrito.' });
+  }
+});
+
+/**
+ * POST /api/cart/:sessionId/access/refresh
+ * Renueva la credencial de compra de un carrito todavía activo.
+ */
+router.post('/:sessionId/access/refresh', rateLimit, async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const cart = await loadAuthorizedCart(req, sessionId);
+    if (
+      !cart ||
+      cart.active === false ||
+      cart.convertedOrderId ||
+      ['inactive', 'closed', 'deleted'].includes(cleanLower(cart.status)) ||
+      !Array.isArray(cart.items) ||
+      cart.items.length === 0
+    ) {
+      return sendCartAccessNotFound(res);
+    }
+
+    const access = rotateCartAccess({
+      cartId: cart._id,
+      sessionId: cart.sessionId,
+      secret: getCartAccessSecret(),
+    });
+    const refreshed = await Cart.findOneAndUpdate(
+      {
+        _id: cart._id,
+        sessionId: cart.sessionId,
+        accessTokenHash: cart.accessTokenHash,
+        accessVersion: cart.accessVersion,
+        convertedOrderId: null,
+      },
+      {
+        $set: {
+          accessTokenHash: access.tokenHash,
+          accessVersion: access.version,
+          accessIssuedAt: new Date(),
+          lastCustomerActivityAt: new Date(),
+        },
+      },
+      { new: true }
+    )
+      .select('+accessTokenHash +accessVersion +accessIssuedAt')
+      .exec();
+
+    if (!refreshed) return sendCartAccessNotFound(res);
+    return res.status(200).json({
+      ok: true,
+      sessionId: refreshed.sessionId,
+      cartAccessToken: access.token,
+      version: cartVersionOf(refreshed),
+    });
+  } catch (error) {
+    console.error('Error al renovar el acceso del carrito:', error?.code || error?.message);
+    return res.status(500).json({ message: 'Error interno al renovar el carrito.' });
   }
 });
 

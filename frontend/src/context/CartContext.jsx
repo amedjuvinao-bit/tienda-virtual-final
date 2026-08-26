@@ -247,6 +247,23 @@ export function CartProvider({ children }) {
     return createRemoteCart(createPayload.items);
   };
 
+  const renewCartAccess = async () => {
+    const access = getCartAccess();
+    if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+    const { data } = await api.post(
+      `/api/cart/${encodeURIComponent(access.sessionId)}/access/refresh`,
+      null,
+      { headers: buildCartAccessHeaders(access) }
+    );
+    const sessionId = clean(data?.sessionId);
+    const token = clean(data?.cartAccessToken);
+    if (!storeCartAccess(sessionId, token)) {
+      throw new Error('CART_ACCESS_REFRESH_INVALID');
+    }
+    setApiSessionId(sessionId);
+    return { sessionId, token, version: clean(data?.version) };
+  };
+
   const writeCartVersion = async ({ items, version }) => {
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
@@ -481,6 +498,7 @@ export function CartProvider({ children }) {
         clearCart,
         validateCart,
         ensureCartReady,
+        renewCartAccess,
         syncCart,
         API_BASE: api.defaults.baseURL,
       }}
