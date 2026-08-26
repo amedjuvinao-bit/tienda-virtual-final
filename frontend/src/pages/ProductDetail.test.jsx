@@ -46,6 +46,9 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
     selectedAttributes,
     onVariantAttributeChange,
     onAddToCart,
+    inventoryTracked,
+    selectedAvailableStock,
+    isVariantOptionAvailable,
   }) => (
     <div>
       <img
@@ -59,6 +62,10 @@ vi.mock("../components/product-detail/ProductDetailView", () => ({
       <span data-testid="variant-ram">{selectedAttributes?.ram}</span>
       <span data-testid="variant-connectivity">
         {selectedAttributes?.conectividad}
+      </span>
+      <span data-testid="variant-stock">{String(selectedAvailableStock)}</span>
+      <span data-testid="gold-available">
+        {String(isVariantOptionAvailable?.("color", "Dorado"))}
       </span>
       <button
         type="button"
@@ -251,5 +258,33 @@ describe("ProductDetail con variantes", () => {
         variantLabel: "4 / Azul rey",
       })
     );
+  });
+
+  it("elige inicialmente una variante disponible y expone las opciones agotadas", async () => {
+    api.get.mockImplementation(async (url) => {
+      if (url === "/api/pages") return { data: [] };
+      return {
+        data: {
+          ...DEMO_PRODUCT,
+          inventoryTracked: true,
+          availableStock: 2,
+          variants: [
+            { ...DEMO_PRODUCT.variants[0], availableStock: 0 },
+            { ...DEMO_PRODUCT.variants[1], availableStock: 2 },
+          ],
+        },
+      };
+    });
+
+    render(<ProductDetail />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("variant-image")).toHaveAttribute(
+        "src",
+        "https://example.com/256-dorado.jpg"
+      );
+      expect(screen.getByTestId("variant-stock")).toHaveTextContent("2");
+      expect(screen.getByTestId("gold-available")).toHaveTextContent("true");
+    });
   });
 });

@@ -378,6 +378,73 @@ function serializeAdminProduct(product, inventorySummaryMap = new Map()) {
   };
 }
 
+async function serializePublicProductWithAvailability(product) {
+  const safeProduct = serializePublicProduct(product);
+  if (!safeProduct) return safeProduct;
+
+  const inventoryTracked =
+    safeProduct.trackInventory !== false &&
+    !['digital', 'service'].includes(normalizeProductType(safeProduct.productType));
+
+  if (!inventoryTracked) {
+    return {
+      ...safeProduct,
+      inventoryTracked: false,
+      availableStock: null,
+      variants: Array.isArray(safeProduct.variants)
+        ? safeProduct.variants.map((variant) => ({ ...variant, availableStock: null }))
+        : safeProduct.variants,
+    };
+  }
+
+  const productId = getObjectId(safeProduct._id);
+  const rows = productId
+    ? await InventoryStock.aggregate([
+        {
+          $match: {
+            product: productId,
+            deletedAt: null,
+            active: { $ne: false },
+          },
+        },
+        {
+          $group: {
+            _id: '$variantKey',
+            availableStock: { $sum: { $ifNull: ['$availableStock', 0] } },
+          },
+        },
+      ])
+    : [];
+
+  const availability = new Map(
+    rows.map((row) => [
+      String(row?._id || 'default__default').trim().toLowerCase(),
+      Math.max(0, Number(row?.availableStock || 0)),
+    ])
+  );
+  const availableStock = Array.from(availability.values()).reduce(
+    (total, quantity) => total + quantity,
+    0
+  );
+
+  return {
+    ...safeProduct,
+    inventoryTracked: true,
+    availableStock,
+    stock: availableStock,
+    variants: Array.isArray(safeProduct.variants)
+      ? safeProduct.variants.map((variant) => ({
+          ...variant,
+          availableStock: availability.get(
+            String(variant?.variantKey || variant?.variantId || 'default__default')
+              .trim()
+              .toLowerCase()
+          ) || 0,
+        }))
+      : safeProduct.variants,
+  };
+}
+
 // GET /api/products (catálogo público: siempre activos y visibles)
 router.get('/', async (req, res) => {
   try {
@@ -441,7 +508,7 @@ router.get('/slug/:slug', async (req, res) => {
       .lean();
 
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    res.json(serializePublicProduct(product));
+    res.json(await serializePublicProductWithAvailability(product));
   } catch (error) {
     console.error('❌ Error al obtener producto por slug:', error.message);
     res.status(500).json({ message: 'Error al obtener el producto' });
@@ -1215,7 +1282,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    res.json(serializePublicProduct(product));
+    res.json(await serializePublicProductWithAvailability(product));
   } catch (error) {
     console.error('❌ Error al obtener producto por ID/slug:', error.message);
     res.status(500).json({ message: 'Error al obtener el producto' });

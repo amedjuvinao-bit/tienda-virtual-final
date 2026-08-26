@@ -165,6 +165,9 @@ function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
   const originalPrice = variant.originalPrice === null || variant.originalPrice === undefined || variant.originalPrice === ""
     ? null
     : Number(variant.originalPrice);
+  const availableStock = variant.availableStock === null || variant.availableStock === undefined
+    ? null
+    : Math.max(0, Number(variant.availableStock) || 0);
 
   const labelParts = attributes.length
     ? attributes.map((attribute) =>
@@ -200,6 +203,7 @@ function normalizeVariant(product = {}, variant = {}, index = 0, axes = []) {
     image: images[0] || "",
     images,
     active: variant.active !== false,
+    availableStock,
     sortOrder: Number.isFinite(Number(variant.sortOrder)) ? Number(variant.sortOrder) : index,
   };
 }
@@ -340,9 +344,12 @@ function findVariantForChangedAttribute(
       );
     }, 0);
 
-  return [...candidates].sort(
-    (left, right) => score(right) - score(left)
-  )[0];
+  return [...candidates].sort((left, right) => {
+    const stockDifference =
+      Number((right.availableStock ?? 1) > 0) -
+      Number((left.availableStock ?? 1) > 0);
+    return stockDifference || score(right) - score(left);
+  })[0];
 }
 
 function findVariantForChangedOption(
@@ -461,6 +468,19 @@ export default function ProductDetail() {
       ),
     [selectedVariant]
   );
+  const inventoryTracked = publicProduct?.inventoryTracked === true;
+  const selectedAvailableStock = inventoryTracked
+    ? Math.max(0, Number(selectedVariant?.availableStock || 0))
+    : null;
+  const isVariantOptionAvailable = (axisKey, value) => {
+    if (!inventoryTracked) return true;
+    return (publicProduct?.variants || []).some(
+      (variant) =>
+        variant.active !== false &&
+        Number(variant.availableStock || 0) > 0 &&
+        cleanLower(findAttributeValue(variant.attributes, axisKey)) === cleanLower(value)
+    );
+  };
   const variantAwareProduct = useMemo(
     () => buildVariantAwareProduct(publicProduct, selectedVariant),
     [publicProduct, selectedVariant]
@@ -475,7 +495,11 @@ export default function ProductDetail() {
         const res = await api.get(`/api/products/${productKey}`);
         const data = res.data?.product || res.data?.data || res.data;
         const decorated = decorateProductForPublic(data);
-        const initialVariant = decorated?.variants?.[0] || null;
+        const initialVariant = decorated?.variants?.find(
+          (variant) =>
+            decorated?.inventoryTracked !== true ||
+            Number(variant?.availableStock || 0) > 0
+        ) || decorated?.variants?.[0] || null;
 
         setProduct(data);
         setSelectedVariantKey(initialVariant?.variantKey || "");
@@ -622,6 +646,7 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!variantAwareProduct) return;
+    if (inventoryTracked && selectedAvailableStock <= 0) return;
 
     const size = selectedVariant?.size || selectedSize;
     const displayColor = selectedVariant?.colorLabel || selectedColor;
@@ -729,6 +754,9 @@ export default function ProductDetail() {
       variantAxes={publicProduct?.variantAxes || []}
       selectedAttributes={selectedAttributes}
       onVariantAttributeChange={handleVariantAttributeChange}
+      isVariantOptionAvailable={isVariantOptionAvailable}
+      inventoryTracked={inventoryTracked}
+      selectedAvailableStock={selectedAvailableStock}
       quantity={quantity}
       setQuantity={setQuantity}
       reviewName={reviewName}
