@@ -303,18 +303,31 @@ export function CartProvider({ children }) {
       setCartMessage(message);
       toast.error(message, { toastId: 'cart-write-conflict' });
     },
-    onRejected: (error, _snapshot, operation) => {
-      const invalidItems =
-        error?.response?.status === 409 &&
-        error?.response?.data?.error === 'CART_ITEMS_INVALID';
-      const message = invalidItems
-        ? operation?.type === 'increase'
-          ? 'No hay más unidades disponibles de este producto.'
-          : 'No se agregó el producto porque está agotado o no tiene disponibilidad.'
-        : 'No fue posible actualizar el carrito. Se conservó su estado anterior.';
+    onRejected: (error, _snapshot, operation, recovery = {}) => {
+      const invalidItems = Array.isArray(error?.response?.data?.items)
+        ? error.response.data.items
+        : [];
+      const affected = invalidItems[0] || {};
+      const productName = String(affected.title || operation?.item?.title || 'Este producto').trim();
+      const reasonMessages = {
+        OUT_OF_STOCK: 'se agotó',
+        INSUFFICIENT_STOCK: 'no tiene suficientes unidades disponibles',
+        INVALID_VARIANT: 'ya no tiene disponible la opción seleccionada',
+        PRODUCT_NOT_AVAILABLE: 'ya no está disponible',
+        PRODUCT_NOT_FOUND: 'ya no se encuentra en el catálogo',
+        INVALID_QUANTITY: 'tiene una cantidad no válida',
+        PRODUCT_PRICE_INVALID: 'requiere actualizar su precio',
+      };
+      const reason = reasonMessages[affected.invalidReason || affected.reason];
+      const message = recovery.recovered
+        ? `Retiramos “${productName}” porque ${reason || 'requiere revisión'}. El nuevo producto sí se agregó.`
+        : invalidItems.length
+          ? `${productName} ${reason || 'no se puede agregar en este momento'}.`
+          : 'No fue posible actualizar el carrito. Conservamos su estado anterior.';
       setCartMessage(message);
-      toast.error(message, {
-        toastId: invalidItems ? 'cart-item-unavailable' : 'cart-update-rejected',
+      const notify = invalidItems.length ? toast.warning : toast.error;
+      notify(message, {
+        toastId: invalidItems.length ? 'cart-item-unavailable' : 'cart-update-rejected',
       });
     },
   });

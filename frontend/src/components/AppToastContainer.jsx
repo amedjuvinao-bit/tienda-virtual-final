@@ -11,7 +11,7 @@ export default function AppToastContainer() {
       pauseOnFocusLoss
       draggable
       pauseOnHover
-      theme="colored"
+      theme="light"
     />
   );
 }
