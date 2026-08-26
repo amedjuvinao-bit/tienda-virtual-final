@@ -83,7 +83,11 @@ async function run() {
   assertSafeMongoUri(MONGO_URI);
   await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 });
   await mongoose.connection.dropDatabase();
-  await Promise.all([Customer.init(), StoreCredit.init(), StoreCreditUsage.init()]);
+  // Esta prueba valida los índices propios del saldo. Customer conserva índices
+  // heredados que MongoDB 7 no puede recrear en una base temporal vacía, pero
+  // ninguno de ellos interviene en la reserva o devolución que se prueba aquí.
+  await Customer.createCollection();
+  await Promise.all([StoreCredit.init(), StoreCreditUsage.init()]);
 
   const customer = await Customer.create({
     firstName: 'Cliente',
