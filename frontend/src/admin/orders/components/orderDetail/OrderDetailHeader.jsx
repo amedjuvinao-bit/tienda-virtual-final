@@ -3,6 +3,7 @@
 import { ORDER_DETAIL_THEME, getOrderStatusMeta } from './orderDetailTheme';
 import {
   fmtDate,
+  getOrderExchangeInfo,
   getOrderBranchInfo,
   getOrderSourceLabel,
   getOrderSummary,
@@ -12,11 +13,30 @@ import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
 import { GhostButton, PrimaryButton, SoftBadge } from './OrderDetailPrimitives';
 
 function getOrderOriginInfo(order) {
+  const exchange = getOrderExchangeInfo(order);
   const source = String(order?.source || '').trim().toLowerCase();
   const channel = String(order?.channel || '').trim().toLowerCase();
   const saleType = String(order?.saleType || '').trim().toLowerCase();
   const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
   const pos = order?.pos || {};
+
+  if (exchange.isExchange) {
+    const provenance = [
+      exchange.originalOrderNumber
+        ? `Orden original #${exchange.originalOrderNumber}`
+        : '',
+      exchange.returnNumber,
+    ].filter(Boolean);
+
+    return {
+      label: 'CAMBIO RMA',
+      description: 'Orden de reemplazo',
+      detail: provenance.length
+        ? `Sin cobro · ${provenance.join(' · ')}`
+        : 'Reposición sin cobro',
+      variant: 'primary',
+    };
+  }
 
   const isPos =
     source === 'pos' ||
@@ -82,7 +102,11 @@ export default function OrderDetailHeader({
   downloadingPdf = false,
   invoiceLoading = false,
 }) {
-  const status = getOrderStatusMeta(order?.status);
+  const exchange = getOrderExchangeInfo(order);
+  const status = getOrderStatusMeta(
+    exchange.noCharge ? 'processing' : order?.status
+  );
+  const statusLabel = exchange.noCharge ? 'Cambio sin cobro' : status.label;
   const branchInfo = getOrderBranchInfo(order);
   const sourceLabel = getOrderSourceLabel(order?.source);
   const summary = getOrderSummary(order);
@@ -187,7 +211,7 @@ export default function OrderDetailHeader({
                     background: 'currentColor',
                   }}
                 />
-                {status.label}
+                {statusLabel}
               </span>
             </div>
 
@@ -273,7 +297,7 @@ export default function OrderDetailHeader({
           </GhostButton>
           ) : null}
 
-          {typeof onOpenInvoice === 'function' ? (
+          {typeof onOpenInvoice === 'function' && !exchange.noCharge ? (
           <PrimaryButton
             onClick={onOpenInvoice}
             disabled={invoiceLoading}

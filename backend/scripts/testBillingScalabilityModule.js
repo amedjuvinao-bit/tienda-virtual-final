@@ -11,6 +11,10 @@ const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const billingService = require('../services/adminBillingService');
 const {
+  isBillableOrder,
+  isNoChargeExchangeOrder,
+} = require('../services/electronicInvoiceIssuanceService');
+const {
   buildCreditNotesPaginationPipeline,
   buildInvoiceSummaryPipeline,
   buildPendingOrdersCountPipeline,
@@ -119,6 +123,56 @@ function validatePendingOrdersPipeline() {
   );
 
   ok('Órdenes pendientes usan $lookup indexado, conteo y paginación en MongoDB');
+}
+
+function validateNoChargeExchangeTreatment() {
+  const paidAt = new Date('2026-08-25T20:00:00.000Z');
+  const exchange = {
+    sessionId: 'exchange:order-return-001',
+    source: 'system',
+    saleType: 'system_order',
+    status: 'paid',
+    total: 0,
+    tags: ['exchange'],
+    payment: {
+      status: 'paid',
+      paidAt,
+      provider: 'manual',
+      method: 'exchange',
+    },
+  };
+  const regularPaidOrder = {
+    sessionId: 'manual:paid-order-001',
+    source: 'manual',
+    status: 'paid',
+    total: 162900,
+    payment: {
+      status: 'paid',
+      paidAt,
+      provider: 'manual',
+      method: 'cash',
+    },
+  };
+  const pendingFilter = billingService.buildBillableOrderFilter();
+
+  assert(
+    isNoChargeExchangeOrder(exchange) && !isBillableOrder(exchange),
+    'Una reposición RMA de cero pesos todavía puede entrar a facturación.'
+  );
+  assert(
+    isBillableOrder(regularPaidOrder),
+    'La exclusión de cambios bloqueó una venta pagada normal.'
+  );
+  assert(
+    pendingFilter.$and?.some((condition) =>
+      condition.$nor?.some(
+        (candidate) => candidate.sessionId?.source === '^exchange:'
+      )
+    ),
+    'La cola de facturación no excluye sesiones de cambio sin cobro.'
+  );
+
+  ok('Cambios RMA sin cobro quedan fuera de factura y de la cola fiscal');
 }
 
 function validateSummaryPipeline() {
@@ -432,6 +486,7 @@ async function main() {
   [
     validateCreditNotePipeline,
     validatePendingOrdersPipeline,
+    validateNoChargeExchangeTreatment,
     validateSummaryPipeline,
     validateReportAggregationPipeline,
     validateReportStreamingSource,

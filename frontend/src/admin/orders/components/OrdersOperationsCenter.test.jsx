@@ -130,6 +130,32 @@ describe('centro operativo avanzado de órdenes', () => {
     expect(comfortable).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('identifica una reposición RMA de cero pesos como cambio sin cobro', () => {
+    render(
+      <OrdersTable
+        {...tableProps}
+        data={[
+          {
+            ...ORDER,
+            _id: 'exchange-order-1',
+            orderNumber: '000239',
+            sessionId: 'exchange:return-239',
+            source: 'system',
+            saleType: 'system_order',
+            total: 0,
+            tags: ['exchange'],
+            payment: { status: 'paid', method: 'exchange' },
+          },
+        ]}
+        openOrderDetail={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Cambio sin cobro')).toBeInTheDocument();
+    expect(screen.getByText(/Cambio RMA/i)).toBeInTheDocument();
+    expect(screen.queryByText('Pagada')).not.toBeInTheDocument();
+  });
+
   it('usa una tabla semántica en escritorio y conserva la acción dentro de la fila responsive', () => {
     render(
       <OrdersTable

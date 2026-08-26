@@ -488,7 +488,30 @@ function readPaymentMethodFromTransaction(transaction = {}) {
   };
 }
 
+function isNoChargeExchangeOrder(order = {}) {
+  const total = money(order.total);
+  if (total > 0) return false;
+
+  const paymentMethod = cleanText(order.payment?.method, 80).toLowerCase();
+  const sessionId = cleanText(order.sessionId, 180).toLowerCase();
+  const source = cleanText(order.source, 50).toLowerCase();
+  const saleType = cleanText(order.saleType, 50).toLowerCase();
+  const exchangeType = cleanText(order.exchangeOrigin?.type, 50).toLowerCase();
+  const tags = Array.isArray(order.tags)
+    ? order.tags.map((tag) => cleanText(tag, 40).toLowerCase())
+    : [];
+
+  return (
+    exchangeType === 'rma_exchange' ||
+    paymentMethod === 'exchange' ||
+    sessionId.startsWith('exchange:') ||
+    (source === 'system' && saleType === 'system_order' && tags.includes('exchange'))
+  );
+}
+
 function isBillableOrder(order = {}) {
+  if (isNoChargeExchangeOrder(order)) return false;
+
   const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
   const source = cleanText(order.source || order.channel, 50).toLowerCase();
   const paymentProvider = cleanText(order.payment?.provider, 50).toLowerCase();
@@ -1125,4 +1148,5 @@ module.exports = {
   sanitizeProviderPayload,
   issueElectronicInvoiceForOrder: defaultService.issueElectronicInvoiceForOrder,
   isBillableOrder,
+  isNoChargeExchangeOrder,
 };

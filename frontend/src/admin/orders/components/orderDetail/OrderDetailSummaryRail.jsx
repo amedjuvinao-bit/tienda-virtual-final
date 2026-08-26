@@ -4,6 +4,7 @@ import { ORDER_DETAIL_THEME, getOrderStatusMeta } from './orderDetailTheme';
 import {
   fmtDate,
   getAdminSnapshot,
+  getOrderExchangeInfo,
   getInvoiceInfo,
   getOrderBranchInfo,
   getOrderSourceLabel,
@@ -292,7 +293,11 @@ function RailStatusCard({ icon, label, value, variant = 'soft' }) {
 }
 
 export default function OrderDetailSummaryRail({ order }) {
-  const status = getOrderStatusMeta(order?.status);
+  const exchange = getOrderExchangeInfo(order);
+  const status = getOrderStatusMeta(
+    exchange.noCharge ? 'processing' : order?.status
+  );
+  const statusLabel = exchange.noCharge ? 'Cambio sin cobro' : status.label;
   const summary = getOrderSummary(order);
   const payment = getPaymentInfo(order);
   const invoice = getInvoiceInfo(order);
@@ -392,7 +397,7 @@ export default function OrderDetailSummaryRail({ order }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {status.label}
+            {statusLabel}
           </span>
         </div>
 
@@ -482,12 +487,12 @@ export default function OrderDetailSummaryRail({ order }) {
           <RailStatusCard
             icon={OrderDetailIcons.ReceiptText}
             label="Factura"
-            value={invoice.number}
+            value={exchange.noCharge ? 'No aplica' : invoice.number}
           />
           <RailStatusCard
             icon={OrderDetailIcons.ShieldCheck}
-            label="CUFE"
-            value={invoice.cufe}
+            label={exchange.noCharge ? 'Fiscal' : 'CUFE'}
+            value={exchange.noCharge ? 'Venta original' : invoice.cufe}
           />
         </div>
       </section>
@@ -517,7 +522,7 @@ export default function OrderDetailSummaryRail({ order }) {
           >
             {progressPercent}% completado
           </span>
-          <SoftBadge>{status.label}</SoftBadge>
+          <SoftBadge>{statusLabel}</SoftBadge>
         </div>
 
         <div

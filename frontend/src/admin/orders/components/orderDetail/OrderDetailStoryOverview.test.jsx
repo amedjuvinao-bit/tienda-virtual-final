@@ -6,6 +6,7 @@ import OrderDetailStoryOverview, {
   buildOrderStory,
 } from './OrderDetailStoryOverview';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
+import OrderDetailHeader from './OrderDetailHeader';
 import OrderDetailTabs from './OrderDetailTabs';
 import OrderDetailProfessionalView from './OrderDetailProfessionalView';
 
@@ -202,6 +203,57 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(story.phases.find((phase) => phase.id === 'operation')?.state).toBe('current');
   });
 
+  it('trata el cambio RMA de cero pesos como reposición sin nueva factura', () => {
+    const order = {
+      ...BASE_ORDER,
+      sessionId: 'exchange:return-001',
+      source: 'system',
+      channel: 'system',
+      saleType: 'system_order',
+      status: 'paid',
+      total: 0,
+      subtotal: 0,
+      tags: ['exchange'],
+      payment: {
+        status: 'paid',
+        method: 'exchange',
+        methodLabel: 'Cambio sin cobro',
+        reference: 'RMA-ORD-STORY-001-ABC123',
+        paidAt: '2026-08-14T14:02:00.000Z',
+      },
+      inventoryAllocations: [
+        {
+          reservedQuantity: 1,
+          reservedAt: '2026-08-14T14:03:00.000Z',
+        },
+      ],
+      fulfillment: { status: 'pending', shipments: [] },
+    };
+
+    const story = buildOrderStory(order);
+    const invoicePhase = story.phases.find((phase) => phase.id === 'invoice');
+
+    expect(invoicePhase).toMatchObject({
+      title: 'No requiere una nueva factura',
+      state: 'skipped',
+    });
+    expect(story.phases.find((phase) => phase.id === 'payment')?.title).toBe(
+      'Cambio sin cobro confirmado'
+    );
+    expect(story.next.title).toBe('Preparar logística');
+
+    render(
+      <OrderDetailHeader
+        order={order}
+        onClose={vi.fn()}
+        onOpenInvoice={vi.fn()}
+      />
+    );
+    expect(screen.getAllByText(/CAMBIO RMA/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Sin cobro · RMA-ORD-STORY-001-ABC123/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Factura' })).not.toBeInTheDocument();
+  });
+
   it('orienta a confirmar entrega cuando el envío ya está en tránsito', () => {
     const story = buildOrderStory({
       ...BASE_ORDER,
@@ -251,6 +303,31 @@ describe('resumen decorativo original', () => {
     expect(screen.getByText(cufe)).toHaveAttribute('title', cufe);
     expect(screen.getByText(`#${order.orderNumber}`)).toBeInTheDocument();
     expect(screen.getByText('Datos rápidos')).toBeInTheDocument();
+  });
+
+  it('muestra que la factura no aplica en una reposición RMA sin cobro', () => {
+    render(
+      <OrderDetailSummaryRail
+        order={{
+          ...BASE_ORDER,
+          sessionId: 'exchange:return-002',
+          source: 'system',
+          saleType: 'system_order',
+          status: 'paid',
+          total: 0,
+          subtotal: 0,
+          tags: ['exchange'],
+          payment: {
+            status: 'paid',
+            method: 'exchange',
+            reference: 'RMA-ORD-STORY-002-ABC123',
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('No aplica')).toBeInTheDocument();
+    expect(screen.getByText('Venta original')).toBeInTheDocument();
   });
 });
 

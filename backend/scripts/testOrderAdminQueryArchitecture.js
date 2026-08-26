@@ -89,6 +89,13 @@ async function main() {
       (stage) => stage.$match?.['_adminInvoices.0']?.$exists === false
     )
   );
+  assert.ok(
+    pagePipeline.some((stage) =>
+      stage.$match?.$nor?.some(
+        (condition) => condition.sessionId?.source === '^exchange:'
+      )
+    )
+  );
   assert.ok(pagePipeline.some((stage) => stage.$skip === 20));
   assert.ok(pagePipeline.some((stage) => stage.$limit === 20));
 
@@ -100,6 +107,7 @@ async function main() {
   const summaryFacet = summaryPipeline.find((stage) => stage.$facet)?.$facet;
   const group = summaryFacet?.financial?.find((stage) => stage.$group)?.$group;
   assert.ok(group?.totalOrders);
+  assert.ok(group?.invoiceRequiredOrders);
   assert.ok(group?.withInvoiceOrders);
   assert.ok(group?.validatedInvoiceOrders);
   assert.ok(summaryFacet?.operational?.some((stage) => stage.$group));
@@ -124,6 +132,7 @@ async function main() {
               paidOrders: 7,
               pendingOrders: 2,
               cancelledOrders: 1,
+              invoiceRequiredOrders: 42,
               withInvoiceOrders: 30,
               validatedInvoiceOrders: 28,
               averageTicket: 120000,

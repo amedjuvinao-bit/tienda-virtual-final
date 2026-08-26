@@ -349,31 +349,44 @@ function serializePendingOrder(order = {}) {
 }
 
 function buildBillableOrderFilter(params = {}) {
-  const filter = {
-    $or: [
-      { status: { $in: BILLABLE_ORDER_STATUSES } },
-      { 'payment.status': { $in: PAID_PAYMENT_STATUSES } },
-      { source: 'pos', total: { $gt: 0 } },
-    ],
-  };
+  const conditions = [
+    {
+      $or: [
+        { status: { $in: BILLABLE_ORDER_STATUSES } },
+        { 'payment.status': { $in: PAID_PAYMENT_STATUSES } },
+        { source: 'pos', total: { $gt: 0 } },
+      ],
+    },
+    {
+      $nor: [
+        { total: { $lte: 0 }, 'exchangeOrigin.type': 'rma_exchange' },
+        { total: { $lte: 0 }, 'payment.method': /^exchange$/i },
+        { total: { $lte: 0 }, sessionId: /^exchange:/i },
+        {
+          source: 'system',
+          saleType: 'system_order',
+          total: { $lte: 0 },
+          tags: 'exchange',
+        },
+      ],
+    },
+  ];
 
   const regex = makeRegex(params.q || params.search || '');
   if (regex) {
-    filter.$and = [
-      {
-        $or: [
-          { orderNumber: regex },
-          { 'customer.name': regex },
-          { 'customer.lastname': regex },
-          { 'customer.email': regex },
-          { 'customer.emailOrPhone': regex },
-          { 'billing.email': regex },
-        ],
-      },
-    ];
+    conditions.push({
+      $or: [
+        { orderNumber: regex },
+        { 'customer.name': regex },
+        { 'customer.lastname': regex },
+        { 'customer.email': regex },
+        { 'customer.emailOrPhone': regex },
+        { 'billing.email': regex },
+      ],
+    });
   }
 
-  return filter;
+  return { $and: conditions };
 }
 
 async function getBillingSettingsSnapshot() {
@@ -588,6 +601,7 @@ async function getBillingSummary() {
 }
 
 module.exports = {
+  buildBillableOrderFilter,
   extractProviderDocument,
   getBillingSummary,
   getBillingSettingsSnapshot,

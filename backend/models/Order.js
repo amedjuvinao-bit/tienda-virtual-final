@@ -1045,6 +1045,30 @@ const OrderFulfillmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const OrderExchangeOriginSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ['', 'rma_exchange'],
+      default: '',
+    },
+    originalOrder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Order',
+      default: null,
+    },
+    originalOrderNumber: { type: String, trim: true, default: '' },
+    returnCase: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'OrderReturn',
+      default: null,
+    },
+    returnNumber: { type: String, trim: true, default: '' },
+    noCharge: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 /* ========= Esquema principal ========= */
 const OrderSchema = new mongoose.Schema(
   {
@@ -1145,6 +1169,11 @@ const OrderSchema = new mongoose.Schema(
       enum: ORDER_SALE_TYPES,
       default: 'online_order',
       index: true,
+    },
+
+    exchangeOrigin: {
+      type: OrderExchangeOriginSchema,
+      default: undefined,
     },
 
     cashSession: {

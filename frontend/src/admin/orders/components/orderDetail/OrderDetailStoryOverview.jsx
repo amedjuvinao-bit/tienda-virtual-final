@@ -3,6 +3,7 @@ import {
   fmtDate,
   getInvoiceInfo,
   getOrderBranchInfo,
+  getOrderExchangeInfo,
   getOrderSourceLabel,
   getOrderSummary,
   normalizeText,
@@ -301,6 +302,7 @@ function isRefundReconciliationComplete(refunds) {
 
 export function buildOrderStory(order, refunds = []) {
   const orderStatus = normalizeText(order?.status);
+  const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentState(order);
   const invoice = getInvoiceState(order, payment.complete);
   const fulfillment = getFulfillmentState(order, payment.complete);
@@ -315,7 +317,9 @@ export function buildOrderStory(order, refunds = []) {
     : payment.complete
       ? 'complete'
       : 'current';
-  const invoiceState = invoice.failed
+  const invoiceState = exchange.noCharge
+    ? 'skipped'
+    : invoice.failed
     ? 'attention'
     : invoice.complete
       ? 'complete'
@@ -344,7 +348,9 @@ export function buildOrderStory(order, refunds = []) {
       id: 'received',
       label: '01 · Pedido',
       title: 'Orden recibida',
-      description: `Se creó por ${getOrderSourceLabel(order?.source).toLowerCase()}.`,
+      description: exchange.isExchange
+        ? `Se creó como reemplazo desde ${exchange.returnNumber || 'un RMA'}.`
+        : `Se creó por ${getOrderSourceLabel(order?.source).toLowerCase()}.`,
       state: 'complete',
       date: dateValue(order?.createdAt),
       icon: OrderDetailIcons.ShoppingBag,
@@ -352,12 +358,16 @@ export function buildOrderStory(order, refunds = []) {
     storyPhase({
       id: 'payment',
       label: '02 · Pago',
-      title: payment.failed
+      title: exchange.noCharge
+        ? 'Cambio sin cobro confirmado'
+        : payment.failed
         ? 'Pago rechazado o fallido'
         : payment.complete
           ? 'Pago confirmado'
           : 'Pago pendiente',
-      description: payment.failed
+      description: exchange.noCharge
+        ? 'Esta reposición no genera un nuevo recaudo al cliente.'
+        : payment.failed
         ? 'La transacción requiere revisión antes de continuar.'
         : payment.complete
           ? 'La operación comercial quedó habilitada.'
@@ -369,14 +379,18 @@ export function buildOrderStory(order, refunds = []) {
     storyPhase({
       id: 'invoice',
       label: '03 · Factura',
-      title: invoice.failed
+      title: exchange.noCharge
+        ? 'No requiere una nueva factura'
+        : invoice.failed
         ? 'Facturación con novedad'
         : invoice.complete
           ? `Factura ${invoice.number}`
           : payment.complete
             ? 'Factura pendiente de emisión o validación'
             : 'Facturación aún no iniciada',
-      description: invoice.complete
+      description: exchange.noCharge
+        ? `La trazabilidad fiscal permanece en la venta original y ${exchange.returnNumber || 'su RMA'}.`
+        : invoice.complete
         ? 'El documento fiscal está disponible para consulta.'
         : invoice.failed
           ? `Estado reportado: ${invoice.status}.`
@@ -496,6 +510,19 @@ export function buildOrderStory(order, refunds = []) {
         };
     actionTarget = 'payment';
     actionLabel = refundReconciliationComplete ? 'Ver trazabilidad' : 'Ver conciliación';
+  } else if (exchange.noCharge && fulfillment.delivered) {
+    current = {
+      title: 'Cambio entregado',
+      description: 'La reposición sin cobro completó su recorrido operativo.',
+      tone: 'success',
+    };
+    next = {
+      title: 'Sin operación pendiente',
+      description: `La venta original conserva la factura y ${exchange.returnNumber || 'el RMA'} conserva la trazabilidad del cambio.`,
+      tone: 'success',
+    };
+    actionTarget = 'customer';
+    actionLabel = 'Ver historial';
   } else if (fulfillment.delivered && invoice.complete) {
     current = {
       title: 'Proceso completado',

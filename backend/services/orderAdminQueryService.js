@@ -471,7 +471,12 @@ function buildInvoiceLookupStage(ElectronicInvoiceModel = ElectronicInvoice) {
 function buildInvoiceFilterStage(invoiceFilter) {
   if (invoiceFilter === 'all') return null;
   if (invoiceFilter === 'without_invoice') {
-    return { $match: { '_adminInvoices.0': { $exists: false } } };
+    return {
+      $match: {
+        '_adminInvoices.0': { $exists: false },
+        ...buildNoChargeExchangeExclusion(),
+      },
+    };
   }
 
   const criteria = INVOICE_FILTER_CRITERIA[invoiceFilter] || [];
@@ -484,6 +489,71 @@ function buildInvoiceFilterStage(invoiceFilter) {
 
 function hasInvoiceExpression() {
   return { $gt: [{ $size: { $ifNull: ['$_adminInvoices', []] } }, 0] };
+}
+
+function buildNoChargeExchangeExclusion() {
+  return {
+    $nor: [
+      { total: { $lte: 0 }, 'exchangeOrigin.type': 'rma_exchange' },
+      { total: { $lte: 0 }, 'payment.method': /^exchange$/i },
+      { total: { $lte: 0 }, sessionId: /^exchange:/i },
+      {
+        source: 'system',
+        saleType: 'system_order',
+        total: { $lte: 0 },
+        tags: 'exchange',
+      },
+    ],
+  };
+}
+
+function isNoChargeExchangeExpression() {
+  const totalIsZero = { $lte: [{ $ifNull: ['$total', 0] }, 0] };
+
+  return {
+    $and: [
+      totalIsZero,
+      {
+        $or: [
+          {
+            $eq: [
+              { $toLower: { $ifNull: ['$exchangeOrigin.type', ''] } },
+              'rma_exchange',
+            ],
+          },
+          {
+            $eq: [
+              { $toLower: { $ifNull: ['$payment.method', ''] } },
+              'exchange',
+            ],
+          },
+          {
+            $regexMatch: {
+              input: { $ifNull: ['$sessionId', ''] },
+              regex: /^exchange:/i,
+            },
+          },
+          {
+            $and: [
+              {
+                $eq: [
+                  { $toLower: { $ifNull: ['$source', ''] } },
+                  'system',
+                ],
+              },
+              {
+                $eq: [
+                  { $toLower: { $ifNull: ['$saleType', ''] } },
+                  'system_order',
+                ],
+              },
+              { $in: ['exchange', { $ifNull: ['$tags', []] }] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
 }
 
 function hasValidatedInvoiceExpression() {
@@ -577,6 +647,7 @@ function buildSummaryPipeline({
     now
   );
   const financialPipeline = [];
+  const countsAsCommercialSale = { $not: [isNoChargeExchangeExpression()] };
   if (operationalCriteria) financialPipeline.push({ $match: operationalCriteria });
 
   financialPipeline.push(
@@ -587,7 +658,12 @@ function buildSummaryPipeline({
         totalSales: {
           $sum: {
             $cond: [
-              { $in: ['$status', PAID_STATUSES] },
+              {
+                $and: [
+                  { $in: ['$status', PAID_STATUSES] },
+                  countsAsCommercialSale,
+                ],
+              },
               { $ifNull: ['$total', 0] },
               0,
             ],
@@ -603,7 +679,18 @@ function buildSummaryPipeline({
           },
         },
         paidOrders: {
-          $sum: { $cond: [{ $in: ['$status', PAID_STATUSES] }, 1, 0] },
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $in: ['$status', PAID_STATUSES] },
+                  countsAsCommercialSale,
+                ],
+              },
+              1,
+              0,
+            ],
+          },
         },
         pendingOrders: {
           $sum: { $cond: [{ $in: ['$status', PENDING_STATUSES] }, 1, 0] },
@@ -611,11 +698,31 @@ function buildSummaryPipeline({
         cancelledOrders: {
           $sum: { $cond: [{ $in: ['$status', CANCELLED_STATUSES] }, 1, 0] },
         },
+        invoiceRequiredOrders: {
+          $sum: { $cond: [countsAsCommercialSale, 1, 0] },
+        },
         withInvoiceOrders: {
-          $sum: { $cond: [hasInvoiceExpression(), 1, 0] },
+          $sum: {
+            $cond: [
+              { $and: [countsAsCommercialSale, hasInvoiceExpression()] },
+              1,
+              0,
+            ],
+          },
         },
         validatedInvoiceOrders: {
-          $sum: { $cond: [hasValidatedInvoiceExpression(), 1, 0] },
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  countsAsCommercialSale,
+                  hasValidatedInvoiceExpression(),
+                ],
+              },
+              1,
+              0,
+            ],
+          },
         },
       },
     },
@@ -628,6 +735,7 @@ function buildSummaryPipeline({
         paidOrders: 1,
         pendingOrders: 1,
         cancelledOrders: 1,
+        invoiceRequiredOrders: 1,
         withInvoiceOrders: 1,
         validatedInvoiceOrders: 1,
         averageTicket: {
@@ -1147,8 +1255,14 @@ function normalizeFinancialSummary(row) {
   if (!row) return emptyFinancialSummary();
   const totalOrders = Number(row.totalOrders || 0);
   const withInvoiceOrders = Number(row.withInvoiceOrders || 0);
+  const invoiceRequiredOrders = Number(
+    row.invoiceRequiredOrders ?? totalOrders
+  );
   const validatedInvoiceOrders = Number(row.validatedInvoiceOrders || 0);
-  const withoutInvoiceOrders = Math.max(0, totalOrders - withInvoiceOrders);
+  const withoutInvoiceOrders = Math.max(
+    0,
+    invoiceRequiredOrders - withInvoiceOrders
+  );
 
   return {
     totalOrders,

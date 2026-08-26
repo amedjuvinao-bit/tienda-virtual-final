@@ -1612,6 +1612,14 @@ async function resolveOrderReturnAutomaticExchange(
             source: 'system',
             channel: 'system',
             saleType: 'system_order',
+            exchangeOrigin: {
+              type: 'rma_exchange',
+              originalOrder: order._id,
+              originalOrderNumber: order.orderNumber,
+              returnCase: returnCase._id,
+              returnNumber: returnCase.returnNumber,
+              noCharge: true,
+            },
             customer: order.customer || {},
             billing: order.billing || {},
             items,
@@ -1778,6 +1786,7 @@ async function resolveOrderReturnAutomaticExchange(
           message: `Orden de cambio creada desde ${order.orderNumber} y ${returnCase.returnNumber}.`,
           meta: {
             originalOrderId: order._id,
+            originalOrderNumber: order.orderNumber,
             returnId: returnCase._id,
             returnNumber: returnCase.returnNumber,
           },

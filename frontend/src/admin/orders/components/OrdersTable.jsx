@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   Truck,
 } from 'lucide-react';
+import { getOrderExchangeInfo } from './orderDetail/orderDetailUtils';
 
 const QUEUE_STYLES = {
   attention: { label: 'Atención', color: '#be123c', bg: '#fff1f2' },
@@ -59,6 +60,8 @@ function branchInfo(order) {
 }
 
 function channelLabel(order) {
+  if (getOrderExchangeInfo(order).isExchange) return 'Cambio RMA';
+
   const source = String(order?.source || '').toLowerCase();
   const channel = String(order?.channel || '').toLowerCase();
   const provider = String(order?.payment?.provider || '').toLowerCase();
@@ -315,6 +318,7 @@ function OrderRow({
   const queue = QUEUE_STYLES[operational.queue] || QUEUE_STYLES.monitor;
   const progress = Math.min(100, Math.max(0, Number(operational.progress || 0)));
   const tags = Array.isArray(order.tags) ? order.tags : [];
+  const exchange = getOrderExchangeInfo(order);
   const slaState = operational?.sla?.state || 'none';
   const cellPadding = compact ? 'xl:py-2.5' : 'xl:py-3.5';
 
@@ -404,8 +408,10 @@ function OrderRow({
       </td>
 
       <td className={`order-3 block min-w-0 border-b-0 text-right xl:table-cell xl:border-b xl:px-3 xl:text-left ${cellPadding}`} style={{ borderColor: ADMIN_BORDER }}>
-        <span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-black ${statusBadgeClasses(order.status)}`}>
-          {STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
+        <span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-black ${statusBadgeClasses(exchange.noCharge ? 'processing' : order.status)}`}>
+          {exchange.noCharge
+            ? 'Cambio sin cobro'
+            : STATUS_LABELS[String(order.status || '').toLowerCase()] || order.status || '—'}
         </span>
         {!compact ? (
           <p className="mt-1.5 truncate text-[8px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
