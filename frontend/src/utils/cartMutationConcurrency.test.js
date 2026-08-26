@@ -183,6 +183,35 @@ describe('concurrencia del carrito', () => {
     expect(adopted).toEqual(serverState);
   });
 
+  it('revierte la vista optimista cuando el servidor rechaza un producto sin stock', async () => {
+    const serverState = { items: [item(PRODUCT_A)], version: 'v1' };
+    const rejected = new Error('invalid cart items');
+    rejected.response = {
+      status: 409,
+      data: { error: 'CART_ITEMS_INVALID' },
+    };
+    let adopted = null;
+    const onRejected = vi.fn();
+    const coordinator = createCartMutationCoordinator({
+      getSnapshot: async () => serverState,
+      write: async () => { throw rejected; },
+      reload: async () => serverState,
+      adopt: (snapshot) => { adopted = snapshot; },
+      onRejected,
+    });
+
+    await expect(
+      coordinator.enqueue({ type: 'add', item: item(PRODUCT_B) })
+    ).rejects.toBe(rejected);
+
+    expect(adopted).toEqual(serverState);
+    expect(onRejected).toHaveBeenCalledWith(
+      rejected,
+      serverState,
+      expect.objectContaining({ type: 'add' })
+    );
+  });
+
   it('envia realmente If-Match-Updated-At junto con las credenciales', async () => {
     const api = { put: vi.fn().mockResolvedValue({ data: { version: 'v2' } }) };
     const access = {

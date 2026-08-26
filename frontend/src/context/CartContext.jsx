@@ -303,6 +303,20 @@ export function CartProvider({ children }) {
       setCartMessage(message);
       toast.error(message, { toastId: 'cart-write-conflict' });
     },
+    onRejected: (error, _snapshot, operation) => {
+      const invalidItems =
+        error?.response?.status === 409 &&
+        error?.response?.data?.error === 'CART_ITEMS_INVALID';
+      const message = invalidItems
+        ? operation?.type === 'increase'
+          ? 'No hay más unidades disponibles de este producto.'
+          : 'No se agregó el producto porque está agotado o no tiene disponibilidad.'
+        : 'No fue posible actualizar el carrito. Se conservó su estado anterior.';
+      setCartMessage(message);
+      toast.error(message, {
+        toastId: invalidItems ? 'cart-item-unavailable' : 'cart-update-rejected',
+      });
+    },
   });
 
   const enqueueCartOperation = (operation, { optimistic = true } = {}) => {

@@ -119,6 +119,7 @@ export function createCartMutationCoordinator({
   reload,
   adopt,
   onTerminalConflict,
+  onRejected,
 } = {}) {
   let queue = Promise.resolve();
 
@@ -136,7 +137,11 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: false });
       return { ...written, retried: false };
     } catch (error) {
-      if (!isCartWriteConflict(error)) throw error;
+      if (!isCartWriteConflict(error)) {
+        adopt(snapshot, { operation, rejected: true });
+        onRejected?.(error, snapshot, operation);
+        throw error;
+      }
     }
 
     const reloaded = normalizeCartSnapshot(await reload());
@@ -153,7 +158,11 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: true });
       return { ...written, retried: true };
     } catch (error) {
-      if (!isCartWriteConflict(error)) throw error;
+      if (!isCartWriteConflict(error)) {
+        adopt(reloaded, { operation, rejected: true, reloaded: true });
+        onRejected?.(error, reloaded, operation);
+        throw error;
+      }
       const server = normalizeCartSnapshot(error?.response?.data || {});
       adopt(server, { operation, terminalConflict: true });
       onTerminalConflict?.(server, operation);
