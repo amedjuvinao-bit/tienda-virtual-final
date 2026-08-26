@@ -53,6 +53,9 @@ jobs:
       - name: Validar antifraude y políticas avanzadas de devolución
         run: npm --prefix backend run test:orders-return-risk
 
+      - name: Validar saldo a favor como medio de pago
+        run: npm --prefix backend run test:checkout-store-credit
+
       - name: Validar permisos y arquitectura
         run: |
           npm --prefix backend run test:orders-security
@@ -165,6 +168,11 @@ jobs:
           ORDERS_RETURN_RISK_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_return_risk?replicaSet=rs0
         run: npm --prefix backend run test:orders-return-risk-integration
 
+      - name: Validar reserva y devolución transaccional del saldo
+        env:
+          ORDERS_STORE_CREDIT_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_store_credit?replicaSet=rs0
+        run: npm --prefix backend run test:checkout-store-credit-integration
+
       - name: Validar estados masivos
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_bulk_status?replicaSet=rs0
@@ -238,6 +246,9 @@ jobs:
 
       - name: Validar experiencia antifraude y políticas especiales
         run: npm --prefix frontend run test:orders-return-risk
+
+      - name: Validar saldo a favor en Checkout y detalle de la orden
+        run: npm --prefix frontend run test:checkout-store-credit
 
       - name: Validar cliente, WhatsApp y precontrol fiscal
         run: |

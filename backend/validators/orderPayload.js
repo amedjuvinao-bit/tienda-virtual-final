@@ -66,6 +66,7 @@ const MAX_LEN = {
   paymentCurrency: 12,
   paymentCheckoutLabel: 180,
   paymentStatus: 40,
+  storeCreditAccessToken: 2000,
 };
 
 function isBlank(v) {
@@ -176,6 +177,17 @@ function normalizePayment(raw) {
     checkoutLabel: trimTo(p.checkoutLabel, MAX_LEN.paymentCheckoutLabel) || undefined,
     enableWebhook: !!p.enableWebhook,
     status: PAYMENT_STATUSES.includes(status) ? status : undefined,
+  };
+}
+
+function normalizeStoreCredit(raw) {
+  const value = raw && typeof raw === 'object' ? raw : {};
+  const amount = toNumber(value.amount, 0);
+  return {
+    apply: value.apply === true,
+    amount: isNonNegative(amount) ? amount : 0,
+    accessToken:
+      trimTo(value.accessToken, MAX_LEN.storeCreditAccessToken) || undefined,
   };
 }
 
@@ -426,6 +438,17 @@ module.exports = function validateOrderPayload(body) {
 
     if (isBlank(cleaned.payment.currency)) {
       errors.push('La moneda del pago es obligatoria.');
+    }
+  }
+
+  // ---- saldo a favor (el servidor vuelve a validar identidad y saldo)
+  cleaned.storeCredit = normalizeStoreCredit(body.storeCredit);
+  if (cleaned.storeCredit.apply) {
+    if (cleaned.storeCredit.amount <= 0) {
+      errors.push('El valor de saldo a favor debe ser mayor a cero.');
+    }
+    if (!/^sc1_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(cleaned.storeCredit.accessToken || '')) {
+      errors.push('Vuelve a comprobar el saldo a favor antes de utilizarlo.');
     }
   }
 

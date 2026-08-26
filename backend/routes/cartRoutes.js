@@ -32,6 +32,9 @@ const {
 const {
   createCartRecoveryService,
 } = require('../services/cartRecoveryService');
+const {
+  previewCustomerStoreCredit,
+} = require('../services/storeCreditCheckoutService');
 const cartAdminRoutes = require('./cartAdminRoutes');
 
 /* -------------------------------------------------------
@@ -699,6 +702,45 @@ router.post('/recovery/claim', rateLimit, async (req, res) => {
   } catch (error) {
     console.error('Error reclamando recuperacion del carrito:', error?.code || 'unknown');
     return sendCartAccessNotFound(res);
+  }
+});
+
+/* -------------------------------------------------------
+ * POST /api/cart/:sessionId/store-credit/preview
+ * Exige la credencial vigente del carrito y coincidencia exacta entre
+ * documento y uno de los contactos de la ficha del cliente.
+ * ----------------------------------------------------- */
+router.post('/:sessionId/store-credit/preview', rateLimit, async (req, res) => {
+  try {
+    const cart = await loadAuthorizedCart(req, req.params.sessionId);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
+
+    const preview = await previewCustomerStoreCredit({
+      documentNumber: req.body?.documentNumber,
+      emailOrPhone: req.body?.emailOrPhone,
+      phone: req.body?.phone,
+      sessionId: cart.sessionId,
+      currency: req.body?.currency || 'COP',
+    });
+
+    return res.json({ ok: true, ...preview });
+  } catch (error) {
+    if (error?.code === 'CART_ACCESS_SECRET_MISCONFIGURED') {
+      return res.status(500).json({
+        ok: false,
+        error: 'STORE_CREDIT_ACCESS_UNAVAILABLE',
+        message: 'No fue posible comprobar el saldo de forma segura.',
+      });
+    }
+    console.error(
+      'POST /cart/:sessionId/store-credit/preview',
+      error?.code || error?.message
+    );
+    return res.status(500).json({
+      ok: false,
+      error: 'STORE_CREDIT_PREVIEW_ERROR',
+      message: 'No fue posible comprobar el saldo en este momento.',
+    });
   }
 });
 

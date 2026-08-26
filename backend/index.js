@@ -113,6 +113,7 @@ const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
 const geoRoutes = tryRequire('./routes/geo');
 const inventoryReservationService = tryRequire('./services/inventoryReservationService');
+const storeCreditCheckoutService = tryRequire('./services/storeCreditCheckoutService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
 const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
@@ -208,6 +209,8 @@ function startInventoryReservationExpirationJob() {
   }
 
   const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
+  const releaseExpiredStoreCreditReservations =
+    storeCreditCheckoutService?.releaseExpiredStoreCreditReservations;
 
   if (typeof expireInventoryReservations !== 'function') {
     console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
@@ -232,6 +235,16 @@ function startInventoryReservationExpirationJob() {
       const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
       if (result?.expired > 0) {
         console.log(`Reservas expiradas automaticamente: ${result.expired}`);
+      }
+      if (typeof releaseExpiredStoreCreditReservations === 'function') {
+        const storeCreditResult = await releaseExpiredStoreCreditReservations({
+          limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
+        });
+        if (storeCreditResult?.count > 0) {
+          console.log(
+            `Reservas de saldo a favor liberadas: ${storeCreditResult.count}`
+          );
+        }
       }
     } catch (error) {
       console.error('Error en job de expiracion de reservas:', error.message);

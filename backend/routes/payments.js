@@ -50,6 +50,10 @@ const {
   resolveAuthorizedPublicPaymentOrder,
 } = require('../services/publicPaymentAccessService');
 
+function getStoreCreditCheckoutService() {
+  return require('../services/storeCreditCheckoutService');
+}
+
 const WOMPI_ENVIRONMENTS = {
   sandbox: 'https://sandbox.wompi.co/v1',
   production: 'https://production.wompi.co/v1',
@@ -131,6 +135,37 @@ async function withWompiOrderTransaction(orderNumber, work) {
       }
 
       result = await work(order, { session });
+
+      if (
+        order.storeCredit?.applied === true &&
+        String(order.payment?.status || '').trim().toLowerCase() === 'paid'
+      ) {
+        const { consumeReservedStoreCreditForOrder } =
+          getStoreCreditCheckoutService();
+        const storeCreditResult = await consumeReservedStoreCreditForOrder(order, {
+          session,
+        });
+        if (
+          storeCreditResult.consumed === true &&
+          storeCreditResult.duplicate !== true
+        ) {
+          await OrderEvent.create(
+            [
+              {
+                orderId: order._id,
+                type: 'store_credit_consumed',
+                message: 'Saldo a favor aplicado definitivamente al pago.',
+                meta: {
+                  provider: 'store_credit',
+                  amount: Number(storeCreditResult.usage?.amount || 0),
+                  currency: storeCreditResult.usage?.currency || 'COP',
+                },
+              },
+            ],
+            { session }
+          );
+        }
+      }
       await order.save({ session });
     });
     return result;
@@ -1103,7 +1138,12 @@ router.post('/wompi/checkout-data', async (req, res) => {
       });
     }
 
-    const amountInCents = amountToCents(order.total);
+    const payableAmount =
+      order.storeCredit?.applied === true &&
+      Number.isFinite(Number(order.payment?.amount))
+      ? Number(order.payment.amount)
+      : Number(order.total || 0);
+    const amountInCents = amountToCents(payableAmount);
     if (amountInCents <= 0) {
       return res.status(422).json({
         error: 'INVALID_ORDER_TOTAL',
@@ -1357,12 +1397,29 @@ router.post('/wompi/webhook', async (req, res) => {
     }
 
     const transactionAmountInCents = Math.round(Number(transaction.amount_in_cents || 0));
-    const expectedAmountInCents = amountToCents(existingOrder.total);
+    const expectedPayableAmount =
+      existingOrder.storeCredit?.applied === true &&
+      Number.isFinite(Number(existingOrder.payment?.amount))
+      ? Number(existingOrder.payment.amount)
+      : Number(existingOrder.total || 0);
+    const expectedAmountInCents = amountToCents(expectedPayableAmount);
+    const releasedStoreCreditRemainderInCents =
+      existingOrder.storeCredit?.status === 'released'
+        ? amountToCents(
+            Number(existingOrder.total || 0) -
+              Number(existingOrder.storeCredit?.amount || 0)
+          )
+        : 0;
+    const validExpectedAmounts = new Set(
+      [expectedAmountInCents, releasedStoreCreditRemainderInCents].filter(
+        (value) => value > 0
+      )
+    );
 
     if (
       transactionAmountInCents <= 0 ||
       expectedAmountInCents <= 0 ||
-      transactionAmountInCents !== expectedAmountInCents
+      !validExpectedAmounts.has(transactionAmountInCents)
     ) {
       return res.status(409).json({
         ok: false,
@@ -1646,6 +1703,41 @@ router.post('/wompi/webhook', async (req, res) => {
             ],
             { session }
           );
+        }
+
+        if (shouldRecoverFailedInventory && order.storeCredit?.applied === true) {
+          const { releaseReservedStoreCreditForOrder } =
+            getStoreCreditCheckoutService();
+          const storeCreditRelease =
+            await releaseReservedStoreCreditForOrder(order, {
+              session,
+              reason:
+                mapped.paymentStatus === 'cancelled'
+                  ? 'El pago restante fue cancelado en Wompi.'
+                  : 'El pago restante fue rechazado por Wompi.',
+            });
+          if (
+            storeCreditRelease.released === true &&
+            storeCreditRelease.duplicate !== true
+          ) {
+            await OrderEvent.create(
+              [
+                {
+                  orderId: order._id,
+                  type: 'store_credit_released',
+                  message:
+                    'El saldo a favor reservado volvió a quedar disponible.',
+                  meta: {
+                    provider: 'store_credit',
+                    amount: Number(storeCreditRelease.usage?.amount || 0),
+                    currency: storeCreditRelease.usage?.currency || 'COP',
+                    paymentStatus: mapped.paymentStatus,
+                  },
+                },
+              ],
+              { session }
+            );
+          }
         }
 
         await order.save({ session });

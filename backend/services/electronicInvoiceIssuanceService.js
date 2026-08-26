@@ -345,9 +345,20 @@ function assertTotalsReconciled(order = {}, totals = {}) {
   const expectedTotal = money(
     totals.subtotalAfterDiscount + totals.shipping + totals.taxAmount
   );
-  const paymentAmount = hasFiniteNumber(order?.payment?.amount)
-    ? money(order.payment.amount)
-    : expectedTotal;
+  const splitPaymentAmount = Array.isArray(order?.payment?.splitPayments)
+    ? money(
+        order.payment.splitPayments.reduce(
+          (sum, item) => sum + money(item?.amount),
+          0
+        )
+      )
+    : 0;
+  const paymentAmount =
+    order?.storeCredit?.applied === true && splitPaymentAmount > 0
+      ? splitPaymentAmount
+      : hasFiniteNumber(order?.payment?.amount)
+        ? money(order.payment.amount)
+        : expectedTotal;
 
   if (Math.abs(expectedTotal - totals.total) > 0.01) {
     throw createBillingError(

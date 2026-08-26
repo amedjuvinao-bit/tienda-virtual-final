@@ -23,10 +23,22 @@ import { redirectToPayU } from '../lib/payuRedirect';
 import CheckoutDianCustomerFields from '../checkout/dian/CheckoutDianCustomerFields';
 import { dianCustomerDefaults } from '../checkout/dian/dianCustomerDefaults';
 import { validateDianCustomer } from '../checkout/dian/dianCustomerValidators';
+import {
+  buildStoreCreditOrderPayload,
+  calculateStoreCreditApplication,
+} from '../checkout/storeCreditCheckout';
 
 
 const API_BASE = API_BASE_URL;
 const WOMPI_WIDGET_URL = 'https://checkout.wompi.co/widget.js';
+const EMPTY_STORE_CREDIT_PREVIEW = Object.freeze({
+  status: 'idle',
+  eligible: false,
+  balance: 0,
+  currency: 'COP',
+  accessToken: '',
+  message: '',
+});
 
 function createOrderFromAuthorizedCart({ order, cartAccess, idempotencyKey }) {
   return api.post('/api/orders', order, {
@@ -843,6 +855,11 @@ function CheckoutPage() {
 
   const [paymentsConfig, setPaymentsConfig] = useState(buildSafePaymentsConfig({}));
   const [paymentsConfigLoading, setPaymentsConfigLoading] = useState(true);
+  const [storeCreditPreview, setStoreCreditPreview] = useState({
+    ...EMPTY_STORE_CREDIT_PREVIEW,
+  });
+  const [useStoreCredit, setUseStoreCredit] = useState(false);
+  const [storeCreditAmount, setStoreCreditAmount] = useState('');
 
   const [cartView, setCartView] = useState(null);
   const [serverSummary, setServerSummary] = useState(null);
@@ -1019,6 +1036,19 @@ function CheckoutPage() {
   const total = Number(
     quotePricing?.total ?? quotedSubtotal - productDiscount + finalShipping + taxAmount
   );
+  const storeCreditCalculation = useMemo(
+    () =>
+      calculateStoreCreditApplication({
+        enabled: useStoreCredit,
+        eligible: storeCreditPreview.eligible,
+        balance: storeCreditPreview.balance,
+        requestedAmount: storeCreditAmount,
+        orderTotal: total,
+      }),
+    [storeCreditAmount, storeCreditPreview, total, useStoreCredit]
+  );
+  const appliedStoreCreditAmount = storeCreditCalculation.appliedAmount;
+  const amountDue = storeCreditCalculation.amountDue;
 
   const shippingEta = useMemo(() => {
     if (!cartRequiresShipping) {
@@ -1081,6 +1111,12 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const [isPlacing, setIsPlacing] = useState(false);
 
+  useEffect(() => {
+    setStoreCreditPreview({ ...EMPTY_STORE_CREDIT_PREVIEW });
+    setUseStoreCredit(false);
+    setStoreCreditAmount('');
+  }, [customerEmailOrPhone, customerId, customerPhone]);
+
   const buildQuoteRequestPayload = (couponCode = '') => ({
     sessionId: getSessionId(),
     items: (currentCart || []).map((item) => ({
@@ -1130,6 +1166,77 @@ function CheckoutPage() {
     setCouponError('');
     setCouponMessage('Validando cupón...');
     setAppliedCoupon({ code });
+  };
+
+  const handlePreviewStoreCredit = async () => {
+    const documentNumber = String(customerId || '').replace(/\D/g, '');
+    const contact = String(customerEmailOrPhone || '').trim();
+    const phone = String(customerPhone || '').trim();
+    if (documentNumber.length < 4 || (!contact && !phone)) {
+      setStoreCreditPreview({
+        ...EMPTY_STORE_CREDIT_PREVIEW,
+        status: 'error',
+        currency: paymentsConfig.currency || 'COP',
+        message:
+          'Escribe primero la cédula y el correo o teléfono usados en tus compras.',
+      });
+      return;
+    }
+
+    setStoreCreditPreview({
+      ...EMPTY_STORE_CREDIT_PREVIEW,
+      status: 'checking',
+      currency: paymentsConfig.currency || 'COP',
+      message: 'Comprobando saldo...',
+    });
+    setUseStoreCredit(false);
+    setStoreCreditAmount('');
+
+    try {
+      const cartAccess = await ensureCartReady();
+      const { data } = await api.post(
+        `/api/cart/${encodeURIComponent(cartAccess.sessionId)}/store-credit/preview`,
+        {
+          documentNumber,
+          emailOrPhone: contact,
+          phone,
+          currency: paymentsConfig.currency || 'COP',
+        },
+        { headers: buildCartAccessHeaders(cartAccess) }
+      );
+      const balance = Math.max(0, Number(data?.balance || 0));
+      if (data?.eligible !== true || balance <= 0 || !data?.accessToken) {
+        setStoreCreditPreview({
+          ...EMPTY_STORE_CREDIT_PREVIEW,
+          status: 'ready',
+          currency: data?.currency || paymentsConfig.currency || 'COP',
+          message: 'No encontramos saldo a favor disponible con esos datos.',
+        });
+        return;
+      }
+
+      const initialAmount = Math.min(balance, total);
+      setStoreCreditPreview({
+        status: 'ready',
+        eligible: true,
+        balance,
+        currency: data.currency || paymentsConfig.currency || 'COP',
+        accessToken: data.accessToken,
+        accessExpiresAt: data.accessExpiresAt || null,
+        message: 'Saldo disponible. Puedes aplicarlo a esta compra.',
+      });
+      setStoreCreditAmount(String(initialAmount));
+      setUseStoreCredit(true);
+    } catch (error) {
+      setStoreCreditPreview({
+        ...EMPTY_STORE_CREDIT_PREVIEW,
+        status: 'error',
+        currency: paymentsConfig.currency || 'COP',
+        message:
+          error?.response?.data?.message ||
+          'No fue posible comprobar el saldo en este momento.',
+      });
+    }
   };
 
   useEffect(() => {
@@ -1503,6 +1610,7 @@ function CheckoutPage() {
     orderTax,
     orderShipping,
     orderTotal,
+    storeCreditApplied = 0,
     lineItemCount,
     paymentAccess,
   }) => {
@@ -1585,6 +1693,7 @@ function CheckoutPage() {
             tax: orderTax,
             shipping: orderShipping,
             total: orderTotal,
+            storeCreditApplied,
             itemCount: lineItemCount,
             transactionId: tx?.id || '',
           },
@@ -1594,12 +1703,24 @@ function CheckoutPage() {
       }
 
       if (txStatus === 'DECLINED') {
-        setErrors(['El pago fue rechazado por Wompi.']);
+        setUseStoreCredit(false);
+        setStoreCreditPreview({ ...EMPTY_STORE_CREDIT_PREVIEW });
+        setStoreCreditAmount('');
+        setErrors([
+          'El pago fue rechazado por Wompi.',
+          'Si habías usado saldo a favor, ya volvió a quedar disponible.',
+        ]);
         return;
       }
 
       if (txStatus === 'ERROR') {
-        setErrors(['Wompi reportó un error al procesar el pago.']);
+        setUseStoreCredit(false);
+        setStoreCreditPreview({ ...EMPTY_STORE_CREDIT_PREVIEW });
+        setStoreCreditAmount('');
+        setErrors([
+          'Wompi reportó un error al procesar el pago.',
+          'Si habías usado saldo a favor, ya volvió a quedar disponible.',
+        ]);
         return;
       }
 
@@ -1761,7 +1882,11 @@ function CheckoutPage() {
       couponCode: appliedCoupon?.code || '',
       customer,
       billing: checkoutConfig.showBillingSection ? billing : undefined,
-      payment
+      payment,
+      storeCredit: buildStoreCreditOrderPayload({
+        amount: appliedStoreCreditAmount,
+        accessToken: storeCreditPreview.accessToken,
+      }),
     };
 
     try {
@@ -1788,6 +1913,11 @@ function CheckoutPage() {
       const createdTax = Number(response.data?.taxes?.iva?.amount ?? createdPricing.taxAmount ?? 0);
       const createdShipping = Number(response.data?.shipping ?? createdPricing.shipping ?? 0);
       const createdTotal = Number(response.data?.total ?? createdPricing.total ?? order.total);
+      const createdAmountDue = Number(response.data?.amountDue ?? createdTotal);
+      const createdStoreCredit = response.data?.storeCredit || {
+        applied: false,
+        amount: 0,
+      };
       const paymentAccess = response.data?.paymentAccess || null;
 
       if (!(response.status === 201 || response.status === 200) || !createdOrderId) {
@@ -1819,6 +1949,25 @@ function CheckoutPage() {
         return;
       }
       if (paymentsConfig.provider === 'wompi') {
+        if (createdStoreCredit.applied === true && createdAmountDue <= 0) {
+          await clearCart();
+          setIsPlacing(false);
+          navigate('/gracias', {
+            state: {
+              orderId: createdOrderId,
+              orderNumber: createdOrderNumber,
+              customerName,
+              subtotal: createdSubtotal,
+              discount: createdDiscount,
+              tax: createdTax,
+              shipping: createdShipping,
+              total: createdTotal,
+              itemCount: finalItems.length,
+              storeCreditApplied: Number(createdStoreCredit.amount || 0),
+            },
+          });
+          return;
+        }
         try {
           await openWompiCheckout({
             orderId: createdOrderId,
@@ -1828,6 +1977,7 @@ function CheckoutPage() {
             orderTax: createdTax,
             orderShipping: createdShipping,
             orderTotal: createdTotal,
+            storeCreditApplied: Number(createdStoreCredit.amount || 0),
             lineItemCount: finalItems.length,
             paymentAccess,
           });
@@ -2322,6 +2472,137 @@ function CheckoutPage() {
                     {paymentBlockMessage}
                   </div>
                 </div>
+
+                {paymentsConfig.active !== false &&
+                  paymentsConfig.provider === 'wompi' && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        border: `1px solid ${checkoutConfig.style.sectionCardBorderColor}`,
+                        borderRadius: 14,
+                        padding: 14,
+                        background: checkoutConfig.style.inputBg,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>
+                            ¿Tienes saldo a favor?
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 3,
+                              fontSize: 12,
+                              color: checkoutConfig.style.textSecondaryColor,
+                            }}
+                          >
+                            Compruébalo con la cédula y el contacto escritos arriba.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="co-btn-secondary"
+                          onClick={handlePreviewStoreCredit}
+                          disabled={storeCreditPreview.status === 'checking'}
+                        >
+                          {storeCreditPreview.status === 'checking'
+                            ? 'Comprobando...'
+                            : 'Consultar saldo'}
+                        </button>
+                      </div>
+
+                      {storeCreditPreview.message && (
+                        <div
+                          role={
+                            storeCreditPreview.status === 'error'
+                              ? 'alert'
+                              : 'status'
+                          }
+                          style={{
+                            marginTop: 12,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color:
+                              storeCreditPreview.eligible === true
+                                ? '#047857'
+                                : storeCreditPreview.status === 'error'
+                                  ? '#be123c'
+                                  : checkoutConfig.style.textSecondaryColor,
+                          }}
+                        >
+                          {storeCreditPreview.message}
+                        </div>
+                      )}
+
+                      {storeCreditPreview.eligible === true && (
+                        <div style={{ marginTop: 12 }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              fontSize: 13,
+                              fontWeight: 650,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={useStoreCredit}
+                              onChange={(event) =>
+                                setUseStoreCredit(event.target.checked)
+                              }
+                            />
+                            Usar saldo disponible: {storeCreditPreview.currency}{' '}
+                            ${Number(storeCreditPreview.balance || 0).toLocaleString(
+                              'es-CO'
+                            )}
+                          </label>
+
+                          {useStoreCredit && (
+                            <div style={{ marginTop: 10 }}>
+                              <label className="co-field-label">
+                                Saldo que quieres usar
+                              </label>
+                              <input
+                                type="number"
+                                className="co-input"
+                                min="1"
+                                max={Math.min(
+                                  Number(storeCreditPreview.balance || 0),
+                                  total
+                                )}
+                                step="1"
+                                value={storeCreditAmount}
+                                onChange={(event) =>
+                                  setStoreCreditAmount(event.target.value)
+                                }
+                              />
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  fontSize: 12,
+                                  color: checkoutConfig.style.textSecondaryColor,
+                                }}
+                              >
+                                Saldo aplicado: ${appliedStoreCreditAmount.toLocaleString(
+                                  'es-CO'
+                                )} · A pagar ahora: ${amountDue.toLocaleString('es-CO')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
               </div>
 
               {checkoutConfig.showBillingSection && (
@@ -2382,7 +2663,11 @@ function CheckoutPage() {
                         <path d="M13 5H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1z" stroke="currentColor" strokeWidth="1.5" />
                         <path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
-                      {paymentsConfig.provider === 'manual' ? 'Confirmar pedido' : checkoutConfig.confirmButtonText}
+                      {appliedStoreCreditAmount >= total
+                        ? 'Pagar con saldo a favor'
+                        : paymentsConfig.provider === 'manual'
+                          ? 'Confirmar pedido'
+                          : checkoutConfig.confirmButtonText}
                     </>
                   )}
                 </button>
@@ -2551,6 +2836,24 @@ function CheckoutPage() {
                           {paymentsConfig.currency} ${total.toLocaleString('es-CO')}
                         </span>
                       </div>
+                      {appliedStoreCreditAmount > 0 && (
+                        <>
+                          <div className="co-totals-row">
+                            <span style={{ color: '#047857' }}>Saldo a favor</span>
+                            <span style={{ fontWeight: 600, color: '#047857' }}>
+                              -${appliedStoreCreditAmount.toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                          <div className="co-totals-row co-totals-total">
+                            <span style={{ color: checkoutConfig.style.totalTextColor }}>
+                              A pagar ahora
+                            </span>
+                            <span style={{ color: checkoutConfig.style.accentColor }}>
+                              {paymentsConfig.currency} ${amountDue.toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {checkoutConfig.shippingMessageText && (

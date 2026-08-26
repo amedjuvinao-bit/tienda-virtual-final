@@ -433,7 +433,16 @@ const PaymentSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
     provider: {
       type: String,
-      enum: ['bold', 'wompi', 'mercado-pago', 'payu', 'manual', 'pos', ''],
+      enum: [
+        'bold',
+        'wompi',
+        'mercado-pago',
+        'payu',
+        'manual',
+        'pos',
+        'store_credit',
+        '',
+      ],
       default: '',
     },
     providerLabel: { type: String, default: '' },
@@ -462,6 +471,33 @@ const PaymentSchema = new mongoose.Schema(
     changeAmount: { type: Number, default: 0, min: 0, set: cleanMoney },
     splitPayments: { type: [PaymentSplitSchema], default: [] },
     rawMethod: { type: Object, default: () => ({}) },
+  },
+  { _id: false }
+);
+
+/* ========= Saldo a favor aplicado en checkout ========= */
+const StoreCreditOrderSnapshotSchema = new mongoose.Schema(
+  {
+    applied: { type: Boolean, default: false },
+    usage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StoreCreditUsage',
+      default: null,
+      index: true,
+    },
+    amount: { type: Number, min: 0, default: 0, set: cleanMoney },
+    currency: { type: String, trim: true, uppercase: true, default: 'COP' },
+    status: {
+      type: String,
+      enum: ['none', 'reserved', 'consumed', 'released'],
+      default: 'none',
+    },
+    references: { type: [String], default: [] },
+    reservedAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null },
+    consumedAt: { type: Date, default: null },
+    releasedAt: { type: Date, default: null },
+    releaseReason: { type: String, trim: true, default: '' },
   },
   { _id: false }
 );
@@ -1441,6 +1477,18 @@ const OrderSchema = new mongoose.Schema(
       }),
     },
 
+    storeCredit: {
+      type: StoreCreditOrderSnapshotSchema,
+      default: () => ({
+        applied: false,
+        usage: null,
+        amount: 0,
+        currency: 'COP',
+        status: 'none',
+        references: [],
+      }),
+    },
+
     paymentProcessing: {
       type: PaymentProcessingSchema,
       default: undefined,
@@ -1835,10 +1883,23 @@ OrderSchema.pre('validate', function (next) {
       this.payment.methodLabel = cleanText(this.payment.methodLabel);
       this.payment.transactionId = cleanText(this.payment.transactionId);
       this.payment.reference = cleanText(this.payment.reference);
-      this.payment.amount = cleanMoney(this.payment.amount || this.total);
+      const paymentAmount = Number(this.payment.amount);
+      const hasCheckoutStoreCredit = this.storeCredit?.applied === true;
+      this.payment.amount = hasCheckoutStoreCredit && Number.isFinite(paymentAmount)
+        ? cleanMoney(paymentAmount)
+        : cleanMoney(paymentAmount || this.total);
+      const paymentAmountInCents = Number(this.payment.amountInCents);
+      const useExplicitPaymentCents =
+        hasCheckoutStoreCredit &&
+        Number.isFinite(paymentAmountInCents) &&
+        (paymentAmountInCents > 0 || this.payment.amount === 0);
       this.payment.amountInCents = Math.max(
         0,
-        Math.round(Number(this.payment.amountInCents || this.payment.amount * 100 || 0))
+        Math.round(
+          useExplicitPaymentCents
+            ? paymentAmountInCents
+            : this.payment.amount * 100
+        )
       );
       this.payment.receivedAmount = cleanMoney(this.payment.receivedAmount);
       this.payment.changeAmount = cleanMoney(this.payment.changeAmount);

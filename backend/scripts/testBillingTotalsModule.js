@@ -303,6 +303,51 @@ function validateInvoiceReconciliationGuard() {
   ok('La emisión se bloquea si orden, pago y factura no tienen el mismo total');
 }
 
+function validateStoreCreditInvoiceReconciliation() {
+  const order = {
+    subtotal: 100000,
+    shipping: 0,
+    total: 100000,
+    pricing: {
+      version: 2,
+      currency: 'COP',
+      subtotal: 100000,
+      productDiscount: 0,
+      subtotalAfterDiscount: 100000,
+      originalShipping: 0,
+      shippingDiscount: 0,
+      shipping: 0,
+      totalDiscount: 0,
+      taxableBase: 100000,
+      taxAmount: 0,
+      total: 100000,
+    },
+    taxes: { iva: { enabled: false, percent: 0, taxableBase: 100000, amount: 0 } },
+    payment: {
+      currency: 'COP',
+      amount: 40000,
+      splitPayments: [
+        { method: 'store_credit', amount: 60000 },
+        { method: 'wompi', amount: 40000 },
+      ],
+    },
+    storeCredit: { applied: true, amount: 60000, status: 'consumed' },
+  };
+  assertTotalsReconciled(order, calculateTotals(order));
+
+  const fullyPaid = {
+    ...order,
+    payment: {
+      currency: 'COP',
+      amount: 0,
+      splitPayments: [{ method: 'store_credit', amount: 100000 }],
+    },
+    storeCredit: { applied: true, amount: 100000, status: 'consumed' },
+  };
+  assertTotalsReconciled(fullyPaid, calculateTotals(fullyPaid));
+  ok('La factura concilia pagos parciales y totales realizados con saldo a favor');
+}
+
 function validateAtomicCheckoutAndGatewayGuards() {
   const orders = readProjectFile('backend/routes/orders.js');
   const payments = readProjectFile('backend/routes/payments.js');
@@ -339,6 +384,7 @@ function main() {
     validateFactusPayload,
     validateFactusExcludedPayload,
     validateInvoiceReconciliationGuard,
+    validateStoreCreditInvoiceReconciliation,
     validateAtomicCheckoutAndGatewayGuards,
     validatePackageScript,
   ].forEach((step) => {

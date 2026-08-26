@@ -358,6 +358,47 @@ describe('resumen decorativo original', () => {
     expect(screen.getByText('Sin cobro')).toBeInTheDocument();
     expect(screen.queryByText('paid')).not.toBeInTheDocument();
   });
+
+  it('separa el saldo a favor del remanente pagado por Wompi', () => {
+    render(
+      <OrderDetailPaymentPanel
+        order={{
+          ...BASE_ORDER,
+          total: 100000,
+          payment: {
+            status: 'paid',
+            provider: 'wompi',
+            providerLabel: 'Wompi',
+            currency: 'COP',
+            method: 'mixed',
+            methodLabel: 'Saldo a favor + Wompi',
+            amount: 40000,
+            splitPayments: [
+              {
+                method: 'store_credit',
+                methodLabel: 'Saldo a favor',
+                amount: 60000,
+              },
+              { method: 'wompi', methodLabel: 'Wompi', amount: 40000 },
+            ],
+          },
+          storeCredit: {
+            applied: true,
+            amount: 60000,
+            currency: 'COP',
+            status: 'consumed',
+            references: ['SC-CHECKOUT-001'],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Composición del pago')).toBeInTheDocument();
+    expect(screen.getByText('Saldo a favor · Aplicado')).toBeInTheDocument();
+    expect(screen.getByText('Saldo utilizado:')).toBeInTheDocument();
+    expect(screen.getByText('SC-CHECKOUT-001')).toBeInTheDocument();
+    expect(screen.getAllByText('Wompi').length).toBeGreaterThan(0);
+  });
 });
 
 describe('pestañas del detalle', () => {

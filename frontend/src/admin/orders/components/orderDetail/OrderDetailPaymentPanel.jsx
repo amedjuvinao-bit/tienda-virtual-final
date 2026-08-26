@@ -196,6 +196,20 @@ export default function OrderDetailPaymentPanel({ order }) {
   const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
   const details = getPaymentDetails(order);
+  const storeCredit = order?.storeCredit || {};
+  const hasStoreCredit = storeCredit.applied === true && Number(storeCredit.amount) > 0;
+  const splitPayments = Array.isArray(order?.payment?.splitPayments)
+    ? order.payment.splitPayments
+    : [];
+  const externalPayment = splitPayments.find(
+    (item) => String(item?.method || '').toLowerCase() !== 'store_credit'
+  );
+  const storeCreditStatus =
+    {
+      consumed: 'Aplicado',
+      reserved: 'Reservado',
+      released: 'Devuelto',
+    }[String(storeCredit.status || '').toLowerCase()] || 'Registrado';
   const badgeVariant = getPaymentBadgeVariant(payment.status);
   const paymentStatusLabel = exchange.noCharge ? 'Sin cobro' : payment.status;
 
@@ -241,12 +255,68 @@ export default function OrderDetailPaymentPanel({ order }) {
         />
 
         <MiniInfoCard
-          label="Valor pagado"
-          value={toCOP(details.amount)}
+          label={hasStoreCredit ? 'Total de la compra' : 'Valor pagado'}
+          value={toCOP(hasStoreCredit ? order?.total : details.amount)}
           icon={OrderDetailIcons.CheckCircle2}
           accent
         />
       </div>
+
+      {hasStoreCredit && (
+        <div
+          style={{
+            border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+            background: ORDER_DETAIL_THEME.inputBg,
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 850, marginBottom: 12 }}>
+            Composición del pago
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: externalPayment
+                ? 'repeat(2, minmax(0, 1fr))'
+                : '1fr',
+              gap: 12,
+            }}
+          >
+            <MiniInfoCard
+              label={`Saldo a favor · ${storeCreditStatus}`}
+              value={toCOP(storeCredit.amount)}
+              icon={OrderDetailIcons.CircleDollarSign}
+              accent
+            />
+            {externalPayment && (
+              <MiniInfoCard
+                label={externalPayment.methodLabel || 'Pago por pasarela'}
+                value={toCOP(externalPayment.amount)}
+                icon={OrderDetailIcons.CreditCard}
+              />
+            )}
+          </div>
+          {Array.isArray(storeCredit.references) &&
+            storeCredit.references.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <InfoLine
+                  label="Saldo utilizado:"
+                  value={storeCredit.references.join(', ')}
+                />
+              </div>
+            )}
+          {storeCredit.status === 'released' && storeCredit.releaseReason && (
+            <div style={{ marginTop: 8 }}>
+              <InfoLine
+                label="Motivo de devolución:"
+                value={storeCredit.releaseReason}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         style={{

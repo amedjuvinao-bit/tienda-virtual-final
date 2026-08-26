@@ -28,6 +28,7 @@ const validateOrderPayload = require('../validators/orderPayload');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const {
   createInventoryReservation,
+  confirmInventoryReservation,
   expandReservableItems,
   expireInventoryReservations,
 } = require('../services/inventoryReservationService');
@@ -54,6 +55,15 @@ const {
 const {
   applyReservationToOrderDocument,
 } = require('../services/orderInventoryAllocationService');
+const {
+  applyUsageSnapshotToOrder,
+  consumeReservedStoreCreditForOrder,
+  releaseExpiredStoreCreditReservations,
+  reserveStoreCreditForOrder,
+} = require('../services/storeCreditCheckoutService');
+const {
+  executeElectronicInvoiceAfterPayment,
+} = require('../services/electronicInvoiceAfterPaymentService');
 const {
   markCartConverted,
 } = require('../services/cartAdminOperationsService');
@@ -153,6 +163,21 @@ function withOrderPaymentAccess(payload, { order, sessionId, secret } = {}) {
 }
 
 function buildOrderCreationResult(order, extra = {}) {
+  const storeCreditIsApplied =
+    order?.storeCredit?.applied === true &&
+    order?.storeCredit?.status !== 'released';
+  const storeCredit = storeCreditIsApplied
+    ? {
+        applied: true,
+        amount: Number(order.storeCredit.amount || 0),
+        currency: order.storeCredit.currency || order?.payment?.currency || 'COP',
+        status: order.storeCredit.status || 'reserved',
+      }
+    : {
+        applied: false,
+        amount: 0,
+        status: order?.storeCredit?.status || 'none',
+      };
   return {
     _id: order?._id,
     orderNumber: order?.orderNumber,
@@ -163,6 +188,8 @@ function buildOrderCreationResult(order, extra = {}) {
     taxes: order?.taxes || null,
     shipping: Number(order?.shipping || 0),
     total: Number(order?.total || 0),
+    amountDue: Number(order?.payment?.amount ?? order?.total ?? 0),
+    storeCredit,
     ...extra,
   };
 }
@@ -945,6 +972,10 @@ function deriveIdempotencyKey(cleaned) {
     total: Number(cleaned.total || 0),
     couponCode: String(cleaned.couponCode || ''),
     customerEmail: String(cleaned.customer?.emailOrPhone || cleaned.customer?.email || ''),
+    storeCredit: {
+      apply: cleaned.storeCredit?.apply === true,
+      amount: Number(cleaned.storeCredit?.amount || 0),
+    },
     createdAtDay: new Date().toISOString().slice(0, 10),
   };
 
@@ -1828,11 +1859,12 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
     console.error('Idempotency lookup error:', err);
   }
 
-    try {
+  try {
     await expireInventoryReservations({ limit: 25 });
+    await releaseExpiredStoreCreditReservations({ limit: 25 });
   } catch (expirationError) {
     console.warn(
-      '⚠️ No se pudieron liberar reservas vencidas antes de crear la orden:',
+      '⚠️ No se pudieron liberar todas las reservas vencidas antes de crear la orden:',
       expirationError.message
     );
   }
@@ -1842,12 +1874,16 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
   try {
     let created;
     let inventoryReservation = null;
+    let storeCreditUsage = null;
+    let fullyPaidWithStoreCredit = false;
 
     await session.withTransaction(async () => {
       // withTransaction puede volver a ejecutar este callback. Ningún documento
       // procedente de un intento abortado puede reutilizarse en el siguiente.
       created = null;
       inventoryReservation = null;
+      storeCreditUsage = null;
+      fullyPaidWithStoreCredit = false;
       activeIdempotencyRecord = null;
 
       if (idempoKey) {
@@ -2051,6 +2087,191 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
         await created.save({ session });
       }
 
+      if (cleaned.storeCredit?.apply === true) {
+        const customerId = created.customer?.customerId;
+        if (!customerId) {
+          throw Object.assign(
+            new Error(
+              'No fue posible identificar la ficha del cliente para aplicar el saldo.'
+            ),
+            { code: 'STORE_CREDIT_CUSTOMER_REQUIRED', statusCode: 422 }
+          );
+        }
+
+        storeCreditUsage = await reserveStoreCreditForOrder(
+          {
+            order: created,
+            customerId,
+            sessionId: cleaned.sessionId,
+            currency: created.payment?.currency || 'COP',
+            requestedAmount: cleaned.storeCredit.amount,
+            orderTotal: pricing.total,
+            accessToken: cleaned.storeCredit.accessToken,
+            expiresAt: inventoryReservation?.expiresAt,
+          },
+          { session }
+        );
+
+        const storeCreditAmount = Number(storeCreditUsage.amount || 0);
+        const amountDue = Math.max(
+          0,
+          Math.round((pricing.total - storeCreditAmount + Number.EPSILON) * 100) /
+            100
+        );
+        const configuredProvider = String(created.payment?.provider || '')
+          .trim()
+          .toLowerCase();
+        if (amountDue > 0 && configuredProvider !== 'wompi') {
+          throw Object.assign(
+            new Error(
+              'El pago parcial con saldo a favor está disponible actualmente con Wompi.'
+            ),
+            {
+              code: 'STORE_CREDIT_GATEWAY_UNSUPPORTED',
+              statusCode: 409,
+            }
+          );
+        }
+
+        applyUsageSnapshotToOrder(created, storeCreditUsage, 'reserved');
+        created.payment.amount = amountDue;
+        created.payment.amountInCents = Math.round(amountDue * 100);
+        created.payment.splitPayments = [
+          {
+            method: 'store_credit',
+            methodLabel: 'Saldo a favor',
+            amount: storeCreditAmount,
+            reference: storeCreditUsage.allocations
+              .map((item) => item.creditNumber)
+              .join(', '),
+          },
+          ...(amountDue > 0
+            ? [
+                {
+                  method: configuredProvider,
+                  methodLabel: created.payment?.providerLabel || 'Wompi',
+                  amount: amountDue,
+                  reference: `ORDER-${created.orderNumber}`,
+                },
+              ]
+            : []),
+        ];
+
+        await OrderEvent.create(
+          [
+            {
+              orderId: created._id,
+              type: 'store_credit_reserved',
+              message: `Saldo a favor reservado por $${storeCreditAmount.toLocaleString(
+                'es-CO'
+              )}.`,
+              meta: {
+                usageId: storeCreditUsage._id,
+                amount: storeCreditAmount,
+                currency: storeCreditUsage.currency,
+                amountDue,
+                expiresAt: storeCreditUsage.expiresAt,
+              },
+            },
+          ],
+          { session }
+        );
+
+        if (amountDue <= 0) {
+          const paidAt = new Date();
+          const transactionId = `SC-${storeCreditUsage._id}`;
+          created.payment.provider = 'store_credit';
+          created.payment.providerLabel = 'Saldo a favor';
+          created.payment.checkoutLabel = 'Saldo a favor';
+          created.payment.enableWebhook = false;
+          created.payment.status = 'paid';
+          created.payment.methodType = 'store_credit';
+          created.payment.method = 'store_credit';
+          created.payment.methodLabel = 'Saldo a favor';
+          created.payment.transactionId = transactionId;
+          created.payment.reference = `ORDER-${created.orderNumber}`;
+          created.payment.paidAt = paidAt;
+          created.payment.receivedAmount = pricing.total;
+          created.status = 'paid';
+
+          let inventoryStatus = 'not_required';
+          if (reservationRequired && inventoryReservation) {
+            const confirmedReservation = await confirmInventoryReservation(
+              inventoryReservation._id,
+              {
+                order: created._id,
+                orderNumber: created.orderNumber,
+                paymentReference: created.payment.reference,
+                paymentTransactionId: transactionId,
+              },
+              { session, syncOrderAllocations: false }
+            );
+            applyReservationToOrderDocument(created, confirmedReservation);
+            created.inventoryControl.discountedAtCheckout = true;
+            inventoryStatus = 'confirmed';
+          } else {
+            created.inventoryControl.reservationRequired = false;
+            created.inventoryControl.discountedAtCheckout = false;
+          }
+
+          created.paymentProcessing = {
+            provider: 'store_credit',
+            approvedTransactionId: transactionId,
+            approvedAt: paidAt,
+            inventory: {
+              status: inventoryStatus,
+              lastAttemptAt: paidAt,
+              confirmedAt: paidAt,
+              errorCode: '',
+              errorMessage: '',
+            },
+            invoice: {
+              status: 'pending',
+              claimId: '',
+              claimedAt: null,
+              scheduledAt: null,
+              transactionId,
+              outcomeCode: '',
+              errorCode: '',
+            },
+          };
+          await consumeReservedStoreCreditForOrder(created, { session, now: paidAt });
+          created.timeline = Array.isArray(created.timeline) ? created.timeline : [];
+          created.timeline.push({
+            type: 'system',
+            message: 'Compra pagada completamente con saldo a favor.',
+            by: 'store_credit_checkout',
+            at: paidAt,
+          });
+          await OrderEvent.create(
+            [
+              {
+                orderId: created._id,
+                type: 'store_credit_consumed',
+                message: 'Compra pagada completamente con saldo a favor.',
+                meta: {
+                  usageId: storeCreditUsage._id,
+                  amount: storeCreditAmount,
+                  transactionId,
+                  inventoryStatus,
+                },
+              },
+            ],
+            { session }
+          );
+          fullyPaidWithStoreCredit = true;
+        } else {
+          created.payment.methodType = 'mixed';
+          created.payment.method = 'mixed';
+          created.payment.methodLabel = 'Saldo a favor + Wompi';
+        }
+
+        await created.save({ session });
+        if (fullyPaidWithStoreCredit) {
+          await applyCustomerStatsForOrder(created, { session });
+        }
+      }
+
       if (quote.couponValidation?.valid && created.coupon?.coupon) {
         const redemption = await couponService.recordCouponRedemption(
           {
@@ -2185,6 +2406,61 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
     });
 
     if (created && created._id) {
+      if (fullyPaidWithStoreCredit) {
+        const transaction = {
+          id: created.payment?.transactionId,
+          reference: created.payment?.reference,
+          status: 'APPROVED',
+          currency: created.payment?.currency || 'COP',
+          amount_in_cents: 0,
+          payment_method_type: 'STORE_CREDIT',
+        };
+        try {
+          const invoiceOutcome = await executeElectronicInvoiceAfterPayment({
+            orderId: created._id,
+            transaction,
+            payments: req.authorizedPaymentConfig || {},
+            paymentProvider: 'store_credit',
+            allowRetry: true,
+          });
+          const invoiceStatus = invoiceOutcome?.outcome === 'performed'
+            ? 'scheduled'
+            : invoiceOutcome?.outcome === 'skipped'
+              ? 'not_required'
+              : 'pending';
+          await Order.updateOne(
+            { _id: created._id },
+            {
+              $set: {
+                'paymentProcessing.invoice.status': invoiceStatus,
+                'paymentProcessing.invoice.scheduledAt':
+                  invoiceStatus === 'scheduled' ? new Date() : null,
+                'paymentProcessing.invoice.outcomeCode': String(
+                  invoiceOutcome?.reasonCode || ''
+                ).slice(0, 100),
+                'paymentProcessing.invoice.errorCode': '',
+              },
+            }
+          );
+        } catch (invoiceError) {
+          console.error('No fue posible completar la facturación post saldo:', {
+            orderNumber: created.orderNumber,
+            code: invoiceError?.code || '',
+            message: invoiceError?.message || '',
+          });
+          await Order.updateOne(
+            { _id: created._id },
+            {
+              $set: {
+                'paymentProcessing.invoice.status': 'failed',
+                'paymentProcessing.invoice.errorCode': String(
+                  invoiceError?.code || 'STORE_CREDIT_INVOICE_ERROR'
+                ).slice(0, 100),
+              },
+            }
+          );
+        }
+      }
       const statusCode = created.idempotent || created.reused ? 200 : 201;
 
       return res.status(statusCode).json(
@@ -2298,6 +2574,18 @@ router.post('/', rateLimit, requireAuthorizedOrderCart, async (req, res) => {
         error: code,
         code,
         message: error.message || 'El cupón no pudo aplicarse a la orden.',
+        details: error.details || null,
+      });
+    }
+
+    if (code.startsWith('STORE_CREDIT_')) {
+      return res.status(error.statusCode || 409).json({
+        ok: false,
+        error: code,
+        code,
+        message:
+          error.message ||
+          'No fue posible aplicar el saldo a favor a esta compra.',
         details: error.details || null,
       });
     }

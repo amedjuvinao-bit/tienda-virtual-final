@@ -785,6 +785,9 @@ async function runMountedRouteControls() {
       '../services/electronicCreditNoteService': {
         createOfficialCreditNote: async () => ({}),
       },
+      '../services/orderRefundReconciliationService': {
+        linkRefundCreditNote: async () => ({}),
+      },
       '../lib/orders/orderTimeline': {
         addInvoiceGeneratedEvent: async () => {},
         addInvoiceValidatedEvent: async () => {},

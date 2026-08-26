@@ -155,6 +155,8 @@ function getPaymentStatusMeta(status, provider, mainMessageFallback) {
       ? 'Wompi'
       : provider === 'payu'
         ? 'PayU'
+        : provider === 'store_credit'
+          ? 'el saldo a favor'
         : 'la pasarela de pago';
 
   switch (status) {
@@ -766,8 +768,12 @@ export default function GraciasPage() {
     (wompiTxData ? 'wompi' : '');
 
   const resolvedPaymentStatus =
-    thanksOrderData?.paymentStatus ||
-    thanksOrderData?.status ||
+    (thanksOrderData?.paymentStatus
+      ? mapGatewayStatusToUiStatus(thanksOrderData.paymentStatus)
+      : '') ||
+    (thanksOrderData?.status
+      ? mapGatewayStatusToUiStatus(thanksOrderData.status)
+      : '') ||
     (wompiTxData?.paymentStatus ? mapGatewayStatusToUiStatus(wompiTxData.paymentStatus) : '') ||
     paymentResponse.status ||
     'unknown';
@@ -776,6 +782,9 @@ export default function GraciasPage() {
     thanksOrderData?.paymentStatusLabel ||
     thanksOrderData?.paymentStatusRaw ||
     thanksOrderData?.paymentGatewayStatus ||
+    (resolvedProvider === 'store_credit' && thanksOrderData?.paymentStatus === 'paid'
+      ? 'Pagado con saldo a favor'
+      : thanksOrderData?.paymentStatus) ||
     wompiTxData?.wompiStatus ||
     paymentResponse.rawStatus ||
     paymentResponse.lapTransactionState ||
@@ -785,6 +794,13 @@ export default function GraciasPage() {
   const resolvedShipping = Number(thanksOrderData?.shipping || 0);
   const resolvedSubtotal = Number(thanksOrderData?.subtotal || 0);
   const resolvedTotal = Number(thanksOrderData?.total || 0);
+  const resolvedStoreCreditAmount = Number(
+    thanksOrderData?.storeCredit?.amount ?? state?.storeCreditApplied ?? 0
+  );
+  const resolvedAmountDue = Number(
+    thanksOrderData?.amountDue ??
+      Math.max(0, resolvedTotal - resolvedStoreCreditAmount)
+  );
 
   const stateShipping = Number(state?.shipping || state?.shippingCost || state?.deliveryCost || 0);
 
@@ -852,6 +868,8 @@ export default function GraciasPage() {
       ? 'Estado de PayU:'
       : resolvedProvider === 'wompi'
         ? 'Estado de Wompi:'
+        : resolvedProvider === 'store_credit'
+          ? 'Medio de pago:'
         : 'Estado del pago:';
 
   const paymentStatusValue =
@@ -1248,6 +1266,24 @@ export default function GraciasPage() {
                             <span className="gp-summary-row-label">{thanksConfig.shippingLabel}</span>
                             <span className="gp-summary-row-value">
                               {SHIP > 0 ? moneyCOP(SHIP) : 'Gratis'}
+                            </span>
+                          </div>
+                        )}
+
+                        {resolvedStoreCreditAmount > 0 && (
+                          <div className="gp-summary-row" style={{ borderBottomColor: s.panelBorderColor, color: s.textPrimaryColor }}>
+                            <span className="gp-summary-row-label">Saldo a favor aplicado:</span>
+                            <span className="gp-summary-row-value">
+                              {moneyCOP(resolvedStoreCreditAmount)}
+                            </span>
+                          </div>
+                        )}
+
+                        {resolvedStoreCreditAmount > 0 && resolvedAmountDue > 0 && (
+                          <div className="gp-summary-row" style={{ borderBottomColor: s.panelBorderColor, color: s.textPrimaryColor }}>
+                            <span className="gp-summary-row-label">Pagado con Wompi:</span>
+                            <span className="gp-summary-row-value">
+                              {moneyCOP(resolvedAmountDue)}
                             </span>
                           </div>
                         )}

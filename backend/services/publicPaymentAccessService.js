@@ -292,7 +292,21 @@ function isWompiTransactionOwnedByOrder({
   const storedTransactionId = cleanText(order?.payment?.transactionId, 120);
   const orderNumber = cleanText(order?.orderNumber, 80);
   const referenceOrderNumber = extractWompiOrderNumber(transaction?.reference);
-  const expectedAmountInCents = Math.round(Number(order?.total || 0) * 100);
+  const expectedPayableAmount =
+    order?.storeCredit?.applied === true &&
+    Number.isFinite(Number(order?.payment?.amount))
+    ? Number(order.payment.amount)
+    : Number(order?.total || 0);
+  const expectedAmountInCents = Math.round(expectedPayableAmount * 100);
+  const releasedStoreCreditRemainderInCents =
+    order?.storeCredit?.status === 'released'
+      ? Math.round(
+          Math.max(
+            0,
+            Number(order?.total || 0) - Number(order?.storeCredit?.amount || 0)
+          ) * 100
+        )
+      : 0;
   const transactionAmountInCents = Number(transaction?.amount_in_cents || 0);
   const expectedCurrency = cleanText(order?.payment?.currency || 'COP', 12).toUpperCase();
   const transactionCurrency = cleanText(transaction?.currency, 12).toUpperCase();
@@ -303,7 +317,9 @@ function isWompiTransactionOwnedByOrder({
     !safeEqual(requestedId, transactionId) ||
     (storedTransactionId && !safeEqual(storedTransactionId, transactionId)) ||
     expectedAmountInCents <= 0 ||
-    transactionAmountInCents !== expectedAmountInCents ||
+    ![expectedAmountInCents, releasedStoreCreditRemainderInCents]
+      .filter((value) => value > 0)
+      .includes(transactionAmountInCents) ||
     !safeEqual(expectedCurrency, transactionCurrency)
   ) {
     return false;
@@ -377,6 +393,9 @@ function buildPublicThanksResponse({ order } = {}) {
     0
   );
   const customer = order?.customer || {};
+  const storeCreditActive =
+    order?.storeCredit?.applied === true &&
+    order?.storeCredit?.status !== 'released';
 
   return {
     ok: true,
@@ -395,6 +414,16 @@ function buildPublicThanksResponse({ order } = {}) {
     paymentProviderLabel: cleanText(order?.payment?.providerLabel, 80),
     paymentStatus: cleanText(order?.payment?.status, 40).toLowerCase(),
     currency: cleanText(order?.payment?.currency || 'COP', 12).toUpperCase(),
+    amountDue: Number(order?.payment?.amount ?? order?.total ?? 0),
+    storeCredit: {
+      applied: storeCreditActive,
+      amount: storeCreditActive ? Number(order?.storeCredit?.amount || 0) : 0,
+      currency: cleanText(
+        order?.storeCredit?.currency || order?.payment?.currency || 'COP',
+        12
+      ).toUpperCase(),
+      status: cleanText(order?.storeCredit?.status || 'none', 40).toLowerCase(),
+    },
     createdAt: order?.createdAt || null,
     updatedAt: order?.updatedAt || null,
   };

@@ -77,6 +77,7 @@ function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
     customer: source.customer,
     billing: source.billing,
     payment: { ...safePaymentSnapshot },
+    storeCredit: source.storeCredit,
     couponCode: source.couponCode,
     branch: source.branch,
     branchId: source.branchId,

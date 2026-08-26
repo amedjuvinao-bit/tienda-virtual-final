@@ -425,6 +425,9 @@ Module._load = function loadWithIntegrityDoubles(request, parent, isMain) {
     '../services/electronicCreditNoteService': {
       createOfficialCreditNote: async () => ({}),
     },
+    '../services/orderRefundReconciliationService': {
+      linkRefundCreditNote: async () => ({}),
+    },
     '../lib/orders/orderTimeline': {
       addInvoiceGeneratedEvent: async () => {},
       addInvoiceValidatedEvent: async () => {},
