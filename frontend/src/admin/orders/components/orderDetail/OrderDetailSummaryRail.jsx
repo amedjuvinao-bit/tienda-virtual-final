@@ -481,7 +481,7 @@ export default function OrderDetailSummaryRail({ order }) {
           <RailStatusCard
             icon={OrderDetailIcons.CreditCard}
             label="Pago"
-            value={payment.status}
+            value={exchange.noCharge ? 'Sin cobro' : payment.status}
             variant="success"
           />
           <RailStatusCard

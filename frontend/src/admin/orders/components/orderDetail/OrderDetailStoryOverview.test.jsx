@@ -5,6 +5,7 @@ import OrderDetailStoryOverview, {
   buildOrderOverview,
   buildOrderStory,
 } from './OrderDetailStoryOverview';
+import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailHeader from './OrderDetailHeader';
 import OrderDetailTabs from './OrderDetailTabs';
@@ -328,6 +329,34 @@ describe('resumen decorativo original', () => {
 
     expect(screen.getByText('No aplica')).toBeInTheDocument();
     expect(screen.getByText('Venta original')).toBeInTheDocument();
+    expect(screen.getByText('Sin cobro')).toBeInTheDocument();
+  });
+
+  it('reemplaza el estado técnico paid por Sin cobro en el panel de pago RMA', () => {
+    render(
+      <OrderDetailPaymentPanel
+        order={{
+          ...BASE_ORDER,
+          sessionId: 'exchange:return-003',
+          source: 'system',
+          saleType: 'system_order',
+          status: 'paid',
+          total: 0,
+          subtotal: 0,
+          tags: ['exchange'],
+          payment: {
+            status: 'paid',
+            method: 'exchange',
+            methodLabel: 'Cambio sin cobro',
+            providerLabel: 'Cambio RMA',
+            reference: 'RMA-ORD-STORY-003-ABC123',
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Sin cobro')).toBeInTheDocument();
+    expect(screen.queryByText('paid')).not.toBeInTheDocument();
   });
 });
 

@@ -4,6 +4,7 @@ import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
   cleanText,
   fmtDate,
+  getOrderExchangeInfo,
   getPaymentInfo,
   toCOP,
 } from './orderDetailUtils';
@@ -192,9 +193,11 @@ function getPaymentBadgeVariant(status) {
 }
 
 export default function OrderDetailPaymentPanel({ order }) {
+  const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
   const details = getPaymentDetails(order);
   const badgeVariant = getPaymentBadgeVariant(payment.status);
+  const paymentStatusLabel = exchange.noCharge ? 'Sin cobro' : payment.status;
 
   return (
     <OrderDetailPanel
@@ -206,7 +209,7 @@ export default function OrderDetailPaymentPanel({ order }) {
         icon={OrderDetailIcons.CreditCard}
         title="Pago"
         subtitle="Información financiera y trazabilidad de la transacción"
-        action={<SoftBadge variant={badgeVariant}>{payment.status}</SoftBadge>}
+        action={<SoftBadge variant={badgeVariant}>{paymentStatusLabel}</SoftBadge>}
       />
 
       <div
