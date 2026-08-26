@@ -108,6 +108,13 @@ export function isInvalidCartItems(error) {
   );
 }
 
+export function isCartAccessNotFound(error) {
+  return Boolean(
+    error?.response?.status === 404 &&
+    error?.response?.data?.error === 'CART_ACCESS_NOT_FOUND'
+  );
+}
+
 function invalidItemIdentities(error) {
   return new Set(
     (isInvalidCartItems(error) ? error.response.data.items : [])
@@ -144,10 +151,11 @@ export function createCartMutationCoordinator({
   adopt,
   onTerminalConflict,
   onRejected,
+  onMissingCart,
 } = {}) {
   let queue = Promise.resolve();
 
-  async function execute(operation) {
+  async function executeAgainstCurrentCart(operation) {
     let snapshot = normalizeCartSnapshot(await getSnapshot());
     let desired = applyCartOperation(snapshot.items, operation);
 
@@ -232,6 +240,17 @@ export function createCartMutationCoordinator({
       controlled.code = 'CART_WRITE_CONFLICT';
       controlled.response = error.response;
       throw controlled;
+    }
+  }
+
+  async function execute(operation) {
+    try {
+      return await executeAgainstCurrentCart(operation);
+    } catch (error) {
+      if (isCartAccessNotFound(error) && onMissingCart) {
+        return onMissingCart(operation, error);
+      }
+      throw error;
     }
   }
 

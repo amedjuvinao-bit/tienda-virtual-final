@@ -252,6 +252,34 @@ describe('concurrencia del carrito', () => {
     );
   });
 
+  it('descarta de forma controlada un carrito que ya no existe en el servidor', async () => {
+    const missing = new Error('missing cart');
+    missing.response = {
+      status: 404,
+      data: { error: 'CART_ACCESS_NOT_FOUND' },
+    };
+    const onMissingCart = vi.fn().mockResolvedValue({
+      items: [],
+      version: '',
+      recoveredMissingCart: true,
+    });
+    const write = vi.fn();
+    const coordinator = createCartMutationCoordinator({
+      getSnapshot: async () => { throw missing; },
+      write,
+      reload: vi.fn(),
+      adopt: vi.fn(),
+      onMissingCart,
+    });
+    const operation = { type: 'remove', identity: cartItemIdentity(item(PRODUCT_A)) };
+
+    await expect(coordinator.enqueue(operation)).resolves.toMatchObject({
+      recoveredMissingCart: true,
+    });
+    expect(onMissingCart).toHaveBeenCalledWith(operation, missing);
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('envia realmente If-Match-Updated-At junto con las credenciales', async () => {
     const api = { put: vi.fn().mockResolvedValue({ data: { version: 'v2' } }) };
     const access = {

@@ -279,6 +279,24 @@ export function CartProvider({ children }) {
     };
   };
 
+  const recoverMissingCart = async (operation) => {
+    clearCartAccess();
+    setApiSessionId('');
+    adoptSnapshot({ items: [], version: '' });
+
+    if (operation?.type === 'add' && operation.item) {
+      await createRemoteCart([toBackendItem(operation.item)]);
+    }
+
+    const message = 'El carrito anterior ya no existía. Iniciamos uno nuevo.';
+    setCartMessage(message);
+    toast.info(message, { toastId: 'cart-recreated' });
+    return {
+      ...authoritativeRef.current,
+      recoveredMissingCart: true,
+    };
+  };
+
   coordinatorRef.current ||= createCartMutationCoordinator({
     getSnapshot: async () => {
       await ensureCartReady(authoritativeRef.current.items.map(toBackendItem));
@@ -330,6 +348,7 @@ export function CartProvider({ children }) {
         toastId: invalidItems.length ? 'cart-item-unavailable' : 'cart-update-rejected',
       });
     },
+    onMissingCart: recoverMissingCart,
   });
 
   const enqueueCartOperation = (operation, { optimistic = true } = {}) => {
