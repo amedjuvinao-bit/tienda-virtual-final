@@ -1,6 +1,6 @@
 // src/components/ProductCard.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
   ShoppingBag,
@@ -56,6 +56,36 @@ function hexToRgba(hex, alpha = 1) {
   const b = num & 255;
 
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function buildCatalogCartIntent(product = {}) {
+  const variants = (Array.isArray(product.variants) ? product.variants : [])
+    .filter((variant) => variant?.active !== false);
+
+  if (variants.length > 1) {
+    return { requiresSelection: true, payload: null };
+  }
+
+  const variant = variants[0] || null;
+  return {
+    requiresSelection: false,
+    payload: {
+      ...product,
+      color: variant?.colorLabel || variant?.color || '',
+      colorValue: variant?.color || '',
+      size: variant?.size || '',
+      variantId: variant?.variantId || variant?.variantKey || '',
+      variantKey: variant?.variantKey || '',
+      variantLabel: variant?.label || '',
+      variantAttributes: Array.isArray(variant?.attributes)
+        ? variant.attributes
+        : [],
+      variantSku: variant?.sku || product.sku || '',
+      variantBarcode: variant?.barcode || product.barcode || '',
+      quantity: 1,
+      price: Number(variant?.price ?? product.price ?? 0) || 0,
+    },
+  };
 }
 
 function buildSafeCardUiConfig(raw) {
@@ -249,6 +279,7 @@ export default function ProductCard({
 
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const navigate = useNavigate();
 
   const [hovered, setHovered] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -269,6 +300,13 @@ export default function ProductCard({
   const cover = String(image || '').trim();
   const linkTo = `/producto/${encodeURIComponent(slug || _id)}`;
   const isFavoriteActive = isFavorite(_id);
+  const cartIntent = useMemo(
+    () => buildCatalogCartIntent(product),
+    [product]
+  );
+  const cartActionLabel = cartIntent.requiresSelection
+    ? 'Seleccionar opciones'
+    : 'Agregar al carrito';
 
   const normalizedColors = Array.isArray(colors)
     ? colors
@@ -357,20 +395,11 @@ export default function ProductCard({
     e.preventDefault();
     e.stopPropagation();
 
-    const firstColor =
-      visibleColors[0]?.label ||
-      (Array.isArray(colors) && colors[0]) ||
-      'Único';
-
-    const firstSize =
-      (Array.isArray(sizes) && sizes[0]) || 'Única';
-
-    addToCart({
-      ...product,
-      color: firstColor,
-      size: firstSize,
-      quantity: 1,
-    });
+    if (cartIntent.requiresSelection) {
+      navigate(linkTo);
+      return;
+    }
+    addToCart(cartIntent.payload);
   };
 
   const handleToggleFavorite = (e) => {
@@ -471,14 +500,14 @@ export default function ProductCard({
                     onClick={handleAddToCart}
                     className="flex h-8 w-8 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.05] hover:shadow-sm"
                     style={cartButtonStyle}
-                    aria-label="Comprar"
+                    aria-label={cartActionLabel}
                   >
                     {renderCartIcon(safeCardUi.cartIconName, cartIconStyle)}
                   </button>
 
                   {hovered === 'comprar' && !isMobile && (
                     <span className="absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-pink-700 shadow">
-                      Comprar
+                      {cartActionLabel}
                     </span>
                   )}
                 </div>
@@ -607,14 +636,14 @@ export default function ProductCard({
                     onClick={handleAddToCart}
                     className="flex h-9 w-9 items-center justify-center rounded-full border transition duration-200 hover:scale-[1.04] hover:shadow-sm"
                     style={cartButtonStyle}
-                    aria-label="Comprar"
+                    aria-label={cartActionLabel}
                   >
                     {renderCartIcon(safeCardUi.cartIconName, cartIconStyle)}
                   </button>
 
                   {hovered === 'comprar' && !isMobile && (
                     <span className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-pink-700 shadow">
-                      Comprar
+                      {cartActionLabel}
                     </span>
                   )}
                 </div>
