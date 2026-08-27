@@ -22,6 +22,9 @@ const {
   transitionOrderStatus,
 } = require('../services/orderStatusTransitionService');
 const {
+  confirmManualPayment,
+} = require('../services/manualPaymentConfirmationService');
+const {
   processOrderRefund,
 } = require('../services/orderRefundService');
 const {
@@ -324,14 +327,23 @@ async function run() {
     });
     ok('El stock reservado coincide con cada asignación');
 
-    await transitionOrderStatus({
+    const paymentResult = await confirmManualPayment({
       orderId: order._id,
-      status: 'paid',
+      payment: {
+        method: 'transfer',
+        reference: `${PREFIX}-PAYMENT-SALE`,
+        amount: 300000,
+        currency: 'COP',
+        reason: 'Pago manual verificado para la integración multisede.',
+      },
       actor: {
+        id: 'ci-products',
         label: 'ci-products',
+        role: 'system',
         source: 'integration',
       },
     });
+    assert.strictEqual(paymentResult.confirmed, true);
     order = await Order.findById(order._id).lean();
     assert.strictEqual(
       order.inventoryAllocationSummary.soldQuantity,

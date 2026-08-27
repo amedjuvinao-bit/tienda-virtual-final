@@ -53,6 +53,9 @@ function run() {
   const fulfillmentService = read(
     'backend/services/orderFulfillmentService.js'
   );
+  const digitalAccessService = read(
+    'backend/services/orderFulfillment/digitalAccess.js'
+  );
 
   const requiredSuites = [
     'test:products-integrity',
@@ -165,7 +168,7 @@ function run() {
     'Ruta de descarga'
   );
   assertIncludes(
-    fulfillmentService,
+    `${fulfillmentService}\n${digitalAccessService}`,
     [
       'DIGITAL_DELIVERY_TOKEN_SECRET',
       ".createHmac('sha256'",
