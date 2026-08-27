@@ -142,14 +142,29 @@ function main() {
   ok('MongoDB calcula los contadores operativos sin recorrer órdenes en React');
 
   const adminSource = read('frontend/src/admin/OrdersAdmin.jsx');
+  const adminControlSource = read(
+    'frontend/src/admin/orders/components/OrdersControlToggle.jsx'
+  );
+  const adminControlHookSource = read(
+    'frontend/src/admin/orders/hooks/useOrdersControlPanel.js'
+  );
+  const adminStylesSource = read(
+    'frontend/src/admin/orders/ordersAdmin.css'
+  );
   const boardSource = read(
     'frontend/src/admin/orders/components/OrdersQuickViews.jsx'
   );
   const tableSource = read(
     'frontend/src/admin/orders/components/OrdersTable.jsx'
   );
-  assert.ok(adminSource.includes('operationalView'));
-  assert.ok(adminSource.includes('operationalSummary'));
+  const adminCompositionSource = [
+    adminSource,
+    read('frontend/src/admin/orders/hooks/useOrdersQuickViews.js'),
+    read('frontend/src/admin/orders/hooks/useOrdersAdminFilters.js'),
+    read('frontend/src/admin/orders/hooks/useOrdersAdminQuery.js'),
+  ].join('\n');
+  assert.ok(adminCompositionSource.includes('operationalView'));
+  assert.ok(adminCompositionSource.includes('operationalSummary'));
   assert.ok(!boardSource.includes('createPortal'));
   assert.ok(boardSource.includes('Centro de operaciones'));
   ok('el tablero dejó de ser flotante y se integra al flujo principal');
@@ -163,19 +178,19 @@ function main() {
   assert.ok(tableSource.includes('grid grid-cols-2'));
   assert.ok(boardSource.includes('Cola operativa'));
   assert.ok(boardSource.includes('xl:grid-cols-9'));
-  assert.ok(adminSource.includes('.orders-control-toggle'));
-  assert.ok(adminSource.includes('position: fixed'));
-  assert.ok(adminSource.includes('backdrop-filter: blur(18px)'));
-  assert.ok(adminSource.includes('CONTROL_TOGGLE_POSITION_KEY'));
-  assert.ok(adminSource.includes('createPortal(controlToggleButton, document.body)'));
-  assert.ok(adminSource.includes('onPointerMove={handleControlTogglePointerMove}'));
-  assert.ok(adminSource.includes('grid-area: controls'));
+  assert.ok(adminStylesSource.includes('.orders-control-toggle'));
+  assert.ok(adminStylesSource.includes('position: fixed'));
+  assert.ok(adminStylesSource.includes('backdrop-filter: blur(18px)'));
+  assert.ok(adminControlHookSource.includes('CONTROL_TOGGLE_POSITION_KEY'));
+  assert.ok(adminControlSource.includes('createPortal(content, document.body)'));
+  assert.ok(adminSource.includes('onPointerMove={controls.handleControlTogglePointerMove}'));
+  assert.ok(adminStylesSource.includes('grid-area: controls'));
   assert.ok(
-    adminSource.includes("position: controlTogglePinned ? 'absolute' : 'fixed'")
+    adminControlSource.includes("position: pinned ? 'absolute' : 'fixed'")
   );
-  assert.ok(adminSource.includes('inset: auto'));
-  assert.ok(adminSource.includes('overflow: visible'));
-  assert.ok(!adminSource.includes('overflow-y: auto'));
+  assert.ok(adminStylesSource.includes('inset: auto'));
+  assert.ok(adminStylesSource.includes('overflow: visible'));
+  assert.ok(!adminStylesSource.includes('overflow-y: auto'));
   assert.ok(boardSource.includes('role="tooltip"'));
   assert.ok(boardSource.includes('group-hover:opacity-100'));
   ok('la bandeja ofrece tabla semántica, densidad, prioridad y adaptación por pantalla');

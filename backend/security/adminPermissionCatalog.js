@@ -67,6 +67,7 @@ const ADMIN_PERMISSION_MODULES = [
       permission('orders:create', 'Crear órdenes', 'Permite crear órdenes manuales desde el panel o desde POS.', { audit: true, sensitive: true }),
       permission('orders:update', 'Editar órdenes', 'Permite modificar información general de una orden.', { audit: true, sensitive: true }),
       permission('orders:status', 'Cambiar estado', 'Permite cambiar el estado operativo de una orden.', { audit: true, sensitive: true }),
+      permission('orders:confirm_manual_payment', 'Confirmar pagos manuales', 'Permite confirmar un pago manual únicamente con monto, moneda, referencia y evidencia administrativa verificables.', { audit: true, sensitive: true, danger: true }),
       permission('orders:fulfillment', 'Gestionar logística', 'Permite preparar, empacar, despachar, seguir y resolver incidencias de envíos físicos o prestaciones.', { audit: true, sensitive: true }),
       permission('orders:mark_printed', 'Marcar impresa', 'Permite marcar o quitar la marca de orden impresa.', { audit: true, sensitive: true }),
       permission('orders:archive', 'Archivar órdenes', 'Permite archivar o desarchivar órdenes.', { audit: true, sensitive: true }),

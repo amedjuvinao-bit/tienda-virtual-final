@@ -223,6 +223,10 @@ async function main() {
     path.join(ROOT, 'backend/routes/orders.js'),
     'utf8'
   );
+  const orderCreationTransactionSource = fs.readFileSync(
+    path.join(ROOT, 'backend/services/orderCreationTransactionService.js'),
+    'utf8'
+  );
   const adminServiceSource = fs.readFileSync(
     path.join(ROOT, 'backend/services/adminBillingService.js'),
     'utf8'
@@ -230,7 +234,11 @@ async function main() {
   assert.ok(routeSource.includes("'/orders/:orderId/preflight'"));
   assert.ok(routeSource.includes('preflightFingerprint: req.body?.preflightFingerprint'));
   assert.ok(adminServiceSource.includes('assertPreflightReady(preflight, options.preflightFingerprint)'));
-  assert.ok(ordersRouteSource.includes("'isFinalConsumer'"));
+  assert.ok(
+    `${ordersRouteSource}\n${orderCreationTransactionSource}`.includes(
+      'billing: cleaned.billing'
+    )
+  );
   ok('la ruta de emisión no puede omitir el precontrol confirmado');
 
   const e2eSource = fs.readFileSync(

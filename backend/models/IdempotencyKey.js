@@ -1,5 +1,8 @@
 // backend/models/IdempotencyKey.js
 const mongoose = require('mongoose');
+const {
+  IDEMPOTENCY_KEY_INDEX_DEFINITIONS,
+} = require('./idempotencyKeyIndexDefinitions');
 
 const IdempotencyKeySchema = new mongoose.Schema(
   {
@@ -14,7 +17,6 @@ const IdempotencyKeySchema = new mongoose.Schema(
       type: String,
       enum: ['processing', 'completed', 'failed'],
       default: 'processing',
-      index: true,
     },
 
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
@@ -27,14 +29,12 @@ const IdempotencyKeySchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-// Evita reusar la misma clave en el mismo endpoint
-IdempotencyKeySchema.index({ key: 1, endpoint: 1 }, { unique: true });
-
-// TTL: elimina automáticamente las claves después de 48h
-IdempotencyKeySchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: 172800, name: 'ttl_createdAt_48h' }
-);
+for (const definition of IDEMPOTENCY_KEY_INDEX_DEFINITIONS) {
+  IdempotencyKeySchema.index(
+    { ...definition.key },
+    { ...definition.options }
+  );
+}
 
 module.exports =
   mongoose.models.IdempotencyKey ||

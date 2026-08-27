@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Order = require('../models/Order');
+const OrderEvent = require('../models/OrderEvent');
 const Customer = require('../models/Customer');
 const {
   applyCustomerStatsForOrder,
@@ -1366,6 +1367,26 @@ async function createPosSale(payload = {}, options = {}) {
     }
     const createdOrders = await Order.create([orderPayload], { session });
     const order = createdOrders[0];
+    await OrderEvent.create(
+      [
+        {
+          orderId: order._id,
+          type: 'status_changed',
+          message: `Orden POS creada con estado ${order.status}.`,
+          meta: {
+            from: null,
+            to: order.status,
+            source: 'pos',
+            branch: branch._id,
+            by:
+              order.createdByAdminSnapshot?.username ||
+              order.cashierSnapshot?.username ||
+              'pos',
+          },
+        },
+      ],
+      { session }
+    );
 
     const movements = await applyPosInventoryOut({
       order,

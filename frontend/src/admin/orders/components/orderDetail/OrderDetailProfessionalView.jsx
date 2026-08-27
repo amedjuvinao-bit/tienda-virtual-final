@@ -30,6 +30,12 @@ export default function OrderDetailProfessionalView({
 
   timeline = [],
   notes = [],
+  timelineHasMore = false,
+  notesHasMore = false,
+  timelineMoreLoading = false,
+  notesMoreLoading = false,
+  onLoadMoreTimeline,
+  onLoadMoreNotes,
   tags = [],
 
   noteText = '',
@@ -62,6 +68,8 @@ export default function OrderDetailProfessionalView({
   onCustomerStageConfirmed,
   onOrderUpdated,
   canUpdateFulfillment = false,
+  canConfirmManualPayment = false,
+  manualPaymentConfirmation,
 
   loadingAux = false,
   onRefreshTimeline,
@@ -189,7 +197,11 @@ export default function OrderDetailProfessionalView({
     ),
     payment: (
       <>
-        <OrderDetailPaymentPanel order={order} />
+        <OrderDetailPaymentPanel
+          order={order}
+          canConfirmManualPayment={canConfirmManualPayment}
+          manualPaymentConfirmation={manualPaymentConfirmation}
+        />
         <OrderDetailRefundReconciliation
           refunds={refunds}
           loading={refundsLoading}
@@ -218,6 +230,12 @@ export default function OrderDetailProfessionalView({
           setNoteText={setNoteText}
           onSaveNote={onSaveNote}
           savingNote={savingNote}
+          timelineHasMore={timelineHasMore}
+          notesHasMore={notesHasMore}
+          timelineMoreLoading={timelineMoreLoading}
+          notesMoreLoading={notesMoreLoading}
+          onLoadMoreTimeline={onLoadMoreTimeline}
+          onLoadMoreNotes={onLoadMoreNotes}
         />
       </>
     ),

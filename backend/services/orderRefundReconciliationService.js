@@ -5,8 +5,16 @@ const mongoose = require('mongoose');
 const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const OrderRefund = require('../models/OrderRefund');
+const {
+  assertRefundAmountMatchesItems,
+  assertRefundCreditNoteAmount,
+  assertSupportedRefundPaymentSources,
+} = require('./orderRefunds/refundPaymentIntegrity');
 const OrderReturn = require('../models/OrderReturn');
 const { recalculateCashSession } = require('./cashSessionService');
+const {
+  completePaymentStageManually,
+} = require('./orderRefundAutomation/claims');
 
 const RESOLVED_STAGE_STATES = new Set(['completed', 'not_required']);
 const INVOICE_WITHOUT_FISCAL_EFFECT = new Set(['rejected', 'failed', 'error']);
@@ -301,30 +309,30 @@ async function confirmRefundPaymentReversal(
     );
   }
 
-  if (stageState(refund.reconciliation?.payment) === 'completed') {
-    if (cleanText(refund.reconciliation.payment.reference, 220) !== safeReference) {
-      throw createReconciliationError(
-        'La devolución del dinero ya fue confirmada con otra referencia.',
-        'PAYMENT_REVERSAL_ALREADY_CONFIRMED',
-        409
-      );
-    }
-    return refreshOrderRefundReconciliation(refund._id, options);
+  const orderQuery = Order.findById(orderId);
+  if (options.session) orderQuery.session(options.session);
+  const order = await orderQuery;
+  if (!order) {
+    throw createReconciliationError(
+      'Orden no encontrada.',
+      'ORDER_NOT_FOUND',
+      404
+    );
   }
+  assertSupportedRefundPaymentSources(order);
+  assertRefundAmountMatchesItems({
+    order,
+    amount: refund.amount,
+    items: refund.items,
+  });
 
-  const now = new Date();
-  refund.reconciliation.payment = {
-    ...(refund.reconciliation?.payment?.toObject?.() || refund.reconciliation?.payment || {}),
-    state: 'completed',
-    reference: safeReference,
-    errorCode: '',
-    errorMessage: '',
-    lastAttemptAt: now,
-    completedAt: now,
-    completedByLabel: cleanText(adminLabel || 'admin', 160),
-  };
-  await refund.save(options.session ? { session: options.session } : undefined);
-  return refreshOrderRefundReconciliation(refund._id, options);
+  const confirmation = await completePaymentStageManually(
+    refund,
+    safeReference,
+    adminLabel,
+    { session: options.session || null }
+  );
+  return refreshOrderRefundReconciliation(confirmation.refund._id, options);
 }
 
 async function linkRefundCreditNote(
@@ -342,6 +350,23 @@ async function linkRefundCreditNote(
     );
   }
 
+  const orderQuery = Order.findById(orderId);
+  if (options.session) orderQuery.session(options.session);
+  const order = await orderQuery;
+  if (!order) {
+    throw createReconciliationError(
+      'Orden no encontrada.',
+      'ORDER_NOT_FOUND',
+      404
+    );
+  }
+  assertSupportedRefundPaymentSources(order);
+  assertRefundAmountMatchesItems({
+    order,
+    amount: refund.amount,
+    items: refund.items,
+  });
+
   const noteState = cleanLower(creditNote?.status || creditNote?.emission?.state, 40);
   if (!['sent', 'validated', 'completed'].includes(noteState)) {
     throw createReconciliationError(
@@ -350,20 +375,64 @@ async function linkRefundCreditNote(
       409
     );
   }
+  assertRefundCreditNoteAmount(refund, creditNote);
 
   const now = new Date();
+  const expectedClaimId = cleanText(options.expectedClaimId, 160);
+  const reference = cleanText(
+    creditNote?.provider?.number || creditNote?.referenceCode || creditNote?._id,
+    220
+  );
+
+  if (expectedClaimId) {
+    const fencedQuery = OrderRefund.findOneAndUpdate(
+      {
+        _id: refundId,
+        order: orderId,
+        'reconciliation.billing.state': 'processing',
+        'reconciliation.billing.claimId': expectedClaimId,
+      },
+      {
+        $set: {
+          'reconciliation.billing.state': 'completed',
+          'reconciliation.billing.reference': reference,
+          'reconciliation.billing.errorCode': '',
+          'reconciliation.billing.errorMessage': '',
+          'reconciliation.billing.lastAttemptAt': now,
+          'reconciliation.billing.completedAt': now,
+          'reconciliation.billing.completedByLabel': cleanText(
+            adminLabel || 'admin',
+            160
+          ),
+          'reconciliation.electronicInvoice': invoice?._id || null,
+          'reconciliation.creditNoteId': creditNote?._id || null,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    if (options.session) fencedQuery.session(options.session);
+    const fencedRefund = await fencedQuery;
+    if (!fencedRefund) {
+      throw createReconciliationError(
+        'El intento de automatización fue reemplazado por un claim más reciente.',
+        'REFUND_AUTOMATION_CLAIM_SUPERSEDED',
+        409,
+        { stage: 'billing' }
+      );
+    }
+    return refreshOrderRefundReconciliation(fencedRefund._id, options);
+  }
+
   refund.reconciliation.billing = {
     ...(refund.reconciliation?.billing?.toObject?.() || refund.reconciliation?.billing || {}),
     state: 'completed',
-    reference: cleanText(
-      creditNote?.provider?.number || creditNote?.referenceCode || creditNote?._id,
-      220
-    ),
+    reference,
     errorCode: '',
     errorMessage: '',
     lastAttemptAt: now,
     completedAt: now,
     completedByLabel: cleanText(adminLabel || 'admin', 160),
+    claimId: '',
   };
   refund.reconciliation.electronicInvoice = invoice?._id || null;
   refund.reconciliation.creditNoteId = creditNote?._id || null;

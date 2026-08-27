@@ -2,12 +2,13 @@
 
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
-  cleanText,
   fmtDate,
   getOrderExchangeInfo,
   getPaymentInfo,
   toCOP,
 } from './orderDetailUtils';
+import OrderManualPaymentConfirmationCard from './OrderManualPaymentConfirmationCard';
+import OrderManualPaymentEvidence from './OrderManualPaymentEvidence';
 import { OrderDetailIcons } from './OrderDetailIcons';
 import {
   InfoLine,
@@ -16,183 +17,16 @@ import {
   SectionTitle,
   SoftBadge,
 } from './OrderDetailPrimitives';
+import {
+  getPaymentBadgeVariant,
+  getPaymentDetails,
+} from './orderPaymentPanelModel';
 
-function firstValidText(...values) {
-  const found = values
-    .map((value) => String(value || '').trim())
-    .find((value) => value && value !== '—');
-
-  return found || '—';
-}
-
-function firstValidValue(...values) {
-  const found = values.find((value) => {
-    if (value === undefined || value === null || value === '') return false;
-
-    const numberValue = Number(value);
-
-    if (typeof value === 'number') {
-      return Number.isFinite(value) && value > 0;
-    }
-
-    if (Number.isFinite(numberValue)) {
-      return numberValue > 0;
-    }
-
-    return String(value).trim() !== '';
-  });
-
-  return found || 0;
-}
-
-function getInvoiceData(order) {
-  return (
-    order?.electronicInvoice ||
-    order?.invoice ||
-    order?.factusInvoice ||
-    {}
-  );
-}
-
-function getPaymentDetails(order) {
-  const payment = order?.payment || {};
-  const paymentDetails = order?.paymentDetails || {};
-  const wompi = order?.wompi || {};
-  const payu = order?.payu || {};
-  const transaction = order?.transaction || {};
-  const invoice = getInvoiceData(order);
-  const dianResponse = invoice?.dianResponse || {};
-  const providerRaw = invoice?.provider?.raw || {};
-  const providerPaymentDetails = Array.isArray(providerRaw?.payment_details)
-    ? providerRaw.payment_details[0] || {}
-    : {};
-
-  const method = firstValidText(
-    payment.methodLabel,
-    payment.methodType,
-    payment.method,
-    payment.paymentMethod,
-    paymentDetails.methodLabel,
-    paymentDetails.methodType,
-    paymentDetails.method,
-    paymentDetails.paymentMethod,
-    wompi.payment_method_type,
-    wompi.paymentMethodType,
-    wompi.payment_method?.type,
-    payu.paymentMethod,
-    transaction.payment_method_type,
-    transaction.payment_method?.type,
-    providerPaymentDetails?.payment_method?.name,
-    providerPaymentDetails?.payment_method?.code
-  );
-
-  const reference = firstValidText(
-    payment.reference,
-    payment.referenceCode,
-    paymentDetails.reference,
-    paymentDetails.referenceCode,
-    wompi.reference,
-    payu.reference,
-    transaction.reference,
-    order?.paymentReference,
-    dianResponse.paymentReference,
-    invoice?.provider?.referenceCode,
-    providerRaw?.reference_code,
-    order?.orderNumber ? `ORDER-${order.orderNumber}` : ''
-  );
-
-  const transactionId = firstValidText(
-    payment.transactionId,
-    payment.transaction_id,
-    paymentDetails.transactionId,
-    paymentDetails.transaction_id,
-    wompi.id,
-    wompi.transactionId,
-    payu.transactionId,
-    transaction.id,
-    transaction.transactionId,
-    transaction.transaction_id,
-    order?.transactionId,
-    dianResponse.transactionId,
-    dianResponse.paymentTransactionId
-  );
-
-  const authorization = firstValidText(
-    payment.authorization,
-    payment.authorizationCode,
-    payment.authCode,
-    payment.approvalCode,
-    paymentDetails.authorization,
-    paymentDetails.authorizationCode,
-    paymentDetails.authCode,
-    transaction.authorization_code,
-    transaction.authorizationCode,
-    transaction.approval_code,
-    transaction.approvalCode,
-    providerRaw?.number,
-    invoice?.provider?.number,
-    invoice?.invoiceNumber
-  );
-
-  const paidAt =
-    payment.paidAt ||
-    payment.paymentDate ||
-    paymentDetails.paidAt ||
-    paymentDetails.paymentDate ||
-    transaction.finalized_at ||
-    transaction.created_at ||
-    dianResponse.generatedAt ||
-    invoice?.generatedAt ||
-    invoice?.createdAt ||
-    order?.paidAt ||
-    order?.updatedAt ||
-    '';
-
-  const amount = firstValidValue(
-    payment.amount,
-    payment.paidAmount,
-    paymentDetails.amount,
-    paymentDetails.paidAmount,
-    transaction.amount_in_cents ? Number(transaction.amount_in_cents) / 100 : 0,
-    providerRaw?.totals?.total,
-    order?.total
-  );
-
-  return {
-    method: cleanText(method),
-    reference: cleanText(reference),
-    transactionId: cleanText(transactionId),
-    authorization: cleanText(authorization),
-    paidAt,
-    amount,
-  };
-}
-
-function getPaymentBadgeVariant(status) {
-  const normalized = String(status || '').toLowerCase();
-
-  if (
-    normalized.includes('approved') ||
-    normalized.includes('aprob') ||
-    normalized.includes('paid') ||
-    normalized.includes('pag')
-  ) {
-    return 'success';
-  }
-
-  if (
-    normalized.includes('failed') ||
-    normalized.includes('rechaz') ||
-    normalized.includes('cancel') ||
-    normalized.includes('error')
-  ) {
-    return 'danger';
-  }
-
-  return 'warning';
-}
-
-export default function OrderDetailPaymentPanel({ order }) {
+export default function OrderDetailPaymentPanel({
+  order,
+  canConfirmManualPayment = false,
+  manualPaymentConfirmation,
+}) {
   const exchange = getOrderExchangeInfo(order);
   const payment = getPaymentInfo(order);
   const details = getPaymentDetails(order);
@@ -334,6 +168,13 @@ export default function OrderDetailPaymentPanel({ order }) {
         <InfoLine label="Autorización:" value={details.authorization} />
         <InfoLine label="Fecha de pago:" value={fmtDate(details.paidAt)} />
       </div>
+
+      <OrderManualPaymentEvidence order={order} />
+      <OrderManualPaymentConfirmationCard
+        canConfirmManualPayment={canConfirmManualPayment}
+        controller={manualPaymentConfirmation}
+        order={order}
+      />
 
       <style>
         {`

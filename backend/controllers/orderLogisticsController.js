@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 
 const Order = require('../models/Order');
+const OrderEvent = require('../models/OrderEvent');
 const {
   buildScopedOrderFilter,
 } = require('../services/orderAdminScopeService');
@@ -27,7 +28,7 @@ const {
   getShippingProviderStatus,
 } = require('../services/shippingProviderService');
 
-function buildAccess(req) {
+function buildAccess(req, options = {}) {
   const orderId = String(req.params?.id || '').trim();
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     return {
@@ -40,7 +41,7 @@ function buildAccess(req) {
   return buildScopedOrderFilter(
     req,
     { _id: new mongoose.Types.ObjectId(orderId) },
-    { requestedBranchId: '' }
+    { ...options, requestedBranchId: '' }
   );
 }
 
@@ -109,7 +110,9 @@ async function getOrderLogistics(req, res) {
 
 async function initializeLogistics(req, res) {
   try {
-    const access = buildAccess(req);
+    const access = buildAccess(req, {
+      requiredCapability: 'canManageInventory',
+    });
     if (!access.ok) return sendAccessError(res, access);
     const result = await initializeOrderLogistics(
       {
@@ -117,7 +120,7 @@ async function initializeLogistics(req, res) {
         actor: actorFromRequest(req),
         ...serviceScope(access),
       },
-      { OrderEventModel: mongoose.models.OrderEvent || null }
+      { OrderEventModel: OrderEvent }
     );
     return res.status(201).json({
       ok: true,
@@ -134,7 +137,9 @@ async function initializeLogistics(req, res) {
 
 async function updateShipment(req, res) {
   try {
-    const access = buildAccess(req);
+    const access = buildAccess(req, {
+      requiredCapability: 'canManageInventory',
+    });
     if (!access.ok) return sendAccessError(res, access);
     const result = await updateOrderShipment(
       {
@@ -146,7 +151,7 @@ async function updateShipment(req, res) {
         actor: actorFromRequest(req),
         ...serviceScope(access),
       },
-      { OrderEventModel: mongoose.models.OrderEvent || null }
+      { OrderEventModel: OrderEvent }
     );
     return res.json({
       ok: true,
@@ -174,7 +179,9 @@ async function shippingProviders(_req, res) {
 
 async function runShippingOperation(req, res, operation) {
   try {
-    const access = buildAccess(req);
+    const access = buildAccess(req, {
+      requiredCapability: 'canManageInventory',
+    });
     if (!access.ok) return sendAccessError(res, access);
     const result = await operation({
       orderFilter: access.filter,

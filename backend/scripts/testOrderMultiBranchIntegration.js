@@ -412,20 +412,23 @@ async function run() {
     );
     ok('La entrega cierra las asignaciones de ambas sedes');
 
-    await processOrderRefund({
-      orderId: order._id,
-      amount: 300000,
-      reason: 'Devolución total multisede',
-      items: [
-        {
-          orderItemId: String(order.items[0]._id),
-          quantity: 3,
-          restock: true,
-        },
-      ],
-      idempotencyKey: `${PREFIX}-REFUND`,
-      adminLabel: 'ci-products',
-    });
+    await processOrderRefund(
+      {
+        orderId: order._id,
+        amount: 300000,
+        reason: 'Devolución total multisede',
+        items: [
+          {
+            orderItemId: String(order.items[0]._id),
+            quantity: 3,
+            restock: true,
+          },
+        ],
+        idempotencyKey: `${PREFIX}-REFUND`,
+        adminLabel: 'ci-products',
+      },
+      { allowInventoryRestock: true }
+    );
     order = await Order.findById(order._id).lean();
     assert.strictEqual(
       order.inventoryAllocationSummary.returnedQuantity,

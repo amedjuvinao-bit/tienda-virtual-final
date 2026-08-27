@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import api from '../../../lib/api';
 
@@ -15,11 +15,59 @@ function stableParamsKey(params = {}) {
 function summaryParamsKey(params = {}) {
   const summaryParams = { ...params };
   delete summaryParams.page;
+  delete summaryParams.cursor;
+  delete summaryParams.pagination;
   delete summaryParams.limit;
   delete summaryParams.sort;
   delete summaryParams.populate;
   delete summaryParams.includeSummary;
   return stableParamsKey(summaryParams);
+}
+
+function isCanonicalCursorSort(value) {
+  const normalized = String(value || 'createdAt:-1')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+  return normalized === 'createdat:-1' || normalized === 'createdat:-1,_id:-1';
+}
+
+function cursorContextKey(params = {}) {
+  const context = { ...params };
+  delete context.page;
+  delete context.cursor;
+  return stableParamsKey(context);
+}
+
+function initialCursorNavigation(key = '') {
+  return {
+    contextKey: key,
+    cursor: '',
+    cursorStack: [],
+    page: 1,
+  };
+}
+
+export function buildOrdersAdminRequestParams(params = {}, cursor = '') {
+  const wantsCursor = String(params.pagination || '').toLowerCase() === 'cursor';
+  const cursorMode = wantsCursor && isCanonicalCursorSort(params.sort);
+
+  if (!cursorMode) {
+    const pageParams = { ...params };
+    delete pageParams.cursor;
+    delete pageParams.pagination;
+    return { cursorMode: false, params: pageParams };
+  }
+
+  const cursorParams = {
+    ...params,
+    pagination: 'cursor',
+    sort: 'createdAt:-1',
+  };
+  delete cursorParams.page;
+  delete cursorParams.cursor;
+  if (cursor) cursorParams.cursor = cursor;
+
+  return { cursorMode: true, params: cursorParams };
 }
 
 function acquireOrdersRequest(params) {
@@ -101,6 +149,41 @@ export default function useOrdersAdminQuery({
   const requestSequence = useRef(0);
   const completedSummaryKey = useRef('');
   const knownTotal = useRef(0);
+  const contextKey = cursorContextKey(params);
+  const [cursorNavigation, setCursorNavigation] = useState(() =>
+    initialCursorNavigation(contextKey)
+  );
+  const activeCursorNavigation = cursorNavigation.contextKey === contextKey
+    ? cursorNavigation
+    : initialCursorNavigation(contextKey);
+  const requestConfiguration = useMemo(
+    () => buildOrdersAdminRequestParams(params, activeCursorNavigation.cursor),
+    [params, activeCursorNavigation.cursor]
+  );
+  const [cursorPage, setCursorPage] = useState({
+    contextKey: '',
+    cursor: '',
+    hasMore: false,
+    nextCursor: '',
+  });
+
+  useEffect(() => {
+    setCursorNavigation((current) => (
+      current.contextKey === contextKey
+        ? current
+        : initialCursorNavigation(contextKey)
+    ));
+    setCursorPage((current) => (
+      current.contextKey === contextKey
+        ? current
+        : {
+            contextKey,
+            cursor: '',
+            hasMore: false,
+            nextCursor: '',
+          }
+    ));
+  }, [contextKey]);
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
@@ -124,14 +207,15 @@ export default function useOrdersAdminQuery({
       return undefined;
     }
 
-    const currentSummaryKey = summaryParamsKey(params);
+    const requestParams = requestConfiguration.params;
+    const currentSummaryKey = summaryParamsKey(requestParams);
     const includeSummary = completedSummaryKey.current !== currentSummaryKey;
 
     setLoading(true);
     setErr('');
 
     const request = acquireOrdersRequest({
-      ...params,
+      ...requestParams,
       includeSummary: includeSummary ? 1 : 0,
     });
 
@@ -142,6 +226,18 @@ export default function useOrdersAdminQuery({
         const payload = response?.data || {};
         setData(Array.isArray(payload.data) ? payload.data : []);
 
+        if (requestConfiguration.cursorMode) {
+          const nextCursor = typeof payload.nextCursor === 'string'
+            ? payload.nextCursor.trim()
+            : '';
+          setCursorPage({
+            contextKey,
+            cursor: activeCursorNavigation.cursor,
+            hasMore: Boolean(payload.hasMore && nextCursor),
+            nextCursor,
+          });
+        }
+
         if (payload.summaryIncluded !== false) {
           completedSummaryKey.current = currentSummaryKey;
           knownTotal.current = Number(payload.total || 0);
@@ -150,7 +246,7 @@ export default function useOrdersAdminQuery({
           setFinancialSummary(payload.financialSummary || null);
           setOperationalSummary(payload.operationalSummary || null);
         } else {
-          const pageSize = Math.max(1, Number(params?.limit || 20));
+          const pageSize = Math.max(1, Number(requestParams?.limit || 20));
           setTotalPages(Math.max(1, Math.ceil(knownTotal.current / pageSize)));
         }
       })
@@ -167,9 +263,75 @@ export default function useOrdersAdminQuery({
       });
 
     return request.release;
-  }, [authLoading, hasSession, canView, params]);
+  }, [
+    authLoading,
+    hasSession,
+    canView,
+    requestConfiguration,
+    contextKey,
+    activeCursorNavigation.cursor,
+  ]);
+
+  const currentCursorPage = cursorPage.contextKey === contextKey &&
+    cursorPage.cursor === activeCursorNavigation.cursor
+    ? cursorPage
+    : null;
+  const cursorMode = requestConfiguration.cursorMode;
+  const page = cursorMode
+    ? activeCursorNavigation.page
+    : Math.max(1, Number(params?.page || 1));
+  const canGoPrevious = cursorMode
+    ? activeCursorNavigation.cursorStack.length > 0
+    : page > 1;
+  const canGoNext = cursorMode
+    ? Boolean(currentCursorPage?.hasMore && currentCursorPage.nextCursor)
+    : page < totalPages;
+
+  const goToPreviousCursorPage = () => {
+    if (!cursorMode) return;
+    const expectedCursor = activeCursorNavigation.cursor;
+    setCursorNavigation((current) => {
+      const navigation = current.contextKey === contextKey
+        ? current
+        : initialCursorNavigation(contextKey);
+      if (
+        navigation.cursor !== expectedCursor ||
+        !navigation.cursorStack.length
+      ) {
+        return navigation;
+      }
+      const cursorStack = navigation.cursorStack.slice(0, -1);
+      return {
+        contextKey,
+        cursor: navigation.cursorStack[navigation.cursorStack.length - 1] || '',
+        cursorStack,
+        page: Math.max(1, navigation.page - 1),
+      };
+    });
+  };
+
+  const goToNextCursorPage = () => {
+    if (!cursorMode || !currentCursorPage?.hasMore || !currentCursorPage.nextCursor) {
+      return;
+    }
+    setCursorNavigation((current) => {
+      const navigation = current.contextKey === contextKey
+        ? current
+        : initialCursorNavigation(contextKey);
+      if (navigation.cursor !== currentCursorPage.cursor) return navigation;
+      return {
+        contextKey,
+        cursor: currentCursorPage.nextCursor,
+        cursorStack: [...navigation.cursorStack, navigation.cursor],
+        page: navigation.page + 1,
+      };
+    });
+  };
 
   return {
+    canGoNext,
+    canGoPrevious,
+    cursorMode,
     data,
     setData,
     totalPages,
@@ -178,6 +340,10 @@ export default function useOrdersAdminQuery({
     operationalSummary,
     loading,
     err,
+    goToNextCursorPage,
+    goToPreviousCursorPage,
+    hasMore: cursorMode ? Boolean(currentCursorPage?.hasMore) : page < totalPages,
+    page,
     setErr,
   };
 }

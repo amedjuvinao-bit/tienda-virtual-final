@@ -5,6 +5,10 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const orderAdminQueryService = require('../services/orderAdminQueryService');
+const queryFilters = require('../services/orderAdminQuery/filters');
+const queryPipelines = require('../services/orderAdminQuery/pipelines');
+const queryExecutor = require('../services/orderAdminQuery/queryExecutor');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let passed = 0;
@@ -33,7 +37,19 @@ function run() {
   const backendPackage = JSON.parse(read('backend/package.json'));
   const frontendPackage = JSON.parse(read('frontend/package.json'));
   const workflow = read('.github/workflows/orders-ci.yml');
-  const service = read('backend/services/orderAdminQueryService.js');
+  const serviceFacade = read('backend/services/orderAdminQueryService.js');
+  const service = [
+    serviceFacade,
+    read('backend/services/orderAdminQuery/filters.js'),
+    read('backend/services/orderAdminQuery/invoiceExpressions.js'),
+    read('backend/services/orderAdminQuery/operationalExpressions.js'),
+    read('backend/services/orderAdminQuery/pipelines.js'),
+    read('backend/services/orderAdminQuery/operationalPresentation.js'),
+    read('backend/services/orderAdminQuery/enrichment.js'),
+    read('backend/services/orderAdminQuery/summaryPresentation.js'),
+    read('backend/services/orderAdminQuery/csv.js'),
+    read('backend/services/orderAdminQuery/queryExecutor.js'),
+  ].join('\n');
   const integration = read(
     'backend/scripts/testOrderAdminQueryScaleIntegration.js'
   );
@@ -87,6 +103,18 @@ function run() {
   );
   assert(!service.includes('countDocuments(filter)'));
   assert(!service.includes("find(filter).select('_id')"));
+  assert.strictEqual(
+    orderAdminQueryService.parseSort,
+    queryFilters.parseSort
+  );
+  assert.strictEqual(
+    orderAdminQueryService.buildPagePipeline,
+    queryPipelines.buildPagePipeline
+  );
+  assert.strictEqual(
+    orderAdminQueryService.queryAdminOrders,
+    queryExecutor.queryAdminOrders
+  );
   ok('la página y el resumen permanecen separados sin cargar el universo en Node');
 
   includesAll(

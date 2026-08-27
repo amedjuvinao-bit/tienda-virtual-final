@@ -14,6 +14,13 @@ const {
   buildOrderPaymentSnapshot,
   createPaymentConfigurationAuthority,
 } = require('../services/paymentConfigurationAuthorityService');
+const {
+  createPaymentRouteConfigurationService,
+  trimSafe,
+} = require('../services/paymentRouteConfigurationService');
+const {
+  createPaymentPublicController,
+} = require('../controllers/paymentPublicController');
 const { issueCartAccess } = require('../services/cartAccessService');
 
 const CART_ID = '64a000000000000000000111';
@@ -91,6 +98,62 @@ function authorityFor(payments) {
     SiteSettingsModel: fakeSettingsModel(payments),
     env: {},
   });
+}
+
+function routeConfigurationFor(payments) {
+  return createPaymentRouteConfigurationService({
+    SiteSettingsModel: fakeSettingsModel(payments),
+  });
+}
+
+function createPublicConfigController(getActivePaymentsConfig) {
+  const publicPaymentAccessService = {
+    SAFE_PAYMENT_ACCESS_ERROR: { error: 'PAYMENT_NOT_FOUND' },
+    buildPublicCheckoutResponse: () => ({}),
+    buildPublicTransactionResponse: () => ({}),
+    isValidObjectIdText: () => false,
+    isValidTransactionId: () => false,
+    isWompiTransactionOwnedByOrder: () => false,
+    resolveAuthorizedPublicPaymentOrder: async () => ({ allowed: false }),
+  };
+
+  return createPaymentPublicController({
+    OrderModel: {},
+    getActivePaymentsConfig,
+    trimSafe,
+    resolveWompiBaseUrl: () => 'https://sandbox.example.invalid',
+    buildWompiReference: () => 'ORDER-TEST',
+    amountToCents: () => 0,
+    buildRedirectUrl: () => 'https://store.example.invalid/gracias',
+    buildIntegritySignature: () => 'signature',
+    fingerprintPaymentMerchant: () => 'merchant-fingerprint',
+    parseWompiTransactionStatus: () => ({ status: 'pending' }),
+    publicPaymentAccessService,
+    paymentAttemptService: {
+      issueAttempt: async () => ({ attempt: {} }),
+      findAttempt: async () => null,
+    },
+    wompiGatewayService: {
+      fetchMerchantData: async () => ({}),
+      fetchTransactionById: async () => ({}),
+    },
+    logger: { error() {} },
+  });
+}
+
+function createJsonResponse() {
+  const state = { statusCode: 200, body: null };
+  const response = {
+    status(statusCode) {
+      state.statusCode = statusCode;
+      return response;
+    },
+    json(body) {
+      state.body = body;
+      return body;
+    },
+  };
+  return { response, state };
 }
 
 function createCart() {
@@ -211,10 +274,59 @@ async function main() {
   });
 
   await check('active true no activa una configuracion deshabilitada', async () => {
+    const routeConfig = await routeConfigurationFor(
+      wompiConfig({ active: false })
+    ).getActivePaymentsConfig();
+    assert.equal(routeConfig.active, false);
     await assert.rejects(
       authorityFor(wompiConfig({ active: false })).resolveOrderPaymentSelection('wompi'),
       (error) => error.code === 'PAYMENTS_DISABLED'
     );
+  });
+
+  await check('configuracion ausente permanece desactivada en toda la ruta', async () => {
+    const authority = authorityFor(undefined);
+    const authorityConfig = await authority.getActivePaymentsConfig();
+    const routeConfig = await routeConfigurationFor(
+      undefined
+    ).getActivePaymentsConfig();
+
+    assert.equal(authorityConfig.active, false);
+    assert.equal(routeConfig.active, false);
+    assert.deepEqual(routeConfig, authorityConfig);
+    await assert.rejects(
+      authority.resolveOrderPaymentSelection('wompi'),
+      (error) => error.code === 'PAYMENTS_DISABLED'
+    );
+  });
+
+  await check('configuracion publica nunca expone credenciales', async () => {
+    const routeConfiguration = routeConfigurationFor(wompiConfig());
+    const controller = createPublicConfigController(
+      routeConfiguration.getActivePaymentsConfig
+    );
+    const { response, state } = createJsonResponse();
+
+    await controller.getPublicConfig({}, response);
+
+    assert.equal(state.statusCode, 200);
+    assert.deepEqual(state.body, {
+      active: true,
+      provider: 'wompi',
+      mode: 'sandbox',
+      currency: 'COP',
+      checkoutLabel: 'Pagar con Wompi',
+      successMessage: '',
+      enableWebhook: true,
+    });
+    const serialized = JSON.stringify(state.body);
+    [
+      'public-test-value',
+      'private-test-value',
+      'integrity-test-value',
+      'webhook-test-value',
+      'api-key-test',
+    ].forEach((secret) => assert.equal(serialized.includes(secret), false));
   });
 
   await check('enableWebhook false del cliente no desactiva el webhook canonico', async () => {

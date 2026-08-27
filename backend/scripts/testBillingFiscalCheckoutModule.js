@@ -3,6 +3,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
+const Order = require('../models/Order');
 
 const validateOrderPayload = require('../validators/orderPayload');
 const {
@@ -291,15 +295,15 @@ function validateInvoiceSnapshotUsesBillingFirst() {
 }
 
 function validateCheckoutIntegration() {
-  const checkout = read('frontend/src/pages/CheckoutPage.jsx');
+  const checkout = readCheckoutComposition();
   const fields = read('frontend/src/checkout/dian/CheckoutDianCustomerFields.jsx');
-  const orderModel = read('backend/models/Order.js');
 
   [
     'CheckoutDianCustomerFields',
     'validateDianCustomer(resolvedDianCustomer)',
-    'personType: resolvedDianCustomer.personType',
-    'municipalityCode: resolvedDianCustomer.municipalityCode',
+    'const resolved = derived.resolvedDianCustomer',
+    'personType: resolved.personType',
+    'municipalityCode: resolved.municipalityCode',
   ].forEach((needle) => assert(checkout.includes(needle), `Checkout incompleto: falta ${needle}`));
 
   [
@@ -311,12 +315,18 @@ function validateCheckoutIntegration() {
   ].forEach((needle) => assert(fields.includes(needle), `Formulario fiscal incompleto: falta ${needle}`));
 
   [
-    'personType: String',
-    'documentNumber: String',
-    'businessName: String',
-    'municipalityCode: String',
-    'countryCode: String',
-  ].forEach((needle) => assert(orderModel.includes(needle), `Order no persiste ${needle}`));
+    'personType',
+    'documentNumber',
+    'businessName',
+    'municipalityCode',
+    'countryCode',
+  ].forEach((field) => {
+    const schemaPath = `billing.${field}`;
+    assert(
+      Order.schema.path(schemaPath)?.instance === 'String',
+      `Order no persiste ${schemaPath} como String`
+    );
+  });
 
   ok('Checkout muestra y persiste todos los datos fiscales profesionales');
 }

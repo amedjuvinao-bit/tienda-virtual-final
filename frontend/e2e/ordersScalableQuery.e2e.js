@@ -162,7 +162,7 @@ async function configurePage(page) {
       const params = Object.fromEntries(url.searchParams.entries());
       orderRequests.push(params);
       const query = String(params.q || '');
-      const pageNumber = Number(params.page || 1);
+      const cursor = String(params.cursor || '');
       const includeSummary = String(params.includeSummary || '1') !== '0';
 
       if (query === 'anterior') {
@@ -174,6 +174,9 @@ async function configurePage(page) {
             total: 99,
             totalPages: 5,
             summaryIncluded: true,
+            paginationMode: 'cursor',
+            hasMore: false,
+            nextCursor: null,
             financialSummary: summary(99),
             operationalSummary: operationalSummary(99),
           });
@@ -191,15 +194,24 @@ async function configurePage(page) {
           total: 1,
           totalPages: 1,
           summaryIncluded: true,
+          paginationMode: 'cursor',
+          hasMore: false,
+          nextCursor: null,
           financialSummary: summary(1),
           operationalSummary: operationalSummary(1),
         });
       }
 
-      const rows = pageNumber === 2 ? PAGE_TWO : PAGE_ONE;
+      const secondPage = cursor === 'cursor-after-page-1';
+      const rows = secondPage ? PAGE_TWO : PAGE_ONE;
       return json(route, {
         data: rows,
-        page: pageNumber,
+        page: 1,
+        paginationMode: 'cursor',
+        hasMore: true,
+        nextCursor: secondPage
+          ? 'cursor-after-page-2'
+          : 'cursor-after-page-1',
         summaryIncluded: includeSummary,
         ...(includeSummary
           ? {
@@ -232,9 +244,12 @@ async function runScenario(browser) {
   await page.getByText('Página 2 de 3', { exact: false }).waitFor();
 
   const secondPageRequest = orderRequests.find(
-    (params) => params.page === '2' && !params.q
+    (params) => params.cursor === 'cursor-after-page-1' && !params.q
   );
   assert(secondPageRequest, 'No se solicitó la segunda página.');
+  assert.equal(secondPageRequest.pagination, 'cursor');
+  assert.equal(secondPageRequest.sort, 'createdAt:-1');
+  assert.equal(secondPageRequest.page, undefined);
   assert.equal(
     secondPageRequest.includeSummary,
     '0',

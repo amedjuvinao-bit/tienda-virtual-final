@@ -87,6 +87,30 @@ describe('aislamiento de teclado del detalle de la orden', () => {
     expect(onOrderUpdated).toHaveBeenCalledWith(optimistic);
   });
 
+  it('ignora una recarga obsoleta cuando el operador ya abrió otra orden', async () => {
+    let activeOrderId = 'order-a';
+    let resolveOrder;
+    const onOrderUpdated = vi.fn();
+    const loadOrder = vi.fn(() => new Promise((resolve) => {
+      resolveOrder = resolve;
+    }));
+
+    const synchronization = synchronizeOrderDetailState({
+      orderId: 'order-a',
+      onOrderUpdated,
+      loadOrder,
+      shouldApplyResult: (orderId) => activeOrderId === orderId,
+    });
+
+    await Promise.resolve();
+    activeOrderId = 'order-b';
+    resolveOrder({ _id: 'order-a', status: 'delivered' });
+    const result = await synchronization;
+
+    expect(result).toEqual({ _id: 'order-a', status: 'delivered' });
+    expect(onOrderUpdated).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['Control', { key: 'Control', ctrlKey: true }],
     ['copiar', { key: 'c', ctrlKey: true }],

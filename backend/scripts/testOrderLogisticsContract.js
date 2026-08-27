@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const Order = require('../models/Order');
 
 const {
   initializeOrderLogistics,
@@ -137,16 +138,77 @@ async function update(order, shipment, action, payload = {}, now = new Date('202
 }
 
 async function main() {
-  const modelSource = read('backend/models/Order.js');
   const routeSource = read('backend/routes/orders.js');
-  const transitionSource = read('backend/services/orderStatusTransitionService.js');
-  const allocationSource = read('backend/services/orderInventoryAllocationService.js');
+  const transitionSource = [
+    'backend/services/orderStatusTransitionService.js',
+    'backend/services/orderStatus/operationalValidation.js',
+    'backend/services/orderStatus/operationalEffects.js',
+    'backend/services/orderStatus/singleTransition.js',
+  ].map(read).join('\n');
+  const allocationSource = [
+    'backend/services/orderInventoryAllocationService.js',
+    'backend/services/orderInventoryAllocation/fulfillment.js',
+  ].map(read).join('\n');
   const permissionSource = read('backend/security/adminRoutePermissionMap.js');
-  const frontendSource = read('frontend/src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.jsx');
+  const frontendFacadeSource = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.jsx'
+  );
+  const frontendShipmentCardSource = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderLogisticsShipmentCard.jsx'
+  );
+  const frontendShipmentCardModelSource = read(
+    'frontend/src/admin/orders/components/orderDetail/orderLogisticsShipmentCardModel.js'
+  );
+  const frontendViewModelSource = read(
+    'frontend/src/admin/orders/components/orderDetail/orderLogisticsViewModel.js'
+  );
+  const frontendLogisticsDirectory = path.join(
+    __dirname,
+    '../../frontend/src/admin/orders/components/orderDetail'
+  );
+  const frontendLogisticsModulesSource = fs
+    .readdirSync(frontendLogisticsDirectory)
+    .filter(
+      (fileName) =>
+        /^(?:OrderLogistics|orderLogistics).+\.(?:js|jsx)$/.test(fileName) &&
+        !fileName.includes('.test.')
+    )
+    .map((fileName) => fs.readFileSync(path.join(frontendLogisticsDirectory, fileName), 'utf8'))
+    .join('\n');
+  const frontendLogisticsHooksSource = [
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderLogisticsController.js',
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderShippingProviderActions.js',
+  ]
+    .map(read)
+    .join('\n');
+  const frontendSource = [
+    frontendFacadeSource,
+    frontendShipmentCardSource,
+    frontendShipmentCardModelSource,
+    frontendViewModelSource,
+    frontendLogisticsModulesSource,
+    frontendLogisticsHooksSource,
+  ].join('\n');
 
-  for (const marker of ['PhysicalShipmentSchema', 'LogisticsIncidentSchema', 'LogisticsSummarySchema', 'ShippingIntegrationSchema', 'revision:', 'allocationIds:', 'deliveryEvidence:']) {
-    assert(modelSource.includes(marker), `Falta ${marker}`);
-  }
+  const orderSchema = Order.schema;
+  const shipmentPath = orderSchema.path('fulfillment.shipments');
+  assert.strictEqual(shipmentPath?.instance, 'Array');
+  assert.ok(shipmentPath?.schema, 'fulfillment.shipments no es un subdocumento');
+  [
+    ['fulfillment.shipments.incidents', 'Array'],
+    ['fulfillment.shipments.shippingIntegration', 'Embedded'],
+    ['fulfillment.logisticsSummary', 'Embedded'],
+    ['fulfillment.shipments.revision', 'Number'],
+    ['fulfillment.shipments.allocationIds', 'Array'],
+    ['fulfillment.shipments.deliveryEvidence.reference', 'String'],
+    ['fulfillment.shipments.deliveryEvidence.recordedAt', 'Date'],
+  ].forEach(([schemaPath, expectedInstance]) => {
+    assert.strictEqual(
+      orderSchema.path(schemaPath)?.instance,
+      expectedInstance,
+      `Contrato logístico inválido en ${schemaPath}`
+    );
+  });
   ok('el modelo conserva envíos multisede, paquetes, evidencia, SLA, incidencias y revisión');
 
   assert(routeSource.includes("requirePermission('orders:fulfillment')"));
@@ -348,6 +410,10 @@ async function main() {
   );
   ok('la revisión optimista evita sobrescribir cambios de otro operador');
 
+  assert(frontendFacadeSource.includes("from './OrderLogisticsShipmentCard'"));
+  assert(frontendFacadeSource.includes('<OrderLogisticsShipmentCard'));
+  assert(frontendShipmentCardSource.includes("from './orderLogisticsShipmentCardModel'"));
+  assert(frontendShipmentCardModelSource.includes("from './orderLogisticsViewModel'"));
   assert(frontendSource.includes('Centro logístico'));
   assert(frontendSource.includes('Plan manual de transportadora, paquetes y SLA'));
   assert(frontendSource.includes('Reportar incidencia'));

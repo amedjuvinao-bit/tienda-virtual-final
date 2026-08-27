@@ -780,6 +780,10 @@ const approvalService = createWompiWebhookIntegrityService({
   reconcileFailureRecovery: (payload) => paymentFailureService.reconcileApproved(payload),
   createOrderEvent: async () => null,
   scheduleInvoiceOnce: async () => ({ scheduled: true }),
+  claimApprovedPaymentAttempt: async () => ({
+    allowed: true,
+    duplicate: false,
+  }),
 });
 
 async function processFailure(fixture, status = 'failed', transactionId = null) {
@@ -2081,9 +2085,13 @@ async function main() {
         idempotencyKey: `${RUN_ID}-REFUND`,
         adminLabel: 'atlas-integrity',
       };
-      const refund = await processOrderRefund(refundInput);
+      const refund = await processOrderRefund(refundInput, {
+        allowInventoryRestock: true,
+      });
       assert.equal(refund.idempotent, false);
-      const repeatedRefund = await processOrderRefund(refundInput);
+      const repeatedRefund = await processOrderRefund(refundInput, {
+        allowInventoryRestock: true,
+      });
       assert.equal(repeatedRefund.idempotent, true);
 
       const persistedRefunds = await OrderRefund.find({ order: orderId }).lean();

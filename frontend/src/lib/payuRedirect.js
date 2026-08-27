@@ -1,3 +1,22 @@
+const PAYU_ACTION_URLS = Object.freeze({
+  sandbox: 'https://sandbox.checkout.payulatam.com/ppp-web-gateway-payu/',
+  production: 'https://checkout.payulatam.com/ppp-web-gateway-payu/',
+});
+
+function resolvePayUActionUrl(payload) {
+  const mode = payload?.mode === 'production' ? 'production' : 'sandbox';
+  const emittedUrl = String(payload?.actionUrl || '').trim();
+  const actionUrl = emittedUrl || PAYU_ACTION_URLS[mode];
+  const normalized = actionUrl.replace(/\/+$/, '');
+  const expected = PAYU_ACTION_URLS[mode].replace(/\/+$/, '');
+
+  if (normalized !== expected) {
+    throw new Error('La dirección de pago PayU no es válida.');
+  }
+
+  return PAYU_ACTION_URLS[mode];
+}
+
 export function redirectToPayU(payload = {}) {
   const payu = payload?.payu || {};
   const customerData = payload?.customerData || {};
@@ -10,23 +29,39 @@ export function redirectToPayU(payload = {}) {
     payu.description ||
       `Pago orden ${order.orderNumber || referenceCode || ''}`
   ).trim();
-  const amount = Number(payu.amount || 0);
+  const amount = String(payu.amount ?? '').trim();
   const currency = String(payu.currency || 'COP').trim().toUpperCase();
-  const buyerEmail = String(customerData.email || '').trim();
-  const responseUrl = String(payu.redirectUrl || '').trim();
+  const signature = String(payu.signature || '').trim();
+  const algorithmSignature = String(payu.algorithmSignature || '').trim();
+  const buyerEmail = String(
+    customerData.buyerEmail || customerData.email || ''
+  ).trim();
+  const responseUrl = String(
+    payu.responseUrl || payu.redirectUrl || ''
+  ).trim();
   const confirmationUrl = String(payu.confirmationUrl || '').trim();
   const test = String(
-    payu.test === true || payload?.mode === 'sandbox' ? '1' : '0'
-  );
+    payu.test ?? (payload?.mode === 'production' ? 0 : 1)
+  ).trim();
+  const actionUrl = resolvePayUActionUrl(payload);
 
-  if (!merchantId || !accountId || !referenceCode || !amount || !currency) {
+  if (
+    !merchantId ||
+    !accountId ||
+    !referenceCode ||
+    !amount ||
+    !Number.isFinite(Number(amount)) ||
+    Number(amount) <= 0 ||
+    !currency ||
+    !signature ||
+    !algorithmSignature ||
+    !buyerEmail ||
+    !responseUrl ||
+    !confirmationUrl ||
+    !['0', '1'].includes(test)
+  ) {
     throw new Error('Faltan datos obligatorios para redirigir a PayU.');
   }
-
-  const actionUrl =
-    payload?.mode === 'production'
-      ? 'https://gateway.payulatam.com/ppp-web-gateway/'
-      : 'https://sandbox.checkout.payulatam.com/ppp-web-gateway-payu/';
 
   const form = document.createElement('form');
   form.method = 'POST';
@@ -42,6 +77,8 @@ export function redirectToPayU(payload = {}) {
     tax: '0',
     taxReturnBase: '0',
     currency,
+    algorithmSignature,
+    signature,
     buyerEmail,
     test,
     responseUrl,

@@ -71,7 +71,9 @@ jobs:
           npm --prefix frontend ci
 
       - name: Validar autoridad de configuración de pagos
-        run: npm --prefix backend run test:payment-configuration-authority
+        run: |
+          npm --prefix backend run test:payment-configuration-authority
+          npm --prefix backend run test:payu-secure-composition
 
       - name: Validar almacenamiento Cloudinary
         run: npm --prefix backend run test:cloudinary-storage
@@ -112,6 +114,12 @@ jobs:
 
       - name: Probar precontrol fiscal visual
         run: npm --prefix frontend run test:billing-invoice-preflight
+
+      - name: Validar redirección firmada PayU
+        run: npm --prefix frontend run test:payu-redirect
+
+      - name: Validar arquitectura y datos sensibles de Checkout
+        run: npm --prefix frontend run test:checkout-architecture
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

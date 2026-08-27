@@ -5,6 +5,11 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const Order = require('../models/Order');
+const {
+  buildAdminOrderFilter,
+} = require('../services/orderAdminQueryService');
+const { hasExactIndex } = require('./lib/orderSchemaContract');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let passed = 0;
@@ -19,28 +24,39 @@ function ok(label) {
 }
 
 function run() {
-  const orderModel = read('backend/models/Order.js');
+  const orderSchema = Order.schema;
   const reservationModel = read(
     'backend/models/InventoryReservation.js'
   );
-  const allocationService = read(
-    'backend/services/orderInventoryAllocationService.js'
-  );
-  const reservationService = read(
-    'backend/services/inventoryReservationService.js'
-  );
-  const statusService = read(
-    'backend/services/orderStatusTransitionService.js'
-  );
-  const refundService = read(
-    'backend/services/orderRefundService.js'
-  );
+  const allocationService = [
+    'backend/services/orderInventoryAllocationService.js',
+    'backend/services/orderInventoryAllocation/fulfillment.js',
+  ].map(read).join('\n');
+  const reservationService = [
+    'backend/services/inventoryReservationService.js',
+    'backend/services/inventoryReservation/stockReservation.js',
+    'backend/services/inventoryReservation/releaseReservation.js',
+    'backend/services/inventoryReservation/confirmReservation.js',
+    'backend/services/inventoryReservation/expireReservations.js',
+  ].map(read).join('\n');
+  const statusService = [
+    'backend/services/orderStatusTransitionService.js',
+    'backend/services/orderStatus/operationalEffects.js',
+    'backend/services/orderStatus/singleTransition.js',
+  ].map(read).join('\n');
+  const refundService = [
+    'backend/services/orderRefunds/refundInventoryService.js',
+    'backend/services/orderRefunds/refundInventoryAllocationService.js',
+    'backend/services/orderRefunds/refundInventoryDemandService.js',
+    'backend/services/orderRefunds/refundInventoryRestorationService.js',
+    'backend/services/orderRefunds/refundTransactionService.js',
+  ].map(read).join('\n');
   const ordersRoute = read('backend/routes/orders.js');
+  const orderDetailController = read(
+    'backend/controllers/orderAdminDetailController.js'
+  );
   const orderScopeService = read(
     'backend/services/orderAdminScopeService.js'
-  );
-  const orderQueryService = read(
-    'backend/services/orderAdminQueryService.js'
   );
   const detailView = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailProfessionalView.jsx'
@@ -53,10 +69,25 @@ function run() {
     read('backend/package.json')
   );
 
-  assert(orderModel.includes('inventoryAllocations'));
-  assert(orderModel.includes('inventoryAllocationSummary'));
-  assert(orderModel.includes('splitAcrossBranches'));
-  assert(orderModel.includes("'inventoryAllocations.branch'"));
+  assert.strictEqual(orderSchema.path('inventoryAllocations')?.instance, 'Array');
+  assert.ok(
+    orderSchema.path('inventoryAllocations')?.schema,
+    'inventoryAllocations no contiene subdocumentos'
+  );
+  assert.strictEqual(
+    orderSchema.path('inventoryAllocationSummary')?.instance,
+    'Embedded'
+  );
+  assert.strictEqual(
+    orderSchema.path('inventoryAllocationSummary.splitAcrossBranches')?.instance,
+    'Boolean'
+  );
+  assert.ok(
+    hasExactIndex(orderSchema, {
+      'inventoryAllocations.branch': 1,
+      createdAt: -1,
+    })
+  );
   ok('La orden conserva asignaciones e índice por cada sede');
 
   [
@@ -67,7 +98,16 @@ function run() {
     'returnedQuantity',
     'releasedQuantity',
   ].forEach((field) => {
-    assert(orderModel.includes(field), `${field} no existe`);
+    assert.strictEqual(
+      orderSchema.path(`inventoryAllocations.${field}`)?.instance,
+      'Number',
+      `inventoryAllocations.${field} no existe`
+    );
+    assert.strictEqual(
+      orderSchema.path(`inventoryAllocationSummary.${field}`)?.instance,
+      'Number',
+      `inventoryAllocationSummary.${field} no existe`
+    );
   });
   ok('Las cantidades operativas quedan separadas y auditables');
 
@@ -102,16 +142,23 @@ function run() {
   ok('Las devoluciones regresan a la asignación de origen');
 
   assert(
-    ordersRoute.includes('applyOrderBranchAccessFilter')
+    orderDetailController.includes('applyOrderBranchAccessFilter') &&
+      ordersRoute.includes('getAdminOrderDetail')
   );
   assert(
     orderScopeService.includes(
       "{ 'inventoryAllocations.branch': { $in: branchObjectIds } }"
     )
   );
+  const searchFilter = buildAdminOrderFilter({
+    adminRole: 'owner',
+    query: { q: 'Sede Norte' },
+  });
+  assert.strictEqual(searchFilter.ok, true);
   assert(
-    orderQueryService.includes(
-      "'inventoryAllocations.branchSnapshot.name'"
+    searchFilter.filter.$or.some(
+      (criterion) =>
+        criterion['inventoryAllocations.branchSnapshot.name'] instanceof RegExp
     )
   );
   ok('Filtros, búsqueda y permisos reconocen todas las sedes');

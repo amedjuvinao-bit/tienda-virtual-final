@@ -2,8 +2,13 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import OrdersFilters from './OrdersFilters';
 import OrdersQuickViews from './OrdersQuickViews';
 import OrdersTable from './OrdersTable';
+import {
+  buildOrdersFilterMetrics,
+  mergeStatusFilters,
+} from './ordersFiltersModel';
 
 const ORDER = {
   _id: 'order-operations-1',
@@ -51,6 +56,47 @@ const tableProps = {
   toCOP: (value) => `$ ${Number(value).toLocaleString('es-CO')}`,
   statusBadgeClasses: () => 'status-test',
 };
+
+function buildFiltersProps(overrides = {}) {
+  return {
+    ADMIN_BORDER: '#fbcfe8',
+    STATUS_FILTERS: [{ key: 'paid', label: 'Pagadas del comercio' }],
+    branchId: 'branch-main',
+    branches: [{ _id: 'branch-main', name: 'Sede Principal', code: 'bog' }],
+    canExport: true,
+    clearStatus: vi.fn(),
+    controlsOpen: true,
+    dateFrom: '2026-08-01',
+    dateTo: '2026-08-31',
+    exportCsv: vi.fn(),
+    financialSummary: {
+      averageTicket: 120000,
+      pendingOrders: 2,
+      totalOrders: 12,
+      totalSales: 1440000,
+      validatedDianOrders: 8,
+      withoutInvoiceOrders: 4,
+    },
+    loading: false,
+    onCloseControls: vi.fn(),
+    populate: false,
+    setBranchId: vi.fn(),
+    setDateFrom: vi.fn(),
+    setDateTo: vi.fn(),
+    setPage: vi.fn(),
+    setPopulate: vi.fn(),
+    setTagsMode: vi.fn(),
+    setTagsStr: vi.fn(),
+    setTypingQ: vi.fn(),
+    statusFilter: ['paid'],
+    tagsMode: 'any',
+    tagsStr: 'vip',
+    toggleStatus: vi.fn(),
+    total: 12,
+    typingQ: 'ana',
+    ...overrides,
+  };
+}
 
 describe('centro operativo avanzado de órdenes', () => {
   afterEach(() => cleanup());
@@ -187,5 +233,106 @@ describe('centro operativo avanzado de órdenes', () => {
     expect(
       screen.getByText('Cambia la vista operativa o restablece los filtros.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('composición profesional de filtros de órdenes', () => {
+  afterEach(() => cleanup());
+
+  it('conserva el DOM, las opciones obligatorias y las métricas del panel original', () => {
+    const { container } = render(
+      <OrdersFilters {...buildFiltersProps()}>
+        <div data-testid="orders-filter-child">Operación</div>
+      </OrdersFilters>
+    );
+
+    expect(container.querySelectorAll('.orf-card-metric')).toHaveLength(6);
+    expect(screen.getByRole('complementary', { name: 'Filtros y estados de órdenes' }))
+      .toHaveAttribute('id', 'orders-control-panel');
+    expect(screen.getByText('Reembolsadas')).toBeInTheDocument();
+    expect(screen.getByText('Sede Principal (BOG)')).toBeInTheDocument();
+    expect(screen.getByTestId('orders-filter-child')).toBeInTheDocument();
+
+    const labels = Array.from(
+      container.querySelectorAll('.orf-filters > div > label')
+    ).map((label) => label.textContent);
+    expect(labels).toEqual([
+      'Buscar',
+      'Desde',
+      'Hasta',
+      'Estado',
+      'Sede',
+      'Datos',
+      'Limpiar',
+      'Tags',
+      'Modo tags',
+    ]);
+  });
+
+  it('mantiene la semántica de búsqueda, estado, sede, vista, tags y limpieza', () => {
+    const props = buildFiltersProps();
+    const { container } = render(<OrdersFilters {...props} />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText('Buscar orden, cliente o email...'),
+      { target: { value: 'orden nueva' } }
+    );
+    expect(props.setTypingQ).toHaveBeenCalledWith('orden nueva');
+
+    const selects = container.querySelectorAll('.orf-filters select');
+    fireEvent.change(selects[0], { target: { value: 'refunded' } });
+    expect(props.clearStatus).toHaveBeenCalledTimes(1);
+    expect(props.toggleStatus).toHaveBeenCalledWith('refunded');
+
+    fireEvent.change(selects[1], { target: { value: '' } });
+    expect(props.setBranchId).toHaveBeenCalledWith('');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full' }));
+    expect(props.setPopulate).toHaveBeenCalledWith(true);
+
+    fireEvent.change(screen.getByPlaceholderText('vip, urgente, mayorista...'), {
+      target: { value: 'mayorista' },
+    });
+    expect(props.setTagsStr).toHaveBeenCalledWith('mayorista');
+
+    fireEvent.change(selects[2], { target: { value: 'all' } });
+    expect(props.setTagsMode).toHaveBeenCalledWith('all');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(props.setTypingQ).toHaveBeenLastCalledWith('');
+    expect(props.setDateFrom).toHaveBeenCalledWith('');
+    expect(props.setDateTo).toHaveBeenCalledWith('');
+    expect(props.setTagsStr).toHaveBeenLastCalledWith('');
+    expect(props.setTagsMode).toHaveBeenLastCalledWith('any');
+    expect(props.setBranchId).toHaveBeenLastCalledWith('');
+    expect(props.clearStatus).toHaveBeenCalledTimes(2);
+    expect(props.setPage).toHaveBeenCalledWith(1);
+  });
+
+  it('preserva el contrato de orden, extensibilidad y fallbacks del modelo', () => {
+    expect(mergeStatusFilters([
+      { key: 'custom', label: 'Personalizado' },
+      { key: 'paid', label: 'Pago confirmado' },
+    ])).toEqual([
+      { key: 'pending', label: 'Pendientes' },
+      { key: 'processing', label: 'Procesando' },
+      { key: 'paid', label: 'Pago confirmado' },
+      { key: 'failed', label: 'Fallidas' },
+      { key: 'shipped', label: 'Enviadas' },
+      { key: 'delivered', label: 'Entregadas' },
+      { key: 'cancelled', label: 'Canceladas' },
+      { key: 'refunded', label: 'Reembolsadas' },
+      { key: 'custom', label: 'Personalizado' },
+    ]);
+
+    const metrics = buildOrdersFilterMetrics({
+      ordersWithoutInvoice: 3,
+      validatedInvoiceOrders: 7,
+    }, 11);
+    expect(metrics.map(({ key }) => key)).toEqual([
+      'total', 'sales', 'ticket', 'pending', 'noinv', 'dian',
+    ]);
+    expect(metrics.find(({ key }) => key === 'noinv')?.value).toBe('3');
+    expect(metrics.find(({ key }) => key === 'dian')?.value).toBe('7');
   });
 });

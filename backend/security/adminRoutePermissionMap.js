@@ -190,6 +190,15 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   {
     method: 'GET',
     path: '/api/orders/admin',
+    query: { format: 'csv' },
+    permission: 'orders:export',
+    additionalPermissions: ['orders:view'],
+    description: 'Exportar el listado filtrado de órdenes.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/admin',
     permission: 'orders:view',
     description: 'Listar órdenes en administración.',
   },
@@ -201,16 +210,10 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
-    method: 'GET',
-    path: '/api/orders/admin/export',
-    permission: 'orders:export',
-    description: 'Exportar órdenes.',
-    audit: true,
-  },
-  {
     method: 'POST',
     path: '/api/orders/admin/export',
     permission: 'orders:export',
+    additionalPermissions: ['orders:view'],
     description: 'Exportar órdenes con filtros avanzados.',
     audit: true,
   },
@@ -227,6 +230,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     permission: 'orders:status',
     description: 'Cambiar estado de orden.',
     audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/payments/manual-confirmation',
+    permission: 'orders:confirm_manual_payment',
+    description: 'Confirmar un pago manual con evidencia financiera persistida.',
+    audit: true,
+    danger: true,
   },
   {
     method: 'PATCH',
@@ -372,6 +383,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Ver historial de la orden.',
   },
   {
+    method: 'GET',
+    path: '/api/orders/:id',
+    permission: 'orders:view',
+    description: 'Consultar el detalle administrativo de una orden.',
+  },
+  {
     method: 'POST',
     path: '/api/orders/:id/email',
     permission: 'orders:email',
@@ -397,6 +414,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/orders/:id/pdf',
     permission: 'billing:download',
     description: 'Descargar PDF de orden/factura.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/receipt-pdf',
+    permission: 'billing:download',
+    description: 'Descargar el comprobante comercial interno de la orden.',
     audit: true,
   },
   {
@@ -479,6 +503,28 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/orders/:id/refund',
     permission: 'orders:refund',
     description: 'Registrar reembolso o devolución.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/refunds',
+    permission: 'orders:view',
+    description: 'Consultar reembolsos y conciliación de la orden.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/refunds/:refundId/confirm-payment',
+    permission: 'orders:refund',
+    description: 'Confirmar manualmente el desembolso de un reembolso.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/refunds/:refundId/automate',
+    permission: 'orders:refund',
+    description: 'Automatizar reembolso y conciliación con nota crédito.',
     audit: true,
     danger: true,
   },
@@ -785,6 +831,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/payments/admin',
     permission: 'payments:view',
     description: 'Ver pagos administrativos.',
+  },
+  {
+    method: 'POST',
+    path: '/api/payments/admin/wompi/test-merchant',
+    permission: 'settings:payments',
+    description: 'Validar la configuración comercial de Wompi.',
+    audit: true,
+    sensitive: true,
   },
   {
     method: 'POST',
@@ -1201,6 +1255,37 @@ function normalizePath(pathname) {
   return clean || '/';
 }
 
+function normalizeQueryValue(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function queryFromPath(pathname) {
+  const raw = String(pathname || '');
+  const questionMark = raw.indexOf('?');
+  if (questionMark < 0) return {};
+
+  const params = new URLSearchParams(raw.slice(questionMark + 1));
+  const query = {};
+
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    query[key] = values.length > 1 ? values : values[0];
+  }
+
+  return query;
+}
+
+function matchRouteQuery(ruleQuery, requestQuery = {}) {
+  const expectedEntries = Object.entries(ruleQuery || {});
+  if (!expectedEntries.length) return true;
+
+  return expectedEntries.every(([key, expected]) => {
+    return (
+      normalizeQueryValue(requestQuery?.[key]) === normalizeQueryValue(expected)
+    );
+  });
+}
+
 function splitPath(pathname) {
   return normalizePath(pathname)
     .split('/')
@@ -1245,27 +1330,46 @@ function matchRoutePath(rulePath, requestPath) {
 
 function normalizeRule(rule) {
   const permission = canonicalPermission(rule.permission);
+  const additionalPermissions = Array.from(
+    new Set(
+      (Array.isArray(rule.additionalPermissions)
+        ? rule.additionalPermissions
+        : [])
+        .map(canonicalPermission)
+        .filter(Boolean)
+    )
+  );
+  const requiredPermissions = Array.from(
+    new Set([permission, ...additionalPermissions].filter(Boolean))
+  );
 
   return {
     ...rule,
     method: normalizeMethod(rule.method),
     path: normalizePath(rule.path),
     permission,
-    knownPermission: isKnownPermission(permission),
+    additionalPermissions,
+    requiredPermissions,
+    knownPermission: requiredPermissions.every(isKnownPermission),
   };
 }
 
 const ADMIN_ROUTE_PERMISSIONS = ADMIN_ROUTE_PERMISSION_RULES.map(normalizeRule);
 
-function findAdminRoutePermission(method, pathname) {
+function findAdminRoutePermission(method, pathname, requestQuery = null) {
   const requestMethod = normalizeMethod(method);
   const requestPath = normalizePath(pathname);
+  const query = {
+    ...queryFromPath(pathname),
+    ...(requestQuery && typeof requestQuery === 'object' ? requestQuery : {}),
+  };
 
   return (
     ADMIN_ROUTE_PERMISSIONS.find((rule) => {
       return (
         rule.method === requestMethod &&
-        matchRoutePath(rule.path, requestPath)
+        matchRoutePath(rule.path, requestPath) &&
+        matchRouteQuery(rule.query, query)
       );
     }) || null
   );
@@ -1303,7 +1407,10 @@ module.exports = {
 
   normalizeMethod,
   normalizePath,
+  normalizeQueryValue,
   matchRoutePath,
+  matchRouteQuery,
+  queryFromPath,
 
   findAdminRoutePermission,
   getRoutesByPermission,

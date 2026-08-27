@@ -71,6 +71,8 @@ function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
   // Lista positiva: el comprador controla sus datos de contacto, entrega,
   // facturación, cupón y únicamente la selección del proveedor. Todo dato
   // comercial o configuración operativa se reemplaza con autoridades del servidor.
+  // La sede se resuelve después contra política, cobertura e inventario; nunca
+  // se copia desde branch/branchId/defaultBranch del navegador.
   return {
     sessionId,
     cart: buildAuthoritativeCartItems(cart),
@@ -79,9 +81,6 @@ function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
     payment: { ...safePaymentSnapshot },
     storeCredit: source.storeCredit,
     couponCode: source.couponCode,
-    branch: source.branch,
-    branchId: source.branchId,
-    defaultBranch: source.defaultBranch,
   };
 }
 

@@ -3,6 +3,9 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const {
+  ORDER_REFUND_INDEX_DEFINITIONS,
+} = require('./orderRefundIndexDefinitions');
 
 const { Schema } = mongoose;
 
@@ -146,6 +149,7 @@ const ReconciliationStageSchema = new Schema(
     completedByLabel: { type: String, trim: true, default: '', maxlength: 160 },
     attempts: { type: Number, default: 0, min: 0 },
     operationKey: { type: String, trim: true, default: '', maxlength: 160 },
+    claimId: { type: String, trim: true, default: '', maxlength: 160 },
     providerStatus: { type: String, trim: true, default: '', maxlength: 80 },
     nextRetryAt: { type: Date, default: null },
   },
@@ -203,8 +207,6 @@ const OrderRefundSchema = new Schema(
       trim: true,
       uppercase: true,
       required: true,
-      unique: true,
-      index: true,
       maxlength: 80,
     },
     order: {
@@ -311,20 +313,12 @@ const OrderRefundSchema = new Schema(
   }
 );
 
-OrderRefundSchema.index(
-  { order: 1, idempotencyKey: 1 },
-  { unique: true }
-);
-OrderRefundSchema.index({ order: 1, status: 1, createdAt: 1 });
-OrderRefundSchema.index({
-  order: 1,
-  'items.orderItemId': 1,
-  status: 1,
-});
-OrderRefundSchema.index({
-  'reconciliation.state': 1,
-  'reconciliation.lastReconciledAt': -1,
-});
+for (const definition of ORDER_REFUND_INDEX_DEFINITIONS) {
+  OrderRefundSchema.index(
+    { ...definition.key },
+    { ...definition.options }
+  );
+}
 
 OrderRefundSchema.pre('validate', function normalizeRefund(next) {
   this.refundNumber = cleanUpper(this.refundNumber);

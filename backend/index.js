@@ -39,19 +39,28 @@ const mongooseIndexPolicy = applyMongooseIndexPolicy(mongoose, {
 });
 
 function tryRequire(relPath) {
+  let resolvedPath;
   try {
-    const mod = require(relPath);
-    console.log(`Ruta cargada: ${relPath}`);
-    return mod;
-  } catch (e) {
-    if (e.code === 'MODULE_NOT_FOUND') {
+    resolvedPath = require.resolve(relPath);
+  } catch (error) {
+    if (error.code === 'MODULE_NOT_FOUND') {
       console.warn(`Ruta NO encontrada, se omite: ${relPath}`);
       return null;
     }
-
-    console.error(`Error al cargar ${relPath}:`, e.message);
-    return null;
+    throw error;
   }
+
+  // Si el archivo existe, cualquier error interno debe detener el arranque.
+  // Ocultarlo produciría un backend "sano" sin rutas o servicios esenciales.
+  const mod = require(resolvedPath);
+  console.log(`Ruta cargada: ${relPath}`);
+  return mod;
+}
+
+function requireCritical(relPath) {
+  const mod = require(relPath);
+  console.log(`Módulo crítico cargado: ${relPath}`);
+  return mod;
 }
 
 app.use(cors());
@@ -93,27 +102,28 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Estos adaptadores deben cargarse antes de las rutas heredadas para que las
 // emisiones usen rangos sincronizados y recuperación de resultados inciertos.
-tryRequire('./services/electronicCreditNoteRangeService');
-tryRequire('./services/electronicInvoiceRecoveryBootstrapService');
+requireCritical('./services/electronicCreditNoteRangeService');
+requireCritical('./services/electronicInvoiceRecoveryBootstrapService');
 
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
-const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
-const orderCustomerNotificationRoutes = tryRequire(
+const orderEmailRoutes = requireCritical('./routes/orderEmailRoutes');
+const orderCustomerNotificationRoutes = requireCritical(
   './routes/orderCustomerNotificationRoutes'
 );
-const orderQuoteRoutes = tryRequire('./routes/orderQuote');
-const orderReturnRoutes = tryRequire('./routes/orderReturnRoutes');
-const orderRoutes = tryRequire('./routes/orders');
-const payuRoutes = tryRequire('./routes/payuProductionWebhook');
-const paymentRoutes = tryRequire('./routes/payments');
+const orderQuoteRoutes = requireCritical('./routes/orderQuote');
+const orderReturnRoutes = requireCritical('./routes/orderReturnRoutes');
+const orderRoutes = requireCritical('./routes/orders');
+const payuRoutes = requireCritical('./routes/payuProductionWebhook');
+const paymentRoutes = requireCritical('./routes/payments');
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
 const geoRoutes = tryRequire('./routes/geo');
-const inventoryReservationService = tryRequire('./services/inventoryReservationService');
-const storeCreditCheckoutService = tryRequire('./services/storeCreditCheckoutService');
+const inventoryReservationService = requireCritical('./services/inventoryReservationService');
+const storeCreditCheckoutService = requireCritical('./services/storeCreditCheckoutService');
+const orderPostCommitOutboxWorkerService = requireCritical('./services/orderPostCommitOutboxWorkerService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
 const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
@@ -201,6 +211,7 @@ let billingRecoveryTimer = null;
 let billingRecoveryRunning = false;
 let shippingWebhookRecoveryTimer = null;
 let shippingWebhookRecoveryRunning = false;
+let orderPostCommitOutboxWorker = null;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -352,6 +363,27 @@ function startShippingWebhookRecoveryJob() {
   runRecovery().catch(() => null);
 }
 
+function startOrderPostCommitOutboxWorker() {
+  if (!env.orderPostCommitOutbox.enabled) {
+    console.log('Worker post-pago desactivado por configuración.');
+    return;
+  }
+  if (orderPostCommitOutboxWorker) return;
+
+  orderPostCommitOutboxWorker =
+    orderPostCommitOutboxWorkerService.createOrderPostCommitOutboxWorker({
+      intervalMs: env.orderPostCommitOutbox.intervalMs,
+      batchSize: env.orderPostCommitOutbox.batchSize,
+      isReady: () => mongoose.connection.readyState === 1,
+      logger: console,
+    });
+  orderPostCommitOutboxWorker.start({ runImmediately: true });
+  console.log('Worker post-pago iniciado.', {
+    intervalMs: orderPostCommitOutboxWorker.intervalMs,
+    batchSize: orderPostCommitOutboxWorker.batchSize,
+  });
+}
+
 mongoose
   .connect(env.mongoUri, {
     autoIndex: mongooseIndexPolicy.autoIndex,
@@ -361,6 +393,7 @@ mongoose
     startInventoryReservationExpirationJob();
     startBillingInvoiceRecoveryJob();
     startShippingWebhookRecoveryJob();
+    startOrderPostCommitOutboxWorker();
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });

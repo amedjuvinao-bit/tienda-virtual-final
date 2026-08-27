@@ -11,7 +11,10 @@ const {
   getCreditNoteFromFactus,
   getInvoiceFromFactus,
 } = require('../lib/dian/providers/factusProvider');
-const { serializeElectronicInvoice, serializeCreditNote } = require('./adminBillingService');
+const {
+  serializeCreditNote,
+  serializeElectronicInvoice,
+} = require('./adminBillingSerializationService');
 
 function cleanText(value, max = 180) {
   if (value === undefined || value === null) return '';

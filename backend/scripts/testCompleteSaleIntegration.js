@@ -1066,7 +1066,9 @@ async function run() {
     idempotencyKey: `${PREFIX}-REFUND`,
     adminLabel: 'ci-products',
   };
-  const refund = await processOrderRefund(refundInput);
+  const refund = await processOrderRefund(refundInput, {
+    allowInventoryRestock: true,
+  });
   assert.strictEqual(refund.idempotent, false);
   order = await Order.findById(order._id).lean();
   assert.strictEqual(
@@ -1083,7 +1085,9 @@ async function run() {
   );
   ok('La devolución repone cada unidad en su sede de origen');
 
-  const repeatedRefund = await processOrderRefund(refundInput);
+  const repeatedRefund = await processOrderRefund(refundInput, {
+    allowInventoryRestock: true,
+  });
   assert.strictEqual(repeatedRefund.idempotent, true);
   assert.strictEqual(
     await OrderRefund.countDocuments({

@@ -6,6 +6,10 @@ const PRIVILEGED_ORDER_ROLES = new Set([
   'owner',
   'admin',
 ]);
+const BRANCH_CAPABILITIES = new Set([
+  'canManageInventory',
+  'canInvoice',
+]);
 
 function normalizeBranchId(value, visited = new Set()) {
   if (!value) return '';
@@ -50,17 +54,52 @@ function canAdminSeeAllBranches(req = {}) {
   return PRIVILEGED_ORDER_ROLES.has(getAdminRoleCode(req));
 }
 
-function getAllowedBranchIdsFromRequest(req = {}) {
-  const ids = new Set();
-  const defaultBranchId = normalizeBranchId(req.adminDefaultBranch);
+function normalizeRequiredCapability(value) {
+  const capability = String(value || '').trim();
+  return BRANCH_CAPABILITIES.has(capability) ? capability : '';
+}
 
-  if (defaultBranchId) ids.add(defaultBranchId);
-
+function getAssignedBranchPermissions(req = {}) {
+  const permissions = new Map();
   const branches = Array.isArray(req.adminBranches) ? req.adminBranches : [];
 
   for (const item of branches) {
     const branchId = normalizeBranchId(item?.branch || item);
-    if (branchId) ids.add(branchId);
+    if (!branchId) continue;
+    const current = permissions.get(branchId) || {
+      branchId,
+      canManageInventory: false,
+      canInvoice: false,
+    };
+    current.canManageInventory =
+      current.canManageInventory || item?.canManageInventory === true;
+    current.canInvoice = current.canInvoice || item?.canInvoice === true;
+    permissions.set(branchId, current);
+  }
+
+  return permissions;
+}
+
+function getAllowedBranchIdsFromRequest(req = {}, options = {}) {
+  const ids = new Set();
+  const requiredCapability = normalizeRequiredCapability(
+    options.requiredCapability
+  );
+  const defaultBranchId = normalizeBranchId(req.adminDefaultBranch);
+  const assignedPermissions = getAssignedBranchPermissions(req);
+
+  if (
+    !requiredCapability &&
+    defaultBranchId &&
+    assignedPermissions.has(defaultBranchId)
+  ) {
+    ids.add(defaultBranchId);
+  }
+
+  for (const permission of assignedPermissions.values()) {
+    if (!requiredCapability || permission[requiredCapability] === true) {
+      ids.add(permission.branchId);
+    }
   }
 
   return Array.from(ids);
@@ -91,7 +130,41 @@ function appendBranchScope(filter, branchObjectIds) {
   ];
 }
 
+function appendWholeOrderBranchScope(filter, branchObjectIds) {
+  filter.$and = [
+    ...(Array.isArray(filter.$and) ? filter.$and : []),
+    {
+      $and: [
+        {
+          $or: [
+            { branch: { $exists: false } },
+            { branch: null },
+            { branch: { $in: branchObjectIds } },
+          ],
+        },
+        {
+          inventoryAllocations: {
+            $not: {
+              $elemMatch: { branch: { $nin: branchObjectIds } },
+            },
+          },
+        },
+        {
+          'fulfillment.shipments': {
+            $not: {
+              $elemMatch: { branch: { $nin: branchObjectIds } },
+            },
+          },
+        },
+      ],
+    },
+  ];
+}
+
 function applyOrderBranchAccessFilter(req, filter = {}, options = {}) {
+  const requiredCapability = normalizeRequiredCapability(
+    options.requiredCapability
+  );
   const requestedBranchRaw = Object.prototype.hasOwnProperty.call(
     options,
     'requestedBranchId'
@@ -118,18 +191,25 @@ function applyOrderBranchAccessFilter(req, filter = {}, options = {}) {
       ok: true,
       mode: requestedBranchId ? 'single' : 'all',
       branchIds: requestedBranchId ? [requestedBranchId] : [],
+      requiredCapability,
       filter,
     };
   }
 
-  const allowedBranchIds = getAllowedBranchIdsFromRequest(req);
+  const allowedBranchIds = getAllowedBranchIdsFromRequest(req, {
+    requiredCapability,
+  });
 
   if (allowedBranchIds.length === 0) {
     return {
       ok: false,
       status: 403,
-      error: 'NO_BRANCH_ASSIGNED',
-      message: 'Tu usuario no tiene sedes asignadas para consultar órdenes.',
+      error: requiredCapability
+        ? 'BRANCH_CAPABILITY_REQUIRED'
+        : 'NO_BRANCH_ASSIGNED',
+      message: requiredCapability
+        ? 'Tu usuario no tiene una sede autorizada para esta operación.'
+        : 'Tu usuario no tiene sedes asignadas para consultar órdenes.',
     };
   }
 
@@ -150,11 +230,15 @@ function applyOrderBranchAccessFilter(req, filter = {}, options = {}) {
   );
 
   appendBranchScope(filter, branchObjectIds);
+  if (options.requireWholeOrder === true) {
+    appendWholeOrderBranchScope(filter, branchObjectIds);
+  }
 
   return {
     ok: true,
     mode: requestedBranchId ? 'single' : 'assigned',
     branchIds: branchIdsToUse,
+    requiredCapability,
     filter,
   };
 }
@@ -169,7 +253,12 @@ function buildScopedOrderFilter(req, baseFilter = {}, options = {}) {
   };
 }
 
-async function authorizeOrderAdminScope(req, orderId, OrderModel) {
+async function authorizeOrderAdminScope(
+  req,
+  orderId,
+  OrderModel,
+  options = {}
+) {
   const normalizedOrderId = normalizeBranchId(orderId);
 
   if (!normalizedOrderId) {
@@ -189,7 +278,7 @@ async function authorizeOrderAdminScope(req, orderId, OrderModel) {
   const access = buildScopedOrderFilter(
     req,
     { _id: new mongoose.Types.ObjectId(normalizedOrderId) },
-    { requestedBranchId: '' }
+    { ...options, requestedBranchId: '' }
   );
 
   if (!access.ok) return access;
@@ -211,11 +300,14 @@ async function authorizeOrderAdminScope(req, orderId, OrderModel) {
 
 module.exports = {
   applyOrderBranchAccessFilter,
+  appendWholeOrderBranchScope,
   authorizeOrderAdminScope,
   buildScopedOrderFilter,
   canAdminSeeAllBranches,
   getAdminRoleCode,
+  getAssignedBranchPermissions,
   getAllowedBranchIdsFromRequest,
   getRequestedBranchIdFromQuery,
   normalizeBranchId,
+  normalizeRequiredCapability,
 };

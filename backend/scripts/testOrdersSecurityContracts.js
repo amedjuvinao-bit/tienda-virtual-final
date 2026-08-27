@@ -17,6 +17,12 @@ const {
 const {
   findAdminRoutePermission,
 } = require('../security/adminRoutePermissionMap');
+const {
+  getPaymentAccessSecret,
+} = require('../services/publicPaymentAccessService');
+const {
+  readWompiWebhookOrderComposition,
+} = require('./lib/readWompiWebhookComposition');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BRANCH_A = '64b000000000000000000001';
@@ -136,6 +142,24 @@ async function main() {
     checks.push(message);
     console.log(`OK ${checks.length}: ${message}`);
   };
+
+  assert.throws(
+    () =>
+      getPaymentAccessSecret({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'legacy-jwt-secret-that-must-not-sign-payment-access',
+      }),
+    (error) => error?.code === 'PAYMENT_ACCESS_SECRET_MISCONFIGURED'
+  );
+  assert.strictEqual(
+    getPaymentAccessSecret({
+      NODE_ENV: 'production',
+      ORDER_PAYMENT_ACCESS_SECRET: 'dedicated-payment-access-secret-1234567890',
+      JWT_SECRET: 'legacy-jwt-secret-that-must-not-sign-payment-access',
+    }),
+    'dedicated-payment-access-secret-1234567890'
+  );
+  ok('producción exige una clave dedicada para el acceso público de pago');
 
   const objectIdBranch = new mongoose.Types.ObjectId(BRANCH_A);
   assert.strictEqual(normalizeBranchId(objectIdBranch), BRANCH_A);
@@ -301,13 +325,74 @@ async function main() {
   const customerNotificationRoute = read(
     'backend/routes/orderCustomerNotificationRoutes.js'
   );
+  const emailController = read('backend/controllers/orderEmailController.js');
+  const emailContentService = read(
+    'backend/services/orderEmailContentService.js'
+  );
+  const customerNotificationController = read(
+    'backend/controllers/orderCustomerNotificationController.js'
+  );
+  const customerNotificationOrchestrator = read(
+    'backend/services/orderCustomerNotificationOrchestrator.js'
+  );
   const paymentRoute = read('backend/routes/payments.js');
+  const paymentFiscalAdminController = read(
+    'backend/controllers/paymentFiscalAdminController.js'
+  );
+  const wompiWebhookController = read(
+    'backend/controllers/wompiWebhookController.js'
+  );
+  const wompiWebhookOrderService = readWompiWebhookOrderComposition();
   const billingRoute = read('backend/routes/adminBilling.js');
-  assert.ok(ordersRoute.includes('buildAuthorizedSelectionFilter'));
-  assert.ok(ordersRoute.includes('ensureOrderOperationAccess'));
-  assert.ok(ordersRoute.includes('Order.findOne(access.filter)'));
-  assert.ok(paymentRoute.includes('requireAuthorizedOrderScope'));
+  const orderAccessService = read('backend/services/orderRouteAccessService.js');
+  const orderBulkController = read('backend/controllers/orderBulkController.js');
+  const orderExportController = read('backend/controllers/orderExportController.js');
+  const orderRefundController = read('backend/controllers/orderRefundController.js');
+  const orderManualPaymentController = read(
+    'backend/controllers/orderManualPaymentController.js'
+  );
+  const orderDocumentsController = read('backend/controllers/orderDocumentsController.js');
+  const orderAdminDetailController = read('backend/controllers/orderAdminDetailController.js');
+  const orderAdminMutationController = read('backend/controllers/orderAdminMutationController.js');
+  const orderCustomerDataController = read('backend/controllers/orderCustomerDataController.js');
+  const orderFulfillmentServiceController = read(
+    'backend/controllers/orderFulfillmentServiceController.js'
+  );
+  const envConfig = read('backend/config/env.js');
+  const envExample = read('backend/.env.example');
+  const orderProtectedOperations = [
+    ordersRoute,
+    orderAccessService,
+    orderBulkController,
+    orderExportController,
+    orderRefundController,
+    orderManualPaymentController,
+    orderDocumentsController,
+    orderAdminDetailController,
+    orderAdminMutationController,
+    orderCustomerDataController,
+    orderFulfillmentServiceController,
+    emailController,
+    customerNotificationOrchestrator,
+  ].join('\n');
+  assert.ok(orderProtectedOperations.includes('buildAuthorizedSelectionFilter'));
+  assert.ok(orderProtectedOperations.includes('ensureOrderOperationAccess'));
+  assert.ok(orderProtectedOperations.includes('Order.findOne(access.filter)'));
+  assert.ok(
+    [paymentRoute, paymentFiscalAdminController]
+      .join('\n')
+      .includes('requireAuthorizedOrderScope')
+  );
   assert.ok(billingRoute.includes('authorizeOrderAdminScope'));
+  assert.ok(orderAccessService.includes('FINANCIAL_ORDER_ACCESS'));
+  assert.ok(orderAccessService.includes("requiredCapability: 'canInvoice'"));
+  assert.ok(orderAccessService.includes('requireWholeOrder: true'));
+  assert.ok(orderRefundController.includes('requireFinancialOrderAccess'));
+  assert.ok(orderManualPaymentController.includes('FINANCIAL_ORDER_ACCESS'));
+  assert.ok(paymentFiscalAdminController.includes('fiscalOrderAccess'));
+  assert.ok(envConfig.includes('orderPaymentAccessSecret'));
+  assert.ok(envConfig.includes('Producción requiere ORDER_PAYMENT_ACCESS_SECRET'));
+  assert.ok(envExample.includes('ORDER_PAYMENT_ACCESS_SECRET='));
   assert.strictEqual(
     (ordersRoute.match(/router\.post\('\/:id\/email'/g) || []).length,
     0
@@ -320,14 +405,32 @@ async function main() {
 
   const trustedRuntime = [
     ordersRoute,
+    orderBulkController,
+    orderExportController,
+    orderRefundController,
+    orderManualPaymentController,
+    orderDocumentsController,
+    orderAdminDetailController,
+    orderAdminMutationController,
+    orderCustomerDataController,
+    orderFulfillmentServiceController,
     emailRoute,
+    emailController,
+    emailContentService,
     customerNotificationRoute,
+    customerNotificationController,
+    customerNotificationOrchestrator,
     paymentRoute,
+    paymentFiscalAdminController,
+    wompiWebhookController,
+    wompiWebhookOrderService,
   ].join('\n');
   assert.ok(!trustedRuntime.includes("req.headers['x-admin-user']"));
-  assert.ok(emailRoute.includes('escapeHtml'));
-  assert.ok(ordersRoute.includes('ORDER_CUSTOMER_EDITABLE_FIELDS'));
-  assert.ok(ordersRoute.includes('customerFields: customer ? Object.keys(customer) : []'));
+  assert.ok(emailContentService.includes('escapeHtml'));
+  assert.ok(trustedRuntime.includes('ORDER_CUSTOMER_EDITABLE_FIELDS'));
+  assert.ok(
+    trustedRuntime.includes('customerFields: customer ? Object.keys(customer) : []')
+  );
   ok('actores y datos editables provienen de contratos confiables y acotados');
 
   const expectedRules = [
@@ -335,6 +438,7 @@ async function main() {
     ['POST', '/api/orders/admin/export', 'orders:export'],
     ['POST', '/api/orders/admin/bulk', 'orders:bulk'],
     ['PATCH', `/api/orders/${ORDER_ID}/status`, 'orders:status'],
+    ['POST', `/api/orders/${ORDER_ID}/payments/manual-confirmation`, 'orders:confirm_manual_payment'],
     ['GET', `/api/orders/${ORDER_ID}/fulfillment/logistics`, 'orders:view'],
     ['POST', `/api/orders/${ORDER_ID}/fulfillment/logistics/initialize`, 'orders:fulfillment'],
     ['PATCH', `/api/orders/${ORDER_ID}/fulfillment/logistics/shipments/${ORDER_ID}`, 'orders:fulfillment'],

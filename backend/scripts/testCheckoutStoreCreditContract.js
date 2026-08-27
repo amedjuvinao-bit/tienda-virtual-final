@@ -140,6 +140,7 @@ async function run() {
   ok('el pago total con saldo puede dejar cero para la pasarela');
 
   const partialOrder = {
+    _id: new mongoose.Types.ObjectId(),
     orderNumber: 'ORD-SC-PARTIAL',
     total: 100000,
     payment: { currency: 'COP', amount: 40000 },
@@ -148,6 +149,13 @@ async function run() {
   assert.strictEqual(
     isWompiTransactionOwnedByOrder({
       order: partialOrder,
+      attempt: {
+        provider: 'wompi',
+        order: partialOrder._id,
+        reference: 'ORDER-ORD-SC-PARTIAL__TRY__1',
+        amountInCents: 4000000,
+        currency: 'COP',
+      },
       requestedTransactionId: 'tx-store-credit-partial',
       transaction: {
         id: 'tx-store-credit-partial',
@@ -161,6 +169,13 @@ async function run() {
   assert.strictEqual(
     isWompiTransactionOwnedByOrder({
       order: partialOrder,
+      attempt: {
+        provider: 'wompi',
+        order: partialOrder._id,
+        reference: 'ORDER-ORD-SC-PARTIAL__TRY__2',
+        amountInCents: 4000000,
+        currency: 'COP',
+      },
       requestedTransactionId: 'tx-store-credit-wrong-total',
       transaction: {
         id: 'tx-store-credit-wrong-total',
@@ -181,6 +196,15 @@ async function run() {
   assert.strictEqual(
     isWompiTransactionOwnedByOrder({
       order: releasedOrder,
+      attempt: {
+        provider: 'wompi',
+        order: releasedOrder._id,
+        reference: 'ORDER-ORD-SC-PARTIAL__TRY__old',
+        amountInCents: 4000000,
+        currency: 'COP',
+        state: 'superseded',
+        active: false,
+      },
       requestedTransactionId: 'tx-store-credit-old-attempt',
       transaction: {
         id: 'tx-store-credit-old-attempt',
@@ -194,6 +218,15 @@ async function run() {
   assert.strictEqual(
     isWompiTransactionOwnedByOrder({
       order: releasedOrder,
+      attempt: {
+        provider: 'wompi',
+        order: releasedOrder._id,
+        reference: 'ORDER-ORD-SC-PARTIAL__TRY__new',
+        amountInCents: 10000000,
+        currency: 'COP',
+        state: 'issued',
+        active: true,
+      },
       requestedTransactionId: 'tx-store-credit-new-attempt',
       transaction: {
         id: 'tx-store-credit-new-attempt',
@@ -204,7 +237,7 @@ async function run() {
     }),
     true
   );
-  ok('tras devolver el saldo se reconocen el intento anterior y el nuevo cobro total');
+  ok('la consulta pública identifica cada intento por su ledger exacto');
 
   const usage = new StoreCreditUsage({
     order: fullCreditOrder._id,
@@ -231,12 +264,12 @@ async function run() {
   assert.strictEqual(usage.amount, 100000);
   ok('cada uso conserva la fuente y el movimiento de saldo');
 
-  const checkoutServiceSource = fs.readFileSync(
-    path.join(__dirname, '../services/storeCreditCheckoutService.js'),
+  const checkoutReservationSource = fs.readFileSync(
+    path.join(__dirname, '../services/storeCreditCheckout/reservation.js'),
     'utf8'
   );
-  assert(checkoutServiceSource.includes('$set: { balance: after }'));
-  assert(!checkoutServiceSource.includes('$inc: { balance: -take'));
+  assert(checkoutReservationSource.includes('$set: { balance: after }'));
+  assert(!checkoutReservationSource.includes('$inc: { balance: -take'));
   ok('la reserva guarda el saldo restante sin aplicar setters a un incremento negativo');
 
   assert.strictEqual(parseStoreCreditDemoArgs([]).confirmPersist, false);

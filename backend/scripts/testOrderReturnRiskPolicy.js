@@ -227,18 +227,25 @@ test('el esquema de política acepta controles y reglas válidas', async () => {
 });
 
 test('la respuesta pública no incluye el análisis antifraude', () => {
-  const service = source('backend/services/orderReturnService.js');
-  const customerView = service.slice(
-    service.indexOf('function safeCustomerReturnView'),
-    service.indexOf('async function createOrderEvent')
+  const presentation = source('backend/services/orderReturns/presentation.js');
+  const customerView = presentation.slice(
+    presentation.indexOf('function safeCustomerReturnView'),
+    presentation.indexOf('function safeStoreCreditView')
   );
+  const creation = source('backend/services/orderReturns/creation.js');
   assert.ok(!customerView.includes('riskAssessment'));
-  assert.ok(service.includes("'RETURN_RISK_BLOCKED'"));
-  assert.ok(!service.includes('signals: riskAssessment.signals.map((entry) => entry.code),\n          }'));
+  assert.ok(creation.includes("'RETURN_RISK_BLOCKED'"));
+  assert.ok(!customerView.includes('signals: riskAssessment.signals'));
 });
 
 test('la interfaz administrativa exige documentar una alerta antes de autorizar', () => {
-  const panel = source('frontend/src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.jsx');
+  const panel = [
+    'frontend/src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.jsx',
+    'frontend/src/admin/orders/components/orderDetail/OrderReturnCaseWorkflow.jsx',
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderReturnActions.js',
+  ]
+    .map(source)
+    .join('\n');
   const editor = source('frontend/src/admin/orders/components/orderDetail/OrderReturnPolicyAdvancedEditor.jsx');
   assert.ok(panel.includes('Conclusión de la revisión antifraude'));
   assert.ok(panel.includes('riskReviewNote'));

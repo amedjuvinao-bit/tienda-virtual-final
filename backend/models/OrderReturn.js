@@ -1,6 +1,9 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const {
+  orderReturnCreationIdempotencyIndexDefinition,
+} = require('./orderReturnIndexDefinitions');
 
 const { Schema } = mongoose;
 
@@ -189,6 +192,25 @@ const OrderReturnSchema = new Schema(
       default: 'admin',
       index: true,
     },
+    creationIdempotencyScope: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: undefined,
+    },
+    creationIdempotencyKey: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: undefined,
+    },
+    creationRequestHash: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: 64,
+      default: undefined,
+    },
     customerSnapshot: {
       type: CustomerSnapshotSchema,
       default: () => ({}),
@@ -285,11 +307,24 @@ OrderReturnSchema.index({ status: 1, 'eligibility.eligibleUntil': 1 });
 OrderReturnSchema.index({ 'customerSnapshot.customer': 1, requestedAt: -1 });
 OrderReturnSchema.index({ 'customerSnapshot.email': 1, requestedAt: -1 });
 OrderReturnSchema.index({ 'customerSnapshot.phone': 1, requestedAt: -1 });
+{
+  const { key, options } = orderReturnCreationIdempotencyIndexDefinition();
+  OrderReturnSchema.index(key, options);
+}
 
 OrderReturnSchema.pre('validate', function normalizeOrderReturn(next) {
   this.returnNumber = cleanUpper(this.returnNumber);
   this.orderNumber = cleanUpper(this.orderNumber);
   this.reasonSummary = cleanText(this.reasonSummary);
+  if (this.creationIdempotencyScope !== undefined) {
+    this.creationIdempotencyScope = cleanLower(this.creationIdempotencyScope);
+  }
+  if (this.creationIdempotencyKey !== undefined) {
+    this.creationIdempotencyKey = cleanText(this.creationIdempotencyKey);
+  }
+  if (this.creationRequestHash !== undefined) {
+    this.creationRequestHash = cleanLower(this.creationRequestHash);
+  }
   this.rejectionReason = cleanText(this.rejectionReason);
   this.cancellationReason = cleanText(this.cancellationReason);
   this.revision = cleanQuantity(this.revision);

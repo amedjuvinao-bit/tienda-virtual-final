@@ -78,6 +78,9 @@ describe('OrderReturnsPage', () => {
     await screen.findByText(/Solicitud RMA-000123-1 creada correctamente/);
     const post = requests.find((options) => options.method === 'POST');
     expect(post.headers['X-Order-Return-Token']).toBe('return-access-token');
+    expect(post.headers['Idempotency-Key']).toMatch(/^rma-v1-/);
+    expect(post.headers['Idempotency-Key'].length).toBeGreaterThanOrEqual(8);
+    expect(post.headers['Idempotency-Key'].length).toBeLessThanOrEqual(200);
     expect(JSON.parse(post.body)).toEqual(expect.objectContaining({
       requestedResolution: 'exchange',
       items: [expect.objectContaining({
@@ -87,6 +90,86 @@ describe('OrderReturnsPage', () => {
         reasonText: 'Necesito otra talla',
       })],
     }));
+    expect(JSON.parse(post.body)).not.toHaveProperty('idempotencyKey');
+  });
+
+  it('reutiliza la clave tras 5xx, rota con el payload y la limpia tras éxito', async () => {
+    const postRequests = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, options = {}) => {
+      if (options.method === 'POST') {
+        postRequests.push(options);
+        if (postRequests.length <= 3) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ message: 'Servicio temporalmente no disponible.' }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            returnCase: { returnNumber: `RMA-000123-${postRequests.length}` },
+          }),
+        };
+      }
+      return { ok: true, json: async () => payload() };
+    }));
+
+    render(
+      <MemoryRouter initialEntries={[`/devoluciones/${ORDER_ID}`]}>
+        <Routes><Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} /></Routes>
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Tenis Plus');
+    fireEvent.change(screen.getByLabelText('Cantidad Tenis Plus'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Motivo Tenis Plus'), { target: { value: 'wrong_size' } });
+    fireEvent.change(screen.getByLabelText('Detalle Tenis Plus'), { target: { value: 'Necesito otra talla' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }));
+    await waitFor(() => expect(postRequests).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }));
+    await waitFor(() => expect(postRequests).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeEnabled());
+
+    fireEvent.change(screen.getByLabelText('Detalle Tenis Plus'), {
+      target: { value: 'Necesito una talla diferente' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }));
+    await waitFor(() => expect(postRequests).toHaveLength(3));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }));
+    await screen.findByText(/Solicitud RMA-000123-4 creada correctamente/);
+    await screen.findByText('Tenis Plus');
+
+    fireEvent.change(screen.getByLabelText('Cantidad Tenis Plus'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Motivo Tenis Plus'), { target: { value: 'wrong_size' } });
+    fireEvent.change(screen.getByLabelText('Detalle Tenis Plus'), {
+      target: { value: 'Necesito una talla diferente' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud' }));
+    await waitFor(() => expect(postRequests).toHaveLength(5));
+
+    const keys = postRequests.map(
+      (request) => request.headers['Idempotency-Key']
+    );
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[1]);
+    expect(keys[3]).toBe(keys[2]);
+    expect(keys[4]).not.toBe(keys[3]);
+    postRequests.forEach((request) => {
+      expect(Object.keys(request.headers).sort()).toEqual([
+        'Content-Type',
+        'Idempotency-Key',
+        'X-Order-Return-Token',
+      ]);
+      expect(JSON.parse(request.body)).not.toHaveProperty('idempotencyKey');
+    });
+    const persistedAccess = localStorage.getItem('order_return_access_v1') || '';
+    keys.forEach((key) => expect(persistedAccess).not.toContain(key));
   });
 
   it('muestra trazabilidad y etiqueta cuando la devolución está autorizada', async () => {

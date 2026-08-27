@@ -175,11 +175,22 @@ function main() {
   ok('solo etapas aptas para clientes pueden alimentar el informe');
 
   const routeSource = read('backend/routes/orderCustomerNotificationRoutes.js');
+  const controllerSource = read(
+    'backend/controllers/orderCustomerNotificationController.js'
+  );
+  const orchestratorSource = read(
+    'backend/services/orderCustomerNotificationOrchestrator.js'
+  );
+  const notificationComposition = [
+    routeSource,
+    controllerSource,
+    orchestratorSource,
+  ].join('\n');
   assert.ok(routeSource.includes("requirePermission('orders:email')"));
-  assert.ok(routeSource.includes('buildScopedOrderFilter'));
-  assert.ok(routeSource.includes('deliveryConfirmed: false'));
-  assert.ok(!routeSource.includes('axios'));
-  assert.ok(!routeSource.includes('fetch('));
+  assert.ok(orchestratorSource.includes('buildScopedOrderFilter'));
+  assert.ok(controllerSource.includes('deliveryConfirmed: false'));
+  assert.ok(!notificationComposition.includes('axios'));
+  assert.ok(!notificationComposition.includes('fetch('));
   ok('las rutas son privadas, respetan la sede y no simulan una entrega externa');
 
   const modelSource = read('backend/models/OrderCustomerNotification.js');
@@ -199,15 +210,24 @@ function main() {
   const modalSource = read(
     'frontend/src/admin/orders/components/OrderDetailModal.jsx'
   );
+  const customerNotificationsHookSource = read(
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderCustomerNotifications.js'
+  );
+  const modalCompositionSource = `${modalSource}\n${customerNotificationsHookSource}`;
   const toolbarSource = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailActionToolbar.jsx'
+  );
+  const quickActionsSource = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderDetailQuickActions.jsx'
   );
   const previewSource = read(
     'frontend/src/admin/orders/components/orderDetail/OrderWhatsAppPreview.jsx'
   );
-  assert.ok(modalSource.includes('saveStatusAndOfferWhatsApp'));
-  assert.ok(modalSource.includes('Etapa confirmada'));
-  assert.ok(toolbarSource.includes('Informar por WhatsApp'));
+  assert.ok(modalCompositionSource.includes('saveStatusAndOfferWhatsApp'));
+  assert.ok(modalCompositionSource.includes('Etapa confirmada'));
+  assert.ok(
+    `${toolbarSource}\n${quickActionsSource}`.includes('Informar por WhatsApp')
+  );
   assert.ok(previewSource.includes('Mensaje que verá el cliente'));
   assert.ok(previewSource.includes('Abrir WhatsApp'));
   ok('la interfaz ofrece el informe después de confirmar y también como acción permanente');
@@ -215,9 +235,17 @@ function main() {
   const logisticsSource = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailLogisticsPanel.jsx'
   );
-  assert.ok(logisticsSource.includes('CUSTOMER_STAGE_LABELS'));
-  assert.ok(logisticsSource.includes('onCustomerStageConfirmed'));
-  assert.ok(!logisticsSource.includes("update_plan: '"));
+  const logisticsControllerSource = read(
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderLogisticsController.js'
+  );
+  const logisticsViewModelSource = read(
+    'frontend/src/admin/orders/components/orderDetail/orderLogisticsViewModel.js'
+  );
+  const logisticsComposition =
+    `${logisticsSource}\n${logisticsControllerSource}\n${logisticsViewModelSource}`;
+  assert.ok(logisticsComposition.includes('CUSTOMER_STAGE_LABELS'));
+  assert.ok(logisticsComposition.includes('onCustomerStageConfirmed'));
+  assert.ok(!logisticsComposition.includes("update_plan: '"));
   ok('picking, empaque, despacho, tránsito, entrega e incidencias activan el aviso rápido');
 
   console.log(

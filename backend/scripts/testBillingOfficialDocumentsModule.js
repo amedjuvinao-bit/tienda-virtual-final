@@ -216,6 +216,8 @@ function validateSyncIdentityAndStatus() {
 
 function validateProtectedRoutes() {
   const routes = read('backend/routes/orders.js');
+  const controller = read('backend/controllers/orderDocumentsController.js');
+  const implementation = `${routes}\n${controller}`;
 
   [
     "require('../services/electronicInvoiceDocumentService')",
@@ -225,7 +227,11 @@ function validateProtectedRoutes() {
     "X-Invoice-Document-Source",
     "Cache-Control', 'private, no-store'",
   ].forEach((needle) => {
-    assertIncludes(routes, needle, `Rutas de descarga incompletas: falta ${needle}`);
+    assertIncludes(
+      implementation,
+      needle,
+      `Rutas de descarga incompletas: falta ${needle}`
+    );
   });
 
   ok('Rutas PDF/XML están autenticadas, autorizadas y sirven el archivo oficial');
@@ -233,8 +239,13 @@ function validateProtectedRoutes() {
 
 function validateOrderReceiptSeparation() {
   const routes = read('backend/routes/orders.js');
+  const controller = read('backend/controllers/orderDocumentsController.js');
+  const implementation = `${routes}\n${controller}`;
   const orderDetail = read(
     'frontend/src/admin/orders/components/OrderDetailModal.jsx'
+  );
+  const orderDocumentsHook = read(
+    'frontend/src/admin/orders/components/orderDetail/hooks/useOrderDocuments.js'
   );
   const billingApi = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const invoiceDocuments = read(
@@ -247,7 +258,7 @@ function validateOrderReceiptSeparation() {
     'generateOrderPdf({',
   ].forEach((needle) => {
     assertIncludes(
-      routes,
+      implementation,
       needle,
       `El comprobante interno de la orden no conserva ${needle}`
     );
@@ -255,13 +266,23 @@ function validateOrderReceiptSeparation() {
 
   assertIncludes(
     orderDetail,
-    '/api/orders/${order._id}/receipt-pdf',
-    'El botón PDF del detalle no usa la ruta exclusiva del comprobante interno.'
+    "import useOrderDocuments from './orderDetail/hooks/useOrderDocuments'",
+    'El modal de orden no compone la autoridad modular de documentos.'
+  );
+  assertIncludes(
+    orderDetail,
+    'const documents = useOrderDocuments({',
+    'El modal de orden no usa la autoridad modular de documentos.'
+  );
+  assertIncludes(
+    orderDocumentsHook,
+    '/api/orders/${targetOrderId}/receipt-pdf',
+    'El módulo de documentos no usa la ruta exclusiva del comprobante interno.'
   );
   assertNotIncludes(
-    orderDetail,
-    'api.get(`/api/orders/${order._id}/pdf`',
-    'El botón PDF del detalle no debe intentar descargar la factura oficial.'
+    orderDocumentsHook,
+    'api.get(`/api/orders/${targetOrderId}/pdf`',
+    'El módulo del comprobante no debe intentar descargar la factura oficial.'
   );
   assertIncludes(
     billingApi,

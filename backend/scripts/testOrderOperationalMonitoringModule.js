@@ -5,6 +5,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const Order = require('../models/Order');
+const { hasExactIndex } = require('./lib/orderSchemaContract');
 
 const {
   buildOrderHealthPipeline,
@@ -46,14 +48,27 @@ function validateStaticContract() {
   const controller = read(
     'backend/controllers/orderOperationalMonitoringController.js'
   );
-  const service = read(
+  const serviceFacade = read(
     'backend/services/orderOperationalMonitoringService.js'
   );
-  const orderModel = read('backend/models/Order.js');
+  const serviceModules = [
+    'constants.js',
+    'metricsPipeline.js',
+    'mongoExpressions.js',
+    'operationalChecks.js',
+    'service.js',
+  ]
+    .map((name) =>
+      read(`backend/services/orderOperationalMonitoring/${name}`)
+    )
+    .join('\n');
+  const service = `${serviceFacade}\n${serviceModules}`;
   const packageJson = JSON.parse(read('backend/package.json'));
   const workflow = read('.github/workflows/products-ci.yml');
   const stress = read('backend/scripts/testOrderTransactionalStress.js');
-  const logistics = read('backend/services/orderLogisticsService.js');
+  const logisticsTransaction = read(
+    'backend/services/orderLogistics/transactionSupport.js'
+  );
 
   assert.ok(
     routes.includes(
@@ -106,9 +121,30 @@ function validateStaticContract() {
   );
   ok('la observabilidad no llama pasarelas, DIAN, correo ni altera índices');
 
-  assert.ok(orderModel.includes('orders_logistics_branch_status_sla'));
-  assert.ok(orderModel.includes("OrderSchema.index({ 'payment.status': 1, createdAt: -1 })"));
-  assert.ok(orderModel.includes('orders_admin_branch_status_date'));
+  assert.ok(
+    hasExactIndex(
+      Order.schema,
+      {
+        'fulfillment.shipments.branch': 1,
+        'fulfillment.shipments.status': 1,
+        'fulfillment.shipments.sla.dispatchDueAt': 1,
+      },
+      'orders_logistics_branch_status_sla'
+    )
+  );
+  assert.ok(
+    hasExactIndex(Order.schema, {
+      'payment.status': 1,
+      createdAt: -1,
+    })
+  );
+  assert.ok(
+    hasExactIndex(
+      Order.schema,
+      { branch: 1, status: 1, createdAt: -1 },
+      'orders_admin_branch_status_date'
+    )
+  );
   ok('las consultas operativas reutilizan índices comerciales y logísticos existentes');
 
   assert.strictEqual(
@@ -132,7 +168,7 @@ function validateStaticContract() {
   assert.ok(stress.includes('assertIsolatedMongoUri'));
   assert.ok(stress.includes('initializeOrderLogistics'));
   assert.ok(stress.includes('updateOrderShipment'));
-  assert.ok(logistics.includes('withTransaction'));
+  assert.ok(logisticsTransaction.includes('withTransaction'));
   assert.ok(stress.includes('dropDatabase'));
   assert.ok(stress.includes('Promise.allSettled'));
   assert.ok(stress.includes('LOGISTICS_REVISION_CONFLICT'));

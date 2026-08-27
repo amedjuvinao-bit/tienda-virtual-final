@@ -333,7 +333,11 @@ router.get(
       const access = await authorizeOrderAdminScope(
         req,
         req.params.orderId,
-        Order
+        Order,
+        {
+          requiredCapability: 'canInvoice',
+          requireWholeOrder: true,
+        }
       );
 
       if (!access.ok) {
@@ -369,7 +373,11 @@ router.post(
       const access = await authorizeOrderAdminScope(
         req,
         req.params.orderId,
-        Order
+        Order,
+        {
+          requiredCapability: 'canInvoice',
+          requireWholeOrder: true,
+        }
       );
 
       if (!access.ok) {

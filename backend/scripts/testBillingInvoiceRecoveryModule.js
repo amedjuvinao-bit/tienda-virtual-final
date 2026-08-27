@@ -390,6 +390,10 @@ function testIntegrationAndNoReissueControls() {
   const index = read('backend/index.js');
   const model = read('backend/models/ElectronicInvoice.js');
   const taskModel = read('backend/models/BillingInvoiceRecoveryTask.js');
+  const recoveryBootstrapPosition = index.indexOf(
+    'electronicInvoiceRecoveryBootstrapService'
+  );
+  const paymentRoutesPosition = index.indexOf("'./routes/payments'");
 
   assert(
     bootstrap.includes('isInvoiceLockExpired') &&
@@ -398,8 +402,9 @@ function testIntegrationAndNoReissueControls() {
     'El motor real no intercepta locks vencidos y resultados inciertos.'
   );
   assert(
-    index.indexOf('electronicInvoiceRecoveryBootstrapService') <
-      index.indexOf("tryRequire('./routes/payments')"),
+    recoveryBootstrapPosition >= 0 &&
+      paymentRoutesPosition >= 0 &&
+      recoveryBootstrapPosition < paymentRoutesPosition,
     'El bootstrap se carga después de las rutas de pago.'
   );
   assert(

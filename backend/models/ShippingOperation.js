@@ -1,6 +1,9 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const {
+  SHIPPING_OPERATION_INDEX_DEFINITIONS,
+} = require('./shippingOperationIndexDefinitions');
 
 const ShippingOperationSchema = new mongoose.Schema(
   {
@@ -18,13 +21,12 @@ const ShippingOperationSchema = new mongoose.Schema(
       enum: ['generate_label', 'schedule_pickup', 'cancel_label'],
       required: true,
     },
-    idempotencyKey: { type: String, trim: true, required: true, unique: true },
+    idempotencyKey: { type: String, trim: true, required: true },
     requestHash: { type: String, trim: true, required: true },
     status: {
       type: String,
       enum: ['processing', 'succeeded', 'failed', 'action_required'],
       default: 'processing',
-      index: true,
     },
     attempts: { type: Number, min: 1, default: 1 },
     providerReference: { type: String, trim: true, default: '' },
@@ -38,7 +40,12 @@ const ShippingOperationSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-ShippingOperationSchema.index({ order: 1, shipmentId: 1, createdAt: -1 });
+for (const definition of SHIPPING_OPERATION_INDEX_DEFINITIONS) {
+  ShippingOperationSchema.index(
+    { ...definition.key },
+    { ...definition.options }
+  );
+}
 
 module.exports =
   mongoose.models.ShippingOperation ||

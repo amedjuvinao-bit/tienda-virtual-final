@@ -460,6 +460,7 @@ async function run() {
     };
     const first = await processOrderRefund(firstPayload, {
       OrderEventModel: OrderEvent,
+      allowInventoryRestock: true,
     });
     assert.strictEqual(first.idempotent, false);
     assert.strictEqual(first.refund.totalReturnedUnits, 3);
@@ -489,6 +490,7 @@ async function run() {
 
     const retry = await processOrderRefund(firstPayload, {
       OrderEventModel: OrderEvent,
+      allowInventoryRestock: true,
     });
     assert.strictEqual(retry.idempotent, true);
     assert.strictEqual(
@@ -525,6 +527,7 @@ async function run() {
       },
       {
         OrderEventModel: OrderEvent,
+        allowInventoryRestock: true,
       }
     );
     assert.strictEqual(second.idempotent, false);
@@ -574,6 +577,7 @@ async function run() {
           },
           {
             OrderEventModel: OrderEvent,
+            allowInventoryRestock: true,
           }
         ),
       (error) =>

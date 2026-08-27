@@ -4,6 +4,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 
@@ -52,7 +55,26 @@ function validateFilesExist() {
 function validateBackendOrderCouponFlow() {
   const quoteRoute = readProjectFile('backend/routes/orderQuote.js');
   const pricing = readProjectFile('backend/services/orderPricingService.js');
-  const orders = readProjectFile('backend/routes/orders.js');
+  const ordersRoute = readProjectFile('backend/routes/orders.js');
+  const orderCreationController = readProjectFile(
+    'backend/controllers/orderCreationController.js'
+  );
+  const orderCreationTransaction = readProjectFile(
+    'backend/services/orderCreationTransactionService.js'
+  );
+  const orderCreationCoupon = readProjectFile(
+    'backend/services/orderCreationCouponService.js'
+  );
+  const orderCreationPayload = readProjectFile(
+    'backend/lib/orders/orderCreationPayload.js'
+  );
+  const orderCreationComposition = [
+    ordersRoute,
+    orderCreationController,
+    orderCreationTransaction,
+    orderCreationCoupon,
+    orderCreationPayload,
+  ].join('\n');
   const indexFile = readProjectFile('backend/index.js');
 
   [
@@ -64,8 +86,25 @@ function validateBackendOrderCouponFlow() {
   ['calculateOrderPricing', 'resolveAuthoritativeItems', 'resolveShippingAmount']
     .forEach((needle) => assertIncludes(pricing, needle, `orderPricingService.js no contiene ${needle}`));
 
-  ['recordCouponRedemption', 'coupon_applied', 'couponCode', 'pricing: pricingSnapshot']
-    .forEach((needle) => assertIncludes(orders, needle, `orders.js no contiene ${needle}`));
+  [
+    'recordCouponRedemption',
+    'coupon_applied',
+    'couponCode',
+    'buildPricingSnapshot(pricing)',
+  ]
+    .forEach((needle) =>
+      assertIncludes(
+        orderCreationComposition,
+        needle,
+        `La composición de creación de órdenes no contiene ${needle}`
+      )
+    );
+
+  assertIncludes(
+    ordersRoute,
+    "router.post('/', rateLimit, requireAuthorizedOrderCart, createOrder)",
+    'orders.js no conserva la composición directa y segura de POST /api/orders'
+  );
 
   assertIncludes(indexFile, "./routes/orderQuote", 'index.js no carga orderQuote.');
   assertIncludes(indexFile, "app.use('/api/orders', orderQuoteRoutes)", 'index.js no monta la cotización de órdenes.');
@@ -73,7 +112,7 @@ function validateBackendOrderCouponFlow() {
 }
 
 function validateFrontendCheckoutCouponFlow() {
-  const checkout = readProjectFile('frontend/src/pages/CheckoutPage.jsx');
+  const checkout = readCheckoutComposition();
   const mainFile = readProjectFile('frontend/src/main.jsx');
 
   [

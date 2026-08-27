@@ -154,6 +154,23 @@ async function getEffectivePermissions(req) {
   return effectivePermissions;
 }
 
+async function hasEffectivePermission(req, requiredPermission, options = {}) {
+  const permission = normalizePermission(requiredPermission);
+  if (!permission) return false;
+  if (!req?.adminUser && !req?.adminUserId && !req?.adminRole) return false;
+
+  const allowOwner = options.allowOwner !== false;
+  const allowAdmin = options.allowAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
+
+  if (allowLegacyAdmin && isLegacyAdmin(req)) return true;
+  if (allowOwner && isOwner(req)) return true;
+  if (allowAdmin && isAdmin(req) && !isLegacyAdmin(req)) return true;
+
+  const effectivePermissions = await getEffectivePermissions(req);
+  return hasWildcardPermission(new Set(effectivePermissions), permission);
+}
+
 function reject(res, status, error, message, extra = {}) {
   return res.status(status).json({
     ok: false,
@@ -490,6 +507,7 @@ requirePermission.branchAccess = function requireBranchAccess(getBranchId) {
 };
 
 requirePermission.getEffectivePermissions = getEffectivePermissions;
+requirePermission.hasEffectivePermission = hasEffectivePermission;
 requirePermission.normalizePermission = normalizePermission;
 
 module.exports = requirePermission;

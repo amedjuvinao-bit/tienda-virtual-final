@@ -32,6 +32,25 @@ function read(relativePath) {
   return fs.readFileSync(absolutePath, 'utf8');
 }
 
+function readSourceTree(relativeDirectory) {
+  const absoluteDirectory = path.join(ROOT, relativeDirectory);
+  assert(fs.existsSync(absoluteDirectory), `Falta el directorio ${relativeDirectory}.`);
+  const files = [];
+
+  function visit(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(fullPath);
+      else if (/\.(?:js|jsx)$/.test(entry.name) && !/\.test\./.test(entry.name)) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  visit(absoluteDirectory);
+  return files.sort().map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+}
+
 function ok(label) {
   passed += 1;
   console.log(`OK  ${label}`);
@@ -47,11 +66,16 @@ function run() {
   const frontendPackage = JSON.parse(read('frontend/package.json'));
   const workflow = read('.github/workflows/orders-ci.yml');
   const routes = read('backend/routes/orderReturnRoutes.js');
-  const service = read('backend/services/orderReturnService.js');
+  const service = [
+    'backend/services/orderReturnService.js',
+    'backend/services/orderReturns/creation.js',
+    'backend/services/orderReturns/exchangeResolution.js',
+    'backend/services/orderReturns/storeCreditResolution.js',
+  ].map(read).join('\n');
   const accessService = read('backend/services/orderReturnAccessService.js');
   const customerPage = read('frontend/src/pages/OrderReturnsPage.jsx');
-  const adminPanel = read(
-    'frontend/src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.jsx'
+  const adminPanel = readSourceTree(
+    'frontend/src/admin/orders/components/orderDetail'
   );
   const e2e = read('frontend/e2e/ordersReturnsStage4.e2e.js');
   const integration = read('backend/scripts/testOrderReturnsStage4Integration.js');

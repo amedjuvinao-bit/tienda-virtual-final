@@ -504,6 +504,10 @@ function testEmissionUsesStoredSelections() {
   const adapter = read('backend/lib/dian/providerAdapter.js');
   const bootstrap = read('backend/services/electronicCreditNoteRangeService.js');
   const index = read('backend/index.js');
+  const creditNoteRangePosition = index.indexOf(
+    'electronicCreditNoteRangeService'
+  );
+  const paymentRoutesPosition = index.indexOf("'./routes/payments'");
 
   assert(
     rangeProvider.includes('numbering_range_id: numberingRangeId'),
@@ -531,8 +535,9 @@ function testEmissionUsesStoredSelections() {
     'La nota crédito no se enruta al proveedor con rango sincronizado.'
   );
   assert(
-    index.indexOf('electronicCreditNoteRangeService') <
-      index.indexOf("tryRequire('./routes/payments')"),
+    creditNoteRangePosition >= 0 &&
+      paymentRoutesPosition >= 0 &&
+      creditNoteRangePosition < paymentRoutesPosition,
     'El proveedor de notas se inicializa después de las rutas heredadas.'
   );
 

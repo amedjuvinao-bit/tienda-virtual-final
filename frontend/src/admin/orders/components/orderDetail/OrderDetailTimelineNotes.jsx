@@ -26,6 +26,12 @@ export default function OrderDetailTimelineNotes({
   setNoteText,
   onSaveNote,
   savingNote = false,
+  timelineHasMore = false,
+  notesHasMore = false,
+  timelineMoreLoading = false,
+  notesMoreLoading = false,
+  onLoadMoreTimeline,
+  onLoadMoreNotes,
 }) {
   const normalizedTags = normalizeTags(tags || order?.tags);
 
@@ -58,22 +64,29 @@ export default function OrderDetailTimelineNotes({
         {timeline.length === 0 ? (
           <EmptyState>No hay eventos registrados para esta orden.</EmptyState>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gap: 12,
-              maxHeight: 320,
-              overflowY: 'auto',
-              paddingRight: 4,
-            }}
-          >
-            {timeline.map((event, index) => (
-              <TimelineItem
-                key={event?._id || event?.id || `${event?.type || 'event'}-${index}`}
-                event={event}
-                isLast={index === timeline.length - 1}
-              />
-            ))}
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 12,
+                maxHeight: 320,
+                overflowY: 'auto',
+                paddingRight: 4,
+              }}
+            >
+              {timeline.map((event, index) => (
+                <TimelineItem
+                  key={event?._id || event?.id || `${event?.type || 'event'}-${index}`}
+                  event={event}
+                  isLast={index === timeline.length - 1}
+                />
+              ))}
+            </div>
+            {timelineHasMore && typeof onLoadMoreTimeline === 'function' ? (
+              <GhostButton onClick={onLoadMoreTimeline} disabled={timelineMoreLoading}>
+                {timelineMoreLoading ? 'Cargando...' : 'Mostrar eventos anteriores'}
+              </GhostButton>
+            ) : null}
           </div>
         )}
       </OrderDetailPanel>
@@ -179,21 +192,28 @@ export default function OrderDetailTimelineNotes({
           {notes.length === 0 ? (
             <EmptyState>No hay notas internas guardadas.</EmptyState>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gap: 10,
-                maxHeight: 210,
-                overflowY: 'auto',
-                paddingRight: 4,
-              }}
-            >
-              {notes.map((note, index) => (
-                <NoteItem
-                  key={note?._id || note?.id || `note-${index}`}
-                  note={note}
-                />
-              ))}
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gap: 10,
+                  maxHeight: 210,
+                  overflowY: 'auto',
+                  paddingRight: 4,
+                }}
+              >
+                {notes.map((note, index) => (
+                  <NoteItem
+                    key={note?._id || note?.id || `note-${index}`}
+                    note={note}
+                  />
+                ))}
+              </div>
+              {notesHasMore && typeof onLoadMoreNotes === 'function' ? (
+                <GhostButton onClick={onLoadMoreNotes} disabled={notesMoreLoading}>
+                  {notesMoreLoading ? 'Cargando...' : 'Mostrar más notas'}
+                </GhostButton>
+              ) : null}
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const Order = require('../models/Order');
 
 const {
   buildFactusCustomer,
@@ -138,18 +139,40 @@ function testFactusCustomerPayload() {
 }
 
 function testOrderPersistenceContract() {
-  const model = read('backend/models/Order.js');
   const route = read('backend/routes/orders.js');
+  const customerDataController = read(
+    'backend/controllers/orderCustomerDataController.js'
+  );
+  const administrationComposition = `${route}\n${customerDataController}`;
 
-  assert(model.includes('municipalityCode: String'), 'Order.customer no persiste municipalityCode.');
-  assert(route.includes("'municipalityCode'"), 'La edición administrativa descarta municipalityCode.');
-  assert(route.includes("'departmentCode'"), 'La edición administrativa descarta departmentCode.');
+  assert(
+    Order.schema.path('customer.municipalityCode')?.instance === 'String',
+    'Order.customer no persiste municipalityCode.'
+  );
+  assert(administrationComposition.includes("'municipalityCode'"), 'La edición administrativa descarta municipalityCode.');
+  assert(administrationComposition.includes("'departmentCode'"), 'La edición administrativa descarta departmentCode.');
   ok('Orden persiste los códigos geográficos editados por el administrador');
 }
 
 function testFrontendSelectorContract() {
-  const component = read(
+  const facade = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.jsx'
+  );
+  const editForm = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderCustomerBillingEditForm.jsx'
+  );
+  const geographyHook = read(
+    'frontend/src/admin/orders/components/orderDetail/useOrderCustomerBillingGeography.js'
+  );
+  const formModel = read(
+    'frontend/src/admin/orders/components/orderDetail/orderCustomerBillingModel.js'
+  );
+  const component = `${facade}\n${editForm}\n${geographyHook}\n${formModel}`;
+
+  assert(
+    facade.includes("from './OrderCustomerBillingEditForm'") &&
+      facade.includes("from './useOrderCustomerBillingGeography'"),
+    'La fachada no compone el formulario y la autoridad geográfica.'
   );
 
   [

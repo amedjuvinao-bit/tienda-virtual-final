@@ -179,13 +179,23 @@ function run() {
   assert(!billing.permissions.includes('orders:returns'));
   ok('bodega opera la pieza física y facturación conserva la autoridad monetaria');
 
-  const returnService = source('backend/services/orderReturnService.js');
-  const refundService = source('backend/services/orderRefundService.js');
+  const returnService = [
+    'backend/services/orderReturnService.js',
+    'backend/services/orderReturns/validation.js',
+    'backend/services/orderReturns/workflow.js',
+  ].map(source).join('\n');
+  const refundService = source(
+    'backend/services/orderRefunds/refundTransactionService.js'
+  );
   const ordersRoute = source('backend/routes/orders.js');
+  const orderMutationController = source(
+    'backend/controllers/orderAdminMutationController.js'
+  );
   assert(returnService.includes('expectedRevision'));
   assert(returnService.includes('restockQuantity: item.sellableQuantity'));
   assert(refundService.includes('RETURN_INSPECTION_REQUIRED'));
-  assert(ordersRoute.includes('allowInventoryRestock: false'));
+  assert(ordersRoute.includes('updateOrderStatus'));
+  assert(orderMutationController.includes('allowInventoryRestock: false'));
   ok('la concurrencia es optimista y el endpoint heredado no repone inventario sin inspección');
 
   const persistentTrace = source('backend/scripts/seedPersistentOrderReturnTrace.js');

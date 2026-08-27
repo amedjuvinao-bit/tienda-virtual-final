@@ -3,6 +3,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
+const {
+  readWompiWebhookApprovedComposition,
+  readWompiWebhookOrderComposition,
+} = require('./lib/readWompiWebhookComposition');
 
 const {
   calculateOrderPricing,
@@ -15,6 +22,9 @@ const {
   assertTotalsReconciled,
   calculateTotals,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  evaluateApprovedPaymentAttempt,
+} = require('../services/paymentAttemptService');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -349,9 +359,21 @@ function validateStoreCreditInvoiceReconciliation() {
 }
 
 function validateAtomicCheckoutAndGatewayGuards() {
-  const orders = readProjectFile('backend/routes/orders.js');
-  const payments = readProjectFile('backend/routes/payments.js');
-  const checkout = readProjectFile('frontend/src/pages/CheckoutPage.jsx');
+  const orderCreationComposition = [
+    readProjectFile('backend/routes/orders.js'),
+    readProjectFile('backend/controllers/orderCreationController.js'),
+    readProjectFile('backend/services/orderCreationTransactionService.js'),
+    readProjectFile('backend/services/orderCreationCouponService.js'),
+  ].join('\n');
+  const paymentComposition = [
+    readProjectFile('backend/routes/payments.js'),
+    readProjectFile('backend/controllers/wompiWebhookController.js'),
+    readWompiWebhookOrderComposition(),
+    readWompiWebhookApprovedComposition(),
+    readProjectFile('backend/services/paymentAttemptService.js'),
+    readProjectFile('backend/services/paymentAttempts/policy.js'),
+  ].join('\n');
+  const checkout = readCheckoutComposition();
   const main = readProjectFile('frontend/src/main.jsx');
 
   [
@@ -359,10 +381,83 @@ function validateAtomicCheckoutAndGatewayGuards() {
     'recordCouponRedemption',
     'amountInCents: Math.round(pricing.total * 100)',
     'coupon_applied',
-  ].forEach((needle) => assert(orders.includes(needle), `orders.js no contiene ${needle}.`));
-  assert(payments.includes('WOMPI_AMOUNT_MISMATCH'), 'Wompi no valida el valor confirmado.');
-  assert(payments.includes('WOMPI_CURRENCY_MISMATCH'), 'Wompi no valida la moneda confirmada.');
-  assert(checkout.includes("api.post('/api/orders/quote'"), 'Checkout no consume la cotización real.');
+  ].forEach((needle) =>
+    assert(
+      orderCreationComposition.includes(needle),
+      `La composición de creación de órdenes no contiene ${needle}.`
+    )
+  );
+  [
+    'createWompiWebhookController',
+    'claimApprovedPaymentAttempt',
+    'evaluateApprovedPaymentAttempt',
+    'PAYMENT_ATTEMPT_VALUE_MISMATCH',
+  ].forEach((needle) =>
+    assert(
+      paymentComposition.includes(needle),
+      `La composición Wompi no conserva ${needle}.`
+    )
+  );
+
+  const order = {
+    _id: '64b000000000000000000777',
+    orderNumber: 'ORDER-TOTALS-1',
+    payment: { status: 'pending_gateway' },
+  };
+  const merchantFingerprint = 'wompi:billing-totals-fixture';
+  const attempt = {
+    provider: 'wompi',
+    order: order._id,
+    orderNumber: order.orderNumber,
+    reference: 'ORDER-ORDER-TOTALS-1__TRY__1',
+    amountInCents: 12900000,
+    currency: 'COP',
+    merchantFingerprint,
+    state: 'issued',
+    active: true,
+    issuedBySystem: true,
+    storeCredit: { applied: false },
+  };
+  const approval = {
+    order,
+    attempt,
+    provider: 'wompi',
+    reference: attempt.reference,
+    transactionId: 'wompi-transaction-totals-1',
+    amountInCents: attempt.amountInCents,
+    currency: attempt.currency,
+    merchantFingerprint,
+  };
+  assert(
+    evaluateApprovedPaymentAttempt(approval).allowed === true,
+    'Wompi debe aceptar el monto y la moneda del intento exacto emitido.'
+  );
+  const amountMismatch = evaluateApprovedPaymentAttempt({
+    ...approval,
+    amountInCents: attempt.amountInCents - 1,
+  });
+  assert(
+    amountMismatch.allowed === false &&
+      amountMismatch.reconciliationRequired === true &&
+      amountMismatch.code === 'PAYMENT_ATTEMPT_VALUE_MISMATCH' &&
+      amountMismatch.expectedAmountInCents === attempt.amountInCents,
+    'Wompi no bloquea ni concilia un valor diferente al intento emitido.'
+  );
+  const currencyMismatch = evaluateApprovedPaymentAttempt({
+    ...approval,
+    currency: 'USD',
+  });
+  assert(
+    currencyMismatch.allowed === false &&
+      currencyMismatch.reconciliationRequired === true &&
+      currencyMismatch.code === 'PAYMENT_ATTEMPT_VALUE_MISMATCH' &&
+      currencyMismatch.expectedCurrency === 'COP',
+    'Wompi no bloquea ni concilia una moneda diferente al intento emitido.'
+  );
+  assert(
+    checkout.includes("'/api/orders/quote'"),
+    'Checkout no consume la cotización real.'
+  );
   assert(!main.includes('checkoutCouponBridge'), 'main.jsx todavía carga el bridge antiguo.');
   ok('Checkout, transacción y webhook usan los totales autoritativos');
 }

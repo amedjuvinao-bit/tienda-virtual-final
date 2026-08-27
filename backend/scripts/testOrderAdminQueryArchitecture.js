@@ -3,6 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const Order = require('../models/Order');
 
 const {
   buildAdminOrderFilter,
@@ -12,6 +13,9 @@ const {
   parseSort,
   queryAdminOrders,
 } = require('../services/orderAdminQueryService');
+const queryFilters = require('../services/orderAdminQuery/filters');
+const queryPipelines = require('../services/orderAdminQuery/pipelines');
+const queryExecutor = require('../services/orderAdminQuery/queryExecutor');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (relativePath) =>
@@ -26,6 +30,27 @@ function ok(message) {
 async function main() {
   const routesSource = read('backend/routes/orders.js');
   const serviceSource = read('backend/services/orderAdminQueryService.js');
+  const implementationPaths = [
+    'backend/services/orderAdminQuery/filters.js',
+    'backend/services/orderAdminQuery/invoiceExpressions.js',
+    'backend/services/orderAdminQuery/operationalExpressions.js',
+    'backend/services/orderAdminQuery/pipelines.js',
+    'backend/services/orderAdminQuery/operationalPresentation.js',
+    'backend/services/orderAdminQuery/enrichment.js',
+    'backend/services/orderAdminQuery/listPresentation.js',
+    'backend/services/orderAdminQuery/listProjection.js',
+    'backend/services/orderAdminQuery/summaryPresentation.js',
+    'backend/services/orderAdminQuery/csv.js',
+    'backend/services/orderAdminQuery/cursor.js',
+    'backend/services/orderAdminQuery/queryExecutor.js',
+  ];
+  const implementationSources = implementationPaths.map((file) => ({
+    file,
+    source: read(file),
+  }));
+  const implementationSource = implementationSources
+    .map(({ source }) => source)
+    .join('\n');
   const controllerSource = read('backend/controllers/orderAdminQueryController.js');
   const frontendSource = read('frontend/src/admin/OrdersAdmin.jsx');
   const hookSource = read(
@@ -39,12 +64,34 @@ async function main() {
   assert.ok(!routesSource.includes('summaryOrderIdsForInvoices'));
   ok('el listado administrativo salió del archivo monolítico de rutas');
 
-  assert.ok(serviceSource.includes('$lookup'));
-  assert.ok(serviceSource.includes('allowDiskUse(true)'));
-  assert.ok(!serviceSource.includes('countDocuments(filter)'));
-  assert.ok(!serviceSource.includes("find(filter).select('_id')"));
-  assert.ok(!serviceSource.includes("distinct('_id', filter)"));
+  assert.strictEqual(buildAdminOrderFilter, queryFilters.buildAdminOrderFilter);
+  assert.strictEqual(buildPagePipeline, queryPipelines.buildPagePipeline);
+  assert.strictEqual(buildSummaryPipeline, queryPipelines.buildSummaryPipeline);
+  assert.strictEqual(queryAdminOrders, queryExecutor.queryAdminOrders);
+  assert.ok(serviceSource.includes("require('./orderAdminQuery/filters')"));
+  assert.ok(implementationSource.includes('$lookup'));
+  assert.ok(implementationSource.includes('allowDiskUse(true)'));
+  assert.ok(!implementationSource.includes('countDocuments(filter)'));
+  assert.ok(!implementationSource.includes("find(filter).select('_id')"));
+  assert.ok(!implementationSource.includes("distinct('_id', filter)"));
   ok('facturación y métricas se resuelven en MongoDB sin cargar todos los IDs en Node');
+
+  assert.ok(serviceSource.split(/\r?\n/).length <= 100);
+  implementationSources.forEach(({ file, source }) => {
+    assert.ok(
+      source.split(/\r?\n/).length <= 700,
+      `${file} excede el límite modular de 700 líneas`
+    );
+  });
+  assert.ok(
+    read('backend/services/orderAdminQuery/listProjection.js')
+      .split(/\r?\n/).length <= 180
+  );
+  assert.ok(
+    read('backend/services/orderAdminQuery/listPresentation.js')
+      .split(/\r?\n/).length <= 250
+  );
+  ok('la fachada y sus módulos internos mantienen límites explícitos de tamaño');
 
   const ownerRequest = {
     adminRole: 'owner',
@@ -205,10 +252,30 @@ async function main() {
   assert.ok(hookSource.includes('includeSummary: includeSummary ? 1 : 0'));
   ok('React deduplica solicitudes y descarta respuestas obsoletas');
 
-  const orderModelSource = read('backend/models/Order.js');
-  assert.ok(orderModelSource.includes('orders_admin_branch_status_date'));
-  assert.ok(orderModelSource.includes('orders_admin_allocation_status_date'));
-  assert.ok(orderModelSource.includes('orders_admin_archive_status_date'));
+  const namedIndexes = new Map(
+    Order.schema
+      .indexes()
+      .filter(([, options]) => options.name)
+      .map(([keys, options]) => [options.name, keys])
+  );
+  assert.deepStrictEqual(namedIndexes.get('orders_admin_branch_status_date'), {
+    branch: 1,
+    status: 1,
+    createdAt: -1,
+  });
+  assert.deepStrictEqual(
+    namedIndexes.get('orders_admin_allocation_status_date'),
+    { 'inventoryAllocations.branch': 1, status: 1, createdAt: -1 }
+  );
+  assert.deepStrictEqual(namedIndexes.get('orders_admin_archive_status_date'), {
+    archived: 1,
+    status: 1,
+    createdAt: -1,
+  });
+  assert.deepStrictEqual(
+    namedIndexes.get('orders_admin_created_at_id_desc'),
+    { createdAt: -1, _id: -1 }
+  );
   ok('los filtros operativos principales tienen índices compuestos dedicados');
 
   console.log(

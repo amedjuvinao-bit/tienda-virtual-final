@@ -3,6 +3,9 @@
 const {
   queryAdminOrders,
 } = require('../services/orderAdminQueryService');
+const {
+  setOrderCsvResponseHeaders,
+} = require('../services/orderCsvSerializationService');
 
 async function listAdminOrders(req, res) {
   try {
@@ -19,16 +22,23 @@ async function listAdminOrders(req, res) {
     }
 
     if (Object.prototype.hasOwnProperty.call(result, 'csv')) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
+      setOrderCsvResponseHeaders(res, 'orders.csv');
       return res.status(200).send(result.csv);
     }
 
     return res.json(result);
   } catch (error) {
     console.error('Error en /api/orders/admin:', error);
-    return res.status(500).json({
-      message: 'Error al listar órdenes para admin',
+    const statusCode = Number(error?.statusCode) === 400 ? 400 : 500;
+    return res.status(statusCode).json({
+      error:
+        statusCode === 400
+          ? error.code || 'ORDER_ADMIN_QUERY_INVALID'
+          : 'ORDER_ADMIN_QUERY_FAILED',
+      message:
+        statusCode === 400
+          ? error.message
+          : 'Error al listar órdenes para admin',
     });
   }
 }

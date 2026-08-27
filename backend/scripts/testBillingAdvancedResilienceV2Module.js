@@ -198,6 +198,10 @@ async function testRecoveryArchitecture() {
   const provider = read(
     'backend/lib/dian/providers/factusRangeAwareProvider.js'
   );
+  const recoveryBootstrapPosition = index.indexOf(
+    'electronicInvoiceRecoveryBootstrapService'
+  );
+  const paymentRoutesPosition = index.indexOf("'./routes/payments'");
 
   assert(
     bootstrap.includes('BILLING_RECONCILIATION_PENDING') &&
@@ -220,8 +224,9 @@ async function testRecoveryArchitecture() {
     'La consulta no exige referencia exacta y única.'
   );
   assert(
-    index.indexOf('electronicInvoiceRecoveryBootstrapService') <
-      index.indexOf("tryRequire('./routes/payments')") &&
+    recoveryBootstrapPosition >= 0 &&
+      paymentRoutesPosition >= 0 &&
+      recoveryBootstrapPosition < paymentRoutesPosition &&
       index.includes('startBillingInvoiceRecoveryJob'),
     'La protección no se carga antes de pagos o no tiene worker.'
   );

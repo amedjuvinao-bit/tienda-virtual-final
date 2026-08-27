@@ -20,6 +20,9 @@ const {
 const {
   createGuestOrderAccessToken,
 } = require('../services/publicPaymentAccessService');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
 
 const SECRET = 'cart-access-test-secret-only-12345678901234567890';
 const CART_A_ID = '64b64b64b64b64b64b64c001';
@@ -35,10 +38,7 @@ const cartContextSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'context', 'CartContext.jsx'),
   'utf8'
 );
-const checkoutSource = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'frontend', 'src', 'pages', 'CheckoutPage.jsx'),
-  'utf8'
-);
+const checkoutSource = readCheckoutComposition();
 const frontendAccessSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'cartAccess.js'),
   'utf8'

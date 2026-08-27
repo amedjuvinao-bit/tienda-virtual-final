@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import FooterSection from '../components/FooterSection';
@@ -8,6 +8,7 @@ import {
   getOrderReturnAccess,
   storeOrderReturnAccess,
 } from '../utils/orderReturnAccess';
+import { createRmaCreationIdempotency } from '../utils/rmaCreationIdempotency';
 
 const REASONS = [
   ['wrong_size', 'Talla incorrecta'],
@@ -174,6 +175,14 @@ export default function OrderReturnsPage() {
   const [resolution, setResolution] = useState('exchange');
   const [reasonSummary, setReasonSummary] = useState('');
   const [items, setItems] = useState({});
+  const createAttemptRef = useRef(null);
+  if (!createAttemptRef.current) {
+    createAttemptRef.current = createRmaCreationIdempotency();
+  }
+
+  useEffect(() => {
+    createAttemptRef.current.reset();
+  }, [orderId]);
 
   useEffect(() => {
     if (!stateAccess) return;
@@ -270,6 +279,19 @@ export default function OrderReturnsPage() {
       setBusy(true);
       setError('');
       setSuccess('');
+      const requestBody = {
+        requestedResolution: resolution,
+        reasonSummary: reasonSummary.trim(),
+        items: selectedItems,
+      };
+      const requestDescriptor = {
+        endpoint: 'customer-order-return-create',
+        orderId,
+        payload: requestBody,
+      };
+      const idempotencyKey = createAttemptRef.current.keyFor(
+        requestDescriptor
+      );
       const response = await fetch(
         `${API_BASE_URL}/api/orders/${orderId}/returns/self-service`,
         {
@@ -277,16 +299,14 @@ export default function OrderReturnsPage() {
           headers: {
             'Content-Type': 'application/json',
             ...buildOrderReturnAccessHeaders(access),
+            'Idempotency-Key': idempotencyKey,
           },
-          body: JSON.stringify({
-            requestedResolution: resolution,
-            reasonSummary: reasonSummary.trim(),
-            items: selectedItems,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.message || 'No fue posible crear la solicitud.');
+      createAttemptRef.current.complete(requestDescriptor, idempotencyKey);
       setSuccess(`Solicitud ${payload.returnCase?.returnNumber || ''} creada correctamente.`);
       setItems({});
       setReasonSummary('');

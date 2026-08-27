@@ -214,7 +214,10 @@ function validateOfficialDocuments() {
 
 function validateSecurityAndPermissions() {
   const routes = read('backend/routes/adminBilling.js');
-  const payments = read('backend/routes/payments.js');
+  const payments = [
+    read('backend/routes/payments.js'),
+    read('backend/controllers/paymentFiscalAdminController.js'),
+  ].join('\n');
   const provider = readFactusProviderSource();
   includes(routes, "requirePermission('billing:credit_note')", 'Creación sin permiso específico.');
   includes(routes, "requirePermission('billing:download')", 'Descarga sin permiso específico.');
@@ -256,6 +259,39 @@ function validateSyncIdentity() {
   ok('Sincronización protege número y CUDE oficiales de la nota crédito');
 }
 
+function validateUncertainOutcomeReconciliation() {
+  const model = read('backend/models/ElectronicInvoice.js');
+  const service = read('backend/services/electronicCreditNoteService.js');
+  const provider = read('backend/lib/dian/providers/factusRangeAwareProvider.js');
+
+  includes(
+    provider,
+    '/v2/credit-notes?filter[reference_code]=',
+    'No consulta la nota por referencia exacta antes de reemitir.'
+  );
+  includes(
+    service,
+    'findCreditNoteByReferenceFromFactus',
+    'El motor no reconcilia resultados inciertos.'
+  );
+  includes(
+    service,
+    "'creditNotes.$.emission.state': 'reconciliation_pending'",
+    'Una respuesta incierta podría quedar marcada como fallo definitivo.'
+  );
+  includes(
+    service,
+    'MAX_RECONCILIATION_ABSENCES',
+    'No exige ausencias remotas repetidas antes de permitir reemisión.'
+  );
+  includes(
+    model,
+    'confirmedNotFound',
+    'No persiste las confirmaciones negativas de conciliación.'
+  );
+  ok('Timeouts y respuestas ambiguas se concilian por referencia antes de cualquier reemisión');
+}
+
 function validateFrontend() {
   const api = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const page = readBillingFrontendSource();
@@ -288,6 +324,7 @@ async function main() {
     validateSecurityAndPermissions,
     validateProviderErrors,
     validateSyncIdentity,
+    validateUncertainOutcomeReconciliation,
     validateFrontend,
     validatePackageScript,
   ];

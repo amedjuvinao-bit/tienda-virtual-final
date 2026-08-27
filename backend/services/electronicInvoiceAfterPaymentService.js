@@ -17,25 +17,28 @@ async function executeElectronicInvoiceAfterPayment({
   payments = {},
   paymentProvider = '',
   allowRetry = false,
+  processFulfillment = true,
 } = {}) {
   const source = trimSafe(
     paymentProvider || transaction?.provider || transaction?.payment_provider || 'payment',
     60
   ).toLowerCase();
 
-  try {
-    await processOrderFulfillmentAfterPayment({
-      orderId,
-      transaction,
-      paymentProvider: source,
-    });
-  } catch (error) {
-    console.error('❌ Error preparando entrega post pago:', {
-      orderId: String(orderId || ''),
-      paymentProvider: source,
-      code: error.code || '',
-      error: error.message,
-    });
+  if (processFulfillment) {
+    try {
+      await processOrderFulfillmentAfterPayment({
+        orderId,
+        transaction,
+        paymentProvider: source,
+      });
+    } catch (error) {
+      console.error('❌ Error preparando entrega post pago:', {
+        orderId: String(orderId || ''),
+        paymentProvider: source,
+        code: error.code || '',
+        error: error.message,
+      });
+    }
   }
 
   try {

@@ -32,6 +32,9 @@ function run() {
   const reconciliation = read(
     'backend/services/orderRefundReconciliationService.js'
   );
+  const paymentClaims = read(
+    'backend/services/orderRefundAutomation/claims.js'
+  );
   const panel = read(
     'frontend/src/admin/orders/components/orderDetail/OrderDetailRefundReconciliation.jsx'
   );
@@ -95,7 +98,8 @@ function run() {
 
   assert(reconciliation.includes("allResolved && isFullRefund"));
   assert(reconciliation.includes("orderUpdate.status = 'refunded'"));
-  assert(reconciliation.includes('PAYMENT_REVERSAL_ALREADY_CONFIRMED'));
+  assert(paymentClaims.includes('PAYMENT_REVERSAL_ALREADY_CONFIRMED'));
+  assert(paymentClaims.includes('PAYMENT_REVERSAL_AUTOMATION_IN_PROGRESS'));
   ok('la autoridad de conciliación impide cierres prematuros y referencias contradictorias');
 
   assert(panel.includes('nextReconciliationStep'));

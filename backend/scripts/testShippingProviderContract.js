@@ -4,6 +4,9 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
 
 const {
   BASE_URLS,
@@ -654,10 +657,7 @@ async function main() {
   );
   ok('cada país descubre sus transportadoras y cotiza una por solicitud');
 
-  const checkoutSource = fs.readFileSync(
-    path.join(__dirname, '../../frontend/src/pages/CheckoutPage.jsx'),
-    'utf8'
-  );
+  const checkoutSource = readCheckoutComposition();
   const branchesSource = fs.readFileSync(
     path.join(__dirname, '../../frontend/src/admin/configuracion/sections/SedesSection.jsx'),
     'utf8'

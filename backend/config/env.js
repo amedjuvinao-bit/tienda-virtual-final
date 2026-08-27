@@ -83,6 +83,7 @@ const env = {
   },
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
   cartAccessSecret: clean(process.env.CART_ACCESS_SECRET),
+  orderPaymentAccessSecret: clean(process.env.ORDER_PAYMENT_ACCESS_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
   integrationsEncryptionKey: integrationsEncryption.value,
   integrationsEncryptionKeySource: integrationsEncryption.value
@@ -109,6 +110,19 @@ const env = {
     enabled: toBoolean(process.env.INVENTORY_RESERVATION_EXPIRATION_ENABLED, true),
     intervalMs: toNumber(process.env.INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS, 60_000, { min: 30_000 }),
     limit: toNumber(process.env.INVENTORY_RESERVATION_LIMIT || process.env.INVENTORY_RESERVATION_EXPIRATION_LIMIT, 50, { min: 1 }),
+  },
+  orderPostCommitOutbox: {
+    enabled: toBoolean(process.env.ORDER_POST_COMMIT_OUTBOX_ENABLED, true),
+    intervalMs: toNumber(
+      process.env.ORDER_POST_COMMIT_OUTBOX_INTERVAL_MS,
+      30_000,
+      { min: 1_000, max: 60 * 60 * 1000 }
+    ),
+    batchSize: toNumber(
+      process.env.ORDER_POST_COMMIT_OUTBOX_BATCH_SIZE,
+      25,
+      { min: 1, max: 200 }
+    ),
   },
   shipping: {
     defaultProvider: clean(process.env.SHIPPING_PROVIDER).toLowerCase() || 'manual',
@@ -152,10 +166,24 @@ function assertEnv() {
   }
 
   if (
+    env.orderPaymentAccessSecret &&
+    env.orderPaymentAccessSecret.length < 32
+  ) {
+    errors.push('ORDER_PAYMENT_ACCESS_SECRET debe tener al menos 32 caracteres.');
+  }
+
+  if (
     env.nodeEnv === 'production' &&
     !env.cartAccessSecret
   ) {
     errors.push('Producción requiere CART_ACCESS_SECRET independiente con al menos 32 caracteres.');
+  }
+
+  if (
+    env.nodeEnv === 'production' &&
+    !env.orderPaymentAccessSecret
+  ) {
+    errors.push('Producción requiere ORDER_PAYMENT_ACCESS_SECRET independiente con al menos 32 caracteres.');
   }
 
   if (!['manual', 'envia'].includes(env.shipping.defaultProvider)) {
@@ -210,6 +238,9 @@ function getSafeEnvSummary() {
     cartAccessSecretConfigured: Boolean(
       env.cartAccessSecret && env.cartAccessSecret.length >= 32
     ),
+    orderPaymentAccessSecretConfigured: Boolean(
+      env.orderPaymentAccessSecret && env.orderPaymentAccessSecret.length >= 32
+    ),
     billingEncryptionConfigured: Boolean(
       env.billingEncryptionKey && env.billingEncryptionKey.length >= 32
     ),
@@ -233,6 +264,7 @@ function getSafeEnvSummary() {
     cloudinaryConfigured: cloudinaryBackendConfigured,
     smtpConfigured: Boolean(env.mail.host && env.mail.user && env.mail.pass),
     inventoryReservation: env.inventoryReservation,
+    orderPostCommitOutbox: env.orderPostCommitOutbox,
     shipping: {
       defaultProvider: env.shipping.defaultProvider,
       envia: {

@@ -243,6 +243,7 @@ async function run() {
     reasonSummary: 'Primera unidad.',
     requestSource: 'customer',
     actor: { label: 'Cliente Etapa 4', role: 'customer' },
+    idempotencyKey: 'stage4-credit-rma-0001',
     now: NOW,
   });
   const exchangeRequest = await createOrderReturn({
@@ -257,6 +258,7 @@ async function run() {
     reasonSummary: 'Segunda unidad.',
     requestSource: 'customer',
     actor: { label: 'Cliente Etapa 4', role: 'customer' },
+    idempotencyKey: 'stage4-exchange-rma-0001',
     now: NOW,
   });
   assert.strictEqual(creditRequest.status, 'authorized');

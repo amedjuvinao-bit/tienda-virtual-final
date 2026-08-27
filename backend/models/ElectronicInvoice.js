@@ -49,6 +49,7 @@ const InvoiceEmissionSchema = new mongoose.Schema(
     lastAttemptAt: { type: Date, default: null },
     reconciliationRequestedAt: { type: Date, default: null },
     reconciledAt: { type: Date, default: null },
+    confirmedNotFound: { type: Number, default: 0, min: 0 },
     completedAt: { type: Date, default: null },
     failedAt: { type: Date, default: null },
   },

@@ -62,6 +62,29 @@ describe('OrderDetailReturnsPanel', () => {
     }));
   });
 
+  it('descarta el borrador local al cambiar de orden', () => {
+    const { rerender } = render(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-1', eligibility: [eligibility], returns: [] }}
+        canManage
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva devolución o cambio' }));
+    fireEvent.change(screen.getByLabelText('Cantidad Tenis Plus'), { target: { value: '2' } });
+    expect(screen.getByLabelText('Cantidad Tenis Plus')).toHaveValue(2);
+
+    rerender(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-2', eligibility: [eligibility], returns: [] }}
+        canManage
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Nueva devolución o cambio' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cantidad Tenis Plus')).not.toBeInTheDocument();
+  });
+
   it('clasifica toda recepción para el cierre de inspección', () => {
     const onAction = vi.fn();
     render(
@@ -97,6 +120,32 @@ describe('OrderDetailReturnsPanel', () => {
     );
   });
 
+  it('registra únicamente la cantidad recibida elegida por bodega', () => {
+    const onAction = vi.fn();
+    const authorizedReturn = {
+      ...receivedReturn,
+      status: 'authorized',
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-1', eligibility: [], returns: [authorizedReturn] }}
+        canManage
+        onAction={onAction}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Recibir Tenis Plus'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar recepción' }));
+
+    expect(onAction).toHaveBeenCalledWith(
+      authorizedReturn,
+      'receive',
+      {
+        items: [{ orderItemId: LINE_ID, receivedQuantity: 1 }],
+      }
+    );
+  });
+
   it('muestra un RMA listo para dinero sin habilitarlo a un rol de bodega', () => {
     render(
       <OrderDetailReturnsPanel
@@ -115,6 +164,29 @@ describe('OrderDetailReturnsPanel', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Crear reembolso' })).toBeDisabled();
+  });
+
+  it('emite saldo a favor por el monto administrado', () => {
+    const onStoreCredit = vi.fn();
+    const storeCreditReturn = {
+      ...receivedReturn,
+      status: 'resolution_required',
+      requestedResolution: 'store_credit',
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{ orderId: 'order-1', eligibility: [], returns: [storeCreditReturn] }}
+        canRefund
+        onStoreCredit={onStoreCredit}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Monto saldo a favor RMA-ORD-1'), {
+      target: { value: '90000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Emitir saldo a favor' }));
+
+    expect(onStoreCredit).toHaveBeenCalledWith(storeCreditReturn, 90000);
   });
 
   it('guarda una política versionada y conserva los colores heredados', () => {

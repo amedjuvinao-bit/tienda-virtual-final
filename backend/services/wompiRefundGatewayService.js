@@ -3,6 +3,9 @@
 const {
   getActivePaymentsConfig,
 } = require('./paymentConfigurationAuthorityService');
+const {
+  resolveRefundableOrderTotal,
+} = require('./orderRefunds/refundPaymentIntegrity');
 
 const WOMPI_ENVIRONMENTS = Object.freeze({
   sandbox: 'https://sandbox.wompi.co/v1',
@@ -33,11 +36,7 @@ function createGatewayError(message, code, statusCode = 409, details = {}) {
 }
 
 function orderTotal(order = {}) {
-  return toMoney(
-    order?.payment?.amount ||
-      order?.pricing?.total ||
-      order?.total
-  );
+  return resolveRefundableOrderTotal(order);
 }
 
 function paymentMethodType(order = {}) {
@@ -50,6 +49,18 @@ function paymentMethodType(order = {}) {
 }
 
 function resolveWompiRefundCapability({ order = {}, refund = {}, config = {} } = {}) {
+  if (
+    order?.storeCredit?.applied === true &&
+    cleanLower(order?.storeCredit?.status, 40) !== 'released' &&
+    toMoney(order?.storeCredit?.amount) > 0
+  ) {
+    return {
+      automatic: false,
+      code: 'STORE_CREDIT_REFUND_MANUAL_REVIEW_REQUIRED',
+      message: 'La orden usó saldo a favor. La devolución requiere distribuir y restaurar cada fuente antes de operar la pasarela.',
+    };
+  }
+
   const provider = cleanLower(
     refund?.reconciliation?.paymentProvider || order?.payment?.provider,
     40

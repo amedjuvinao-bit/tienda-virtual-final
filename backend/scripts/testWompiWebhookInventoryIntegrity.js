@@ -3,6 +3,9 @@
 const assert = require('assert/strict');
 const crypto = require('crypto');
 const Module = require('module');
+const {
+  secureChecksumEquals,
+} = require('../controllers/wompiWebhookController');
 
 const FIXTURE_WEBHOOK_SECRET = 'local-fixture-wompi-webhook-secret';
 const ORDER_NUMBER = 'WOMPI-INTEGRITY-0001';
@@ -29,6 +32,7 @@ const state = {
   transactionMutex: null,
   inventoryMutex: null,
   mongoMutex: null,
+  paymentAttempt: null,
 };
 
 function createBarrier(parties) {
@@ -143,6 +147,18 @@ function resetState(
   state.transactionMutex = createMutex();
   state.inventoryMutex = createMutex();
   state.mongoMutex = createMutex();
+  state.paymentAttempt = {
+    provider: 'wompi',
+    order: state.order._id,
+    orderNumber: state.order.orderNumber,
+    reference: ORDER_REFERENCE,
+    amountInCents: AMOUNT_IN_CENTS,
+    currency: 'COP',
+    state: 'issued',
+    active: true,
+    issuedBySystem: true,
+    transactionId: '',
+  };
 }
 
 function setDotted(target, dottedPath, value) {
@@ -211,7 +227,10 @@ const fakeOrderModel = {
   findOne: () => thenableOrderQuery(),
   findById: () => thenableOrderQuery(),
   findOneAndUpdate: async (filter, update) => {
-    if (state.invoiceClaimBarrier) {
+    if (
+      state.invoiceClaimBarrier &&
+      update?.$set?.['paymentProcessing.invoice.status'] === 'scheduling'
+    ) {
       await state.invoiceClaimBarrier.wait();
     }
     return state.mongoMutex(async () => {
@@ -236,6 +255,60 @@ const fakeOrderEventModel = {
     state.orderEvents.push(...documents.map((document) => ({ ...document })));
     return documents;
   },
+};
+
+const fakePaymentAttemptService = {
+  findAttempt: async () => state.paymentAttempt,
+  issueAttempt: async () => ({ attempt: state.paymentAttempt, reused: true }),
+  claimApprovedAttempt: async ({ order, reference, transactionId, amountInCents }) => {
+    const attempt = state.paymentAttempt;
+    if (
+      !attempt ||
+      attempt.reference !== reference ||
+      Number(attempt.amountInCents) !== Number(amountInCents)
+    ) {
+      return {
+        allowed: false,
+        reconciliationRequired: true,
+        code: 'PAYMENT_ATTEMPT_VALUE_MISMATCH',
+        message: 'Intento inconsistente.',
+      };
+    }
+    if (attempt.state === 'approved') {
+      if (attempt.transactionId === transactionId) {
+        return { allowed: true, duplicate: true };
+      }
+      return {
+        allowed: false,
+        reconciliationRequired: true,
+        code: 'PAYMENT_SECOND_CHARGE_DETECTED',
+        message: 'Segundo cobro.',
+      };
+    }
+    attempt.state = 'approved';
+    attempt.active = false;
+    attempt.transactionId = transactionId;
+    return { allowed: true, duplicate: false };
+  },
+  claimNonApprovedAttempt: async ({ reference, amountInCents }) => {
+    const attempt = state.paymentAttempt;
+    if (
+      !attempt ||
+      attempt.active !== true ||
+      attempt.reference !== reference ||
+      Number(attempt.amountInCents) !== Number(amountInCents)
+    ) {
+      return { allowed: false, ignored: true, reason: 'PAYMENT_ATTEMPT_NOT_ACTIVE' };
+    }
+    attempt.active = false;
+    attempt.state = 'declined';
+    return { allowed: true, ignored: false };
+  },
+};
+
+const fakePaymentAttemptModule = {
+  createPaymentAttemptService: () => fakePaymentAttemptService,
+  fingerprintPaymentMerchant: () => 'fixture-merchant-fingerprint',
 };
 
 const fakeMongoose = {
@@ -407,7 +480,12 @@ Module._load = function loadWithIntegrityDoubles(request, parent, isMain) {
     mongoose: fakeMongoose,
     '../models/SiteSettings': fakeSiteSettings,
     '../models/Order': fakeOrderModel,
+    '../models/OrderEvent': fakeOrderEventModel,
+    '../models/PaymentAttempt': {},
+    '../models/StoreCreditUsage': {},
     '../models/Product': { findById: async () => null },
+    '../models/MailSettings': {},
+    '../lib/mail/mailer': { sendMail: async () => ({}) },
     '../middleware/requireAdmin': (req, res, next) => next(),
     '../middleware/requirePermission': () => (req, res, next) => next(),
     '../services/inventoryReservationService': fakeInventoryReservationService,
@@ -416,6 +494,7 @@ Module._load = function loadWithIntegrityDoubles(request, parent, isMain) {
     './electronicInvoiceIssuanceService': fakeElectronicInvoiceIssuanceService,
     './orderFulfillmentService': fakeOrderFulfillmentService,
     '../services/publicPaymentAccessService': fakePublicPaymentAccessService,
+    '../services/paymentAttemptService': fakePaymentAttemptModule,
     '../models/ElectronicInvoice': fakeElectronicInvoiceModel,
     '../lib/dian/providers/factusProvider': {
       deleteFactusBillByReference: async () => ({}),
@@ -554,6 +633,14 @@ async function control(name, run) {
 }
 
 (async () => {
+  const canonicalChecksum = 'ab'.repeat(32);
+  assert.equal(secureChecksumEquals(canonicalChecksum, canonicalChecksum), true);
+  assert.equal(secureChecksumEquals(canonicalChecksum.toUpperCase(), canonicalChecksum), true);
+  assert.equal(secureChecksumEquals('ab', canonicalChecksum), false);
+  assert.equal(secureChecksumEquals('z'.repeat(64), canonicalChecksum), false);
+  assert.equal(secureChecksumEquals('', canonicalChecksum), false);
+  originalConsole.log('OK  checksum Wompi usa comparación constante y rechaza formatos inválidos');
+
   resetState({}, 'success');
   const invalidSignatureEvent = signedEvent('APPROVED', {
     finalizedAt: FIRST_PAID_AT,
@@ -706,7 +793,7 @@ async function control(name, run) {
   await control('8/19 el fallo de factura ocurre despues de adquirir el reclamo', async () => {
     resetState({}, 'success', 'fail');
     const response = await invokeWebhook(invoiceFailureEvent);
-    assert.equal(response.statusCode, 500);
+    assert.equal(response.statusCode, 503);
     assert.equal(state.invoiceAttemptCount, 1);
     assert.ok(state.order.paymentProcessing.invoice.claimId);
   });
@@ -792,7 +879,7 @@ async function control(name, run) {
         transactionId: 'tx-temporary-skip',
       })
     );
-    assert.equal(temporaryResponse.statusCode, 200);
+    assert.equal(temporaryResponse.statusCode, 503);
     assert.equal(state.order.paymentProcessing.invoice.status, 'pending');
     assert.equal(state.order.paymentProcessing.invoice.errorCode, '');
   });
@@ -1075,7 +1162,7 @@ async function control(name, run) {
         transactionId: 'tx-invoice-still-processing',
       })
     );
-    assert.equal(response.statusCode, 200);
+    assert.equal(response.statusCode, 503);
     assert.equal(state.order.paymentProcessing.invoice.status, 'pending');
     assert.equal(state.order.paymentProcessing.invoice.scheduledAt, null);
     assert.equal(
@@ -1097,14 +1184,14 @@ async function control(name, run) {
     });
 
     const inProgress = await invokeWebhook(event);
-    assert.equal(inProgress.statusCode, 200);
+    assert.equal(inProgress.statusCode, 503);
     assert.equal(state.order.paymentProcessing.invoice.status, 'pending');
     assert.equal(state.order.paymentProcessing.invoice.scheduledAt, null);
     const pendingClaimId = state.order.paymentProcessing.invoice.claimId;
 
     state.invoiceMode = 'fail';
     const failed = await invokeWebhook(event);
-    assert.equal(failed.statusCode, 500);
+    assert.equal(failed.statusCode, 503);
     assert.equal(state.order.paymentProcessing.invoice.status, 'failed');
     assert.equal(state.order.paymentProcessing.invoice.scheduledAt, null);
     const failedClaimId = state.order.paymentProcessing.invoice.claimId;

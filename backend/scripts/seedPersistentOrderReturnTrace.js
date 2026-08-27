@@ -360,6 +360,7 @@ async function run() {
     requestedResolution: 'refund',
     reasonSummary: 'Prueba completa RMA sobre MongoDB principal.',
     actor: { label: 'QA RMA Mongo principal', role: 'manager' },
+    idempotencyKey: `${PREFIX}-CREATE-0001`,
   };
   const concurrentRequests = await Promise.allSettled([
     createOrderReturn(requestInput, { OrderEventModel: OrderEvent }),
@@ -368,24 +369,30 @@ async function run() {
   const successfulRequests = concurrentRequests.filter(
     (result) => result.status === 'fulfilled'
   );
-  const rejectedRequests = concurrentRequests.filter(
-    (result) => result.status === 'rejected'
+  assert.strictEqual(successfulRequests.length, 2);
+  assert.strictEqual(
+    concurrentRequests.filter((result) => result.status === 'rejected').length,
+    0
   );
-  assert.strictEqual(successfulRequests.length, 1);
-  assert.strictEqual(rejectedRequests.length, 1);
-  assert(
-    ['RETURN_QUANTITY_NOT_AVAILABLE', 'ITEM_ALREADY_RETURNED'].includes(
-      rejectedRequests[0].reason?.code
-    ),
-    `La segunda solicitud concurrente falló con un motivo inesperado: ${
-      rejectedRequests[0].reason?.code || rejectedRequests[0].reason?.message
-    }`
+  assert.strictEqual(
+    successfulRequests.filter((result) => result.value.idempotent === false)
+      .length,
+    1
+  );
+  assert.strictEqual(
+    successfulRequests.filter((result) => result.value.idempotent === true)
+      .length,
+    1
+  );
+  assert.strictEqual(
+    String(successfulRequests[0].value._id),
+    String(successfulRequests[1].value._id)
   );
   assert.strictEqual(
     await OrderReturn.countDocuments({ order: fixture.order._id }),
     1
   );
-  ok('dos solicitudes simultáneas reservaron las unidades una sola vez');
+  ok('un doble envío idempotente reutilizó un solo RMA y una sola reserva');
 
   let returnCase = successfulRequests[0].value;
   assert.strictEqual(returnCase.status, 'requested');

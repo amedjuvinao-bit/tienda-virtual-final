@@ -54,19 +54,57 @@ jobs:
         run: npm --prefix backend run test:orders-return-risk
 
       - name: Validar saldo a favor como medio de pago
-        run: npm --prefix backend run test:checkout-store-credit
+        run: |
+          npm --prefix backend run test:checkout-store-credit
+          npm --prefix backend run test:store-credit-composition
 
       - name: Validar permisos y arquitectura
         run: |
           npm --prefix backend run test:orders-security
+          npm --prefix backend run test:orders-admin-read-security
           npm --prefix backend run test:orders-architecture
+          npm --prefix backend run test:order-admin-output-security
+          npm --prefix backend run test:orders-cursor
+          npm --prefix backend run test:order-admin-cursor-index-migration
+          npm --prefix backend run test:order-creation-composition
+          npm --prefix backend run test:order-branch-authority
+          npm --prefix backend run test:order-creation-postcommit
+          npm --prefix backend run test:order-postcommit-outbox
+          npm --prefix backend run test:order-fulfillment-composition
+          npm --prefix backend run test:order-model-parity
+          npm --prefix backend run test:order-status-composition
+          npm --prefix backend run test:inventory-reservation-composition
+          npm --prefix backend run test:order-inventory-allocation-composition
+          npm --prefix backend run test:order-module-boundaries
+          npm --prefix backend run test:backend-commonjs-acyclicity
+          npm --prefix backend run test:order-activity-scalability
+          npm --prefix backend run test:order-activity-index-migration
+          npm --prefix backend run test:order-timeline-retention
+          npm --prefix backend run test:order-selection-scalability
+          npm --prefix backend run test:payment-configuration-authority
+          npm --prefix backend run test:payment-route-composition
+          npm --prefix backend run test:payment-attempt-ledger
+          npm --prefix backend run test:payment-attempt-index-migration
+          npm --prefix backend run test:manual-payment-confirmation
+          npm --prefix backend run test:manual-payment-index-migration
+          npm --prefix backend run test:payu-secure-composition
+          npm --prefix backend run test:wompi-inventory-integrity
+          npm --prefix backend run test:wompi-webhook-composition
+          npm --prefix backend run test:payment-inventory-failure-composition
+          npm --prefix backend run test:payment-inventory-failure
 
       - name: Validar operación, logística y devoluciones
         run: |
           npm --prefix backend run test:orders-logistics
+          npm --prefix backend run test:order-shipping-composition
+          npm --prefix backend run test:order-return-controller-composition
           npm --prefix backend run test:orders-returns
+          npm --prefix backend run test:order-return-idempotency
+          npm --prefix backend run test:order-return-index-migration
+          npm --prefix backend run test:critical-order-index-migrations
           npm --prefix backend run test:orders-operations
           npm --prefix backend run test:orders-observability
+          npm --prefix backend run test:order-monitoring-composition
 
       - name: Validar transportadoras sin llamadas externas
         env:
@@ -82,6 +120,7 @@ jobs:
       - name: Validar clientes, comunicación y datos fiscales
         run: |
           npm --prefix backend run test:orders-whatsapp-assisted
+          npm --prefix backend run test:order-communication-composition
           npm --prefix backend run test:orders-customer-connection
           npm --prefix backend run test:orders-billing-municipality
           npm --prefix backend run test:orders-manual-invoice
@@ -95,6 +134,7 @@ jobs:
           npm --prefix backend run test:order-refund-automation
           npm --prefix backend run test:order-bulk-status-contract
           npm --prefix backend run test:order-multi-branch-contract
+          npm --prefix backend run test:order-multi-branch-isolation
           npm --prefix backend run test:complete-sale-contract
 
       - name: Validar plan transaccional aislado
@@ -234,6 +274,7 @@ jobs:
           npm --prefix frontend run test:orders-operations
           npm --prefix frontend run test:orders-detail-story
           npm --prefix frontend run test:orders-keyboard
+          npm --prefix frontend run test:orders-manual-payment
 
       - name: Validar logística, envíos y posventa
         run: |
@@ -248,7 +289,10 @@ jobs:
         run: npm --prefix frontend run test:orders-return-risk
 
       - name: Validar saldo a favor en Checkout y detalle de la orden
-        run: npm --prefix frontend run test:checkout-store-credit
+        run: |
+          npm --prefix frontend run test:checkout-architecture
+          npm --prefix frontend run test:checkout-store-credit
+          npm --prefix frontend run test:payu-redirect
 
       - name: Validar cliente, WhatsApp y precontrol fiscal
         run: |

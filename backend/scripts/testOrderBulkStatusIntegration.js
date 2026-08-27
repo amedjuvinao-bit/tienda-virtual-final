@@ -240,6 +240,14 @@ async function bulk(orderIds, status) {
   );
 }
 
+async function recordVerifiedPaymentFact(order, reference) {
+  order.payment.status = 'paid';
+  order.payment.paidAt = new Date();
+  order.payment.transactionId = reference;
+  order.payment.reference = reference;
+  await order.save();
+}
+
 async function run() {
   assert(
     MONGO_URI,
@@ -478,7 +486,6 @@ async function run() {
       ],
     });
     legacyPaidOrder.status = 'paid';
-    await legacyPaidOrder.save();
     const virtualOrder = await createOrder({
       suffix: 'VIRTUAL',
       branch,
@@ -498,6 +505,11 @@ async function run() {
         }),
       ],
     });
+    await Promise.all([
+      recordVerifiedPaymentFact(physicalOrder, `${PREFIX}-PAY-PHYSICAL`),
+      recordVerifiedPaymentFact(virtualOrder, `${PREFIX}-PAY-VIRTUAL`),
+      recordVerifiedPaymentFact(legacyPaidOrder, `${PREFIX}-PAY-LEGACY`),
+    ]);
     ok('Cinco órdenes con reservas y un estado heredado creadas');
 
     assert.deepStrictEqual(
@@ -538,7 +550,7 @@ async function run() {
         availableStock: 6,
       }
     );
-    ok('Pago masivo confirmó y descontó la variante física exacta');
+    ok('Conciliación masiva confirmó y descontó la variante física exacta');
 
     const paidReservation = await InventoryReservation.findOne({
       order: physicalOrder._id,
@@ -552,7 +564,7 @@ async function run() {
       }),
       1
     );
-    ok('Pago masivo dejó reserva confirmada y movimiento sale_out');
+    ok('Conciliación masiva dejó reserva confirmada y movimiento sale_out');
 
     const reconciledPaid = await bulk(
       [legacyPaidOrder._id],

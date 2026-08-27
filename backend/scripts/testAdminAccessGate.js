@@ -28,8 +28,11 @@ const SAMPLE_PARAMS = {
   noteId: process.env.ADMIN_GATE_NOTE_ID || SAMPLE_ID,
 };
 
-function buildUrl(pattern) {
-  let url = pattern;
+function buildUrl(ruleOrPattern) {
+  const rule = typeof ruleOrPattern === 'string'
+    ? { path: ruleOrPattern, query: {} }
+    : ruleOrPattern || {};
+  let url = rule.path || '/';
 
   for (const [key, value] of Object.entries(SAMPLE_PARAMS)) {
     url = url.replace(new RegExp(`:${key}\\b`, 'g'), value);
@@ -37,7 +40,8 @@ function buildUrl(pattern) {
 
   url = url.replace(/:[a-zA-Z0-9_]+/g, SAMPLE_ID);
 
-  return `${BASE_URL}${url}`;
+  const query = new URLSearchParams(rule.query || {}).toString();
+  return `${BASE_URL}${url}${query ? `?${query}` : ''}`;
 }
 
 function shouldSendBody(method) {
@@ -71,7 +75,7 @@ function getTestBody(rule) {
 }
 
 async function requestRule(rule, token = '') {
-  const url = buildUrl(rule.path);
+  const url = buildUrl(rule);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -165,7 +169,12 @@ async function testWithTokenWithoutPermission() {
   let skipped = 0;
 
   for (const rule of ADMIN_ROUTE_PERMISSIONS) {
-    if (TOKEN_ALLOWED_PERMISSIONS.includes(rule.permission)) {
+    const requiredPermissions = rule.requiredPermissions || [rule.permission];
+    const tokenAlreadyAllowsRoute = requiredPermissions.every((permission) =>
+      TOKEN_ALLOWED_PERMISSIONS.includes(permission)
+    );
+
+    if (tokenAlreadyAllowsRoute) {
       console.log(
         `⏭️  [OMITIDA] ${rule.method} ${rule.path} | ${rule.permission} | el usuario sí tiene este permiso`
       );

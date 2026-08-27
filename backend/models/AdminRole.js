@@ -475,6 +475,7 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
         'dashboard:view',
 
         'orders:view',
+        'orders:confirm_manual_payment',
         'orders:customer_data',
         'orders:email',
         'orders:refund',

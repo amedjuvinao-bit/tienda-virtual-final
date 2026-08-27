@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,6 +67,7 @@ vi.mock('./orders/components/OrdersTable', () => ({
 vi.mock('./orders/components/OrderDetailModal', () => ({
   default: ({
     open,
+    order,
     onSaveStatus,
     onSaveTags,
     onTogglePrinted,
@@ -75,9 +76,12 @@ vi.mock('./orders/components/OrderDetailModal', () => ({
     canSendEmail,
     canUpdateFulfillment,
     canDownloadBilling,
+    canConfirmManualPayment,
   }) =>
     open ? (
       <section aria-label="Detalle de orden">
+        <span>Detalle {order?.orderNumber}</span>
+        <span>{order?.customer?.name}</span>
         {onSaveStatus ? <button type="button">Cambiar estado</button> : null}
         {onSaveTags ? <button type="button">Editar etiquetas</button> : null}
         {onTogglePrinted ? <button type="button">Marcar impresa</button> : null}
@@ -87,6 +91,7 @@ vi.mock('./orders/components/OrderDetailModal', () => ({
         {canSendEmail ? <button type="button">Informar por WhatsApp</button> : null}
         {canUpdateFulfillment ? <button type="button">Editar prestación</button> : null}
         {canDownloadBilling ? <button type="button">Descargar PDF</button> : null}
+        {canConfirmManualPayment ? <button type="button">Confirmar pago manual</button> : null}
       </section>
     ) : null,
 }));
@@ -110,6 +115,22 @@ const ORDER = {
   total: 150000,
   status: 'paid',
 };
+
+const SECOND_ORDER = {
+  _id: '64c000000000000000000002',
+  orderNumber: 'ORD-SEG-002',
+  customer: { name: 'Segundo cliente' },
+  total: 210000,
+  status: 'processing',
+};
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
 
 function renderOrders() {
   return render(
@@ -258,16 +279,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     const hideFilters = screen.getByRole('button', { name: 'Ocultar panel de filtros' });
     expect(hideFilters).toHaveAttribute('aria-expanded', 'true');
     expect(document.querySelector('.orders-admin-shell')).toHaveClass('controls-open');
-    expect(
-      Array.from(document.querySelectorAll('style'))
-        .map((style) => style.textContent)
-        .join('\n')
-    ).toContain('inset: 0 0 auto 0');
-    expect(
-      Array.from(document.querySelectorAll('style'))
-        .map((style) => style.textContent)
-        .join('\n')
-    ).toContain('min-height: var(--orders-control-panel-min-height, auto)');
+    expect(panel).toHaveClass('is-open');
     await waitFor(() => {
       expect(shell.style.getPropertyValue('--orders-control-panel-min-height')).toBe('816px');
     });
@@ -512,6 +524,7 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       'orders:notes',
       'orders:email',
       'orders:fulfillment',
+      'orders:confirm_manual_payment',
       'billing:download',
       'branches:view',
     ]);
@@ -527,6 +540,67 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
       expect(screen.getByRole('button', { name: 'Enviar email' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Informar por WhatsApp' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Confirmar pago manual' })).toBeInTheDocument();
     });
+  });
+
+  it('ignora respuestas obsoletas al abrir dos órdenes consecutivamente', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+    const firstDetail = deferred();
+    const secondDetail = deferred();
+
+    state.api.get.mockImplementation((url) => {
+      if (url === '/api/orders/admin') {
+        return Promise.resolve({
+          data: {
+            data: [ORDER, SECOND_ORDER],
+            page: 1,
+            total: 2,
+            totalPages: 1,
+            financialSummary: { totalOrders: 2 },
+          },
+        });
+      }
+      if (url === '/api/admin/branches') {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      if (url === `/api/orders/${ORDER._id}`) return firstDetail.promise;
+      if (url === `/api/orders/${SECOND_ORDER._id}`) return secondDetail.promise;
+      return Promise.resolve({ data: {} });
+    });
+
+    renderOrders();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir ORD-SEG-001' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir ORD-SEG-002' }));
+
+    await act(async () => {
+      secondDetail.resolve({
+        data: {
+          ...SECOND_ORDER,
+          customer: { name: 'Detalle reciente' },
+        },
+      });
+      await secondDetail.promise;
+    });
+    expect(await screen.findByText('Detalle reciente')).toBeInTheDocument();
+
+    await act(async () => {
+      firstDetail.resolve({
+        data: {
+          ...ORDER,
+          customer: { name: 'Detalle obsoleto' },
+        },
+      });
+      await firstDetail.promise;
+    });
+
+    expect(screen.queryByText('Detalle obsoleto')).not.toBeInTheDocument();
+    expect(screen.getByText('Detalle ORD-SEG-002')).toBeInTheDocument();
   });
 });

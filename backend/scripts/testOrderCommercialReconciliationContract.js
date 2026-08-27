@@ -133,24 +133,31 @@ function run() {
   ok('devoluciones de pagos mixtos se distribuyen sin generar saldos negativos');
 
   const ordersRoute = source('routes/orders.js');
+  const refundController = source('controllers/orderRefundController.js');
   assert(ordersRoute.includes("'/:id/refunds/:refundId/confirm-payment'"));
   assert(ordersRoute.includes("requirePermission('orders:refund')"));
-  assert(ordersRoute.includes('confirmRefundPaymentReversal'));
+  assert(ordersRoute.includes('confirmOrderRefundPayment'));
+  assert(refundController.includes('confirmRefundPaymentReversal'));
   const reconciliationSource = source('services/orderRefundReconciliationService.js');
   assert(reconciliationSource.includes('PAYMENT_REVERSAL_REFERENCE_REQUIRED'));
   const automationSource = source('services/orderRefundAutomationService.js');
   const gatewaySource = source('services/wompiRefundGatewayService.js');
   assert(ordersRoute.includes("'/:id/refunds/:refundId/automate'"));
   assert(ordersRoute.includes("requirePermission('billing:credit_note')"));
+  assert(ordersRoute.includes('automateOrderRefundReconciliation'));
+  assert(refundController.includes('automateOrderRefund'));
   assert(automationSource.includes('claimStage'));
   assert(gatewaySource.includes('/void'));
   assert(gatewaySource.includes('manualRequired'));
   ok('el reverso automático usa bloqueo persistente y conserva confirmación manual cuando no aplica');
 
   const paymentsRoute = source('routes/payments.js');
+  const paymentFiscalController = source(
+    'controllers/paymentFiscalAdminController.js'
+  );
   assert(paymentsRoute.includes("requirePermission('billing:credit_note')"));
-  assert(paymentsRoute.includes('linkRefundCreditNote'));
-  assert(paymentsRoute.includes('req.body?.refundId'));
+  assert(paymentFiscalController.includes('linkRefundCreditNote'));
+  assert(paymentFiscalController.includes('req.body?.refundId'));
   ok('la nota crédito oficial se vincula al reembolso con permiso fiscal independiente');
 
   assert(reconciliationSource.includes("orderUpdate.status = 'refunded'"));

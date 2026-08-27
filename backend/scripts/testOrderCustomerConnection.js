@@ -5,7 +5,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const Customer = require('../models/Customer');
+const Order = require('../models/Order');
+const { hasExactIndex } = require('./lib/orderSchemaContract');
 
+const customerOrderLinkModule = require('../services/customerOrderLinkService');
 const {
   applyCustomerResolutionToOrderData,
   applyCustomerStatsForOrder,
@@ -14,7 +17,14 @@ const {
   hasCustomerIdentity,
   isConfirmedOrder,
   isDemoOrder,
-} = require('../services/customerOrderLinkService');
+  resolveCustomerForOrder,
+  syncCustomerMasterFromOrder,
+} = customerOrderLinkModule;
+const customerOrderNormalization = require('../services/customerOrderLink/normalization');
+const customerOrderMatching = require('../services/customerOrderLink/matching');
+const customerOrderResolution = require('../services/customerOrderLink/resolution');
+const customerOrderStats = require('../services/customerOrderLink/stats');
+const customerOrderSync = require('../services/customerOrderLink/sync');
 const {
   buildCandidateFilter,
   parseOptions,
@@ -39,6 +49,44 @@ function read(relativePath) {
 }
 
 async function main() {
+  const expectedCustomerOrderLinkExports = [
+    'applyCustomerResolutionToOrderData',
+    'applyCustomerStatsForOrder',
+    'buildCustomerPayloadFromOrder',
+    'findCustomerMatch',
+    'hasCustomerIdentity',
+    'isConfirmedOrder',
+    'isDemoOrder',
+    'resolveCustomerForOrder',
+    'syncCustomerMasterFromOrder',
+  ];
+  ok(
+    'la fachada conserva exactamente sus nueve exports públicos',
+    JSON.stringify(Object.keys(customerOrderLinkModule)) ===
+      JSON.stringify(expectedCustomerOrderLinkExports)
+  );
+  ok(
+    'la fachada delega sin wrappers a normalización, matching, resolución, stats y sync',
+    customerOrderLinkModule.buildCustomerPayloadFromOrder ===
+      customerOrderNormalization.buildCustomerPayloadFromOrder &&
+      customerOrderLinkModule.findCustomerMatch ===
+        customerOrderMatching.findCustomerMatch &&
+      customerOrderLinkModule.resolveCustomerForOrder ===
+        customerOrderResolution.resolveCustomerForOrder &&
+      customerOrderLinkModule.applyCustomerStatsForOrder ===
+        customerOrderStats.applyCustomerStatsForOrder &&
+      customerOrderLinkModule.syncCustomerMasterFromOrder ===
+        customerOrderSync.syncCustomerMasterFromOrder
+  );
+  const customerOrderLinkFacade = read(
+    'backend/services/customerOrderLinkService.js'
+  );
+  ok(
+    'customerOrderLinkService permanece como fachada menor a 100 líneas',
+    customerOrderLinkFacade.split(/\r?\n/).length <= 100 &&
+      !customerOrderLinkFacade.includes("require('mongoose')")
+  );
+
   const demoOrder = {
     source: 'system',
     tags: ['demo', 'orders-trace'],
@@ -90,6 +138,101 @@ async function main() {
     CustomerModel: CustomerMatchModel,
   });
   ok('la búsqueda prioriza documento, correo y celular de forma determinista', queries.length === 2 && match.matchedBy === 'email');
+
+  const linkedCustomerId = '64c000000000000000000009';
+  const customerSession = { id: 'customer-link-session' };
+  const sessionTrace = { querySessions: [], saves: [] };
+  const linkedCustomer = {
+    _id: linkedCustomerId,
+    fullName: 'María Pérez',
+    displayName: 'María Pérez',
+    firstName: 'María',
+    lastName: 'Pérez',
+    phone: payload.phone,
+    email: payload.email,
+    documentType: payload.documentType,
+    documentNumber: payload.documentNumber,
+    address: payload.address,
+    city: payload.city,
+    country: payload.country,
+    async save(options) {
+      sessionTrace.saves.push(options?.session);
+    },
+    toOrderSnapshot() {
+      return {
+        customerId: this._id,
+        customerCode: 'CLI-SESSION-001',
+        name: this.fullName,
+        email: this.email,
+        phone: this.phone,
+      };
+    },
+  };
+  const SessionCustomerModel = {
+    findOne(filter) {
+      const value = filter?._id === linkedCustomerId ? linkedCustomer : null;
+      return {
+        session(session) {
+          sessionTrace.querySessions.push(session);
+          return Promise.resolve(value);
+        },
+        then(resolve, reject) {
+          return Promise.resolve(value).then(resolve, reject);
+        },
+      };
+    },
+    async create() {
+      throw new Error('No debe crear una ficha cuando customerId sigue vigente');
+    },
+  };
+  const linkedOrder = {
+    ...webOrder,
+    customer: {
+      ...webOrder.customer,
+      customerId: linkedCustomerId,
+    },
+  };
+  const linkedResolution = await resolveCustomerForOrder(linkedOrder, {
+    session: customerSession,
+    CustomerModel: SessionCustomerModel,
+  });
+  ok(
+    'la resolución conserva la sesión y el snapshot de la ficha vinculada',
+    linkedResolution.matchedBy === 'customer_id' &&
+      linkedResolution.snapshot.customerCode === 'CLI-SESSION-001' &&
+      sessionTrace.querySessions.length >= 2 &&
+      sessionTrace.querySessions.every((value) => value === customerSession) &&
+      sessionTrace.saves.every((value) => value === customerSession)
+  );
+
+  sessionTrace.querySessions.length = 0;
+  sessionTrace.saves.length = 0;
+  const masterSync = await syncCustomerMasterFromOrder(linkedOrder, {
+    session: customerSession,
+    CustomerModel: SessionCustomerModel,
+  });
+  ok(
+    'la sincronización maestra conserva sesión, match y snapshot de orden',
+    masterSync.matchedBy === 'customer_id' &&
+      linkedOrder.customer.customerCode === 'CLI-SESSION-001' &&
+      sessionTrace.querySessions.length >= 2 &&
+      sessionTrace.querySessions.every((value) => value === customerSession) &&
+      sessionTrace.saves.length === 1 &&
+      sessionTrace.saves[0] === customerSession
+  );
+  await assert.rejects(
+    () =>
+      syncCustomerMasterFromOrder(demoOrder, {
+        session: customerSession,
+        CustomerModel: SessionCustomerModel,
+      }),
+    (error) =>
+      error?.code === 'DEMO_CUSTOMER_SYNC_NOT_ALLOWED' &&
+      error?.statusCode === 422 &&
+      error?.details &&
+      typeof error.details === 'object'
+  );
+  ok('la sincronización DEMO conserva su error público exacto');
 
   const resolvedData = applyCustomerResolutionToOrderData(webOrder, {
     customer: matchedCustomer,
@@ -188,21 +331,66 @@ async function main() {
       liveIdentity.initialPhone !== liveIdentity.correctedPhone
   );
 
-  const orderModel = read('backend/models/Order.js');
   const ordersRoute = read('backend/routes/orders.js');
+  const orderCreationTransactionService = read(
+    'backend/services/orderCreationTransactionService.js'
+  );
+  const orderCustomerDataController = read(
+    'backend/controllers/orderCustomerDataController.js'
+  );
   const posService = read('backend/services/adminPosService.js');
   const adminUi = read('frontend/src/admin/OrdersAdmin.jsx');
-  const customerUi = read('frontend/src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.jsx');
+  const adminCapabilities = read(
+    'frontend/src/admin/orders/hooks/useOrdersAdminCapabilities.js'
+  );
+  const customerUiFacade = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.jsx'
+  );
+  const customerUiEditForm = read(
+    'frontend/src/admin/orders/components/orderDetail/OrderCustomerBillingEditForm.jsx'
+  );
+  const customerUi = `${customerUiFacade}\n${customerUiEditForm}`;
   const reconciliationScript = read('backend/scripts/reconcileOrderCustomers.js');
   const liveLifecycleScript = read('backend/scripts/testRealOrderCustomerLifecycle.js');
   const backendPackage = read('backend/package.json');
   const ciWorkflow = read('.github/workflows/products-ci.yml');
-  ok('el modelo persiste customerId como referencia a Customer', orderModel.includes("ref: 'Customer'") && orderModel.includes("'customer.customerId'"));
-  ok('checkout crea o vincula el cliente dentro de la transacción', ordersRoute.includes('resolveCustomerForOrder(base') && ordersRoute.includes('applyCustomerResolutionToOrderData'));
+  const customerIdPath = Order.schema.path('customer.customerId');
+  ok(
+    'el modelo persiste customerId como referencia a Customer',
+    customerIdPath?.instance === 'ObjectId' &&
+      customerIdPath?.options?.ref === 'Customer' &&
+      hasExactIndex(Order.schema, {
+        'customer.customerId': 1,
+        createdAt: -1,
+      })
+  );
+  ok(
+    'checkout crea o vincula el cliente dentro de la transacción',
+    ordersRoute.includes('createOrder') &&
+      orderCreationTransactionService.includes('resolveCustomerForOrder(base') &&
+      orderCreationTransactionService.includes(
+        'applyCustomerResolutionToOrderData'
+      )
+  );
   ok('POS reutiliza identidades existentes antes de crear cliente rápido', posService.includes('findCustomerMatch(quickCustomerPayload'));
-  ok('la edición administrativa distingue orden y ficha maestra', ordersRoute.includes('syncCustomerMasterFromOrder') && ordersRoute.includes('syncCustomer'));
-  ok('la interfaz respeta el permiso sensible de datos del cliente', adminUi.includes("can('orders:customer_data')"));
-  ok('la interfaz ofrece los dos alcances sin exponer mensajes técnicos', customerUi.includes('Solo esta orden') && customerUi.includes('Esta orden y ficha del cliente') && !customerUi.includes('podrás corregir sus datos para probar WhatsApp'));
+  ok(
+    'la edición administrativa distingue orden y ficha maestra',
+    ordersRoute.includes('updateOrderCustomerData') &&
+      orderCustomerDataController.includes('syncCustomerMasterFromOrder') &&
+      orderCustomerDataController.includes('syncCustomer')
+  );
+  ok(
+    'la interfaz respeta el permiso sensible de datos del cliente',
+    `${adminUi}\n${adminCapabilities}`.includes("can('orders:customer_data')") &&
+      adminUi.includes('canEditCustomerData={capabilities.canEditCustomerData}')
+  );
+  ok(
+    'la interfaz ofrece los dos alcances sin exponer mensajes técnicos',
+    customerUiFacade.includes("from './OrderCustomerBillingEditForm'") &&
+      customerUi.includes('Solo esta orden') &&
+      customerUi.includes('Esta orden y ficha del cliente') &&
+      !customerUi.includes('podrás corregir sus datos para probar WhatsApp')
+  );
   ok('la conciliación histórica no contiene operaciones de borrado', !/deleteOne|deleteMany|findOneAndDelete|dropDatabase/.test(reconciliationScript));
   ok('la prueba real reutiliza las autoridades de cliente, inventario, estado y logística', liveLifecycleScript.includes('resolveCustomerForOrder') && liveLifecycleScript.includes('createInventoryReservation') && liveLifecycleScript.includes('transitionOrderStatus') && liveLifecycleScript.includes('updateOrderShipment'));
   ok('la prueba real conserva evidencia y no contiene operaciones de borrado', liveLifecycleScript.includes('RESULTADO CONSERVADO PARA REVISIÓN VISUAL') && !/deleteOne|deleteMany|findOneAndDelete|dropDatabase/.test(liveLifecycleScript));

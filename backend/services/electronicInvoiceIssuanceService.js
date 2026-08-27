@@ -18,6 +18,9 @@ const {
 const {
   resolveOrderBillingMunicipality,
 } = require('./orderBillingMunicipalityService');
+const {
+  sendValidatedInvoiceEmail,
+} = require('./electronicInvoiceEmailService');
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
@@ -1140,12 +1143,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
 }
 
 const defaultService = createElectronicInvoiceIssuanceService({
-  sendValidatedInvoiceEmail: async (...args) => {
-    const {
-      sendValidatedInvoiceEmail,
-    } = require('./electronicInvoiceEmailService');
-    return sendValidatedInvoiceEmail(...args);
-  },
+  sendValidatedInvoiceEmail,
 });
 
 module.exports = {
