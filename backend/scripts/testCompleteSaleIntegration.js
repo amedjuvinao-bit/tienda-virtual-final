@@ -165,6 +165,7 @@ function buildWompiPayload({
   orderNumber,
   total,
   transactionId,
+  reference,
 }) {
   const payload = {
     event: 'transaction.updated',
@@ -173,7 +174,8 @@ function buildWompiPayload({
       transaction: {
         id: transactionId,
         status: 'APPROVED',
-        reference: `ORDER-${orderNumber}__TRY__${PREFIX}`,
+        reference:
+          reference || `ORDER-${orderNumber}__TRY__${PREFIX}`,
         amount_in_cents: Math.round(Number(total || 0) * 100),
         currency: 'COP',
         payment_method_type: 'CARD',
@@ -902,6 +904,7 @@ async function run() {
     orderNumber: order.orderNumber,
     total: order.total - 0.01,
     transactionId: `${PREFIX}-BAD-AMOUNT`,
+    reference: checkoutData.data.reference,
   });
   const badPayment = await requestJson(
     baseUrl,
@@ -915,19 +918,41 @@ async function run() {
       body: badPaymentPayload,
     }
   );
-  assert.strictEqual(badPayment.status, 409);
+  assert.strictEqual(badPayment.status, 200);
   assert.strictEqual(
     badPayment.data.error,
-    'WOMPI_AMOUNT_MISMATCH'
+    'PAYMENT_ATTEMPT_VALUE_MISMATCH'
   );
+  assert.strictEqual(badPayment.data.reconciliationRequired, true);
+  assert.strictEqual(badPayment.data.applied, false);
   order = await Order.findById(order._id).lean();
   assert.strictEqual(order.status, 'pending');
-  ok('Wompi no puede aprobar un valor distinto al total');
+  ok('Wompi concilia sin aplicar un valor distinto al intento emitido');
+
+  const retryCheckoutData = await requestJson(
+    baseUrl,
+    '/api/payments/wompi/checkout-data',
+    {
+      method: 'POST',
+      headers: paymentAccessHeaders(paymentAccess),
+      body: { orderId: String(order._id) },
+    }
+  );
+  assert.strictEqual(
+    retryCheckoutData.status,
+    200,
+    JSON.stringify(retryCheckoutData.data)
+  );
+  assert.notStrictEqual(
+    retryCheckoutData.data.reference,
+    checkoutData.data.reference
+  );
 
   const approvedPayload = buildWompiPayload({
     orderNumber: order.orderNumber,
     total: order.total,
     transactionId: `${PREFIX}-APPROVED`,
+    reference: retryCheckoutData.data.reference,
   });
   const approved = await requestJson(
     baseUrl,

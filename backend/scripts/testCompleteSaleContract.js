@@ -61,7 +61,8 @@ function run() {
     integration,
     [
       "'Idempotency-Key'",
-      'WOMPI_AMOUNT_MISMATCH',
+      'PAYMENT_ATTEMPT_VALUE_MISMATCH',
+      'reconciliationRequired',
       '/api/payments/wompi/webhook',
       'buildWompiEventChecksum',
     ],
