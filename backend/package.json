@@ -57,6 +57,8 @@
     "test:order-return-index-migration": "node scripts/testOrderReturnIndexMigration.js",
     "migrate:order-return-indexes": "node scripts/migrateOrderReturnIndexes.js",
     "test:critical-order-index-migrations": "node scripts/testCriticalOrderIndexMigrations.js",
+    "test:order-index-dry-runs": "node scripts/testOrderIndexDryRunSuite.js",
+    "migrate:orders:indexes:dry-run": "node scripts/runOrderIndexMigrationDryRuns.js",
     "migrate:order-refund-indexes": "node scripts/migrateOrderRefundIndexes.js",
     "migrate:idempotency-key-indexes": "node scripts/migrateIdempotencyKeyIndexes.js",
     "migrate:shipping-operation-indexes": "node scripts/migrateShippingOperationIndexes.js",

@@ -174,6 +174,11 @@ despliegue se deben revisar y después aplicar explícitamente los comandos de:
 - evidencia de pago manual: `migrate:manual-payment-indexes`.
 - outbox post-pago: `migrate:order-postcommit-indexes`.
 
+La revisión conjunta se ejecuta con
+`npm --prefix backend run migrate:orders:indexes:dry-run`. El comando no acepta
+banderas de escritura y falla si alguna migración no demuestra modo `dry-run` o
+`plan`, cero mutaciones y ausencia de operaciones destructivas.
+
 Ninguna migración usa `syncIndexes`, elimina ni renombra índices automáticamente.
 En producción exige la bandera de aplicación de su comando y la confirmación
 adicional documentada por el propio script. Un índice incompatible detiene el
