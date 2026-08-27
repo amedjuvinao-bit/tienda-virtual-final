@@ -826,7 +826,7 @@ async function run() {
   wompiTransactions.set(validLookupId, {
     id: validLookupId,
     status: 'PENDING',
-    reference: `ORDER-${order.orderNumber}__TRY__${PREFIX}`,
+    reference: checkoutData.data.reference,
     amount_in_cents: Math.round(order.total * 100),
     currency: 'COP',
     customer_email: 'no-debe-salir@example.com',
@@ -843,7 +843,7 @@ async function run() {
   wompiTransactions.set(wrongAmountLookupId, {
     id: wrongAmountLookupId,
     status: 'APPROVED',
-    reference: `ORDER-${order.orderNumber}__TRY__${PREFIX}`,
+    reference: checkoutData.data.reference,
     amount_in_cents: Math.round(order.total * 100) - 1,
     currency: 'COP',
   });

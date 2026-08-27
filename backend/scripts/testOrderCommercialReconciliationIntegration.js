@@ -82,17 +82,21 @@ function baseOrder({
         title: 'Producto temporal de conciliación',
         productType: 'physical',
         variantKey: 'default__default',
-        quantity: 1,
-        qty: 1,
-        price: total,
-        unitPrice: total,
+        quantity: 5,
+        qty: 5,
+        price: total / 5,
+        unitPrice: total / 5,
         lineTotal: total,
       },
     ],
   };
 }
 
-async function createProcessedRefund(order, { number, amount } = {}) {
+async function createProcessedRefund(
+  order,
+  { number, amount, returnedQuantity } = {}
+) {
+  const orderItem = order.items[0];
   const refund = await OrderRefund.create({
     refundNumber: number,
     order: order._id,
@@ -103,6 +107,17 @@ async function createProcessedRefund(order, { number, amount } = {}) {
     amount,
     currency: 'COP',
     reason: 'Prueba aislada de conciliación comercial',
+    items: [
+      {
+        orderItemId: orderItem._id,
+        product: orderItem.product,
+        title: orderItem.title,
+        productType: orderItem.productType,
+        variantKey: orderItem.variantKey,
+        purchasedQuantity: orderItem.quantity,
+        returnedQuantity,
+      },
+    ],
     processedAt: new Date(),
     reconciliation: {
       inventory: { state: 'pending' },
@@ -172,6 +187,7 @@ async function runFullRefundScenario() {
   const refund = await createProcessedRefund(order, {
     number: 'RF-STAGE2-TOTAL',
     amount: 100000,
+    returnedQuantity: 5,
   });
 
   const pending = await refreshOrderRefundReconciliation(refund._id);
@@ -283,6 +299,7 @@ async function runPartialRefundScenario() {
   const refund = await createProcessedRefund(order, {
     number: 'RF-STAGE2-PARTIAL',
     amount: 40000,
+    returnedQuantity: 2,
   });
 
   const pending = await refreshOrderRefundReconciliation(refund._id);

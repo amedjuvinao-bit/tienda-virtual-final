@@ -357,6 +357,7 @@ function validateUnifiedEntryPoints() {
   const payu = [
     read('backend/routes/payuProductionWebhook.js'),
     read('backend/controllers/payu/payuWebhookController.js'),
+    read('backend/services/payu/payuWebhookResponseService.js'),
   ].join('\n');
   const adminPos = read('backend/services/adminPosService.js');
   const cashPos = read('backend/services/posCashSaleService.js');
