@@ -28,6 +28,9 @@ const {
   parseArguments,
 } = require('./wompiFactusSandboxTrace/config');
 const {
+  createAutonomousCheckout,
+} = require('./wompiFactusSandboxTrace/checkoutStage');
+const {
   ensureFactusInvoice,
   verifyCreditNoteDocuments,
 } = require('./wompiFactusSandboxTrace/factusStage');
@@ -36,11 +39,20 @@ const {
   createFullCancellationRefund,
 } = require('./wompiFactusSandboxTrace/refundStage');
 const {
+  createApprovedSandboxTransaction,
+} = require('./wompiFactusSandboxTrace/secureCardStage');
+const {
   applyVerifiedApproval,
   loadVerifiedTransaction,
 } = require('./wompiFactusSandboxTrace/wompiStage');
 
-const MONGO_URI = String(process.env.MONGODB_URI || '').trim();
+const MONGO_URI = String(
+  process.env.MONGO_URI ||
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URL ||
+    process.env.DATABASE_URL ||
+    ''
+).trim();
 
 async function assertTransactionalDatabase() {
   await mongoose.connection.db.command({ ping: 1 });
@@ -69,8 +81,11 @@ async function verifyRemoteVoid({ transactionId, payments, baseUrl }) {
 
 async function run() {
   assertNonProductionProcess();
-  const { orderNumber, transactionId } = parseArguments();
-  assert(MONGO_URI, 'No existe MONGODB_URI en backend/.env.');
+  const args = parseArguments();
+  assert(
+    MONGO_URI,
+    'No existe MONGO_URI en backend/.env (también se aceptan MONGODB_URI, MONGO_URL o DATABASE_URL).'
+  );
   await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 15000 });
   await assertTransactionalDatabase();
 
@@ -82,11 +97,34 @@ async function run() {
   const baseUrl = assertWompiSandboxConfig(payments);
   const factus = assertFactusHabilitationConfig(settings);
 
-  console.log('\nTRAZA EXTERNA — SOLO SANDBOX/HABILITACIÓN');
-  console.log(`Orden: ${orderNumber}`);
+  console.log('\nTRAZA AUTÓNOMA — SOLO SANDBOX/HABILITACIÓN');
   console.log(`Wompi: ${baseUrl}`);
   console.log(`Factus: ${factus.apiUrl}`);
   console.log('No almacena tarjeta y no contacta ambientes de producción.\n');
+
+  let orderNumber = args.orderNumber;
+  let transactionId = args.transactionId;
+  if (args.autonomous) {
+    const checkout = await createAutonomousCheckout();
+    orderNumber = checkout.order.orderNumber;
+    console.log(
+      `OK 1/9: carrito firmado y orden ${orderNumber} creados con inventario real`
+    );
+    console.log(
+      `OK 2/9: reserva ${checkout.order.inventoryControl.reservationId} e intento de pago persistidos`
+    );
+
+    const transaction = await createApprovedSandboxTransaction({
+      baseUrl,
+      payments,
+      checkoutData: checkout.checkoutData,
+      email: checkout.identity.email,
+    });
+    transactionId = transaction.id;
+    console.log(`OK 3/9: Wompi creó y aprobó la transacción ${transactionId}`);
+  } else {
+    console.log(`Reanudando orden ${orderNumber} y transacción ${transactionId}`);
+  }
 
   const verified = await loadVerifiedTransaction({
     orderNumber,
@@ -94,28 +132,40 @@ async function run() {
     payments,
     baseUrl,
   });
-  console.log(`OK 1/6: Wompi confirmó ${verified.status} y la propiedad de la transacción`);
+  console.log(
+    `${args.autonomous ? 'OK 4/9' : 'OK 1/6'}: Wompi confirmó ${verified.status} y la propiedad de la transacción`
+  );
 
   const paidOrder = await applyVerifiedApproval({ ...verified, payments });
-  console.log('OK 2/6: pago e inventario aplicados por el motor canónico');
+  console.log(
+    `${args.autonomous ? 'OK 5/9' : 'OK 2/6'}: pago e inventario aplicados por el motor canónico`
+  );
 
   const invoice = await ensureFactusInvoice({
     order: paidOrder,
     transaction: verified.transaction,
     payments,
   });
-  console.log(`OK 3/6: factura Factus ${invoice.invoiceNumber} validada con PDF/XML`);
+  console.log(
+    `${args.autonomous ? 'OK 6/9' : 'OK 3/6'}: factura Factus ${invoice.invoiceNumber} validada con PDF/XML`
+  );
 
   const refund = await createFullCancellationRefund(paidOrder);
-  console.log(`OK 4/6: reembolso ${refund.refundNumber} e inventario conciliados`);
+  console.log(
+    `${args.autonomous ? 'OK 7/9' : 'OK 4/6'}: reembolso ${refund.refundNumber} e inventario conciliados`
+  );
 
   const completed = await automateSandboxRefund({ order: paidOrder, refund });
   const note = await verifyCreditNoteDocuments(completed.finalInvoice);
-  console.log(`OK 5/6: nota crédito Factus ${note.provider.number} validada con PDF/XML`);
+  console.log(
+    `${args.autonomous ? 'OK 8/9' : 'OK 5/6'}: nota crédito Factus ${note.provider.number} validada con PDF/XML`
+  );
 
   const voided = await verifyRemoteVoid({ transactionId, payments, baseUrl });
   const events = await OrderEvent.countDocuments({ orderId: paidOrder._id });
-  console.log(`OK 6/6: Wompi confirmó ${voided.status}; ${events} eventos auditables`);
+  console.log(
+    `${args.autonomous ? 'OK 9/9' : 'OK 6/6'}: Wompi confirmó ${voided.status}; ${events} eventos auditables`
+  );
 
   console.log('\nTRAZA CONSERVADA');
   console.log(`Buscar en Órdenes: ${paidOrder.orderNumber}`);

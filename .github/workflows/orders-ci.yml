@@ -90,6 +90,7 @@ jobs:
           npm --prefix backend run test:payu-secure-composition
           npm --prefix backend run test:wompi-inventory-integrity
           npm --prefix backend run test:wompi-webhook-composition
+          npm --prefix backend run test:orders-wompi-factus-sandbox
           npm --prefix backend run test:payment-inventory-failure-composition
           npm --prefix backend run test:payment-inventory-failure
 

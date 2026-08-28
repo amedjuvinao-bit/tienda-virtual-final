@@ -16,6 +16,7 @@ const FLAGS = Object.freeze({
   factus: '--confirm-factus-habilitacion',
 });
 const ORDER_PREFIX = '--order=';
+const RESUME_ORDER_PREFIX = '--resume-order=';
 const TRANSACTION_PREFIX = '--wompi-transaction=';
 
 function clean(value, max = 300) {
@@ -31,11 +32,20 @@ function parseArguments(args = process.argv.slice(2)) {
   for (const flag of Object.values(FLAGS)) {
     assert(args.includes(flag), `Falta ${flag}.`);
   }
-  const orderNumber = argumentValue(args, ORDER_PREFIX, 100);
+  const orderNumber =
+    argumentValue(args, RESUME_ORDER_PREFIX, 100) ||
+    argumentValue(args, ORDER_PREFIX, 100);
   const transactionId = argumentValue(args, TRANSACTION_PREFIX, 160);
-  assert(orderNumber, `${ORDER_PREFIX} requiere el número de orden.`);
-  assert(transactionId, `${TRANSACTION_PREFIX} requiere el ID devuelto por Wompi.`);
-  return { orderNumber, transactionId };
+  assert.strictEqual(
+    Boolean(orderNumber),
+    Boolean(transactionId),
+    'Para reanudar se requieren juntos --resume-order y --wompi-transaction.'
+  );
+  return {
+    autonomous: !orderNumber,
+    orderNumber,
+    transactionId,
+  };
 }
 
 function assertNonProductionProcess(env = process.env) {
@@ -86,6 +96,7 @@ function assertFactusHabilitationConfig(settings = {}) {
 module.exports = {
   FLAGS,
   ORDER_PREFIX,
+  RESUME_ORDER_PREFIX,
   TRANSACTION_PREFIX,
   assertFactusHabilitationConfig,
   assertNonProductionProcess,
