@@ -30,7 +30,7 @@ export default function OrderDetailSummaryRail({ order }) {
         statusLabel={model.statusLabel}
       />
       <OrderDetailProgressPanel
-        progressPercent={model.progressPercent}
+        progress={model.progress}
         statusLabel={model.statusLabel}
       />
       <OrderDetailQuickInfoPanel

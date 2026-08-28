@@ -18,18 +18,55 @@ export const FLOW_LABELS = {
   delivered: 'Entregada',
 };
 
-export function getProgressPercent(status) {
+const TERMINAL_PROGRESS = {
+  refunded: {
+    summary: 'Ciclo cerrado por reembolso',
+    title: 'Reembolso conciliado',
+    description:
+      'La orden cerró antes de completar la entrega; no se marca como enviada ni entregada.',
+  },
+  cancelled: {
+    summary: 'Ciclo cerrado por cancelación',
+    title: 'Orden cancelada',
+    description:
+      'La orden fue cancelada; no se marca como enviada ni entregada.',
+  },
+};
+
+function normalizeProgressStatus(status) {
   const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'reembolsada') return 'refunded';
+  if (normalized === 'canceled' || normalized === 'cancelada') return 'cancelled';
+  return normalized;
+}
+
+export function getProgressPercent(status) {
+  const normalized = normalizeProgressStatus(status);
 
   if (normalized === 'paid') return 40;
-  if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'failed') return 0;
-  if (normalized === 'refunded') return 100;
+  if (normalized === 'failed') return 0;
+  if (TERMINAL_PROGRESS[normalized]) return null;
 
   const index = FLOW_STEPS.indexOf(normalized);
 
   if (index < 0) return 20;
 
   return Math.max(20, Math.round(((index + 1) / FLOW_STEPS.length) * 100));
+}
+
+export function getProgressPresentation(status) {
+  const normalized = normalizeProgressStatus(status);
+  const terminal = TERMINAL_PROGRESS[normalized];
+  if (terminal) return { kind: 'terminal', percent: null, ...terminal };
+
+  const percent = getProgressPercent(normalized);
+  return {
+    kind: 'delivery',
+    percent,
+    summary: `${percent}% completado`,
+    title: '',
+    description: '',
+  };
 }
 
 function toNumber(value) {
@@ -198,6 +235,7 @@ export function buildOrderSummaryRailModel(order) {
     exchange.noCharge ? 'processing' : order?.status
   );
   const summary = getOrderSummary(order);
+  const progress = getProgressPresentation(order?.status);
 
   return {
     order,
@@ -210,7 +248,7 @@ export function buildOrderSummaryRailModel(order) {
     branchInfo: getOrderBranchInfo(order),
     admin: getAdminSnapshot(order),
     sourceLabel: getOrderSourceLabel(order?.source),
-    progressPercent: getProgressPercent(order?.status),
+    progress,
     breakdown: getMoneyBreakdown(order, summary),
   };
 }

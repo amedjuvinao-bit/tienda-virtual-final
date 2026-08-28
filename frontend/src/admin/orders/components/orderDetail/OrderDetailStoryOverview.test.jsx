@@ -799,6 +799,31 @@ describe('resumen decorativo original', () => {
     expect(screen.getByText('Datos rápidos')).toBeInTheDocument();
   });
 
+  it.each([
+    ['refunded', 'Ciclo cerrado por reembolso', 'Reembolso conciliado'],
+    ['cancelled', 'Ciclo cerrado por cancelación', 'Orden cancelada'],
+  ])(
+    'presenta %s como cierre terminal sin simular envío ni entrega',
+    (status, summary, title) => {
+      const order = { ...BASE_ORDER, status };
+      const model = buildOrderSummaryRailModel(order);
+
+      expect(model.progress).toMatchObject({
+        kind: 'terminal',
+        percent: null,
+        summary,
+        title,
+      });
+
+      render(<OrderDetailSummaryRail order={order} />);
+      expect(screen.getByText(summary)).toBeInTheDocument();
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(screen.queryByText(/% completado/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('Enviada')).not.toBeInTheDocument();
+      expect(screen.queryByText('Entregada')).not.toBeInTheDocument();
+    }
+  );
+
   it('mantiene el contenedor delgado y módulos cohesivos dentro de sus límites', () => {
     const files = [
       ['OrderDetailSummaryRail.jsx', 220],
@@ -860,7 +885,11 @@ describe('resumen decorativo original', () => {
     });
     expect(model).toMatchObject({
       statusLabel: 'Enviada',
-      progressPercent: 75,
+      progress: {
+        kind: 'delivery',
+        percent: 75,
+        summary: '75% completado',
+      },
       sourceLabel: 'Tienda online',
       branchInfo: { name: 'Sede Principal', code: 'PRINCIPAL' },
       admin: { displayName: 'Administradora', role: 'owner' },
