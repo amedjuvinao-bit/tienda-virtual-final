@@ -432,23 +432,50 @@ function createEnviaProvider({
         'track'
       );
     },
+    async listShipmentsByMonth({ month, year } = {}) {
+      const safeMonth = clean(month);
+      const safeYear = clean(year);
+      if (!/^(0[1-9]|1[0-2])$/.test(safeMonth) || !/^\d{4}$/.test(safeYear)) {
+        throw new ShippingProviderError(
+          'El mes y el año para consultar las guías de Envia no son válidos.',
+          'SHIPPING_SHIPMENT_PERIOD_INVALID',
+          422,
+          { provider: 'envia', operation: 'list_shipments' }
+        );
+      }
+      const payload = await request(
+        `/guide/${safeMonth}/${safeYear}`,
+        undefined,
+        'list_shipments',
+        { queryApi: true, method: 'GET', normalize: false }
+      );
+      return Array.isArray(payload?.data) ? payload.data : [];
+    },
     async schedulePickup(payload) {
       return request('/ship/pickup/', payload, 'schedule_pickup');
     },
-    async testWebhook({ trackingNumber, webhookUrl } = {}) {
+    async testWebhook({ carrier, trackingNumber, status = 'Shipped' } = {}) {
+      const safeCarrier = clean(carrier).toLowerCase();
       const safeTrackingNumber = clean(trackingNumber);
-      const safeWebhookUrl = clean(webhookUrl);
-      if (!safeTrackingNumber || !safeWebhookUrl) {
+      const safeStatus = clean(status);
+      const allowedStatuses = new Set([
+        'Shipped',
+        'Delivered',
+        'Canceled',
+        'Picked Up',
+      ]);
+      if (!safeCarrier || !safeTrackingNumber || !allowedStatuses.has(safeStatus)) {
         throw new ShippingProviderError(
-          'La prueba oficial del webhook exige una guía y la URL pública registrada.',
+          'La prueba oficial del webhook exige la transportadora, una guía de la cuenta y un estado válido.',
           'SHIPPING_WEBHOOK_TEST_DATA_REQUIRED',
           422,
           { provider: 'envia', operation: 'test_webhook' }
         );
       }
       const body = {
-        tracking_number: safeTrackingNumber,
-        webhook_url: safeWebhookUrl,
+        carrier: safeCarrier,
+        trackingNumber: safeTrackingNumber,
+        status: safeStatus,
       };
       const retryableStatuses = new Set([500, 502, 503, 504]);
       const retryDelaysMs = [250, 750];
@@ -475,8 +502,8 @@ function createEnviaProvider({
       const providerStatus = Number(lastError?.details?.providerStatus || 0);
       if (retryableStatuses.has(providerStatus)) {
         throw new ShippingProviderError(
-          'Envia Sandbox no pudo enviar la prueba oficial después de tres intentos. La URL continúa sin aprobarse; inténtalo más tarde o repórtalo a soporte de Envia.',
-          'SHIPPING_WEBHOOK_TEST_PROVIDER_UNAVAILABLE',
+          `Envia Sandbox respondió HTTP ${providerStatus} en tres intentos. El webhook no fue aprobado.`,
+          'SHIPPING_WEBHOOK_TEST_PROVIDER_ERROR',
           502,
           {
             provider: 'envia',

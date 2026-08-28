@@ -63,7 +63,99 @@ function webhookDashboardUrl(mode = 'sandbox') {
     : 'https://shipping-test.envia.com/settings/developers';
 }
 
-const ENVIA_SANDBOX_WEBHOOK_TEST_TRACKING_NUMBER = '7520610403';
+const ENVIA_SANDBOX_WEBHOOK_TEST_STATUS = 'Shipped';
+const ENVIA_RECENT_SHIPMENT_MONTHS = 3;
+
+function recentShipmentPeriods(now = new Date(), count = ENVIA_RECENT_SHIPMENT_MONTHS) {
+  const anchor = new Date(now);
+  if (Number.isNaN(anchor.getTime())) return [];
+  return Array.from({ length: count }, (_, index) => {
+    const period = new Date(Date.UTC(
+      anchor.getUTCFullYear(),
+      anchor.getUTCMonth() - index,
+      1
+    ));
+    return {
+      month: String(period.getUTCMonth() + 1).padStart(2, '0'),
+      year: String(period.getUTCFullYear()),
+    };
+  });
+}
+
+function shipmentIdentity(shipment = {}) {
+  const carrierValue =
+    shipment.carrier ||
+    shipment.carrier_name ||
+    shipment.carrierName ||
+    shipment.service?.carrier ||
+    shipment.shipment?.carrier;
+  const carrier = clean(
+    typeof carrierValue === 'object'
+      ? carrierValue?.code || carrierValue?.slug || carrierValue?.name
+      : carrierValue,
+    80
+  ).toLowerCase();
+  const trackingNumber = clean(
+    shipment.tracking_number ||
+    shipment.trackingNumber ||
+    shipment.tracking ||
+    shipment.guide_number ||
+    shipment.guideNumber ||
+    shipment.shipment?.tracking_number ||
+    shipment.shipment?.trackingNumber,
+    180
+  );
+  const createdAt = new Date(
+    shipment.created_at || shipment.createdAt || shipment.date || 0
+  );
+  return {
+    carrier,
+    trackingNumber,
+    createdAt: Number.isNaN(createdAt.getTime()) ? 0 : createdAt.getTime(),
+  };
+}
+
+async function resolveSandboxWebhookTestShipment(
+  input = {},
+  provider,
+  now = new Date()
+) {
+  if (typeof provider?.listShipmentsByMonth !== 'function') {
+    throw new ShippingSettingsError(
+      'La integración de Envia no puede consultar las guías de la cuenta.',
+      'SHIPPING_SHIPMENT_LOOKUP_UNAVAILABLE',
+      500
+    );
+  }
+  const requestedTrackingNumber = clean(input.trackingNumber, 180);
+  const requestedCarrier = clean(input.carrier, 80).toLowerCase();
+  const candidates = [];
+  for (const period of recentShipmentPeriods(now)) {
+    const shipments = await provider.listShipmentsByMonth(period);
+    (Array.isArray(shipments) ? shipments : []).forEach((shipment) => {
+      const candidate = shipmentIdentity(shipment);
+      if (!candidate.carrier || !candidate.trackingNumber) return;
+      if (
+        requestedTrackingNumber &&
+        candidate.trackingNumber !== requestedTrackingNumber
+      ) return;
+      if (requestedCarrier && candidate.carrier !== requestedCarrier) return;
+      candidates.push(candidate);
+    });
+    if (candidates.length) break;
+  }
+  candidates.sort((left, right) => right.createdAt - left.createdAt);
+  if (candidates[0]) return candidates[0];
+
+  throw new ShippingSettingsError(
+    requestedTrackingNumber
+      ? 'La guía indicada no pertenece a las guías recientes de esta cuenta Envia Sandbox.'
+      : 'La cuenta Envia Sandbox no tiene una guía reciente para realizar la prueba oficial. Primero debe existir una guía de prueba en esa misma cuenta.',
+    'SHIPPING_WEBHOOK_TEST_SHIPMENT_REQUIRED',
+    409,
+    { provider: 'envia', mode: 'sandbox' }
+  );
+}
 
 function publicHttpsUrl(value) {
   try {
@@ -475,7 +567,12 @@ async function confirmShippingWebhook(
 async function requestShippingWebhookProof(
   input = {},
   actor = null,
-  { SettingsModel = ShippingSettings, provider = null, fetchImpl } = {}
+  {
+    SettingsModel = ShippingSettings,
+    provider = null,
+    fetchImpl,
+    now = new Date(),
+  } = {}
 ) {
   const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
   const state = readiness(runtime.settings, runtime);
@@ -506,16 +603,16 @@ async function requestShippingWebhookProof(
     return getShippingSettingsView({ SettingsModel });
   }
 
-  const webhookUrl = publicWebhookUrl();
-  const trackingNumber = clean(
-    input.trackingNumber || ENVIA_SANDBOX_WEBHOOK_TEST_TRACKING_NUMBER,
-    180
-  );
   const envia = provider || createEnviaProvider({
     config: runtime.envia,
     fetchImpl,
   });
-  await envia.testWebhook({ trackingNumber, webhookUrl });
+  const shipment = await resolveSandboxWebhookTestShipment(input, envia, now);
+  await envia.testWebhook({
+    carrier: shipment.carrier,
+    trackingNumber: shipment.trackingNumber,
+    status: ENVIA_SANDBOX_WEBHOOK_TEST_STATUS,
+  });
   runtime.settings.updatedBy = actorId(actor);
   await runtime.settings.save();
   return getShippingSettingsView({ SettingsModel });

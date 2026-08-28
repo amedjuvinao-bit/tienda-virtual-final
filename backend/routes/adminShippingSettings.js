@@ -83,7 +83,10 @@ router.post('/webhook/confirm', async (req, res) => {
 router.post('/webhook/test', async (req, res) => {
   try {
     const result = await requestShippingWebhookProof(
-      { trackingNumber: req.body?.trackingNumber },
+      {
+        carrier: req.body?.carrier,
+        trackingNumber: req.body?.trackingNumber,
+      },
       actor(req)
     );
     return res.json({

@@ -189,24 +189,57 @@ async function main() {
     },
   };
   let proofRequest = null;
+  const queriedPeriods = [];
   await requestShippingWebhookProof(
     {},
     '64b000000000000000000001',
     {
       SettingsModel: { getSingleton: async () => proofSettings },
       provider: {
+        async listShipmentsByMonth(period) {
+          queriedPeriods.push(period);
+          return [{
+            tracking_number: 'ACCOUNT-TRACK-2026-001',
+            carrier: 'FedEx',
+            created_at: '2026-08-27T15:00:00.000Z',
+          }];
+        },
         async testWebhook(input) {
           proofRequest = input;
           return { success: true };
         },
       },
+      now: new Date('2026-08-28T12:00:00.000Z'),
     }
   );
+  assert.deepStrictEqual(queriedPeriods, [{ month: '08', year: '2026' }]);
   assert.deepStrictEqual(proofRequest, {
-    trackingNumber: '7520610403',
-    webhookUrl: 'https://shipping-settings.test/api/shipping/webhooks/envia',
+    carrier: 'fedex',
+    trackingNumber: 'ACCOUNT-TRACK-2026-001',
+    status: 'Shipped',
   });
-  ok('el panel solicita a Envia su POST oficial con tracking_number y webhook_url');
+  ok('el panel usa una guía real de la cuenta y el contrato oficial carrier/trackingNumber/status');
+
+  await assert.rejects(
+    () => requestShippingWebhookProof(
+      {},
+      '64b000000000000000000001',
+      {
+        SettingsModel: { getSingleton: async () => proofSettings },
+        provider: {
+          async listShipmentsByMonth() {
+            return [];
+          },
+          async testWebhook() {
+            throw new Error('No debe solicitar la prueba sin una guía de la cuenta');
+          },
+        },
+        now: new Date('2026-08-28T12:00:00.000Z'),
+      }
+    ),
+    (error) => error.code === 'SHIPPING_WEBHOOK_TEST_SHIPMENT_REQUIRED'
+  );
+  ok('sin una guía de la cuenta la prueba falla cerrada y no usa números de ejemplo');
 
   const productionSettings = {
     ...verifiedSettings,

@@ -108,7 +108,11 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
       422
     );
   }
-  const result = await provider.testWebhook({ trackingNumber, webhookUrl });
+  const result = await provider.testWebhook({
+    carrier,
+    trackingNumber,
+    status: 'Shipped',
+  });
   return integrationResponse(
     order,
     shipment,

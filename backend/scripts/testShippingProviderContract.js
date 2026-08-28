@@ -102,6 +102,23 @@ async function main() {
           },
         };
       }
+      if (url.endsWith('/guide/08/2026')) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              success: true,
+              data: [{
+                tracking_number: 'ACCOUNT-TEST-001',
+                carrier: 'fedex',
+                status: 'Created',
+                created_at: '2026-08-28T12:00:00.000Z',
+              }],
+            };
+          },
+        };
+      }
       if (url.endsWith('/ship/webhooktest/')) {
         return {
           ok: true,
@@ -134,9 +151,15 @@ async function main() {
   };
   const pickupResult = await automationProvider.schedulePickup(pickupRequest);
   assert.strictEqual(pickupResult[0].confirmation, 'PU-001');
+  const accountShipments = await automationProvider.listShipmentsByMonth({
+    month: '08',
+    year: '2026',
+  });
+  assert.strictEqual(accountShipments[0].tracking_number, 'ACCOUNT-TEST-001');
   await automationProvider.testWebhook({
-    trackingNumber: 'TEST-001',
-    webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
+    carrier: 'fedex',
+    trackingNumber: 'ACCOUNT-TEST-001',
+    status: 'Shipped',
   });
   assert.strictEqual(
     automationCalls[0].url,
@@ -146,11 +169,17 @@ async function main() {
   assert.deepStrictEqual(automationCalls[1].body, pickupRequest);
   assert.strictEqual('pickupAddress' in automationCalls[1].body, false);
   assert.strictEqual('pickupDate' in automationCalls[1].body, false);
-  assert.deepStrictEqual(automationCalls[2].body, {
-    tracking_number: 'TEST-001',
-    webhook_url: 'https://tienda.test/api/shipping/webhooks/envia',
+  assert.strictEqual(
+    automationCalls[2].url,
+    `${BASE_URLS.sandbox.queries}/guide/08/2026`
+  );
+  assert.strictEqual(automationCalls[2].options.method, 'GET');
+  assert.deepStrictEqual(automationCalls[3].body, {
+    carrier: 'fedex',
+    trackingNumber: 'ACCOUNT-TEST-001',
+    status: 'Shipped',
   });
-  ok('capacidades, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
+  ok('guías de la cuenta, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
   let transientWebhookCalls = 0;
   const retryDelays = [];
@@ -170,8 +199,9 @@ async function main() {
     },
   });
   await transientWebhookProvider.testWebhook({
+    carrier: 'fedex',
     trackingNumber: 'TEST-RETRY-001',
-    webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
+    status: 'Shipped',
   });
   assert.strictEqual(transientWebhookCalls, 3);
   assert.deepStrictEqual(retryDelays, [250, 750]);
@@ -194,16 +224,17 @@ async function main() {
   });
   await assert.rejects(
     () => unavailableWebhookProvider.testWebhook({
+      carrier: 'fedex',
       trackingNumber: 'TEST-RETRY-002',
-      webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
+      status: 'Shipped',
     }),
     (error) =>
-      error.code === 'SHIPPING_WEBHOOK_TEST_PROVIDER_UNAVAILABLE' &&
+      error.code === 'SHIPPING_WEBHOOK_TEST_PROVIDER_ERROR' &&
       error.details?.providerStatus === 500 &&
       error.details?.attempts === 3
   );
   assert.strictEqual(permanentWebhookCalls, 3);
-  ok('un Envia caído nunca aprueba el webhook y devuelve un diagnóstico explícito');
+  ok('un HTTP 5xx persistente nunca aprueba el webhook ni se presenta como una causa demostrada');
 
   const sandboxTestBody = Buffer.from(JSON.stringify({
     carrierName: 'fedex',
