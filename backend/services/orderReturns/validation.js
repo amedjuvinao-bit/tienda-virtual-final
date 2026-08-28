@@ -109,6 +109,40 @@ function applyReceipt(returnCase, payload, actor, now) {
   returnCase.status = 'received';
   returnCase.receivedAt = now;
   returnCase.receivedBy = actorSnapshot(actor);
+  if (returnCase.shipping) {
+    returnCase.shipping.awaitingWarehouseReceipt = false;
+  }
+}
+
+function assertReturnShippingCancelled(returnCase) {
+  const integration = returnCase.shipping?.integration || {};
+  const automatedLabel =
+    integration.provider &&
+    integration.provider !== 'manual' &&
+    returnCase.shipping?.trackingNumber &&
+    returnCase.shipping?.labelUrl;
+  if (automatedLabel && integration.status !== 'cancelled') {
+    throw createReturnError(
+      'Cancela primero la guía activa con la transportadora y luego cancela el RMA.',
+      'RETURN_SHIPPING_LABEL_CANCELLATION_REQUIRED',
+      409
+    );
+  }
+}
+
+function assertManualReturnTransitAllowed(returnCase) {
+  const integration = returnCase.shipping?.integration || {};
+  if (
+    integration.provider &&
+    integration.provider !== 'manual' &&
+    integration.status !== 'cancelled'
+  ) {
+    throw createReturnError(
+      'El tránsito de una guía integrada debe provenir del seguimiento de la transportadora.',
+      'RETURN_SHIPPING_PROVIDER_TRACKING_REQUIRED',
+      409
+    );
+  }
 }
 
 function validateInspection(returnCase, inspections = []) {
@@ -147,6 +181,8 @@ function validateInspection(returnCase, inspections = []) {
 module.exports = {
   applyAuthorization,
   applyReceipt,
+  assertManualReturnTransitAllowed,
+  assertReturnShippingCancelled,
   assertExpectedRevision,
   validateInspection,
 };

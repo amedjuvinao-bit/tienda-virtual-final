@@ -27,6 +27,8 @@ const { safeReturnView } = require('./presentation');
 const {
   applyAuthorization,
   applyReceipt,
+  assertManualReturnTransitAllowed,
+  assertReturnShippingCancelled,
   assertExpectedRevision,
   validateInspection,
 } = require('./validation');
@@ -80,6 +82,7 @@ async function updateOrderReturn(
         if (returnCase.status !== 'authorized') {
           throw createReturnError('Solo un RMA autorizado puede marcarse en tránsito.', 'RETURN_STATUS_INVALID', 409);
         }
+        assertManualReturnTransitAllowed(returnCase);
         returnCase.shipping.carrierName = cleanText(payload.shipping?.carrierName || returnCase.shipping?.carrierName, 160);
         returnCase.shipping.trackingNumber = cleanText(payload.shipping?.trackingNumber || returnCase.shipping?.trackingNumber, 180);
         returnCase.shipping.trackingUrl = cleanText(payload.shipping?.trackingUrl || returnCase.shipping?.trackingUrl, 1000);
@@ -99,6 +102,7 @@ async function updateOrderReturn(
         if (!MUTABLE_RETURN_STATUSES.has(returnCase.status) || returnCase.status === 'received') {
           throw createReturnError('Este RMA ya no puede cancelarse.', 'RETURN_STATUS_INVALID', 409);
         }
+        assertReturnShippingCancelled(returnCase);
         const reason = cleanText(payload.reason, 800);
         if (reason.length < 5) throw createReturnError('Explica el motivo de la cancelación.', 'RETURN_CANCELLATION_REASON_REQUIRED', 400);
         returnCase.status = 'cancelled';

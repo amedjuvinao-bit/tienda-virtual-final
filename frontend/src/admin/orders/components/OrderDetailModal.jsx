@@ -267,6 +267,7 @@ export default function OrderDetailModal({
           onExchangeReturn={returnActions.exchangeReturn}
           onAutomaticExchangeReturn={returnActions.automaticExchange}
           onStoreCreditReturn={returnActions.createStoreCredit}
+          onReturnShipping={returnActions.runReturnShipping}
           onSaveReturnPolicy={returnActions.savePolicy}
           onSaveCustomerData={
             canEditCustomerData ? management.saveCustomerData : null

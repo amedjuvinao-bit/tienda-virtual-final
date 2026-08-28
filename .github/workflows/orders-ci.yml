@@ -101,6 +101,7 @@ jobs:
           npm --prefix backend run test:order-shipping-composition
           npm --prefix backend run test:order-return-controller-composition
           npm --prefix backend run test:orders-returns
+          npm --prefix backend run test:orders-return-shipping
           npm --prefix backend run test:order-return-idempotency
           npm --prefix backend run test:order-return-index-migration
           npm --prefix backend run test:critical-order-index-migrations
@@ -194,6 +195,12 @@ jobs:
           ORDERS_CART_VERSION_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_cart_version?replicaSet=rs0
           ORDERS_CART_VERSION_RACES: 30
         run: npm --prefix backend run test:order-cart-version-integration
+
+      - name: Validar exclusión de operaciones simultáneas por RMA
+        env:
+          ORDERS_RETURN_SHIPPING_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_return_shipping?replicaSet=rs0
+          ORDERS_RETURN_SHIPPING_RACES: 30
+        run: npm --prefix backend run test:orders-return-shipping-integration
 
       - name: Validar conciliación comercial completa
         env:

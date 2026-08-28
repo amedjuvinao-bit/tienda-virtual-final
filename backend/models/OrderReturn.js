@@ -3,7 +3,9 @@
 const mongoose = require('mongoose');
 const {
   orderReturnCreationIdempotencyIndexDefinition,
+  orderReturnShippingTrackingIndexDefinition,
 } = require('./orderReturnIndexDefinitions');
+const { OrderReturnShippingSchema } = require('./orderReturnShippingSchemas');
 
 const { Schema } = mongoose;
 
@@ -246,23 +248,7 @@ const OrderReturnSchema = new Schema(
       type: ReturnRiskAssessmentSchema,
       default: () => ({}),
     },
-    shipping: {
-      method: {
-        type: String,
-        enum: ['pending', 'drop_off', 'carrier', 'customer_arranged'],
-        default: 'pending',
-      },
-      carrierName: { type: String, trim: true, default: '', maxlength: 160 },
-      trackingNumber: { type: String, trim: true, default: '', maxlength: 180 },
-      trackingUrl: { type: String, trim: true, default: '', maxlength: 1000 },
-      labelUrl: { type: String, trim: true, default: '', maxlength: 1000 },
-      labelType: {
-        type: String,
-        enum: ['none', 'internal_rma', 'carrier'],
-        default: 'none',
-      },
-      instructions: { type: String, trim: true, default: '', maxlength: 1600 },
-    },
+    shipping: { type: OrderReturnShippingSchema, default: () => ({}) },
     inventoryRestorations: { type: [InventoryRestorationSchema], default: [] },
     inventoryProcessedAt: { type: Date, default: null },
     estimatedRefundAmount: { type: Number, min: 0, default: 0, set: cleanMoney },
@@ -309,6 +295,10 @@ OrderReturnSchema.index({ 'customerSnapshot.email': 1, requestedAt: -1 });
 OrderReturnSchema.index({ 'customerSnapshot.phone': 1, requestedAt: -1 });
 {
   const { key, options } = orderReturnCreationIdempotencyIndexDefinition();
+  OrderReturnSchema.index(key, options);
+}
+{
+  const { key, options } = orderReturnShippingTrackingIndexDefinition();
   OrderReturnSchema.index(key, options);
 }
 

@@ -15,6 +15,7 @@ import {
 } from './OrderReturnCaseWorkflow';
 import OrderReturnInspectionSection from './OrderReturnInspectionSection';
 import OrderReturnResolutionSection from './OrderReturnResolutionSection';
+import OrderReturnShippingSection from './OrderReturnShippingSection';
 
 export default function OrderReturnCaseCard({
   busyId,
@@ -26,15 +27,18 @@ export default function OrderReturnCaseCard({
   onExchange,
   onRefund,
   onStoreCredit,
+  onShipping,
   policy,
   returnCase,
+  shippingDestinations,
+  shippingProviders,
   setDraft,
   setInspection,
   setLineValue,
 }) {
   const id = String(returnCase._id || returnCase.returnNumber);
   const [statusLabel, variant] = returnStatusMeta(returnCase.status);
-  const busy = busyId === id || busyId === 'create';
+  const busy = busyId === id || busyId === 'create' || busyId.startsWith(`${id}:`);
   const requestedUnits = (returnCase.items || []).reduce(
     (sum, item) => sum + positiveInteger(item.requestedQuantity),
     0
@@ -113,16 +117,29 @@ export default function OrderReturnCaseCard({
       ) : null}
 
       {canManage && ['authorized', 'in_transit'].includes(returnCase.status) ? (
-        <ReturnReceivingSection
-          busy={busy}
-          draft={draft}
-          id={id}
-          onAction={onAction}
-          policy={policy}
-          returnCase={returnCase}
-          setDraft={setDraft}
-          setLineValue={setLineValue}
-        />
+        <>
+          <OrderReturnShippingSection
+            busy={busy}
+            destinations={shippingDestinations}
+            draft={draft}
+            id={id}
+            onShipping={onShipping}
+            policy={policy}
+            providers={shippingProviders}
+            returnCase={returnCase}
+            setDraft={setDraft}
+          />
+          <ReturnReceivingSection
+            busy={busy}
+            draft={draft}
+            id={id}
+            onAction={onAction}
+            policy={policy}
+            returnCase={returnCase}
+            setDraft={setDraft}
+            setLineValue={setLineValue}
+          />
+        </>
       ) : null}
 
       {canManage && returnCase.status === 'received' ? (

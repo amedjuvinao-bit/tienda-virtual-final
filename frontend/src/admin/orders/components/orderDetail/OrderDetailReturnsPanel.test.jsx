@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import OrderDetailReturnsPanel from './OrderDetailReturnsPanel';
@@ -144,6 +144,110 @@ describe('OrderDetailReturnsPanel', () => {
         items: [{ orderItemId: LINE_ID, receivedQuantity: 1 }],
       }
     );
+  });
+
+  it('cotiza y genera una guía RMA con ruta cliente a sede', async () => {
+    const onShipping = vi.fn()
+      .mockResolvedValueOnce({
+        rates: [{
+          carrier: 'coordinadora',
+          service: 'standard',
+          serviceDescription: 'Nacional',
+          totalPrice: 18500,
+          currency: 'COP',
+        }],
+      })
+      .mockResolvedValueOnce({ ok: true });
+    const authorizedReturn = {
+      ...receivedReturn,
+      status: 'authorized',
+      policySnapshot: { returnShippingPaidBy: 'store' },
+      shipping: { method: 'pending', integration: { status: 'manual' } },
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{
+          orderId: 'order-1',
+          eligibility: [],
+          returns: [authorizedReturn],
+          shippingProviders: { envia: { enabled: true, mode: 'sandbox' } },
+          shippingDestinations: [{
+            _id: 'branch-1',
+            name: 'Sede Principal',
+            code: 'MAIN',
+            defaultPackages: [{
+              weightGrams: 900,
+              lengthCm: 30,
+              widthCm: 20,
+              heightCm: 12,
+            }],
+          }],
+        }}
+        canManage
+        onShipping={onShipping}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cotizar devolución' }));
+    await waitFor(() => expect(screen.getByText('coordinadora')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Generar guía RMA Sandbox' }));
+
+    expect(onShipping).toHaveBeenNthCalledWith(
+      1,
+      authorizedReturn,
+      'quote',
+      expect.objectContaining({ destinationBranchId: 'branch-1' })
+    );
+    await waitFor(() => expect(onShipping).toHaveBeenNthCalledWith(
+      2,
+      authorizedReturn,
+      'label',
+      expect.objectContaining({
+        confirmStorePaidShipping: true,
+        rate: expect.objectContaining({ carrier: 'coordinadora' }),
+      })
+    ));
+  });
+
+  it('bloquea acciones contradictorias después de la llegada reportada por Envia', () => {
+    const deliveredReturn = {
+      ...receivedReturn,
+      status: 'in_transit',
+      shipping: {
+        carrierName: 'coordinadora',
+        trackingNumber: 'RET-DELIVERED-1',
+        labelUrl: 'https://labels.example/RET-DELIVERED-1.pdf',
+        awaitingWarehouseReceipt: true,
+        integration: {
+          provider: 'envia',
+          status: 'tracking',
+          handoffMode: 'pickup',
+          pickup: { status: 'completed' },
+        },
+      },
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{
+          orderId: 'order-1',
+          eligibility: [],
+          returns: [deliveredReturn],
+          shippingProviders: { envia: { enabled: true, mode: 'sandbox' } },
+          shippingDestinations: [],
+        }}
+        canManage
+        onShipping={vi.fn()}
+      />
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(`Motivo cancelación ${deliveredReturn.returnNumber}`),
+      { target: { value: 'El cliente cambió de decisión' } }
+    );
+    expect(screen.getByRole('button', { name: 'Cancelar RMA' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Entrega en punto' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancelar guía' })).not.toBeInTheDocument();
+    expect(screen.getByText(/falta confirmar las unidades físicas/i)).toBeInTheDocument();
   });
 
   it('muestra un RMA listo para dinero sin habilitarlo a un rol de bodega', () => {

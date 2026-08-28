@@ -2,9 +2,13 @@
 
 const Order = require('../models/Order');
 const ShippingWebhookEvent = require('../models/ShippingWebhookEvent');
+const OrderReturn = require('../models/OrderReturn');
 const {
   applyProviderTrackingUpdate,
 } = require('./shippingTrackingStateService');
+const {
+  applyOrderReturnShippingWebhook,
+} = require('./orderReturnShipping/webhook');
 
 function clean(value, maxLength = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
@@ -111,7 +115,12 @@ async function claimWebhookEvent(
 
 async function processShippingWebhookEvent(
   eventId,
-  { OrderModel = Order, EventModel = ShippingWebhookEvent, now = new Date() } = {}
+  {
+    OrderModel = Order,
+    OrderReturnModel = OrderReturn,
+    EventModel = ShippingWebhookEvent,
+    now = new Date(),
+  } = {}
 ) {
   const eventRecord = await claimWebhookEvent(eventId, EventModel, { now });
   if (!eventRecord) return { ok: true, skipped: true };
@@ -126,10 +135,40 @@ async function processShippingWebhookEvent(
       return { ok: true, ignored: true, reason: 'missing_tracking_or_status' };
     }
 
+    const shipmentMatch = {
+      'carrier.trackingNumber': parsed.trackingNumber,
+      ...(parsed.providerShipmentId
+        ? { 'shippingIntegration.providerShipmentId': parsed.providerShipmentId }
+        : {}),
+    };
     const order = await OrderModel.findOne({
-      'fulfillment.shipments.carrier.trackingNumber': parsed.trackingNumber,
+      'fulfillment.shipments': { $elemMatch: shipmentMatch },
     });
     if (!order) {
+      const returnResult = await applyOrderReturnShippingWebhook(
+        { parsed, eventRecord, now },
+        { OrderModel, OrderReturnModel }
+      );
+      if (returnResult) {
+        await markEvent(eventRecord, 'processed', {
+          order: returnResult.order._id,
+          returnCase: returnResult.returnCase._id,
+          shipmentId: null,
+          processedAt: now,
+          error: '',
+        });
+        return {
+          ok: true,
+          processed: true,
+          scope: 'return',
+          orderId: String(returnResult.order._id),
+          returnId: String(returnResult.returnCase._id),
+          trackingNumber: parsed.trackingNumber,
+          stage: returnResult.stage,
+          statusFrom: returnResult.statusFrom,
+          statusTo: returnResult.statusTo,
+        };
+      }
       await markEvent(eventRecord, 'ignored', {
         processedAt: now,
         error: `No existe un envío local con la guía ${parsed.trackingNumber}.`,
@@ -140,9 +179,14 @@ async function processShippingWebhookEvent(
     const shipments = Array.isArray(order?.fulfillment?.shipments)
       ? order.fulfillment.shipments
       : [];
-    const shipment = shipments.find(
-      (candidate) => clean(candidate?.carrier?.trackingNumber, 180) === parsed.trackingNumber
-    );
+    const shipment = shipments.find((candidate) => (
+      clean(candidate?.carrier?.trackingNumber, 180) === parsed.trackingNumber &&
+      (
+        !parsed.providerShipmentId ||
+        clean(candidate?.shippingIntegration?.providerShipmentId, 180) ===
+          parsed.providerShipmentId
+      )
+    ));
     if (!shipment) {
       await markEvent(eventRecord, 'ignored', {
         processedAt: now,
@@ -195,7 +239,12 @@ async function processShippingWebhookEvent(
 
 async function recoverShippingWebhookEvents(
   { limit = 25, staleMs = 5 * 60_000, maxAttempts = 5 } = {},
-  { EventModel = ShippingWebhookEvent, OrderModel = Order, now = new Date() } = {}
+  {
+    EventModel = ShippingWebhookEvent,
+    OrderModel = Order,
+    OrderReturnModel = OrderReturn,
+    now = new Date(),
+  } = {}
 ) {
   const staleBefore = new Date(now.getTime() - staleMs);
   const query = EventModel.find({
@@ -212,6 +261,7 @@ async function recoverShippingWebhookEvents(
       const result = await processShippingWebhookEvent(event._id, {
         EventModel,
         OrderModel,
+        OrderReturnModel,
         now: new Date(),
       });
       if (result?.processed) summary.processed += 1;

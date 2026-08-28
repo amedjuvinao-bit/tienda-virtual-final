@@ -27,6 +27,7 @@ export default function OrderDetailReturnsPanel({
   onExchange,
   onAutomaticExchange,
   onStoreCredit,
+  onShipping,
   onSavePolicy,
 }) {
   const panel = useOrderReturnsPanel({ data, onCreate });
@@ -97,7 +98,10 @@ export default function OrderDetailReturnsPanel({
               onExchange={onExchange}
               onRefund={onRefund}
               onStoreCredit={onStoreCredit}
+              onShipping={onShipping}
               policy={panel.policy}
+              shippingDestinations={data?.shippingDestinations || []}
+              shippingProviders={data?.shippingProviders || {}}
               returnCase={returnCase}
               setDraft={panel.setDraft}
               setInspection={panel.setInspection}

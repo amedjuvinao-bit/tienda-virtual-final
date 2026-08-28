@@ -6,10 +6,10 @@
 - Etapa 1: **cerrada en GitHub con Órdenes CI en verde**.
 - Etapa 2: **cerrada en GitHub con Órdenes CI en verde**.
 - Etapas 1 a 4 del cronograma Plus: **implementadas en la rama de evolución**.
-- Bloque actual: **reglas antifraude y políticas avanzadas de devolución**.
-- Estado del bloque actual: implementación local validada; todavía no se ha publicado.
+- Bloque actual: **Etapa 1 Plus · logística inversa RMA con Envia**.
+- Estado del bloque actual: implementación y contratos locales validados; pendiente de traza real en Envia Sandbox y todavía no publicado.
 
-La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md). El cierre de consultas, paginación y concurrencia de la Etapa 3 está en [`ordenes-etapa-3-cierre.md`](./ordenes-etapa-3-cierre.md). El cierre Plus de autoservicio y resoluciones RMA está en [`ordenes-etapa-4-cierre.md`](./ordenes-etapa-4-cierre.md). El bloque local de seguridad comercial está documentado en [`ordenes-antifraude-politicas-cierre.md`](./ordenes-antifraude-politicas-cierre.md).
+La matriz por roles y dispositivos de la Etapa 1 está en [`ordenes-etapa-1-cierre.md`](./ordenes-etapa-1-cierre.md). El cierre transaccional y visual de devoluciones de la Etapa 2 está en [`ordenes-etapa-2-cierre.md`](./ordenes-etapa-2-cierre.md). El cierre de consultas, paginación y concurrencia de la Etapa 3 está en [`ordenes-etapa-3-cierre.md`](./ordenes-etapa-3-cierre.md). El cierre Plus de autoservicio y resoluciones RMA está en [`ordenes-etapa-4-cierre.md`](./ordenes-etapa-4-cierre.md). El bloque local de seguridad comercial está documentado en [`ordenes-antifraude-politicas-cierre.md`](./ordenes-antifraude-politicas-cierre.md). La logística inversa automatizada se documenta en [`ordenes-plus-etapa-1-logistica-inversa.md`](./ordenes-plus-etapa-1-logistica-inversa.md).
 
 ## Antifraude y políticas diferenciadas de devolución
 
@@ -612,7 +612,5 @@ La ejecución exige `--confirm-persist`, no limpia las órdenes creadas y no mod
 
 ## Trabajo pendiente deliberado
 
-1. Integrar generación/compra de etiquetas de retorno con una transportadora real; el RMA actual conserva referencias manuales sin afirmar validación externa.
-2. Integrar el consumo del saldo a favor en checkout; esta etapa emite y audita el saldo, pero no lo presenta como medio de pago.
-3. Añadir reglas antifraude y políticas diferenciadas por categoría, mercado o condición comercial.
-4. Fusionar la rama mediante revisión controlada después de validar el recorrido RMA sobre una base de staging con réplica.
+1. Certificar la logística inversa ya implementada mediante una traza real de Envia Sandbox en staging; las pruebas locales no se presentan como certificación externa.
+2. Fusionar la rama mediante revisión controlada después de validar el recorrido RMA sobre una base de staging con réplica.

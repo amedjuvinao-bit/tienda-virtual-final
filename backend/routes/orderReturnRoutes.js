@@ -19,6 +19,14 @@ const {
   postReturnStoreCredit,
   putReturnPolicy,
 } = require('../controllers/orderReturnController');
+const {
+  postReturnShippingDropoff,
+  postReturnShippingLabel,
+  postReturnShippingLabelCancel,
+  postReturnShippingPickup,
+  postReturnShippingRates,
+  postReturnShippingTrackingSync,
+} = require('../controllers/orderReturns/shippingController');
 
 const router = express.Router();
 
@@ -41,6 +49,48 @@ router.post('/:id/returns/self-service', postCustomerOrderReturn);
 router.patch(
   '/:id/returns/self-service/:returnId/cancel',
   cancelCustomerOrderReturn
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/rates',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingRates
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/label',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingLabel
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/tracking/sync',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingTrackingSync
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/pickup',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingPickup
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/handoff/dropoff',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingDropoff
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/label/cancel',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingLabelCancel
 );
 router.get(
   '/:id/returns/self-service/:returnId/label',

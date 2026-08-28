@@ -20,6 +20,11 @@ const ShippingWebhookEventSchema = new mongoose.Schema(
       index: true,
     },
     shipmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    returnCase: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'OrderReturn',
+      default: null,
+    },
     processedAt: { type: Date, default: null },
     attempts: { type: Number, min: 0, default: 0 },
     lastAttemptAt: { type: Date, default: null },

@@ -14,6 +14,21 @@ const ShippingOperationSchema = new mongoose.Schema(
       index: true,
     },
     shipmentId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+    scope: {
+      type: String,
+      enum: ['outbound', 'return'],
+      default: 'outbound',
+      required: true,
+    },
+    returnCase: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'OrderReturn',
+      default: null,
+    },
+    activeLock: {
+      type: Boolean,
+      default: false,
+    },
     provider: { type: String, trim: true, lowercase: true, required: true },
     mode: { type: String, enum: ['sandbox', 'production'], required: true },
     type: {

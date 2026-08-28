@@ -19,20 +19,34 @@ function stableHash(value) {
   return crypto.createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
 }
 
-function operationIdentity({ order, shipment, provider, type } = {}) {
+function operationIdentity({ order, shipment, provider, type, scope, returnCase } = {}) {
   return {
     orderId: idValue(order?._id),
     shipmentId: idValue(shipment?._id),
     provider: clean(provider?.key, 80).toLowerCase(),
     providerMode: clean(provider?.mode, 40).toLowerCase(),
     operationType: clean(type, 80).toLowerCase(),
+    scope: clean(scope || 'outbound', 40).toLowerCase(),
+    returnCaseId: idValue(returnCase?._id || returnCase),
   };
 }
 
 function operationRequestHash(input = {}) {
+  const identity = operationIdentity(input);
+  if (identity.scope === 'outbound' && !identity.returnCaseId) {
+    return stableHash({
+      version: 2,
+      orderId: identity.orderId,
+      shipmentId: identity.shipmentId,
+      provider: identity.provider,
+      providerMode: identity.providerMode,
+      operationType: identity.operationType,
+      requestPayload: input.requestPayload,
+    });
+  }
   return stableHash({
-    version: 2,
-    ...operationIdentity(input),
+    version: 3,
+    ...identity,
     requestPayload: input.requestPayload,
   });
 }
@@ -44,7 +58,9 @@ function persistedOperationMatches(existing, input = {}) {
     idValue(existing?.shipmentId) === expected.shipmentId &&
     clean(existing?.provider, 80).toLowerCase() === expected.provider &&
     clean(existing?.mode, 40).toLowerCase() === expected.providerMode &&
-    clean(existing?.type, 80).toLowerCase() === expected.operationType
+    clean(existing?.type, 80).toLowerCase() === expected.operationType &&
+    clean(existing?.scope || 'outbound', 40).toLowerCase() === expected.scope &&
+    idValue(existing?.returnCase) === expected.returnCaseId
   );
 }
 
@@ -64,7 +80,8 @@ async function inspectReservedOperation(
   existing,
   input,
   requestHash,
-  legacyRequestHash
+  legacyRequestHash,
+  { reconcileActionRequired = false } = {}
 ) {
   if (!requestMatches(existing, input, requestHash, legacyRequestHash)) {
     throw createLogisticsError(
@@ -81,8 +98,27 @@ async function inspectReservedOperation(
     existing.attempts = Number(existing.attempts || 1) + 1;
     existing.error = {};
     existing.requestHash = requestHash;
-    await existing.save();
+    existing.activeLock = input.scope === 'return';
+    try {
+      await existing.save();
+    } catch (error) {
+      if (error?.code === 11000 && input.scope === 'return') {
+        throw createLogisticsError(
+          'Otra operación externa de este RMA está siendo procesada.',
+          'RETURN_SHIPPING_OPERATION_IN_PROGRESS',
+          409
+        );
+      }
+      throw error;
+    }
     return { operation: existing, replay: false };
+  }
+  if (
+    existing.status === 'action_required' &&
+    reconcileActionRequired &&
+    existing.result
+  ) {
+    return { operation: existing, replay: true, reconcile: true };
   }
   throw createLogisticsError(
     'La operación externa ya existe y requiere revisión antes de reintentar.',
@@ -93,7 +129,17 @@ async function inspectReservedOperation(
 }
 
 async function reserveOperation(
-  { order, shipment, provider, type, idempotencyKey, requestPayload },
+  {
+    order,
+    shipment,
+    provider,
+    type,
+    idempotencyKey,
+    requestPayload,
+    scope = 'outbound',
+    returnCase = null,
+    reconcileActionRequired = false,
+  },
   { OperationModel = ShippingOperation } = {}
 ) {
   const key = clean(idempotencyKey, 180);
@@ -110,6 +156,8 @@ async function reserveOperation(
     provider,
     type,
     requestPayload,
+    scope,
+    returnCase,
   };
   const requestHash = operationRequestHash(identityInput);
   const legacyRequestHash = stableHash(requestPayload);
@@ -119,7 +167,8 @@ async function reserveOperation(
       existing,
       identityInput,
       requestHash,
-      legacyRequestHash
+      legacyRequestHash,
+      { reconcileActionRequired }
     );
   }
   try {
@@ -129,6 +178,9 @@ async function reserveOperation(
       provider: provider.key,
       mode: provider.mode,
       type,
+      scope,
+      returnCase: returnCase?._id || returnCase || null,
+      activeLock: scope === 'return',
       idempotencyKey: key,
       requestHash,
       status: 'processing',
@@ -141,12 +193,17 @@ async function reserveOperation(
           concurrent,
           identityInput,
           requestHash,
-          legacyRequestHash
+          legacyRequestHash,
+          { reconcileActionRequired }
         );
       }
       throw createLogisticsError(
-        'La operación externa ya está siendo procesada.',
-        'SHIPPING_OPERATION_IN_PROGRESS',
+        scope === 'return'
+          ? 'Otra operación externa de este RMA está siendo procesada.'
+          : 'La operación externa ya está siendo procesada.',
+        scope === 'return'
+          ? 'RETURN_SHIPPING_OPERATION_IN_PROGRESS'
+          : 'SHIPPING_OPERATION_IN_PROGRESS',
         409
       );
     }
@@ -159,6 +216,7 @@ async function recordOperationFailure(operation, error, ambiguousCodes) {
   operation.status = operation.result || ambiguousCodes.has(error?.code)
     ? 'action_required'
     : 'failed';
+  operation.activeLock = operation.status === 'action_required' && operation.scope === 'return';
   operation.error = {
     code: clean(error?.code, 100),
     message: clean(error?.message, 500),

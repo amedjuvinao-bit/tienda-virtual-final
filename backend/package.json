@@ -54,6 +54,8 @@
     "test:shipping-providers": "node scripts/testShippingProviderContract.js",
     "test:shipping-settings": "node scripts/testShippingSettingsContract.js",
     "test:orders-returns": "node scripts/testOrderReturnsModule.js",
+    "test:orders-return-shipping": "node scripts/testOrderReturnShippingContract.js",
+    "test:orders-return-shipping-integration": "node scripts/testOrderReturnShippingConcurrencyIntegration.js",
     "test:order-return-controller-composition": "node scripts/testOrderReturnControllerComposition.js",
     "test:order-return-idempotency": "node scripts/testOrderReturnCreationIdempotency.js",
     "test:order-return-index-migration": "node scripts/testOrderReturnIndexMigration.js",

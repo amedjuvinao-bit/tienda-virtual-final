@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+  orderReturnIndexDefinitions,
   orderReturnCreationIdempotencyIndexDefinition,
 } = require('../models/orderReturnIndexDefinitions');
 const OrderReturn = require('../models/OrderReturn');
@@ -137,17 +138,19 @@ test('createIndex recibe exactamente la clave y opciones declaradas por el model
     apply: true,
     nodeEnv: 'test',
   });
-  const definition = orderReturnCreationIdempotencyIndexDefinition();
+  const definitions = orderReturnIndexDefinitions();
 
   assert.strictEqual(result.status, 'created');
-  assert.strictEqual(result.mutations, 1);
-  assert.deepStrictEqual(collection.createCalls, [definition]);
-  const schemaIndex = OrderReturn.schema.indexes().find(
-    ([, options]) => options.name === definition.options.name
-  );
-  assert.deepStrictEqual(schemaIndex[0], definition.key);
-  const { background: _mongooseDefault, ...schemaOptions } = schemaIndex[1];
-  assert.deepStrictEqual(schemaOptions, definition.options);
+  assert.strictEqual(result.mutations, definitions.length);
+  assert.deepStrictEqual(collection.createCalls, definitions);
+  definitions.forEach((definition) => {
+    const schemaIndex = OrderReturn.schema.indexes().find(
+      ([, options]) => options.name === definition.options.name
+    );
+    assert.deepStrictEqual(schemaIndex[0], definition.key);
+    const { background: _mongooseDefault, ...schemaOptions } = schemaIndex[1];
+    assert.deepStrictEqual(schemaOptions, definition.options);
+  });
 });
 
 test('una segunda aplicación es idempotente y no vuelve a crear el índice', async () => {
@@ -167,7 +170,10 @@ test('una segunda aplicación es idempotente y no vuelve a crear el índice', as
   assert.strictEqual(first.status, 'created');
   assert.strictEqual(second.status, 'already_present');
   assert.strictEqual(second.mutations, 0);
-  assert.strictEqual(collection.createCalls.length, 1);
+  assert.strictEqual(
+    collection.createCalls.length,
+    orderReturnIndexDefinitions().length
+  );
 });
 
 test('un índice incompatible detiene la migración sin borrar ni reemplazar', async () => {

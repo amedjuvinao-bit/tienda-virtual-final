@@ -7,6 +7,10 @@ const Order = require('../../models/Order');
 const OrderReturn = require('../../models/OrderReturn');
 const { getOrderReturnPolicy } = require('../orderReturnPolicyService');
 const { evaluateOrderReturnRisk } = require('../orderReturnRiskService');
+const { getShippingProviderStatus } = require('../shippingProviderService');
+const {
+  returnShippingDestinations,
+} = require('../orderReturnShipping/context');
 const {
   buildReturnEligibility,
   loadReturnUsage,
@@ -44,12 +48,18 @@ function buildReturnNumber(orderNumber = '') {
     .toUpperCase()}`;
 }
 
-async function listOrderReturns({ orderFilter, now = new Date() } = {}) {
+async function listOrderReturns({
+  orderFilter,
+  now = new Date(),
+  includeAdminShipping = true,
+} = {}) {
   const order = await Order.findOne(orderFilter).lean();
   if (!order) throw createReturnError('Orden no encontrada.', 'ORDER_NOT_FOUND', 404);
-  const [usage, policy] = await Promise.all([
+  const [usage, policy, shippingDestinations, shippingProviders] = await Promise.all([
     loadReturnUsage(order._id),
     getOrderReturnPolicy(),
+    includeAdminShipping ? returnShippingDestinations(order) : Promise.resolve([]),
+    includeAdminShipping ? getShippingProviderStatus() : Promise.resolve({}),
   ]);
   const [returns, eligibility] = await Promise.all([
     OrderReturn.find({ order: order._id }).sort({ createdAt: -1, _id: -1 }).lean(),
@@ -58,12 +68,18 @@ async function listOrderReturns({ orderFilter, now = new Date() } = {}) {
   return {
     policy,
     eligibility,
+    shippingDestinations,
+    shippingProviders,
     returns: returns.map(safeReturnView),
   };
 }
 
 async function listCustomerOrderReturns({ orderFilter, now = new Date() } = {}) {
-  const result = await listOrderReturns({ orderFilter, now });
+  const result = await listOrderReturns({
+    orderFilter,
+    now,
+    includeAdminShipping: false,
+  });
   return {
     policy: {
       enabled: result.policy.enabled,
@@ -95,6 +111,8 @@ async function listCustomerOrderReturns({ orderFilter, now = new Date() } = {}) 
       allowedResolutions: item.allowedResolutions,
       requireReasonText: item.requireReasonText,
     })),
+    shippingDestinations: [],
+    shippingProviders: {},
     returns: (result.returns || []).map(safeCustomerReturnView),
   };
 }

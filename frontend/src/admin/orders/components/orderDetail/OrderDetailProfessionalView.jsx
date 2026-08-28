@@ -93,6 +93,7 @@ export default function OrderDetailProfessionalView({
   onExchangeReturn,
   onAutomaticExchangeReturn,
   onStoreCreditReturn,
+  onReturnShipping,
   onSaveReturnPolicy,
   onSaveCustomerData,
   savingCustomerData = false,
@@ -192,6 +193,7 @@ export default function OrderDetailProfessionalView({
         onExchange={onExchangeReturn}
         onAutomaticExchange={onAutomaticExchangeReturn}
         onStoreCredit={onStoreCreditReturn}
+        onShipping={onReturnShipping}
         onSavePolicy={onSaveReturnPolicy}
       />
     ),

@@ -837,7 +837,12 @@ async function main() {
     status: 'packed',
     allocationIds: ['allocation-1'],
     carrier: { trackingNumber: 'TEST-TRACK-1' },
-    shippingIntegration: { provider: 'envia', status: 'tracking', trackingEvents: [] },
+    shippingIntegration: {
+      provider: 'envia',
+      providerShipmentId: '98765',
+      status: 'tracking',
+      trackingEvents: [],
+    },
     history: [],
   };
   const webhookOrder = {
@@ -880,7 +885,12 @@ async function main() {
     status: 'packed',
     allocationIds: ['allocation-durable-1'],
     carrier: { trackingNumber: 'DURABLE-TRACK-1' },
-    shippingIntegration: { provider: 'envia', status: 'tracking', trackingEvents: [] },
+    shippingIntegration: {
+      provider: 'envia',
+      providerShipmentId: '12345',
+      status: 'tracking',
+      trackingEvents: [],
+    },
     history: [],
   };
   const durableOrder = {

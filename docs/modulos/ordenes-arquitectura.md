@@ -20,6 +20,7 @@ mantienen compatibilidad mientras la implementación interna puede evolucionar.
 Las fachadas estables incluyen `Order.js`, `orderAdminQueryService.js`,
 `orderLogisticsService.js`, `orderReturnService.js`, `orderRefundService.js`,
 `orderShippingIntegrationService.js`, `orderStatusTransitionService.js`,
+`orderReturnShippingService.js`,
 `orderFulfillmentService.js`, `inventoryReservationService.js`,
 `orderInventoryAllocationService.js`, `orderOperationalMonitoringService.js`,
 `orderRefundAutomationService.js`, `paymentAttemptService.js`,

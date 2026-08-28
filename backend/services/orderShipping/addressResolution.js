@@ -48,14 +48,29 @@ function chooseEnviaLocation(locations, address) {
   return ranked[0].location;
 }
 
-function unresolvedShippingAddress(key, address, message = '') {
+function addressRole(key, address, roles = {}) {
+  const role = roles?.[key] || {};
   const origin = key === 'origin';
-  const place = origin
-    ? `la sede ${clean(address.name, 120) || 'de origen'}`
-    : 'la dirección de entrega';
+  return {
+    place: clean(role.place, 180) || (
+      origin
+        ? `la sede ${clean(address.name, 120) || 'de origen'}`
+        : 'la dirección de entrega'
+    ),
+    correction: clean(role.correction, 240) || (
+      origin
+        ? 'Corrige la ubicación en Configuración → Sedes.'
+        : 'Corrige la dirección del cliente en la orden.'
+    ),
+  };
+}
+
+function unresolvedShippingAddress(key, address, message = '', roles = {}) {
+  const origin = key === 'origin';
+  const { place, correction } = addressRole(key, address, roles);
   return createLogisticsError(
     message ||
-      `No fue posible validar ${place}: ${clean(address.city, 120)} (${clean(address.state, 80)}), ${clean(address.country, 10)}. ${origin ? 'Corrige la ubicación en Configuración → Sedes.' : 'Corrige la dirección del cliente en la orden.'}`,
+      `No fue posible validar ${place}: ${clean(address.city, 120)} (${clean(address.state, 80)}), ${clean(address.country, 10)}. ${correction}`,
     'SHIPPING_ADDRESS_NOT_RESOLVED',
     422,
     {
@@ -68,7 +83,7 @@ function unresolvedShippingAddress(key, address, message = '') {
   );
 }
 
-async function resolveShippingAddresses(provider, payload) {
+async function resolveShippingAddresses(provider, payload, roles = {}) {
   const prepared = {
     ...payload,
     origin: { ...payload.origin },
@@ -80,7 +95,8 @@ async function resolveShippingAddresses(provider, payload) {
       throw unresolvedShippingAddress(
         key,
         address,
-        `El país de ${key === 'origin' ? 'la sede' : 'la entrega'} no tiene un código ISO de dos letras válido.`
+        `El país de ${addressRole(key, address, roles).place} no tiene un código ISO de dos letras válido.`,
+        roles
       );
     }
 
@@ -119,10 +135,10 @@ async function resolveShippingAddresses(provider, payload) {
             .includes(error?.code) &&
           error?.details?.operation === 'resolve_address';
         if (!unresolved) throw error;
-        throw unresolvedShippingAddress(key, address);
+        throw unresolvedShippingAddress(key, address, '', roles);
       }
       const located = chooseEnviaLocation(locations, address);
-      if (!located) throw unresolvedShippingAddress(key, address);
+      if (!located) throw unresolvedShippingAddress(key, address, '', roles);
       address.city = locationValue(located, 'city', 'locality') || address.city;
       address.state = locationValue(located, 'state', 'stateCode') || address.state;
       address.postalCode =
@@ -151,12 +167,9 @@ async function resolveShippingAddresses(provider, payload) {
       continue;
     }
 
-    const origin = key === 'origin';
-    const place = origin
-      ? `la sede ${clean(address.name, 120) || 'de origen'}`
-      : 'la dirección de entrega';
+    const { place, correction } = addressRole(key, address, roles);
     const unresolvedCity = () => createLogisticsError(
-      `No fue posible identificar el municipio colombiano de ${place}: ${cityValue} (${clean(address.state, 20)}). ${origin ? 'Corrige la ubicación en Configuración → Sedes.' : 'Corrige la dirección del cliente en la orden.'}`,
+      `No fue posible identificar el municipio colombiano de ${place}: ${cityValue} (${clean(address.state, 20)}). ${correction}`,
       'SHIPPING_CITY_NOT_RESOLVED',
       422,
       {

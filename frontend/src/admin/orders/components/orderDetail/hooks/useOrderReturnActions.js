@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../../../../lib/api';
 import { createRmaCreationIdempotency } from '../../../../../utils/rmaCreationIdempotency';
+import { runOrderReturnShippingOperation } from '../../../orderReturnShippingApi';
+
+function newShippingKey() {
+  const random = globalThis.crypto?.randomUUID?.() ||
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `rma-shipping-${random}`.slice(0, 180);
+}
 
 export default function useOrderReturnActions({
   orderId,
@@ -14,6 +21,7 @@ export default function useOrderReturnActions({
   const normalizedOrderId = String(orderId || '');
   const orderIdRef = useRef(normalizedOrderId);
   const createAttemptRef = useRef(null);
+  const shippingAttemptsRef = useRef(new Map());
   const [busyId, setBusyId] = useState('');
   if (!createAttemptRef.current) {
     createAttemptRef.current = createRmaCreationIdempotency();
@@ -23,6 +31,7 @@ export default function useOrderReturnActions({
   useEffect(() => {
     setBusyId('');
     createAttemptRef.current.reset();
+    shippingAttemptsRef.current.clear();
   }, [normalizedOrderId]);
 
   const isCurrent = useCallback(
@@ -245,6 +254,66 @@ export default function useOrderReturnActions({
     }
   }, [canManageReturnPolicy, fetchReturns, isCurrent, showReturnError, showToast]);
 
+  const runReturnShipping = useCallback(async (returnCase, action, payload = {}) => {
+    const targetOrderId = orderIdRef.current;
+    if (!canManageReturns || !targetOrderId || !returnCase?._id) return null;
+    const returnId = String(returnCase._id);
+    const idempotentActions = new Set(['label', 'pickup', 'cancel_label']);
+    const descriptor = JSON.stringify({ returnId, action, payload });
+    let idempotencyKey = '';
+    if (idempotentActions.has(action)) {
+      idempotencyKey = shippingAttemptsRef.current.get(descriptor) || newShippingKey();
+      shippingAttemptsRef.current.set(descriptor, idempotencyKey);
+    }
+    try {
+      setBusyId(`${returnId}:shipping:${action}`);
+      const data = await runOrderReturnShippingOperation(
+        targetOrderId,
+        returnId,
+        action,
+        {
+          ...payload,
+          expectedRevision: returnCase.revision,
+          provider: 'envia',
+        },
+        idempotencyKey
+      );
+      if (idempotencyKey) shippingAttemptsRef.current.delete(descriptor);
+      if (!isCurrent(targetOrderId)) return data;
+      if (action !== 'quote') {
+        showToast({
+          type: data?.actionRequired ? 'warning' : 'success',
+          title: data?.actionRequired ? 'Guía creada con revisión pendiente' : 'Logística RMA actualizada',
+          message: data?.actionRequired
+            ? 'Envia creó la guía, pero la recolección requiere validación antes de continuar.'
+            : 'La operación quedó conciliada con la transportadora.',
+          persist: data?.actionRequired === true,
+        });
+        await synchronizeAfterMutation();
+      }
+      return data;
+    } catch (error) {
+      if (error?.response?.data?.error === 'RETURN_REVISION_CONFLICT') {
+        await fetchReturns(targetOrderId).catch(() => {});
+      }
+      showReturnError(
+        error,
+        'No fue posible completar la logística de la devolución.',
+        targetOrderId
+      );
+      throw error;
+    } finally {
+      if (isCurrent(targetOrderId)) setBusyId('');
+    }
+  }, [
+    canManageReturns,
+    fetchReturns,
+    isCurrent,
+    showReturnError,
+    showToast,
+    synchronizeAfterMutation,
+  ]);
+
   return {
     busyId,
     createReturn,
@@ -253,6 +322,7 @@ export default function useOrderReturnActions({
     exchangeReturn,
     automaticExchange,
     createStoreCredit,
+    runReturnShipping,
     savePolicy,
   };
 }

@@ -132,6 +132,8 @@ const CASES = [
       'idempotencyKey_1',
       'order_1_shipmentId_1_createdAt_-1',
       'status_1',
+      'returnCase_1_createdAt_-1',
+      'returnCase_1_activeLock_1',
     ],
   },
 ];

@@ -5,6 +5,8 @@ const EMPTY_RETURNS = Object.freeze({
   orderId: '',
   policy: {},
   eligibility: [],
+  shippingDestinations: [],
+  shippingProviders: {},
   returns: [],
 });
 
@@ -211,6 +213,10 @@ export default function useOrderDetailResources({
         orderId: targetOrderId,
         policy: data?.policy || {},
         eligibility: Array.isArray(data?.eligibility) ? data.eligibility : [],
+        shippingDestinations: Array.isArray(data?.shippingDestinations)
+          ? data.shippingDestinations
+          : [],
+        shippingProviders: data?.shippingProviders || {},
         returns: Array.isArray(data?.returns) ? data.returns : [],
       };
       if (isCurrent('returns', requestId, targetOrderId)) setReturnsState(result);

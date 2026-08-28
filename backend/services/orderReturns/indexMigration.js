@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  orderReturnIndexDefinitions,
   orderReturnCreationIdempotencyIndexDefinition,
 } = require('../../models/orderReturnIndexDefinitions');
 
@@ -67,7 +68,7 @@ function exactIndexMatches(existing = {}, definition = {}) {
   return (
     existing.name === definition.options.name &&
     orderedKeyEquals(existing.key, definition.key) &&
-    existing.unique === true &&
+    Boolean(existing.unique) === Boolean(definition.options.unique) &&
     objectEquals(
       existing.partialFilterExpression,
       definition.options.partialFilterExpression
@@ -81,6 +82,7 @@ function migrationPlan({
   nodeEnv = process.env.NODE_ENV,
 } = {}) {
   const definition = orderReturnCreationIdempotencyIndexDefinition();
+  const definitions = orderReturnIndexDefinitions();
   const production = normalizeEnvironment(nodeEnv) === 'production';
   return {
     ok: true,
@@ -88,6 +90,8 @@ function migrationPlan({
     appliesChanges: apply === true,
     collection: ORDER_RETURN_COLLECTION,
     index: definition,
+    indexes: definitions,
+    indexCount: definitions.length,
     confirmations: {
       apply: apply === true,
       productionRequired: production,
@@ -138,17 +142,21 @@ async function runOrderReturnIndexMigration({
     throw new TypeError('ORDER_RETURN_INDEX_REPOSITORY_REQUIRED');
   }
 
-  const definition = orderReturnCreationIdempotencyIndexDefinition();
+  const definitions = orderReturnIndexDefinitions();
   const indexes = await repository.listIndexes();
-  const sameName = (indexes || []).find(
-    (index) => index.name === definition.options.name
-  );
-  const sameKey = (indexes || []).find((index) =>
-    orderedKeyEquals(index.key, definition.key)
-  );
-  const existing = sameName || sameKey;
-
-  if (existing) {
+  const missing = [];
+  for (const definition of definitions) {
+    const sameName = (indexes || []).find(
+      (index) => index.name === definition.options.name
+    );
+    const sameKey = (indexes || []).find((index) =>
+      orderedKeyEquals(index.key, definition.key)
+    );
+    const existing = sameName || sameKey;
+    if (!existing) {
+      missing.push(definition);
+      continue;
+    }
     if (!exactIndexMatches(existing, definition)) {
       throw new OrderReturnIndexMigrationError(
         'ORDER_RETURN_INDEX_CONFLICT',
@@ -159,28 +167,34 @@ async function runOrderReturnIndexMigration({
         }
       );
     }
+  }
+  if (!missing.length) {
     return { ...plan, status: 'already_present', mutations: 0 };
   }
-
-  const createdName = await repository.createIndex(
-    definition.key,
-    definition.options
-  );
-  if (createdName !== definition.options.name) {
-    throw new OrderReturnIndexMigrationError(
-      'ORDER_RETURN_INDEX_NAME_MISMATCH',
-      'MongoDB no confirmó el nombre esperado para el índice.',
-      {
-        expectedName: definition.options.name,
-        createdName: String(createdName || ''),
-      }
+  const createdIndexes = [];
+  for (const definition of missing) {
+    const createdName = await repository.createIndex(
+      definition.key,
+      definition.options
     );
+    if (createdName !== definition.options.name) {
+      throw new OrderReturnIndexMigrationError(
+        'ORDER_RETURN_INDEX_NAME_MISMATCH',
+        'MongoDB no confirmó el nombre esperado para el índice.',
+        {
+          expectedName: definition.options.name,
+          createdName: String(createdName || ''),
+        }
+      );
+    }
+    createdIndexes.push(createdName);
   }
   return {
     ...plan,
     status: 'created',
-    mutations: 1,
-    createdIndex: createdName,
+    mutations: createdIndexes.length,
+    createdIndex: createdIndexes[0],
+    createdIndexes,
   };
 }
 
