@@ -14,6 +14,34 @@ function base64url(value) {
   return Buffer.from(value).toString('base64url');
 }
 
+function normalizeTokenizationPublicKey(value) {
+  const pem = String(value || '')
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r/g, '')
+    .trim();
+  const match = pem.match(
+    /-----BEGIN PUBLIC KEY-----([\s\S]+?)-----END PUBLIC KEY-----/
+  );
+  const body = String(match?.[1] || '').replace(/\s+/g, '');
+  if (!body || !/^[A-Za-z0-9+/]+={0,2}$/.test(body)) {
+    throw Object.assign(
+      new Error('Wompi entregó una llave RSA de tokenización inválida.'),
+      { code: 'WOMPI_TOKENIZATION_KEY_INVALID' }
+    );
+  }
+  const lines = body.match(/.{1,64}/g) || [];
+  const normalized = `-----BEGIN PUBLIC KEY-----\n${lines.join('\n')}\n-----END PUBLIC KEY-----`;
+  try {
+    return crypto.createPublicKey(normalized);
+  } catch {
+    throw Object.assign(
+      new Error('No fue posible interpretar la llave RSA de Wompi.'),
+      { code: 'WOMPI_TOKENIZATION_KEY_INVALID' }
+    );
+  }
+}
+
 function buildCompactJwe(payload, publicKeyPem) {
   const protectedHeader = base64url(
     JSON.stringify({ alg: 'RSA-OAEP-256', enc: 'A256GCM' })
@@ -29,7 +57,7 @@ function buildCompactJwe(payload, publicKeyPem) {
     const tag = cipher.getAuthTag();
     const encryptedKey = crypto.publicEncrypt(
       {
-        key: publicKeyPem,
+        key: normalizeTokenizationPublicKey(publicKeyPem),
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
         oaepHash: 'sha256',
       },
@@ -184,6 +212,7 @@ module.exports = {
   buildCompactJwe,
   createApprovedSandboxTransaction,
   createTransaction,
+  normalizeTokenizationPublicKey,
   tokenizeApprovedSandboxCard,
   waitForApproved,
 };

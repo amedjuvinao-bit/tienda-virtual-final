@@ -15,6 +15,7 @@ const {
 } = require('./wompiFactusSandboxTrace/config');
 const {
   buildCompactJwe,
+  normalizeTokenizationPublicKey,
 } = require('./wompiFactusSandboxTrace/secureCardStage');
 
 const root = path.resolve(__dirname, '..', '..');
@@ -125,17 +126,25 @@ for (const token of [
 }
 console.log('OK 4: selecciona inventario real y crea carrito, orden e intento canónicos');
 
-const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-const compactJwe = buildCompactJwe(
-  {
-    number: ['4000', '0000', '0000', '0002'].join(''),
-    cvc: ['9', '9', '9'].join(''),
-    exp_month: '12',
-    exp_year: '30',
-    card_holder: 'CONTRACT TEST',
-  },
-  publicKey.export({ type: 'spki', format: 'pem' })
+const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+});
+const escapedPublicKey = publicKey
+  .export({ type: 'spki', format: 'pem' })
+  .replace(/\n/g, '\\n');
+assert.doesNotThrow(() => normalizeTokenizationPublicKey(escapedPublicKey));
+assert.throws(
+  () => normalizeTokenizationPublicKey('invalid'),
+  /llave RSA de tokenización inválida/
 );
+const cardFixture = {
+  number: ['4000', '0000', '0000', '0002'].join(''),
+  cvc: ['9', '9', '9'].join(''),
+  exp_month: '12',
+  exp_year: '30',
+  card_holder: 'CONTRACT TEST',
+};
+const compactJwe = buildCompactJwe(cardFixture, escapedPublicKey);
 const parts = compactJwe.split('.');
 assert.strictEqual(parts.length, 5);
 assert.deepEqual(
@@ -143,7 +152,25 @@ assert.deepEqual(
   { alg: 'RSA-OAEP-256', enc: 'A256GCM' }
 );
 assert(parts.slice(1).every(Boolean));
-console.log('OK 5: cifra la tarjeta efímera con JWE RSA-OAEP-256 y AES-256-GCM');
+const cek = crypto.privateDecrypt(
+  {
+    key: privateKey,
+    padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+    oaepHash: 'sha256',
+  },
+  Buffer.from(parts[1], 'base64url')
+);
+const decipher = crypto.createDecipheriv('aes-256-gcm', cek, Buffer.from(parts[2], 'base64url'));
+decipher.setAAD(Buffer.from(parts[0], 'ascii'));
+decipher.setAuthTag(Buffer.from(parts[4], 'base64url'));
+const decrypted = Buffer.concat([
+  decipher.update(Buffer.from(parts[3], 'base64url')),
+  decipher.final(),
+]);
+assert.deepEqual(JSON.parse(decrypted.toString('utf8')), cardFixture);
+cek.fill(0);
+decrypted.fill(0);
+console.log('OK 5: normaliza la llave Wompi y cifra JWE RSA-OAEP-256/AES-256-GCM');
 
 for (const token of [
   '/tokens/keys/tokenization',
