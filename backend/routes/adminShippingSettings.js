@@ -9,6 +9,7 @@ const {
   confirmShippingWebhook,
   disableShippingProvider,
   getShippingSettingsView,
+  requestShippingWebhookProof,
   testShippingConnection,
   updateShippingSettings,
 } = require('../services/shippingConfigurationService');
@@ -71,7 +72,23 @@ router.post('/webhook/confirm', async (req, res) => {
     const result = await confirmShippingWebhook(actor(req));
     return res.json({
       ok: true,
-      message: 'Registro anotado. Ahora pulsa “Probar” en Envia; este panel se aprobará cuando reciba esa prueba real.',
+      message: 'Registro anotado. Solicita ahora la prueba oficial de Envia desde este panel.',
+      ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/webhook/test', async (req, res) => {
+  try {
+    const result = await requestShippingWebhookProof(
+      { trackingNumber: req.body?.trackingNumber },
+      actor(req)
+    );
+    return res.json({
+      ok: true,
+      message: 'Prueba oficial solicitada a Envia. El panel se aprobará cuando llegue el POST autenticado.',
       ...result,
     });
   } catch (error) {

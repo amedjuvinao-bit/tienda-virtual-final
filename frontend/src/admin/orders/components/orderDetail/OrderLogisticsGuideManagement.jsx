@@ -1,7 +1,6 @@
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
   dangerButtonStyle,
-  inputStyle,
   primaryButtonStyle,
   secondaryButtonStyle,
 } from './OrderLogisticsUi';
@@ -12,7 +11,6 @@ export default function OrderLogisticsGuideManagement({
   onRunProviderAction,
   onSetLabelConfirmation,
   onSetPickupConfirmation,
-  onUpdateForm,
   pickupConfirmation,
   shipment,
   view,
@@ -28,20 +26,14 @@ export default function OrderLogisticsGuideManagement({
           </summary>
           <div style={{ marginTop: 9 }}>
             <div style={{ color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
-              Esto no forma parte del trabajo diario. Imita un aviso de la transportadora para comprobar que la tienda lo recibe automáticamente.
+              Esto no forma parte del trabajo diario. Solicita a Envia un aviso externo de prueba para comprobar que la tienda lo recibe automáticamente.
             </div>
             <div className="order-logistics-sandbox-grid" style={{ gap: 7, marginTop: 9 }}>
-              <label style={{ display: 'grid', gap: 5 }}>
-                <span style={{ color: '#4338ca', fontSize: 9, fontWeight: 900 }}>Estado que deseas imitar</span>
-                <select aria-label={`Estado de webhook de prueba ${shipment.code}`} value={view.form.testStatus} onChange={(event) => onUpdateForm(view.shipmentId, { testStatus: event.target.value })} style={inputStyle()}>
-                  <option value="Picked Up">Paquete recolectado</option>
-                  <option value="Shipped">Paquete en tránsito</option>
-                  <option value="Delivered">Paquete entregado</option>
-                  <option value="Canceled">Envío cancelado</option>
-                </select>
-              </label>
+              <div style={{ color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
+                Envia elegirá el contenido de prueba y lo enviará a la URL registrada.
+              </div>
               <button type="button" onClick={() => onRunProviderAction(shipment, 'webhook_test')} disabled={view.isBusy} style={{ ...secondaryButtonStyle(), alignSelf: 'end' }}>
-                Enviar aviso de prueba
+                Solicitar prueba oficial
               </button>
             </div>
           </div>

@@ -24,6 +24,7 @@ const {
   markShippingWebhookVerified,
   permanentPublicHttpsUrl,
   readiness,
+  requestShippingWebhookProof,
 } = require('../services/shippingConfigurationService');
 const {
   resolveShippingProvider,
@@ -72,6 +73,7 @@ async function main() {
     ['PUT', '/api/admin/shipping-settings'],
     ['POST', '/api/admin/shipping-settings/test'],
     ['POST', '/api/admin/shipping-settings/webhook/confirm'],
+    ['POST', '/api/admin/shipping-settings/webhook/test'],
     ['POST', '/api/admin/shipping-settings/activate'],
     ['POST', '/api/admin/shipping-settings/disable'],
   ];
@@ -83,7 +85,7 @@ async function main() {
   const routeSource = read('backend/routes/adminShippingSettings.js');
   assert.match(routeSource, /requireAdmin/);
   assert.match(routeSource, /requirePermission\('settings:shipping'\)/);
-  ok('las seis operaciones administrativas exigen sesión y permiso de envíos');
+  ok('las siete operaciones administrativas exigen sesión y permiso de envíos');
 
   const webhookRouteSource = read('backend/routes/shippingWebhookRoutes.js');
   assert.match(webhookRouteSource, /router\.get\('\/'[\s\S]*?ready: true/);
@@ -108,9 +110,14 @@ async function main() {
   assert.match(providerSource, /payload\?\.carrierName/);
   assert.match(providerSource, /replace\(\/\^Bearer\\s\+\/i, ''\)/);
   assert.match(webhookRouteSource, /apiToken: runtime\.envia\.token/);
+  assert.match(
+    webhookRouteSource,
+    /runtime\.envia\.mode === 'sandbox'[\s\S]*?runtime\.envia\.sandboxWebhookToken \|\| runtime\.envia\.webhookSecret/
+  );
   assert.match(webhookRouteSource, /endsWith\('\.trycloudflare\.com'\)/);
-  assert.match(webhookRouteSource, /runtime\.envia\.mode === 'sandbox' && temporarySandboxTunnel/);
-  ok('GET y la prueba v1 por Quick Tunnel responden HTTP 200 antes de consultar o persistir');
+  assert.doesNotMatch(webhookRouteSource, /allowLegacySandboxProbe/);
+  assert.doesNotMatch(providerSource, /allowLegacySandboxProbe/);
+  ok('GET responde rápido, ningún túnel aprueba sin autenticación y Sandbox admite firma vigente');
 
   const service = read('backend/services/shippingConfigurationService.js');
   assert.match(service, /SHIPPING_PRODUCTION_CONFIRMATION_REQUIRED/);
@@ -154,6 +161,52 @@ async function main() {
     },
   });
   assert.strictEqual(sandboxWithWebhookToken.canConfirmWebhook, true);
+
+  const proofSettings = {
+    managedFromPanel: true,
+    defaultProvider: 'manual',
+    enviaMode: 'sandbox',
+    enviaTokenEncrypted: encryptShippingSecret('sandbox-api-token'),
+    sandboxWebhookTokenEncrypted: encryptShippingSecret('sandbox-webhook-token'),
+    credentialRevision: 1,
+    lastTestStatus: 'success',
+    lastTestMode: 'sandbox',
+    lastTestCredentialRevision: 1,
+    providerWebhookId: 'dashboard-confirmed',
+    providerWebhookMode: 'sandbox',
+    providerWebhookUrl: 'https://shipping-settings.test/api/shipping/webhooks/envia',
+    webhookRegisteredAt: new Date(),
+    async save() {
+      return this;
+    },
+    toSafeObject() {
+      return {
+        defaultProvider: this.defaultProvider,
+        enviaMode: this.enviaMode,
+        hasEnviaToken: true,
+        hasSandboxWebhookToken: true,
+      };
+    },
+  };
+  let proofRequest = null;
+  await requestShippingWebhookProof(
+    {},
+    '64b000000000000000000001',
+    {
+      SettingsModel: { getSingleton: async () => proofSettings },
+      provider: {
+        async testWebhook(input) {
+          proofRequest = input;
+          return { success: true };
+        },
+      },
+    }
+  );
+  assert.deepStrictEqual(proofRequest, {
+    trackingNumber: '7520610403',
+    webhookUrl: 'https://shipping-settings.test/api/shipping/webhooks/envia',
+  });
+  ok('el panel solicita a Envia su POST oficial con tracking_number y webhook_url');
 
   const productionSettings = {
     ...verifiedSettings,
@@ -271,6 +324,7 @@ async function main() {
   assert.match(frontend, /Probar conexión/);
   assert.match(frontend, /Abrir portal de Envia/);
   assert.match(frontend, /Ya registré la URL/);
+  assert.match(frontend, /Enviar prueba oficial desde Envia/);
   assert.match(frontend, /Prueba recibida desde Envia/);
   assert.match(frontend, /trycloudflare\.com es temporal/);
   assert.match(frontend, /confirmProduction/);

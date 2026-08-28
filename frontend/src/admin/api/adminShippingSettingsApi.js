@@ -50,6 +50,13 @@ export function confirmAdminShippingWebhook() {
   );
 }
 
+export function testAdminShippingWebhook() {
+  return request(
+    () => api.post(`${BASE_URL}/webhook/test`),
+    'No se pudo solicitar la prueba oficial del webhook a Envia.'
+  );
+}
+
 export function activateAdminShippingProvider(confirmProduction = false) {
   return request(
     () => api.post(`${BASE_URL}/activate`, { confirmProduction }),

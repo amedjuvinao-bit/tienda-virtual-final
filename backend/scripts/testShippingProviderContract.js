@@ -135,9 +135,8 @@ async function main() {
   const pickupResult = await automationProvider.schedulePickup(pickupRequest);
   assert.strictEqual(pickupResult[0].confirmation, 'PU-001');
   await automationProvider.testWebhook({
-    carrier: 'FedEx',
     trackingNumber: 'TEST-001',
-    status: 'Delivered',
+    webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
   });
   assert.strictEqual(
     automationCalls[0].url,
@@ -148,9 +147,8 @@ async function main() {
   assert.strictEqual('pickupAddress' in automationCalls[1].body, false);
   assert.strictEqual('pickupDate' in automationCalls[1].body, false);
   assert.deepStrictEqual(automationCalls[2].body, {
-    carrier: 'fedex',
-    trackingNumber: 'TEST-001',
-    status: 'Delivered',
+    tracking_number: 'TEST-001',
+    webhook_url: 'https://tienda.test/api/shipping/webhooks/envia',
   });
   ok('capacidades, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
@@ -187,17 +185,6 @@ async function main() {
     now: 1_800_002,
   });
   assert.strictEqual(verifiedApiAuthorization.sandboxTest, true);
-  const verifiedTemporaryTunnelProbe = verifyEnviaSandboxTestWebhook({
-    rawBody: sandboxTestBody,
-    headers: { authorization: 'Bearer token-generado-por-el-portal' },
-    mode: 'sandbox',
-    webhookToken: 'sandbox-webhook-secret',
-    apiToken: 'sandbox-api-token',
-    allowLegacySandboxProbe: true,
-    now: 1_800_003,
-  });
-  assert.strictEqual(verifiedTemporaryTunnelProbe.sandboxTest, true);
-  assert.strictEqual(verifiedTemporaryTunnelProbe.sandboxUnverified, true);
   assert.throws(
     () => verifyEnviaSandboxTestWebhook({
       rawBody: sandboxTestBody,
@@ -217,7 +204,17 @@ async function main() {
     }),
     (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
   );
-  ok('la prueba v1 acepta credenciales válidas y limita la compatibilidad legacy al túnel Sandbox autorizado');
+  assert.throws(
+    () => verifyEnviaSandboxTestWebhook({
+      rawBody: sandboxTestBody,
+      headers: {},
+      mode: 'sandbox',
+      webhookToken: 'sandbox-webhook-secret',
+      apiToken: 'sandbox-api-token',
+    }),
+    (error) => error.code === 'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION'
+  );
+  ok('la prueba Sandbox exige siempre una credencial Bearer válida, incluso detrás de un túnel temporal');
 
   const generateWithPickup = pickupOnGeneratePayload(
     {

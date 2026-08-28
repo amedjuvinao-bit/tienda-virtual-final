@@ -1,6 +1,7 @@
 'use strict';
 
 const { createLogisticsError } = require('../orderLogisticsService');
+const { publicWebhookUrl } = require('../shippingConfigurationService');
 const {
   applyProviderTrackingUpdate,
   mergeTrackingEvents,
@@ -82,7 +83,7 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
   const { order, shipment, scope } = await loadContext(input, dependencies);
   if (provider.mode !== 'sandbox') {
     throw createLogisticsError(
-      'Los eventos simulados solo están disponibles en Envia Sandbox.',
+      'La prueba oficial automática solo está disponible en Envia Sandbox.',
       'SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY',
       409
     );
@@ -96,23 +97,18 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
       422
     );
   }
-  const allowed = new Map([
-    ['picked up', 'Picked Up'],
-    ['shipped', 'Shipped'],
-    ['delivered', 'Delivered'],
-    ['canceled', 'Canceled'],
-    ['cancelled', 'Canceled'],
-  ]);
-  const requestedStatus = clean(input.testStatus || 'Shipped', 40).toLowerCase();
-  const status = allowed.get(requestedStatus);
-  if (!status) {
+  const webhookUrl = clean(
+    dependencies.webhookUrl || publicWebhookUrl(),
+    500
+  );
+  if (!webhookUrl) {
     throw createLogisticsError(
-      'El estado de prueba debe ser Picked Up, Shipped, Delivered o Canceled.',
-      'SHIPPING_WEBHOOK_TEST_STATUS_INVALID',
+      'Configura la URL pública del webhook antes de solicitar la prueba oficial.',
+      'SHIPPING_WEBHOOK_URL_REQUIRED',
       422
     );
   }
-  const result = await provider.testWebhook({ carrier, trackingNumber, status });
+  const result = await provider.testWebhook({ trackingNumber, webhookUrl });
   return integrationResponse(
     order,
     shipment,
@@ -121,7 +117,7 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
         accepted: true,
         carrier,
         trackingNumber,
-        status,
+        webhookUrl,
         result,
       },
     },

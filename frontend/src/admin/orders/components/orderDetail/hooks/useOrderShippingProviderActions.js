@@ -17,7 +17,6 @@ import {
   planPayload,
   shipmentForm,
   shipmentIdempotencyKey,
-  WEBHOOK_TEST_LABELS,
 } from '../orderLogisticsViewModel';
 
 export default function useOrderShippingProviderActions({
@@ -145,11 +144,10 @@ export default function useOrderShippingProviderActions({
         await testOrderShipmentWebhook(orderId, shipmentId, {
           provider: 'envia',
           expectedRevision: Number(shipment.revision || 0),
-          testStatus: form.testStatus,
         });
         setMessage({
           type: 'success',
-          text: `Prueba enviada: estamos imitando que Envia informó que ${WEBHOOK_TEST_LABELS[form.testStatus] || form.testStatus}. En un envío real, Envia enviará este aviso automáticamente y el administrador no tendrá que cambiar el estado.`,
+          text: 'Prueba oficial solicitada. Envia enviará el aviso a la URL registrada y la tienda lo procesará automáticamente.',
         });
         window.setTimeout(() => refresh().catch(() => {}), 1800);
       } else if (action === 'dropoff') {

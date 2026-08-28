@@ -194,7 +194,6 @@ async function runShippingOperation(req, res, operation) {
       pickupTimeEnd: req.body?.pickupTimeEnd,
       pickupInstructions: req.body?.pickupInstructions,
       now: new Date(),
-      testStatus: req.body?.testStatus,
       idempotencyKey:
         req.get('Idempotency-Key') || req.body?.idempotencyKey,
       ...serviceScope(access),

@@ -6,6 +6,7 @@ import ShippingProvidersCard from './ShippingProvidersCard';
 import {
   confirmAdminShippingWebhook,
   getAdminShippingSettings,
+  testAdminShippingWebhook,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
 
@@ -15,6 +16,7 @@ vi.mock('../../../api/adminShippingSettingsApi', () => ({
   disableAdminShippingProvider: vi.fn(),
   getAdminShippingSettings: vi.fn(),
   testAdminShippingConnection: vi.fn(),
+  testAdminShippingWebhook: vi.fn(),
   updateAdminShippingSettings: vi.fn(),
 }));
 
@@ -178,7 +180,7 @@ describe('ShippingProvidersCard', () => {
           canConfirmWebhook: true,
         },
       }),
-      message: 'Registro anotado. Ahora pulsa “Probar” en Envia.',
+      message: 'Registro anotado. Solicita ahora la prueba oficial de Envia desde este panel.',
     });
 
     render(<ShippingProvidersCard />);
@@ -194,8 +196,44 @@ describe('ShippingProvidersCard', () => {
     await user.click(screen.getByRole('button', { name: 'Ya registré la URL' }));
     await waitFor(() => expect(confirmAdminShippingWebhook).toHaveBeenCalledTimes(1));
     expect(
-      (await screen.findAllByText('Esperando prueba de Envia')).length
+      (await screen.findAllByText('Esperando el POST autenticado de Envia')).length
     ).toBeGreaterThan(0);
+  });
+
+  it('solicita a Envia el POST oficial después de registrar la URL', async () => {
+    const user = userEvent.setup();
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: { hasEnviaToken: true, hasSandboxWebhookToken: true },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: false,
+        },
+      })
+    );
+    testAdminShippingWebhook.mockResolvedValue({
+      ...response({
+        settings: { hasEnviaToken: true, hasSandboxWebhookToken: true },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: false,
+        },
+      }),
+      message: 'Prueba oficial solicitada a Envia.',
+    });
+
+    render(<ShippingProvidersCard />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Enviar prueba oficial desde Envia' })
+    );
+
+    await waitFor(() => expect(testAdminShippingWebhook).toHaveBeenCalledTimes(1));
   });
 
   it('muestra la confirmación únicamente cuando Envia ya comprobó el webhook', async () => {

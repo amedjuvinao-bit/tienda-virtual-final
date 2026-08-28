@@ -434,13 +434,22 @@ function createEnviaProvider({
     async schedulePickup(payload) {
       return request('/ship/pickup/', payload, 'schedule_pickup');
     },
-    async testWebhook({ carrier, trackingNumber, status = 'Shipped' } = {}) {
+    async testWebhook({ trackingNumber, webhookUrl } = {}) {
+      const safeTrackingNumber = clean(trackingNumber);
+      const safeWebhookUrl = clean(webhookUrl);
+      if (!safeTrackingNumber || !safeWebhookUrl) {
+        throw new ShippingProviderError(
+          'La prueba oficial del webhook exige una guía y la URL pública registrada.',
+          'SHIPPING_WEBHOOK_TEST_DATA_REQUIRED',
+          422,
+          { provider: 'envia', operation: 'test_webhook' }
+        );
+      }
       return request(
         '/ship/webhooktest/',
         {
-          carrier: clean(carrier).toLowerCase(),
-          trackingNumber: clean(trackingNumber),
-          status: clean(status) || 'Shipped',
+          tracking_number: safeTrackingNumber,
+          webhook_url: safeWebhookUrl,
         },
         'test_webhook',
         { normalize: false }
@@ -515,7 +524,6 @@ function verifyEnviaSandboxTestWebhook({
   mode,
   webhookToken,
   apiToken,
-  allowLegacySandboxProbe = false,
   now = Date.now(),
 } = {}) {
   if (clean(mode).toLowerCase() !== 'sandbox') {
@@ -536,7 +544,7 @@ function verifyEnviaSandboxTestWebhook({
     const expectedDigest = crypto.createHash('sha256').update(expectedToken).digest();
     return crypto.timingSafeEqual(suppliedDigest, expectedDigest);
   });
-  if ((!suppliedToken || !authenticated) && !allowLegacySandboxProbe) {
+  if (!suppliedToken || !authenticated) {
     throw new ShippingProviderError(
       'La prueba de webhook Sandbox no pudo autenticarse con la credencial del webhook configurada.',
       'INVALID_SANDBOX_WEBHOOK_AUTHORIZATION',
@@ -589,7 +597,6 @@ function verifyEnviaSandboxTestWebhook({
     timestamp: Number(now),
     body,
     sandboxTest: true,
-    sandboxUnverified: !authenticated,
   };
 }
 

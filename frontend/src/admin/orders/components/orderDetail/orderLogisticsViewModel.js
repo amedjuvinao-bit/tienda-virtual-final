@@ -30,13 +30,6 @@ export const STEPS = [
   ['delivered', 'Entrega'],
 ];
 
-export const WEBHOOK_TEST_LABELS = {
-  'Picked Up': 'el paquete fue recolectado',
-  Shipped: 'el paquete está en tránsito',
-  Delivered: 'el paquete fue entregado',
-  Canceled: 'el envío fue cancelado',
-};
-
 export const STATUS_POSITION = {
   ready_to_pick: 0,
   picking: 1,
@@ -138,7 +131,6 @@ export function shipmentForm(shipment = {}) {
     pickupTimeStart: shipment.shippingIntegration?.pickup?.timeFrom || '09:00',
     pickupTimeEnd: shipment.shippingIntegration?.pickup?.timeTo || '14:00',
     pickupInstructions: shipment.shippingIntegration?.pickup?.instructions || '',
-    testStatus: 'Shipped',
     dispatchReference: shipment.dispatchEvidence?.reference || '',
     deliveryReference: shipment.deliveryEvidence?.reference || '',
     recipient: shipment.deliveryEvidence?.recipient || '',

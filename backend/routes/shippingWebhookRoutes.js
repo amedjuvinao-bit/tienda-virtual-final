@@ -89,7 +89,6 @@ router.post('/', async (req, res) => {
           mode: runtime.envia.mode,
           webhookToken: runtime.envia.sandboxWebhookToken,
           apiToken: runtime.envia.token,
-          allowLegacySandboxProbe: runtime.envia.mode === 'sandbox',
         });
         const payload = JSON.parse(verified.body || '{}');
         await persistVerifiedEvent(verified, payload);
@@ -109,7 +108,10 @@ router.post('/', async (req, res) => {
       ? verifyEnviaWebhook({
           rawBody: req.body,
           headers: req.headers,
-          secret: runtime.envia.webhookSecret,
+          secret:
+            runtime.envia.mode === 'sandbox'
+              ? runtime.envia.sandboxWebhookToken || runtime.envia.webhookSecret
+              : runtime.envia.webhookSecret,
         })
       : verifyEnviaSandboxTestWebhook({
           rawBody: req.body,
@@ -117,8 +119,6 @@ router.post('/', async (req, res) => {
           mode: runtime.envia.mode,
           webhookToken: runtime.envia.sandboxWebhookToken,
           apiToken: runtime.envia.token,
-          allowLegacySandboxProbe:
-            runtime.envia.mode === 'sandbox' && temporarySandboxTunnel,
         });
     let payload;
     try {

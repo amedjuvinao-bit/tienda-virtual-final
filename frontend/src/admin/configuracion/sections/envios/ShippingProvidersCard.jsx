@@ -5,6 +5,7 @@ import {
   disableAdminShippingProvider,
   getAdminShippingSettings,
   testAdminShippingConnection,
+  testAdminShippingWebhook,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
 import './ShippingCenter.css';
@@ -198,7 +199,7 @@ export default function ShippingProvidersCard() {
         : !ready.webhookRegistered
           ? 'Copia la URL, regístrala en Envia y confirma “Ya registré la URL”.'
           : !ready.webhookVerified
-            ? 'En el portal de Envia pulsa “Probar”. Esta pantalla detectará la respuesta sola.'
+            ? 'Solicita la prueba oficial: Envia enviará un POST autenticado y esta pantalla lo detectará sola.'
             : !selectedEnvia
               ? `Todo está listo. Activa Envia ${production ? 'Producción' : 'Sandbox'}.`
               : 'Envia está conectado y ya puede operar desde las órdenes.';
@@ -421,7 +422,7 @@ export default function ShippingProvidersCard() {
                       <span className="mt-1 block text-xs text-gray-500">
                         {settings.hasSandboxWebhookToken
                           ? `Guardada: ${settings.sandboxWebhookTokenHint || 'credencial protegida'}. Déjala vacía para conservarla.`
-                          : 'En el portal Sandbox, guarda el webhook y copia la credencial generada en el segundo campo “Url”. No uses aquí el token de la API.'}
+                          : 'En el portal Sandbox, guarda un webhook firmado de seguimiento y copia aquí su secreto. No uses aquí el token de la API.'}
                       </span>
                       {meta.sandboxWebhookTokenSource === 'database' && (
                         <label className="shipping-danger-text mt-2 flex items-center gap-2 text-xs">
@@ -520,12 +521,21 @@ export default function ShippingProvidersCard() {
                     >
                       Ya registré la URL
                     </ActionButton>
+                    {ready.webhookRegistered && !ready.webhookVerified && !production && (
+                      <ActionButton
+                        tone="pink"
+                        busy={busyAction === 'webhook-test'}
+                        onClick={() => runAction('webhook-test', testAdminShippingWebhook)}
+                      >
+                        Enviar prueba oficial desde Envia
+                      </ActionButton>
+                    )}
                   </div>
                 </div>
 
                 {ready.webhookRegistered && !ready.webhookVerified && (
                   <div className="shipping-alert-warning mt-3 rounded-xl border p-3 text-sm font-semibold">
-                    Esperando prueba de Envia
+                    Esperando el POST autenticado de Envia
                   </div>
                 )}
                 {ready.webhookVerified && (

@@ -2,7 +2,7 @@
 
 ## Estado verificable
 
-La implementación local está completa y sus contratos automatizados están en verde. Todavía no se ha publicado ni se declara certificada en Producción. El cierre de la etapa exige ejecutar una traza real en Envia Sandbox con las credenciales y el webhook del entorno de staging.
+La implementación está publicada en la rama de desarrollo y sus contratos automatizados están en verde. Todavía no se declara certificada en Producción. El cierre de la etapa exige ejecutar una traza real en Envia Sandbox con las credenciales y el webhook del entorno de staging.
 
 ## Contrato funcional
 
@@ -60,10 +60,18 @@ El dry-run conjunto reporta nueve migraciones y cero escrituras.
 
 Estas pruebas no sustituyen la llamada real a Envia Sandbox.
 
+## Comprobación oficial del webhook Sandbox
+
+El botón **Probar** del portal de Envia solo comprueba que la URL responde; esa respuesta no demuestra que la tienda haya recibido un evento autenticado. La prueba aceptada por el panel se solicita desde **Configuración → Envíos → Enviar prueba oficial desde Envia**. El backend llama al endpoint oficial `POST /ship/webhooktest/` con `tracking_number` y `webhook_url`; Envia realiza después un POST externo a la URL registrada usando la autorización Bearer de Sandbox.
+
+La tienda responde rápidamente y procesa el evento de forma asíncrona, pero solo marca el webhook como verificado si la autorización coincide con una credencial configurada y el payload contiene transportadora, guía y estado. Una visita GET, el botón de conectividad del portal o un POST sin credenciales nunca completan el control.
+
+Para los eventos reales se debe registrar el tipo firmado `tracking.simple` (`type_id: 3`). Los tipos heredados `onShipmentStatusUpdate` y `statusUpdateWithEcommerceInfo` no incluyen firma HMAC y no son aptos para certificar Producción.
+
 ## Puerta de cierre en staging
 
 1. Ejecutar el dry-run y aplicar los dos índices con las confirmaciones documentadas.
-2. Confirmar Envia Sandbox activo, token válido y webhook auténtico verificado para la URL permanente de staging.
+2. Confirmar token válido, registrar un webhook firmado `tracking.simple` y solicitar desde el panel la prueba oficial para la URL pública de staging.
 3. Crear una orden de prueba con dirección realista, sede operativa y paquete medido; autorizar su RMA.
 4. Cotizar y generar una guía Sandbox desde Posventa. Verificar etiqueta, guía, proveedor, tarifa y una sola `ShippingOperation` exitosa.
 5. Probar recolección o entrega en punto según las capacidades de la transportadora.

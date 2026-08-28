@@ -63,6 +63,8 @@ function webhookDashboardUrl(mode = 'sandbox') {
     : 'https://shipping-test.envia.com/settings/developers';
 }
 
+const ENVIA_SANDBOX_WEBHOOK_TEST_TRACKING_NUMBER = '7520610403';
+
 function publicHttpsUrl(value) {
   try {
     const parsed = new URL(value);
@@ -470,6 +472,55 @@ async function confirmShippingWebhook(
   return getShippingSettingsView({ SettingsModel });
 }
 
+async function requestShippingWebhookProof(
+  input = {},
+  actor = null,
+  { SettingsModel = ShippingSettings, provider = null, fetchImpl } = {}
+) {
+  const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
+  const state = readiness(runtime.settings, runtime);
+  if (runtime.envia.mode !== 'sandbox') {
+    throw new ShippingSettingsError(
+      'La prueba automática solo está permitida en Envia Sandbox. Producción exige un evento firmado real.',
+      'SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY',
+      409
+    );
+  }
+  if (!state.webhookRegistered || !state.webhookUrlReady) {
+    throw new ShippingSettingsError(
+      'Registra primero la URL pública del webhook en Envia.',
+      'SHIPPING_WEBHOOK_NOT_REGISTERED',
+      409,
+      state
+    );
+  }
+  if (!state.hasToken || !state.tested || !state.hasSandboxWebhookToken) {
+    throw new ShippingSettingsError(
+      'La prueba exige token, conexión y credencial Sandbox aprobados.',
+      'SHIPPING_WEBHOOK_TEST_NOT_READY',
+      409,
+      state
+    );
+  }
+  if (state.webhookVerified) {
+    return getShippingSettingsView({ SettingsModel });
+  }
+
+  const webhookUrl = publicWebhookUrl();
+  const trackingNumber = clean(
+    input.trackingNumber || ENVIA_SANDBOX_WEBHOOK_TEST_TRACKING_NUMBER,
+    180
+  );
+  const envia = provider || createEnviaProvider({
+    config: runtime.envia,
+    fetchImpl,
+  });
+  await envia.testWebhook({ trackingNumber, webhookUrl });
+  runtime.settings.updatedBy = actorId(actor);
+  await runtime.settings.save();
+  return getShippingSettingsView({ SettingsModel });
+}
+
 async function markShippingWebhookVerified(
   verified = {},
   { SettingsModel = ShippingSettings, now = new Date() } = {}
@@ -573,6 +624,7 @@ module.exports = {
   publicWebhookUrl,
   readiness,
   confirmShippingWebhook,
+  requestShippingWebhookProof,
   testShippingConnection,
   updateShippingSettings,
 };

@@ -608,20 +608,16 @@ describe('centro logístico avanzado de la orden', () => {
       'https://example.com/label.pdf'
     );
     fireEvent.click(screen.getByText('Pruebas Sandbox · solo para verificar la integración'));
-    fireEvent.change(screen.getByLabelText(`Estado de webhook de prueba ${SHIPMENT.code}`), {
-      target: { value: 'Delivered' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar aviso de prueba' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Solicitar prueba oficial' }));
     await waitFor(() => expect(logisticsApi.testOrderShipmentWebhook).toHaveBeenCalledWith(
       ORDER._id,
       SHIPMENT._id,
       {
         provider: 'envia',
         expectedRevision: 4,
-        testStatus: 'Delivered',
       }
     ));
-    expect(await screen.findByText(/Prueba enviada: estamos imitando que Envia informó que el paquete fue entregado/)).toBeInTheDocument();
+    expect(await screen.findByText(/Prueba oficial solicitada/)).toBeInTheDocument();
     expect(screen.getByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver seguimiento público' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Comenzar a reunir productos' })).not.toBeInTheDocument();

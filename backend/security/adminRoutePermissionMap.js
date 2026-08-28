@@ -984,6 +984,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
+    path: '/api/admin/shipping-settings/webhook/test',
+    permission: 'settings:shipping',
+    description: 'Solicitar a Envia la prueba oficial del webhook Sandbox.',
+    audit: true,
+  },
+  {
+    method: 'POST',
     path: '/api/admin/shipping-settings/activate',
     permission: 'settings:shipping',
     description: 'Activar la transportadora como proveedor predeterminado.',
