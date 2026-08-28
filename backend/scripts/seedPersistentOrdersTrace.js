@@ -667,6 +667,7 @@ module.exports = {
   DEFAULT_OPTIONS,
   MULTI_BRANCH_SCENARIO,
   actionPayload,
+  applyScenarioLogistics,
   assertPersistentConfirmation,
   buildCandidatePool,
   buildOrderDraft,

@@ -184,6 +184,15 @@ En un entorno local o de pruebas, la aplicación conjunta requiere
 Este comando repite primero el `dry-run`, se bloquea si `NODE_ENV=production` y
 detiene la secuencia ante el primer error sin eliminar datos ni índices.
 
+La trazabilidad financiera del panel puede comprobarse con datos persistentes de
+demostración mediante
+`npm --prefix backend run demo:orders-payment-trace -- --confirm-persist`. El
+generador crea nueve órdenes identificables por un `runId`: Wompi pendiente,
+aprobado, rechazado, reintentado y en conciliación; pago mixto y total con saldo a
+favor; devolución del saldo tras fallo; y transferencia manual con evidencia. Solo
+usa productos e inventario como fotografías comerciales: no descuenta existencias,
+no crea movimientos de caja y no contacta pasarelas, DIAN ni transportadoras.
+
 Ninguna migración usa `syncIndexes`, elimina ni renombra índices automáticamente.
 En producción exige la bandera de aplicación de su comando y la confirmación
 adicional documentada por el propio script. Un índice incompatible detiene el
