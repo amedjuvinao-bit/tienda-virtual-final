@@ -470,27 +470,56 @@ async function exportAdminCarts(query = {}, sessionIds = [], options = {}) {
 }
 
 async function markCartConverted(
-  { sessionId, orderId, convertedAt = new Date() } = {},
+  {
+    sessionId,
+    orderId,
+    convertedAt = new Date(),
+    authority = null,
+  } = {},
   { CartModel = Cart, session = null } = {}
 ) {
   const safeSessionId = clean(sessionId, 120);
   if (!safeSessionId || !orderId) return { matchedCount: 0, modifiedCount: 0 };
+  const filter = {
+    sessionId: safeSessionId,
+    $or: [
+      { convertedOrderId: null },
+      { convertedOrderId: { $exists: false } },
+      { convertedOrderId: orderId },
+    ],
+  };
+
+  if (authority) {
+    const expectedUpdatedAt = new Date(authority.expectedUpdatedAt || 0);
+    const safeCartId = authority.cartId;
+    const safeTokenHash = clean(authority.accessTokenHash, 128);
+    const accessVersion = Number(authority.accessVersion);
+    if (
+      !safeCartId ||
+      !safeTokenHash ||
+      !Number.isInteger(accessVersion) ||
+      accessVersion <= 0 ||
+      Number.isNaN(expectedUpdatedAt.getTime()) ||
+      !Array.isArray(authority.items)
+    ) {
+      return { matchedCount: 0, modifiedCount: 0 };
+    }
+    filter._id = safeCartId;
+    filter.accessTokenHash = safeTokenHash;
+    filter.accessVersion = accessVersion;
+    filter.updatedAt = expectedUpdatedAt;
+    filter.items = authority.items;
+  }
+
   const query = CartModel.updateOne(
+    filter,
     {
-      sessionId: safeSessionId,
-      $or: [
-        { convertedOrderId: null },
-        { convertedOrderId: { $exists: false } },
-        { convertedOrderId: orderId },
-      ],
-    },
-      {
-        $set: {
-          convertedOrderId: orderId,
-          convertedAt,
-          'recoveryAccess.usedAt': convertedAt,
-        },
-      }
+      $set: {
+        convertedOrderId: orderId,
+        convertedAt,
+        'recoveryAccess.usedAt': convertedAt,
+      },
+    }
   );
   return session && typeof query.session === 'function' ? query.session(session) : query;
 }

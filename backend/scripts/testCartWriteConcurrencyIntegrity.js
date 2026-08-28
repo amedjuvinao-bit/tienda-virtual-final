@@ -314,6 +314,20 @@ async function main() {
       assert.equal(stillThere.status, 200);
     });
 
+    await check('un carrito convertido no admite escrituras posteriores', async () => {
+      const stored = records.get(sessionId);
+      const previousItems = stored.items.map((entry) => ({ ...entry }));
+      stored.convertedOrderId = '68a4a78a59706e44cade0999';
+      const result = await request(`/${encodeURIComponent(sessionId)}`, {
+        method: 'PUT',
+        headers: { ...accessHeaders, 'If-Match-Updated-At': version },
+        body: { items: [item(PRODUCT_C, 9)] },
+      });
+      assert.equal(result.status, 404);
+      assert.equal(result.body.error, 'CART_ACCESS_NOT_FOUND');
+      assert.deepEqual(stored.items, previousItems);
+    });
+
     await check('las pruebas de carrito no crean orden, reserva, pago ni factura', async () => {
       assert.equal(records.size, 1);
       assert.equal(mongoose.connection.readyState, 0);

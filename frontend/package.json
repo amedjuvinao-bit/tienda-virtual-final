@@ -22,7 +22,7 @@
     "test:orders-stage4": "vitest run src/utils/orderReturnAccess.test.js src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:orders-return-risk": "vitest run src/pages/OrderReturnsPage.test.jsx src/admin/orders/components/orderDetail/OrderDetailReturnsPanel.test.jsx",
     "test:checkout-store-credit": "vitest run src/checkout/storeCreditCheckout.test.js src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",
-    "test:checkout-architecture": "vitest run src/checkout/page/checkoutPageArchitecture.test.js src/checkout/page/checkoutSubmissionModel.test.js src/pages/gracias/graciasPageArchitecture.test.jsx src/pages/paymentPages.sensitiveLogging.test.js",
+    "test:checkout-architecture": "vitest run src/checkout/page/checkoutPageArchitecture.test.js src/checkout/page/checkoutSubmissionModel.test.js src/checkout/page/useCheckoutSubmission.test.js src/pages/gracias/graciasPageArchitecture.test.jsx src/pages/paymentPages.sensitiveLogging.test.js",
     "test:payu-redirect": "vitest run src/lib/payuRedirect.test.js",
     "test:orders-operations": "vitest run src/admin/orders/components/OrdersOperationsCenter.test.jsx src/admin/orders/hooks/useOrdersQuickViews.test.jsx",
     "test:orders-detail-story": "vitest run src/admin/orders/components/orderDetail/OrderDetailStoryOverview.test.jsx",

@@ -20,11 +20,15 @@ import useWompiCheckout from './useWompiCheckout';
 export function createOrderFromAuthorizedCart({
   order,
   cartAccess,
+  cartVersion,
+  cartSnapshotFingerprint,
   idempotencyKey,
 }) {
   return api.post('/api/orders', order, {
     headers: {
       ...buildCartAccessHeaders(cartAccess),
+      'If-Match-Updated-At': cartVersion,
+      'X-Cart-Snapshot-Fingerprint': cartSnapshotFingerprint,
       'Idempotency-Key': idempotencyKey,
     },
   });
@@ -36,6 +40,7 @@ export default function useCheckoutSubmission({
   clearCart,
   ensureCartReady,
   renewCartAccess,
+  syncCart,
   validateCart,
 }) {
   const navigate = useNavigate();
@@ -63,13 +68,25 @@ export default function useCheckoutSubmission({
     let validation;
     let serverItems = null;
     let serverSummary = null;
+    let cartVersion = '';
+    let cartSnapshotFingerprint = '';
 
     try {
       cartAccess = await ensureCartReady();
       validation = await validateCart('strict');
       serverItems = Array.isArray(validation?.items) ? validation.items : null;
       serverSummary = validation?.summary || null;
-      if (!validation?.ok) throw new Error('CART_VALIDATION_FAILED');
+      cartVersion = String(validation?.version || '').trim();
+      cartSnapshotFingerprint = String(
+        validation?.orderSnapshotFingerprint || ''
+      ).trim();
+      if (
+        !validation?.ok ||
+        !cartVersion ||
+        !cartSnapshotFingerprint
+      ) {
+        throw new Error('CART_VALIDATION_FAILED');
+      }
 
       const filteredFromServer = (serverItems || []).filter(
         (item) => Number(item?.quantity ?? item?.qty ?? 0) > 0
@@ -149,6 +166,8 @@ export default function useCheckoutSubmission({
         response = await createOrderFromAuthorizedCart({
           order,
           cartAccess,
+          cartVersion,
+          cartSnapshotFingerprint,
           idempotencyKey,
         });
       } catch (orderError) {
@@ -163,9 +182,30 @@ export default function useCheckoutSubmission({
         } catch {
           // El header renovado sigue siendo la autoridad para este reintento.
         }
+        const renewedValidation = await validateCart('strict');
+        const renewedFingerprint = String(
+          renewedValidation?.orderSnapshotFingerprint || ''
+        ).trim();
+        if (
+          !renewedValidation?.ok ||
+          !renewedValidation?.version ||
+          !renewedFingerprint ||
+          renewedFingerprint !== cartSnapshotFingerprint
+        ) {
+          state.setErrors([
+            'El carrito cambió mientras renovábamos tu acceso.',
+            'Revisa los productos y confirma nuevamente la compra.',
+          ]);
+          scrollCheckoutToTop();
+          return;
+        }
+        cartVersion = String(renewedValidation.version).trim();
+        cartSnapshotFingerprint = renewedFingerprint;
         response = await createOrderFromAuthorizedCart({
           order,
           cartAccess,
+          cartVersion,
+          cartSnapshotFingerprint,
           idempotencyKey,
         });
       }
@@ -312,6 +352,20 @@ export default function useCheckoutSubmission({
     } catch (error) {
       if (error?.response?.status === 409) {
         const data = error.response.data || {};
+        if (data?.error === 'CART_VERSION_CONFLICT') {
+          try {
+            await syncCart?.();
+          } catch {
+            // La recarga visual no reemplaza el bloqueo seguro del backend.
+          }
+          state.setErrors([
+            'Tu carrito cambió antes de crear la orden.',
+            'Revisa los productos, cantidades y precios; luego confirma nuevamente.',
+          ]);
+          scrollCheckoutToTop();
+          state.setIsPlacing(false);
+          return;
+        }
         if (data?.error === 'IDEMPOTENT_IN_PROGRESS') {
           state.setErrors([
             'Ya hay un intento de pago en proceso.',

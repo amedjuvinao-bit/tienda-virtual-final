@@ -69,6 +69,9 @@ const {
   processOrderRefund,
 } = require('../services/orderRefundService');
 const {
+  buildOrderCartRequestHeaders,
+} = require('./lib/orderCartRequestHeaders');
+const {
   buildVariantKey,
 } = require('../lib/products/productVariantConfig');
 const {
@@ -1715,13 +1718,15 @@ async function main() {
         { _id: checkoutCart._id },
         { $set: { accessIssuedAt: new Date() } }
       );
+      const checkoutOrderHeaders = await buildOrderCartRequestHeaders({
+        cartId: checkoutCart._id,
+        access: checkoutAccess,
+        idempotencyKey,
+      });
 
       const created = await requestJson(baseUrl, '/api/orders', {
         method: 'POST',
-        headers: {
-          ...cartAccessHeaders(checkoutAccess),
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: checkoutOrderHeaders,
         body: checkoutPayload,
       });
       assert.equal(created.status, 201, JSON.stringify(created.data));
@@ -1773,10 +1778,7 @@ async function main() {
       });
       const replay = await requestJson(baseUrl, '/api/orders', {
         method: 'POST',
-        headers: {
-          ...cartAccessHeaders(checkoutAccess),
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: checkoutOrderHeaders,
         body: checkoutPayload,
       });
       assert.equal(replay.status, 200, JSON.stringify(replay.data));

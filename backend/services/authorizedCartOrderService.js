@@ -17,9 +17,16 @@ const {
 const {
   resolveOrderPaymentSelection,
 } = require('./paymentConfigurationAuthorityService');
+const {
+  ORDER_CART_SNAPSHOT_HEADER,
+  createOrderCartSnapshotFingerprint,
+  isValidOrderCartSnapshotFingerprint,
+  safeFingerprintEqual,
+} = require('./orderCartSnapshotService');
 
 const DEFAULT_ORDER_CART_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
 const ORDER_ENDPOINT = 'POST /orders';
+const CART_VERSION_HEADER = 'if-match-updated-at';
 
 function toPlain(value) {
   if (!value) return value;
@@ -86,6 +93,79 @@ function buildAuthorizedOrderBody(body, cart, sessionId, paymentSnapshot) {
 
 function sendCartAccessNotFound(res) {
   return res.status(404).json(SAFE_CART_ACCESS_ERROR);
+}
+
+function cartVersionOf(cart) {
+  const value = new Date(cart?.updatedAt || 0);
+  return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+}
+
+function readOrderCartPreconditions(req = {}) {
+  const rawVersion = String(req?.headers?.[CART_VERSION_HEADER] || '').trim();
+  const rawFingerprint = String(
+    req?.headers?.[ORDER_CART_SNAPSHOT_HEADER] || ''
+  )
+    .trim()
+    .toLowerCase();
+  const parsedVersion = new Date(rawVersion);
+  const versionValid =
+    Boolean(rawVersion) &&
+    !Number.isNaN(parsedVersion.getTime()) &&
+    parsedVersion.toISOString() === rawVersion;
+
+  return {
+    ok:
+      versionValid &&
+      isValidOrderCartSnapshotFingerprint(rawFingerprint),
+    version: versionValid ? parsedVersion : null,
+    versionError: rawVersion ? 'CART_VERSION_INVALID' : 'CART_VERSION_REQUIRED',
+    fingerprint: rawFingerprint,
+    fingerprintError: rawFingerprint
+      ? 'CART_SNAPSHOT_INVALID'
+      : 'CART_SNAPSHOT_REQUIRED',
+  };
+}
+
+function sendOrderCartPrecondition(res, preconditions) {
+  const versionFailed = !preconditions.version;
+  const error = versionFailed
+    ? preconditions.versionError
+    : preconditions.fingerprintError;
+  return res.status(428).json({
+    ok: false,
+    error,
+    message: 'Debes validar la versión vigente del carrito antes de comprar.',
+  });
+}
+
+function sendOrderCartConflict(res, cart) {
+  return res.status(409).json({
+    ok: false,
+    error: 'CART_VERSION_CONFLICT',
+    code: 'CART_VERSION_CONFLICT',
+    message:
+      'El carrito cambió mientras confirmabas la compra. Revísalo y confirma nuevamente.',
+    version: cartVersionOf(cart) || undefined,
+  });
+}
+
+function persistenceItems(cart) {
+  return (Array.isArray(cart?.items) ? cart.items : []).map((item) =>
+    typeof item?.toObject === 'function'
+      ? item.toObject({ virtuals: false, depopulate: true, getters: false })
+      : { ...item }
+  );
+}
+
+function buildCartConversionAuthority(cart, snapshotFingerprint) {
+  return {
+    cartId: cart?._id,
+    expectedUpdatedAt: new Date(cart?.updatedAt),
+    accessTokenHash: String(cart?.accessTokenHash || ''),
+    accessVersion: Number(cart?.accessVersion || 0),
+    items: persistenceItems(cart),
+    snapshotFingerprint: String(snapshotFingerprint || '').trim().toLowerCase(),
+  };
 }
 
 function isFreshOrderCartAccess(
@@ -170,6 +250,8 @@ function createRequireAuthorizedOrderCart({
         return sendCartAccessNotFound(res);
       }
 
+      const preconditions = readOrderCartPreconditions(req);
+
       if (cart.convertedOrderId) {
         const replay = await findAuthorizedIdempotentReplay({
           cart,
@@ -177,13 +259,26 @@ function createRequireAuthorizedOrderCart({
           IdempotencyKeyModel,
         });
         if (!replay) return sendCartAccessNotFound(res);
+        if (!preconditions.ok) {
+          return sendOrderCartPrecondition(res, preconditions);
+        }
         req.authorizedCart = toPlain(cart) || {};
         req.authorizedCartSessionId = credentials.sessionId;
         req.authorizedOrderReplay = replay;
         return next();
       }
 
+      if (!preconditions.ok) {
+        return sendOrderCartPrecondition(res, preconditions);
+      }
+
       if (cart.items.length === 0) return sendCartAccessNotFound(res);
+      if (
+        preconditions.version.getTime() !==
+        new Date(cart.updatedAt || 0).getTime()
+      ) {
+        return sendOrderCartConflict(res, cart);
+      }
 
       const validation = await canonicalValidationService.validateItems(cart.items, {
         mode: 'strict',
@@ -195,6 +290,17 @@ function createRequireAuthorizedOrderCart({
           message: 'El carrito contiene productos que no pueden comprarse.',
           items: validation.invalidItems,
         });
+      }
+      const snapshotFingerprint = createOrderCartSnapshotFingerprint(
+        validation.items
+      );
+      if (
+        !safeFingerprintEqual(
+          preconditions.fingerprint,
+          snapshotFingerprint
+        )
+      ) {
+        return sendOrderCartConflict(res, cart);
       }
 
       const plainCart = toPlain(cart) || {};
@@ -209,6 +315,10 @@ function createRequireAuthorizedOrderCart({
       const paymentSelection = await resolvePaymentSelection(requestedProvider);
       req.authorizedCart = authoritativeCart;
       req.authorizedCartSessionId = credentials.sessionId;
+      req.authorizedCartConversionAuthority = buildCartConversionAuthority(
+        cart,
+        snapshotFingerprint
+      );
       req.authorizedPaymentConfig = paymentSelection.config;
       req.authorizedPaymentSnapshot = paymentSelection.snapshot;
       req.body = buildAuthorizedOrderBody(
@@ -256,8 +366,11 @@ module.exports = {
   DEFAULT_ORDER_CART_ACCESS_TTL_MS,
   buildAuthoritativeCartItems,
   buildAuthorizedOrderBody,
+  buildCartConversionAuthority,
+  cartVersionOf,
   createRequireAuthorizedOrderCart,
   findAuthorizedIdempotentReplay,
   isFreshOrderCartAccess,
+  readOrderCartPreconditions,
   requireAuthorizedOrderCart: createRequireAuthorizedOrderCart(),
 };

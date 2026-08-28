@@ -31,6 +31,9 @@ const {
   toStoredCartItem,
 } = require('../services/cartCanonicalValidationService');
 const {
+  createOrderCartSnapshotFingerprint,
+} = require('../services/orderCartSnapshotService');
+const {
   createCartRecoveryService,
 } = require('../services/cartRecoveryService');
 const {
@@ -104,6 +107,7 @@ function authorizedCartVersionFilter(cart, sessionId, expectedVersion) {
     accessTokenHash: cart.accessTokenHash,
     accessVersion: cart.accessVersion,
     updatedAt: expectedVersion,
+    convertedOrderId: null,
   };
 }
 
@@ -775,7 +779,7 @@ router.put('/:sessionId', rateLimit, async (req, res) => {
 
   try {
     const cart = await loadAuthorizedCart(req, sessionId);
-    if (!cart) return sendCartAccessNotFound(res);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
     const expectedVersion = readExpectedCartVersion(req);
     if (!expectedVersion.ok) {
       return sendCartVersionPrecondition(res, expectedVersion.reason);
@@ -826,7 +830,7 @@ router.delete('/:sessionId', rateLimit, async (req, res) => {
 
   try {
     const cart = await loadAuthorizedCart(req, sessionId);
-    if (!cart) return sendCartAccessNotFound(res);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
     const expectedVersion = readExpectedCartVersion(req);
     if (!expectedVersion.ok) {
       return sendCartVersionPrecondition(res, expectedVersion.reason);
@@ -889,6 +893,10 @@ router.post('/validate', rateLimit, async (req, res) => {
       adjustments,
       summary,
       version: cartVersion || undefined,
+      orderSnapshotFingerprint:
+        sessionId && strict && validation.ok
+          ? createOrderCartSnapshotFingerprint(validated)
+          : undefined,
     });
   } catch (error) {
     console.error('Error en /api/cart/validate:', error);

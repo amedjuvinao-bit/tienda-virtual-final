@@ -45,6 +45,10 @@ const { recordNewOrderCoupon } = require('./orderCreationCouponService');
 const {
   normalizeNewsletterIntent,
 } = require('./orderCreationNewsletterService');
+const {
+  createOrderCartSnapshotFingerprint,
+  safeFingerprintEqual,
+} = require('./orderCartSnapshotService');
 
 async function getNextOrderNumber({ session } = {}) {
   const document = await Counter.findOneAndUpdate(
@@ -138,6 +142,27 @@ function assertValidQuote(quote, cleaned) {
       { code: 'FULFILLMENT_EMAIL_REQUIRED', statusCode: 400 }
     );
   }
+}
+
+function assertOrderCartSnapshot(items, authority = {}) {
+  const currentFingerprint = createOrderCartSnapshotFingerprint(items);
+  if (
+    !safeFingerprintEqual(
+      authority.snapshotFingerprint,
+      currentFingerprint
+    )
+  ) {
+    throw Object.assign(
+      new Error(
+        'El carrito cambió mientras se confirmaba la compra.'
+      ),
+      {
+        code: 'CART_VERSION_CONFLICT',
+        statusCode: 409,
+      }
+    );
+  }
+  return currentFingerprint;
 }
 
 function assertReservationUsesEligibleBranches(reservation, orderBranchData) {
@@ -255,6 +280,7 @@ async function createOrderInTransaction({
   requestContext,
   idempotencyKey,
   requestHash,
+  cartConversionAuthority,
 }) {
   let result = {
     created: null,
@@ -292,6 +318,10 @@ async function createOrderInTransaction({
       { session, settings }
     );
     assertValidQuote(quote, cleaned);
+    assertOrderCartSnapshot(
+      quote.pricing.items,
+      cartConversionAuthority
+    );
 
     const pricing = quote.pricing;
     const reservableItems = await expandReservableItems(pricing.items, {
@@ -387,13 +417,14 @@ async function createOrderInTransaction({
         sessionId: cleaned.sessionId,
         orderId: created._id,
         convertedAt: created.createdAt || new Date(),
+        authority: cartConversionAuthority,
       },
       { session }
     );
     if (Number(cartConversion?.matchedCount || 0) !== 1) {
       throw Object.assign(
-        new Error('La credencial del carrito ya fue utilizada.'),
-        { code: 'CART_ACCESS_ALREADY_USED', statusCode: 404 }
+        new Error('El carrito cambió mientras se confirmaba la compra.'),
+        { code: 'CART_VERSION_CONFLICT', statusCode: 409 }
       );
     }
 
@@ -421,6 +452,7 @@ async function createOrderInTransaction({
 }
 
 module.exports = {
+  assertOrderCartSnapshot,
   assertReservationUsesEligibleBranches,
   createOrderInTransaction,
   getNextOrderNumber,

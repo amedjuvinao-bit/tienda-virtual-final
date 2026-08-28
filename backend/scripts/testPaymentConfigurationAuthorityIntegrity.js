@@ -22,6 +22,9 @@ const {
   createPaymentPublicController,
 } = require('../controllers/paymentPublicController');
 const { issueCartAccess } = require('../services/cartAccessService');
+const {
+  createOrderCartSnapshotFingerprint,
+} = require('../services/orderCartSnapshotService');
 
 const CART_ID = '64a000000000000000000111';
 const PRODUCT_ID = '68a4a78a59706e44cade0316';
@@ -164,6 +167,7 @@ function createCart() {
     accessTokenHash: access.tokenHash,
     accessVersion: access.version,
     accessIssuedAt: new Date(),
+    updatedAt: new Date('2030-01-01T00:00:00.000Z'),
     active: true,
     items: [{
       _id: PRODUCT_ID,
@@ -227,7 +231,12 @@ async function withServer(payments, callback) {
   try {
     await callback({
       url: `http://127.0.0.1:${server.address().port}/api/orders`,
-      access,
+      access: {
+        ...access,
+        version: cart.updatedAt.toISOString(),
+        snapshotFingerprint:
+          createOrderCartSnapshotFingerprint(cart.items),
+      },
       effects,
     });
   } finally {
@@ -243,6 +252,8 @@ async function postOrder(url, access, payment) {
       'content-type': 'application/json',
       'X-Session-Id': access.sessionId,
       'X-Cart-Access-Token': access.token,
+      'If-Match-Updated-At': access.version,
+      'X-Cart-Snapshot-Fingerprint': access.snapshotFingerprint,
     },
     body: JSON.stringify({ payment, customer: { name: 'Cliente' } }),
   });

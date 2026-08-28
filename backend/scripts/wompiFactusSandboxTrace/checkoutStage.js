@@ -11,6 +11,9 @@ const {
   createAuthorizedCart,
   findPurchasableInventoryItem,
 } = require('./productStage');
+const {
+  buildOrderCartRequestHeaders,
+} = require('../lib/orderCartRequestHeaders');
 
 async function requestJson(baseUrl, pathname, { headers = {}, body } = {}) {
   const response = await fetch(`${baseUrl}${pathname}`, {
@@ -51,14 +54,6 @@ async function startCheckoutServer() {
   };
 }
 
-function cartHeaders(access, idempotencyKey) {
-  return {
-    'X-Session-Id': access.sessionId,
-    'X-Cart-Access-Token': access.token,
-    'Idempotency-Key': idempotencyKey,
-  };
-}
-
 function paymentHeaders(paymentAccess) {
   return {
     'X-Session-Id': paymentAccess.sessionId,
@@ -78,8 +73,13 @@ async function createAutonomousCheckout() {
   const local = await startCheckoutServer();
 
   try {
+    const orderHeaders = await buildOrderCartRequestHeaders({
+      cartId: cart._id,
+      access,
+      idempotencyKey: `${identity.runId}-ORDER`,
+    });
     const created = await requestJson(local.baseUrl, '/api/orders', {
-      headers: cartHeaders(access, `${identity.runId}-ORDER`),
+      headers: orderHeaders,
       body: payload,
     });
     assert(created?._id && created?.orderNumber, 'El checkout no creó la orden.');

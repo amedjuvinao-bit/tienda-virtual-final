@@ -70,6 +70,9 @@ describe('arquitectura escalable de Checkout', () => {
     expect(submission).toContain('await renewCartAccess()');
     expect(submission).toContain("'/api/payments/payu/checkout-data'");
     expect(submission).toContain("'Idempotency-Key': idempotencyKey");
+    expect(submission).toContain("'If-Match-Updated-At': cartVersion");
+    expect(submission).toContain("'X-Cart-Snapshot-Fingerprint': cartSnapshotFingerprint");
+    expect(submission).toContain("data?.error === 'CART_VERSION_CONFLICT'");
     expect(wompi).toContain('/api/payments/wompi/checkout-data');
     expect(view).toContain('<CheckoutContactSection');
     expect(view).toContain('<CheckoutDeliverySection');

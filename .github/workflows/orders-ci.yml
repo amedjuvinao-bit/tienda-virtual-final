@@ -67,6 +67,7 @@ jobs:
           npm --prefix backend run test:orders-cursor
           npm --prefix backend run test:order-admin-cursor-index-migration
           npm --prefix backend run test:order-creation-composition
+          npm --prefix backend run test:order-cart-version
           npm --prefix backend run test:order-branch-authority
           npm --prefix backend run test:order-creation-postcommit
           npm --prefix backend run test:order-postcommit-outbox
@@ -187,6 +188,12 @@ jobs:
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_refund_inventory?replicaSet=rs0
         run: npm --prefix backend run test:order-refund-inventory
+
+      - name: Validar versión atómica entre carrito y orden
+        env:
+          ORDERS_CART_VERSION_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_cart_version?replicaSet=rs0
+          ORDERS_CART_VERSION_RACES: 30
+        run: npm --prefix backend run test:order-cart-version-integration
 
       - name: Validar conciliación comercial completa
         env:

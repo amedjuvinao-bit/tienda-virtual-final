@@ -13,6 +13,8 @@
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",
+    "test:order-cart-version": "node scripts/testOrderCartVersionContract.js",
+    "test:order-cart-version-integration": "node scripts/testOrderCartVersionConcurrencyIntegration.js",
     "test:order-branch-authority": "node scripts/testOrderCreationBranchAuthority.js",
     "test:order-creation-postcommit": "node scripts/testOrderCreationPostCommitIntegrity.js",
     "test:order-postcommit-outbox": "node scripts/testOrderPostCommitOutboxWorker.js",

@@ -12,6 +12,15 @@ function sendOrderCreationError(res, error) {
   if (code === 'CART_ACCESS_ALREADY_USED') {
     return res.status(404).json(SAFE_CART_ACCESS_ERROR);
   }
+  if (code === 'CART_VERSION_CONFLICT') {
+    return res.status(error.statusCode || 409).json({
+      ok: false,
+      error: code,
+      code,
+      message:
+        'El carrito cambió mientras confirmabas la compra. Revísalo y confirma nuevamente.',
+    });
+  }
   if (code === 'INSUFFICIENT_STOCK') {
     return res.status(error.statusCode || 409).json({
       error: 'No hay inventario suficiente para completar la compra.',

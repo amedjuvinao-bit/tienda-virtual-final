@@ -52,6 +52,9 @@ const {
 const {
   createGuestOrderAccessToken,
 } = require('../services/publicPaymentAccessService');
+const {
+  buildOrderCartRequestHeaders,
+} = require('./lib/orderCartRequestHeaders');
 
 const MONGO_URI =
   process.env.PRODUCTS_TEST_MONGO_URI ||
@@ -642,6 +645,11 @@ async function run() {
     { _id: checkoutCart._id },
     { $set: { accessIssuedAt: new Date() } }
   );
+  const checkoutOrderHeaders = await buildOrderCartRequestHeaders({
+    cartId: checkoutCart._id,
+    access: checkoutAccess,
+    idempotencyKey,
+  });
   assert.strictEqual(await Order.countDocuments({}), 0);
   assert.strictEqual(await InventoryReservation.countDocuments({}), 0);
   ok('POST /api/orders rechaza credenciales ausentes, alteradas, vencidas o de otro carrito');
@@ -651,10 +659,7 @@ async function run() {
     '/api/orders',
     {
       method: 'POST',
-      headers: {
-        ...cartAccessHeaders(checkoutAccess),
-        'Idempotency-Key': idempotencyKey,
-      },
+      headers: checkoutOrderHeaders,
       body: checkoutPayload,
     }
   );
@@ -692,10 +697,7 @@ async function run() {
     '/api/orders',
     {
       method: 'POST',
-      headers: {
-        ...cartAccessHeaders(checkoutAccess),
-        'Idempotency-Key': idempotencyKey,
-      },
+      headers: checkoutOrderHeaders,
       body: checkoutPayload,
     }
   );

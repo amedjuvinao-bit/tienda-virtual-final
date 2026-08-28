@@ -68,13 +68,25 @@ async function sendExistingOrder(
 async function markConvertedAndSendExistingOrder(
   res,
   order,
-  { sessionId, secret, paymentConfig = {} }
+  {
+    sessionId,
+    secret,
+    paymentConfig = {},
+    cartConversionAuthority,
+  }
 ) {
-  await markCartConverted({
+  const conversion = await markCartConverted({
     sessionId,
     orderId: order._id,
     convertedAt: order.createdAt || new Date(),
+    authority: cartConversionAuthority,
   });
+  if (Number(conversion?.matchedCount || 0) !== 1) {
+    return sendOrderCreationError(res, {
+      code: 'CART_VERSION_CONFLICT',
+      statusCode: 409,
+    });
+  }
   return sendExistingOrder(res, order, {
     sessionId,
     secret,
@@ -155,6 +167,8 @@ async function createOrder(req, res) {
           sessionId: cleaned.sessionId,
           secret: paymentAccessSecret,
           paymentConfig: req.authorizedPaymentConfig || {},
+          cartConversionAuthority:
+            req.authorizedCartConversionAuthority,
         });
       }
 
@@ -167,6 +181,8 @@ async function createOrder(req, res) {
           sessionId: cleaned.sessionId,
           secret: paymentAccessSecret,
           paymentConfig: req.authorizedPaymentConfig || {},
+          cartConversionAuthority:
+            req.authorizedCartConversionAuthority,
         });
       }
     }
@@ -198,6 +214,8 @@ async function createOrder(req, res) {
       requestContext: buildRequestContext(req),
       idempotencyKey,
       requestHash,
+      cartConversionAuthority:
+        req.authorizedCartConversionAuthority,
     });
 
     await persistNewsletterSubscription(newsletterIntent);
@@ -242,6 +260,8 @@ async function createOrder(req, res) {
           sessionId: cleaned.sessionId,
           secret: paymentAccessSecret,
           paymentConfig: req.authorizedPaymentConfig || {},
+          cartConversionAuthority:
+            req.authorizedCartConversionAuthority,
         });
       }
     }

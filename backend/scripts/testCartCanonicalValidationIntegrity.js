@@ -12,6 +12,9 @@ const {
   createRequireAuthorizedOrderCart,
 } = require('../services/authorizedCartOrderService');
 const {
+  createOrderCartSnapshotFingerprint,
+} = require('../services/orderCartSnapshotService');
+const {
   issueCartAccess,
 } = require('../services/cartAccessService');
 
@@ -295,6 +298,7 @@ function makeCart(cartItem) {
     accessTokenHash: access.tokenHash,
     accessVersion: access.version,
     accessIssuedAt: new Date(),
+    updatedAt: new Date('2030-01-01T00:00:00.000Z'),
     active: true,
     items: [cartItem],
   };
@@ -315,6 +319,7 @@ function makeCartModel(cart) {
 
 async function runMiddleware(cartItem) {
   const { cart, access } = makeCart(cartItem);
+  const canonical = await service.validateItems([cartItem], { mode: 'strict' });
   const middleware = createRequireAuthorizedOrderCart({
     CartModel: makeCartModel(cart),
     getSecret: () => CART_SECRET,
@@ -344,6 +349,9 @@ async function runMiddleware(cartItem) {
     headers: {
       'x-session-id': access.sessionId,
       'x-cart-access-token': access.token,
+      'if-match-updated-at': cart.updatedAt.toISOString(),
+      'x-cart-snapshot-fingerprint':
+        createOrderCartSnapshotFingerprint(canonical.items),
     },
     body: {
       customer: { name: 'QA' },
@@ -493,6 +501,22 @@ async function main() {
       assert.equal(stored.items[0].image, '/uploads/simple-real.webp');
       assert.equal(stored.items[0].price, 50000);
       assert.equal(body.cart.items[0].title, 'Producto simple real');
+      const validationResponse = await fetch(
+        `${testServer.baseUrl}/api/cart/validate`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'X-Session-Id': body.sessionId,
+            'X-Cart-Access-Token': body.cartAccessToken,
+          },
+          body: JSON.stringify({ sessionId: body.sessionId, mode: 'strict' }),
+        }
+      );
+      const validated = await validationResponse.json();
+      assert.equal(validationResponse.status, 200);
+      assert.equal(validated.version, body.version);
+      assert.match(validated.orderSnapshotFingerprint, /^[a-f0-9]{64}$/);
     } finally {
       await testServer.close();
     }

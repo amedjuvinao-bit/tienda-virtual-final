@@ -16,6 +16,7 @@ export default function CheckoutPage() {
     clearCart,
     ensureCartReady,
     renewCartAccess,
+    syncCart,
     validateCart,
   } = useCart();
 
@@ -35,6 +36,7 @@ export default function CheckoutPage() {
     clearCart,
     ensureCartReady,
     renewCartAccess,
+    syncCart,
     validateCart,
   });
 

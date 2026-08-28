@@ -261,7 +261,12 @@ export function CartProvider({ children }) {
       throw new Error('CART_ACCESS_REFRESH_INVALID');
     }
     setApiSessionId(sessionId);
-    return { sessionId, token, version: clean(data?.version) };
+    const version = clean(data?.version);
+    authoritativeRef.current = {
+      ...authoritativeRef.current,
+      version,
+    };
+    return { sessionId, token, version };
   };
 
   const writeCartVersion = async ({ items, version }) => {
@@ -509,6 +514,11 @@ export function CartProvider({ children }) {
           { type: 'replace_validated', items: local },
           { optimistic: true }
         );
+      } else if (data?.version) {
+        authoritativeRef.current = {
+          ...authoritativeRef.current,
+          version: clean(data.version),
+        };
       }
 
       return {
@@ -517,11 +527,21 @@ export function CartProvider({ children }) {
         summary: data?.summary || calcSummary(cartRef.current),
         ok: !!data?.ok,
         mode: data?.mode || mode,
+        version: authoritativeRef.current.version || clean(data?.version),
+        orderSnapshotFingerprint: clean(data?.orderSnapshotFingerprint),
       };
     } catch (err) {
       console.error('Error al validar carrito:', err?.message);
       const current = cartRef.current;
-      return { items: current, adjustments: [], summary: calcSummary(current), ok: false, mode };
+      return {
+        items: current,
+        adjustments: [],
+        summary: calcSummary(current),
+        ok: false,
+        mode,
+        version: authoritativeRef.current.version,
+        orderSnapshotFingerprint: '',
+      };
     }
   };
 
