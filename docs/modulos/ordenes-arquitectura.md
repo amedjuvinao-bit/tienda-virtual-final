@@ -179,6 +179,11 @@ La revisión conjunta se ejecuta con
 banderas de escritura y falla si alguna migración no demuestra modo `dry-run` o
 `plan`, cero mutaciones y ausencia de operaciones destructivas.
 
+En un entorno local o de pruebas, la aplicación conjunta requiere
+`npm --prefix backend run migrate:orders:indexes:apply:test -- --confirm-test-order-index-application`.
+Este comando repite primero el `dry-run`, se bloquea si `NODE_ENV=production` y
+detiene la secuencia ante el primer error sin eliminar datos ni índices.
+
 Ninguna migración usa `syncIndexes`, elimina ni renombra índices automáticamente.
 En producción exige la bandera de aplicación de su comando y la confirmación
 adicional documentada por el propio script. Un índice incompatible detiene el
