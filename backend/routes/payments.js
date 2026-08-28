@@ -36,33 +36,21 @@ const {
 const {
   authorizeOrderAdminScope,
 } = require('../services/orderAdminScopeService');
-const {
-  buildPaymentFailureReleaseReason,
-  confirmInventoryReservation,
-  reconcilePaymentFailureReservation,
-  releaseInventoryReservation,
-} = require('../services/inventoryReservationService');
-const {
-  applyReservationToOrderDocument,
-} = require('../services/orderInventoryAllocationService');
+const inventoryReservationService = require('../services/inventoryReservationService');
+const orderInventoryAllocationService = require('../services/orderInventoryAllocationService');
 const {
   issueElectronicInvoiceForOrder,
 } = require('../services/electronicInvoiceIssuanceService');
-const {
-  createWompiWebhookIntegrityService,
-  isApprovedPayment,
-  resolveMonotonicWompiTransition,
-} = require('../services/wompiWebhookIntegrityService');
-const {
-  createPaymentInventoryFailureService,
-  isRetryablePaymentInventoryError,
-  runPaymentInventoryTransaction,
-} = require('../services/paymentInventoryFailureService');
+const wompiWebhookIntegrityService = require('../services/wompiWebhookIntegrityService');
+const paymentInventoryFailureService = require('../services/paymentInventoryFailureService');
 const publicPaymentAccessService = require('../services/publicPaymentAccessService');
 const {
   createPaymentAttemptService,
   fingerprintPaymentMerchant,
 } = require('../services/paymentAttemptService');
+const {
+  createWompiWebhookRuntimeService,
+} = require('../services/wompiWebhookRuntimeService');
 const {
   deleteFactusBillByReference,
   getFactusCredentials,
@@ -121,26 +109,22 @@ const paymentPostCommitService = createOrderCreationPostCommitService({
   OrderModel: Order,
 });
 
-const wompiWebhookOrderService = createWompiWebhookOrderService({
-  mongooseAdapter: mongoose,
-  OrderModel: Order,
-  OrderEventModel: OrderEvent,
-  getStoreCreditCheckoutService,
-  createPaymentInventoryFailureService,
-  createWompiWebhookIntegrityService,
-  buildPaymentFailureReleaseReason,
-  confirmInventoryReservation,
-  reconcilePaymentFailureReservation,
-  releaseInventoryReservation,
-  applyReservationToOrderDocument,
-  isApprovedPayment,
-  resolveMonotonicWompiTransition,
-  runPaymentInventoryTransaction,
-  postCommitService: paymentPostCommitService,
-  paymentAttemptService,
-  fingerprintPaymentMerchant,
-  trimSafe,
-});
+const { orderService: wompiWebhookOrderService } =
+  createWompiWebhookRuntimeService({
+    paymentAttemptService,
+    postCommitService: paymentPostCommitService,
+    getStoreCreditCheckoutService,
+    createWompiWebhookOrderService,
+    inventoryReservationService,
+    orderInventoryAllocationService,
+    paymentInventoryFailureService,
+    wompiWebhookIntegrityService,
+    paymentAttemptModule: {
+      createPaymentAttemptService,
+      fingerprintPaymentMerchant,
+    },
+    trimSafe,
+  });
 
 const wompiWebhookController = createWompiWebhookController({
   OrderModel: Order,
@@ -155,7 +139,8 @@ const wompiWebhookController = createWompiWebhookController({
   parseWompiTransactionStatus:
     wompiPaymentUtils.parseWompiTransactionStatus,
   trimSafe,
-  isRetryablePaymentInventoryError,
+  isRetryablePaymentInventoryError:
+    paymentInventoryFailureService.isRetryablePaymentInventoryError,
 });
 
 const paymentFiscalAdminController = createPaymentFiscalAdminController({
