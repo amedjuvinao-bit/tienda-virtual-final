@@ -152,6 +152,59 @@ async function main() {
   });
   ok('capacidades, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
+  let transientWebhookCalls = 0;
+  const retryDelays = [];
+  const transientWebhookProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    sleepImpl: async (delayMs) => retryDelays.push(delayMs),
+    fetchImpl: async () => {
+      transientWebhookCalls += 1;
+      const succeeds = transientWebhookCalls === 3;
+      return {
+        ok: succeeds,
+        status: succeeds ? 200 : 500,
+        async json() {
+          return succeeds ? { success: true } : { message: 'Server Error' };
+        },
+      };
+    },
+  });
+  await transientWebhookProvider.testWebhook({
+    trackingNumber: 'TEST-RETRY-001',
+    webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
+  });
+  assert.strictEqual(transientWebhookCalls, 3);
+  assert.deepStrictEqual(retryDelays, [250, 750]);
+  ok('la prueba oficial reintenta de forma acotada los fallos transitorios de Envia');
+
+  let permanentWebhookCalls = 0;
+  const unavailableWebhookProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    sleepImpl: async () => {},
+    fetchImpl: async () => {
+      permanentWebhookCalls += 1;
+      return {
+        ok: false,
+        status: 500,
+        async json() {
+          return { message: 'Server Error' };
+        },
+      };
+    },
+  });
+  await assert.rejects(
+    () => unavailableWebhookProvider.testWebhook({
+      trackingNumber: 'TEST-RETRY-002',
+      webhookUrl: 'https://tienda.test/api/shipping/webhooks/envia',
+    }),
+    (error) =>
+      error.code === 'SHIPPING_WEBHOOK_TEST_PROVIDER_UNAVAILABLE' &&
+      error.details?.providerStatus === 500 &&
+      error.details?.attempts === 3
+  );
+  assert.strictEqual(permanentWebhookCalls, 3);
+  ok('un Envia caído nunca aprueba el webhook y devuelve un diagnóstico explícito');
+
   const sandboxTestBody = Buffer.from(JSON.stringify({
     carrierName: 'fedex',
     trackingNumber: 'TEST-001',

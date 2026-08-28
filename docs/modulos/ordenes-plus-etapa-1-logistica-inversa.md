@@ -66,6 +66,8 @@ El botón **Probar** del portal de Envia solo comprueba que la URL responde; esa
 
 La tienda responde rápidamente y procesa el evento de forma asíncrona, pero solo marca el webhook como verificado si la autorización coincide con una credencial configurada y el payload contiene transportadora, guía y estado. Una visita GET, el botón de conectividad del portal o un POST sin credenciales nunca completan el control.
 
+La solicitud oficial reintenta como máximo tres veces los errores temporales `500`, `502`, `503` y `504` de Envia. Los rechazos de autenticación o validación no se reintentan. Si el proveedor continúa fallando, el panel conserva la operación manual, no marca la URL como verificada y muestra un diagnóstico para soporte.
+
 Para los eventos reales se debe registrar el tipo firmado `tracking.simple` (`type_id: 3`). Los tipos heredados `onShipmentStatusUpdate` y `statusUpdateWithEcommerceInfo` no incluyen firma HMAC y no son aptos para certificar Producción.
 
 ## Puerta de cierre en staging

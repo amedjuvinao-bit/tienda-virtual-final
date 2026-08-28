@@ -122,6 +122,7 @@ function normalizeData(payload, operation) {
 function createEnviaProvider({
   config = env.shipping.envia,
   fetchImpl = global.fetch,
+  sleepImpl = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 } = {}) {
   const mode = config?.mode === 'production' ? 'production' : 'sandbox';
   const urls = BASE_URLS[mode];
@@ -445,15 +446,47 @@ function createEnviaProvider({
           { provider: 'envia', operation: 'test_webhook' }
         );
       }
-      return request(
-        '/ship/webhooktest/',
-        {
-          tracking_number: safeTrackingNumber,
-          webhook_url: safeWebhookUrl,
-        },
-        'test_webhook',
-        { normalize: false }
-      );
+      const body = {
+        tracking_number: safeTrackingNumber,
+        webhook_url: safeWebhookUrl,
+      };
+      const retryableStatuses = new Set([500, 502, 503, 504]);
+      const retryDelaysMs = [250, 750];
+      let lastError = null;
+      for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+        try {
+          return await request(
+            '/ship/webhooktest/',
+            body,
+            'test_webhook',
+            { normalize: false }
+          );
+        } catch (error) {
+          lastError = error;
+          const providerStatus = Number(error?.details?.providerStatus || 0);
+          const canRetry =
+            error?.code === 'SHIPPING_PROVIDER_HTTP_ERROR' &&
+            retryableStatuses.has(providerStatus) &&
+            attempt < retryDelaysMs.length;
+          if (!canRetry) break;
+          await sleepImpl(retryDelaysMs[attempt]);
+        }
+      }
+      const providerStatus = Number(lastError?.details?.providerStatus || 0);
+      if (retryableStatuses.has(providerStatus)) {
+        throw new ShippingProviderError(
+          'Envia Sandbox no pudo enviar la prueba oficial después de tres intentos. La URL continúa sin aprobarse; inténtalo más tarde o repórtalo a soporte de Envia.',
+          'SHIPPING_WEBHOOK_TEST_PROVIDER_UNAVAILABLE',
+          502,
+          {
+            provider: 'envia',
+            operation: 'test_webhook',
+            providerStatus,
+            attempts: retryDelaysMs.length + 1,
+          }
+        );
+      }
+      throw lastError;
     },
     async cancel({ carrier, trackingNumber }) {
       return request(
