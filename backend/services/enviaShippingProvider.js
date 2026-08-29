@@ -8,11 +8,13 @@ const BASE_URLS = Object.freeze({
   sandbox: {
     shipping: 'https://api-test.envia.com',
     queries: 'https://queries-test.envia.com',
+    accountQueries: 'https://queries.test.envia.com',
     geocodes: 'https://geocodes.envia.com',
   },
   production: {
     shipping: 'https://api.envia.com',
     queries: 'https://queries.envia.com',
+    accountQueries: 'https://queries.envia.com',
     geocodes: 'https://geocodes.envia.com',
   },
 });
@@ -133,6 +135,7 @@ function createEnviaProvider({
     operation,
     {
       queryApi = false,
+      accountQueryApi = false,
       geocodesApi = false,
       requiresAuth = true,
       method = 'POST',
@@ -171,7 +174,15 @@ function createEnviaProvider({
         options.body = JSON.stringify(body);
       }
       const response = await fetchImpl(
-        `${geocodesApi ? urls.geocodes : queryApi ? urls.queries : urls.shipping}${path}`,
+        `${
+          geocodesApi
+            ? urls.geocodes
+            : accountQueryApi
+              ? urls.accountQueries
+              : queryApi
+                ? urls.queries
+                : urls.shipping
+        }${path}`,
         options
       );
       const payload = await response.json().catch(() => ({}));
@@ -447,7 +458,7 @@ function createEnviaProvider({
         `/guide/${safeMonth}/${safeYear}`,
         undefined,
         'list_shipments',
-        { queryApi: true, method: 'GET', normalize: false }
+        { accountQueryApi: true, method: 'GET', normalize: false }
       );
       return Array.isArray(payload?.data) ? payload.data : [];
     },

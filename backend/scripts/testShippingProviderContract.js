@@ -171,7 +171,7 @@ async function main() {
   assert.strictEqual('pickupDate' in automationCalls[1].body, false);
   assert.strictEqual(
     automationCalls[2].url,
-    `${BASE_URLS.sandbox.queries}/guide/08/2026`
+    `${BASE_URLS.sandbox.accountQueries}/guide/08/2026`
   );
   assert.strictEqual(automationCalls[2].options.method, 'GET');
   assert.deepStrictEqual(automationCalls[3].body, {
