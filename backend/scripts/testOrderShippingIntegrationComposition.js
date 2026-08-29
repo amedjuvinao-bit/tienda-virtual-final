@@ -65,6 +65,25 @@ assert.strictEqual(facade.syncOrderShipmentTracking, trackingOperations.syncOrde
 assert.strictEqual(facade.testOrderShipmentWebhook, trackingOperations.testOrderShipmentWebhook);
 ok('recolección, entrega, tracking y webhook conservan referencias estables');
 
+assert.strictEqual(trackingOperations.sandboxWebhookTestStatus(), 'Shipped');
+assert.strictEqual(trackingOperations.sandboxWebhookTestStatus('Delivered'), 'Delivered');
+assert.throws(
+  () => trackingOperations.sandboxWebhookTestStatus('Canceled'),
+  (error) => error.code === 'SHIPPING_WEBHOOK_TEST_STATUS_INVALID'
+);
+ok('las pruebas de una orden solo permiten los eventos Sandbox de envío y entrega');
+
+async function validateProductionWebhookTestBlock() {
+  await assert.rejects(
+    () => trackingOperations.testOrderShipmentWebhook(
+      { webhookStatus: 'Delivered' },
+      { provider: { configured: true, mode: 'production' } }
+    ),
+    (error) => error.code === 'SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY'
+  );
+  ok('el backend bloquea la simulación de entrega cuando Envia está en producción');
+}
+
 assert.strictEqual(facade.pickupOnGeneratePayload, pickupPayloads.pickupOnGeneratePayload);
 assert.strictEqual(facade.buildStandalonePickupPayload, pickupPayloads.buildStandalonePickupPayload);
 ok('los payloads de recolección permanecen disponibles desde la fachada');
@@ -302,6 +321,7 @@ ok('la fachada y cada módulo especializado permanecen por debajo de 700 líneas
 
 async function main() {
   await validateOptionalCarrierCapabilities();
+  await validateProductionWebhookTestBlock();
   await validateScopedShippingFingerprint();
   await validateShippingReplayAndConflicts();
   await validateLegacyScopedCompatibility();

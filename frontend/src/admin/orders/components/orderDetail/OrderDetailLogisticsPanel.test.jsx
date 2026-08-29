@@ -608,16 +608,17 @@ describe('centro logístico avanzado de la orden', () => {
       'https://example.com/label.pdf'
     );
     fireEvent.click(screen.getByText('Pruebas Sandbox · solo para verificar la integración'));
-    fireEvent.click(screen.getByRole('button', { name: 'Solicitar prueba oficial' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Simular envío oficial' }));
     await waitFor(() => expect(logisticsApi.testOrderShipmentWebhook).toHaveBeenCalledWith(
       ORDER._id,
       SHIPMENT._id,
       {
         provider: 'envia',
         expectedRevision: 4,
+        status: 'Shipped',
       }
     ));
-    expect(await screen.findByText(/Prueba oficial solicitada/)).toBeInTheDocument();
+    expect(await screen.findByText(/Prueba oficial de envío solicitada/)).toBeInTheDocument();
     expect(screen.getByText('PASO ACTUAL 2 DE 3')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver seguimiento público' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Comenzar a reunir productos' })).not.toBeInTheDocument();
@@ -684,6 +685,18 @@ describe('centro logístico avanzado de la orden', () => {
 
     expect(await screen.findByText('PASO ACTUAL 3 DE 3')).toBeInTheDocument();
     expect(screen.getByText('No hagas nada: espera la actualización')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Pruebas Sandbox · solo para verificar la integración'));
+    fireEvent.click(screen.getByRole('button', { name: 'Simular entrega oficial' }));
+    await waitFor(() => expect(logisticsApi.testOrderShipmentWebhook).toHaveBeenCalledWith(
+      ORDER._id,
+      SHIPMENT._id,
+      {
+        provider: 'envia',
+        expectedRevision: 6,
+        status: 'Delivered',
+      }
+    ));
+    expect(await screen.findByText(/Prueba oficial de entrega solicitada/)).toBeInTheDocument();
     transitView.unmount();
 
     const delivered = { ...preparedForDropoff, status: 'delivered', revision: 7 };
@@ -833,6 +846,8 @@ describe('centro logístico avanzado de la orden', () => {
     const trackingLink = await screen.findByRole('link', { name: 'Ver seguimiento público' });
     expect(trackingLink).toHaveAttribute('href', 'https://envia.com/rastreo?label=PROD-123');
     expect(screen.queryByText(/Modo de prueba/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Pruebas Sandbox · solo para verificar la integración')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Simular entrega oficial' })).not.toBeInTheDocument();
   });
 
   it('exige confirmación explícita antes de generar una guía de producción', async () => {

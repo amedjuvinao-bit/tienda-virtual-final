@@ -193,6 +193,7 @@ async function runShippingOperation(req, res, operation) {
       pickupTimeStart: req.body?.pickupTimeStart,
       pickupTimeEnd: req.body?.pickupTimeEnd,
       pickupInstructions: req.body?.pickupInstructions,
+      webhookStatus: req.body?.status,
       now: new Date(),
       idempotencyKey:
         req.get('Idempotency-Key') || req.body?.idempotencyKey,

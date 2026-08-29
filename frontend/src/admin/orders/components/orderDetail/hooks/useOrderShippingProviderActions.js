@@ -141,13 +141,19 @@ export default function useOrderShippingProviderActions({
           text: `Seguimiento de ${shipment.code} sincronizado.`,
         });
       } else if (action === 'webhook_test') {
+        const webhookStatus = options.webhookStatus === 'Delivered'
+          ? 'Delivered'
+          : 'Shipped';
         await testOrderShipmentWebhook(orderId, shipmentId, {
           provider: 'envia',
           expectedRevision: Number(shipment.revision || 0),
+          status: webhookStatus,
         });
         setMessage({
           type: 'success',
-          text: 'Prueba oficial solicitada. Envia enviará el aviso a la URL registrada y la tienda lo procesará automáticamente.',
+          text: webhookStatus === 'Delivered'
+            ? 'Prueba oficial de entrega solicitada. La orden cambiará únicamente cuando llegue el aviso de Envia.'
+            : 'Prueba oficial de envío solicitada. Envia enviará el aviso a la URL registrada y la tienda lo procesará automáticamente.',
         });
         window.setTimeout(() => refresh().catch(() => {}), 1800);
       } else if (action === 'dropoff') {

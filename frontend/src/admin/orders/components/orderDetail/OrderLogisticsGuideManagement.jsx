@@ -16,24 +16,44 @@ export default function OrderLogisticsGuideManagement({
   view,
 }) {
   const guideManageable = canManage && view.hasActiveLabel && view.providerConfigured;
+  const sandboxTestAvailable = Boolean(
+    guideManageable &&
+    view.providerMode === 'sandbox' &&
+    !view.isProductionGuide &&
+    view.webhookRegistered &&
+    shipment.carrier?.trackingNumber &&
+    !view.shipmentDelivered
+  );
+  const shipmentAlreadySent = ['dispatched', 'in_transit'].includes(view.status);
 
   return (
     <>
-      {guideManageable && !view.isProductionGuide && view.webhookRegistered && shipment.carrier?.trackingNumber ? (
+      {sandboxTestAvailable ? (
         <details style={{ marginTop: 10, border: '1px dashed #a5b4fc', borderRadius: 13, padding: '9px 10px', background: '#f8faff' }}>
           <summary style={{ cursor: 'pointer', color: '#4338ca', fontSize: 10, fontWeight: 950 }}>
             Pruebas Sandbox · solo para verificar la integración
           </summary>
           <div style={{ marginTop: 9 }}>
             <div style={{ color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
-              Esto no forma parte del trabajo diario. Solicita a Envia un aviso externo de prueba para comprobar que la tienda lo recibe automáticamente.
+              Esto solo funciona en Sandbox. Envia enviará el aviso oficial a la URL registrada y la tienda cambiará el estado únicamente después de recibirlo.
             </div>
             <div className="order-logistics-sandbox-grid" style={{ gap: 7, marginTop: 9 }}>
               <div style={{ color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
-                Envia elegirá el contenido de prueba y lo enviará a la URL registrada.
+                {shipmentAlreadySent
+                  ? 'La guía ya está enviada. Solicita ahora la prueba oficial de entrega.'
+                  : 'Primero solicita la prueba oficial de envío. La entrega se habilitará cuando Envia confirme ese estado.'}
               </div>
-              <button type="button" onClick={() => onRunProviderAction(shipment, 'webhook_test')} disabled={view.isBusy} style={{ ...secondaryButtonStyle(), alignSelf: 'end' }}>
-                Solicitar prueba oficial
+              <button
+                type="button"
+                onClick={() => onRunProviderAction(
+                  shipment,
+                  'webhook_test',
+                  { webhookStatus: shipmentAlreadySent ? 'Delivered' : 'Shipped' }
+                )}
+                disabled={view.isBusy}
+                style={{ ...secondaryButtonStyle(), alignSelf: 'end' }}
+              >
+                {shipmentAlreadySent ? 'Simular entrega oficial' : 'Simular envío oficial'}
               </button>
             </div>
           </div>

@@ -17,6 +17,20 @@ const { resolveProvider } = require('./providerAdapter');
 const { clean } = require('./shared');
 
 const MAX_TRACKING_EVENTS = 80;
+const SANDBOX_WEBHOOK_TEST_STATUSES = new Set(['Shipped', 'Delivered']);
+
+function sandboxWebhookTestStatus(value = 'Shipped') {
+  const status = clean(value || 'Shipped', 40);
+  if (!SANDBOX_WEBHOOK_TEST_STATUSES.has(status)) {
+    throw createLogisticsError(
+      'La prueba de esta orden solo permite simular envío o entrega desde Envia Sandbox.',
+      'SHIPPING_WEBHOOK_TEST_STATUS_INVALID',
+      422,
+      { allowedStatuses: [...SANDBOX_WEBHOOK_TEST_STATUSES] }
+    );
+  }
+  return status;
+}
 
 function trackingEventsFrom(data = [], now = new Date()) {
   const validDate = (value) => {
@@ -80,12 +94,22 @@ async function syncOrderShipmentTracking(input = {}, dependencies = {}) {
 
 async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
   const provider = await resolveProvider(input, dependencies);
-  const { order, shipment, scope } = await loadContext(input, dependencies);
   if (provider.mode !== 'sandbox') {
     throw createLogisticsError(
       'La prueba oficial automática solo está disponible en Envia Sandbox.',
       'SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY',
       409
+    );
+  }
+  const status = sandboxWebhookTestStatus(input.webhookStatus);
+  const { order, shipment, scope } = await loadContext(input, dependencies);
+  const shipmentStatus = clean(shipment?.status, 40).toLowerCase();
+  if (status === 'Delivered' && !['dispatched', 'in_transit'].includes(shipmentStatus)) {
+    throw createLogisticsError(
+      'Primero solicita la prueba oficial de envío; después podrás simular la entrega.',
+      'SHIPPING_WEBHOOK_TEST_DELIVERY_NOT_READY',
+      409,
+      { shipmentStatus }
     );
   }
   const carrier = clean(shipment?.carrier?.code || shipment?.carrier?.name, 80).toLowerCase();
@@ -111,7 +135,7 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
   const result = await provider.testWebhook({
     carrier,
     trackingNumber,
-    status: 'Shipped',
+    status,
   });
   return integrationResponse(
     order,
@@ -121,6 +145,7 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
         accepted: true,
         carrier,
         trackingNumber,
+        status,
         webhookUrl,
         result,
       },
@@ -130,6 +155,7 @@ async function testOrderShipmentWebhook(input = {}, dependencies = {}) {
 }
 
 module.exports = {
+  sandboxWebhookTestStatus,
   syncOrderShipmentTracking,
   testOrderShipmentWebhook,
   trackingEventsFrom,
