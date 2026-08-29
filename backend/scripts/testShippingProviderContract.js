@@ -229,10 +229,10 @@ async function main() {
   );
   assert.deepStrictEqual(capabilityCalls, [
     `${BASE_URLS.sandbox.queries}/carrier-action/77`,
-    `${BASE_URLS.sandbox.queries}/carrier-action`,
-    `${BASE_URLS.sandbox.queries}/carrier-action`,
+    `${BASE_URLS.production.queries}/carrier-action`,
+    `${BASE_URLS.production.queries}/carrier-action`,
   ]);
-  ok('si la consulta por identificador falla, las capacidades se resuelven desde la colección oficial por transportadora y país');
+  ok('si la consulta Sandbox por identificador falla, las capacidades se resuelven desde la colección global oficial por transportadora y país');
 
   let transientWebhookCalls = 0;
   const retryDelays = [];

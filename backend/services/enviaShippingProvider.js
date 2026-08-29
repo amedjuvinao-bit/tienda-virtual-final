@@ -162,6 +162,7 @@ function createEnviaProvider({
     operation,
     {
       queryApi = false,
+      globalQueryApi = false,
       accountQueryApi = false,
       geocodesApi = false,
       requiresAuth = true,
@@ -206,6 +207,8 @@ function createEnviaProvider({
             ? urls.geocodes
             : accountQueryApi
               ? urls.accountQueries
+              : globalQueryApi
+                ? BASE_URLS.production.queries
               : queryApi
                 ? urls.queries
                 : urls.shipping
@@ -349,7 +352,7 @@ function createEnviaProvider({
         '/carrier-action',
         undefined,
         'carrier_actions',
-        { queryApi: true, method: 'GET', normalize: false }
+        { globalQueryApi: true, method: 'GET', normalize: false }
       );
       const matches = carrierActionRows(payload).filter((item) => {
         const itemCarrier = item?.carrier || item?.carrier_name || item?.name;
