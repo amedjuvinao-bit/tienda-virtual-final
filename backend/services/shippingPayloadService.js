@@ -427,7 +427,20 @@ function buildEnviaShipmentPayload({
 }
 
 function normalizeRate(item = {}, now = new Date()) {
-  return {
+  const carrierId = clean(
+    item.carrierId ||
+    item.carrier_id ||
+    item.idCarrier ||
+    item.id_carrier ||
+    item.carrier?.id,
+    80
+  );
+  const carrierActions = [...new Set(
+    (Array.isArray(item.carrierActions) ? item.carrierActions : [])
+      .map((action) => clean(action, 80).toLowerCase())
+      .filter(Boolean)
+  )];
+  const normalized = {
     carrier: clean(item.carrier, 80),
     service: clean(item.service, 120),
     serviceDescription: clean(item.serviceDescription, 180),
@@ -436,6 +449,14 @@ function normalizeRate(item = {}, now = new Date()) {
     currency: clean(item.currency || 'COP', 10).toUpperCase(),
     quotedAt: now,
   };
+  if (carrierId) normalized.carrierId = carrierId;
+  if (Object.prototype.hasOwnProperty.call(item, 'carrierActions')) {
+    normalized.carrierActions = carrierActions;
+  }
+  if (typeof item.carrierActionsResolved === 'boolean') {
+    normalized.carrierActionsResolved = item.carrierActionsResolved;
+  }
+  return normalized;
 }
 
 function normalizeGeneratedLabel(item = {}) {

@@ -84,7 +84,7 @@ async function main() {
     config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
     fetchImpl: async (url, options) => {
       automationCalls.push({ url, options, body: options.body ? JSON.parse(options.body) : null });
-      if (url.endsWith('/carrier-action/fedex')) {
+      if (url.endsWith('/carrier-action/77')) {
         return {
           ok: true,
           status: 200,
@@ -131,7 +131,10 @@ async function main() {
       throw new Error(`URL inesperada: ${url}`);
     },
   });
-  assert.deepStrictEqual(await automationProvider.getCarrierActions('FedEx'), ['pickup_on_generate']);
+  assert.deepStrictEqual(
+    await automationProvider.getCarrierActions('FedEx', { carrierId: 77 }),
+    ['pickup_on_generate']
+  );
   const pickupRequest = {
     origin: { country: 'CO', city: '08001000' },
     shipment: {
@@ -163,7 +166,7 @@ async function main() {
   });
   assert.strictEqual(
     automationCalls[0].url,
-    `${BASE_URLS.sandbox.queries}/carrier-action/fedex`
+    `${BASE_URLS.sandbox.queries}/carrier-action/77`
   );
   assert.strictEqual(automationCalls[0].options.method, 'GET');
   assert.deepStrictEqual(automationCalls[1].body, pickupRequest);

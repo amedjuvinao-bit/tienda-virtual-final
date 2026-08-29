@@ -294,18 +294,18 @@ function createEnviaProvider({
       });
       return { ok: true, provider: 'envia', mode };
     },
-    async getCarrierActions(carrier) {
-      const safeCarrier = clean(carrier).toLowerCase();
-      if (!safeCarrier) {
+    async getCarrierActions(carrier, { carrierId } = {}) {
+      const safeCarrierId = clean(carrierId || carrier);
+      if (!/^\d+$/.test(safeCarrierId)) {
         throw new ShippingProviderError(
-          'La consulta de capacidades exige una transportadora.',
-          'SHIPPING_CARRIER_REQUIRED',
+          'La consulta de capacidades exige el identificador numérico de la transportadora.',
+          'SHIPPING_CARRIER_ID_REQUIRED',
           422,
-          { provider: 'envia', operation: 'carrier_actions' }
+          { provider: 'envia', operation: 'carrier_actions', carrier: clean(carrier) }
         );
       }
       const payload = await request(
-        `/carrier-action/${encodeURIComponent(safeCarrier)}`,
+        `/carrier-action/${encodeURIComponent(safeCarrierId)}`,
         undefined,
         'carrier_actions',
         { queryApi: true, method: 'GET', normalize: false }

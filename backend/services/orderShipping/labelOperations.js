@@ -53,7 +53,10 @@ async function generateOrderShipmentLabel(input = {}, dependencies = {}) {
       customsPolicy: provider.customsPolicy,
     })
   );
-  const actions = await resolveCarrierActions(provider, rate.carrier);
+  const actions = await resolveCarrierActions(provider, rate.carrier, {
+    ...rate,
+    optional: true,
+  });
   const pickupOnGenerate = actions.includes('pickup_on_generate');
   const requestedPickupDate = pickupOnGenerate
     ? pickupDate(input.pickupDate, input.now || new Date())

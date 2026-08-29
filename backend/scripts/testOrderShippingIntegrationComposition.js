@@ -11,6 +11,7 @@ const labelOperations = require('../services/orderShipping/labelOperations');
 const pickupOperations = require('../services/orderShipping/pickupOperations');
 const pickupPayloads = require('../services/orderShipping/pickupPayloads');
 const rateOperations = require('../services/orderShipping/rateOperations');
+const providerAdapter = require('../services/orderShipping/providerAdapter');
 const trackingOperations = require('../services/orderShipping/trackingOperations');
 const {
   operationRequestHash,
@@ -67,6 +68,39 @@ ok('recolección, entrega, tracking y webhook conservan referencias estables');
 assert.strictEqual(facade.pickupOnGeneratePayload, pickupPayloads.pickupOnGeneratePayload);
 assert.strictEqual(facade.buildStandalonePickupPayload, pickupPayloads.buildStandalonePickupPayload);
 ok('los payloads de recolección permanecen disponibles desde la fachada');
+
+async function validateOptionalCarrierCapabilities() {
+  let calls = 0;
+  const unresolved = await providerAdapter.resolveCarrierActions(
+    {
+      async getCarrierActions() {
+        calls += 1;
+        throw Object.assign(new Error('Not Found'), {
+          code: 'SHIPPING_PROVIDER_HTTP_ERROR',
+          details: { providerStatus: 404 },
+        });
+      },
+    },
+    'fedex',
+    { optional: true }
+  );
+  assert.deepStrictEqual(unresolved, []);
+  assert.strictEqual(calls, 1);
+
+  const knownUnavailable = await providerAdapter.resolveCarrierActions(
+    {
+      async getCarrierActions() {
+        calls += 1;
+        throw new Error('No debe repetirse la consulta');
+      },
+    },
+    'fedex',
+    { carrierActions: [], carrierActionsResolved: false, optional: true }
+  );
+  assert.deepStrictEqual(knownUnavailable, []);
+  assert.strictEqual(calls, 1);
+  ok('un fallo de capacidades opcionales no bloquea la creación de la guía');
+}
 
 assert.strictEqual(
   stableHash({ carrier: 'envia', values: { b: 2, a: 1 } }),
@@ -267,6 +301,7 @@ for (const file of moduleFiles) {
 ok('la fachada y cada módulo especializado permanecen por debajo de 700 líneas');
 
 async function main() {
+  await validateOptionalCarrierCapabilities();
   await validateScopedShippingFingerprint();
   await validateShippingReplayAndConflicts();
   await validateLegacyScopedCompatibility();

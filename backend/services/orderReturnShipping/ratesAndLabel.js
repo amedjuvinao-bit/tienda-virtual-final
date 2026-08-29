@@ -56,7 +56,11 @@ async function quoteOrderReturnShipping(input = {}, dependencies = {}) {
   await Promise.all(carriers.map(async (carrier) => {
     try {
       capabilities.set(carrier, {
-        actions: await resolveCarrierActions(provider, carrier),
+        actions: await resolveCarrierActions(
+          provider,
+          carrier,
+          rates.find((rate) => rate.carrier.toLowerCase() === carrier) || {}
+        ),
         resolved: true,
       });
     } catch {
@@ -201,7 +205,10 @@ async function generateOrderReturnLabel(input = {}, dependencies = {}) {
     built.payload,
     RETURN_ADDRESS_ROLES
   );
-  const actions = await resolveCarrierActions(provider, rate.carrier);
+  const actions = await resolveCarrierActions(provider, rate.carrier, {
+    ...rate,
+    optional: true,
+  });
   const pickupOnGenerate = actions.includes('pickup_on_generate');
   const requestedPickupDate = pickupOnGenerate
     ? pickupDate(input.pickupDate, input.now || new Date())

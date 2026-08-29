@@ -3,7 +3,7 @@
 const { buildEnviaShipmentPayload, normalizeRate } = require('../shippingPayloadService');
 const { resolveShippingAddresses } = require('./addressResolution');
 const { integrationResponse, loadContext } = require('./integrationState');
-const { resolveProvider } = require('./providerAdapter');
+const { resolveCarrierActions, resolveProvider } = require('./providerAdapter');
 const { clean } = require('./shared');
 
 async function quoteOrderShipment(input = {}, dependencies = {}) {
@@ -27,12 +27,11 @@ async function quoteOrderShipment(input = {}, dependencies = {}) {
   await Promise.all(
     [...new Set(normalizedRates.map((rate) => clean(rate.carrier, 80).toLowerCase()).filter(Boolean))]
       .map(async (carrier) => {
-        if (typeof provider.getCarrierActions !== 'function') {
-          actionsByCarrier.set(carrier, { actions: [], resolved: false });
-          return;
-        }
+        const rate = normalizedRates.find(
+          (candidate) => clean(candidate.carrier, 80).toLowerCase() === carrier
+        ) || {};
         try {
-          const actions = await provider.getCarrierActions(carrier);
+          const actions = await resolveCarrierActions(provider, carrier, rate);
           actionsByCarrier.set(carrier, {
             actions: [...new Set((Array.isArray(actions) ? actions : [])
               .map((action) => clean(action, 80).toLowerCase())
