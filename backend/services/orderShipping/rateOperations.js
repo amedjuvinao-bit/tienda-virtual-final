@@ -31,7 +31,10 @@ async function quoteOrderShipment(input = {}, dependencies = {}) {
           (candidate) => clean(candidate.carrier, 80).toLowerCase() === carrier
         ) || {};
         try {
-          const actions = await resolveCarrierActions(provider, carrier, rate);
+          const actions = await resolveCarrierActions(provider, carrier, {
+            ...rate,
+            countryCode: payload.origin?.country,
+          });
           actionsByCarrier.set(carrier, {
             actions: [...new Set((Array.isArray(actions) ? actions : [])
               .map((action) => clean(action, 80).toLowerCase())

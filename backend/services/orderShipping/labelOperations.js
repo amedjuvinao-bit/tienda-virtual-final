@@ -55,6 +55,7 @@ async function generateOrderShipmentLabel(input = {}, dependencies = {}) {
   );
   const actions = await resolveCarrierActions(provider, rate.carrier, {
     ...rate,
+    countryCode: payload.origin?.country,
     optional: true,
   });
   const pickupOnGenerate = actions.includes('pickup_on_generate');

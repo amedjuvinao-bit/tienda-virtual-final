@@ -59,7 +59,10 @@ async function quoteOrderReturnShipping(input = {}, dependencies = {}) {
         actions: await resolveCarrierActions(
           provider,
           carrier,
-          rates.find((rate) => rate.carrier.toLowerCase() === carrier) || {}
+          {
+            ...(rates.find((rate) => rate.carrier.toLowerCase() === carrier) || {}),
+            countryCode: payload.origin?.country,
+          }
         ),
         resolved: true,
       });
@@ -207,6 +210,7 @@ async function generateOrderReturnLabel(input = {}, dependencies = {}) {
   );
   const actions = await resolveCarrierActions(provider, rate.carrier, {
     ...rate,
+    countryCode: payload.origin?.country,
     optional: true,
   });
   const pickupOnGenerate = actions.includes('pickup_on_generate');

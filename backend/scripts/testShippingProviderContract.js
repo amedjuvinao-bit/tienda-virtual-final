@@ -184,6 +184,56 @@ async function main() {
   });
   ok('guías de la cuenta, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
+  const capabilityCalls = [];
+  const capabilityProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async (url) => {
+      capabilityCalls.push(url);
+      if (url.endsWith('/carrier-action/77')) {
+        return {
+          ok: false,
+          status: 404,
+          async json() {
+            return { message: 'Carrier action not found' };
+          },
+        };
+      }
+      if (url.endsWith('/carrier-action')) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              data: [
+                { name: 'FedEx', country_code: 'CO', action_name: 'pickup' },
+                { name: 'FedEx', country_code: 'MX', action_name: 'pickup_on_generate' },
+                { name: 'DHL Express', country_code: 'CO', action_name: 'pickup_mandatory' },
+              ],
+            };
+          },
+        };
+      }
+      throw new Error(`URL inesperada: ${url}`);
+    },
+  });
+  assert.deepStrictEqual(
+    await capabilityProvider.getCarrierActions('FedEx', {
+      carrierId: 77,
+      countryCode: 'CO',
+    }),
+    ['pickup']
+  );
+  assert.deepStrictEqual(
+    await capabilityProvider.getCarrierActions('DHL', { countryCode: 'CO' }),
+    ['pickup_mandatory']
+  );
+  assert.deepStrictEqual(capabilityCalls, [
+    `${BASE_URLS.sandbox.queries}/carrier-action/77`,
+    `${BASE_URLS.sandbox.queries}/carrier-action`,
+    `${BASE_URLS.sandbox.queries}/carrier-action`,
+  ]);
+  ok('si la consulta por identificador falla, las capacidades se resuelven desde la colección oficial por transportadora y país');
+
   let transientWebhookCalls = 0;
   const retryDelays = [];
   const transientWebhookProvider = createEnviaProvider({

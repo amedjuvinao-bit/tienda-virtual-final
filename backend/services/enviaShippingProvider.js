@@ -52,6 +52,33 @@ function normalizedText(value) {
     .trim();
 }
 
+function carrierActionRows(payload = {}) {
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload)) return payload;
+  if (payload?.data && typeof payload.data === 'object') return [payload.data];
+  return [];
+}
+
+function carrierActionNames(rows = []) {
+  return [...new Set((Array.isArray(rows) ? rows : [])
+    .map((item) => clean(item?.action_name || item?.action || item?.name).toLowerCase())
+    .filter(Boolean))];
+}
+
+function carrierNameMatches(value, expected) {
+  const candidate = normalizedText(value);
+  const requested = normalizedText(expected);
+  return Boolean(
+    candidate &&
+    requested &&
+    (
+      candidate === requested ||
+      candidate.startsWith(`${requested} `) ||
+      requested.startsWith(`${candidate} `)
+    )
+  );
+}
+
 async function settleWithConcurrency(values, limit, worker) {
   const source = Array.isArray(values) ? values : [];
   const results = new Array(source.length);
@@ -294,32 +321,47 @@ function createEnviaProvider({
       });
       return { ok: true, provider: 'envia', mode };
     },
-    async getCarrierActions(carrier, { carrierId } = {}) {
-      const safeCarrierId = clean(carrierId || carrier);
-      if (!/^\d+$/.test(safeCarrierId)) {
-        throw new ShippingProviderError(
-          'La consulta de capacidades exige el identificador numérico de la transportadora.',
-          'SHIPPING_CARRIER_ID_REQUIRED',
-          422,
-          { provider: 'envia', operation: 'carrier_actions', carrier: clean(carrier) }
-        );
+    async getCarrierActions(carrier, { carrierId, countryCode } = {}) {
+      const safeCarrier = clean(carrier).toLowerCase();
+      const safeCarrierId = clean(carrierId);
+      const safeCountryCode = clean(countryCode).toUpperCase();
+
+      if (/^\d+$/.test(safeCarrierId)) {
+        try {
+          const payload = await request(
+            `/carrier-action/${encodeURIComponent(safeCarrierId)}`,
+            undefined,
+            'carrier_actions',
+            { queryApi: true, method: 'GET', normalize: false }
+          );
+          return carrierActionNames(carrierActionRows(payload));
+        } catch (error) {
+          if (
+            error?.code !== 'SHIPPING_PROVIDER_HTTP_ERROR' ||
+            ![404, 422].includes(Number(error?.details?.providerStatus))
+          ) {
+            throw error;
+          }
+        }
       }
+
       const payload = await request(
-        `/carrier-action/${encodeURIComponent(safeCarrierId)}`,
+        '/carrier-action',
         undefined,
         'carrier_actions',
         { queryApi: true, method: 'GET', normalize: false }
       );
-      const data = Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload)
-          ? payload
-          : payload?.data
-            ? [payload.data]
-            : [];
-      return data
-        .map((item) => clean(item?.action_name || item?.action || item?.name).toLowerCase())
-        .filter(Boolean);
+      const matches = carrierActionRows(payload).filter((item) => {
+        const itemCarrier = item?.carrier || item?.carrier_name || item?.name;
+        const itemCountry = clean(
+          item?.country_code || item?.countryCode || item?.country
+        ).toUpperCase();
+        return (
+          carrierNameMatches(itemCarrier, safeCarrier) &&
+          (!safeCountryCode || !itemCountry || itemCountry === safeCountryCode)
+        );
+      });
+      return carrierActionNames(matches);
     },
     async resolveColombiaCity({ city, state, country = 'CO' } = {}) {
       const data = await request(

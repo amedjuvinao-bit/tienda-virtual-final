@@ -20,7 +20,10 @@ async function resolveCarrierActions(provider, carrier, capability = {}) {
   try {
     const actions = await provider.getCarrierActions(
       clean(carrier, 80).toLowerCase(),
-      { carrierId: clean(capability.carrierId, 80) }
+      {
+        carrierId: clean(capability.carrierId, 80),
+        countryCode: clean(capability.countryCode, 10).toUpperCase(),
+      }
     );
     return normalizedActions(actions);
   } catch (error) {
