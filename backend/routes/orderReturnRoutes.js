@@ -26,6 +26,7 @@ const {
   postReturnShippingPickup,
   postReturnShippingRates,
   postReturnShippingTrackingSync,
+  postReturnShippingWebhookTest,
 } = require('../controllers/orderReturns/shippingController');
 
 const router = express.Router();
@@ -77,6 +78,13 @@ router.post(
   requireAdmin,
   requirePermission('orders:returns'),
   postReturnShippingPickup
+);
+
+router.post(
+  '/:id/returns/:returnId/shipping/webhook/test',
+  requireAdmin,
+  requirePermission('orders:returns'),
+  postReturnShippingWebhookTest
 );
 
 router.post(

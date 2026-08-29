@@ -281,15 +281,32 @@ export default function useOrderReturnActions({
       if (idempotencyKey) shippingAttemptsRef.current.delete(descriptor);
       if (!isCurrent(targetOrderId)) return data;
       if (action !== 'quote') {
+        const webhookStatus = payload.status === 'Delivered' ? 'Delivered' : 'Picked Up';
+        const isWebhookTest = action === 'test_webhook';
         showToast({
           type: data?.actionRequired ? 'warning' : 'success',
-          title: data?.actionRequired ? 'Guía creada con revisión pendiente' : 'Logística RMA actualizada',
-          message: data?.actionRequired
-            ? 'Envia creó la guía, pero la recolección requiere validación antes de continuar.'
-            : 'La operación quedó conciliada con la transportadora.',
+          title: isWebhookTest
+            ? 'Prueba oficial solicitada'
+            : data?.actionRequired
+              ? 'Guía creada con revisión pendiente'
+              : 'Logística RMA actualizada',
+          message: isWebhookTest
+            ? webhookStatus === 'Delivered'
+              ? 'Envia enviará la entrega a tu webhook. La recepción física solo se habilitará cuando llegue ese aviso.'
+              : 'Envia enviará la recogida a tu webhook. La entrega se habilitará cuando llegue ese aviso.'
+            : data?.actionRequired
+              ? 'Envia creó la guía, pero la recolección requiere validación antes de continuar.'
+              : 'La operación quedó conciliada con la transportadora.',
           persist: data?.actionRequired === true,
         });
         await synchronizeAfterMutation();
+        if (isWebhookTest) {
+          window.setTimeout(() => {
+            if (isCurrent(targetOrderId)) {
+              Promise.resolve(synchronizeAfterMutation()).catch(() => {});
+            }
+          }, 1800);
+        }
       }
       return data;
     } catch (error) {

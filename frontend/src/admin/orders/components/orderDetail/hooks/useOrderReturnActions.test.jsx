@@ -14,6 +14,7 @@ vi.mock('../../../../../lib/api', () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('creación RMA administrativa idempotente', () => {
@@ -108,5 +109,52 @@ describe('logística RMA idempotente', () => {
     expect(first[0]).toBe('/api/orders/order-shipping-1/returns/return-1/shipping/label');
     expect(first[2].headers['Idempotency-Key']).toBe(second[2].headers['Idempotency-Key']);
     expect(synchronizeAfterMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it('solicita el webhook oficial de la guía RMA y actualiza después del aviso', async () => {
+    vi.useFakeTimers();
+    api.post.mockResolvedValueOnce({
+      data: { ok: true, testWebhook: { accepted: true, status: 'Picked Up' } },
+    });
+    const synchronizeAfterMutation = vi.fn().mockResolvedValue(undefined);
+    const showToast = vi.fn();
+    const { result } = renderHook(() =>
+      useOrderReturnActions({
+        orderId: 'order-shipping-1',
+        canManageReturns: true,
+        synchronizeAfterMutation,
+        fetchReturns: vi.fn(),
+        showToast,
+      })
+    );
+    const returnCase = { _id: 'return-1', revision: 7 };
+
+    await act(async () => {
+      await result.current.runReturnShipping(
+        returnCase,
+        'test_webhook',
+        { status: 'Picked Up' }
+      );
+    });
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/orders/order-shipping-1/returns/return-1/shipping/webhook/test',
+      {
+        status: 'Picked Up',
+        expectedRevision: 7,
+        provider: 'envia',
+      },
+      undefined
+    );
+    expect(synchronizeAfterMutation).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Prueba oficial solicitada',
+      message: expect.stringMatching(/recogida.*webhook/i),
+    }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1800);
+    });
+    expect(synchronizeAfterMutation).toHaveBeenCalledTimes(2);
   });
 });

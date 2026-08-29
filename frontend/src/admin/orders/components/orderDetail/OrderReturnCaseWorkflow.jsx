@@ -95,6 +95,9 @@ export function ReturnReceivingSection({
     returnCase.shipping?.trackingNumber &&
     returnCase.shipping?.labelUrl
   );
+  const waitingForCarrierDelivery = Boolean(
+    activeIntegratedLabel && !returnCase.shipping?.awaitingWarehouseReceipt
+  );
   const markInTransit = () => onAction?.(returnCase, 'mark_in_transit', {
     shipping: {
       carrierName: draft.carrierName || returnCase.shipping?.carrierName,
@@ -132,6 +135,11 @@ export function ReturnReceivingSection({
       </div>
 
       <input aria-label={`Motivo cancelación ${returnCase.returnNumber}`} value={draft.cancellationReason || ''} onChange={(event) => setDraft(id, { cancellationReason: event.target.value })} placeholder="Motivo si el cliente cancela el RMA" style={returnInputStyle({ marginTop: 8 })} />
+      {waitingForCarrierDelivery ? (
+        <p style={{ margin: '8px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 780 }}>
+          Registrar recepción se habilitará cuando la transportadora reporte la llegada a la sede.
+        </p>
+      ) : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
         <GhostButton disabled={busy || activeIntegratedLabel || String(draft.cancellationReason || '').trim().length < 5} onClick={() => onAction?.(returnCase, 'cancel', { reason: String(draft.cancellationReason || '').trim() })}>Cancelar RMA</GhostButton>
         {returnCase.status === 'authorized' && (
@@ -141,7 +149,7 @@ export function ReturnReceivingSection({
         ) ? (
           <GhostButton disabled={busy} onClick={markInTransit}>Marcar en tránsito</GhostButton>
         ) : null}
-        <PrimaryButton disabled={busy || !(returnCase.items || []).some((item) => positiveInteger(draft.received?.[returnItemId(item)] ?? item.authorizedQuantity) > 0)} onClick={receive}>Registrar recepción</PrimaryButton>
+        <PrimaryButton disabled={busy || waitingForCarrierDelivery || !(returnCase.items || []).some((item) => positiveInteger(draft.received?.[returnItemId(item)] ?? item.authorizedQuantity) > 0)} onClick={receive}>Registrar recepción</PrimaryButton>
       </div>
     </div>
   );

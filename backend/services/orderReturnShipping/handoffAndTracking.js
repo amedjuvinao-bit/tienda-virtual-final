@@ -1,6 +1,7 @@
 'use strict';
 
 const { createLogisticsError } = require('../orderLogisticsService');
+const { publicWebhookUrl } = require('../shippingConfigurationService');
 const { resolveShippingAddresses } = require('../orderShipping/addressResolution');
 const {
   recordOperationFailure,
@@ -37,6 +38,7 @@ const AMBIGUOUS_PROVIDER_FAILURES = new Set([
   'SHIPPING_PROVIDER_HTTP_ERROR',
   'SHIPPING_PICKUP_CONFIRMATION_MISSING',
 ]);
+const SANDBOX_RETURN_WEBHOOK_TEST_STATUSES = new Set(['Picked Up', 'Delivered']);
 
 function clean(value, maxLength = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
@@ -47,6 +49,19 @@ function carrierIdentity(returnCase) {
     carrier: clean(returnCase.shipping?.carrierName, 80).toLowerCase(),
     trackingNumber: clean(returnCase.shipping?.trackingNumber, 180),
   };
+}
+
+function sandboxReturnWebhookTestStatus(value = 'Picked Up') {
+  const status = clean(value || 'Picked Up', 40);
+  if (!SANDBOX_RETURN_WEBHOOK_TEST_STATUSES.has(status)) {
+    throw createLogisticsError(
+      'La prueba de esta devolución solo permite simular la recogida o la entrega desde Envia Sandbox.',
+      'RETURN_SHIPPING_WEBHOOK_TEST_STATUS_INVALID',
+      422,
+      { allowedStatuses: [...SANDBOX_RETURN_WEBHOOK_TEST_STATUSES] }
+    );
+  }
+  return status;
 }
 
 function assertLabel(returnCase, { allowCancelled = false } = {}) {
@@ -138,6 +153,87 @@ async function syncOrderReturnTracking(input = {}, dependencies = {}) {
     dependencies
   );
   return returnShippingResponse(updated, { trackingStage: state.stage }, dependencies);
+}
+
+async function testOrderReturnShippingWebhook(input = {}, dependencies = {}) {
+  const provider = await resolveProvider(input, dependencies);
+  if (provider.mode !== 'sandbox') {
+    throw createLogisticsError(
+      'La prueba oficial automática de devoluciones solo está disponible en Envia Sandbox.',
+      'RETURN_SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY',
+      409
+    );
+  }
+  const status = sandboxReturnWebhookTestStatus(input.webhookStatus);
+  const context = await loadReturnShippingContext(
+    { ...input, requireDestination: false },
+    dependencies
+  );
+  const { carrier, trackingNumber } = assertLabel(context.returnCase);
+  const shipping = returnShippingValue(context.returnCase);
+  const integration = shipping.integration || {};
+  const guideMode = clean(integration.mode, 40).toLowerCase();
+  if (guideMode && guideMode !== 'sandbox') {
+    throw createLogisticsError(
+      'Esta guía RMA no fue creada en Sandbox y no admite eventos de prueba.',
+      'RETURN_SHIPPING_WEBHOOK_TEST_GUIDE_MODE_INVALID',
+      409,
+      { guideMode }
+    );
+  }
+  if (shipping.carrierDeliveredAt || shipping.awaitingWarehouseReceipt) {
+    throw createLogisticsError(
+      'Envia ya reportó la devolución en la sede. Ahora corresponde confirmar la recepción física.',
+      'RETURN_SHIPPING_ALREADY_DELIVERED',
+      409
+    );
+  }
+  const pickupCompleted = integration.pickup?.status === 'completed';
+  const alreadyInTransit = context.returnCase.status === 'in_transit' || pickupCompleted;
+  if (status === 'Picked Up' && alreadyInTransit) {
+    throw createLogisticsError(
+      'Envia ya reportó la recogida. Ahora puedes solicitar la prueba oficial de entrega.',
+      'RETURN_SHIPPING_WEBHOOK_TEST_PICKUP_ALREADY_CONFIRMED',
+      409
+    );
+  }
+  if (status === 'Picked Up' && !['pickup', 'dropoff'].includes(integration.handoffMode)) {
+    throw createLogisticsError(
+      'Primero programa la recolección o confirma la entrega en un punto autorizado.',
+      'RETURN_SHIPPING_HANDOFF_REQUIRED',
+      409
+    );
+  }
+  if (status === 'Delivered' && !alreadyInTransit) {
+    throw createLogisticsError(
+      'Primero solicita la prueba oficial de recogida; después podrás simular la entrega en sede.',
+      'RETURN_SHIPPING_WEBHOOK_TEST_DELIVERY_NOT_READY',
+      409
+    );
+  }
+  const webhookUrl = clean(dependencies.webhookUrl || publicWebhookUrl(), 500);
+  if (!webhookUrl) {
+    throw createLogisticsError(
+      'Configura la URL pública del webhook antes de solicitar la prueba oficial.',
+      'SHIPPING_WEBHOOK_URL_REQUIRED',
+      422
+    );
+  }
+  const result = await provider.testWebhook({ carrier, trackingNumber, status });
+  return returnShippingResponse(
+    context.returnCase,
+    {
+      testWebhook: {
+        accepted: true,
+        carrier,
+        trackingNumber,
+        status,
+        webhookUrl,
+        result,
+      },
+    },
+    dependencies
+  );
 }
 
 async function confirmOrderReturnDropoff(input = {}, dependencies = {}) {
@@ -434,5 +530,7 @@ module.exports = {
   cancelOrderReturnLabel,
   confirmOrderReturnDropoff,
   scheduleOrderReturnPickup,
+  sandboxReturnWebhookTestStatus,
   syncOrderReturnTracking,
+  testOrderReturnShippingWebhook,
 };

@@ -89,6 +89,16 @@ export default function OrderReturnShippingSection({
   const pickup = integration.pickup || {};
   const dropoffCommitted = integration.handoffMode === 'dropoff';
   const canAutomate = envia.enabled === true;
+  const returnInTransit = returnCase.status === 'in_transit' || pickup.status === 'completed';
+  const sandboxTestAvailable = Boolean(
+    canAutomate &&
+    envia.mode === 'sandbox' &&
+    envia.webhookRegistered === true &&
+    integration.mode !== 'production' &&
+    activeLabel &&
+    !carrierDelivered &&
+    (pickupCommitted || dropoffCommitted)
+  );
 
   const patchPackage = (field, value) => {
     setDraft(id, {
@@ -235,6 +245,28 @@ export default function OrderReturnShippingSection({
               <GhostButton disabled={busy} onClick={() => run('cancel_label')}>Cancelar guía</GhostButton>
             ) : null}
           </div>
+          {sandboxTestAvailable ? (
+            <details style={{ marginTop: 9, border: '1px dashed #a5b4fc', borderRadius: 12, padding: '9px 10px', background: '#f8faff' }}>
+              <summary style={{ cursor: 'pointer', color: '#4338ca', fontSize: 10, fontWeight: 950 }}>
+                Pruebas Sandbox · solo para verificar la devolución
+              </summary>
+              <div style={{ marginTop: 8, color: '#4338ca', fontSize: 9, fontWeight: 780, lineHeight: 1.5 }}>
+                Envia enviará el aviso oficial a la URL registrada. El RMA cambiará únicamente después de recibir ese webhook.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                <span style={{ color: '#4338ca', fontSize: 9, fontWeight: 780 }}>
+                  {returnInTransit
+                    ? 'El paquete ya fue recogido. Ahora comprueba su llegada a la sede.'
+                    : 'Primero comprueba que la transportadora recogió el paquete.'}
+                </span>
+                <GhostButton disabled={busy} onClick={() => run('test_webhook', {
+                  status: returnInTransit ? 'Delivered' : 'Picked Up',
+                })}>
+                  {returnInTransit ? 'Simular entrega oficial' : 'Simular recogida oficial'}
+                </GhostButton>
+              </div>
+            </details>
+          ) : null}
           {!pickupCommitted && !dropoffCommitted && !carrierDelivered ? (
             <div className="order-return-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 7, marginTop: 8 }}>
               <input aria-label={`Fecha recolección ${returnCase.returnNumber}`} type="date" value={draft.returnPickupDate || ''} onChange={(event) => setDraft(id, { returnPickupDate: event.target.value })} style={returnInputStyle()} />

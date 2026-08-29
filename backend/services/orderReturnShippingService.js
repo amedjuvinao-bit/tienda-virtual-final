@@ -5,6 +5,7 @@ const {
   confirmOrderReturnDropoff,
   scheduleOrderReturnPickup,
   syncOrderReturnTracking,
+  testOrderReturnShippingWebhook,
 } = require('./orderReturnShipping/handoffAndTracking');
 const {
   generateOrderReturnLabel,
@@ -18,4 +19,5 @@ module.exports = {
   quoteOrderReturnShipping,
   scheduleOrderReturnPickup,
   syncOrderReturnTracking,
+  testOrderReturnShippingWebhook,
 };

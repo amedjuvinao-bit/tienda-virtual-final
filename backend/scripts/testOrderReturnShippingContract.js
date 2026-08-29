@@ -14,6 +14,8 @@ const {
 const {
   assertHandoffCompatible,
   assertJourneyNotDelivered,
+  sandboxReturnWebhookTestStatus,
+  testOrderReturnShippingWebhook,
 } = require('../services/orderReturnShipping/handoffAndTracking');
 const {
   buildReturnShipmentPayload,
@@ -135,6 +137,7 @@ test('modelo, índices, rutas y CI conservan el contrato de Producción', () => 
     '/shipping/label',
     '/shipping/tracking/sync',
     '/shipping/pickup',
+    '/shipping/webhook/test',
     '/shipping/handoff/dropoff',
     '/shipping/label/cancel',
   ].forEach((endpoint) => assert.ok(routes.includes(endpoint)));
@@ -161,6 +164,125 @@ test('Delivered solo deja el RMA en tránsito y pendiente de recepción física'
   assert.equal(state.status, 'in_transit');
   assert.equal(state.shipping.awaitingWarehouseReceipt, true);
   assert.equal(returnCase.status, 'authorized');
+});
+
+test('Picked Up confirma la recogida sin fingir llegada a bodega', () => {
+  const { returnCase } = fixture();
+  returnCase.shipping.integration = {
+    provider: 'envia',
+    mode: 'sandbox',
+    status: 'pickup_scheduled',
+    handoffMode: 'pickup',
+    pickup: { status: 'scheduled' },
+  };
+  const state = applyReturnTrackingUpdate(
+    returnCase,
+    { status: 'Picked Up', description: 'Paquete recogido' },
+    { provider: 'envia', source: 'webhook', receivedAt: new Date('2026-08-28T12:00:00Z') }
+  );
+  assert.equal(state.stage, 'picked_up');
+  assert.equal(state.status, 'in_transit');
+  assert.equal(state.shipping.integration.pickup.status, 'completed');
+  assert.equal(state.shipping.awaitingWarehouseReceipt, undefined);
+});
+
+test('la prueba oficial RMA respeta la secuencia recogida y entrega sin mutación local', async () => {
+  const data = fixture();
+  data.returnCase.shipping = {
+    carrierName: 'coordinadora',
+    trackingNumber: 'COORSBX725217',
+    labelUrl: 'https://labels.example/COORSBX725217.pdf',
+    integration: {
+      provider: 'envia',
+      mode: 'sandbox',
+      status: 'pickup_scheduled',
+      handoffMode: 'pickup',
+      pickup: { status: 'scheduled' },
+    },
+  };
+  const calls = [];
+  const provider = {
+    key: 'envia',
+    mode: 'sandbox',
+    configured: true,
+    async testWebhook(payload) {
+      calls.push(payload);
+      return { accepted: true };
+    },
+  };
+  const dependencies = {
+    provider,
+    webhookUrl: 'https://store.example/api/shipping/webhooks/envia',
+    OrderModel: { findOne: async () => data.order },
+    OrderReturnModel: { findOne: async () => data.returnCase },
+    getShippingProviderStatus: async () => ({
+      envia: { enabled: true, mode: 'sandbox', webhookRegistered: true },
+    }),
+  };
+  const baseInput = {
+    orderFilter: { _id: data.order._id },
+    returnId: data.returnCase._id,
+    expectedRevision: data.returnCase.revision,
+    provider: 'envia',
+  };
+
+  const pickedUp = await testOrderReturnShippingWebhook(
+    { ...baseInput, webhookStatus: 'Picked Up' },
+    dependencies
+  );
+  assert.equal(pickedUp.testWebhook.status, 'Picked Up');
+  assert.equal(data.returnCase.status, 'authorized');
+  assert.equal(data.returnCase.shipping.integration.pickup.status, 'scheduled');
+  assert.deepEqual(calls[0], {
+    carrier: 'coordinadora',
+    trackingNumber: 'COORSBX725217',
+    status: 'Picked Up',
+  });
+
+  await assert.rejects(
+    () => testOrderReturnShippingWebhook(
+      { ...baseInput, webhookStatus: 'Delivered' },
+      dependencies
+    ),
+    (error) => error?.code === 'RETURN_SHIPPING_WEBHOOK_TEST_DELIVERY_NOT_READY'
+  );
+
+  data.returnCase.status = 'in_transit';
+  data.returnCase.shipping.integration.pickup.status = 'completed';
+  const delivered = await testOrderReturnShippingWebhook(
+    { ...baseInput, webhookStatus: 'Delivered' },
+    dependencies
+  );
+  assert.equal(delivered.testWebhook.status, 'Delivered');
+  assert.deepEqual(calls[1], {
+    carrier: 'coordinadora',
+    trackingNumber: 'COORSBX725217',
+    status: 'Delivered',
+  });
+  assert.equal(data.returnCase.shipping.awaitingWarehouseReceipt, undefined);
+});
+
+test('la simulación RMA rechaza estados inventados y cualquier proveedor en Producción', async () => {
+  assert.equal(sandboxReturnWebhookTestStatus('Picked Up'), 'Picked Up');
+  assert.equal(sandboxReturnWebhookTestStatus('Delivered'), 'Delivered');
+  assert.throws(
+    () => sandboxReturnWebhookTestStatus('Received'),
+    (error) => error?.code === 'RETURN_SHIPPING_WEBHOOK_TEST_STATUS_INVALID'
+  );
+
+  const data = fixture();
+  await assert.rejects(
+    () => testOrderReturnShippingWebhook(
+      {
+        orderFilter: { _id: data.order._id },
+        returnId: data.returnCase._id,
+        expectedRevision: data.returnCase.revision,
+        webhookStatus: 'Picked Up',
+      },
+      { provider: { key: 'envia', mode: 'production', configured: true } }
+    ),
+    (error) => error?.code === 'RETURN_SHIPPING_WEBHOOK_TEST_SANDBOX_ONLY'
+  );
 });
 
 test('un RMA no puede cancelarse dejando una guía externa activa', () => {

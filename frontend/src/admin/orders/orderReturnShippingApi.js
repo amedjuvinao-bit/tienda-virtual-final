@@ -4,6 +4,7 @@ const PATHS = Object.freeze({
   quote: 'rates',
   label: 'label',
   track: 'tracking/sync',
+  test_webhook: 'webhook/test',
   pickup: 'pickup',
   dropoff: 'handoff/dropoff',
   cancel_label: 'label/cancel',

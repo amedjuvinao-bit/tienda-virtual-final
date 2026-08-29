@@ -248,9 +248,11 @@ describe('OrderDetailReturnsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Entrega en punto' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancelar guía' })).not.toBeInTheDocument();
     expect(screen.getByText(/falta confirmar las unidades físicas/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeEnabled();
   });
 
-  it('mantiene visible la confirmación de una recolección RMA programada', () => {
+  it('mantiene la recolección visible y solicita la recogida oficial de la guía RMA', async () => {
+    const onShipping = vi.fn().mockResolvedValue({ ok: true });
     const scheduledReturn = {
       ...receivedReturn,
       status: 'authorized',
@@ -278,11 +280,13 @@ describe('OrderDetailReturnsPanel', () => {
           orderId: 'order-1',
           eligibility: [],
           returns: [scheduledReturn],
-          shippingProviders: { envia: { enabled: true, mode: 'sandbox' } },
+          shippingProviders: {
+            envia: { enabled: true, mode: 'sandbox', webhookRegistered: true },
+          },
           shippingDestinations: [],
         }}
         canManage
-        onShipping={vi.fn()}
+        onShipping={onShipping}
       />
     );
 
@@ -293,6 +297,72 @@ describe('OrderDetailReturnsPanel', () => {
     expect(screen.getByText('AME260831000130')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Solicitar recolección' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entrega en punto' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeDisabled();
+    expect(screen.getByText(/se habilitará cuando la transportadora reporte la llegada/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simular recogida oficial' }));
+    await waitFor(() => expect(onShipping).toHaveBeenCalledWith(
+      scheduledReturn,
+      'test_webhook',
+      expect.objectContaining({ status: 'Picked Up' })
+    ));
+  });
+
+  it('habilita la entrega oficial después del webhook de recogida y oculta pruebas en Producción', async () => {
+    const onShipping = vi.fn().mockResolvedValue({ ok: true });
+    const inTransitReturn = {
+      ...receivedReturn,
+      status: 'in_transit',
+      shipping: {
+        carrierName: 'coordinadora',
+        trackingNumber: 'COORSBX725217',
+        labelUrl: 'https://labels.example/COORSBX725217.pdf',
+        integration: {
+          provider: 'envia',
+          mode: 'sandbox',
+          status: 'tracking',
+          handoffMode: 'pickup',
+          pickup: { status: 'completed' },
+        },
+      },
+    };
+    const props = {
+      data: {
+        orderId: 'order-1',
+        eligibility: [],
+        returns: [inTransitReturn],
+        shippingProviders: {
+          envia: { enabled: true, mode: 'sandbox', webhookRegistered: true },
+        },
+        shippingDestinations: [],
+      },
+      canManage: true,
+      onShipping,
+    };
+    const { rerender } = render(<OrderDetailReturnsPanel {...props} />);
+
+    expect(screen.getByText('Paquete recogido')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Simular entrega oficial' }));
+    await waitFor(() => expect(onShipping).toHaveBeenCalledWith(
+      inTransitReturn,
+      'test_webhook',
+      expect.objectContaining({ status: 'Delivered' })
+    ));
+
+    rerender(
+      <OrderDetailReturnsPanel
+        {...props}
+        data={{
+          ...props.data,
+          shippingProviders: {
+            envia: { enabled: true, mode: 'production', webhookRegistered: true },
+          },
+        }}
+      />
+    );
+    expect(screen.queryByText(/Pruebas Sandbox/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Simular entrega oficial' })).not.toBeInTheDocument();
   });
 
   it('muestra un RMA listo para dinero sin habilitarlo a un rol de bodega', () => {

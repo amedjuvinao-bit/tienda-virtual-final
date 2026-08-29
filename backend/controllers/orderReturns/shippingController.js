@@ -7,6 +7,7 @@ const {
   quoteOrderReturnShipping,
   scheduleOrderReturnPickup,
   syncOrderReturnTracking,
+  testOrderReturnShippingWebhook,
 } = require('../../services/orderReturnShippingService');
 const {
   buildAccess,
@@ -28,6 +29,7 @@ function shippingInput(req) {
     pickupTimeStart: req.body?.pickupTimeStart,
     pickupTimeEnd: req.body?.pickupTimeEnd,
     pickupInstructions: req.body?.pickupInstructions,
+    webhookStatus: req.body?.status,
     confirmStorePaidShipping: req.body?.confirmStorePaidShipping === true,
     confirmProductionCharge: req.body?.confirmProductionCharge === true,
     idempotencyKey: returnCreationIdempotencyKey(req),
@@ -53,6 +55,7 @@ function shippingHandler(service) {
 const postReturnShippingRates = shippingHandler(quoteOrderReturnShipping);
 const postReturnShippingLabel = shippingHandler(generateOrderReturnLabel);
 const postReturnShippingTrackingSync = shippingHandler(syncOrderReturnTracking);
+const postReturnShippingWebhookTest = shippingHandler(testOrderReturnShippingWebhook);
 const postReturnShippingPickup = shippingHandler(scheduleOrderReturnPickup);
 const postReturnShippingDropoff = shippingHandler(confirmOrderReturnDropoff);
 const postReturnShippingLabelCancel = shippingHandler(cancelOrderReturnLabel);
@@ -64,4 +67,5 @@ module.exports = {
   postReturnShippingPickup,
   postReturnShippingRates,
   postReturnShippingTrackingSync,
+  postReturnShippingWebhookTest,
 };
