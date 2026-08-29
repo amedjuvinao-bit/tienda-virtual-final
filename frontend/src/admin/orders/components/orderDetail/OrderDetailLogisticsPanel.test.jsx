@@ -21,7 +21,9 @@ vi.mock('../../orderLogisticsApi', () => logisticsApi);
 import OrderDetailLogisticsPanel from './OrderDetailLogisticsPanel';
 import {
   deliveryDays,
+  filterShippingRatesByHandoff,
   recommendedShippingRate,
+  shippingRateHandoff,
 } from './shippingRateRecommendation';
 
 const SHIPMENT = {
@@ -458,6 +460,123 @@ describe('centro logístico avanzado de la orden', () => {
     expect(recommendedShippingRate(rates, 'fastest')?.carrier).toBe('express');
   });
 
+  it('distingue recolección, entrega en punto y capacidades no confirmadas', () => {
+    const pickup = {
+      carrier: 'recoge',
+      service: 'standard',
+      totalPrice: 18000,
+      carrierActions: ['pickup'],
+      carrierActionsResolved: true,
+    };
+    const pickupOnGenerate = {
+      carrier: 'recoge-al-crear',
+      service: 'express',
+      totalPrice: 22000,
+      carrierActions: ['pickup_on_generate'],
+      carrierActionsResolved: true,
+    };
+    const dropoff = {
+      carrier: 'punto',
+      service: 'ground',
+      totalPrice: 12000,
+      carrierActions: [],
+      carrierActionsResolved: true,
+    };
+    const unknown = {
+      carrier: 'sin-confirmar',
+      service: 'standard',
+      totalPrice: 15000,
+      carrierActions: [],
+      carrierActionsResolved: false,
+    };
+
+    expect(shippingRateHandoff(pickup).label).toBe('Admite recolección');
+    expect(shippingRateHandoff(pickupOnGenerate).label).toBe('Recolección al crear la guía');
+    expect(shippingRateHandoff(dropoff).label).toBe('Solo entrega en punto');
+    expect(shippingRateHandoff(unknown).label).toBe('Forma de entrega por confirmar');
+    expect(filterShippingRatesByHandoff(
+      [pickup, pickupOnGenerate, dropoff, unknown],
+      'pickup'
+    ).map((rate) => rate.carrier)).toEqual(['recoge', 'recoge-al-crear']);
+    expect(filterShippingRatesByHandoff(
+      [pickup, pickupOnGenerate, dropoff, unknown],
+      'dropoff'
+    ).map((rate) => rate.carrier)).toEqual(['recoge', 'punto']);
+  });
+
+  it('filtra en pantalla las tarifas incompatibles con la entrega elegida', async () => {
+    const pickupRate = {
+      carrier: 'recoge-al-crear',
+      service: 'express',
+      serviceDescription: 'Recolección incluida',
+      deliveryEstimate: '1-2 días',
+      totalPrice: 18000,
+      currency: 'COP',
+      carrierActions: ['pickup_on_generate'],
+      carrierActionsResolved: true,
+    };
+    const dropoffRate = {
+      carrier: 'solo-punto',
+      service: 'ground',
+      serviceDescription: 'Entrega en oficina',
+      deliveryEstimate: '2-3 días',
+      totalPrice: 12000,
+      currency: 'COP',
+      carrierActions: [],
+      carrierActionsResolved: true,
+    };
+    const planned = { ...SHIPMENT, revision: 1 };
+    const quoted = {
+      ...SHIPMENT,
+      revision: 2,
+      shippingIntegration: { provider: 'envia', mode: 'sandbox', status: 'quoted' },
+    };
+    logisticsApi.getShippingProviderStatus.mockResolvedValue({
+      ok: true,
+      providers: {
+        defaultProvider: 'envia',
+        envia: { configured: true, enabled: true, mode: 'sandbox' },
+      },
+    });
+    logisticsApi.updateOrderShipment.mockResolvedValue({
+      ...responseWith(planned),
+      shipment: planned,
+    });
+    logisticsApi.quoteOrderShipment.mockResolvedValue({
+      ...responseWith(quoted),
+      shipment: quoted,
+      rates: [pickupRate, dropoffRate],
+    });
+
+    render(
+      <OrderDetailLogisticsPanel
+        order={{
+          ...ORDER,
+          fulfillment: {
+            shipments: [SHIPMENT],
+            logisticsSummary: responseWith(SHIPMENT).summary,
+          },
+        }}
+        canManage
+      />
+    );
+
+    const quoteButton = await screen.findByRole('button', { name: 'Buscar opciones de envío' });
+    await waitFor(() => expect(quoteButton).toBeEnabled());
+    fireEvent.click(quoteButton);
+    const handoffSelect = await screen.findByLabelText(`Forma de entrega ${SHIPMENT.code}`);
+
+    fireEvent.change(handoffSelect, { target: { value: 'dropoff' } });
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('solo-punto');
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('Solo entrega en punto');
+    expect(screen.queryByRole('button', { name: 'Crear guía de prueba y pedir recolección' })).not.toBeInTheDocument();
+
+    fireEvent.change(handoffSelect, { target: { value: 'pickup' } });
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('recoge-al-crear');
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('Recolección al crear la guía');
+    expect(screen.getByRole('button', { name: 'Crear guía de prueba y pedir recolección' })).toBeInTheDocument();
+  });
+
   it('guía al administrador en tres pasos y exige definir la entrega física antes del picking', async () => {
     const rates = [
       { carrier: 'economica', service: 'ground', serviceDescription: 'Económico', deliveryEstimate: '4-5 días', totalPrice: 10000, currency: 'COP' },
@@ -572,6 +691,8 @@ describe('centro logístico avanzado de la orden', () => {
     fireEvent.click(quoteButton);
 
     expect(await screen.findByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('equilibrada');
+    expect(screen.getByLabelText(`Forma de entrega ${SHIPMENT.code}`)).toHaveValue('any');
+    expect(screen.getByLabelText(`Tarifa seleccionada ${SHIPMENT.code}`)).toHaveTextContent('Forma de entrega por confirmar');
     expect(await screen.findByText('PASO ACTUAL 1 DE 3')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Cambiar recomendación o ver alternativas'));
     fireEvent.change(screen.getByLabelText(`Criterio de tarifa ${SHIPMENT.code}`), {

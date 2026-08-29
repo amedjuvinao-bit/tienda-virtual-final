@@ -1,7 +1,9 @@
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import {
+  filterShippingRatesByHandoff,
   recommendationExplanation,
   recommendedShippingRate,
+  shippingRateHandoff,
   shippingRateKey,
 } from './shippingRateRecommendation';
 import { formatMoney } from './orderLogisticsViewModel';
@@ -11,6 +13,43 @@ import {
   primaryButtonStyle,
   secondaryButtonStyle,
 } from './OrderLogisticsUi';
+
+const HANDOFF_TONES = {
+  success: { background: '#dcfce7', border: '#86efac', color: '#166534' },
+  warning: { background: '#fff7ed', border: '#fdba74', color: '#9a3412' },
+  neutral: { background: '#f8fafc', border: '#cbd5e1', color: '#475569' },
+  unknown: { background: '#fffbeb', border: '#fde68a', color: '#92400e' },
+};
+
+function RateHandoff({ rate, detailed = false }) {
+  const handoff = shippingRateHandoff(rate);
+  const tone = HANDOFF_TONES[handoff.tone] || HANDOFF_TONES.unknown;
+  return (
+    <div style={{ display: 'grid', gap: detailed ? 3 : 0, justifyItems: 'start' }}>
+      <span
+        title={handoff.description}
+        style={{
+          display: 'inline-flex',
+          border: `1px solid ${tone.border}`,
+          borderRadius: 999,
+          padding: '3px 7px',
+          background: tone.background,
+          color: tone.color,
+          fontSize: 8,
+          fontWeight: 950,
+          lineHeight: 1.2,
+        }}
+      >
+        {handoff.label}
+      </span>
+      {detailed ? (
+        <span style={{ color: tone.color, fontSize: 9, fontWeight: 720, lineHeight: 1.4 }}>
+          {handoff.description}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 export default function OrderLogisticsRateSelector({
   canManage,
@@ -24,12 +63,58 @@ export default function OrderLogisticsRateSelector({
   const selectStrategy = (rateStrategy) => {
     onUpdateForm(view.shipmentId, {
       rateStrategy,
-      selectedRate: recommendedShippingRate(view.shipmentRates, rateStrategy),
+      selectedRate: recommendedShippingRate(view.compatibleRates, rateStrategy),
     });
   };
 
+  const selectHandoffPreference = (handoffPreference) => {
+    const compatibleRates = filterShippingRatesByHandoff(
+      view.shipmentRates,
+      handoffPreference
+    );
+    onUpdateForm(view.shipmentId, {
+      handoffPreference,
+      selectedRate: recommendedShippingRate(
+        compatibleRates,
+        view.form.rateStrategy
+      ),
+    });
+  };
+
+  const noCompatibleRates = (
+    view.form.handoffPreference !== 'any' && !view.compatibleRates.length
+  );
+
   return (
     <div style={{ display: 'grid', gap: 9, marginTop: 10 }}>
+      <div style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 14, padding: 11, background: ORDER_DETAIL_THEME.cardBg }}>
+        <label style={{ display: 'grid', gap: 5 }}>
+          <span style={{ color: ORDER_DETAIL_THEME.cardText, fontSize: 10, fontWeight: 950 }}>
+            ¿Cómo entregarás el paquete a la transportadora?
+          </span>
+          <select
+            aria-label={`Forma de entrega ${shipment.code}`}
+            disabled={!canManage}
+            value={view.form.handoffPreference}
+            onChange={(event) => selectHandoffPreference(event.target.value)}
+            style={inputStyle()}
+          >
+            <option value="any">Todavía no lo he decidido</option>
+            <option value="pickup">Quiero que recojan el paquete</option>
+            <option value="dropoff">Lo llevaré a un punto autorizado</option>
+          </select>
+        </label>
+        <p style={{ margin: '6px 0 0', color: ORDER_DETAIL_THEME.mutedText, fontSize: 9, fontWeight: 700, lineHeight: 1.45 }}>
+          La lista mostrará únicamente tarifas compatibles. Envia debe confirmar la recolección; la tienda no la supondrá.
+        </p>
+      </div>
+
+      {noCompatibleRates ? (
+        <div role="alert" style={{ border: '1px solid #fdba74', borderRadius: 12, padding: 10, background: '#fff7ed', color: '#9a3412', fontSize: 10, fontWeight: 800, lineHeight: 1.45 }}>
+          Envia no confirmó ninguna tarifa compatible con esta forma de entrega. Elige otra opción o vuelve a consultar tarifas.
+        </div>
+      ) : null}
+
       {view.selectedRate ? (
         <div aria-label={`Tarifa seleccionada ${shipment.code}`} style={{ border: '1px solid var(--admin-primary)', borderRadius: 14, padding: 12, background: 'var(--admin-primary-soft-bg)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -42,6 +127,9 @@ export default function OrderLogisticsRateSelector({
               </div>
               <div style={{ marginTop: 3, color: ORDER_DETAIL_THEME.mutedText, fontSize: 10, fontWeight: 750 }}>
                 Entrega: {view.selectedRate.deliveryEstimate || 'por confirmar'}
+              </div>
+              <div style={{ marginTop: 7 }}>
+                <RateHandoff rate={view.selectedRate} detailed />
               </div>
             </div>
             <strong style={{ color: 'var(--admin-primary)', fontSize: 18 }}>
@@ -101,9 +189,12 @@ export default function OrderLogisticsRateSelector({
             </select>
           </label>
           {view.alternatives.map((rate, index) => (
-            <button key={`${shippingRateKey(rate)}-${index}`} type="button" onClick={() => onUpdateForm(view.shipmentId, { selectedRate: rate })} style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 10, padding: '8px 10px', background: ORDER_DETAIL_THEME.cardBg, color: ORDER_DETAIL_THEME.cardText, display: 'flex', justifyContent: 'space-between', gap: 8, textAlign: 'left', cursor: 'pointer', fontSize: 10, fontWeight: 850 }}>
-              <span>{rate.carrier} · {rate.serviceDescription || rate.service} · {rate.deliveryEstimate || 'Entrega por confirmar'}</span>
-              <span>{formatMoney(rate.totalPrice, rate.currency)}</span>
+            <button key={`${shippingRateKey(rate)}-${index}`} type="button" onClick={() => onUpdateForm(view.shipmentId, { selectedRate: rate })} style={{ border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, borderRadius: 10, padding: '8px 10px', background: ORDER_DETAIL_THEME.cardBg, color: ORDER_DETAIL_THEME.cardText, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, textAlign: 'left', cursor: 'pointer', fontSize: 10, fontWeight: 850 }}>
+              <span style={{ display: 'grid', gap: 5 }}>
+                <span>{rate.carrier} · {rate.serviceDescription || rate.service} · {rate.deliveryEstimate || 'Entrega por confirmar'}</span>
+                <RateHandoff rate={rate} />
+              </span>
+              <span style={{ whiteSpace: 'nowrap' }}>{formatMoney(rate.totalPrice, rate.currency)}</span>
             </button>
           ))}
           <button type="button" onClick={() => onRunProviderAction(shipment, 'quote')} disabled={view.isBusy} style={{ ...secondaryButtonStyle(), justifySelf: 'start' }}>

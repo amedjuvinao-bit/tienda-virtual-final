@@ -1,4 +1,5 @@
 const STRATEGIES = new Set(['balanced', 'cheapest', 'fastest']);
+const HANDOFF_PREFERENCES = new Set(['any', 'pickup', 'dropoff']);
 
 function normalizedText(value) {
   return String(value || '')
@@ -41,6 +42,77 @@ export function validShippingRates(rates = []) {
     Number.isFinite(Number(rate.totalPrice)) &&
     Number(rate.totalPrice) >= 0
   ));
+}
+
+function normalizedCarrierActions(rate = {}) {
+  return [...new Set((Array.isArray(rate?.carrierActions) ? rate.carrierActions : [])
+    .map((action) => String(action || '').trim().toLowerCase())
+    .filter(Boolean))];
+}
+
+export function shippingRateHandoff(rate = {}) {
+  const actions = normalizedCarrierActions(rate);
+
+  if (actions.includes('pickup_on_generate')) {
+    return {
+      key: 'pickup_on_generate',
+      label: 'Recolección al crear la guía',
+      description: 'Envia solicitará la recolección junto con la guía.',
+      supportsDropoff: false,
+      supportsPickup: true,
+      tone: 'warning',
+    };
+  }
+  if (actions.includes('pickup_mandatory')) {
+    return {
+      key: 'pickup_mandatory',
+      label: 'Recolección obligatoria',
+      description: 'Esta transportadora no admite entrega en punto.',
+      supportsDropoff: false,
+      supportsPickup: true,
+      tone: 'warning',
+    };
+  }
+  if (actions.includes('pickup')) {
+    return {
+      key: 'pickup',
+      label: 'Admite recolección',
+      description: 'Después de crear la guía podrás pedir recolección o llevar el paquete.',
+      supportsDropoff: true,
+      supportsPickup: true,
+      tone: 'success',
+    };
+  }
+  if (rate?.carrierActionsResolved === true) {
+    return {
+      key: 'dropoff_only',
+      label: 'Solo entrega en punto',
+      description: 'Envia no ofrece recolección para esta tarifa.',
+      supportsDropoff: true,
+      supportsPickup: false,
+      tone: 'neutral',
+    };
+  }
+  return {
+    key: 'unknown',
+    label: 'Forma de entrega por confirmar',
+    description: 'Envia no confirmó si esta tarifa admite recolección.',
+    supportsDropoff: false,
+    supportsPickup: false,
+    tone: 'unknown',
+  };
+}
+
+export function filterShippingRatesByHandoff(rates = [], preference = 'any') {
+  const safePreference = HANDOFF_PREFERENCES.has(preference) ? preference : 'any';
+  const valid = validShippingRates(rates);
+  if (safePreference === 'any') return valid;
+  return valid.filter((rate) => {
+    const handoff = shippingRateHandoff(rate);
+    return safePreference === 'pickup'
+      ? handoff.supportsPickup
+      : handoff.supportsDropoff;
+  });
 }
 
 function normalizedMetric(value, minimum, maximum, unknown = 1) {

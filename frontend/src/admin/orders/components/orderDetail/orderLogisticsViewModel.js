@@ -127,6 +127,7 @@ export function shipmentForm(shipment = {}) {
     heightCm: Number(packages[0]?.heightCm || 0),
     selectedRate: null,
     rateStrategy: 'balanced',
+    handoffPreference: 'any',
     pickupDate: shipment.shippingIntegration?.pickup?.requestedDate || localDateAfter(1),
     pickupTimeStart: shipment.shippingIntegration?.pickup?.timeFrom || '09:00',
     pickupTimeEnd: shipment.shippingIntegration?.pickup?.timeTo || '14:00',

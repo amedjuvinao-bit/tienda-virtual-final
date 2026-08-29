@@ -10,6 +10,7 @@ import {
   updateOrderShipment,
 } from '../../../orderLogisticsApi';
 import {
+  filterShippingRatesByHandoff,
   recommendedShippingRate,
   validShippingRates,
 } from '../shippingRateRecommendation';
@@ -62,21 +63,31 @@ export default function useOrderShippingProviderActions({
         const receivedRates = validShippingRates(
           Array.isArray(data?.rates) ? data.rates : []
         );
-        const recommendedRate = recommendedShippingRate(
+        const compatibleRates = filterShippingRatesByHandoff(
           receivedRates,
+          form.handoffPreference
+        );
+        const recommendedRate = recommendedShippingRate(
+          compatibleRates,
           form.rateStrategy
         );
         setRates((previous) => ({ ...previous, [shipmentId]: receivedRates }));
         applyResponse(data);
         updateForm(shipmentId, {
+          handoffPreference: form.handoffPreference,
           rateStrategy: form.rateStrategy,
           selectedRate: recommendedRate,
         });
+        const preferenceLabel = form.handoffPreference === 'pickup'
+          ? 'recolección'
+          : 'entrega en punto';
         setMessage({
           type: recommendedRate ? 'success' : 'warning',
           text: recommendedRate
             ? `Encontramos ${receivedRates.length} opción(es) de envío y seleccionamos la más conveniente.`
-            : 'Envia no devolvió tarifas válidas para este envío.',
+            : receivedRates.length && form.handoffPreference !== 'any'
+              ? `Envia no confirmó tarifas compatibles con ${preferenceLabel}. Cambia la forma de entrega o vuelve a consultar.`
+              : 'Envia no devolvió tarifas válidas para este envío.',
         });
       } else if (action === 'label') {
         if (!form.selectedRate) {

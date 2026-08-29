@@ -160,7 +160,8 @@ export default function useOrderLogisticsController({
   const updateForm = (shipmentId, patch) => {
     if (
       Object.prototype.hasOwnProperty.call(patch, 'selectedRate') ||
-      Object.prototype.hasOwnProperty.call(patch, 'rateStrategy')
+      Object.prototype.hasOwnProperty.call(patch, 'rateStrategy') ||
+      Object.prototype.hasOwnProperty.call(patch, 'handoffPreference')
     ) {
       setLabelConfirmation((current) => current === shipmentId ? '' : current);
     }

@@ -1,4 +1,5 @@
 import {
+  filterShippingRatesByHandoff,
   rankShippingRates,
   shippingRateKey,
 } from './shippingRateRecommendation';
@@ -12,6 +13,8 @@ import {
 
 function assistantCopy({
   automaticTrackingEnabled,
+  compatibleRates,
+  handoffPreference,
   handoffMode,
   hasActiveLabel,
   labelCancelled,
@@ -23,6 +26,9 @@ function assistantCopy({
   shipmentRates,
   status,
 }) {
+  const incompatibleHandoff = (
+    handoffPreference !== 'any' && shipmentRates.length && !compatibleRates.length
+  );
   const title = !providerActive
     ? providerConfigured
       ? 'Activa Envia para comenzar'
@@ -41,11 +47,13 @@ function assistantCopy({
                 ? 'Prepara el paquete y llévalo al punto elegido'
                 : hasActiveLabel
                   ? 'Descarga la etiqueta y elige cómo entregar el paquete'
-                  : shipmentRates.length
-                    ? 'Crea la guía con esta opción'
-                    : labelCancelled
-                      ? 'Busca otra opción de envío'
-                      : 'Busca el mejor envío para este pedido';
+                  : incompatibleHandoff
+                    ? 'Elige otra forma de entrega'
+                    : compatibleRates.length
+                      ? 'Crea la guía con esta opción'
+                      : labelCancelled
+                        ? 'Busca otra opción de envío'
+                        : 'Busca el mejor envío para este pedido';
 
   const description = !providerActive
     ? 'Ve a Configuración de envíos y deja activa la conexión con Envia.'
@@ -63,11 +71,13 @@ function assistantCopy({
                 ? 'Pon la etiqueta, lleva el paquete al punto autorizado y conserva el comprobante.'
                 : hasActiveLabel
                   ? 'Primero descarga la etiqueta. Después elige si llevarás el paquete o pedirás recolección.'
-                  : shipmentRates.length
-                    ? 'La tienda ya comparó precio y tiempo. Confirma para crear la guía.'
-                    : labelCancelled
-                      ? 'La guía anterior fue cancelada. Busca una nueva opción para continuar.'
-                      : 'La tienda revisará los datos y comparará las opciones disponibles.';
+                  : incompatibleHandoff
+                    ? 'Envia no confirmó tarifas compatibles con tu elección. Cambia la forma de entrega o vuelve a consultar.'
+                    : compatibleRates.length
+                      ? 'La tienda ya comparó precio y tiempo. Confirma para crear la guía.'
+                      : labelCancelled
+                        ? 'La guía anterior fue cancelada. Busca una nueva opción para continuar.'
+                        : 'La tienda revisará los datos y comparará las opciones disponibles.';
 
   return { title, description };
 }
@@ -89,9 +99,15 @@ export function buildShipmentCardViewModel({
     (incident) => incident.status === 'open'
   );
   const shipmentRates = providedRates || [];
-  const rankedRates = rankShippingRates(shipmentRates, form.rateStrategy);
+  const compatibleRates = filterShippingRatesByHandoff(
+    shipmentRates,
+    form.handoffPreference
+  );
+  const rankedRates = rankShippingRates(compatibleRates, form.rateStrategy);
   const recommendedRate = rankedRates[0] || null;
-  const selectedRate = form.selectedRate || recommendedRate;
+  const selectedRate = rankedRates.find(
+    (rate) => shippingRateKey(rate) === shippingRateKey(form.selectedRate)
+  ) || recommendedRate;
   const selectedRateKey = shippingRateKey(selectedRate);
   const alternatives = rankedRates.filter(
     (rate) => shippingRateKey(rate) !== selectedRateKey
@@ -145,6 +161,8 @@ export function buildShipmentCardViewModel({
         : 2;
   const copy = assistantCopy({
     automaticTrackingEnabled,
+    compatibleRates,
+    handoffPreference: form.handoffPreference,
     handoffMode,
     hasActiveLabel,
     labelCancelled,
@@ -167,6 +185,7 @@ export function buildShipmentCardViewModel({
     assistantDescription: copy.description,
     assistantTitle: copy.title,
     automaticTrackingEnabled,
+    compatibleRates,
     dropoffAvailable,
     form,
     handoffComplete,
