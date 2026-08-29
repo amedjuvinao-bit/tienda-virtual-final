@@ -1,6 +1,7 @@
 'use strict';
 
 const { env } = require('../config/env');
+const OrderReturn = require('../models/OrderReturn');
 const ShippingSettings = require('../models/ShippingSettings');
 const {
   decryptShippingSecret,
@@ -64,6 +65,7 @@ function webhookDashboardUrl(mode = 'sandbox') {
 }
 
 const ENVIA_SANDBOX_WEBHOOK_TEST_STATUS = 'Shipped';
+const ENVIA_SANDBOX_RETURN_WEBHOOK_TEST_STATUS = 'Picked Up';
 const ENVIA_RECENT_SHIPMENT_MONTHS = 3;
 
 function recentShipmentPeriods(now = new Date(), count = ENVIA_RECENT_SHIPMENT_MONTHS) {
@@ -115,10 +117,48 @@ function shipmentIdentity(shipment = {}) {
   };
 }
 
+async function findRecentSandboxReturnShipment(
+  { OrderReturnModel = OrderReturn } = {}
+) {
+  const returnCase = await OrderReturnModel.findOne({
+    status: { $in: ['authorized', 'in_transit'] },
+    'shipping.integration.provider': 'envia',
+    'shipping.integration.mode': 'sandbox',
+    'shipping.integration.status': { $ne: 'cancelled' },
+    'shipping.integration.pickup.status': 'scheduled',
+    'shipping.carrierName': { $type: 'string', $gt: '' },
+    'shipping.trackingNumber': { $type: 'string', $gt: '' },
+  })
+    .sort({ 'shipping.integration.pickup.requestedAt': -1, updatedAt: -1 })
+    .select({
+      'shipping.carrierName': 1,
+      'shipping.trackingNumber': 1,
+      'shipping.integration.pickup.requestedAt': 1,
+      updatedAt: 1,
+    })
+    .lean();
+
+  if (!returnCase?.shipping) return null;
+  const identity = shipmentIdentity({
+    carrier: returnCase.shipping.carrierName,
+    trackingNumber: returnCase.shipping.trackingNumber,
+    createdAt:
+      returnCase.shipping.integration?.pickup?.requestedAt ||
+      returnCase.updatedAt,
+  });
+  if (!identity.carrier || !identity.trackingNumber) return null;
+  return {
+    ...identity,
+    webhookTestStatus: ENVIA_SANDBOX_RETURN_WEBHOOK_TEST_STATUS,
+    source: 'order_return',
+  };
+}
+
 async function resolveSandboxWebhookTestShipment(
   input = {},
   provider,
-  now = new Date()
+  now = new Date(),
+  { findReturnShipment = findRecentSandboxReturnShipment } = {}
 ) {
   if (typeof provider?.listShipmentsByMonth !== 'function') {
     throw new ShippingSettingsError(
@@ -146,6 +186,13 @@ async function resolveSandboxWebhookTestShipment(
   }
   candidates.sort((left, right) => right.createdAt - left.createdAt);
   if (candidates[0]) return candidates[0];
+
+  if (!requestedTrackingNumber && typeof findReturnShipment === 'function') {
+    const returnShipment = await findReturnShipment();
+    if (returnShipment?.carrier && returnShipment?.trackingNumber) {
+      return returnShipment;
+    }
+  }
 
   throw new ShippingSettingsError(
     requestedTrackingNumber
@@ -572,6 +619,7 @@ async function requestShippingWebhookProof(
     provider = null,
     fetchImpl,
     now = new Date(),
+    findReturnShipment = findRecentSandboxReturnShipment,
   } = {}
 ) {
   const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
@@ -607,11 +655,13 @@ async function requestShippingWebhookProof(
     config: runtime.envia,
     fetchImpl,
   });
-  const shipment = await resolveSandboxWebhookTestShipment(input, envia, now);
+  const shipment = await resolveSandboxWebhookTestShipment(input, envia, now, {
+    findReturnShipment,
+  });
   await envia.testWebhook({
     carrier: shipment.carrier,
     trackingNumber: shipment.trackingNumber,
-    status: ENVIA_SANDBOX_WEBHOOK_TEST_STATUS,
+    status: shipment.webhookTestStatus || ENVIA_SANDBOX_WEBHOOK_TEST_STATUS,
   });
   runtime.settings.updatedBy = actorId(actor);
   await runtime.settings.save();
@@ -713,6 +763,7 @@ module.exports = {
   ShippingSettingsError,
   activateShippingProvider,
   disableShippingProvider,
+  findRecentSandboxReturnShipment,
   getRuntimeShippingConfiguration,
   getShippingSettingsView,
   markShippingWebhookVerified,

@@ -21,6 +21,7 @@ const {
   findAdminRoutePermission,
 } = require('../security/adminRoutePermissionMap');
 const {
+  findRecentSandboxReturnShipment,
   markShippingWebhookVerified,
   permanentPublicHttpsUrl,
   readiness,
@@ -220,6 +221,89 @@ async function main() {
   });
   ok('el panel usa una guía real de la cuenta y el contrato oficial carrier/trackingNumber/status');
 
+  let returnLookupFilter = null;
+  let returnLookupSort = null;
+  const returnShipment = await findRecentSandboxReturnShipment({
+    OrderReturnModel: {
+      findOne(filter) {
+        returnLookupFilter = filter;
+        return {
+          sort(value) {
+            returnLookupSort = value;
+            return this;
+          },
+          select() {
+            return this;
+          },
+          async lean() {
+            return {
+              updatedAt: new Date('2026-08-29T20:00:00.000Z'),
+              shipping: {
+                carrierName: 'Coordinadora',
+                trackingNumber: 'COORSBX725217',
+                integration: {
+                  pickup: {
+                    requestedAt: new Date('2026-08-29T19:00:00.000Z'),
+                  },
+                },
+              },
+            };
+          },
+        };
+      },
+    },
+  });
+  assert.deepStrictEqual(returnLookupFilter.status, {
+    $in: ['authorized', 'in_transit'],
+  });
+  assert.strictEqual(
+    returnLookupFilter['shipping.integration.pickup.status'],
+    'scheduled'
+  );
+  assert.deepStrictEqual(returnLookupSort, {
+    'shipping.integration.pickup.requestedAt': -1,
+    updatedAt: -1,
+  });
+  assert.deepStrictEqual(returnShipment, {
+    carrier: 'coordinadora',
+    trackingNumber: 'COORSBX725217',
+    createdAt: new Date('2026-08-29T19:00:00.000Z').getTime(),
+    webhookTestStatus: 'Picked Up',
+    source: 'order_return',
+  });
+  ok('el respaldo consulta únicamente una devolución Envia Sandbox con recolección programada');
+
+  proofRequest = null;
+  await requestShippingWebhookProof(
+    {},
+    '64b000000000000000000001',
+    {
+      SettingsModel: { getSingleton: async () => proofSettings },
+      provider: {
+        async listShipmentsByMonth() {
+          return [];
+        },
+        async testWebhook(input) {
+          proofRequest = input;
+          return { success: true };
+        },
+      },
+      findReturnShipment: async () => ({
+        carrier: 'coordinadora',
+        trackingNumber: 'COORSBX725217',
+        webhookTestStatus: 'Picked Up',
+        source: 'order_return',
+      }),
+      now: new Date('2026-08-28T12:00:00.000Z'),
+    }
+  );
+  assert.deepStrictEqual(proofRequest, {
+    carrier: 'coordinadora',
+    trackingNumber: 'COORSBX725217',
+    status: 'Picked Up',
+  });
+  ok('si Envia omite la guía inversa del historial, el panel usa la devolución Sandbox programada');
+
   await assert.rejects(
     () => requestShippingWebhookProof(
       {},
@@ -234,6 +318,7 @@ async function main() {
             throw new Error('No debe solicitar la prueba sin una guía de la cuenta');
           },
         },
+        findReturnShipment: async () => null,
         now: new Date('2026-08-28T12:00:00.000Z'),
       }
     ),
