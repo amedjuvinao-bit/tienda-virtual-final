@@ -184,6 +184,30 @@ async function main() {
   });
   ok('guías de la cuenta, recolección y prueba de webhook usan los endpoints y cuerpos oficiales');
 
+  const rejectedPickupProvider = createEnviaProvider({
+    config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          meta: 'error',
+          message: 'Cannot schedule a pickup for requested day.',
+        };
+      },
+    }),
+  });
+  await assert.rejects(
+    () => rejectedPickupProvider.schedulePickup({
+      shipment: { pickup: { date: '2026-08-30' } },
+    }),
+    (error) =>
+      error.code === 'SHIPPING_PROVIDER_REJECTED' &&
+      error.message === 'La transportadora no acepta recolecciones el 30/08/2026. Elige otro día hábil y vuelve a intentarlo.' &&
+      error.details?.providerMessage === 'Cannot schedule a pickup for requested day.'
+  );
+  ok('un día de recolección rechazado se explica en español y conserva el detalle técnico de Envia');
+
   const capabilityCalls = [];
   const capabilityProvider = createEnviaProvider({
     config: { mode: 'sandbox', token: 'sandbox-secret', timeoutMs: 1000 },

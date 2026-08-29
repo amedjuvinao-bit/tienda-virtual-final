@@ -114,6 +114,31 @@ function safeProviderMessage(payload) {
   ).slice(0, 300);
 }
 
+function displayIsoDate(value) {
+  const match = clean(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+
+function providerFailure(payload, operation, body) {
+  const providerMessage = safeProviderMessage(payload);
+  if (
+    operation === 'schedule_pickup' &&
+    /cannot schedule (?:a )?pickup for (?:the )?requested day/i.test(providerMessage)
+  ) {
+    const requestedDate = displayIsoDate(body?.shipment?.pickup?.date);
+    return {
+      message: requestedDate
+        ? `La transportadora no acepta recolecciones el ${requestedDate}. Elige otro día hábil y vuelve a intentarlo.`
+        : 'La transportadora no acepta recolecciones en la fecha seleccionada. Elige otro día hábil y vuelve a intentarlo.',
+      providerMessage,
+    };
+  }
+  return {
+    message: providerMessage || 'La transportadora rechazó la operación.',
+    providerMessage,
+  };
+}
+
 function providerNotConfigured(mode = 'sandbox') {
   return new ShippingProviderError(
     `Envia ${mode === 'production' ? 'Producción' : 'Sandbox'} está preparado, pero falta guardar un token desde Configuración → Envíos.`,
@@ -217,19 +242,34 @@ function createEnviaProvider({
       );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok && !acceptedStatuses.includes(response.status)) {
+        const failure = providerFailure(payload, operation, body);
         throw new ShippingProviderError(
-          safeProviderMessage(payload) || `Envia respondió HTTP ${response.status}.`,
+          failure.message || `Envia respondió HTTP ${response.status}.`,
           'SHIPPING_PROVIDER_HTTP_ERROR',
           502,
-          { provider: 'envia', operation, providerStatus: response.status }
+          {
+            provider: 'envia',
+            operation,
+            providerStatus: response.status,
+            ...(failure.providerMessage
+              ? { providerMessage: failure.providerMessage }
+              : {}),
+          }
         );
       }
       if (!allowProviderError && clean(payload?.meta).toLowerCase() === 'error') {
+        const failure = providerFailure(payload, operation, body);
         throw new ShippingProviderError(
-          safeProviderMessage(payload) || 'La transportadora rechazó la operación.',
+          failure.message,
           'SHIPPING_PROVIDER_REJECTED',
           422,
-          { provider: 'envia', operation }
+          {
+            provider: 'envia',
+            operation,
+            ...(failure.providerMessage
+              ? { providerMessage: failure.providerMessage }
+              : {}),
+          }
         );
       }
       return normalize ? normalizeData(payload, operation) : payload;

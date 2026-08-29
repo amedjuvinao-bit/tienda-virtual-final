@@ -188,10 +188,29 @@ export function hasPhysicalFulfillment(order) {
   });
 }
 
-export function shipmentIdempotencyKey(orderId, shipment, action, rate = null) {
+function idempotencyFingerprint(value) {
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function shipmentIdempotencyKey(
+  orderId,
+  shipment,
+  action,
+  rate = null,
+  requestDescriptor = null
+) {
   const safe = (value) => String(value || '')
     .replace(/[^a-zA-Z0-9._-]/g, '-')
     .slice(0, 50);
+  const requestToken = requestDescriptor
+    ? `p${idempotencyFingerprint(JSON.stringify(requestDescriptor))}`
+    : '';
   return [
     action,
     safe(orderId),
@@ -199,5 +218,6 @@ export function shipmentIdempotencyKey(orderId, shipment, action, rate = null) {
     `r${Number(shipment?.revision || 0)}`,
     safe(rate?.carrier),
     safe(rate?.service),
+    requestToken,
   ].filter(Boolean).join(':');
 }

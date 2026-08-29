@@ -39,8 +39,14 @@ export default function useOrderShippingProviderActions({
     if (!canManage || !providers?.envia?.enabled) return;
     const shipmentId = String(shipment._id);
     const form = forms[shipmentId] || shipmentForm(shipment);
-    const idempotencyKey = (operation, rate = null) => (
-      shipmentIdempotencyKey(orderId, shipment, operation, rate)
+    const idempotencyKey = (operation, rate = null, requestDescriptor = null) => (
+      shipmentIdempotencyKey(
+        orderId,
+        shipment,
+        operation,
+        rate,
+        requestDescriptor
+      )
     );
 
     try {
@@ -193,7 +199,12 @@ export default function useOrderShippingProviderActions({
             pickupTimeEnd: form.pickupTimeEnd,
             pickupInstructions: form.pickupInstructions,
           },
-          idempotencyKey('pickup')
+          idempotencyKey('pickup', null, {
+            pickupDate: form.pickupDate,
+            pickupTimeStart: form.pickupTimeStart,
+            pickupTimeEnd: form.pickupTimeEnd,
+            pickupInstructions: form.pickupInstructions,
+          })
         );
         applyResponse(data);
         setMessage({

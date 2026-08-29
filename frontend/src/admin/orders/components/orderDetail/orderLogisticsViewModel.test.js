@@ -103,6 +103,28 @@ describe('orderLogisticsViewModel', () => {
     );
     expect(shipmentIdempotencyKey('order/1', { ...shipment, revision: 5 }, 'label', rate))
       .not.toBe(shipmentIdempotencyKey('order/1', shipment, 'label', rate));
+
+    const firstPickup = shipmentIdempotencyKey(
+      'order/1',
+      shipment,
+      'pickup',
+      null,
+      { pickupDate: '2026-08-30', pickupTimeStart: '09:00', pickupTimeEnd: '14:00' }
+    );
+    expect(firstPickup).toBe(shipmentIdempotencyKey(
+      'order/1',
+      shipment,
+      'pickup',
+      null,
+      { pickupDate: '2026-08-30', pickupTimeStart: '09:00', pickupTimeEnd: '14:00' }
+    ));
+    expect(firstPickup).not.toBe(shipmentIdempotencyKey(
+      'order/1',
+      shipment,
+      'pickup',
+      null,
+      { pickupDate: '2026-08-31', pickupTimeStart: '09:00', pickupTimeEnd: '14:00' }
+    ));
   });
 
   it('deriva el paso guiado sin mutar el envío ni mezclarlo con la vista', () => {
