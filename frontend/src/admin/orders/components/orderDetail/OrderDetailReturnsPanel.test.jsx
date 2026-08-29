@@ -250,6 +250,51 @@ describe('OrderDetailReturnsPanel', () => {
     expect(screen.getByText(/falta confirmar las unidades físicas/i)).toBeInTheDocument();
   });
 
+  it('mantiene visible la confirmación de una recolección RMA programada', () => {
+    const scheduledReturn = {
+      ...receivedReturn,
+      status: 'authorized',
+      shipping: {
+        carrierName: 'coordinadora',
+        trackingNumber: 'COORSBX725217',
+        labelUrl: 'https://labels.example/COORSBX725217.pdf',
+        integration: {
+          provider: 'envia',
+          status: 'pickup_scheduled',
+          handoffMode: 'pickup',
+          pickup: {
+            status: 'scheduled',
+            confirmation: 'AME260831000130',
+            requestedDate: '2026-08-31',
+            timeFrom: '14:03',
+            timeTo: '15:03',
+          },
+        },
+      },
+    };
+    render(
+      <OrderDetailReturnsPanel
+        data={{
+          orderId: 'order-1',
+          eligibility: [],
+          returns: [scheduledReturn],
+          shippingProviders: { envia: { enabled: true, mode: 'sandbox' } },
+          shippingDestinations: [],
+        }}
+        canManage
+        onShipping={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('status', { name: 'Recolección de devolución confirmada' })).toBeInTheDocument();
+    expect(screen.getByText('Recolección programada')).toBeInTheDocument();
+    expect(screen.getByText('31/08/2026')).toBeInTheDocument();
+    expect(screen.getByText('2:03 p. m. a 3:03 p. m.')).toBeInTheDocument();
+    expect(screen.getByText('AME260831000130')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar recolección' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entrega en punto' })).not.toBeInTheDocument();
+  });
+
   it('muestra un RMA listo para dinero sin habilitarlo a un rol de bodega', () => {
     render(
       <OrderDetailReturnsPanel

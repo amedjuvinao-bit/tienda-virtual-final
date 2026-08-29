@@ -16,6 +16,25 @@ function validPackage(item = {}) {
     .every((field) => Number(item[field]) > 0);
 }
 
+function pickupDateLabel(value) {
+  const text = String(value || '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : text || 'Por confirmar';
+}
+
+function pickupTimeLabel(value) {
+  const text = String(value || '').trim();
+  const match = /^(\d{1,2}):(\d{2})$/.exec(text);
+  if (!match) return text || 'Por confirmar';
+
+  const hours = Number(match[1]);
+  if (!Number.isInteger(hours) || hours < 0 || hours > 23) return text;
+
+  const suffix = hours < 12 ? 'a. m.' : 'p. m.';
+  const normalizedHours = hours % 12 || 12;
+  return `${normalizedHours}:${match[2]} ${suffix}`;
+}
+
 export default function OrderReturnShippingSection({
   busy,
   destinations = [],
@@ -67,6 +86,7 @@ export default function OrderReturnShippingSection({
   );
   const pickupCommitted = integration.handoffMode === 'pickup' &&
     ['scheduled', 'completed'].includes(integration.pickup?.status);
+  const pickup = integration.pickup || {};
   const dropoffCommitted = integration.handoffMode === 'dropoff';
   const canAutomate = envia.enabled === true;
 
@@ -168,6 +188,42 @@ export default function OrderReturnShippingSection({
               Descargar etiqueta
             </a>
           </div>
+          {pickupCommitted ? (
+            <div
+              role="status"
+              aria-label="Recolección de devolución confirmada"
+              style={{
+                marginTop: 9,
+                padding: 10,
+                borderRadius: 12,
+                border: `1px solid ${ORDER_DETAIL_THEME.success}`,
+                background: ORDER_DETAIL_THEME.primarySoftBg,
+              }}
+            >
+              <strong style={{ display: 'block', color: ORDER_DETAIL_THEME.success, fontSize: 12 }}>
+                {pickup.status === 'completed' ? 'Paquete recogido' : 'Recolección programada'}
+              </strong>
+              <span style={{ display: 'block', marginTop: 2, color: ORDER_DETAIL_THEME.mutedText, fontSize: 9 }}>
+                Envia confirmó la recogida del producto en la dirección del cliente.
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 7, marginTop: 8 }}>
+                {[
+                  ['Fecha', pickupDateLabel(pickup.requestedDate)],
+                  ['Horario', `${pickupTimeLabel(pickup.timeFrom)} a ${pickupTimeLabel(pickup.timeTo)}`],
+                  ['Confirmación Envia', pickup.confirmation || 'Confirmada por Envia'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ minWidth: 0, padding: '8px 9px', borderRadius: 10, border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`, background: ORDER_DETAIL_THEME.inputBg }}>
+                    <span style={{ display: 'block', color: ORDER_DETAIL_THEME.mutedText, fontSize: 8, fontWeight: 850, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      {label}
+                    </span>
+                    <strong title={value} style={{ display: 'block', marginTop: 3, color: ORDER_DETAIL_THEME.cardText, fontSize: 10, overflowWrap: 'anywhere' }}>
+                      {value}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 9 }}>
             <GhostButton disabled={busy} onClick={() => run('track')}>Actualizar seguimiento</GhostButton>
             {!pickupCommitted && !carrierDelivered ? (
