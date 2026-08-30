@@ -14,6 +14,7 @@ const FLAGS = Object.freeze({
   persist: '--confirm-persist',
   wompi: '--confirm-wompi-sandbox',
   factus: '--confirm-factus-habilitacion',
+  envia: '--confirm-envia-sandbox',
 });
 const ORDER_PREFIX = '--order=';
 const RESUME_ORDER_PREFIX = '--resume-order=';
@@ -93,11 +94,29 @@ function assertFactusHabilitationConfig(settings = {}) {
   return runtime;
 }
 
+function assertEnviaSandboxConfig(status = {}) {
+  const envia = status.envia || {};
+  assert.strictEqual(envia.mode, 'sandbox', 'Envia no está en Sandbox.');
+  assert.strictEqual(envia.enabled, true, 'Envia Sandbox no está activo.');
+  assert.strictEqual(
+    envia.webhookVerified,
+    true,
+    'Envia Sandbox no tiene una prueba real del webhook aprobada.'
+  );
+  assert.match(
+    envia.webhookUrl || '',
+    /^https:\/\//i,
+    'Envia exige una URL pública HTTPS para recibir los eventos.'
+  );
+  return envia;
+}
+
 module.exports = {
   FLAGS,
   ORDER_PREFIX,
   RESUME_ORDER_PREFIX,
   TRANSACTION_PREFIX,
+  assertEnviaSandboxConfig,
   assertFactusHabilitationConfig,
   assertNonProductionProcess,
   assertWompiSandboxConfig,

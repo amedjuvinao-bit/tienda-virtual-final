@@ -69,6 +69,32 @@ export function getProgressPresentation(status) {
   };
 }
 
+function wasDeliveredBeforeClosure(order = {}) {
+  if (String(order.fulfillmentStatus || '').toLowerCase() === 'delivered') return true;
+  if (String(order.fulfillment?.logisticsSummary?.status || '').toLowerCase() === 'delivered') {
+    return true;
+  }
+  return (order.fulfillment?.shipments || []).some((shipment) =>
+    String(shipment?.status || '').toLowerCase() === 'delivered' ||
+    Boolean(shipment?.deliveredAt)
+  );
+}
+
+export function getOrderProgressPresentation(order = {}) {
+  const progress = getProgressPresentation(order?.status);
+  if (
+    normalizeProgressStatus(order?.status) === 'refunded' &&
+    wasDeliveredBeforeClosure(order)
+  ) {
+    return {
+      ...progress,
+      description:
+        'La venta fue entregada y después se reembolsó; el ciclo comercial quedó conciliado.',
+    };
+  }
+  return progress;
+}
+
 function toNumber(value) {
   const numeric = Number(value || 0);
   return Number.isFinite(numeric) ? numeric : 0;
@@ -235,7 +261,7 @@ export function buildOrderSummaryRailModel(order) {
     exchange.noCharge ? 'processing' : order?.status
   );
   const summary = getOrderSummary(order);
-  const progress = getProgressPresentation(order?.status);
+  const progress = getOrderProgressPresentation(order);
 
   return {
     order,

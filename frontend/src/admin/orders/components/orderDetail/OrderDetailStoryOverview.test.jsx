@@ -824,6 +824,29 @@ describe('resumen decorativo original', () => {
     }
   );
 
+  it('explica correctamente un reembolso posterior a la entrega', () => {
+    const order = {
+      ...BASE_ORDER,
+      status: 'refunded',
+      fulfillmentStatus: 'delivered',
+      fulfillment: {
+        logisticsSummary: { status: 'delivered' },
+        shipments: [{ status: 'delivered', deliveredAt: '2026-08-29T20:00:00.000Z' }],
+      },
+    };
+    const model = buildOrderSummaryRailModel(order);
+
+    expect(model.progress).toMatchObject({
+      kind: 'terminal',
+      title: 'Reembolso conciliado',
+      description:
+        'La venta fue entregada y después se reembolsó; el ciclo comercial quedó conciliado.',
+    });
+    render(<OrderDetailSummaryRail order={order} />);
+    expect(screen.getByText(/La venta fue entregada y después se reembolsó/)).toBeInTheDocument();
+    expect(screen.queryByText(/cerró antes de completar la entrega/)).not.toBeInTheDocument();
+  });
+
   it('mantiene el contenedor delgado y módulos cohesivos dentro de sus límites', () => {
     const files = [
       ['OrderDetailSummaryRail.jsx', 220],

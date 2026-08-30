@@ -16,7 +16,7 @@ const {
   toStoredCartItem,
 } = require('../../services/cartCanonicalValidationService');
 
-const TRACE_TAG = 'wompi-factus-sandbox';
+const TRACE_TAG = 'wompi-factus-envia-sandbox';
 
 function buildTraceIdentity(now = new Date()) {
   const suffix = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -112,7 +112,7 @@ async function createAuthorizedCart(item, identity) {
     accessTokenHash: access.tokenHash,
     accessVersion: access.version,
     accessIssuedAt: new Date(),
-    userName: 'Cliente Sandbox Wompi Factus',
+    userName: 'Cliente Sandbox Wompi Factus Envia',
     userEmail: identity.email,
     items: [{ ...storedItem, qty: 1, quantity: 1 }],
     adminTags: [TRACE_TAG],

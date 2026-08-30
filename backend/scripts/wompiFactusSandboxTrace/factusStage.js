@@ -60,7 +60,7 @@ async function ensureFactusInvoice({ order, transaction, payments }) {
     const result = await service.issueElectronicInvoiceForOrder({
       orderId: order._id,
       source: 'wompi-factus-sandbox-trace',
-      initiatedBy: 'QA Wompi + Factus Sandbox',
+      initiatedBy: 'QA Wompi + Factus + Envia Sandbox',
       transaction,
       payments,
       skipWhenElectronicBillingIsInactive: false,
