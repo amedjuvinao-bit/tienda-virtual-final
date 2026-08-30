@@ -14,7 +14,7 @@ const {
 } = require('../../services/electronicInvoiceDocumentService');
 const {
   buildFactusInvoicePayload,
-} = require('../../lib/dian/providers/factus/factusProvider');
+} = require('../../lib/dian/providers/factusProvider');
 const { clean } = require('./config');
 
 function wait(milliseconds) {
