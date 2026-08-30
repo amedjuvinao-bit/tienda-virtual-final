@@ -13,6 +13,19 @@ function normalizedActions(actions) {
     .filter(Boolean))];
 }
 
+function persistedCarrierCapability(integration = {}, fallback = {}) {
+  const carrierActions = normalizedActions(integration.carrierActions);
+  return {
+    carrierActions,
+    ...(carrierActions.length ? { carrierActionsResolved: true } : {}),
+    carrierId: clean(
+      integration.selectedRate?.carrierId || fallback.carrierId,
+      80
+    ),
+    countryCode: clean(fallback.countryCode, 10).toUpperCase(),
+  };
+}
+
 async function resolveCarrierActions(provider, carrier, capability = {}) {
   const supplied = normalizedActions(capability.carrierActions);
   if (typeof capability.carrierActionsResolved === 'boolean') return supplied;
@@ -33,6 +46,7 @@ async function resolveCarrierActions(provider, carrier, capability = {}) {
 }
 
 module.exports = {
+  persistedCarrierCapability,
   resolveCarrierActions,
   resolveProvider,
 };

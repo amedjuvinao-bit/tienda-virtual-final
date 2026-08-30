@@ -118,7 +118,31 @@ async function validateOptionalCarrierCapabilities() {
   );
   assert.deepStrictEqual(knownUnavailable, []);
   assert.strictEqual(calls, 1);
+
+  const persisted = providerAdapter.persistedCarrierCapability({
+    carrierActions: ['pickup', 'PICKUP'],
+    selectedRate: { carrierId: 77 },
+  }, { countryCode: 'co' });
+  assert.deepStrictEqual(persisted, {
+    carrierActions: ['pickup'],
+    carrierActionsResolved: true,
+    carrierId: '77',
+    countryCode: 'CO',
+  });
+  const reused = await providerAdapter.resolveCarrierActions(
+    {
+      async getCarrierActions() {
+        calls += 1;
+        throw new Error('La guía no debe perder la capacidad ya confirmada');
+      },
+    },
+    'interrapidisimo',
+    persisted
+  );
+  assert.deepStrictEqual(reused, ['pickup']);
+  assert.strictEqual(calls, 1);
   ok('un fallo de capacidades opcionales no bloquea la creación de la guía');
+  ok('la recolección reutiliza la capacidad confirmada al generar la guía');
 }
 
 assert.strictEqual(

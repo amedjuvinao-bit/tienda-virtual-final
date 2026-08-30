@@ -15,6 +15,7 @@ const {
   pickupTime,
 } = require('../orderShipping/pickupPayloads');
 const {
+  persistedCarrierCapability,
   resolveCarrierActions,
   resolveProvider,
 } = require('../orderShipping/providerAdapter');
@@ -281,7 +282,14 @@ async function scheduleOrderReturnPickup(input = {}, dependencies = {}) {
   const { carrier, trackingNumber } = assertLabel(context.returnCase);
   assertJourneyNotDelivered(context.returnCase, 'programar una recolección');
   assertHandoffCompatible(context.returnCase, 'pickup');
-  const actions = await resolveCarrierActions(provider, carrier);
+  const shipping = returnShippingValue(context.returnCase);
+  const actions = await resolveCarrierActions(
+    provider,
+    carrier,
+    persistedCarrierCapability(shipping.integration, {
+      countryCode: shipping.originSnapshot?.countryCode,
+    })
+  );
   if (!actions.includes('pickup') && !actions.includes('pickup_mandatory')) {
     throw createLogisticsError(
       actions.includes('pickup_on_generate')
@@ -379,7 +387,6 @@ async function scheduleOrderReturnPickup(input = {}, dependencies = {}) {
       operation.result = result;
       await operation.save();
     }
-    const shipping = returnShippingValue(context.returnCase);
     const currentConfirmation = clean(shipping.integration?.pickup?.confirmation, 180);
     let updated = context.returnCase;
     if (currentConfirmation !== clean(result.confirmation, 180)) {

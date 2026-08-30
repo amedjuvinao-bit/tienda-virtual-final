@@ -18,7 +18,11 @@ const {
   pickupDisplayTime,
   pickupTime,
 } = require('./pickupPayloads');
-const { resolveCarrierActions, resolveProvider } = require('./providerAdapter');
+const {
+  persistedCarrierCapability,
+  resolveCarrierActions,
+  resolveProvider,
+} = require('./providerAdapter');
 const { clean, idValue } = require('./shared');
 
 const AMBIGUOUS_PICKUP_FAILURES = new Set([
@@ -44,7 +48,14 @@ async function scheduleOrderShipmentPickup(input = {}, dependencies = {}) {
     );
   }
 
-  const actions = await resolveCarrierActions(provider, carrier);
+  const integration = providerIntegration(shipment);
+  const actions = await resolveCarrierActions(
+    provider,
+    carrier,
+    persistedCarrierCapability(integration, {
+      countryCode: branch?.address?.countryCode,
+    })
+  );
   const supportsStandalonePickup = actions.includes('pickup') || actions.includes('pickup_mandatory');
   if (!supportsStandalonePickup) {
     throw createLogisticsError(
@@ -127,7 +138,6 @@ async function scheduleOrderShipmentPickup(input = {}, dependencies = {}) {
     await operation.save();
 
     const now = new Date();
-    const integration = providerIntegration(shipment);
     integration.provider = provider.key;
     integration.mode = provider.mode;
     integration.carrierActions = actions;
