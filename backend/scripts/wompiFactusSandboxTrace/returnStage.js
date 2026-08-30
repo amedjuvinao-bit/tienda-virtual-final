@@ -13,9 +13,8 @@ const {
   generateOrderReturnLabel,
   quoteOrderReturnShipping,
   scheduleOrderReturnPickup,
-  testOrderReturnShippingWebhook,
 } = require('../../services/orderReturnShippingService');
-const { poll } = require('./polling');
+const { ensureCarrierJourney } = require('./returnWebhookStage');
 const PACKAGE = Object.freeze({
   code: 'WFE-RMA-01',
   weightGrams: 500,
@@ -145,34 +144,6 @@ async function schedulePickup(order, returnCase) {
     }
   }
   throw lastError || new Error('Envia no aceptó una fecha de recolección Sandbox.');
-}
-async function requestReturnEvent(order, returnCase, status) {
-  await testOrderReturnShippingWebhook({
-    orderFilter: { _id: order._id },
-    returnId: returnCase._id,
-    expectedRevision: returnCase.revision,
-    provider: 'envia',
-    webhookStatus: status,
-  });
-}
-async function ensureCarrierJourney(order, returnCase) {
-  if (returnCase.status === 'authorized') {
-    await requestReturnEvent(order, returnCase, 'Picked Up');
-    returnCase = await poll(
-      'La recogida RMA',
-      () => freshReturn(returnCase._id),
-      (value) => value.status === 'in_transit'
-    );
-  }
-  if (!returnCase.shipping?.carrierDeliveredAt) {
-    await requestReturnEvent(order, returnCase, 'Delivered');
-    returnCase = await poll(
-      'La llegada RMA a la sede',
-      () => freshReturn(returnCase._id),
-      (value) => Boolean(value.shipping?.carrierDeliveredAt)
-    );
-  }
-  return returnCase;
 }
 async function receiveAndInspect(order, item, returnCase) {
   if (returnCase.status === 'in_transit') {

@@ -14,6 +14,9 @@ const rateOperations = require('../services/orderShipping/rateOperations');
 const providerAdapter = require('../services/orderShipping/providerAdapter');
 const trackingOperations = require('../services/orderShipping/trackingOperations');
 const {
+  retryOfficialWebhook,
+} = require('./wompiFactusSandboxTrace/returnWebhookStage');
+const {
   operationRequestHash,
   reserveOperation,
   stableHash,
@@ -143,6 +146,29 @@ async function validateOptionalCarrierCapabilities() {
   assert.strictEqual(calls, 1);
   ok('un fallo de capacidades opcionales no bloquea la creación de la guía');
   ok('la recolección reutiliza la capacidad confirmada al generar la guía');
+}
+
+async function validateEnviaWebhookPropagationRetry() {
+  let attempts = 0;
+  const delays = [];
+  const result = await retryOfficialWebhook({
+    confirmed: async () => false,
+    request: async () => {
+      attempts += 1;
+      if (attempts < 3) {
+        throw Object.assign(new Error('Envia todavía no propagó la guía'), {
+          code: 'SHIPPING_WEBHOOK_TEST_PROVIDER_ERROR',
+        });
+      }
+      return { accepted: true };
+    },
+    retryDelaysMs: [5_000, 10_000],
+    waitFn: async (delay) => delays.push(delay),
+  });
+  assert.deepStrictEqual(result, { accepted: true });
+  assert.strictEqual(attempts, 3);
+  assert.deepStrictEqual(delays, [5_000, 10_000]);
+  ok('la prueba oficial de Envia espera la propagación y reintenta sin intervención manual');
 }
 
 assert.strictEqual(
@@ -345,6 +371,7 @@ ok('la fachada y cada módulo especializado permanecen por debajo de 700 líneas
 
 async function main() {
   await validateOptionalCarrierCapabilities();
+  await validateEnviaWebhookPropagationRetry();
   await validateProductionWebhookTestBlock();
   await validateScopedShippingFingerprint();
   await validateShippingReplayAndConflicts();
