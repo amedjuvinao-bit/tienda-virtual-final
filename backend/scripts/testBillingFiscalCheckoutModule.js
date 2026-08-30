@@ -96,15 +96,43 @@ function baseOrderPayload() {
 }
 
 function validateNaturalPersonAndSameAddress() {
-  const result = validateOrderPayload(baseOrderPayload());
+  const payload = baseOrderPayload();
+  payload.customer.isFinalConsumer = false;
+  payload.billing.isFinalConsumer = false;
+  const result = validateOrderPayload(payload);
 
   assert(result.ok, `La persona natural válida fue rechazada: ${result.errors.join(' | ')}`);
+  assert(result.cleaned.customer.isFinalConsumer === false, 'La orden perdió la condición identificada del cliente.');
+  assert(result.cleaned.billing.isFinalConsumer === false, 'La orden perdió la condición fiscal de comprador identificado.');
   assert(result.cleaned.billing.documentType === 'CC', 'No se conservó el tipo de documento fiscal.');
   assert(result.cleaned.billing.documentNumber === '1234567890', 'No se conservó el documento fiscal.');
   assert(result.cleaned.billing.address === 'Calle 10 # 20-30', 'No se resolvió la dirección de envío como dirección fiscal.');
   assert(result.cleaned.billing.municipalityCode === '47001', 'No se conservó el código DIVIPOLA.');
 
   ok('Persona natural usa documento, correo y dirección fiscal resueltos');
+}
+
+function validateIdentifiedBuyerCannotBecomeFinalConsumer() {
+  const payload = baseOrderPayload();
+  payload.customer.isFinalConsumer = false;
+  payload.billing.isFinalConsumer = false;
+  const validated = validateOrderPayload(payload);
+  assert(validated.ok, validated.errors.join(' | '));
+
+  const customer = buildFactusCustomer({
+    source: 'web',
+    customer: validated.cleaned.customer,
+    billing: validated.cleaned.billing,
+  });
+
+  assert(customer.identification === '1234567890', 'Factus sustituyó el documento identificado.');
+  assert(customer.names === 'Ana Pérez', 'Factus sustituyó el nombre del comprador.');
+  assert(customer.email === 'ana@example.com', 'Factus eliminó el correo del comprador.');
+  assert(customer.address === 'Calle 10 # 20-30', 'Factus eliminó la dirección del comprador.');
+  assert(customer.municipality_code === '47001', 'Factus eliminó el municipio del comprador.');
+  assert(customer.identification !== '222222222222', 'El comprador identificado terminó como consumidor final.');
+
+  ok('Comprador identificado no puede degradarse a consumidor final');
 }
 
 function validateCompanyAndDifferentAddress() {
@@ -345,6 +373,7 @@ console.log('\nValidando datos fiscales reales y checkout de Facturación...');
 
 [
   validateNaturalPersonAndSameAddress,
+  validateIdentifiedBuyerCannotBecomeFinalConsumer,
   validateCompanyAndDifferentAddress,
   validateBackendRejectsIncompleteFiscalData,
   validateFactusNaturalCustomer,

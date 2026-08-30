@@ -294,6 +294,7 @@ module.exports = function validateOrderPayload(body) {
     departmentCode: trimTo(c.departmentCode || c.department, MAX_LEN.departmentCode) || undefined,
     deliveryType,
     wantsNewsletter: !!c.wantsNewsletter,
+    isFinalConsumer: c.isFinalConsumer === true,
   };
 
   if (isBlank(cleaned.customer.name)) errors.push('El nombre es obligatorio.');
@@ -338,6 +339,7 @@ module.exports = function validateOrderPayload(body) {
 
   cleaned.billing = {
     useSameAddress,
+    isFinalConsumer: b.isFinalConsumer === true,
     personType: BILLING_PERSON_TYPES.includes(personType) ? personType : '',
     documentType: BILLING_DOCUMENT_TYPES.includes(documentType) ? documentType : '',
     documentNumber,

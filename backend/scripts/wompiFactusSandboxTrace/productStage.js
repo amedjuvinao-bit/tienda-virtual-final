@@ -139,6 +139,7 @@ function buildCheckoutPayload({ item, identity, sessionId }) {
     departmentCode: '11',
     deliveryType: 'retiro',
     wantsNewsletter: false,
+    isFinalConsumer: false,
   };
   return {
     sessionId,
@@ -149,6 +150,7 @@ function buildCheckoutPayload({ item, identity, sessionId }) {
     customer,
     billing: {
       useSameAddress: true,
+      isFinalConsumer: false,
       personType: 'natural',
       documentType: 'CC',
       documentNumber: identity.documentNumber,
