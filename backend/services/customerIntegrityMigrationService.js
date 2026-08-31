@@ -216,6 +216,33 @@ function analyzeFollowUps(
   };
 }
 
+function indexKeyMatches(existing = {}, expected = {}) {
+  if (orderedKeyEquals(existing.key, expected)) return true;
+
+  const expectedEntries = Object.entries(expected || {});
+  const expectedTextFields = expectedEntries
+    .filter(([, value]) => value === 'text')
+    .map(([field]) => field)
+    .sort();
+  const isPureTextDefinition =
+    expectedTextFields.length > 0 &&
+    expectedTextFields.length === expectedEntries.length;
+  const isMongoTextRepresentation =
+    existing?.key?._fts === 'text' && Number(existing?.key?._ftsx) === 1;
+
+  if (!isPureTextDefinition || !isMongoTextRepresentation) return false;
+
+  const existingTextFields = Object.keys(existing.weights || {}).sort();
+  return (
+    existingTextFields.length === expectedTextFields.length &&
+    existingTextFields.every(
+      (field, index) =>
+        field === expectedTextFields[index] &&
+        Number(existing.weights[field]) === 1
+    )
+  );
+}
+
 function analyzeIndexes(existingByCollection = {}, definitions = buildIndexPlan()) {
   const results = [];
   const conflicts = [];
@@ -226,13 +253,13 @@ function analyzeIndexes(existingByCollection = {}, definitions = buildIndexPlan(
       (index) => index.name === definition.options.name
     );
     const sameKey = existing.find((index) =>
-      orderedKeyEquals(index.key, definition.key)
+      indexKeyMatches(index, definition.key)
     );
     const current = sameName || sameKey;
 
     if (current) {
       const exact =
-        orderedKeyEquals(current.key, definition.key) &&
+        indexKeyMatches(current, definition.key) &&
         semanticOptionsEqual(current, definition.options);
       if (!exact) {
         conflicts.push({

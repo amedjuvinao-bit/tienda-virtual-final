@@ -148,12 +148,13 @@ async function main() {
       },
       {
         name: 'fullName_text_phone_text_email_text_documentNumber_text_customerCode_text',
-        key: {
-          fullName: 'text',
-          phone: 'text',
-          email: 'text',
-          documentNumber: 'text',
-          customerCode: 'text',
+        key: { _fts: 'text', _ftsx: 1 },
+        weights: {
+          customerCode: 1,
+          documentNumber: 1,
+          email: 1,
+          fullName: 1,
+          phone: 1,
         },
       },
     ],
