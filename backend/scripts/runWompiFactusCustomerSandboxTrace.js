@@ -24,6 +24,9 @@ const {
   parseCustomerInvoiceArguments,
 } = require('./wompiFactusSandboxTrace/config');
 const {
+  cleanupSinglePendingInvoiceInSandbox,
+} = require('../lib/dian/providers/factusRangeAwareProvider');
+const {
   createAutonomousCheckout,
 } = require('./wompiFactusSandboxTrace/checkoutStage');
 const {
@@ -70,7 +73,7 @@ function customerEvidence(order, invoice) {
 
 async function run() {
   assertNonProductionProcess();
-  parseCustomerInvoiceArguments();
+  const args = parseCustomerInvoiceArguments();
   assert(
     MONGO_URI,
     'No existe MONGO_URI en backend/.env (también se aceptan MONGODB_URI, MONGO_URL o DATABASE_URL).'
@@ -91,6 +94,23 @@ async function run() {
   console.log(`Wompi: ${baseUrl}`);
   console.log(`Factus: ${factus.apiUrl}`);
   console.log('No ejecuta Envia, devolución, reembolso ni nota crédito.\n');
+
+  if (args.cleanupPending) {
+    const cleanup = await cleanupSinglePendingInvoiceInSandbox({
+      providerConfig: factus,
+      confirm: true,
+    });
+    assert(
+      cleanup.success === true,
+      cleanup.error ||
+        'No fue posible retirar de forma segura la factura pendiente de Factus Sandbox.'
+    );
+    console.log(
+      cleanup.cleaned
+        ? `OK PREVIO: pendiente no validada ${cleanup.referenceCode} retirada de Factus Sandbox`
+        : 'OK PREVIO: Factus Sandbox no tenía facturas pendientes'
+    );
+  }
 
   const checkout = await createAutonomousCheckout();
   const orderNumber = checkout.order.orderNumber;

@@ -12,6 +12,7 @@ const {
   assertEnviaSandboxConfig,
   assertNonProductionProcess,
   assertWompiSandboxConfig,
+  FACTUS_PENDING_CLEANUP_FLAG,
   parseArguments,
   parseCustomerInvoiceArguments,
 } = require('./wompiFactusSandboxTrace/config');
@@ -77,7 +78,16 @@ assert.deepEqual(
     '--confirm-wompi-sandbox',
     '--confirm-factus-habilitacion',
   ]),
-  { autonomous: true }
+  { autonomous: true, cleanupPending: false }
+);
+assert.deepEqual(
+  parseCustomerInvoiceArguments([
+    '--confirm-persist',
+    '--confirm-wompi-sandbox',
+    '--confirm-factus-habilitacion',
+    FACTUS_PENDING_CLEANUP_FLAG,
+  ]),
+  { autonomous: true, cleanupPending: true }
 );
 assert.throws(
   () => parseCustomerInvoiceArguments(['--confirm-persist']),

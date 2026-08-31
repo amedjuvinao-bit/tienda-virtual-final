@@ -19,6 +19,7 @@ const FLAGS = Object.freeze({
 const ORDER_PREFIX = '--order=';
 const RESUME_ORDER_PREFIX = '--resume-order=';
 const TRANSACTION_PREFIX = '--wompi-transaction=';
+const FACTUS_PENDING_CLEANUP_FLAG = '--confirm-factus-pending-cleanup';
 
 function clean(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -53,7 +54,10 @@ function parseCustomerInvoiceArguments(args = process.argv.slice(2)) {
   for (const flag of [FLAGS.persist, FLAGS.wompi, FLAGS.factus]) {
     assert(args.includes(flag), `Falta ${flag}.`);
   }
-  return { autonomous: true };
+  return {
+    autonomous: true,
+    cleanupPending: args.includes(FACTUS_PENDING_CLEANUP_FLAG),
+  };
 }
 
 function assertNonProductionProcess(env = process.env) {
@@ -120,6 +124,7 @@ function assertEnviaSandboxConfig(status = {}) {
 
 module.exports = {
   FLAGS,
+  FACTUS_PENDING_CLEANUP_FLAG,
   ORDER_PREFIX,
   RESUME_ORDER_PREFIX,
   TRANSACTION_PREFIX,
