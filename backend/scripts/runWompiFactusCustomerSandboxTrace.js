@@ -115,7 +115,9 @@ async function run() {
       throw failure;
     }
     console.log(
-      cleanup.cleaned
+      cleanup.settled
+        ? `OK PREVIO: Factus actualizó ante la DIAN el documento ${cleanup.invoiceNumber}`
+        : cleanup.cleaned
         ? `OK PREVIO: pendiente no validada ${cleanup.referenceCode} retirada de Factus Sandbox`
         : 'OK PREVIO: Factus Sandbox no tenía facturas pendientes'
     );
