@@ -38,8 +38,13 @@ function providerConfig(apiUrl = 'https://api-sandbox.factus.com.co') {
   };
 }
 
-function installFetch({ pending = [], deleteStatus = 200 } = {}) {
+function installFetch({
+  pending = [],
+  deleteStatus = 200,
+  settleAfterRefresh = false,
+} = {}) {
   const calls = [];
+  let refreshed = false;
 
   global.fetch = async (url, options = {}) => {
     const target = String(url);
@@ -60,9 +65,14 @@ function installFetch({ pending = [], deleteStatus = 200 } = {}) {
     ) {
       return response(200, {
         data: {
-          data: pending,
+          data: refreshed && settleAfterRefresh ? [] : pending,
         },
       });
+    }
+
+    if (method === 'GET' && /\/v2\/bills\/[^?]+$/.test(target)) {
+      refreshed = true;
+      return response(200, { data: { status: 1 } });
     }
 
     if (
@@ -73,7 +83,11 @@ function installFetch({ pending = [], deleteStatus = 200 } = {}) {
         deleteStatus,
         deleteStatus === 200
           ? { status: 'OK', message: 'Documento eliminado' }
-          : { message: 'No fue posible eliminar' }
+          : {
+              message: settleAfterRefresh
+                ? 'No se puede eliminar: el documento ya fue enviado a la DIAN. Verifica su estado.'
+                : 'No fue posible eliminar',
+            }
       );
     }
 
@@ -199,6 +213,34 @@ async function main() {
     assert(
       calls.every((call) => call.method !== 'DELETE'),
       'Eliminó un documento aunque había varias pendientes.'
+    );
+  });
+
+  await runCase('Actualiza por API un documento ya enviado a la DIAN', async () => {
+    const calls = installFetch({
+      pending: [
+        {
+          number: 'SETP990002244',
+          reference_code: 'pending-dian-244',
+          status: 0,
+        },
+      ],
+      deleteStatus: 409,
+      settleAfterRefresh: true,
+    });
+    const result = await cleanupSinglePendingInvoiceInSandbox({
+      providerConfig: providerConfig(),
+      confirm: true,
+      settlementAttempts: 1,
+      settlementDelayMs: 0,
+    });
+
+    assert(result.success && result.settled, 'No actualizó el estado enviado a DIAN.');
+    assert(
+      calls.some((call) =>
+        call.method === 'GET' && call.target.endsWith('/v2/bills/SETP990002244')
+      ),
+      'No consultó el documento por su número Factus.'
     );
   });
 
