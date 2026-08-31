@@ -49,6 +49,13 @@ function parseArguments(args = process.argv.slice(2)) {
   };
 }
 
+function parseCustomerInvoiceArguments(args = process.argv.slice(2)) {
+  for (const flag of [FLAGS.persist, FLAGS.wompi, FLAGS.factus]) {
+    assert(args.includes(flag), `Falta ${flag}.`);
+  }
+  return { autonomous: true };
+}
+
 function assertNonProductionProcess(env = process.env) {
   assert.notStrictEqual(
     clean(env.NODE_ENV, 40).toLowerCase(),
@@ -122,4 +129,5 @@ module.exports = {
   assertWompiSandboxConfig,
   clean,
   parseArguments,
+  parseCustomerInvoiceArguments,
 };

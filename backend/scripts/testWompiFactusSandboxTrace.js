@@ -13,6 +13,7 @@ const {
   assertNonProductionProcess,
   assertWompiSandboxConfig,
   parseArguments,
+  parseCustomerInvoiceArguments,
 } = require('./wompiFactusSandboxTrace/config');
 const {
   buildCompactJwe,
@@ -28,6 +29,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'backend/package.
 const scriptDirectory = path.join(__dirname, 'wompiFactusSandboxTrace');
 const sourceFiles = [
   path.join(__dirname, 'runWompiFactusSandboxTrace.js'),
+  path.join(__dirname, 'runWompiFactusCustomerSandboxTrace.js'),
   ...fs.readdirSync(scriptDirectory).map((name) => path.join(scriptDirectory, name)),
 ];
 
@@ -69,6 +71,18 @@ assert.deepEqual(
   }
 );
 assert.throws(() => parseArguments([]), /--confirm-persist/);
+assert.deepEqual(
+  parseCustomerInvoiceArguments([
+    '--confirm-persist',
+    '--confirm-wompi-sandbox',
+    '--confirm-factus-habilitacion',
+  ]),
+  { autonomous: true }
+);
+assert.throws(
+  () => parseCustomerInvoiceArguments(['--confirm-persist']),
+  /--confirm-wompi-sandbox/
+);
 assert.throws(
   () => parseArguments([
     '--confirm-persist',
@@ -258,6 +272,10 @@ assert.strictEqual(
 assert.strictEqual(
   packageJson.scripts['demo:orders-wompi-factus-envia-sandbox'],
   'node scripts/runWompiFactusSandboxTrace.js'
+);
+assert.strictEqual(
+  packageJson.scripts['demo:orders-wompi-factus-customer-sandbox'],
+  'node scripts/runWompiFactusCustomerSandboxTrace.js'
 );
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/orders-ci.yml'), 'utf8');
 assert(workflow.includes('npm --prefix backend run test:orders-wompi-factus-sandbox'));
