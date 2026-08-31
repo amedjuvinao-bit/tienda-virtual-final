@@ -12,9 +12,7 @@ const {
   assertEnviaSandboxConfig,
   assertNonProductionProcess,
   assertWompiSandboxConfig,
-  FACTUS_PENDING_CLEANUP_FLAG,
   parseArguments,
-  parseCustomerInvoiceArguments,
 } = require('./wompiFactusSandboxTrace/config');
 const {
   buildCompactJwe,
@@ -30,7 +28,6 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'backend/package.
 const scriptDirectory = path.join(__dirname, 'wompiFactusSandboxTrace');
 const sourceFiles = [
   path.join(__dirname, 'runWompiFactusSandboxTrace.js'),
-  path.join(__dirname, 'runWompiFactusCustomerSandboxTrace.js'),
   ...fs.readdirSync(scriptDirectory).map((name) => path.join(scriptDirectory, name)),
 ];
 
@@ -72,27 +69,6 @@ assert.deepEqual(
   }
 );
 assert.throws(() => parseArguments([]), /--confirm-persist/);
-assert.deepEqual(
-  parseCustomerInvoiceArguments([
-    '--confirm-persist',
-    '--confirm-wompi-sandbox',
-    '--confirm-factus-habilitacion',
-  ]),
-  { autonomous: true, cleanupPending: false }
-);
-assert.deepEqual(
-  parseCustomerInvoiceArguments([
-    '--confirm-persist',
-    '--confirm-wompi-sandbox',
-    '--confirm-factus-habilitacion',
-    FACTUS_PENDING_CLEANUP_FLAG,
-  ]),
-  { autonomous: true, cleanupPending: true }
-);
-assert.throws(
-  () => parseCustomerInvoiceArguments(['--confirm-persist']),
-  /--confirm-wompi-sandbox/
-);
 assert.throws(
   () => parseArguments([
     '--confirm-persist',
@@ -180,11 +156,6 @@ assert.strictEqual(nextBusinessDate(2, new Date('2026-08-28T12:00:00Z')), '2026-
 assert.throws(() => choosePickupRate([]), /no devolvió una tarifa RMA/i);
 
 const allSource = sourceFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
-assert(
-  allSource.includes('verifyCustomerContractWithoutRemoteFactus') &&
-    allSource.includes("cleanup.code === 'FACTUS_PENDING_DIAN_PROCESSING'"),
-  'La validación del cliente depende obligatoriamente del Sandbox externo de Factus.'
-);
 for (const token of [
   'findPurchasableInventoryItem',
   'issueCartAccess',
@@ -287,10 +258,6 @@ assert.strictEqual(
 assert.strictEqual(
   packageJson.scripts['demo:orders-wompi-factus-envia-sandbox'],
   'node scripts/runWompiFactusSandboxTrace.js'
-);
-assert.strictEqual(
-  packageJson.scripts['demo:orders-wompi-factus-customer-sandbox'],
-  'node scripts/runWompiFactusCustomerSandboxTrace.js'
 );
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/orders-ci.yml'), 'utf8');
 assert(workflow.includes('npm --prefix backend run test:orders-wompi-factus-sandbox'));
