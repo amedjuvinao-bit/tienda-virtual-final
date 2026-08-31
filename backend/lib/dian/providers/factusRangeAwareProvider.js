@@ -168,6 +168,81 @@ function referenceCode(document = {}) {
   );
 }
 
+function invoiceNumber(document = {}) {
+  return cleanText(document.number || document.invoice_number || '', 160);
+}
+
+function wasAlreadySentToDian(result = {}) {
+  const message = cleanText(result.error || result?.data?.message || '', 500)
+    .toLowerCase();
+  return message.includes('enviado a la dian');
+}
+
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function refreshPendingInvoiceUntilSettled({
+  credentials,
+  tokenResult,
+  pending,
+  attempts = 6,
+  delayMs = 5000,
+}) {
+  const number = invoiceNumber(pending);
+  const expectedReference = referenceCode(pending);
+
+  if (!number) {
+    return {
+      success: false,
+      code: 'FACTUS_PENDING_DIAN_NUMBER_MISSING',
+      error:
+        'Factus envió el documento a la DIAN, pero no devolvió el número necesario para actualizar su estado.',
+    };
+  }
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await fetchJsonWithTimeout(
+      `${credentials.apiUrl}/v2/bills/${encodeURIComponent(number)}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `${tokenResult.tokenType} ${tokenResult.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const listed = await listPendingInvoices({ credentials, tokenResult });
+    if (!listed.success) {
+      return {
+        success: false,
+        code: listed.code,
+        error: listed.error,
+      };
+    }
+
+    const stillPending = listed.documents.some(
+      (document) => referenceCode(document) === expectedReference
+    );
+    if (!stillPending) {
+      return { success: true, number, referenceCode: expectedReference };
+    }
+
+    if (attempt < attempts) await wait(delayMs);
+  }
+
+  return {
+    success: false,
+    code: 'FACTUS_PENDING_DIAN_PROCESSING',
+    number,
+    referenceCode: expectedReference,
+    error:
+      'Factus todavía está esperando la respuesta de la DIAN para el documento anterior. No se creó otra orden ni otro pago.',
+  };
+}
+
 function isPendingDocument(document = {}) {
   const status = cleanText(document.status, 60).toLowerCase();
   return (
@@ -416,6 +491,43 @@ async function cleanupSinglePendingInvoiceInSandbox(data = {}) {
     });
 
     if (!deleted.success) {
+      if (wasAlreadySentToDian(deleted)) {
+        const settled = await refreshPendingInvoiceUntilSettled({
+          credentials,
+          tokenResult,
+          pending,
+          attempts: positiveInteger(data.settlementAttempts) || 6,
+          delayMs: Number.isFinite(Number(data.settlementDelayMs))
+            ? Math.max(0, Number(data.settlementDelayMs))
+            : 5000,
+        });
+
+        if (settled.success) {
+          return {
+            success: true,
+            provider: 'factus',
+            stage: 'pending_cleanup_dian_settled',
+            status: 200,
+            cleaned: false,
+            settled: true,
+            referenceCode: pendingReference,
+            invoiceNumber: settled.number,
+            message: 'Factus actualizó el documento que ya había enviado a la DIAN.',
+          };
+        }
+
+        return {
+          success: false,
+          provider: 'factus',
+          stage: 'pending_cleanup_dian_processing',
+          status: 409,
+          code: settled.code,
+          referenceCode: pendingReference,
+          invoiceNumber: settled.number || invoiceNumber(pending),
+          error: settled.error,
+        };
+      }
+
       return {
         success: false,
         provider: 'factus',
