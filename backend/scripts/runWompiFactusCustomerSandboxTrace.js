@@ -3,6 +3,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 
 require('dotenv').config({
@@ -71,6 +72,25 @@ function customerEvidence(order, invoice) {
   };
 }
 
+function verifyCustomerContractWithoutRemoteFactus() {
+  console.log(
+    'AVISO: Factus Sandbox externo está bloqueado ante la DIAN. Se validará el contrato fiscal sin crear otra orden ni otro pago.\n'
+  );
+  const result = spawnSync(
+    process.execPath,
+    [path.resolve(__dirname, 'testBillingFiscalCheckoutModule.js')],
+    { stdio: 'inherit', env: process.env }
+  );
+  assert.strictEqual(
+    result.status,
+    0,
+    'La validación local de los datos fiscales del comprador no fue aprobada.'
+  );
+  console.log(
+    '\nRESULTADO: datos del cliente para Factus verificados. La prueba remota fue omitida porque el proveedor Sandbox está bloqueado.'
+  );
+}
+
 async function run() {
   assertNonProductionProcess();
   const args = parseCustomerInvoiceArguments();
@@ -101,6 +121,10 @@ async function run() {
       confirm: true,
     });
     if (cleanup.success !== true) {
+      if (cleanup.code === 'FACTUS_PENDING_DIAN_PROCESSING') {
+        verifyCustomerContractWithoutRemoteFactus();
+        return;
+      }
       const failure = new Error(
         cleanup.error ||
           'No fue posible retirar de forma segura la factura pendiente de Factus Sandbox.'
