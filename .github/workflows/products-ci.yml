@@ -85,6 +85,65 @@ jobs:
       - name: Validar contrato de reembolsos
         run: npm --prefix backend run test:order-refund-contract
 
+      - name: Validar conciliación comercial de órdenes
+        run: npm --prefix backend run test:order-commercial-reconciliation
+
+      - name: Validar automatización segura de reembolsos
+        run: npm --prefix backend run test:order-refund-automation
+
+      - name: Validar arquitectura y rendimiento de órdenes
+        run: npm --prefix backend run test:orders-architecture
+
+      - name: Validar permisos y seguridad de órdenes
+        run: npm --prefix backend run test:orders-security
+
+      - name: Validar logística avanzada de órdenes
+        run: npm --prefix backend run test:orders-logistics
+
+      - name: Validar transportadoras sin llamadas externas
+        env:
+          SHIPPING_PROVIDER: manual
+          ENVIA_MODE: sandbox
+          ENVIA_TOKEN: ''
+          ENVIA_WEBHOOK_SECRET: ''
+          INTEGRATIONS_ENCRYPTION_KEY: shipping-contract-test-key-with-32-characters
+        run: |
+          npm --prefix backend run test:shipping-providers
+          npm --prefix backend run test:shipping-settings
+
+      - name: Validar devoluciones RMA de órdenes
+        run: npm --prefix backend run test:orders-returns
+
+      - name: Validar centro operativo de órdenes
+        run: npm --prefix backend run test:orders-operations
+
+      - name: Validar observabilidad operativa de órdenes
+        run: npm --prefix backend run test:orders-observability
+
+      - name: Validar informes asistidos de órdenes por WhatsApp
+        run: npm --prefix backend run test:orders-whatsapp-assisted
+
+      - name: Validar conexión transaccional entre órdenes y clientes
+        run: npm --prefix backend run test:orders-customer-connection
+
+      - name: Validar municipio fiscal de órdenes
+        run: npm --prefix backend run test:orders-billing-municipality
+
+      - name: Validar orden manual facturable sin emitir documentos
+        run: npm --prefix backend run test:orders-manual-invoice
+
+      - name: Validar precontrol fiscal previo a emisión
+        run: npm --prefix backend run test:billing-invoice-preflight
+
+      - name: Validar aislamiento del plan de estrés de órdenes
+        run: npm --prefix backend run test:orders-stress-plan
+
+      - name: Validar simulador persistente de órdenes
+        run: npm --prefix backend run test:orders-trace-seed
+
+      - name: Validar prueba visual de elegibilidad logística
+        run: npm --prefix backend run test:orders-logistics-eligibility-trace
+
       - name: Validar contrato de estados masivos
         run: npm --prefix backend run test:order-bulk-status-contract
 
@@ -174,7 +233,8 @@ jobs:
       - name: Validar estados masivos de órdenes
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_bulk_status?replicaSet=rs0
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:order-bulk-status-inventory
 
@@ -183,10 +243,19 @@ jobs:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_multi_branch?replicaSet=rs0
         run: npm --prefix backend run test:order-multi-branch-inventory
 
+      - name: Validar transacciones, estrés y alertas de órdenes
+        env:
+          ORDERS_STRESS_MONGO_URI: mongodb://127.0.0.1:27017/orders_ci_stress?replicaSet=rs0
+          ORDERS_STRESS_ORDER_COUNT: 350
+          ORDERS_STRESS_QUERY_REQUESTS: 140
+          ORDERS_STRESS_QUERY_CONCURRENCY: 14
+        run: npm --prefix backend run test:orders-stress
+
       - name: Validar venta integral completa
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_complete_sale?replicaSet=rs0
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:complete-sale-integration
 
@@ -213,7 +282,8 @@ jobs:
       - name: Validar cumplimiento por tipo de producto
         env:
           PRODUCTS_TEST_MONGO_URI: mongodb://127.0.0.1:27017/productos_ci_fulfillment
-          DIGITAL_DELIVERY_TOKEN_SECRET: products-ci-digital-delivery-secret
+          # Semilla efímera y pública para pruebas; no es una credencial de producción.
+          DIGITAL_DELIVERY_TOKEN_SECRET: NOT_A_SECRET_TEST_ONLY_${{ github.run_id }}_${{ github.run_attempt }}
           PUBLIC_BACKEND_URL: https://backend.example
         run: npm --prefix backend run test:product-fulfillment-integration
 
@@ -251,6 +321,39 @@ jobs:
 
       - name: Validar cambio de foto por variante
         run: npm --prefix frontend run test:product-variant-images
+
+      - name: Validar vista previa asistida de WhatsApp para órdenes
+        run: npm --prefix frontend run test:orders-whatsapp-assisted
+
+      - name: Validar permisos visuales de órdenes
+        run: npm --prefix frontend run test:orders-security
+
+      - name: Validar arquitectura de consultas de órdenes
+        run: npm --prefix frontend run test:orders-architecture
+
+      - name: Validar logística visual de órdenes
+        run: npm --prefix frontend run test:orders-logistics
+
+      - name: Validar configuración visual de transportadoras
+        run: npm --prefix frontend run test:shipping-settings-ui
+
+      - name: Validar centro operativo visual de órdenes
+        run: npm --prefix frontend run test:orders-operations
+
+      - name: Validar relato profesional del detalle de orden
+        run: npm --prefix frontend run test:orders-detail-story
+
+      - name: Validar teclado, copiar y pegar dentro del detalle
+        run: npm --prefix frontend run test:orders-keyboard
+
+      - name: Validar corrección y sincronización del cliente desde la orden
+        run: npm --prefix frontend run test:orders-customer-connection
+
+      - name: Validar interfaz posventa RMA de órdenes
+        run: npm --prefix frontend run test:orders-returns
+
+      - name: Validar vista previa fiscal antes de emitir
+        run: npm --prefix frontend run test:billing-invoice-preflight
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

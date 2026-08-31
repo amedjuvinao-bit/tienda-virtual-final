@@ -16,6 +16,9 @@ const {
 const {
   assertBundlePurchasable,
 } = require('./productBundleService');
+const {
+  normalizeProductCustoms,
+} = require('../lib/products/productCustomsConfig');
 
 const MONEY_FACTOR = 100;
 
@@ -110,7 +113,7 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
 
   let query = ProductModel.find({ _id: { $in: productIds } })
     .select(
-      'title price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
+      'title price image images sku barcode category categories variants visible active archivedAt productType trackInventory allowBackorder customs digitalDelivery.fileName digitalDelivery.mimeType digitalDelivery.fileSizeBytes digitalDelivery.downloadLimit digitalDelivery.accessDays digitalDelivery.deliveryMode serviceDelivery.fulfillmentMode serviceDelivery.locationType serviceDelivery.durationMinutes serviceDelivery.leadTimeHours serviceDelivery.customerInstructions bundleComponents'
     );
 
   if (session && typeof query.session === 'function') query = query.session(session);
@@ -204,6 +207,7 @@ async function resolveAuthoritativeItems(items = [], options = {}) {
       requiresShipping: fulfillment.requiresShipping,
       fulfillmentKind: fulfillment.kind,
       fulfillmentSnapshot: fulfillment,
+      customsSnapshot: normalizeProductCustoms(product.customs),
       quantity,
       qty: quantity,
       price: unitPrice,

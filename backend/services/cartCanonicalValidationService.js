@@ -168,9 +168,13 @@ async function readAvailableStock({
   bundleAvailability,
 }) {
   if (product.productType === 'bundle') {
+    const availableStock = Number(await bundleAvailability(product));
+    if (!Number.isFinite(availableStock)) {
+      return { inventoryTracked: false, availableStock: null };
+    }
     return {
       inventoryTracked: true,
-      availableStock: safeStock(await bundleAvailability(product)),
+      availableStock: safeStock(availableStock),
     };
   }
 

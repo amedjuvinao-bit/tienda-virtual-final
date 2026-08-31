@@ -13,12 +13,16 @@ const {
   getCartAccessSecret,
   hashCartAccessToken,
   issueCartAccess,
+  rotateCartAccess,
   stripCartSecrets,
   verifyCartAccess,
 } = require('../services/cartAccessService');
 const {
   createGuestOrderAccessToken,
 } = require('../services/publicPaymentAccessService');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
 
 const SECRET = 'cart-access-test-secret-only-12345678901234567890';
 const CART_A_ID = '64b64b64b64b64b64b64c001';
@@ -34,10 +38,7 @@ const cartContextSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'context', 'CartContext.jsx'),
   'utf8'
 );
-const checkoutSource = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'frontend', 'src', 'pages', 'CheckoutPage.jsx'),
-  'utf8'
-);
+const checkoutSource = readCheckoutComposition();
 const frontendAccessSource = fs.readFileSync(
   path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'cartAccess.js'),
   'utf8'
@@ -210,6 +211,22 @@ async function runHttpRouteContract() {
       body: JSON.stringify({ items: [] }),
     });
     assert.equal(updated.status, 200);
+    records.get(sessionId).items = [{ productId: PRODUCT_ID, qty: 1 }];
+    const refreshed = await request(`/${encodeURIComponent(sessionId)}/access/refresh`, {
+      method: 'POST',
+      headers: safeHeaders,
+    });
+    assert.equal(refreshed.status, 200);
+    assert.equal(refreshed.body.sessionId, sessionId);
+    assert.notEqual(refreshed.body.cartAccessToken, token);
+    const refreshedHeaders = {
+      'X-Session-Id': sessionId,
+      'X-Cart-Access-Token': refreshed.body.cartAccessToken,
+    };
+    const deniedOldToken = await request(`/${encodeURIComponent(sessionId)}`, {
+      headers: safeHeaders,
+    });
+    assert.equal(deniedOldToken.status, 404);
     const deniedDelete = await request(`/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
       headers: { 'X-Session-Id': sessionId },
@@ -218,12 +235,12 @@ async function runHttpRouteContract() {
     const deleted = await request(`/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
       headers: {
-        ...safeHeaders,
-        'If-Match-Updated-At': updated.body.version,
+        ...refreshedHeaders,
+        'If-Match-Updated-At': refreshed.body.version,
       },
     });
     assert.equal(deleted.status, 200);
-    const afterDelete = await request(`/${encodeURIComponent(sessionId)}`, { headers: safeHeaders });
+    const afterDelete = await request(`/${encodeURIComponent(sessionId)}`, { headers: refreshedHeaders });
     assert.equal(afterDelete.status, 404);
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));
@@ -252,7 +269,7 @@ async function main() {
     assert(create.includes('issueCartAccess({'));
     assert(!create.includes('findOne({ sessionId'));
     assert(!create.includes('req.body.sessionId'));
-    assert.equal((routeSource.match(/cartAccessToken: access\.token/g) || []).length, 1);
+    assert.equal((routeSource.match(/cartAccessToken: access\.token/g) || []).length, 2);
     assert.throws(
       () => getCartAccessSecret({ NODE_ENV: 'production', JWT_SECRET: SECRET }),
       /CART_ACCESS_SECRET/
@@ -316,12 +333,13 @@ async function main() {
     );
   });
 
-  await check('lectura, modificación, validación y eliminación comparten autorización', () => {
+  await check('lectura, modificación, validación, renovación y eliminación comparten autorización', () => {
     const sections = [
       routeSlice('get', '/:sessionId', "router.put('/:sessionId'"),
       routeSlice('put', '/:sessionId', "router.delete('/:sessionId'"),
       routeSlice('delete', '/:sessionId', "router.post('/validate'"),
-      routeSlice('post', '/validate', "router.post('/merge'"),
+      routeSlice('post', '/validate', "router.post('/:sessionId/access/refresh'"),
+      routeSlice('post', '/:sessionId/access/refresh', "router.post('/merge'"),
     ];
     for (const section of sections) {
       assert(section.includes('rateLimit'));
@@ -329,6 +347,37 @@ async function main() {
       assert(section.includes('sendCartAccessNotFound(res)'));
     }
     assert(!sections[1].includes('upsert: true'));
+    assert(sections[4].includes('rotateCartAccess({'));
+    assert(sections[4].includes('cart.convertedOrderId'));
+  });
+
+  await check('renovación conserva la sesión e invalida el token anterior', () => {
+    const rotated = rotateCartAccess({
+      cartId: CART_A_ID,
+      sessionId: cartA.sessionId,
+      secret: SECRET,
+    });
+    const rotatedRecord = cartRecord(CART_A_ID, rotated);
+    assert.equal(rotated.sessionId, cartA.sessionId);
+    assert.notEqual(rotated.token, cartA.token);
+    assert.equal(
+      verifyCartAccess({
+        cart: rotatedRecord,
+        sessionId: cartA.sessionId,
+        token: cartA.token,
+        secret: SECRET,
+      }),
+      false
+    );
+    assert.equal(
+      verifyCartAccess({
+        cart: rotatedRecord,
+        sessionId: rotated.sessionId,
+        token: rotated.token,
+        secret: SECRET,
+      }),
+      true
+    );
   });
 
   await check('no existe reemisión por id o sessionId para carritos existentes', () => {

@@ -762,6 +762,9 @@ export default function ProductDetailView({
   variantAxes = [],
   selectedAttributes = {},
   onVariantAttributeChange,
+  isVariantOptionAvailable = () => true,
+  inventoryTracked = false,
+  selectedAvailableStock = null,
   quantity,
   setQuantity,
   reviewName,
@@ -1522,6 +1525,7 @@ export default function ProductDetailView({
                       >
                         {axis.values.map((option, index) => {
                           const value = String(option || "").trim();
+                          const available = isVariantOptionAvailable(axis.key, value);
                           const active =
                             String(selectedAttributes?.[axis.key] || "")
                               .trim()
@@ -1538,6 +1542,8 @@ export default function ProductDetailView({
                                 title={`${axis.label}: ${value}`}
                                 aria-label={`${axis.label}: ${value}`}
                                 aria-pressed={active}
+                                aria-disabled={!available}
+                                disabled={!available}
                                 className={`pd-color-dot ${active ? "active" : ""}`}
                                 style={{
                                   backgroundColor: value,
@@ -1545,6 +1551,8 @@ export default function ProductDetailView({
                                   boxShadow: active
                                     ? `0 0 0 3px ${hexToRgba(accent1, 0.22)}, 0 4px 10px rgba(0,0,0,0.08)`
                                     : "0 2px 6px rgba(0,0,0,0.06)",
+                                  opacity: available ? 1 : 0.35,
+                                  cursor: available ? "pointer" : "not-allowed",
                                 }}
                               />
                             );
@@ -1558,6 +1566,8 @@ export default function ProductDetailView({
                                 onVariantAttributeChange(axis.key, value)
                               }
                               aria-pressed={active}
+                              aria-disabled={!available}
+                              disabled={!available}
                               className={isColorAxis ? "pd-color-chip" : "pd-size-btn"}
                               style={{
                                 borderRadius: 10,
@@ -1571,6 +1581,8 @@ export default function ProductDetailView({
                                 boxShadow: active
                                   ? `0 8px 20px ${hexToRgba(accent1, 0.22)}`
                                   : "0 2px 8px rgba(31,23,42,0.04)",
+                                opacity: available ? 1 : 0.42,
+                                cursor: available ? "pointer" : "not-allowed",
                               }}
                             >
                               {value}
@@ -1683,6 +1695,21 @@ export default function ProductDetailView({
                   <span className="pd-section-label" style={{ color: textSecondary }}>
                     Cantidad
                   </span>
+                  {inventoryTracked && (
+                    <div
+                      role="status"
+                      style={{
+                        marginBottom: 10,
+                        color: selectedAvailableStock > 0 ? "#15803d" : "#92400e",
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {selectedAvailableStock > 0
+                        ? `${selectedAvailableStock} ${selectedAvailableStock === 1 ? "unidad disponible" : "unidades disponibles"}`
+                        : "Esta combinación está agotada"}
+                    </div>
+                  )}
                   <div className="pd-qty-cta">
                     <div
                       className="pd-qty-wrap"
@@ -1710,6 +1737,10 @@ export default function ProductDetailView({
                       <button
                         type="button"
                         onClick={() => setQuantity((q) => q + 1)}
+                        disabled={
+                          inventoryTracked &&
+                          quantity >= Number(selectedAvailableStock || 0)
+                        }
                         className="pd-qty-btn"
                         style={{
                           color: textSecondary,
@@ -1724,6 +1755,7 @@ export default function ProductDetailView({
                       <button
                         type="button"
                         onClick={onAddToCart}
+                        disabled={inventoryTracked && selectedAvailableStock <= 0}
                         className="pd-add-btn"
                         style={{
                           height: 48,
@@ -1734,12 +1766,16 @@ export default function ProductDetailView({
                           boxShadow: `0 12px 28px ${hexToRgba(addToCartBorderColor, 0.28)}`,
                           color: addToCartTextColor,
                           border: `${addToCartBorderWidthPx}px solid ${addToCartBorderColor}`,
+                          opacity: inventoryTracked && selectedAvailableStock <= 0 ? 0.55 : 1,
+                          cursor: inventoryTracked && selectedAvailableStock <= 0 ? "not-allowed" : "pointer",
                         }}
                       >
                         <AddToCartIcon
                           style={{ width: 18, height: 18, color: addToCartIconColor }}
                         />
-                        {cfg.addToCartText || "Añadir al carrito"}
+                        {inventoryTracked && selectedAvailableStock <= 0
+                          ? "Agotado"
+                          : cfg.addToCartText || "Añadir al carrito"}
                       </button>
                     )}
                   </div>

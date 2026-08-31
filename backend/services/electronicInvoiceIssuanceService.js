@@ -15,6 +15,12 @@ const {
 const {
   isApprovedPayment: isCanonicalWompiApproval,
 } = require('./wompiWebhookIntegrityService');
+const {
+  resolveOrderBillingMunicipality,
+} = require('./orderBillingMunicipalityService');
+const {
+  sendValidatedInvoiceEmail,
+} = require('./electronicInvoiceEmailService');
 
 const BILLABLE_ORDER_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
 const PAID_PAYMENT_STATUSES = ['paid', 'approved', 'captured', 'success'];
@@ -150,9 +156,12 @@ function getItems(order = {}) {
   return Array.isArray(order.items) ? order.items : Array.isArray(order.cart) ? order.cart : [];
 }
 
-function buildCustomerSnapshot(order = {}) {
+function buildCustomerSnapshot(order = {}, { requireMunicipality = false } = {}) {
   const customer = order.customer || {};
   const billing = order.billing || {};
+  const municipality = resolveOrderBillingMunicipality(order, {
+    required: requireMunicipality,
+  });
   const fullName = [customer.name, customer.lastname].filter(Boolean).join(' ').trim();
   const billingName = [
     billing.firstName || billing.name,
@@ -160,10 +169,11 @@ function buildCustomerSnapshot(order = {}) {
   ].filter(Boolean).join(' ').trim();
 
   const explicitFinalConsumer =
-    order?.billing?.isFinalConsumer === true ||
-    order?.customer?.isFinalConsumer === true ||
-    order?.pos?.customerMode === 'guest' ||
-    (order?.source === 'pos' && order?.pos?.quickSale === true);
+    typeof order?.billing?.isFinalConsumer === 'boolean'
+      ? order.billing.isFinalConsumer
+      : order?.customer?.isFinalConsumer === true ||
+        order?.pos?.customerMode === 'guest' ||
+        (order?.source === 'pos' && order?.pos?.quickSale === true);
   const documentNumber = cleanText(
     firstValue(
       billing.documentNumber,
@@ -197,17 +207,25 @@ function buildCustomerSnapshot(order = {}) {
     email: billing.email || customer.email || customer.emailOrPhone || '',
     phone: billing.phone || customer.phone || '',
     address: billing.address || customer.address || '',
-    city: billing.city || customer.city || '',
+    city: municipality?.city || billing.city || customer.city || '',
     municipalityCode:
+      municipality?.municipalityCode ||
       billing.municipalityCode ||
       billing.cityCode ||
+      customer.municipalityCode ||
       customer.municipalityId ||
       customer.municipality_id ||
       '',
-    department: billing.department || customer.department || '',
-    departmentCode: billing.departmentCode || customer.departmentCode || '',
-    country: billing.country || customer.country || 'Colombia',
-    countryCode: billing.countryCode || customer.countryCode || 'CO',
+    department:
+      municipality?.department || billing.department || customer.department || '',
+    departmentCode:
+      municipality?.departmentCode ||
+      billing.departmentCode ||
+      customer.departmentCode ||
+      '',
+    country: municipality?.country || billing.country || customer.country || 'Colombia',
+    countryCode:
+      municipality?.countryCode || billing.countryCode || customer.countryCode || 'CO',
     tributeCode: billing.tributeCode || customer.tributeCode || 'ZZ',
     isFinalConsumer: explicitFinalConsumer,
   };
@@ -330,9 +348,20 @@ function assertTotalsReconciled(order = {}, totals = {}) {
   const expectedTotal = money(
     totals.subtotalAfterDiscount + totals.shipping + totals.taxAmount
   );
-  const paymentAmount = hasFiniteNumber(order?.payment?.amount)
-    ? money(order.payment.amount)
-    : expectedTotal;
+  const splitPaymentAmount = Array.isArray(order?.payment?.splitPayments)
+    ? money(
+        order.payment.splitPayments.reduce(
+          (sum, item) => sum + money(item?.amount),
+          0
+        )
+      )
+    : 0;
+  const paymentAmount =
+    order?.storeCredit?.applied === true && splitPaymentAmount > 0
+      ? splitPaymentAmount
+      : hasFiniteNumber(order?.payment?.amount)
+        ? money(order.payment.amount)
+        : expectedTotal;
 
   if (Math.abs(expectedTotal - totals.total) > 0.01) {
     throw createBillingError(
@@ -473,7 +502,30 @@ function readPaymentMethodFromTransaction(transaction = {}) {
   };
 }
 
+function isNoChargeExchangeOrder(order = {}) {
+  const total = money(order.total);
+  if (total > 0) return false;
+
+  const paymentMethod = cleanText(order.payment?.method, 80).toLowerCase();
+  const sessionId = cleanText(order.sessionId, 180).toLowerCase();
+  const source = cleanText(order.source, 50).toLowerCase();
+  const saleType = cleanText(order.saleType, 50).toLowerCase();
+  const exchangeType = cleanText(order.exchangeOrigin?.type, 50).toLowerCase();
+  const tags = Array.isArray(order.tags)
+    ? order.tags.map((tag) => cleanText(tag, 40).toLowerCase())
+    : [];
+
+  return (
+    exchangeType === 'rma_exchange' ||
+    paymentMethod === 'exchange' ||
+    sessionId.startsWith('exchange:') ||
+    (source === 'system' && saleType === 'system_order' && tags.includes('exchange'))
+  );
+}
+
 function isBillableOrder(order = {}) {
+  if (isNoChargeExchangeOrder(order)) return false;
+
   const paymentStatus = cleanText(order.payment?.status, 50).toLowerCase();
   const source = cleanText(order.source || order.channel, 50).toLowerCase();
   const paymentProvider = cleanText(order.payment?.provider, 50).toLowerCase();
@@ -630,7 +682,9 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
       taxAmount,
       total,
     } = totals;
-    const customerSnapshot = buildCustomerSnapshot(order);
+    const customerSnapshot = buildCustomerSnapshot(order, {
+      requireMunicipality: isExternalProvider && providerName === 'factus',
+    });
     const now = nowFactory();
     const issueDate = now.toISOString().slice(0, 10);
     const issueTime = now.toISOString().slice(11, 19);
@@ -1089,12 +1143,7 @@ function createElectronicInvoiceIssuanceService(overrides = {}) {
 }
 
 const defaultService = createElectronicInvoiceIssuanceService({
-  sendValidatedInvoiceEmail: async (...args) => {
-    const {
-      sendValidatedInvoiceEmail,
-    } = require('./electronicInvoiceEmailService');
-    return sendValidatedInvoiceEmail(...args);
-  },
+  sendValidatedInvoiceEmail,
 });
 
 module.exports = {
@@ -1108,4 +1157,5 @@ module.exports = {
   sanitizeProviderPayload,
   issueElectronicInvoiceForOrder: defaultService.issueElectronicInvoiceForOrder,
   isBillableOrder,
+  isNoChargeExchangeOrder,
 };

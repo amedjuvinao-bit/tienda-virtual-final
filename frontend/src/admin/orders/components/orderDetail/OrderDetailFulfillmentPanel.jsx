@@ -28,7 +28,7 @@ function statusLabel(value) {
   );
 }
 
-export default function OrderDetailFulfillmentPanel({ order }) {
+export default function OrderDetailFulfillmentPanel({ order, canUpdate = false }) {
   const fulfillment = order?.fulfillment || {};
   const digitalDeliveries = Array.isArray(
     fulfillment.digitalDeliveries
@@ -69,6 +69,8 @@ export default function OrderDetailFulfillmentPanel({ order }) {
   };
 
   const saveService = async (service) => {
+    if (!canUpdate) return;
+
     try {
       setSavingId(String(service._id));
       setMessage('');
@@ -232,6 +234,7 @@ export default function OrderDetailFulfillmentPanel({ order }) {
                       status: event.target.value,
                     })
                   }
+                  disabled={!canUpdate}
                   style={{
                     border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
                     borderRadius: 10,
@@ -257,6 +260,7 @@ export default function OrderDetailFulfillmentPanel({ order }) {
                       scheduledAtInput: event.target.value,
                     })
                   }
+                  disabled={!canUpdate}
                   style={{
                     border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
                     borderRadius: 10,
@@ -277,6 +281,7 @@ export default function OrderDetailFulfillmentPanel({ order }) {
                     notesInput: event.target.value,
                   })
                 }
+                disabled={!canUpdate}
                 placeholder="Notas operativas de la prestación"
                 style={{
                   border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
@@ -289,6 +294,7 @@ export default function OrderDetailFulfillmentPanel({ order }) {
                 }}
               />
 
+              {canUpdate ? (
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
@@ -314,6 +320,7 @@ export default function OrderDetailFulfillmentPanel({ order }) {
                     : 'Guardar prestación'}
                 </button>
               </div>
+              ) : null}
             </div>
           ))}
         </div>

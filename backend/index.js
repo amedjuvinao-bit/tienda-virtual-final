@@ -29,28 +29,49 @@ const {
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
+// Cloudflared entrega la IP real en X-Forwarded-For desde un proxy local.
+// Confiar solo en proxies privados/locales evita rechazos de express-rate-limit
+// sin permitir que un cliente directo suplante libremente esa cabecera.
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 const PORT = env.port;
 const mongooseIndexPolicy = applyMongooseIndexPolicy(mongoose, {
   nodeEnv: env.nodeEnv,
 });
 
 function tryRequire(relPath) {
+  let resolvedPath;
   try {
-    const mod = require(relPath);
-    console.log(`Ruta cargada: ${relPath}`);
-    return mod;
-  } catch (e) {
-    if (e.code === 'MODULE_NOT_FOUND') {
+    resolvedPath = require.resolve(relPath);
+  } catch (error) {
+    if (error.code === 'MODULE_NOT_FOUND') {
       console.warn(`Ruta NO encontrada, se omite: ${relPath}`);
       return null;
     }
-
-    console.error(`Error al cargar ${relPath}:`, e.message);
-    return null;
+    throw error;
   }
+
+  // Si el archivo existe, cualquier error interno debe detener el arranque.
+  // Ocultarlo produciría un backend "sano" sin rutas o servicios esenciales.
+  const mod = require(resolvedPath);
+  console.log(`Ruta cargada: ${relPath}`);
+  return mod;
+}
+
+function requireCritical(relPath) {
+  const mod = require(relPath);
+  console.log(`Módulo crítico cargado: ${relPath}`);
+  return mod;
 }
 
 app.use(cors());
+const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
+if (shippingWebhookRoutes) {
+  app.use(
+    '/api/shipping/webhooks/envia',
+    express.raw({ type: '*/*', limit: '256kb' }),
+    shippingWebhookRoutes
+  );
+}
 app.use(express.json());
 
 const globalLimiter = rateLimit({
@@ -81,25 +102,32 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Estos adaptadores deben cargarse antes de las rutas heredadas para que las
 // emisiones usen rangos sincronizados y recuperación de resultados inciertos.
-tryRequire('./services/electronicCreditNoteRangeService');
-tryRequire('./services/electronicInvoiceRecoveryBootstrapService');
+requireCritical('./services/electronicCreditNoteRangeService');
+requireCritical('./services/electronicInvoiceRecoveryBootstrapService');
 
 const productRoutes = tryRequire('./routes/productRoutes');
 const cartRoutes = tryRequire('./routes/cartRoutes');
 const favoriteRoutes = tryRequire('./routes/favoriteRoutes');
 const couponRoutes = tryRequire('./routes/coupons');
-const orderEmailRoutes = tryRequire('./routes/orderEmailRoutes');
-const orderQuoteRoutes = tryRequire('./routes/orderQuote');
-const orderRoutes = tryRequire('./routes/orders');
-const payuRoutes = tryRequire('./routes/payuProductionWebhook');
-const paymentRoutes = tryRequire('./routes/payments');
+const orderEmailRoutes = requireCritical('./routes/orderEmailRoutes');
+const orderCustomerNotificationRoutes = requireCritical(
+  './routes/orderCustomerNotificationRoutes'
+);
+const orderQuoteRoutes = requireCritical('./routes/orderQuote');
+const orderReturnRoutes = requireCritical('./routes/orderReturnRoutes');
+const orderRoutes = requireCritical('./routes/orders');
+const payuRoutes = requireCritical('./routes/payuProductionWebhook');
+const paymentRoutes = requireCritical('./routes/payments');
 const dianProviderTestRoutes = tryRequire('./routes/dianProviderTest');
 const uploadRoutes = tryRequire('./routes/uploadRoutes');
 const geoRoutes = tryRequire('./routes/geo');
-const inventoryReservationService = tryRequire('./services/inventoryReservationService');
+const inventoryReservationService = requireCritical('./services/inventoryReservationService');
+const storeCreditCheckoutService = requireCritical('./services/storeCreditCheckoutService');
+const orderPostCommitOutboxWorkerService = requireCritical('./services/orderPostCommitOutboxWorkerService');
 const billingInvoiceRecoveryService = tryRequire('./services/billingInvoiceRecoveryService');
 const billingOperationalRuntime = tryRequire('./services/billingOperationalRuntime');
 const billingOperationalLogger = tryRequire('./services/billingOperationalLogger');
+const shippingWebhookProcessingService = tryRequire('./services/shippingWebhookProcessingService');
 const adminAuthRoutes = tryRequire('./routes/adminAuth');
 const adminUsersRoutes = tryRequire('./routes/adminUsers');
 const adminRolesRoutes = tryRequire('./routes/adminRoles');
@@ -119,6 +147,7 @@ const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
+const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
@@ -133,7 +162,11 @@ if (digitalDeliveryRoutes) {
 }
 
 if (orderEmailRoutes) app.use('/api/orders', orderEmailRoutes);
+if (orderCustomerNotificationRoutes) {
+  app.use('/api/orders', orderCustomerNotificationRoutes);
+}
 if (orderQuoteRoutes) app.use('/api/orders', orderQuoteRoutes);
+if (orderReturnRoutes) app.use('/api/orders', orderReturnRoutes);
 if (orderRoutes) app.use('/api/orders', orderRoutes);
 if (payuRoutes) app.use('/api/payments', payuRoutes);
 if (paymentRoutes) app.use('/api/payments', paymentRoutes);
@@ -159,6 +192,9 @@ if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+if (adminShippingSettingsRoutes) {
+  app.use('/api/admin/shipping-settings', adminShippingSettingsRoutes);
+}
 if (billingSettingsProtectionRoutes) app.use('/api/site-settings', billingSettingsProtectionRoutes);
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);
 if (pageRoutes) app.use('/api/pages', pageRoutes);
@@ -167,11 +203,15 @@ const INVENTORY_RESERVATION_EXPIRATION_ENABLED = env.inventoryReservation.enable
 const INVENTORY_RESERVATION_EXPIRATION_INTERVAL_MS = env.inventoryReservation.intervalMs;
 const INVENTORY_RESERVATION_EXPIRATION_LIMIT = env.inventoryReservation.limit;
 const BILLING_RECOVERY_INTERVAL_MS = 60 * 1000;
+const SHIPPING_WEBHOOK_RECOVERY_INTERVAL_MS = 60 * 1000;
 
 let inventoryReservationExpirationTimer = null;
 let inventoryReservationExpirationRunning = false;
 let billingRecoveryTimer = null;
 let billingRecoveryRunning = false;
+let shippingWebhookRecoveryTimer = null;
+let shippingWebhookRecoveryRunning = false;
+let orderPostCommitOutboxWorker = null;
 
 function startInventoryReservationExpirationJob() {
   if (!INVENTORY_RESERVATION_EXPIRATION_ENABLED) {
@@ -180,6 +220,8 @@ function startInventoryReservationExpirationJob() {
   }
 
   const expireInventoryReservations = inventoryReservationService?.expireInventoryReservations;
+  const releaseExpiredStoreCreditReservations =
+    storeCreditCheckoutService?.releaseExpiredStoreCreditReservations;
 
   if (typeof expireInventoryReservations !== 'function') {
     console.warn('No se inicio el job de expiracion: expireInventoryReservations no esta disponible.');
@@ -204,6 +246,16 @@ function startInventoryReservationExpirationJob() {
       const result = await expireInventoryReservations({ limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT });
       if (result?.expired > 0) {
         console.log(`Reservas expiradas automaticamente: ${result.expired}`);
+      }
+      if (typeof releaseExpiredStoreCreditReservations === 'function') {
+        const storeCreditResult = await releaseExpiredStoreCreditReservations({
+          limit: INVENTORY_RESERVATION_EXPIRATION_LIMIT,
+        });
+        if (storeCreditResult?.count > 0) {
+          console.log(
+            `Reservas de saldo a favor liberadas: ${storeCreditResult.count}`
+          );
+        }
       }
     } catch (error) {
       console.error('Error en job de expiracion de reservas:', error.message);
@@ -284,6 +336,54 @@ function startBillingInvoiceRecoveryJob() {
   });
 }
 
+function startShippingWebhookRecoveryJob() {
+  const recover = shippingWebhookProcessingService?.recoverShippingWebhookEvents;
+  if (typeof recover !== 'function' || shippingWebhookRecoveryTimer) return;
+
+  const runRecovery = async () => {
+    if (shippingWebhookRecoveryRunning || mongoose.connection.readyState !== 1) return;
+    shippingWebhookRecoveryRunning = true;
+    try {
+      const result = await recover({ limit: 25, maxAttempts: 5 });
+      if (result.scanned > 0) {
+        console.log('[shipping-webhook] Recuperación completada:', result);
+      }
+    } catch (error) {
+      console.error('[shipping-webhook] Error en recuperación:', error.message);
+    } finally {
+      shippingWebhookRecoveryRunning = false;
+    }
+  };
+
+  shippingWebhookRecoveryTimer = setInterval(
+    runRecovery,
+    SHIPPING_WEBHOOK_RECOVERY_INTERVAL_MS
+  );
+  shippingWebhookRecoveryTimer.unref?.();
+  runRecovery().catch(() => null);
+}
+
+function startOrderPostCommitOutboxWorker() {
+  if (!env.orderPostCommitOutbox.enabled) {
+    console.log('Worker post-pago desactivado por configuración.');
+    return;
+  }
+  if (orderPostCommitOutboxWorker) return;
+
+  orderPostCommitOutboxWorker =
+    orderPostCommitOutboxWorkerService.createOrderPostCommitOutboxWorker({
+      intervalMs: env.orderPostCommitOutbox.intervalMs,
+      batchSize: env.orderPostCommitOutbox.batchSize,
+      isReady: () => mongoose.connection.readyState === 1,
+      logger: console,
+    });
+  orderPostCommitOutboxWorker.start({ runImmediately: true });
+  console.log('Worker post-pago iniciado.', {
+    intervalMs: orderPostCommitOutboxWorker.intervalMs,
+    batchSize: orderPostCommitOutboxWorker.batchSize,
+  });
+}
+
 mongoose
   .connect(env.mongoUri, {
     autoIndex: mongooseIndexPolicy.autoIndex,
@@ -292,6 +392,8 @@ mongoose
     console.log('MongoDB conectado');
     startInventoryReservationExpirationJob();
     startBillingInvoiceRecoveryJob();
+    startShippingWebhookRecoveryJob();
+    startOrderPostCommitOutboxWorker();
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });

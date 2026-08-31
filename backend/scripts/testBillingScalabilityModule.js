@@ -11,6 +11,10 @@ const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const billingService = require('../services/adminBillingService');
 const {
+  isBillableOrder,
+  isNoChargeExchangeOrder,
+} = require('../services/electronicInvoiceIssuanceService');
+const {
   buildCreditNotesPaginationPipeline,
   buildInvoiceSummaryPipeline,
   buildPendingOrdersCountPipeline,
@@ -91,6 +95,7 @@ function validatePendingOrdersPipeline() {
     orderFilter: { status: 'paid' },
     invoiceCollectionName: 'electronicinvoices',
   });
+  const retryableMatch = pipeline.find((stage) => Array.isArray(stage?.$match?.$or))?.$match;
 
   assert(lookup?.from === 'electronicinvoices', 'Órdenes pendientes no consultan ElectronicInvoice con $lookup.');
   assert(
@@ -98,8 +103,14 @@ function validatePendingOrdersPipeline() {
     '$lookup no limita la coincidencia a una factura.'
   );
   assert(
-    pipeline.some((stage) => stage.$match?.['_billingInvoiceMatch.0']?.$exists === false),
-    'No se excluyen dentro de MongoDB las órdenes ya facturadas.'
+    JSON.stringify(retryableMatch).includes('failed') &&
+      JSON.stringify(retryableMatch).includes('rejected') &&
+      JSON.stringify(retryableMatch).includes('error'),
+    'La consulta no conserva emisiones fallidas para su reintento.'
+  );
+  assert(
+    JSON.stringify(retryableMatch).includes('"$exists":false'),
+    'La consulta perdió las órdenes que aún no tienen factura.'
   );
   assert(
     facet?.rows?.some((stage) => stage.$skip === 20) &&
@@ -112,6 +123,56 @@ function validatePendingOrdersPipeline() {
   );
 
   ok('Órdenes pendientes usan $lookup indexado, conteo y paginación en MongoDB');
+}
+
+function validateNoChargeExchangeTreatment() {
+  const paidAt = new Date('2026-08-25T20:00:00.000Z');
+  const exchange = {
+    sessionId: 'exchange:order-return-001',
+    source: 'system',
+    saleType: 'system_order',
+    status: 'paid',
+    total: 0,
+    tags: ['exchange'],
+    payment: {
+      status: 'paid',
+      paidAt,
+      provider: 'manual',
+      method: 'exchange',
+    },
+  };
+  const regularPaidOrder = {
+    sessionId: 'manual:paid-order-001',
+    source: 'manual',
+    status: 'paid',
+    total: 162900,
+    payment: {
+      status: 'paid',
+      paidAt,
+      provider: 'manual',
+      method: 'cash',
+    },
+  };
+  const pendingFilter = billingService.buildBillableOrderFilter();
+
+  assert(
+    isNoChargeExchangeOrder(exchange) && !isBillableOrder(exchange),
+    'Una reposición RMA de cero pesos todavía puede entrar a facturación.'
+  );
+  assert(
+    isBillableOrder(regularPaidOrder),
+    'La exclusión de cambios bloqueó una venta pagada normal.'
+  );
+  assert(
+    pendingFilter.$and?.some((condition) =>
+      condition.$nor?.some(
+        (candidate) => candidate.sessionId?.source === '^exchange:'
+      )
+    ),
+    'La cola de facturación no excluye sesiones de cambio sin cobro.'
+  );
+
+  ok('Cambios RMA sin cobro quedan fuera de factura y de la cola fiscal');
 }
 
 function validateSummaryPipeline() {
@@ -345,6 +406,13 @@ async function validateRuntimeContracts() {
         payment: { status: 'paid', provider: 'wompi' },
         total: 119,
         items: [{ productId: 'product-1' }],
+        _billingInvoice: {
+          _id: 'invoice-failed-1',
+          status: 'failed',
+          errorMessage: 'Factus rechazó los impuestos de la línea.',
+          providerErrors: { taxes: ['Tarifa inválida.'] },
+          emission: { attempts: 1 },
+        },
       }],
     }];
   };
@@ -374,6 +442,11 @@ async function validateRuntimeContracts() {
     assert(
       pendingOrders.rows[0].orderNumber === '1002',
       'Cambió la serialización de órdenes pendientes.'
+    );
+    assert(
+      pendingOrders.rows[0].billingIssue?.retryable === true &&
+        pendingOrders.rows[0].billingIssue?.invoiceId === 'invoice-failed-1',
+      'La respuesta perdió la emisión fallida reintentable.'
     );
 
     const summary = await billingService.getBillingSummary();
@@ -413,6 +486,7 @@ async function main() {
   [
     validateCreditNotePipeline,
     validatePendingOrdersPipeline,
+    validateNoChargeExchangeTreatment,
     validateSummaryPipeline,
     validateReportAggregationPipeline,
     validateReportStreamingSource,

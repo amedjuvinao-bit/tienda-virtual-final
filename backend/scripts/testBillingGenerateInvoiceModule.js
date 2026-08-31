@@ -80,6 +80,7 @@ function validateBackendGenerationService() {
 
   assertIncludes(adminServiceFile, 'issueElectronicInvoiceForOrder', 'El módulo admin no delega al motor unificado.');
   assertIncludes(adminServiceFile, "source: 'admin'", 'El módulo admin no registra el origen de la emisión.');
+  assertIncludes(adminServiceFile, 'allowRetry: true', 'El módulo admin no permite reintentar una emisión fallida de forma idempotente.');
 
   ok('Motor unificado reserva la orden y guarda la respuesta oficial en ElectronicInvoice');
 }
@@ -124,13 +125,40 @@ function validateFactusCreationResponse() {
   ok('Respuesta de creación Factus conserva número, CUFE y validación oficiales');
 }
 
+function validateFactusValidationMessage() {
+  const { providerMessage } = require('../lib/dian/providers/factusRangeAwareProvider');
+  const message = providerMessage({
+    status: 422,
+    data: {
+      message: 'Error de validación',
+      errors: {
+        'items.0.taxes.0': ['Los datos fiscales del producto no son válidos.'],
+        authorization: ['Authorization: secreto-no-debe-salir'],
+      },
+    },
+  });
+
+  assert(
+    message.includes('Los datos fiscales del producto no son válidos.'),
+    'El rechazo perdió el detalle accionable devuelto por Factus.'
+  );
+  assert(
+    !message.includes('secreto-no-debe-salir'),
+    'El rechazo expuso un dato sensible devuelto por el proveedor.'
+  );
+
+  ok('Rechazo Factus muestra el detalle seguro en lugar del mensaje genérico');
+}
+
 function validateFrontendGeneration() {
   const apiFile = read('frontend/src/admin/billing/api/adminBillingApi.js');
   const pageFile = readBillingFrontendSource();
 
   [
     'generateBillingInvoiceForOrder',
-    '/api/admin/billing/orders/${orderId}/generate',
+    '/api/admin/billing/orders/${encodeURIComponent(orderId)}/generate',
+    'getBillingInvoicePreflight',
+    'preflightFingerprint',
   ].forEach((needle) => {
     assertIncludes(apiFile, needle, `API frontend no conecta generar factura: falta ${needle}`);
   });
@@ -139,19 +167,23 @@ function validateFrontendGeneration() {
     'generateBillingInvoiceForOrder',
     'handleGenerateInvoice',
     'Factura generada correctamente',
-    'Generando...',
-    'Generar',
+    'Procesando...',
+    'Revisar y reintentar',
+    'billingIssue',
+    'Revisar y emitir',
     'await loadPendingOrders()',
+    'openGeneratedDocument',
+    '/admin/facturacion/documentos?q=',
     'return <BillingPendingOrdersPanel />;',
   ].forEach((needle) => {
     assertIncludes(pageFile, needle, `AdminBillingPage no conecta botón Generar: falta ${needle}`);
   });
 
-  assertNotIncludes(pageFile, 'window.location.assign', 'No debe redirigir automáticamente después de generar factura.');
+  assertNotIncludes(pageFile, 'window.location.assign', 'La navegación debe usar React Router, no recargar la aplicación.');
   assertNotIncludes(pageFile, 'buildGeneratedDocumentUrl', 'No debe construir URL automática a documentos.');
   assertNotIncludes(pageFile, 'getInitialDocumentQuery', 'Documentos no debe cargarse filtrado por URL automáticamente.');
 
-  ok('Frontend conecta botón Generar sin redirigir ni recargar la página');
+  ok('Frontend conecta botón Generar y abre el documento resultante sin recargar la aplicación');
 }
 
 function validateGeneratedIsNotValidated() {
@@ -178,30 +210,44 @@ function validateGeneratedIsNotValidated() {
   ok('Estado generado permanece pendiente hasta confirmación real del proveedor');
 }
 
-function validateGenerateConfirmationBridge() {
+function validateGeneratePreflight() {
   const mainFile = read('frontend/src/main.jsx');
-  const bridgeFile = read('frontend/src/admin/billing/billingGenerateConfirmBridge.js');
+  const modalFile = read('frontend/src/admin/billing/components/BillingInvoicePreflightModal.jsx');
+  const panelFile = read('frontend/src/admin/billing/panels/BillingPendingOrdersPanel.jsx');
+  const serviceFile = read('backend/services/adminBillingService.js');
+  const routeFile = read('backend/routes/adminBilling.js');
 
-  assertIncludes(
+  assertNotIncludes(
     mainFile,
     './admin/billing/billingGenerateConfirmBridge',
-    'main.jsx debe cargar la confirmación visual de generar factura.'
+    'main.jsx no debe cargar el puente global basado en window.confirm.'
   );
 
   [
-    'installBillingGenerateConfirmBridge',
-    "window.location.pathname === '/admin/facturacion/ordenes'",
-    "normalizeText(button.textContent) === 'Generar'",
-    '¿Seguro que deseas generar factura para la orden',
-    'ElectronicInvoice',
-    'window.confirm',
-    'event.stopImmediatePropagation',
-    'data-billing-generate-confirmed',
+    'Control fiscal obligatorio',
+    'Revisa antes de emitir en Factus',
+    'Comprador que recibirá Factus',
+    'Conceptos que se enviarán',
+    'Confirmar y emitir',
+    'preflight?.fingerprint',
   ].forEach((needle) => {
-    assertIncludes(bridgeFile, needle, `billingGenerateConfirmBridge no protege Generar factura: falta ${needle}`);
+    assertIncludes(modalFile, needle, `La vista previa fiscal no protege la emisión: falta ${needle}`);
   });
 
-  ok('Botón Generar factura exige confirmación visual antes de crear ElectronicInvoice');
+  [
+    'getBillingInvoicePreflight',
+    'generateBillingInvoiceForOrder(',
+    'reviewedPreflight.fingerprint',
+    '<BillingInvoicePreflightModal',
+  ].forEach((needle) => {
+    assertIncludes(panelFile, needle, `El panel no conecta el precontrol fiscal: falta ${needle}`);
+  });
+
+  assertIncludes(serviceFile, 'assertPreflightReady(preflight, options.preflightFingerprint)');
+  assertIncludes(routeFile, "'/orders/:orderId/preflight'");
+  assertIncludes(routeFile, 'preflightFingerprint: req.body?.preflightFingerprint');
+
+  ok('La emisión exige revisar y confirmar la fotografía fiscal exacta');
 }
 
 function validateScriptRegistered() {
@@ -222,9 +268,10 @@ function main() {
     validateBackendGenerationService();
     validateBackendGenerationRoute();
     validateFactusCreationResponse();
+    validateFactusValidationMessage();
     validateFrontendGeneration();
     validateGeneratedIsNotValidated();
-    validateGenerateConfirmationBridge();
+    validateGeneratePreflight();
     validateScriptRegistered();
   } catch (error) {
     fail('Error validando generación de factura', error);

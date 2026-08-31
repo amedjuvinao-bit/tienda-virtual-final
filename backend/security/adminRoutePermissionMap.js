@@ -190,20 +190,30 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   {
     method: 'GET',
     path: '/api/orders/admin',
+    query: { format: 'csv' },
+    permission: 'orders:export',
+    additionalPermissions: ['orders:view'],
+    description: 'Exportar el listado filtrado de órdenes.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/admin',
     permission: 'orders:view',
     description: 'Listar órdenes en administración.',
   },
   {
     method: 'GET',
-    path: '/api/orders/admin/export',
-    permission: 'orders:export',
-    description: 'Exportar órdenes.',
+    path: '/api/orders/admin/operations/health',
+    permission: 'orders:view',
+    description: 'Consultar métricas, umbrales y alertas operativas de órdenes.',
     audit: true,
   },
   {
     method: 'POST',
     path: '/api/orders/admin/export',
     permission: 'orders:export',
+    additionalPermissions: ['orders:view'],
     description: 'Exportar órdenes con filtros avanzados.',
     audit: true,
   },
@@ -222,10 +232,93 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'POST',
+    path: '/api/orders/:id/payments/manual-confirmation',
+    permission: 'orders:confirm_manual_payment',
+    description: 'Confirmar un pago manual con evidencia financiera persistida.',
+    audit: true,
+    danger: true,
+  },
+  {
     method: 'PATCH',
     path: '/api/orders/:id/fulfillment/services/:serviceId',
-    permission: 'orders:update',
+    permission: 'orders:fulfillment',
     description: 'Actualizar la programación y estado de una prestación.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/fulfillment/logistics',
+    permission: 'orders:view',
+    description: 'Consultar preparación, envíos, seguimiento, SLA e incidencias.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/initialize',
+    permission: 'orders:fulfillment',
+    description: 'Crear envíos por sede desde las asignaciones confirmadas.',
+    audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId',
+    permission: 'orders:fulfillment',
+    description: 'Operar picking, packing, despacho, entrega e incidencias.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/admin/shipping/providers',
+    permission: 'orders:view',
+    description: 'Consultar transportadoras disponibles sin exponer credenciales.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/rates',
+    permission: 'orders:fulfillment',
+    description: 'Cotizar un envío con una transportadora configurada.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label',
+    permission: 'orders:fulfillment',
+    description: 'Generar una guía externa con idempotencia.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/tracking/sync',
+    permission: 'orders:fulfillment',
+    description: 'Sincronizar el seguimiento de una guía externa.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/pickup',
+    permission: 'orders:fulfillment',
+    description: 'Programar una recolección de transportadora con idempotencia.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/webhook/test',
+    permission: 'orders:fulfillment',
+    description: 'Simular un evento de seguimiento para una guía Sandbox.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/handoff/dropoff',
+    permission: 'orders:fulfillment',
+    description: 'Confirmar que una guía se entregará en un punto autorizado.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/fulfillment/logistics/shipments/:shipmentId/label/cancel',
+    permission: 'orders:fulfillment',
+    description: 'Cancelar una guía externa con idempotencia.',
     audit: true,
   },
   {
@@ -290,10 +383,30 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Ver historial de la orden.',
   },
   {
+    method: 'GET',
+    path: '/api/orders/:id',
+    permission: 'orders:view',
+    description: 'Consultar el detalle administrativo de una orden.',
+  },
+  {
     method: 'POST',
     path: '/api/orders/:id/email',
     permission: 'orders:email',
     description: 'Enviar correo relacionado con la orden.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/customer-notifications/whatsapp/preview',
+    permission: 'orders:email',
+    description: 'Preparar la vista previa del estado de una orden para WhatsApp.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/customer-notifications/whatsapp/opened',
+    permission: 'orders:email',
+    description: 'Registrar la apertura asistida del informe de una orden en WhatsApp.',
     audit: true,
   },
   {
@@ -305,10 +418,85 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/orders/:id/receipt-pdf',
+    permission: 'billing:download',
+    description: 'Descargar el comprobante comercial interno de la orden.',
+    audit: true,
+  },
+  {
+    method: 'GET',
     path: '/api/orders/:id/invoice-xml',
     permission: 'billing:download',
     description: 'Descargar XML de factura electrónica.',
     audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/returns/policy',
+    permission: 'orders:view',
+    description: 'Consultar la política versionada de devoluciones.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/orders/returns/policy',
+    permission: 'settings:store',
+    description: 'Editar la política global de devoluciones y cambios.',
+    audit: true,
+    sensitive: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/orders/:id/returns',
+    permission: 'orders:view',
+    description: 'Consultar elegibilidad y expedientes RMA de la orden.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/returns',
+    permission: 'orders:returns',
+    description: 'Crear una solicitud de devolución o cambio RMA.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/orders/:id/returns/:returnId',
+    permission: 'orders:returns',
+    description: 'Autorizar, recibir, inspeccionar o cancelar un RMA.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/returns/:returnId/refund',
+    permission: 'orders:refund',
+    description: 'Resolver un RMA inspeccionado mediante reembolso.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/returns/:returnId/exchange',
+    permission: 'orders:returns',
+    description: 'Resolver un RMA mediante una orden de reemplazo real.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/returns/:returnId/exchange/automatic',
+    permission: 'orders:returns',
+    description: 'Crear una orden de cambio y reservar su inventario automáticamente.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/returns/:returnId/store-credit',
+    permission: 'orders:refund',
+    description: 'Resolver un RMA mediante saldo a favor trazable.',
+    audit: true,
+    danger: true,
   },
   {
     method: 'POST',
@@ -319,15 +507,27 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     danger: true,
   },
   {
-    method: 'DELETE',
-    path: '/api/orders/:id',
-    permission: 'orders:delete',
-    description: 'Eliminar orden. Reservado para superadministración.',
+    method: 'GET',
+    path: '/api/orders/:id/refunds',
+    permission: 'orders:view',
+    description: 'Consultar reembolsos y conciliación de la orden.',
+  },
+  {
+    method: 'POST',
+    path: '/api/orders/:id/refunds/:refundId/confirm-payment',
+    permission: 'orders:refund',
+    description: 'Confirmar manualmente el desembolso de un reembolso.',
     audit: true,
     danger: true,
-    reserved: true,
   },
-
+  {
+    method: 'POST',
+    path: '/api/orders/:id/refunds/:refundId/automate',
+    permission: 'orders:refund',
+    description: 'Automatizar reembolso y conciliación con nota crédito.',
+    audit: true,
+    danger: true,
+  },
   /* =========================================================
    * CARRITOS
    * ======================================================= */
@@ -503,6 +703,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Listar órdenes pendientes por facturar.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/billing/orders/:orderId/preflight',
+    permission: 'billing:create',
+    description: 'Revisar la fotografía fiscal exacta antes de emitir una factura electrónica.',
+    audit: true,
+  },
+  {
     method: 'POST',
     path: '/api/admin/billing/orders/:orderId/generate',
     permission: 'billing:create',
@@ -627,6 +834,14 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'POST',
+    path: '/api/payments/admin/wompi/test-merchant',
+    permission: 'settings:payments',
+    description: 'Validar la configuración comercial de Wompi.',
+    audit: true,
+    sensitive: true,
+  },
+  {
+    method: 'POST',
     path: '/api/payments/admin/sync',
     permission: 'payments:sync',
     description: 'Sincronizar pagos.',
@@ -732,6 +947,61 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     path: '/api/admin/mail-settings/test',
     permission: 'settings:mail_test',
     description: 'Enviar correo de prueba.',
+    audit: true,
+  },
+
+  /* =========================================================
+   * TRANSPORTADORAS
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/shipping-settings',
+    permission: 'settings:shipping',
+    description: 'Ver configuración segura de transportadoras.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/shipping-settings',
+    permission: 'settings:shipping',
+    description: 'Guardar ambiente y credenciales cifradas de transportadoras.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/test',
+    permission: 'settings:shipping',
+    description: 'Probar la autenticación con la transportadora.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/webhook/confirm',
+    permission: 'settings:shipping',
+    description: 'Registrar el webhook firmado de seguimiento.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/webhook/test',
+    permission: 'settings:shipping',
+    description: 'Solicitar a Envia la prueba oficial del webhook Sandbox.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/activate',
+    permission: 'settings:shipping',
+    description: 'Activar la transportadora como proveedor predeterminado.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/shipping-settings/disable',
+    permission: 'settings:shipping',
+    description: 'Volver a la operación logística manual.',
     audit: true,
   },
 
@@ -992,6 +1262,37 @@ function normalizePath(pathname) {
   return clean || '/';
 }
 
+function normalizeQueryValue(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function queryFromPath(pathname) {
+  const raw = String(pathname || '');
+  const questionMark = raw.indexOf('?');
+  if (questionMark < 0) return {};
+
+  const params = new URLSearchParams(raw.slice(questionMark + 1));
+  const query = {};
+
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    query[key] = values.length > 1 ? values : values[0];
+  }
+
+  return query;
+}
+
+function matchRouteQuery(ruleQuery, requestQuery = {}) {
+  const expectedEntries = Object.entries(ruleQuery || {});
+  if (!expectedEntries.length) return true;
+
+  return expectedEntries.every(([key, expected]) => {
+    return (
+      normalizeQueryValue(requestQuery?.[key]) === normalizeQueryValue(expected)
+    );
+  });
+}
+
 function splitPath(pathname) {
   return normalizePath(pathname)
     .split('/')
@@ -1036,27 +1337,46 @@ function matchRoutePath(rulePath, requestPath) {
 
 function normalizeRule(rule) {
   const permission = canonicalPermission(rule.permission);
+  const additionalPermissions = Array.from(
+    new Set(
+      (Array.isArray(rule.additionalPermissions)
+        ? rule.additionalPermissions
+        : [])
+        .map(canonicalPermission)
+        .filter(Boolean)
+    )
+  );
+  const requiredPermissions = Array.from(
+    new Set([permission, ...additionalPermissions].filter(Boolean))
+  );
 
   return {
     ...rule,
     method: normalizeMethod(rule.method),
     path: normalizePath(rule.path),
     permission,
-    knownPermission: isKnownPermission(permission),
+    additionalPermissions,
+    requiredPermissions,
+    knownPermission: requiredPermissions.every(isKnownPermission),
   };
 }
 
 const ADMIN_ROUTE_PERMISSIONS = ADMIN_ROUTE_PERMISSION_RULES.map(normalizeRule);
 
-function findAdminRoutePermission(method, pathname) {
+function findAdminRoutePermission(method, pathname, requestQuery = null) {
   const requestMethod = normalizeMethod(method);
   const requestPath = normalizePath(pathname);
+  const query = {
+    ...queryFromPath(pathname),
+    ...(requestQuery && typeof requestQuery === 'object' ? requestQuery : {}),
+  };
 
   return (
     ADMIN_ROUTE_PERMISSIONS.find((rule) => {
       return (
         rule.method === requestMethod &&
-        matchRoutePath(rule.path, requestPath)
+        matchRoutePath(rule.path, requestPath) &&
+        matchRouteQuery(rule.query, query)
       );
     }) || null
   );
@@ -1094,7 +1414,10 @@ module.exports = {
 
   normalizeMethod,
   normalizePath,
+  normalizeQueryValue,
   matchRoutePath,
+  matchRouteQuery,
+  queryFromPath,
 
   findAdminRoutePermission,
   getRoutesByPermission,

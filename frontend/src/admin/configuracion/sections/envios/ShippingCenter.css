@@ -1,0 +1,296 @@
+.shipping-center {
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-surface {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-page-surface {
+  border-color: var(--admin-card-border);
+  background: var(--admin-page-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-soft-surface {
+  border-color: var(--admin-primary-soft-border);
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-glass-hero {
+  border-color: var(--admin-glass-border);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%),
+      color-mix(in srgb, var(--admin-card-bg) 97%, var(--admin-primary) 3%)
+    );
+  color: var(--admin-card-text);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--admin-primary) 12%, transparent);
+}
+
+.shipping-center .shipping-provider-hero {
+  border-color: var(--admin-primary-soft-border);
+  background:
+    linear-gradient(
+      135deg,
+      var(--admin-card-header-bg),
+      color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 12%)
+    );
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-current-operation {
+  border-color: var(--admin-primary-soft-border);
+  background: color-mix(in srgb, var(--admin-card-bg) 84%, var(--admin-primary) 16%);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-muted {
+  color: var(--admin-card-muted-text);
+}
+
+.shipping-center .shipping-accent {
+  color: var(--admin-primary);
+}
+
+.shipping-center .shipping-nav-option {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-nav-option:hover {
+  border-color: var(--admin-primary-soft-border);
+  background: color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%);
+}
+
+.shipping-center .shipping-nav-option[data-active='true'] {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-card-text);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--admin-primary) 16%, transparent);
+}
+
+.shipping-center .shipping-step-number {
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-primary);
+}
+
+.shipping-center .shipping-nav-option[data-active='true'] .shipping-step-number,
+.shipping-center .shipping-step-number[data-active='true'] {
+  background: var(--admin-primary);
+  color: var(--admin-button-text);
+}
+
+.shipping-center .shipping-choice {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-choice:hover {
+  border-color: var(--admin-primary-soft-border);
+}
+
+.shipping-center .shipping-choice[data-active='true'] {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft-bg);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--admin-primary) 10%, transparent);
+}
+
+.shipping-center .shipping-field {
+  border-color: var(--admin-input-border);
+  background: var(--admin-input-bg);
+  color: var(--admin-input-text);
+}
+
+.shipping-center .shipping-field:focus {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--admin-primary) 16%, transparent);
+}
+
+.shipping-center .shipping-primary-action {
+  border-color: var(--admin-button-border, var(--admin-button-bg));
+  background: var(--admin-button-bg);
+  color: var(--admin-button-text);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--admin-button-bg) 18%, transparent);
+}
+
+.shipping-center .shipping-primary-action:hover {
+  filter: brightness(0.96);
+}
+
+.shipping-center .shipping-secondary-action {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-secondary-action:hover {
+  border-color: var(--admin-primary-soft-border);
+  background: var(--admin-primary-soft-bg);
+}
+
+.shipping-center .shipping-danger-action {
+  border-color: var(--admin-danger);
+  background: var(--admin-danger-soft-bg);
+  color: var(--admin-danger-text);
+}
+
+.shipping-center .shipping-status {
+  border-color: var(--admin-card-border);
+  background: var(--admin-button-soft-bg, var(--admin-primary-soft-bg));
+  color: var(--admin-button-soft-text, var(--admin-card-text));
+}
+
+.shipping-center .shipping-status[data-tone='primary'] {
+  border-color: var(--admin-primary-soft-border);
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-primary-soft-text, var(--admin-primary));
+}
+
+.shipping-center .shipping-status[data-tone='success'] {
+  border-color: var(
+    --admin-success-border,
+    color-mix(in srgb, #22c55e 52%, var(--admin-card-border))
+  );
+  background: var(
+    --admin-success-soft-bg,
+    color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))
+  );
+  color: var(
+    --admin-success-text,
+    color-mix(in srgb, #15803d 76%, var(--admin-card-text))
+  );
+}
+
+.shipping-center .shipping-status[data-tone='warning'],
+.shipping-center .shipping-alert-warning {
+  border-color: color-mix(in srgb, var(--admin-warning) 55%, var(--admin-card-border));
+  background: var(--admin-warning-soft-bg);
+  color: var(--admin-warning-text);
+}
+
+.shipping-center .shipping-status[data-tone='danger'],
+.shipping-center .shipping-alert-danger {
+  border-color: color-mix(in srgb, var(--admin-danger) 55%, var(--admin-card-border));
+  background: var(--admin-danger-soft-bg);
+  color: var(--admin-danger-text);
+}
+
+.shipping-center .shipping-alert-success {
+  border-color: var(
+    --admin-success-border,
+    color-mix(in srgb, #22c55e 52%, var(--admin-card-border))
+  );
+  background: var(
+    --admin-success-soft-bg,
+    color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))
+  );
+  color: var(
+    --admin-success-text,
+    color-mix(in srgb, #15803d 76%, var(--admin-card-text))
+  );
+}
+
+.shipping-center .shipping-success-text {
+  color: var(
+    --admin-success-text,
+    color-mix(in srgb, #15803d 76%, var(--admin-card-text))
+  );
+}
+
+.shipping-center .shipping-warning-text {
+  color: var(--admin-warning-text);
+}
+
+.shipping-center .shipping-danger-text {
+  color: var(--admin-danger-text);
+}
+
+.shipping-center .shipping-details {
+  border-color: var(--admin-card-border);
+  background: var(--admin-card-bg);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-details-body {
+  border-color: var(--admin-card-border);
+  background: color-mix(in srgb, var(--admin-page-bg) 72%, var(--admin-card-bg) 28%);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-link-action {
+  border-color: var(--admin-primary-soft-border);
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-primary-soft-text, var(--admin-primary));
+}
+
+.shipping-center .shipping-link-action:hover {
+  filter: brightness(0.97);
+}
+
+.shipping-center .shipping-check-item {
+  border-color: var(--admin-card-border);
+  background: var(--admin-button-soft-bg, var(--admin-page-bg));
+  color: var(--admin-card-muted-text);
+}
+
+.shipping-center .shipping-check-item[data-complete='true'] {
+  border-color: var(
+    --admin-success-border,
+    color-mix(in srgb, #22c55e 52%, var(--admin-card-border))
+  );
+  background: var(
+    --admin-success-soft-bg,
+    color-mix(in srgb, #22c55e 12%, var(--admin-card-bg))
+  );
+  color: var(
+    --admin-success-text,
+    color-mix(in srgb, #15803d 76%, var(--admin-card-text))
+  );
+}
+
+.shipping-center .shipping-explanation {
+  border-color: var(--admin-primary-soft-border);
+  background: color-mix(in srgb, var(--admin-primary-soft-bg) 72%, var(--admin-card-bg) 28%);
+  color: var(--admin-card-text);
+}
+
+.shipping-center .shipping-preview {
+  border: 1px solid var(--admin-primary-soft-border);
+  background:
+    linear-gradient(
+      135deg,
+      var(--admin-primary-soft-bg),
+      color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)
+    );
+  color: var(--admin-card-text);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--admin-primary) 10%, transparent);
+}
+
+.shipping-center .shipping-code {
+  border: 1px solid var(--admin-input-border);
+  background: var(--admin-input-bg);
+  color: var(--admin-input-text);
+}
+
+.shipping-center .shipping-progress-track {
+  background: color-mix(in srgb, var(--admin-card-border) 60%, transparent);
+}
+
+.shipping-center .shipping-progress-value {
+  background: linear-gradient(
+    90deg,
+    var(--admin-primary),
+    color-mix(in srgb, var(--admin-primary) 62%, white 38%)
+  );
+}
+
+.shipping-center input[type='checkbox'] {
+  accent-color: var(--admin-primary);
+}

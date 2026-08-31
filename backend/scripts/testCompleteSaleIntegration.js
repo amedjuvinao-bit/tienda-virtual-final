@@ -52,6 +52,9 @@ const {
 const {
   createGuestOrderAccessToken,
 } = require('../services/publicPaymentAccessService');
+const {
+  buildOrderCartRequestHeaders,
+} = require('./lib/orderCartRequestHeaders');
 
 const MONGO_URI =
   process.env.PRODUCTS_TEST_MONGO_URI ||
@@ -165,6 +168,7 @@ function buildWompiPayload({
   orderNumber,
   total,
   transactionId,
+  reference,
 }) {
   const payload = {
     event: 'transaction.updated',
@@ -173,7 +177,8 @@ function buildWompiPayload({
       transaction: {
         id: transactionId,
         status: 'APPROVED',
-        reference: `ORDER-${orderNumber}__TRY__${PREFIX}`,
+        reference:
+          reference || `ORDER-${orderNumber}__TRY__${PREFIX}`,
         amount_in_cents: Math.round(Number(total || 0) * 100),
         currency: 'COP',
         payment_method_type: 'CARD',
@@ -640,6 +645,11 @@ async function run() {
     { _id: checkoutCart._id },
     { $set: { accessIssuedAt: new Date() } }
   );
+  const checkoutOrderHeaders = await buildOrderCartRequestHeaders({
+    cartId: checkoutCart._id,
+    access: checkoutAccess,
+    idempotencyKey,
+  });
   assert.strictEqual(await Order.countDocuments({}), 0);
   assert.strictEqual(await InventoryReservation.countDocuments({}), 0);
   ok('POST /api/orders rechaza credenciales ausentes, alteradas, vencidas o de otro carrito');
@@ -649,10 +659,7 @@ async function run() {
     '/api/orders',
     {
       method: 'POST',
-      headers: {
-        ...cartAccessHeaders(checkoutAccess),
-        'Idempotency-Key': idempotencyKey,
-      },
+      headers: checkoutOrderHeaders,
       body: checkoutPayload,
     }
   );
@@ -690,10 +697,7 @@ async function run() {
     '/api/orders',
     {
       method: 'POST',
-      headers: {
-        ...cartAccessHeaders(checkoutAccess),
-        'Idempotency-Key': idempotencyKey,
-      },
+      headers: checkoutOrderHeaders,
       body: checkoutPayload,
     }
   );
@@ -826,7 +830,7 @@ async function run() {
   wompiTransactions.set(validLookupId, {
     id: validLookupId,
     status: 'PENDING',
-    reference: `ORDER-${order.orderNumber}__TRY__${PREFIX}`,
+    reference: checkoutData.data.reference,
     amount_in_cents: Math.round(order.total * 100),
     currency: 'COP',
     customer_email: 'no-debe-salir@example.com',
@@ -843,7 +847,7 @@ async function run() {
   wompiTransactions.set(wrongAmountLookupId, {
     id: wrongAmountLookupId,
     status: 'APPROVED',
-    reference: `ORDER-${order.orderNumber}__TRY__${PREFIX}`,
+    reference: checkoutData.data.reference,
     amount_in_cents: Math.round(order.total * 100) - 1,
     currency: 'COP',
   });
@@ -902,6 +906,7 @@ async function run() {
     orderNumber: order.orderNumber,
     total: order.total - 0.01,
     transactionId: `${PREFIX}-BAD-AMOUNT`,
+    reference: checkoutData.data.reference,
   });
   const badPayment = await requestJson(
     baseUrl,
@@ -915,19 +920,41 @@ async function run() {
       body: badPaymentPayload,
     }
   );
-  assert.strictEqual(badPayment.status, 409);
+  assert.strictEqual(badPayment.status, 200);
   assert.strictEqual(
     badPayment.data.error,
-    'WOMPI_AMOUNT_MISMATCH'
+    'PAYMENT_ATTEMPT_VALUE_MISMATCH'
   );
+  assert.strictEqual(badPayment.data.reconciliationRequired, true);
+  assert.strictEqual(badPayment.data.applied, false);
   order = await Order.findById(order._id).lean();
   assert.strictEqual(order.status, 'pending');
-  ok('Wompi no puede aprobar un valor distinto al total');
+  ok('Wompi concilia sin aplicar un valor distinto al intento emitido');
+
+  const retryCheckoutData = await requestJson(
+    baseUrl,
+    '/api/payments/wompi/checkout-data',
+    {
+      method: 'POST',
+      headers: paymentAccessHeaders(paymentAccess),
+      body: { orderId: String(order._id) },
+    }
+  );
+  assert.strictEqual(
+    retryCheckoutData.status,
+    200,
+    JSON.stringify(retryCheckoutData.data)
+  );
+  assert.notStrictEqual(
+    retryCheckoutData.data.reference,
+    checkoutData.data.reference
+  );
 
   const approvedPayload = buildWompiPayload({
     orderNumber: order.orderNumber,
     total: order.total,
     transactionId: `${PREFIX}-APPROVED`,
+    reference: retryCheckoutData.data.reference,
   });
   const approved = await requestJson(
     baseUrl,
@@ -1066,7 +1093,9 @@ async function run() {
     idempotencyKey: `${PREFIX}-REFUND`,
     adminLabel: 'ci-products',
   };
-  const refund = await processOrderRefund(refundInput);
+  const refund = await processOrderRefund(refundInput, {
+    allowInventoryRestock: true,
+  });
   assert.strictEqual(refund.idempotent, false);
   order = await Order.findById(order._id).lean();
   assert.strictEqual(
@@ -1083,7 +1112,9 @@ async function run() {
   );
   ok('La devolución repone cada unidad en su sede de origen');
 
-  const repeatedRefund = await processOrderRefund(refundInput);
+  const repeatedRefund = await processOrderRefund(refundInput, {
+    allowInventoryRestock: true,
+  });
   assert.strictEqual(repeatedRefund.idempotent, true);
   assert.strictEqual(
     await OrderRefund.countDocuments({

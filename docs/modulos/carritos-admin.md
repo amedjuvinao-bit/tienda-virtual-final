@@ -81,6 +81,8 @@ Cada intento registra fecha, canal, resultado y administrador responsable sin gu
 
 Al completar correctamente la creación protegida de una orden se ejecuta `markCartConverted` con la misma sesión transaccional. Se guardan `convertedOrderId` y `convertedAt`; los reintentos idempotentes pueden confirmar la misma relación, pero nunca reemplazarla por otra orden. Una creación fallida no marca conversión y el carrito se conserva como histórico.
 
+La creación exige dos precondiciones emitidas por la validación estricta: `If-Match-Updated-At` y `X-Cart-Snapshot-Fingerprint`. La huella SHA-256 cubre producto, variante, atributos, cantidad, precio y tipo de entrega canónicos. El middleware vuelve a calcularla antes de entrar a la transacción; la transacción la compara otra vez contra el catálogo vigente y convierte el carrito con un filtro atómico que incluye documento, credencial, versión e items persistidos. Un cambio de pestaña, precio o catálogo responde `CART_VERSION_CONFLICT` y no crea orden, reserva, movimiento, pago ni factura. Después de la conversión, el carrito queda inmutable para las rutas públicas de escritura.
+
 ## Concurrencia
 
 Las mutaciones exigen la versión exacta de `updatedAt`. La comparación y escritura se realizan con un filtro atómico. Una versión desactualizada responde `409 CART_WRITE_CONFLICT`; el panel informa el conflicto, recarga el detalle autoritativo y exige que el administrador repita la acción. No existe sobrescritura silenciosa.
@@ -116,9 +118,10 @@ Validación ejecutada antes del cierre:
 
 - Operaciones administrativas: **29/29**.
 - Montaje real de rutas administrativas: **9/9**.
-- Acceso seguro al carrito: **13/13**.
-- Concurrencia del carrito: **11/11**.
-- Validación canónica: **14/14**.
+- Acceso seguro al carrito: **14/14**.
+- Concurrencia del carrito: **12/12**.
+- Versión carrito–orden: **9/9** controles sin MongoDB y **30 carreras reales** registradas en Órdenes CI sobre replica set.
+- Validación canónica: **15/15**.
 - Creación autorizada de órdenes: **21/21**.
 - Protección de Gracias: **11/11**.
 - Autoridad de configuración de pago: **13/13**.

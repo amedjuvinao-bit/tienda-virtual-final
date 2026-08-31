@@ -69,6 +69,9 @@ const {
   processOrderRefund,
 } = require('../services/orderRefundService');
 const {
+  buildOrderCartRequestHeaders,
+} = require('./lib/orderCartRequestHeaders');
+const {
   buildVariantKey,
 } = require('../lib/products/productVariantConfig');
 const {
@@ -780,6 +783,10 @@ const approvalService = createWompiWebhookIntegrityService({
   reconcileFailureRecovery: (payload) => paymentFailureService.reconcileApproved(payload),
   createOrderEvent: async () => null,
   scheduleInvoiceOnce: async () => ({ scheduled: true }),
+  claimApprovedPaymentAttempt: async () => ({
+    allowed: true,
+    duplicate: false,
+  }),
 });
 
 async function processFailure(fixture, status = 'failed', transactionId = null) {
@@ -1711,13 +1718,15 @@ async function main() {
         { _id: checkoutCart._id },
         { $set: { accessIssuedAt: new Date() } }
       );
+      const checkoutOrderHeaders = await buildOrderCartRequestHeaders({
+        cartId: checkoutCart._id,
+        access: checkoutAccess,
+        idempotencyKey,
+      });
 
       const created = await requestJson(baseUrl, '/api/orders', {
         method: 'POST',
-        headers: {
-          ...cartAccessHeaders(checkoutAccess),
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: checkoutOrderHeaders,
         body: checkoutPayload,
       });
       assert.equal(created.status, 201, JSON.stringify(created.data));
@@ -1769,10 +1778,7 @@ async function main() {
       });
       const replay = await requestJson(baseUrl, '/api/orders', {
         method: 'POST',
-        headers: {
-          ...cartAccessHeaders(checkoutAccess),
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: checkoutOrderHeaders,
         body: checkoutPayload,
       });
       assert.equal(replay.status, 200, JSON.stringify(replay.data));
@@ -2081,9 +2087,13 @@ async function main() {
         idempotencyKey: `${RUN_ID}-REFUND`,
         adminLabel: 'atlas-integrity',
       };
-      const refund = await processOrderRefund(refundInput);
+      const refund = await processOrderRefund(refundInput, {
+        allowInventoryRestock: true,
+      });
       assert.equal(refund.idempotent, false);
-      const repeatedRefund = await processOrderRefund(refundInput);
+      const repeatedRefund = await processOrderRefund(refundInput, {
+        allowInventoryRestock: true,
+      });
       assert.equal(repeatedRefund.idempotent, true);
 
       const persistedRefunds = await OrderRefund.find({ order: orderId }).lean();

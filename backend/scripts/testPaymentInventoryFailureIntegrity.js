@@ -1,8 +1,6 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const crypto = require('node:crypto');
 const Module = require('node:module');
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -35,6 +33,9 @@ const {
 const {
   isBillableOrder,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  createWompiWebhookOrderService,
+} = require('../services/wompiWebhookOrderService');
 
 const checks = [];
 
@@ -741,12 +742,37 @@ async function runMountedRouteControls() {
     find: () => ({ sort: () => ({ lean: async () => [] }) }),
     deleteOne: async () => ({ deletedCount: 0 }),
   };
+  const fakePaymentAttemptService = {
+    findAttempt: async () => ({
+      provider: 'wompi',
+      order: routeState.order._id,
+      orderNumber: routeState.order.orderNumber,
+      reference: REFERENCE,
+      amountInCents: AMOUNT_IN_CENTS,
+      currency: 'COP',
+      state: 'issued',
+      active: true,
+      issuedBySystem: true,
+    }),
+    issueAttempt: async () => ({ attempt: {}, reused: true }),
+    claimApprovedAttempt: async () => ({
+      allowed: true,
+      duplicate: routeState.order.payment?.status === 'paid',
+    }),
+    claimNonApprovedAttempt: async () => ({
+      allowed: true,
+      ignored: false,
+    }),
+  };
   const originalLoad = Module._load;
   Module._load = function loadPaymentFailureRouteDoubles(request, parent, isMain) {
     const doubles = {
       mongoose: fakeMongoose,
       '../models/SiteSettings': fakeSiteSettings,
       '../models/Order': fakeOrderModel,
+      '../models/OrderEvent': fakeOrderEventModel,
+      '../models/PaymentAttempt': {},
+      '../models/StoreCreditUsage': {},
       '../models/Product': { findById: async () => null },
       '../models/ElectronicInvoice': fakeElectronicInvoice,
       '../middleware/requireAdmin': (req, res, next) => next(),
@@ -777,6 +803,10 @@ async function runMountedRouteControls() {
           order: routeState.order,
         }),
       },
+      '../services/paymentAttemptService': {
+        createPaymentAttemptService: () => fakePaymentAttemptService,
+        fingerprintPaymentMerchant: () => 'fixture-merchant-fingerprint',
+      },
       '../lib/dian/providers/factusProvider': {
         deleteFactusBillByReference: async () => ({}),
         getFactusCredentials: async () => ({}),
@@ -784,6 +814,9 @@ async function runMountedRouteControls() {
       },
       '../services/electronicCreditNoteService': {
         createOfficialCreditNote: async () => ({}),
+      },
+      '../services/orderRefundReconciliationService': {
+        linkRefundCreditNote: async () => ({}),
       },
       '../lib/orders/orderTimeline': {
         addInvoiceGeneratedEvent: async () => {},
@@ -2099,28 +2132,60 @@ async function main() {
     assert.equal(order.inventoryControl.restockedOnFailure, false);
   });
 
-  await check('el webhook Wompi delega la recuperacion sin modificar stock directamente', async () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '..', 'routes', 'payments.js'),
-      'utf8'
-    );
-    const wompiWebhookStart = source.indexOf("router.post('/wompi/webhook'");
-    const payuCheckoutStart = source.indexOf(
-      "router.post('/payu/checkout-data'",
-      wompiWebhookStart
-    );
-    assert(wompiWebhookStart >= 0);
-    assert(payuCheckoutStart > wompiWebhookStart);
-    const wompiWebhookSource = source.slice(wompiWebhookStart, payuCheckoutStart);
+  await check('el servicio Wompi compone y delega la recuperacion por su autoridad inyectada', async () => {
+    const releaseReservation = async () => ({});
+    const applyReservation = () => {};
+    const reconcileReservation = async () => ({});
+    const recovery = {
+      process: async () => ({ completed: true }),
+      reconcileApproved: async (payload) => ({ completed: true, payload }),
+    };
+    let recoveryDependencies = null;
+    let integrityDependencies = null;
 
-    assert(!wompiWebhookSource.includes('Product.inventory'));
-    assert(!wompiWebhookSource.includes('product.inventory'));
-    assert(!wompiWebhookSource.includes('Product.stock'));
-    assert(!wompiWebhookSource.includes('product.stock'));
-    assert(!wompiWebhookSource.includes('restockOrderIfNeeded'));
-    assert(!wompiWebhookSource.includes('incrementStock'));
-    assert(wompiWebhookSource.includes('paymentInventoryFailureService.process'));
-    assert(wompiWebhookSource.includes('runPaymentInventoryTransaction'));
+    const composed = createWompiWebhookOrderService({
+      mongooseAdapter: { startSession: async () => ({}) },
+      OrderModel: {},
+      OrderEventModel: {},
+      getStoreCreditCheckoutService: () => ({}),
+      createPaymentInventoryFailureService: (dependencies) => {
+        recoveryDependencies = dependencies;
+        return recovery;
+      },
+      createWompiWebhookIntegrityService: (dependencies) => {
+        integrityDependencies = dependencies;
+        return { processApproved: async () => ({}) };
+      },
+      buildPaymentFailureReleaseReason,
+      confirmInventoryReservation: async () => ({}),
+      reconcilePaymentFailureReservation: reconcileReservation,
+      releaseInventoryReservation: releaseReservation,
+      applyReservationToOrderDocument: applyReservation,
+      isApprovedPayment,
+      resolveMonotonicWompiTransition,
+      runPaymentInventoryTransaction: async () => ({}),
+      invoiceSchedulingService: { scheduleOnce: async () => ({}) },
+      paymentAttemptService: {
+        claimApprovedAttempt: async () => ({}),
+        findAttempt: async () => null,
+        claimNonApprovedAttempt: async () => ({}),
+      },
+      fingerprintPaymentMerchant: () => 'merchant-fingerprint',
+      trimSafe: (value, max = 300) => String(value || '').trim().slice(0, max),
+      logger: { log: () => {} },
+    });
+
+    assert.strictEqual(composed.paymentInventoryFailureService, recovery);
+    assert.strictEqual(recoveryDependencies.releaseReservation, releaseReservation);
+    assert.strictEqual(recoveryDependencies.applyReservation, applyReservation);
+    assert.strictEqual(recoveryDependencies.reconcileReservation, reconcileReservation);
+    const reconciliation = await integrityDependencies.reconcileFailureRecovery({
+      order: 'order-1',
+    });
+    assert.deepEqual(reconciliation, {
+      completed: true,
+      payload: { order: 'order-1' },
+    });
   });
 
   await runMountedRouteControls();

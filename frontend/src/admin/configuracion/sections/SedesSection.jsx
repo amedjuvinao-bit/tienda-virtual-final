@@ -27,6 +27,7 @@ import {
   updateAdminBranch,
   updateAdminBranchStatus,
 } from '../../api/adminBranchesApi';
+import api from '../../../lib/api';
 
 const EMPTY_FORM = {
   name: '',
@@ -110,6 +111,14 @@ function getInitials(text) {
     .map((part) => part[0])
     .join('')
     .toUpperCase();
+}
+
+function normalizeGeoText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 }
 
 function resolveBranchesList(response) {
@@ -269,12 +278,43 @@ export default function SedesSection() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [countries, setCountries] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [total, setTotal] = useState(0);
 
   const editingBranchId = getBranchId(editingBranch);
+
+  const selectedCountry = useMemo(() => {
+    const expected = normalizeGeoText(form.address.country);
+    return countries.find(
+      (country) =>
+        normalizeGeoText(country.code) === expected ||
+        normalizeGeoText(country.name) === expected
+    ) || null;
+  }, [countries, form.address.country]);
+
+  const selectedCountryCode = String(
+    selectedCountry?.code ||
+      (/^[A-Za-z]{2}$/.test(form.address.country)
+        ? form.address.country
+        : normalizeGeoText(form.address.country) === 'colombia'
+          ? 'CO'
+          : '')
+  ).toUpperCase();
+
+  const selectedRegionCode = useMemo(() => {
+    if (form.address.departmentCode) return form.address.departmentCode;
+    const expected = normalizeGeoText(form.address.department);
+    const match = regions.find(
+      (region) => normalizeGeoText(region.name) === expected
+    );
+    return match?.code || match?.isoCode || '';
+  }, [form.address.department, form.address.departmentCode, regions]);
 
   const filteredMetaTypes = useMemo(() => {
     return Array.isArray(meta.types) && meta.types.length > 0
@@ -414,6 +454,115 @@ export default function SedesSection() {
   useEffect(() => {
     loadBranches();
   }, [loadBranches]);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/api/geo/countries')
+      .then(({ data }) => {
+        if (!active) return;
+        setCountries(
+          (Array.isArray(data) ? data : []).map((country) => ({
+            ...country,
+            code: String(country?.code || '').toUpperCase(),
+          }))
+        );
+      })
+      .catch((geoError) => {
+        console.warn('No fue posible cargar el catálogo de países.', geoError);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showForm || !selectedCountryCode) {
+      setRegions([]);
+      setCities([]);
+      return undefined;
+    }
+    let active = true;
+    setGeoLoading(true);
+    api.get('/api/geo/regions', { params: { country: selectedCountryCode } })
+      .then(({ data }) => {
+        if (!active) return;
+        setRegions(Array.isArray(data) ? data : []);
+      })
+      .catch((geoError) => {
+        if (!active) return;
+        setRegions([]);
+        console.warn('No fue posible cargar el catálogo de regiones.', geoError);
+      })
+      .finally(() => {
+        if (active) setGeoLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedCountryCode, showForm]);
+
+  useEffect(() => {
+    if (!regions.length || form.address.departmentCode) return;
+    const expected = normalizeGeoText(form.address.department);
+    const match = regions.find(
+      (region) => normalizeGeoText(region.name) === expected
+    );
+    if (!match) return;
+    setForm((current) => ({
+      ...current,
+      address: {
+        ...current.address,
+        department: match.name,
+        departmentCode: match.code || match.isoCode || '',
+      },
+    }));
+  }, [form.address.department, form.address.departmentCode, regions]);
+
+  useEffect(() => {
+    if (!showForm || !selectedCountryCode || !selectedRegionCode) {
+      setCities([]);
+      return undefined;
+    }
+    let active = true;
+    setGeoLoading(true);
+    api.get('/api/geo/cities', {
+      params: {
+        country: selectedCountryCode,
+        region: selectedRegionCode,
+        limit: 10000,
+      },
+    })
+      .then(({ data }) => {
+        if (!active) return;
+        setCities(Array.isArray(data) ? data : []);
+      })
+      .catch((geoError) => {
+        if (!active) return;
+        setCities([]);
+        console.warn('No fue posible cargar el catálogo de ciudades.', geoError);
+      })
+      .finally(() => {
+        if (active) setGeoLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedCountryCode, selectedRegionCode, showForm]);
+
+  useEffect(() => {
+    if (!cities.length || form.address.cityCode) return;
+    const expected = normalizeGeoText(form.address.city);
+    const match = cities.find((city) => normalizeGeoText(city.name) === expected);
+    if (!match) return;
+    setForm((current) => ({
+      ...current,
+      address: {
+        ...current.address,
+        city: match.name,
+        cityCode: match.code || '',
+      },
+    }));
+  }, [cities, form.address.city, form.address.cityCode]);
 
   useEffect(() => {
     if (!showForm) return undefined;
@@ -854,52 +1003,163 @@ export default function SedesSection() {
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="space-y-1">
                         <span className="text-xs font-semibold">País</span>
-                        <input
-                          value={form.address.country}
-                          onChange={(event) =>
-                            updateNestedField(
-                              'address',
-                              'country',
-                              event.target.value
-                            )
-                          }
-                          className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                          style={inputStyle}
-                        />
+                        {countries.length ? (
+                          <select
+                            value={selectedCountryCode}
+                            onChange={(event) => {
+                              const country = countries.find(
+                                (item) => item.code === event.target.value
+                              );
+                              setForm((current) => ({
+                                ...current,
+                                address: {
+                                  ...current.address,
+                                  country: country?.name || event.target.value,
+                                  department: '',
+                                  departmentCode: '',
+                                  city: '',
+                                  cityCode: '',
+                                },
+                              }));
+                            }}
+                            autoComplete="country"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          >
+                            <option value="">Selecciona un país</option>
+                            {countries.map((country) => (
+                              <option key={country.code} value={country.code}>
+                                {country.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={form.address.country}
+                            onChange={(event) =>
+                              updateNestedField('address', 'country', event.target.value)
+                            }
+                            autoComplete="country-name"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          />
+                        )}
                       </label>
 
                       <label className="space-y-1">
                         <span className="text-xs font-semibold">
-                          Departamento
+                          {selectedCountryCode === 'CO'
+                            ? 'Departamento'
+                            : 'Estado / provincia'}
                         </span>
-                        <input
-                          value={form.address.department}
-                          onChange={(event) =>
-                            updateNestedField(
-                              'address',
-                              'department',
-                              event.target.value
-                            )
-                          }
-                          className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                          style={inputStyle}
-                        />
+                        {regions.length ? (
+                          <select
+                            value={selectedRegionCode}
+                            onChange={(event) => {
+                              const region = regions.find(
+                                (item) =>
+                                  (item.code || item.isoCode) === event.target.value
+                              );
+                              setForm((current) => ({
+                                ...current,
+                                address: {
+                                  ...current.address,
+                                  department: region?.name || '',
+                                  departmentCode: event.target.value,
+                                  city: '',
+                                  cityCode: '',
+                                },
+                              }));
+                            }}
+                            disabled={geoLoading}
+                            autoComplete="address-level1"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          >
+                            <option value="">Selecciona una región</option>
+                            {regions.map((region) => {
+                              const code = region.code || region.isoCode;
+                              return <option key={code} value={code}>{region.name}</option>;
+                            })}
+                          </select>
+                        ) : (
+                          <input
+                            value={form.address.department}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setForm((current) => ({
+                                ...current,
+                                address: {
+                                  ...current.address,
+                                  department: value,
+                                  departmentCode: value,
+                                  city: '',
+                                  cityCode: '',
+                                },
+                              }));
+                            }}
+                            autoComplete="address-level1"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          />
+                        )}
                       </label>
 
                       <label className="space-y-1">
                         <span className="text-xs font-semibold">Ciudad</span>
-                        <input
-                          value={form.address.city}
-                          onChange={(event) =>
-                            updateNestedField(
-                              'address',
-                              'city',
-                              event.target.value
-                            )
-                          }
-                          className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                          style={inputStyle}
-                        />
+                        {cities.length ? (
+                          <select
+                            value={
+                              form.address.cityCode ||
+                              cities.find(
+                                (city) =>
+                                  normalizeGeoText(city.name) ===
+                                  normalizeGeoText(form.address.city)
+                              )?.code ||
+                              ''
+                            }
+                            onChange={(event) => {
+                              const city = cities.find(
+                                (item) => item.code === event.target.value
+                              );
+                              setForm((current) => ({
+                                ...current,
+                                address: {
+                                  ...current.address,
+                                  city: city?.name || '',
+                                  cityCode: event.target.value,
+                                },
+                              }));
+                            }}
+                            disabled={geoLoading}
+                            autoComplete="address-level2"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          >
+                            <option value="">Selecciona una ciudad</option>
+                            {cities.map((city) => (
+                              <option key={city.code} value={city.code}>{city.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={form.address.city}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setForm((current) => ({
+                                ...current,
+                                address: {
+                                  ...current.address,
+                                  city: value,
+                                  cityCode: '',
+                                },
+                              }));
+                            }}
+                            autoComplete="address-level2"
+                            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                            style={inputStyle}
+                          />
+                        )}
                       </label>
 
                       <label className="space-y-1">
@@ -929,6 +1189,23 @@ export default function SedesSection() {
                               event.target.value
                             )
                           }
+                          className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                          style={inputStyle}
+                        />
+                      </label>
+
+                      <label className="space-y-1 md:col-span-2">
+                        <span className="text-xs font-semibold">Código postal</span>
+                        <input
+                          value={form.address.postalCode}
+                          onChange={(event) =>
+                            updateNestedField(
+                              'address',
+                              'postalCode',
+                              event.target.value
+                            )
+                          }
+                          autoComplete="postal-code"
                           className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
                           style={inputStyle}
                         />

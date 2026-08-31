@@ -7,9 +7,11 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const Order = require('../models/Order');
 const SiteSettings = require('../models/SiteSettings');
 const {
-  getInvoiceFromFactus,
   sendCreditNoteToFactus,
 } = require('../lib/dian/providers/factusProvider');
+const {
+  findCreditNoteByReferenceFromFactus,
+} = require('../lib/dian/providers/factusRangeAwareProvider');
 const {
   addCreditNoteCreatedEvent,
 } = require('../lib/orders/orderTimeline');
@@ -28,6 +30,7 @@ const CREDIT_NOTE_REASONS = Object.freeze({
 const ACTIVE_NOTE_STATUSES = new Set(['pending', 'processing', 'sent', 'validated']);
 const COMPLETED_NOTE_STATUSES = new Set(['sent', 'validated']);
 const CREDIT_NOTE_LOCK_MS = 5 * 60 * 1000;
+const MAX_RECONCILIATION_ABSENCES = 3;
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -305,70 +308,6 @@ function extractRemoteDocument(payload = {}, type = 'invoice') {
   return {};
 }
 
-function resolveFactusBillId(invoice = {}) {
-  const raw = toPlain(invoice?.provider?.raw);
-  return firstPositiveInteger(
-    invoice?.provider?.id,
-    raw?.id,
-    raw?.bill?.id,
-    raw?.data?.id,
-    raw?.data?.bill?.id,
-    raw?.response?.data?.id,
-    raw?.response?.data?.bill?.id,
-    raw?.response?.data?.data?.id,
-    raw?.response?.data?.data?.bill?.id,
-    raw?.billingSync?.response?.data?.id,
-    raw?.billingSync?.response?.data?.bill?.id
-  );
-}
-
-async function ensureFactusBillId(invoice, providerConfig = {}) {
-  const storedId = resolveFactusBillId(invoice);
-  if (storedId) return storedId;
-
-  const invoiceNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
-  if (!invoiceNumber) {
-    throw createCreditNoteError(
-      'La factura no tiene número oficial de Factus.',
-      422,
-      'BILLING_CREDIT_NOTE_INVOICE_NUMBER_MISSING'
-    );
-  }
-
-  const result = await getInvoiceFromFactus({ providerConfig, invoiceNumber });
-  if (!result?.success) {
-    throw createCreditNoteError(
-      cleanText(result?.error, 500) || 'Factus no pudo devolver la factura relacionada.',
-      502,
-      'BILLING_CREDIT_NOTE_INVOICE_LOOKUP_FAILED'
-    );
-  }
-
-  const remote = extractRemoteDocument(result.data, 'invoice');
-  const remoteNumber = cleanText(remote.number || remote.invoice_number, 160);
-  if (remoteNumber && remoteNumber.replace(/\s+/g, '').toUpperCase() !== invoiceNumber.replace(/\s+/g, '').toUpperCase()) {
-    throw createCreditNoteError(
-      'Factus devolvió una factura diferente a la factura relacionada.',
-      502,
-      'BILLING_CREDIT_NOTE_INVOICE_IDENTITY_MISMATCH'
-    );
-  }
-
-  const billId = firstPositiveInteger(remote.id, remote?.bill?.id);
-  if (!billId) {
-    throw createCreditNoteError(
-      'Factus no devolvió el ID oficial de la factura requerido para crear la nota crédito.',
-      502,
-      'BILLING_CREDIT_NOTE_BILL_ID_MISSING'
-    );
-  }
-
-  invoice.provider.id = billId;
-  invoice.markModified('provider');
-  await invoice.save();
-  return billId;
-}
-
 function payloadItemsToSnapshot(payload = {}) {
   return (Array.isArray(payload.items) ? payload.items : []).map((item) => {
     const quantity = itemQuantity(item);
@@ -406,6 +345,189 @@ function payloadTotals(payload = {}) {
     acc.totalAmount = money(acc.totalAmount + taxable + tax);
     return acc;
   }, { subtotal: 0, taxAmount: 0, totalAmount: 0 });
+}
+
+function isAmbiguousProviderFailure(result = {}) {
+  const status = Number(result?.status || 0);
+  const stage = cleanText(result?.stage, 100).toLowerCase();
+  return (
+    result?.requiresSync === true ||
+    status >= 500 ||
+    cleanText(result?.code, 100) === 'FACTUS_PENDING_CREDIT_NOTE' ||
+    (!status && stage.includes('exception'))
+  );
+}
+
+async function markCreditNoteForReconciliation({
+  invoiceId,
+  noteId,
+  lockToken,
+  error,
+  confirmedNotFound,
+}) {
+  const now = new Date();
+  const noteSet = {
+    'creditNotes.$.status': 'processing',
+    'creditNotes.$.errorMessage':
+      'El resultado está pendiente de conciliación con Factus; no se volverá a emitir hasta confirmarlo.',
+    'creditNotes.$.providerErrors': {
+      code: error?.code || 'BILLING_CREDIT_NOTE_RECONCILIATION_PENDING',
+      stage: error?.providerResult?.stage || '',
+      httpStatus: Number(error?.providerResult?.status || 0) || null,
+    },
+    'creditNotes.$.emission.state': 'reconciliation_pending',
+    'creditNotes.$.emission.reconciliationRequestedAt': now,
+    'creditNotes.$.emission.lastAttemptAt': now,
+  };
+  const controlSet = {
+    'creditNoteControl.state': 'idle',
+    'creditNoteControl.lockToken': '',
+    'creditNoteControl.requestKey': '',
+    'creditNoteControl.lockedAt': null,
+  };
+  if (Number.isFinite(Number(confirmedNotFound))) {
+    noteSet['creditNotes.$.emission.confirmedNotFound'] = Number(confirmedNotFound);
+  }
+
+  const guarded = await ElectronicInvoice.updateOne(
+    {
+      _id: invoiceId,
+      'creditNotes._id': noteId,
+      ...(lockToken ? { 'creditNoteControl.lockToken': lockToken } : {}),
+    },
+    { $set: { ...noteSet, ...controlSet } }
+  );
+
+  // Si el proveedor respondió pero se perdió el lease antes de persistir, no
+  // liberamos el lease nuevo. Solo cercamos la misma nota si aún no fue
+  // completada por otro worker.
+  if (Number(guarded?.modifiedCount || guarded?.nModified || 0) === 0) {
+    await ElectronicInvoice.updateOne(
+      {
+        _id: invoiceId,
+        creditNotes: {
+          $elemMatch: {
+            _id: noteId,
+            'emission.state': { $ne: 'completed' },
+          },
+        },
+      },
+      { $set: noteSet }
+    );
+  }
+}
+
+async function persistRemoteCreditNote({
+  invoice,
+  noteId,
+  lockToken,
+  referenceCode,
+  remote,
+  responseData,
+  payload,
+  reconciled = false,
+}) {
+  const noteNumber = cleanText(remote?.number, 160);
+  const fiscalKey = cleanText(remote?.cude || remote?.cufe, 220);
+  const remoteReferenceCode = cleanText(
+    remote?.reference_code || remote?.referenceCode,
+    180
+  );
+  const validated =
+    remote?.is_validated === true || remote?.isValidated === true;
+
+  if (!noteNumber) {
+    throw createCreditNoteError(
+      'Factus respondió, pero no devolvió el número oficial de la nota crédito.',
+      503,
+      'BILLING_CREDIT_NOTE_NUMBER_MISSING',
+      { reconciliationPending: true }
+    );
+  }
+  if (
+    remoteReferenceCode &&
+    remoteReferenceCode.toUpperCase() !== referenceCode.toUpperCase()
+  ) {
+    throw createCreditNoteError(
+      'Factus devolvió una nota crédito con una referencia diferente a la solicitud.',
+      502,
+      'BILLING_CREDIT_NOTE_IDENTITY_MISMATCH'
+    );
+  }
+  if (validated && !fiscalKey) {
+    throw createCreditNoteError(
+      'Factus marcó la nota crédito como validada, pero no devolvió su CUDE.',
+      503,
+      'BILLING_CREDIT_NOTE_CUDE_MISSING',
+      { reconciliationPending: true }
+    );
+  }
+
+  const completedAt = new Date();
+  const snapshots = payloadItemsToSnapshot(payload || {});
+  const totals = payloadTotals(payload || {});
+  const set = {
+    'creditNotes.$.status': validated ? 'validated' : 'sent',
+    'creditNotes.$.referenceCode': remoteReferenceCode || referenceCode,
+    'creditNotes.$.billNumber': cleanText(
+      invoice?.provider?.number || invoice.invoiceNumber,
+      160
+    ),
+    'creditNotes.$.provider': {
+      name: 'factus',
+      id: firstPositiveInteger(remote.id),
+      status: validated ? 'validated' : cleanText(remote.status || 'sent', 80),
+      number: noteNumber,
+      cufe: fiscalKey,
+      cude: fiscalKey,
+      isValidated: validated,
+      validatedAt: cleanText(remote.validated_at || remote.validatedAt, 120),
+      links: sanitizeProviderPayload(remote.links || {}),
+      raw: {
+        ...sanitizeProviderPayload(remote),
+        response: sanitizeProviderPayload(responseData || {}),
+      },
+    },
+    'creditNotes.$.providerErrors': {},
+    'creditNotes.$.errorMessage': '',
+    'creditNotes.$.emission.state': 'completed',
+    'creditNotes.$.emission.completedAt': completedAt,
+    'creditNotes.$.emission.lastAttemptAt': completedAt,
+    'creditNotes.$.emission.reconciledAt': reconciled ? completedAt : null,
+    'creditNotes.$.emission.confirmedNotFound': 0,
+    'creditNotes.$.sentAt': completedAt,
+    'creditNotes.$.validatedAt': validated ? completedAt : null,
+    'creditNotes.$.failedAt': null,
+    'creditNoteControl.state': 'idle',
+    'creditNoteControl.lockToken': '',
+    'creditNoteControl.requestKey': '',
+    'creditNoteControl.lockedAt': null,
+  };
+  if (snapshots.length) {
+    set['creditNotes.$.subtotal'] = totals.subtotal;
+    set['creditNotes.$.taxAmount'] = totals.taxAmount;
+    set['creditNotes.$.totalAmount'] = totals.totalAmount;
+    set['creditNotes.$.items'] = snapshots;
+  }
+
+  const updated = await ElectronicInvoice.findOneAndUpdate(
+    {
+      _id: invoice._id,
+      'creditNotes._id': noteId,
+      'creditNoteControl.lockToken': lockToken,
+    },
+    { $set: set },
+    { new: true, runValidators: true }
+  );
+  if (!updated) {
+    throw createCreditNoteError(
+      'Factus procesó la nota, pero no fue posible guardar su resultado. Quedó pendiente de conciliación.',
+      503,
+      'BILLING_CREDIT_NOTE_PERSISTENCE_ERROR',
+      { reconciliationPending: true }
+    );
+  }
+  return updated;
 }
 
 async function findInvoice(identifier) {
@@ -494,6 +616,8 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
         'BILLING_CREDIT_NOTE_INVOICE_NOT_VALIDATED'
       );
     }
+    const settings = await SiteSettings.findOne();
+    const providerConfig = settings?.billing?.electronicProvider || {};
 
     const selectedItems = request.type === 'partial'
       ? normalizePartialItems(order, request.selectedItems)
@@ -526,8 +650,57 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
       };
     }
 
-    assertCreditCapacity(invoice, order, request, selectedItems);
     const referenceCode = existing?.referenceCode || buildReferenceCode(order, request.idempotencyKey);
+
+    if (existing?.emission?.state === 'reconciliation_pending') {
+      noteId = existing._id;
+      const lookup = await findCreditNoteByReferenceFromFactus({
+        settings,
+        providerConfig,
+        referenceCode,
+      });
+
+      if (lookup?.success && lookup?.found && lookup?.document) {
+        const recovered = await persistRemoteCreditNote({
+          invoice,
+          noteId,
+          lockToken,
+          referenceCode,
+          remote: lookup.document,
+          responseData: lookup.data,
+          payload: null,
+          reconciled: true,
+        });
+        return {
+          created: false,
+          reused: true,
+          invoice: recovered,
+          creditNote: recovered.creditNotes.id(noteId),
+          message: 'La nota crédito fue recuperada por su referencia exacta sin volver a emitirla.',
+        };
+      }
+
+      const confirmedNotFound = lookup?.success
+        ? Number(existing?.emission?.confirmedNotFound || 0) + 1
+        : Number(existing?.emission?.confirmedNotFound || 0);
+      if (!lookup?.success || confirmedNotFound < MAX_RECONCILIATION_ABSENCES) {
+        const pendingError = createCreditNoteError(
+          lookup?.success
+            ? `Factus aún no devuelve la referencia exacta. Confirmación ${confirmedNotFound} de ${MAX_RECONCILIATION_ABSENCES}.`
+            : 'No fue posible consultar Factus para conciliar la nota crédito.',
+          503,
+          'BILLING_CREDIT_NOTE_RECONCILIATION_PENDING',
+          {
+            reconciliationPending: true,
+            confirmedNotFound,
+            providerResult: lookup,
+          }
+        );
+        throw pendingError;
+      }
+    }
+
+    assertCreditCapacity(invoice, order, request, selectedItems);
 
     if (existing) {
       existing.type = request.type;
@@ -580,9 +753,14 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
     invoice.markModified('creditNotes');
     await invoice.save();
 
-    const settings = await SiteSettings.findOne();
-    const providerConfig = settings?.billing?.electronicProvider || {};
-    const billId = await ensureFactusBillId(invoice, providerConfig);
+    const billNumber = cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160);
+    if (!billNumber) {
+      throw createCreditNoteError(
+        'La factura no tiene número oficial de Factus.',
+        422,
+        'BILLING_CREDIT_NOTE_INVOICE_NUMBER_MISSING'
+      );
+    }
     const result = await sendCreditNoteToFactus({
       electronicInvoice: invoice,
       order,
@@ -592,110 +770,37 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
       reasonCode: request.reasonCode,
       reasonText: request.reasonText,
       selectedItems,
-      billId,
+      billNumber,
       referenceCode,
     });
 
     if (!result?.success) {
       throw createCreditNoteError(
         cleanText(result?.error, 500) || 'Factus no pudo crear la nota crédito.',
-        result?.status === 409 ? 409 : 502,
+        isAmbiguousProviderFailure(result)
+          ? 503
+          : result?.status === 409
+            ? 409
+            : 502,
         result?.code || 'BILLING_CREDIT_NOTE_PROVIDER_ERROR',
-        { providerResult: result }
+        {
+          providerResult: result,
+          reconciliationPending: isAmbiguousProviderFailure(result),
+        }
       );
     }
 
     const remote = extractRemoteDocument(result.data, 'credit-note');
     const payload = result.payload || {};
-    const snapshots = payloadItemsToSnapshot(payload);
-    const totals = payloadTotals(payload);
-    const validated = remote?.is_validated === true || remote?.isValidated === true;
-    const completedAt = new Date();
-    const noteNumber = cleanText(remote.number, 160);
-    const fiscalKey = cleanText(remote.cude || remote.cufe, 220);
-    const remoteReferenceCode = cleanText(remote.reference_code || remote.referenceCode, 180);
-
-    if (!noteNumber) {
-      throw createCreditNoteError(
-        'Factus respondió, pero no devolvió el número oficial de la nota crédito.',
-        502,
-        'BILLING_CREDIT_NOTE_NUMBER_MISSING'
-      );
-    }
-
-    if (
-      remoteReferenceCode &&
-      remoteReferenceCode.toUpperCase() !== referenceCode.toUpperCase()
-    ) {
-      throw createCreditNoteError(
-        'Factus devolvió una nota crédito con una referencia diferente a la solicitud.',
-        502,
-        'BILLING_CREDIT_NOTE_IDENTITY_MISMATCH'
-      );
-    }
-
-    if (validated && !fiscalKey) {
-      throw createCreditNoteError(
-        'Factus marcó la nota crédito como validada, pero no devolvió su CUDE.',
-        502,
-        'BILLING_CREDIT_NOTE_CUDE_MISSING'
-      );
-    }
-
-    const updated = await ElectronicInvoice.findOneAndUpdate(
-      {
-        _id: invoice._id,
-        'creditNotes._id': noteId,
-        'creditNoteControl.lockToken': lockToken,
-      },
-      {
-        $set: {
-          'creditNotes.$.status': validated ? 'validated' : 'sent',
-          'creditNotes.$.referenceCode': remoteReferenceCode || referenceCode,
-          'creditNotes.$.billNumber': cleanText(invoice?.provider?.number || invoice.invoiceNumber, 160),
-          'creditNotes.$.subtotal': totals.subtotal,
-          'creditNotes.$.taxAmount': totals.taxAmount,
-          'creditNotes.$.totalAmount': totals.totalAmount,
-          'creditNotes.$.items': snapshots,
-          'creditNotes.$.provider': {
-            name: 'factus',
-            id: firstPositiveInteger(remote.id),
-            status: validated ? 'validated' : cleanText(remote.status || 'sent', 80),
-            number: noteNumber,
-            cufe: fiscalKey,
-            cude: fiscalKey,
-            isValidated: validated,
-            validatedAt: cleanText(remote.validated_at || remote.validatedAt, 120),
-            links: sanitizeProviderPayload(remote.links || {}),
-            raw: {
-              ...sanitizeProviderPayload(remote),
-              response: sanitizeProviderPayload(result.data),
-            },
-          },
-          'creditNotes.$.providerErrors': {},
-          'creditNotes.$.errorMessage': '',
-          'creditNotes.$.emission.state': 'completed',
-          'creditNotes.$.emission.completedAt': completedAt,
-          'creditNotes.$.emission.lastAttemptAt': completedAt,
-          'creditNotes.$.sentAt': completedAt,
-          'creditNotes.$.validatedAt': validated ? completedAt : null,
-          'creditNotes.$.failedAt': null,
-          'creditNoteControl.state': 'idle',
-          'creditNoteControl.lockToken': '',
-          'creditNoteControl.requestKey': '',
-          'creditNoteControl.lockedAt': null,
-        },
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!updated) {
-      throw createCreditNoteError(
-        'Factus procesó la nota, pero no fue posible guardar su resultado. Reintenta con la misma solicitud para recuperarla sin duplicarla.',
-        500,
-        'BILLING_CREDIT_NOTE_PERSISTENCE_ERROR'
-      );
-    }
+    const updated = await persistRemoteCreditNote({
+      invoice,
+      noteId,
+      lockToken,
+      referenceCode,
+      remote,
+      responseData: result.data,
+      payload,
+    });
 
     const updatedNote = updated.creditNotes.id(noteId);
     try {
@@ -713,12 +818,22 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
       reused: false,
       invoice: updated,
       creditNote: updatedNote,
-      message: validated
+      message: updatedNote?.provider?.isValidated === true
         ? 'Nota crédito creada y validada correctamente por Factus.'
         : 'Nota crédito creada en Factus y pendiente de validación.',
     };
   } catch (error) {
     if (noteId) {
+      if (error?.reconciliationPending === true) {
+        await markCreditNoteForReconciliation({
+          invoiceId: locked._id,
+          noteId,
+          lockToken,
+          error,
+          confirmedNotFound: error?.confirmedNotFound,
+        });
+        throw error;
+      }
       const failedAt = new Date();
       await ElectronicInvoice.updateOne(
         { _id: locked._id, 'creditNotes._id': noteId },
@@ -730,6 +845,9 @@ async function createOfficialCreditNote(invoiceIdentifier, body = {}, options = 
               code: error?.code || 'BILLING_CREDIT_NOTE_ERROR',
               stage: error?.providerResult?.stage || '',
               httpStatus: error?.providerResult?.status || null,
+              details: sanitizeProviderPayload(
+                error?.providerResult?.validationErrors || {}
+              ),
             },
             'creditNotes.$.emission.state': 'failed',
             'creditNotes.$.emission.failedAt': failedAt,
@@ -753,5 +871,4 @@ module.exports = {
   extractRemoteDocument,
   normalizePartialItems,
   normalizeRequest,
-  resolveFactusBillId,
 };

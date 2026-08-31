@@ -183,6 +183,103 @@ describe('concurrencia del carrito', () => {
     expect(adopted).toEqual(serverState);
   });
 
+  it('revierte la vista optimista cuando el servidor rechaza un producto sin stock', async () => {
+    const serverState = { items: [item(PRODUCT_A)], version: 'v1' };
+    const rejected = new Error('invalid cart items');
+    rejected.response = {
+      status: 409,
+      data: { error: 'CART_ITEMS_INVALID' },
+    };
+    let adopted = null;
+    const onRejected = vi.fn();
+    const coordinator = createCartMutationCoordinator({
+      getSnapshot: async () => serverState,
+      write: async () => { throw rejected; },
+      reload: async () => serverState,
+      adopt: (snapshot) => { adopted = snapshot; },
+      onRejected,
+    });
+
+    await expect(
+      coordinator.enqueue({ type: 'add', item: item(PRODUCT_B) })
+    ).rejects.toBe(rejected);
+
+    expect(adopted).toEqual(serverState);
+    expect(onRejected).toHaveBeenCalledWith(
+      rejected,
+      serverState,
+      expect.objectContaining({ type: 'add' }),
+      expect.objectContaining({ recovered: false })
+    );
+  });
+
+  it('permite agregar un producto valido retirando solo un articulo antiguo invalido', async () => {
+    const stale = item(PRODUCT_A);
+    const available = item(PRODUCT_B);
+    const serverState = { items: [stale], version: 'v1' };
+    const rejected = new Error('invalid cart items');
+    rejected.response = {
+      status: 409,
+      data: {
+        error: 'CART_ITEMS_INVALID',
+        items: [{ ...stale, productId: PRODUCT_A, invalidReason: 'OUT_OF_STOCK' }],
+      },
+    };
+    const write = vi.fn()
+      .mockRejectedValueOnce(rejected)
+      .mockResolvedValueOnce({ items: [available], version: 'v2' });
+    let adopted = null;
+    const onRejected = vi.fn();
+    const coordinator = createCartMutationCoordinator({
+      getSnapshot: async () => serverState,
+      write,
+      reload: async () => serverState,
+      adopt: (snapshot) => { adopted = snapshot; },
+      onRejected,
+    });
+
+    await expect(
+      coordinator.enqueue({ type: 'add', item: available })
+    ).resolves.toMatchObject({ recoveredInvalidItems: true });
+
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(adopted.items).toEqual([available]);
+    expect(onRejected).toHaveBeenCalledWith(
+      rejected,
+      expect.objectContaining({ items: [] }),
+      expect.objectContaining({ type: 'add' }),
+      expect.objectContaining({ recovered: true, targetRejected: false })
+    );
+  });
+
+  it('descarta de forma controlada un carrito que ya no existe en el servidor', async () => {
+    const missing = new Error('missing cart');
+    missing.response = {
+      status: 404,
+      data: { error: 'CART_ACCESS_NOT_FOUND' },
+    };
+    const onMissingCart = vi.fn().mockResolvedValue({
+      items: [],
+      version: '',
+      recoveredMissingCart: true,
+    });
+    const write = vi.fn();
+    const coordinator = createCartMutationCoordinator({
+      getSnapshot: async () => { throw missing; },
+      write,
+      reload: vi.fn(),
+      adopt: vi.fn(),
+      onMissingCart,
+    });
+    const operation = { type: 'remove', identity: cartItemIdentity(item(PRODUCT_A)) };
+
+    await expect(coordinator.enqueue(operation)).resolves.toMatchObject({
+      recoveredMissingCart: true,
+    });
+    expect(onMissingCart).toHaveBeenCalledWith(operation, missing);
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('envia realmente If-Match-Updated-At junto con las credenciales', async () => {
     const api = { put: vi.fn().mockResolvedValue({ data: { version: 'v2' } }) };
     const access = {

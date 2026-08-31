@@ -15,6 +15,7 @@ const {
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Cart = require('../models/Cart');
+const Order = require('../models/Order');
 const {
   buildVariantSyncPlan,
   normalizeVariantRows,
@@ -22,6 +23,12 @@ const {
 const {
   resolveReservationStockVariant,
 } = require('../services/inventoryReservationService');
+const {
+  normalizeRequestedItems,
+} = require('../services/orderRefundService');
+const {
+  buildReturnEligibility,
+} = require('../services/orderReturnService');
 
 const checks = [];
 
@@ -178,6 +185,147 @@ async function main() {
     assert.equal(plan.rowsToReuse[0].existing, legacyRow);
     assert.equal(plan.rowsToCreate.length, 0);
     assert.equal(plan.rowsToDeactivate.length, 0);
+  });
+
+  await check('clave v2 heredada traduce el color visible sin cambiar la variante', async () => {
+    const legacyKey =
+      'v2__capacidad=256gb__color=azul__conectividad=5g__ram=12gb';
+    const canonicalKey =
+      'v2__capacidad=256gb__color=blue__conectividad=5g__ram=12gb';
+    assert.equal(canonicalizeVariantKey(legacyKey), canonicalKey);
+    const identity = resolveVariantIdentity({
+      variantKey: legacyKey,
+      attributes: [
+        { key: 'capacidad', value: '256GB' },
+        { key: 'color', value: 'Azul' },
+        { key: 'conectividad', value: '5G' },
+        { key: 'ram', value: '12GB' },
+      ],
+    });
+    assert.equal(identity.variantKey, canonicalKey);
+    assert.equal(
+      identity.attributes.find((attribute) => attribute.key === 'color')?.value,
+      'blue'
+    );
+
+    const snapshot = resolveVariantCommercialSnapshot(
+      {
+        price: 100,
+        variants: [
+          {
+            variantKey: canonicalKey,
+            attributes: identity.attributes,
+            label: '256GB / Azul / 5G / 12GB',
+            price: 120,
+          },
+        ],
+      },
+      {
+        variantKey: legacyKey,
+        variantAttributes: identity.attributes,
+      }
+    );
+    assert.equal(snapshot.variantKey, canonicalKey);
+
+    const duplicateColorKey = `${legacyKey}__color=blue`;
+    assert.equal(canonicalizeVariantKey(duplicateColorKey), duplicateColorKey);
+    assert.throws(
+      () => resolveVariantIdentity({ variantKey: duplicateColorKey }),
+      (error) => error?.code === 'VARIANT_KEY_MISMATCH'
+    );
+  });
+
+  await check('orden heredada se valida y persiste con identidad canonica', async () => {
+    const legacyKey =
+      'v2__capacidad=256gb__color=azul__conectividad=5g__ram=12gb';
+    const canonicalKey =
+      'v2__capacidad=256gb__color=blue__conectividad=5g__ram=12gb';
+    const order = new Order({
+      sessionId: `variant-authority-${Date.now()}`,
+      orderNumber: `VARIANT-AUTHORITY-${Date.now()}`,
+      items: [
+        {
+          title: 'Smartphone heredado',
+          variantId: legacyKey,
+          variantKey: legacyKey,
+          variantAttributes: [
+            { key: 'capacidad', value: '256GB' },
+            { key: 'color', label: 'Color', value: 'Azul' },
+            { key: 'conectividad', value: '5G' },
+            { key: 'ram', value: '12GB' },
+          ],
+          quantity: 1,
+          price: 100,
+        },
+      ],
+    });
+    await order.validate();
+    assert.equal(order.items[0].variantKey, canonicalKey);
+    assert.equal(order.items[0].variantId, canonicalKey);
+  });
+
+  await check('reserva y devolucion aceptan la identidad v2 heredada', async () => {
+    const legacyKey =
+      'v2__capacidad=256gb__color=azul__conectividad=5g__ram=12gb';
+    const canonicalKey =
+      'v2__capacidad=256gb__color=blue__conectividad=5g__ram=12gb';
+    const attributes = [
+      { key: 'capacidad', value: '256GB' },
+      { key: 'color', label: 'Color', value: 'Blue' },
+      { key: 'conectividad', value: '5G' },
+      { key: 'ram', value: '12GB' },
+    ];
+    const stock = {
+      _id: fakeId(),
+      variantKey: canonicalKey,
+      variant: { attributes },
+    };
+    assert.equal(
+      resolveReservationStockVariant(stock, legacyKey).variantKey,
+      canonicalKey
+    );
+
+    const orderItemId = fakeId();
+    const productId = fakeId();
+    const normalizedRefund = normalizeRequestedItems(
+      {
+        items: [
+          {
+            _id: orderItemId,
+            productId,
+            title: 'Smartphone heredado',
+            variantKey: canonicalKey,
+            variantAttributes: attributes,
+            quantity: 1,
+          },
+        ],
+      },
+      [{ productId, variantKey: legacyKey, quantity: 1 }]
+    );
+    assert.equal(normalizedRefund.length, 1);
+    assert.equal(normalizedRefund[0].variantKey, canonicalKey);
+
+    const deliveredAt = new Date();
+    const eligibility = buildReturnEligibility(
+      {
+        status: 'delivered',
+        updatedAt: deliveredAt,
+        items: [
+          {
+            _id: orderItemId,
+            product: productId,
+            title: 'Smartphone heredado',
+            productType: 'physical',
+            variantKey: legacyKey,
+            quantity: 1,
+            unitPrice: 100,
+          },
+        ],
+      },
+      new Map(),
+      deliveredAt
+    );
+    assert.equal(eligibility[0].variantKey, canonicalKey);
   });
 
   await check('reserva y kardex resuelven la misma clave de la fila', async () => {

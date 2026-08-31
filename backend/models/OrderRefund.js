@@ -3,6 +3,9 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const {
+  ORDER_REFUND_INDEX_DEFINITIONS,
+} = require('./orderRefundIndexDefinitions');
 
 const { Schema } = mongoose;
 
@@ -123,6 +126,80 @@ const RefundItemSchema = new Schema(
   { _id: true }
 );
 
+const ReconciliationStageSchema = new Schema(
+  {
+    state: {
+      type: String,
+      enum: [
+        'not_required',
+        'pending',
+        'action_required',
+        'processing',
+        'completed',
+        'failed',
+      ],
+      default: 'pending',
+      index: true,
+    },
+    reference: { type: String, trim: true, default: '', maxlength: 220 },
+    errorCode: { type: String, trim: true, default: '', maxlength: 120 },
+    errorMessage: { type: String, trim: true, default: '', maxlength: 500 },
+    lastAttemptAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    completedByLabel: { type: String, trim: true, default: '', maxlength: 160 },
+    attempts: { type: Number, default: 0, min: 0 },
+    operationKey: { type: String, trim: true, default: '', maxlength: 160 },
+    claimId: { type: String, trim: true, default: '', maxlength: 160 },
+    providerStatus: { type: String, trim: true, default: '', maxlength: 80 },
+    nextRetryAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const RefundReconciliationSchema = new Schema(
+  {
+    state: {
+      type: String,
+      enum: ['pending', 'action_required', 'completed', 'failed'],
+      default: 'action_required',
+      index: true,
+    },
+    inventory: {
+      type: ReconciliationStageSchema,
+      default: () => ({ state: 'pending' }),
+    },
+    payment: {
+      type: ReconciliationStageSchema,
+      default: () => ({ state: 'action_required' }),
+    },
+    cash: {
+      type: ReconciliationStageSchema,
+      default: () => ({ state: 'not_required' }),
+    },
+    billing: {
+      type: ReconciliationStageSchema,
+      default: () => ({ state: 'pending' }),
+    },
+    paymentProvider: { type: String, trim: true, lowercase: true, default: '' },
+    paymentMethod: { type: String, trim: true, lowercase: true, default: '' },
+    paymentTransactionId: { type: String, trim: true, default: '', maxlength: 220 },
+    cashSession: {
+      type: Schema.Types.ObjectId,
+      ref: 'CashSession',
+      default: null,
+    },
+    electronicInvoice: {
+      type: Schema.Types.ObjectId,
+      ref: 'ElectronicInvoice',
+      default: null,
+    },
+    creditNoteId: { type: Schema.Types.ObjectId, default: null },
+    lastReconciledAt: { type: Date, default: null, index: true },
+    completedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const OrderRefundSchema = new Schema(
   {
     refundNumber: {
@@ -130,8 +207,6 @@ const OrderRefundSchema = new Schema(
       trim: true,
       uppercase: true,
       required: true,
-      unique: true,
-      index: true,
       maxlength: 80,
     },
     order: {
@@ -145,6 +220,12 @@ const OrderRefundSchema = new Schema(
       trim: true,
       uppercase: true,
       default: '',
+      index: true,
+    },
+    returnCase: {
+      type: Schema.Types.ObjectId,
+      ref: 'OrderReturn',
+      default: null,
       index: true,
     },
     idempotencyKey: {
@@ -222,22 +303,22 @@ const OrderRefundSchema = new Schema(
       default: null,
       index: true,
     },
+    reconciliation: {
+      type: RefundReconciliationSchema,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,
   }
 );
 
-OrderRefundSchema.index(
-  { order: 1, idempotencyKey: 1 },
-  { unique: true }
-);
-OrderRefundSchema.index({ order: 1, status: 1, createdAt: 1 });
-OrderRefundSchema.index({
-  order: 1,
-  'items.orderItemId': 1,
-  status: 1,
-});
+for (const definition of ORDER_REFUND_INDEX_DEFINITIONS) {
+  OrderRefundSchema.index(
+    { ...definition.key },
+    { ...definition.options }
+  );
+}
 
 OrderRefundSchema.pre('validate', function normalizeRefund(next) {
   this.refundNumber = cleanUpper(this.refundNumber);

@@ -70,6 +70,17 @@ function validateNoParallelInvoiceLayer() {
 function validateExistingElectronicInvoiceLayer() {
   const electronicInvoiceModel = read('backend/models/ElectronicInvoice.js');
   const ordersRoute = read('backend/routes/orders.js');
+  const orderDocumentsController = read('backend/controllers/orderDocumentsController.js');
+  const orderDetailController = read('backend/controllers/orderAdminDetailController.js');
+  const orderDetailPresentation = read(
+    'backend/services/orderAdminDetailPresentationService.js'
+  );
+  const orderBillingComposition = [
+    ordersRoute,
+    orderDocumentsController,
+    orderDetailController,
+    orderDetailPresentation,
+  ].join('\n');
 
   [
     'ElectronicInvoiceSchema',
@@ -85,26 +96,41 @@ function validateExistingElectronicInvoiceLayer() {
   });
 
   assertIncludes(
-    ordersRoute,
+    orderBillingComposition,
     "require('../models/ElectronicInvoice')",
-    'orders.js no importa ElectronicInvoice.'
+    'La composición de Órdenes no importa ElectronicInvoice.'
   );
 
   assertIncludes(
-    ordersRoute,
+    orderBillingComposition,
     'ElectronicInvoice.findOne',
-    'orders.js no consulta ElectronicInvoice desde órdenes.'
+    'La composición de Órdenes no consulta ElectronicInvoice.'
   );
 
   assertIncludesAny(
-    ordersRoute,
+    orderBillingComposition,
     ['orderId: o?._id', 'orderId: order._id', 'orderId }', 'orderId,'],
-    'orders.js no conserva la relación ElectronicInvoice por orderId.'
+    'La composición de Órdenes no conserva la relación ElectronicInvoice por orderId.'
   );
 
-  ['invoice-xml', 'generateOrderPdf', 'factusLinks'].forEach((needle) => {
-    assertIncludes(ordersRoute, needle, `orders.js no conserva integración existente con ${needle}`);
+  ['invoice-xml', 'generateOrderPdf', 'presentAdminOrderDetail'].forEach((needle) => {
+    assertIncludes(
+      orderBillingComposition,
+      needle,
+      `La composición de documentos de órdenes no conserva la integración con ${needle}`
+    );
   });
+
+  assertNotIncludes(
+    orderDetailController,
+    'extractFactusLinks',
+    'El detalle de orden no debe incrustar URLs fiscales protegidas.'
+  );
+  assertIncludes(
+    orderDetailPresentation,
+    'serializeOrderAdminInvoiceSummary',
+    'El detalle debe exponer un DTO fiscal mínimo y explícito.'
+  );
 
   ok('ElectronicInvoice sigue siendo el documento oficial de facturación en órdenes');
 }

@@ -11,11 +11,16 @@ const FACTUS_DOCUMENT_CODES = Object.freeze({
   RC: '11',
   TI: '12',
   CC: '13',
+  TE: '21',
   CE: '22',
   NIT: '31',
   PP: '41',
   PASAPORTE: '41',
+  DIE: '42',
+  PEP: '47',
   PPT: '48',
+  NIT_EXTRANJERO: '50',
+  NUIP: '91',
 });
 
 function normalizeFactusDocumentCode(value) {
@@ -75,11 +80,19 @@ function buildFactusCustomer(order = {}) {
   const firstName = trimSafe(billing?.firstName || billing?.name || customer?.name, 100);
   const lastName = trimSafe(billing?.lastName || billing?.lastname || customer?.lastname, 100);
   const naturalName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const explicitFinalConsumer =
+    typeof billing?.isFinalConsumer === 'boolean'
+      ? billing.isFinalConsumer
+      : customer?.isFinalConsumer === true ||
+        order?.pos?.customerMode === 'guest' ||
+        (String(order?.source || '').trim().toLowerCase() === 'pos' &&
+          order?.pos?.quickSale === true);
   const isPosConsumerFinal =
     !rawIdentification &&
     String(order?.source || '').trim().toLowerCase() === 'pos' &&
     /consumidor final/i.test(naturalName);
-  const identification = isPosConsumerFinal ? '222222222222' : rawIdentification;
+  const isFinalConsumer = explicitFinalConsumer || isPosConsumerFinal;
+  const identification = isFinalConsumer ? '222222222222' : rawIdentification;
   const businessName = trimSafe(
     billing?.businessName || billing?.company || customer?.businessName || '',
     180
@@ -117,7 +130,7 @@ function buildFactusCustomer(order = {}) {
     factusCustomer.company = businessName;
     if (businessName) factusCustomer.trade_name = businessName;
   } else {
-    factusCustomer.names = naturalName || (isPosConsumerFinal ? 'Consumidor final' : '');
+    factusCustomer.names = naturalName || (isFinalConsumer ? 'Consumidor final' : '');
   }
 
   if (countryCode === 'CO' && municipalityCode) {
@@ -125,6 +138,53 @@ function buildFactusCustomer(order = {}) {
   }
 
   return factusCustomer;
+}
+
+function buildFactusCreditNoteCustomer(electronicInvoice = {}) {
+  const snapshot = electronicInvoice?.customer || {};
+  const documentCode = normalizeFactusDocumentCode(snapshot.documentType || 'CC');
+  const expectedIdentification = normalizeFactusIdentification(
+    snapshot.documentNumber || '',
+    documentCode,
+    snapshot.dv
+  );
+
+  if (!expectedIdentification) {
+    throw new Error(
+      'La factura original no conserva la identificación fiscal necesaria para emitir la nota crédito.'
+    );
+  }
+
+  const customer = buildFactusCustomer({
+    billing: {
+      documentType: snapshot.documentType || 'CC',
+      documentNumber: snapshot.documentNumber || '',
+      dv: snapshot.dv || '',
+      personType: snapshot.personType || 'natural',
+      firstName: snapshot.firstName || '',
+      lastName: snapshot.lastName || '',
+      businessName: snapshot.businessName || '',
+      email: snapshot.email || '',
+      phone: snapshot.phone || '',
+      address: snapshot.address || '',
+      city: snapshot.city || '',
+      municipalityCode: snapshot.municipalityCode || '',
+      department: snapshot.department || '',
+      departmentCode: snapshot.departmentCode || '',
+      country: snapshot.country || 'Colombia',
+      countryCode: snapshot.countryCode || 'CO',
+      tributeCode: snapshot.tributeCode || 'ZZ',
+      isFinalConsumer: expectedIdentification === '222222222222',
+    },
+  });
+
+  if (customer.identification !== expectedIdentification) {
+    throw new Error(
+      'La identidad fiscal de la nota crédito no coincide con la factura original.'
+    );
+  }
+
+  return customer;
 }
 
 function allocateFactusDiscounts(orderItems = [], totalDiscount = 0) {
@@ -204,18 +264,9 @@ function buildFactusInvoicePayload(invoiceData = {}) {
 
       unit_measure_code: '94',
       standard_code: '999',
-      taxes: [
-        {
-          code: '01',
-          rate: ivaRate,
-        },
-      ],
-
-      tax_rate: ivaRate,
-      unit_measure_id: 70,
-      standard_code_id: 1,
-      is_excluded: !hasIva,
-      tribute_id: 1,
+      taxes: hasIva
+        ? [{ code: '01', rate: ivaRate }]
+        : [{ is_excluded: true }],
       withholding_taxes: [],
     };
 
@@ -236,18 +287,7 @@ function buildFactusInvoicePayload(invoiceData = {}) {
 
       unit_measure_code: '94',
       standard_code: '999',
-      taxes: [
-        {
-          code: '01',
-          rate: '0.00',
-        },
-      ],
-
-      tax_rate: '0.00',
-      unit_measure_id: 70,
-      standard_code_id: 1,
-      is_excluded: true,
-      tribute_id: 1,
+      taxes: [{ is_excluded: true }],
       withholding_taxes: [],
     });
   }
@@ -325,7 +365,7 @@ function buildFactusCreditNotePayload({
   reasonText = 'Devolución de factura',
   type = 'total',
   selectedItems = [],
-  billId = 0,
+  billNumber = '',
   referenceCode = '',
   numberingRangeId = 0,
 }) {
@@ -375,21 +415,22 @@ function buildFactusCreditNotePayload({
     const gross = toMoney(toNumber(item.quantity, 0) * toNumber(item.price, 0));
     const discount = toMoney(item.discount_amount || 0);
     const taxable = toMoney(Math.max(0, gross - discount));
-    const rate = item.is_excluded === true
+    const taxDefinition = item?.taxes?.[0] || {};
+    const rate = taxDefinition.is_excluded === true || item.is_excluded === true
       ? 0
-      : toNumber(item.tax_rate ?? item?.taxes?.[0]?.rate, 0);
-    const tax = toMoney(taxable * (rate / 100));
+      : toNumber(taxDefinition.rate ?? item.tax_rate, 0);
+    const taxAmount = toMoney(taxable * (rate / 100));
     acc.subtotal = toMoney(acc.subtotal + gross);
     acc.discount = toMoney(acc.discount + discount);
-    acc.tax = toMoney(acc.tax + tax);
-    acc.total = toMoney(acc.total + taxable + tax);
+    acc.tax = toMoney(acc.tax + taxAmount);
+    acc.total = toMoney(acc.total + taxable + taxAmount);
     return acc;
   }, { subtotal: 0, discount: 0, tax: 0, total: 0 });
 
   const payload = {
     reference_code: trimSafe(referenceCode, 100),
 
-    bill_id: Number(billId || 0),
+    bill_number: trimSafe(billNumber, 160),
 
     correction_concept_code: String(reasonCode),
 
@@ -405,6 +446,8 @@ function buildFactusCreditNotePayload({
       },
     ],
 
+    customer: buildFactusCreditNoteCustomer(electronicInvoice),
+
     items,
   };
 
@@ -414,8 +457,12 @@ function buildFactusCreditNotePayload({
     throw new Error('La nota crédito requiere un código de referencia idempotente.');
   }
 
-  if (!Number.isInteger(payload.bill_id) || payload.bill_id <= 0) {
-    throw new Error('La factura relacionada no tiene el ID oficial de Factus.');
+  if (!payload.bill_number) {
+    throw new Error('La factura relacionada no tiene el número oficial de Factus.');
+  }
+
+  if (!payload.customer?.identification) {
+    throw new Error('La nota crédito no tiene la identificación fiscal del cliente.');
   }
 
   if (!items.length || totals.total <= 0) {

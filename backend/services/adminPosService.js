@@ -7,7 +7,12 @@ const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const Order = require('../models/Order');
+const OrderEvent = require('../models/OrderEvent');
 const Customer = require('../models/Customer');
+const {
+  applyCustomerStatsForOrder,
+  findCustomerMatch,
+} = require('./customerOrderLinkService');
 const Counter = require('../models/Counter');
 const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 const {
@@ -20,6 +25,9 @@ const {
   normalizeAttributes,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
+const {
+  normalizeProductCustoms,
+} = require('../lib/products/productCustomsConfig');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
 const DEFAULT_CURRENCY = 'COP';
@@ -553,6 +561,7 @@ async function resolvePosCustomerForPreview(payload = {}, normalizedPayload = {}
       quickSale: false,
       customer,
       customerSnapshot: buildCustomerOrderSnapshot(customer),
+      matchedBy: 'customer_id',
     };
   }
 
@@ -581,12 +590,44 @@ async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, b
       quickSale: false,
       customer,
       customerSnapshot: buildCustomerOrderSnapshot(customer),
+      matchedBy: 'customer_id',
     };
   }
 
   if (shouldCreateQuickCustomer(payload, normalizedPayload)) {
+    const quickCustomerPayload = buildQuickCustomerPayload(payload, branch, admin);
+    const existingMatch = await findCustomerMatch(quickCustomerPayload, {
+      session,
+    });
+
+    if (existingMatch?.customer) {
+      const conflictingMatch = await findCustomerMatch(quickCustomerPayload, {
+        session,
+        excludeId: existingMatch.customer._id,
+      });
+      if (conflictingMatch?.customer) {
+        throw createPosError(
+          'Los datos ingresados pertenecen a fichas de clientes diferentes.',
+          'POS_CUSTOMER_IDENTITY_CONFLICT',
+          {
+            matchedBy: existingMatch.matchedBy,
+            conflictingBy: conflictingMatch.matchedBy,
+          },
+          409
+        );
+      }
+
+      return {
+        customerMode: 'identified',
+        quickSale: false,
+        customer: existingMatch.customer,
+        customerSnapshot: buildCustomerOrderSnapshot(existingMatch.customer),
+        matchedBy: existingMatch.matchedBy,
+      };
+    }
+
     const createdCustomers = await Customer.create(
-      [buildQuickCustomerPayload(payload, branch, admin)],
+      [quickCustomerPayload],
       { session }
     );
     const customer = createdCustomers[0];
@@ -596,6 +637,7 @@ async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, b
       quickSale: false,
       customer,
       customerSnapshot: buildCustomerOrderSnapshot(customer),
+      matchedBy: 'created',
     };
   }
 
@@ -608,28 +650,8 @@ async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, b
 }
 
 async function updateCustomerStatsAfterPosSale(customer, order, { session = null } = {}) {
-  if (!customer?._id || !order?._id) return;
-
-  const now = new Date();
-  const currentFirstPurchaseAt = customer.stats?.firstPurchaseAt || null;
-
-  await Customer.updateOne(
-    { _id: customer._id },
-    {
-      $inc: {
-        'stats.ordersCount': 1,
-        'stats.posOrdersCount': 1,
-        'stats.totalSpent': toMoney(order.total),
-      },
-      $set: {
-        'stats.lastOrder': order._id,
-        'stats.lastOrderNumber': order.orderNumber || '',
-        'stats.lastPurchaseAt': now,
-        'stats.firstPurchaseAt': currentFirstPurchaseAt || now,
-      },
-    },
-    { session }
-  );
+  if (!customer?._id || !order?._id) return { applied: false };
+  return applyCustomerStatsForOrder(order, { session });
 }
 
 async function validatePosBranch(branchId, { session = null } = {}) {
@@ -981,6 +1003,7 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
     requiresShipping: item.fulfillment?.requiresShipping !== false,
     fulfillmentKind: item.fulfillment?.kind || 'shipment',
     fulfillmentSnapshot: item.fulfillment || {},
+    customsSnapshot: normalizeProductCustoms(item.product?.customs),
   }));
   const hasVirtualFulfillment = normalizedPayload.items.some(
     (item) =>
@@ -1329,8 +1352,41 @@ async function createPosSale(payload = {}, options = {}) {
 
     const orderNumber = await getNextOrderNumber({ session });
     const orderPayload = buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin });
+    if (customerResolution.customer?._id) {
+      orderPayload.customer = {
+        ...(orderPayload.customer || {}),
+        customerId: customerResolution.customer._id,
+        customerCode: customerResolution.customer.customerCode || '',
+      };
+      orderPayload.customerRelationship = {
+        linkedAt: new Date(),
+        statsAppliedAt: null,
+        source: 'pos',
+        matchedBy: customerResolution.matchedBy || 'customer_id',
+      };
+    }
     const createdOrders = await Order.create([orderPayload], { session });
     const order = createdOrders[0];
+    await OrderEvent.create(
+      [
+        {
+          orderId: order._id,
+          type: 'status_changed',
+          message: `Orden POS creada con estado ${order.status}.`,
+          meta: {
+            from: null,
+            to: order.status,
+            source: 'pos',
+            branch: branch._id,
+            by:
+              order.createdByAdminSnapshot?.username ||
+              order.cashierSnapshot?.username ||
+              'pos',
+          },
+        },
+      ],
+      { session }
+    );
 
     const movements = await applyPosInventoryOut({
       order,

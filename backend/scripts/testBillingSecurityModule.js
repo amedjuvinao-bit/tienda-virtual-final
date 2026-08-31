@@ -10,6 +10,9 @@ const {
 const {
   readBillingConfigurationFrontendSource,
 } = require('./lib/readBillingConfigurationFrontendSource');
+const {
+  readWompiWebhookOrderComposition,
+} = require('./lib/readWompiWebhookComposition');
 
 const {
   buildAdminSiteSettings,
@@ -169,6 +172,7 @@ function validateBackendPermissions() {
     ['POST', '/api/payments/admin/delete-factus-invoice/507f1f77bcf86cd799439011', 'billing:retry'],
     ['POST', '/api/payments/admin/create-credit-note/507f1f77bcf86cd799439011', 'billing:credit_note'],
     ['POST', '/api/payments/admin/retry-electronic-invoice/507f1f77bcf86cd799439011', 'billing:retry'],
+    ['POST', '/api/payments/admin/wompi/test-merchant', 'settings:payments'],
     ['GET', '/api/orders/507f1f77bcf86cd799439011/invoice-xml', 'billing:download'],
     ['GET', '/api/site-settings/admin', 'settings:view'],
   ];
@@ -187,21 +191,57 @@ function validateBackendPermissions() {
   assertIncludes(billingRoutes, "requirePermission('billing:create')", 'Generar factura debe exigir billing:create.');
   assertIncludes(paymentRoutes, "requirePermission('billing:credit_note')", 'Nota crédito debe exigir billing:credit_note.');
   assertIncludes(paymentRoutes, "requirePermission('billing:retry')", 'Reintentos y eliminación pendiente deben exigir billing:retry.');
+  assertIncludes(paymentRoutes, "requirePermission('settings:payments')", 'La prueba de comercio Wompi debe exigir settings:payments.');
   assertIncludes(providerRoutes, "requirePermission('billing:settings')", 'Prueba de proveedor debe exigir billing:settings.');
   assertIncludes(protectedSettings, "requirePermission('billing:settings')", 'Guardar configuración debe exigir billing:settings.');
+
+  const wompiMerchantTestRule = findAdminRoutePermission(
+    'POST',
+    '/api/payments/admin/wompi/test-merchant'
+  );
+  assert(
+    wompiMerchantTestRule?.audit === true &&
+      wompiMerchantTestRule?.sensitive === true,
+    'La prueba de comercio Wompi debe ser auditable y sensible.'
+  );
 
   ok('Backend exige permisos específicos para consultar, configurar, generar, sincronizar y acreditar');
 }
 
 function validateNoCredentialLeaksInPaymentResponses() {
   const paymentRoutes = read('backend/routes/payments.js');
+  const paymentPublicController = read(
+    'backend/controllers/paymentPublicController.js'
+  );
+  const wompiPublicGateway = read(
+    'backend/services/wompiPublicGatewayService.js'
+  );
+  const wompiWebhookController = read(
+    'backend/controllers/wompiWebhookController.js'
+  );
+  const wompiWebhookOrderService = readWompiWebhookOrderComposition();
+  const paymentFiscalAdminController = read(
+    'backend/controllers/paymentFiscalAdminController.js'
+  );
+  const paymentRouteConfiguration = read(
+    'backend/services/paymentRouteConfigurationService.js'
+  );
+  const paymentImplementation = [
+    paymentRoutes,
+    paymentPublicController,
+    wompiPublicGateway,
+    wompiWebhookController,
+    wompiWebhookOrderService,
+    paymentFiscalAdminController,
+    paymentRouteConfiguration,
+  ].join('\n');
   const accessGate = read('backend/middleware/adminAccessGate.js');
 
-  assertNotIncludes(paymentRoutes, "integrityKeyLength: String(wompi.integrityKey", 'No debe registrar la llave de integridad Wompi.');
-  assertNotIncludes(paymentRoutes, "'📦 BODY WEBHOOK:'", 'No debe registrar el cuerpo completo del webhook.');
-  assertNotIncludes(paymentRoutes, "'🔐 HEADER CHECKSUM:'", 'No debe registrar la firma recibida del webhook.');
-  assertNotIncludes(paymentRoutes, 'apiKey: payu.apiKey,', 'No debe devolver API Key de PayU al navegador.');
-  assertNotIncludes(paymentRoutes, 'apiLogin: payu.apiLogin,', 'No debe devolver API Login de PayU al navegador.');
+  assertNotIncludes(paymentImplementation, "integrityKeyLength: String(wompi.integrityKey", 'No debe registrar la llave de integridad Wompi.');
+  assertNotIncludes(paymentImplementation, "'📦 BODY WEBHOOK:'", 'No debe registrar el cuerpo completo del webhook.');
+  assertNotIncludes(paymentImplementation, "'🔐 HEADER CHECKSUM:'", 'No debe registrar la firma recibida del webhook.');
+  assertNotIncludes(paymentImplementation, 'apiKey: payu.apiKey,', 'No debe devolver API Key de PayU al navegador.');
+  assertNotIncludes(paymentImplementation, 'apiLogin: payu.apiLogin,', 'No debe devolver API Login de PayU al navegador.');
   ['integrityKey', 'softwarePin', 'technicalKey', 'certificatePath', 'apiLogin'].forEach((key) => {
     assertIncludes(accessGate, `'${key}'`, `La auditoría administrativa debe ocultar ${key}.`);
   });

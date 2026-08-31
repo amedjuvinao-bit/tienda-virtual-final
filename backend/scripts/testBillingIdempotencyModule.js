@@ -6,6 +6,9 @@ const path = require('path');
 const {
   readFactusProviderSource,
 } = require('./lib/readFactusProviderSource');
+const {
+  readWompiWebhookOrderComposition,
+} = require('./lib/readWompiWebhookComposition');
 
 const {
   createElectronicInvoiceIssuanceService,
@@ -152,7 +155,15 @@ async function validateControlledRetry() {
     status: 'paid',
     subtotal: 50000,
     total: 50000,
-    customer: { documentNumber: '987654321', email: 'retry@example.com' },
+    customer: {
+      documentNumber: '987654321',
+      email: 'retry@example.com',
+      city: 'Zona Bananera',
+      municipalityCode: '47980',
+      department: 'Magdalena',
+      departmentCode: '47',
+      countryCode: 'CO',
+    },
     payment: {
       status: 'paid',
       provider: 'payu',
@@ -240,6 +251,11 @@ async function validateConcurrentIssuance() {
       lastname: 'Prueba',
       documentNumber: '123456789',
       email: 'cliente@example.com',
+      city: 'Zona Bananera',
+      municipalityCode: '47980',
+      department: 'Magdalena',
+      departmentCode: '47',
+      countryCode: 'CO',
     },
     payment: {
       status: 'paid',
@@ -332,8 +348,17 @@ function validateDatabaseConstraint() {
 function validateUnifiedEntryPoints() {
   const admin = read('backend/services/adminBillingService.js');
   const afterPayment = read('backend/services/electronicInvoiceAfterPaymentService.js');
-  const wompi = read('backend/routes/payments.js');
-  const payu = read('backend/routes/payuProductionWebhook.js');
+  const wompi = [
+    read('backend/routes/payments.js'),
+    read('backend/controllers/paymentFiscalAdminController.js'),
+    read('backend/services/wompiInvoiceSchedulingService.js'),
+    readWompiWebhookOrderComposition(),
+  ].join('\n');
+  const payu = [
+    read('backend/routes/payuProductionWebhook.js'),
+    read('backend/controllers/payu/payuWebhookController.js'),
+    read('backend/services/payu/payuWebhookResponseService.js'),
+  ].join('\n');
   const adminPos = read('backend/services/adminPosService.js');
   const cashPos = read('backend/services/posCashSaleService.js');
   const posReceipt = read('backend/services/posReceiptService.js');

@@ -1,16 +1,23 @@
 // frontend/src/admin/orders/components/orderDetail/OrderDetailProfessionalView.jsx
 
+import { useEffect, useState } from 'react';
 import { ORDER_DETAIL_THEME } from './orderDetailTheme';
 import OrderDetailHeader from './OrderDetailHeader';
-import OrderDetailProgressStepper from './OrderDetailProgressStepper';
+import OrderDetailStoryOverview from './OrderDetailStoryOverview';
 import OrderDetailSummaryRail from './OrderDetailSummaryRail';
 import OrderDetailCustomerBilling from './OrderDetailCustomerBilling';
 import OrderDetailItemsTable from './OrderDetailItemsTable';
 import OrderDetailInventoryAllocations from './OrderDetailInventoryAllocations';
+import OrderDetailLogisticsPanel from './OrderDetailLogisticsPanel';
 import OrderDetailFulfillmentPanel from './OrderDetailFulfillmentPanel';
 import OrderDetailPaymentPanel from './OrderDetailPaymentPanel';
+import OrderDetailRefundReconciliation from './OrderDetailRefundReconciliation';
+import OrderDetailReturnsPanel from './OrderDetailReturnsPanel';
 import OrderDetailTimelineNotes from './OrderDetailTimelineNotes';
 import OrderDetailActionToolbar from './OrderDetailActionToolbar';
+import OrderDetailTabs from './OrderDetailTabs';
+import { OrderDetailIcons } from './OrderDetailIcons';
+import { OrderDetailPanel, SectionTitle } from './OrderDetailPrimitives';
 
 export default function OrderDetailProfessionalView({
   order,
@@ -23,6 +30,12 @@ export default function OrderDetailProfessionalView({
 
   timeline = [],
   notes = [],
+  timelineHasMore = false,
+  notesHasMore = false,
+  timelineMoreLoading = false,
+  notesMoreLoading = false,
+  onLoadMoreTimeline,
+  onLoadMoreNotes,
   tags = [],
 
   noteText = '',
@@ -49,12 +62,195 @@ export default function OrderDetailProfessionalView({
   setEmailMenuOpen,
   emailBtnRef,
   onSendEmail,
+  onPrepareWhatsApp,
+  whatsAppAvailable = true,
+  whatsAppUnavailableReason = '',
+  onCustomerStageConfirmed,
+  onOrderUpdated,
+  canUpdateFulfillment = false,
+  canConfirmManualPayment = false,
+  manualPaymentConfirmation,
 
   loadingAux = false,
   onRefreshTimeline,
+  refunds = [],
+  refundsLoading = false,
+  canConfirmRefundPayment = false,
+  confirmingRefundId = '',
+  onConfirmRefundPayment,
+  canAutomateRefund = false,
+  automatingRefundId = '',
+  onAutomateRefund,
+  returnsData = {},
+  returnsLoading = false,
+  returnBusyId = '',
+  canManageReturns = false,
+  canManageReturnPolicy = false,
+  canRefundReturns = false,
+  onCreateReturn,
+  onUpdateReturn,
+  onRefundReturn,
+  onExchangeReturn,
+  onAutomaticExchangeReturn,
+  onStoreCreditReturn,
+  onReturnShipping,
+  onSaveReturnPolicy,
+  onSaveCustomerData,
+  savingCustomerData = false,
 }) {
+  const [activeTab, setActiveTab] = useState('summary');
+  const [managementOpen, setManagementOpen] = useState(false);
+  const hasManagementActions = [
+    onSaveStatus,
+    onSaveTags,
+    onTogglePrinted,
+    onToggleArchived,
+    onSendEmail,
+    onPrepareWhatsApp,
+  ].some((handler) => typeof handler === 'function');
+
+  useEffect(() => {
+    setActiveTab('summary');
+    setManagementOpen(false);
+  }, [order?._id]);
+
+  const managementPanel = hasManagementActions ? (
+    <OrderDetailActionToolbar
+      compact
+      order={order}
+      statusLocal={statusLocal}
+      setStatusLocal={setStatusLocal}
+      onSaveStatus={onSaveStatus}
+      disabled={statusSaving}
+      tagsStr={tagsStr}
+      setTagsStr={setTagsStr}
+      onSaveTags={onSaveTags}
+      savingTags={savingTags}
+      printed={printed}
+      archived={archived}
+      onTogglePrinted={onTogglePrinted}
+      onToggleArchived={onToggleArchived}
+      emailMenuOpen={emailMenuOpen}
+      setEmailMenuOpen={setEmailMenuOpen}
+      emailBtnRef={emailBtnRef}
+      onSendEmail={onSendEmail}
+      onPrepareWhatsApp={onPrepareWhatsApp}
+      whatsAppAvailable={whatsAppAvailable}
+      whatsAppUnavailableReason={whatsAppUnavailableReason}
+      loadingAux={loadingAux}
+      onRefreshTimeline={onRefreshTimeline}
+    />
+  ) : null;
+
+  const tabs = [
+    { id: 'summary', label: 'Resumen', icon: OrderDetailIcons.History },
+    { id: 'products', label: 'Pedido', icon: OrderDetailIcons.Package },
+    { id: 'operation', label: 'Operación', icon: OrderDetailIcons.Settings2 },
+    { id: 'returns', label: 'Posventa', icon: OrderDetailIcons.RotateCcw },
+    { id: 'payment', label: 'Pago y factura', icon: OrderDetailIcons.WalletCards },
+    { id: 'customer', label: 'Cliente e historial', icon: OrderDetailIcons.User },
+  ];
+
+  const tabContent = {
+    summary: (
+      <OrderDetailStoryOverview
+        order={order}
+        refunds={refunds}
+        onNavigate={(tabId) => {
+          setManagementOpen(false);
+          setActiveTab(tabId);
+        }}
+      />
+    ),
+    products: <OrderDetailItemsTable order={order} />,
+    operation: (
+      <>
+        <OrderDetailInventoryAllocations order={order} />
+        <OrderDetailLogisticsPanel
+          order={order}
+          canManage={canUpdateFulfillment}
+          onRefreshTimeline={onRefreshTimeline}
+          onCustomerStageConfirmed={onCustomerStageConfirmed}
+          onOrderUpdated={onOrderUpdated}
+        />
+        <OrderDetailFulfillmentPanel
+          order={order}
+          canUpdate={canUpdateFulfillment}
+        />
+      </>
+    ),
+    returns: (
+      <OrderDetailReturnsPanel
+        data={returnsData}
+        loading={returnsLoading}
+        busyId={returnBusyId}
+        canManage={canManageReturns}
+        canManagePolicy={canManageReturnPolicy}
+        canRefund={canRefundReturns}
+        onCreate={onCreateReturn}
+        onAction={onUpdateReturn}
+        onRefund={onRefundReturn}
+        onExchange={onExchangeReturn}
+        onAutomaticExchange={onAutomaticExchangeReturn}
+        onStoreCredit={onStoreCreditReturn}
+        onShipping={onReturnShipping}
+        onSavePolicy={onSaveReturnPolicy}
+      />
+    ),
+    payment: (
+      <>
+        <OrderDetailPaymentPanel
+          order={order}
+          canConfirmManualPayment={canConfirmManualPayment}
+          manualPaymentConfirmation={manualPaymentConfirmation}
+        />
+        <OrderDetailRefundReconciliation
+          refunds={refunds}
+          loading={refundsLoading}
+          canConfirmPayment={canConfirmRefundPayment}
+          confirmingId={confirmingRefundId}
+          onConfirmPayment={onConfirmRefundPayment}
+          canAutomate={canAutomateRefund}
+          automatingId={automatingRefundId}
+          onAutomate={onAutomateRefund}
+        />
+      </>
+    ),
+    customer: (
+      <>
+        <OrderDetailCustomerBilling
+          order={order}
+          onSaveCustomerData={onSaveCustomerData}
+          saving={savingCustomerData}
+        />
+        <OrderDetailTimelineNotes
+          order={order}
+          timeline={timeline}
+          notes={notes}
+          tags={tags}
+          noteText={noteText}
+          setNoteText={setNoteText}
+          onSaveNote={onSaveNote}
+          savingNote={savingNote}
+          timelineHasMore={timelineHasMore}
+          notesHasMore={notesHasMore}
+          timelineMoreLoading={timelineMoreLoading}
+          notesMoreLoading={notesMoreLoading}
+          onLoadMoreTimeline={onLoadMoreTimeline}
+          onLoadMoreNotes={onLoadMoreNotes}
+        />
+      </>
+    ),
+  };
+
+  const handleTabChange = (tabId) => {
+    setManagementOpen(false);
+    setActiveTab(tabId);
+  };
+
   return (
     <div
+      className="order-detail-professional-shell"
       style={{
         width: 'min(1480px, calc(100vw - 34px))',
         maxHeight: 'calc(100vh - 34px)',
@@ -75,11 +271,15 @@ export default function OrderDetailProfessionalView({
         onOpenInvoice={onOpenInvoice}
         downloadingPdf={downloadingPdf}
         invoiceLoading={invoiceLoading}
+        onManage={hasManagementActions ? () => setManagementOpen((open) => !open) : undefined}
+        managementOpen={managementOpen}
       />
 
       <div
         style={{
           overflowY: 'auto',
+          flex: '1 1 auto',
+          minHeight: 0,
           padding: 18,
           background: `
             radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 8%, transparent), transparent 28%),
@@ -88,6 +288,7 @@ export default function OrderDetailProfessionalView({
         }}
       >
         <div
+          className="order-detail-content-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1fr) 360px',
@@ -103,50 +304,59 @@ export default function OrderDetailProfessionalView({
               minWidth: 0,
             }}
           >
-            <OrderDetailProgressStepper order={order} />
-
-            <OrderDetailActionToolbar
-              order={order}
-              statusLocal={statusLocal}
-              setStatusLocal={setStatusLocal}
-              onSaveStatus={onSaveStatus}
-              disabled={statusSaving}
-              tagsStr={tagsStr}
-              setTagsStr={setTagsStr}
-              onSaveTags={onSaveTags}
-              savingTags={savingTags}
-              printed={printed}
-              archived={archived}
-              onTogglePrinted={onTogglePrinted}
-              onToggleArchived={onToggleArchived}
-              emailMenuOpen={emailMenuOpen}
-              setEmailMenuOpen={setEmailMenuOpen}
-              emailBtnRef={emailBtnRef}
-              onSendEmail={onSendEmail}
-              loadingAux={loadingAux}
-              onRefreshTimeline={onRefreshTimeline}
+            <OrderDetailTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={handleTabChange}
             />
 
-            <OrderDetailCustomerBilling order={order} />
+            {managementOpen && managementPanel ? (
+              <OrderDetailPanel style={{ padding: 18 }}>
+                <SectionTitle
+                  icon={OrderDetailIcons.Settings2}
+                  title="Gestionar orden"
+                  subtitle="Estado, etiquetas y acciones administrativas."
+                  action={(
+                    <button
+                      type="button"
+                      aria-label="Cerrar gestión de la orden"
+                      onClick={() => setManagementOpen(false)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 12,
+                        border: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
+                        background: ORDER_DETAIL_THEME.inputBg,
+                        color: ORDER_DETAIL_THEME.cardText,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <OrderDetailIcons.X size={17} strokeWidth={2.4} />
+                    </button>
+                  )}
+                />
+                {managementPanel}
+              </OrderDetailPanel>
+            ) : null}
 
-            <OrderDetailItemsTable order={order} />
-
-            <OrderDetailInventoryAllocations order={order} />
-
-            <OrderDetailFulfillmentPanel order={order} />
-
-            <OrderDetailPaymentPanel order={order} />
-
-            <OrderDetailTimelineNotes
-              order={order}
-              timeline={timeline}
-              notes={notes}
-              tags={tags}
-              noteText={noteText}
-              setNoteText={setNoteText}
-              onSaveNote={onSaveNote}
-              savingNote={savingNote}
-            />
+            <div
+              id="order-detail-active-panel"
+              role="tabpanel"
+              aria-labelledby={`order-detail-tab-${activeTab}`}
+              tabIndex={0}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                minWidth: 0,
+                outline: 'none',
+              }}
+            >
+              {tabContent[activeTab] || tabContent.summary}
+            </div>
           </main>
 
           <OrderDetailSummaryRail order={order} />
@@ -156,13 +366,17 @@ export default function OrderDetailProfessionalView({
       <style>
         {`
           @media (max-width: 1180px) {
-            div[style*="grid-template-columns: minmax(0, 1fr) 360px"] {
+            .order-detail-content-grid {
               grid-template-columns: 1fr !important;
+            }
+
+            .order-detail-summary-rail {
+              position: static !important;
             }
           }
 
           @media (max-width: 720px) {
-            div[style*="width: min(1480px, calc(100vw - 34px))"] {
+            .order-detail-professional-shell {
               width: calc(100vw - 18px) !important;
               max-height: calc(100vh - 18px) !important;
               border-radius: 22px !important;

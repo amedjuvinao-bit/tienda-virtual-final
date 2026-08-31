@@ -3,6 +3,7 @@
 import { ORDER_DETAIL_THEME, getOrderStatusMeta } from './orderDetailTheme';
 import {
   fmtDate,
+  getOrderExchangeInfo,
   getOrderBranchInfo,
   getOrderSourceLabel,
   getOrderSummary,
@@ -12,11 +13,30 @@ import { OrderDetailIcons, IconBadge } from './OrderDetailIcons';
 import { GhostButton, PrimaryButton, SoftBadge } from './OrderDetailPrimitives';
 
 function getOrderOriginInfo(order) {
+  const exchange = getOrderExchangeInfo(order);
   const source = String(order?.source || '').trim().toLowerCase();
   const channel = String(order?.channel || '').trim().toLowerCase();
   const saleType = String(order?.saleType || '').trim().toLowerCase();
   const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
   const pos = order?.pos || {};
+
+  if (exchange.isExchange) {
+    const provenance = [
+      exchange.originalOrderNumber
+        ? `Orden original #${exchange.originalOrderNumber}`
+        : '',
+      exchange.returnNumber,
+    ].filter(Boolean);
+
+    return {
+      label: 'CAMBIO RMA',
+      description: 'Orden de reemplazo',
+      detail: provenance.length
+        ? `Sin cobro · ${provenance.join(' · ')}`
+        : 'Reposición sin cobro',
+      variant: 'primary',
+    };
+  }
 
   const isPos =
     source === 'pos' ||
@@ -77,10 +97,16 @@ export default function OrderDetailHeader({
   onClose,
   onDownloadPdf,
   onOpenInvoice,
+  onManage,
+  managementOpen = false,
   downloadingPdf = false,
   invoiceLoading = false,
 }) {
-  const status = getOrderStatusMeta(order?.status);
+  const exchange = getOrderExchangeInfo(order);
+  const status = getOrderStatusMeta(
+    exchange.noCharge ? 'processing' : order?.status
+  );
+  const statusLabel = exchange.noCharge ? 'Cambio sin cobro' : status.label;
   const branchInfo = getOrderBranchInfo(order);
   const sourceLabel = getOrderSourceLabel(order?.source);
   const summary = getOrderSummary(order);
@@ -91,6 +117,8 @@ export default function OrderDetailHeader({
       style={{
         position: 'relative',
         overflow: 'hidden',
+        flex: '0 0 auto',
+        zIndex: 2,
         borderBottom: `1px solid ${ORDER_DETAIL_THEME.cardBorder}`,
         background: `
           radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 22%, transparent), transparent 34%),
@@ -112,6 +140,7 @@ export default function OrderDetailHeader({
       />
 
       <div
+        className="order-detail-header-layout"
         style={{
           position: 'relative',
           display: 'grid',
@@ -121,6 +150,7 @@ export default function OrderDetailHeader({
         }}
       >
         <div
+          className="order-detail-header-main"
           style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -181,7 +211,7 @@ export default function OrderDetailHeader({
                     background: 'currentColor',
                   }}
                 />
-                {status.label}
+                {statusLabel}
               </span>
             </div>
 
@@ -248,6 +278,7 @@ export default function OrderDetailHeader({
         </div>
 
         <div
+          className="order-detail-header-actions"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -256,6 +287,7 @@ export default function OrderDetailHeader({
             flexWrap: 'wrap',
           }}
         >
+          {typeof onDownloadPdf === 'function' ? (
           <GhostButton
             onClick={onDownloadPdf}
             disabled={downloadingPdf}
@@ -263,7 +295,9 @@ export default function OrderDetailHeader({
           >
             {downloadingPdf ? 'Generando...' : 'PDF'}
           </GhostButton>
+          ) : null}
 
+          {typeof onOpenInvoice === 'function' && !exchange.noCharge ? (
           <PrimaryButton
             onClick={onOpenInvoice}
             disabled={invoiceLoading}
@@ -271,6 +305,17 @@ export default function OrderDetailHeader({
           >
             {invoiceLoading ? 'Cargando...' : 'Factura'}
           </PrimaryButton>
+          ) : null}
+
+          {typeof onManage === 'function' ? (
+            <GhostButton
+              onClick={onManage}
+              title="Abrir acciones administrativas de la orden"
+              icon={<OrderDetailIcons.Settings2 size={15} strokeWidth={2.4} />}
+            >
+              {managementOpen ? 'Cerrar gestión' : 'Gestionar'}
+            </GhostButton>
+          ) : null}
 
           <button
             type="button"
@@ -302,6 +347,31 @@ export default function OrderDetailHeader({
           </button>
         </div>
       </div>
+
+      <style>
+        {`
+          @media (max-width: 940px) {
+            .order-detail-header-layout {
+              grid-template-columns: 1fr !important;
+            }
+
+            .order-detail-header-actions {
+              justify-content: flex-start !important;
+              padding-left: 70px;
+            }
+          }
+
+          @media (max-width: 620px) {
+            .order-detail-header-main {
+              gap: 11px !important;
+            }
+
+            .order-detail-header-actions {
+              padding-left: 0;
+            }
+          }
+        `}
+      </style>
     </header>
   );
 }

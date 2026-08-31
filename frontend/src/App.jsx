@@ -36,6 +36,7 @@ const InformacionSection = lazy(() => import('./components/InformacionSection.js
 
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const GraciasPage = lazy(() => import('./pages/GraciasPage'));
+const OrderReturnsPage = lazy(() => import('./pages/OrderReturnsPage'));
 const DynamicPage = lazy(() => import('./pages/DynamicPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Carrito = lazy(() => import('./pages/Carrito'));
@@ -207,6 +208,7 @@ export default function App() {
                   <Route path="/favoritos" element={<Favoritos />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/gracias" element={<GraciasPage />} />
+                  <Route path="/devoluciones/:orderId" element={<OrderReturnsPage />} />
                   <Route path="/probe-site-settings" element={<ApiProbe />} />
 
                   <Route

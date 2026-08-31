@@ -42,10 +42,10 @@ function includes(content, expected, message) {
 
 function validateOfficialPayload() {
   const provider = readFactusProviderSource();
-  includes(provider, 'bill_id: Number(billId || 0)', 'La nota no usa bill_id oficial.');
+  includes(provider, 'bill_number: trimSafe(billNumber, 160)', 'La nota no usa bill_number oficial.');
   includes(provider, 'reference_code: trimSafe(referenceCode, 100)', 'La referencia no es estable.');
-  assert(!provider.includes('bill_number: invoiceNumber'), 'No se debe relacionar con bill_number.');
-  ok('Payload V2 relaciona la nota mediante bill_id y reference_code estable');
+  assert(!provider.includes('bill_id:'), 'La nota no debe depender del ID interno de Factus.');
+  ok('Payload V2 relaciona la nota mediante bill_number y reference_code estable');
 }
 
 function validatePayloadMath() {
@@ -54,6 +54,15 @@ function validatePayloadMath() {
   } = require('../lib/dian/providers/factusProvider');
   const order = {
     orderNumber: 'TEST-1001',
+    billing: {
+      personType: 'natural',
+      documentType: 'CC',
+      documentNumber: '222222222222',
+      firstName: 'Consumidor',
+      lastName: 'Final',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
     items: [{ productId: 'P1', title: 'Producto', quantity: 2, price: 100 }],
     subtotal: 200,
     shipping: 10,
@@ -67,21 +76,94 @@ function validatePayloadMath() {
     taxes: { iva: { enabled: true, percent: 19, amount: 34.2 } },
   };
   const payload = buildFactusCreditNotePayload({
+    electronicInvoice: {
+      customer: {
+        personType: 'natural',
+        documentType: 'CC',
+        documentNumber: '1014942842',
+        firstName: 'Cliente Prueba',
+        lastName: 'Habilitación',
+        email: 'cliente.prueba@example.com',
+        address: 'Calle 93 # 12-34',
+        municipalityCode: '11001',
+        countryCode: 'CO',
+        tributeCode: 'ZZ',
+      },
+    },
     order,
     type: 'partial',
     selectedItems: [{ codeReference: 'P1', quantity: 1 }],
     reasonCode: '1',
     reasonText: 'Devolución parcial',
-    billId: 77,
+    billNumber: 'SETP9900077',
     referenceCode: 'NC-TEST-1001',
     numberingRangeId: 8,
   });
 
-  assert(payload.bill_id === 77, 'No conserva bill_id.');
+  assert(payload.bill_number === 'SETP9900077', 'No conserva bill_number.');
+  assert(payload.customer.identification === '1014942842', 'No conserva el cliente fiscal de la factura original.');
+  assert(payload.customer.names === 'Cliente Prueba Habilitación', 'No conserva el nombre fiscal de la factura original.');
   assert(payload.items.length === 1, 'La parcial incluyó líneas no seleccionadas.');
   assert(payload.items[0].discount_amount === '10.00', 'No prorratea el descuento.');
   assert(payload.payment_details[0].amount === '107.10', 'No concilia base, descuento e IVA.');
   ok('Cálculo parcial prorratea descuento e IVA sin confiar en el navegador');
+}
+
+function validateImmutableInvoiceCustomer() {
+  const {
+    buildFactusCreditNotePayload,
+  } = require('../lib/dian/providers/factusProvider');
+  const order = {
+    billing: {
+      isFinalConsumer: false,
+      personType: 'natural',
+      documentType: 'CC',
+      documentNumber: '1014942842',
+      firstName: 'Cliente modificado',
+      municipalityCode: '11001',
+      countryCode: 'CO',
+    },
+    items: [{ productId: 'P1', title: 'Producto', quantity: 1, price: 100 }],
+    pricing: { version: 2, subtotalAfterDiscount: 100, shipping: 0 },
+    taxes: { iva: { enabled: false, percent: 0, amount: 0 } },
+  };
+  const common = {
+    order,
+    type: 'total',
+    reasonCode: '2',
+    reasonText: 'Anulación total',
+    billNumber: 'SETP9900078',
+    referenceCode: 'NC-TEST-1002',
+    numberingRangeId: 8,
+  };
+
+  const payload = buildFactusCreditNotePayload({
+    ...common,
+    electronicInvoice: {
+      customer: {
+        personType: 'natural',
+        documentType: 'CC',
+        documentNumber: '222222222222',
+        firstName: 'Consumidor',
+        lastName: 'Final',
+        countryCode: 'CO',
+      },
+    },
+  });
+  assert(payload.customer.identification === '222222222222', 'Cambió el comprador fiscal de la factura original.');
+  assert(payload.customer.names === 'Consumidor Final', 'Cambió el nombre fiscal de la factura original.');
+
+  let missingSnapshotError = null;
+  try {
+    buildFactusCreditNotePayload({ ...common, electronicInvoice: {} });
+  } catch (error) {
+    missingSnapshotError = error;
+  }
+  assert(
+    missingSnapshotError?.message.includes('factura original'),
+    'Permitió emitir una nota sin identidad fiscal inmutable.'
+  );
+  ok('Nota crédito usa exclusivamente el cliente fiscal inmutable de la factura original');
 }
 
 function validateDianReasons() {
@@ -132,13 +214,37 @@ function validateOfficialDocuments() {
 
 function validateSecurityAndPermissions() {
   const routes = read('backend/routes/adminBilling.js');
-  const payments = read('backend/routes/payments.js');
+  const payments = [
+    read('backend/routes/payments.js'),
+    read('backend/controllers/paymentFiscalAdminController.js'),
+  ].join('\n');
   const provider = readFactusProviderSource();
   includes(routes, "requirePermission('billing:credit_note')", 'Creación sin permiso específico.');
   includes(routes, "requirePermission('billing:download')", 'Descarga sin permiso específico.');
   includes(payments, 'createOfficialCreditNote', 'La ruta heredada no comparte el motor seguro.');
   assert(!provider.includes('FACTUS CREDIT NOTE PAYLOAD:'), 'El payload fiscal se escribe en logs.');
   ok('Rutas están autorizadas, no exponen payloads y comparten un único motor');
+}
+
+function validateProviderErrors() {
+  const provider = readFactusProviderSource();
+  const service = read('backend/services/electronicCreditNoteService.js');
+  const {
+    extractFactusValidationErrors,
+    summarizeFactusValidationErrors,
+  } = require('../lib/dian/providers/factus/factusCreditNoteService');
+  includes(provider, 'extractFactusValidationErrors', 'No extrae errores anidados de Factus.');
+  includes(provider, 'validationErrors', 'No devuelve el detalle de validación del proveedor.');
+  includes(service, 'providerResult?.validationErrors', 'No conserva el detalle del rechazo.');
+  const errors = extractFactusValidationErrors({
+    data: { errors: { customer: ['El cliente es obligatorio.'] } },
+  });
+  assert(errors.customer?.[0] === 'El cliente es obligatorio.', 'No reconoce el error anidado.');
+  assert(
+    summarizeFactusValidationErrors(errors).includes('customer:'),
+    'No resume el campo rechazado.'
+  );
+  ok('Rechazos 422 conservan campos y mensajes de validación sin exponer credenciales');
 }
 
 function validateSyncIdentity() {
@@ -151,6 +257,39 @@ function validateSyncIdentity() {
   includes(service, 'BILLING_CREDIT_NOTE_IDENTITY_MISMATCH', 'Creación no protege la referencia idempotente.');
   includes(service, 'BILLING_CREDIT_NOTE_CUDE_MISSING', 'Una nota validada podría guardarse sin CUDE.');
   ok('Sincronización protege número y CUDE oficiales de la nota crédito');
+}
+
+function validateUncertainOutcomeReconciliation() {
+  const model = read('backend/models/ElectronicInvoice.js');
+  const service = read('backend/services/electronicCreditNoteService.js');
+  const provider = read('backend/lib/dian/providers/factusRangeAwareProvider.js');
+
+  includes(
+    provider,
+    '/v2/credit-notes?filter[reference_code]=',
+    'No consulta la nota por referencia exacta antes de reemitir.'
+  );
+  includes(
+    service,
+    'findCreditNoteByReferenceFromFactus',
+    'El motor no reconcilia resultados inciertos.'
+  );
+  includes(
+    service,
+    "'creditNotes.$.emission.state': 'reconciliation_pending'",
+    'Una respuesta incierta podría quedar marcada como fallo definitivo.'
+  );
+  includes(
+    service,
+    'MAX_RECONCILIATION_ABSENCES',
+    'No exige ausencias remotas repetidas antes de permitir reemisión.'
+  );
+  includes(
+    model,
+    'confirmedNotFound',
+    'No persiste las confirmaciones negativas de conciliación.'
+  );
+  ok('Timeouts y respuestas ambiguas se concilian por referencia antes de cualquier reemisión');
 }
 
 function validateFrontend() {
@@ -177,12 +316,15 @@ async function main() {
   const steps = [
     validateOfficialPayload,
     validatePayloadMath,
+    validateImmutableInvoiceCustomer,
     validateDianReasons,
     validateIdempotencyAndLock,
     validateServerSideAmounts,
     validateOfficialDocuments,
     validateSecurityAndPermissions,
+    validateProviderErrors,
     validateSyncIdentity,
+    validateUncertainOutcomeReconciliation,
     validateFrontend,
     validatePackageScript,
   ];

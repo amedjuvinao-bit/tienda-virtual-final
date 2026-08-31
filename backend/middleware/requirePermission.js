@@ -154,6 +154,23 @@ async function getEffectivePermissions(req) {
   return effectivePermissions;
 }
 
+async function hasEffectivePermission(req, requiredPermission, options = {}) {
+  const permission = normalizePermission(requiredPermission);
+  if (!permission) return false;
+  if (!req?.adminUser && !req?.adminUserId && !req?.adminRole) return false;
+
+  const allowOwner = options.allowOwner !== false;
+  const allowAdmin = options.allowAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
+
+  if (allowLegacyAdmin && isLegacyAdmin(req)) return true;
+  if (allowOwner && isOwner(req)) return true;
+  if (allowAdmin && isAdmin(req) && !isLegacyAdmin(req)) return true;
+
+  const effectivePermissions = await getEffectivePermissions(req);
+  return hasWildcardPermission(new Set(effectivePermissions), permission);
+}
+
 function reject(res, status, error, message, extra = {}) {
   return res.status(status).json({
     ok: false,
@@ -180,7 +197,8 @@ function requirePermission(requiredPermissions, options = {}) {
 
   const mode = options.mode === 'any' ? 'any' : 'all';
   const allowOwner = options.allowOwner !== false;
-  const allowLegacyAdmin = options.allowLegacyAdmin !== false;
+  const allowAdmin = options.allowAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
 
   return async function requirePermissionMiddleware(req, res, next) {
     try {
@@ -200,6 +218,10 @@ function requirePermission(requiredPermissions, options = {}) {
       }
 
       if (allowOwner && isOwner(req)) {
+        return next();
+      }
+
+      if (allowAdmin && isAdmin(req) && !isLegacyAdmin(req)) {
         return next();
       }
 
@@ -262,7 +284,7 @@ requirePermission.role = function requireRole(requiredRoles = [], options = {}) 
     .filter(Boolean);
 
   const allowOwner = options.allowOwner !== false;
-  const allowLegacyAdmin = options.allowLegacyAdmin !== false;
+  const allowLegacyAdmin = options.allowLegacyAdmin === true;
 
   if (!roles.length) {
     throw new Error(
@@ -285,6 +307,15 @@ requirePermission.role = function requireRole(requiredRoles = [], options = {}) 
 
       if (allowLegacyAdmin && isLegacyAdmin(req)) {
         return next();
+      }
+
+      if (isLegacyAdmin(req)) {
+        return reject(
+          res,
+          403,
+          'FORBIDDEN',
+          'La autenticación heredada no tiene acceso implícito por rol.'
+        );
       }
 
       if (allowOwner && isOwner(req)) {
@@ -334,7 +365,7 @@ requirePermission.ownerOnly = function requireOwnerOnly() {
         );
       }
 
-      if (!isOwner(req)) {
+      if (isLegacyAdmin(req) || !isOwner(req)) {
         return reject(
           res,
           403,
@@ -371,7 +402,7 @@ requirePermission.adminOrOwner = function requireAdminOrOwner() {
         );
       }
 
-      if (isLegacyAdmin(req) || isOwner(req) || isAdmin(req)) {
+      if (!isLegacyAdmin(req) && (isOwner(req) || isAdmin(req))) {
         return next();
       }
 
@@ -408,8 +439,17 @@ requirePermission.branchAccess = function requireBranchAccess(getBranchId) {
         );
       }
 
-      if (isLegacyAdmin(req) || isOwner(req) || isAdmin(req)) {
+      if (!isLegacyAdmin(req) && (isOwner(req) || isAdmin(req))) {
         return next();
+      }
+
+      if (isLegacyAdmin(req)) {
+        return reject(
+          res,
+          403,
+          'FORBIDDEN',
+          'La autenticación heredada no tiene acceso implícito a sedes.'
+        );
       }
 
       const branchId =
@@ -467,6 +507,7 @@ requirePermission.branchAccess = function requireBranchAccess(getBranchId) {
 };
 
 requirePermission.getEffectivePermissions = getEffectivePermissions;
+requirePermission.hasEffectivePermission = hasEffectivePermission;
 requirePermission.normalizePermission = normalizePermission;
 
 module.exports = requirePermission;

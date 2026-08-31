@@ -10,5 +10,12 @@ describe('variantKeyAuthority CommonJS/ESM interop', () => {
     expect(variantKeyAuthority.normalizeVariantKey('4__royalblue')).toBe(
       '4__royalblue',
     );
+    expect(
+      variantKeyAuthority.canonicalizeVariantKey(
+        'v2__capacidad=256gb__color=azul__conectividad=5g__ram=12gb',
+      ),
+    ).toBe(
+      'v2__capacidad=256gb__color=blue__conectividad=5g__ram=12gb',
+    );
   });
 });

@@ -7,6 +7,7 @@ const InventoryStock = require('../models/InventoryStock');
 const requireAdmin = require('../middleware/requireAdmin');
 const {
   buildVariantKey,
+  canonicalizeVariantKey,
   normalizeAttributes,
   resolveVariantCommercialSnapshot,
   resolveVariantIdentity,
@@ -21,6 +22,7 @@ const {
   isValidCartAccessToken,
   isValidCartSessionId,
   issueCartAccess,
+  rotateCartAccess,
   stripCartSecrets,
   verifyCartAccess,
 } = require('../services/cartAccessService');
@@ -29,8 +31,14 @@ const {
   toStoredCartItem,
 } = require('../services/cartCanonicalValidationService');
 const {
+  createOrderCartSnapshotFingerprint,
+} = require('../services/orderCartSnapshotService');
+const {
   createCartRecoveryService,
 } = require('../services/cartRecoveryService');
+const {
+  previewCustomerStoreCredit,
+} = require('../services/storeCreditCheckoutService');
 const cartAdminRoutes = require('./cartAdminRoutes');
 
 /* -------------------------------------------------------
@@ -99,6 +107,7 @@ function authorizedCartVersionFilter(cart, sessionId, expectedVersion) {
     accessTokenHash: cart.accessTokenHash,
     accessVersion: cart.accessVersion,
     updatedAt: expectedVersion,
+    convertedOrderId: null,
   };
 }
 
@@ -242,15 +251,18 @@ function readVariantId(raw = {}) {
 }
 
 function getVariantSelector(raw = {}) {
-  const variantKey = cleanLower(readVariantId(raw));
+  const rawVariantKey = cleanLower(readVariantId(raw));
   const size = clean(raw.size || raw.talla || '');
   const color = clean(raw.rawColor || raw.colorValue || raw.color || '');
   const variantAttributes = normalizeAttributes(
     raw.variantAttributes || raw.attributes || raw.selectedAttributes || []
   );
+  const variantKey = rawVariantKey
+    ? canonicalizeVariantKey(rawVariantKey) || rawVariantKey
+    : buildVariantKey(size, color, variantAttributes);
 
   return {
-    variantKey: variantKey || buildVariantKey(size, color, variantAttributes),
+    variantKey,
     size,
     color,
     variantAttributes,
@@ -698,6 +710,45 @@ router.post('/recovery/claim', rateLimit, async (req, res) => {
   }
 });
 
+/* -------------------------------------------------------
+ * POST /api/cart/:sessionId/store-credit/preview
+ * Exige la credencial vigente del carrito y coincidencia exacta entre
+ * documento y uno de los contactos de la ficha del cliente.
+ * ----------------------------------------------------- */
+router.post('/:sessionId/store-credit/preview', rateLimit, async (req, res) => {
+  try {
+    const cart = await loadAuthorizedCart(req, req.params.sessionId);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
+
+    const preview = await previewCustomerStoreCredit({
+      documentNumber: req.body?.documentNumber,
+      emailOrPhone: req.body?.emailOrPhone,
+      phone: req.body?.phone,
+      sessionId: cart.sessionId,
+      currency: req.body?.currency || 'COP',
+    });
+
+    return res.json({ ok: true, ...preview });
+  } catch (error) {
+    if (error?.code === 'CART_ACCESS_SECRET_MISCONFIGURED') {
+      return res.status(500).json({
+        ok: false,
+        error: 'STORE_CREDIT_ACCESS_UNAVAILABLE',
+        message: 'No fue posible comprobar el saldo de forma segura.',
+      });
+    }
+    console.error(
+      'POST /cart/:sessionId/store-credit/preview',
+      error?.code || error?.message
+    );
+    return res.status(500).json({
+      ok: false,
+      error: 'STORE_CREDIT_PREVIEW_ERROR',
+      message: 'No fue posible comprobar el saldo en este momento.',
+    });
+  }
+});
+
 /* ============================
  * GET /api/cart/:sessionId
  * ============================ */
@@ -728,7 +779,7 @@ router.put('/:sessionId', rateLimit, async (req, res) => {
 
   try {
     const cart = await loadAuthorizedCart(req, sessionId);
-    if (!cart) return sendCartAccessNotFound(res);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
     const expectedVersion = readExpectedCartVersion(req);
     if (!expectedVersion.ok) {
       return sendCartVersionPrecondition(res, expectedVersion.reason);
@@ -779,7 +830,7 @@ router.delete('/:sessionId', rateLimit, async (req, res) => {
 
   try {
     const cart = await loadAuthorizedCart(req, sessionId);
-    if (!cart) return sendCartAccessNotFound(res);
+    if (!cart || cart.convertedOrderId) return sendCartAccessNotFound(res);
     const expectedVersion = readExpectedCartVersion(req);
     if (!expectedVersion.ok) {
       return sendCartVersionPrecondition(res, expectedVersion.reason);
@@ -842,10 +893,73 @@ router.post('/validate', rateLimit, async (req, res) => {
       adjustments,
       summary,
       version: cartVersion || undefined,
+      orderSnapshotFingerprint:
+        sessionId && strict && validation.ok
+          ? createOrderCartSnapshotFingerprint(validated)
+          : undefined,
     });
   } catch (error) {
     console.error('Error en /api/cart/validate:', error);
     res.status(500).json({ message: 'Error validando carrito.' });
+  }
+});
+
+/**
+ * POST /api/cart/:sessionId/access/refresh
+ * Renueva la credencial de compra de un carrito todavía activo.
+ */
+router.post('/:sessionId/access/refresh', rateLimit, async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const cart = await loadAuthorizedCart(req, sessionId);
+    if (
+      !cart ||
+      cart.active === false ||
+      cart.convertedOrderId ||
+      ['inactive', 'closed', 'deleted'].includes(cleanLower(cart.status)) ||
+      !Array.isArray(cart.items) ||
+      cart.items.length === 0
+    ) {
+      return sendCartAccessNotFound(res);
+    }
+
+    const access = rotateCartAccess({
+      cartId: cart._id,
+      sessionId: cart.sessionId,
+      secret: getCartAccessSecret(),
+    });
+    const refreshed = await Cart.findOneAndUpdate(
+      {
+        _id: cart._id,
+        sessionId: cart.sessionId,
+        accessTokenHash: cart.accessTokenHash,
+        accessVersion: cart.accessVersion,
+        convertedOrderId: null,
+      },
+      {
+        $set: {
+          accessTokenHash: access.tokenHash,
+          accessVersion: access.version,
+          accessIssuedAt: new Date(),
+          lastCustomerActivityAt: new Date(),
+        },
+      },
+      { new: true }
+    )
+      .select('+accessTokenHash +accessVersion +accessIssuedAt')
+      .exec();
+
+    if (!refreshed) return sendCartAccessNotFound(res);
+    return res.status(200).json({
+      ok: true,
+      sessionId: refreshed.sessionId,
+      cartAccessToken: access.token,
+      version: cartVersionOf(refreshed),
+    });
+  } catch (error) {
+    console.error('Error al renovar el acceso del carrito:', error?.code || error?.message);
+    return res.status(500).json({ message: 'Error interno al renovar el carrito.' });
   }
 });
 

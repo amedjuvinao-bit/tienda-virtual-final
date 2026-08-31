@@ -100,6 +100,37 @@ export function isCartWriteConflict(error) {
   );
 }
 
+export function isInvalidCartItems(error) {
+  return Boolean(
+    error?.response?.status === 409 &&
+    error?.response?.data?.error === 'CART_ITEMS_INVALID' &&
+    Array.isArray(error?.response?.data?.items)
+  );
+}
+
+export function isCartAccessNotFound(error) {
+  return Boolean(
+    error?.response?.status === 404 &&
+    error?.response?.data?.error === 'CART_ACCESS_NOT_FOUND'
+  );
+}
+
+function invalidItemIdentities(error) {
+  return new Set(
+    (isInvalidCartItems(error) ? error.response.data.items : [])
+      .map(cartItemIdentity)
+      .filter(Boolean)
+  );
+}
+
+function operationIdentity(operation = {}) {
+  return clean(
+    operation.type === 'add'
+      ? cartItemIdentity(operation.item)
+      : operation.identity
+  );
+}
+
 export function writeVersionedCart({ api, access, version, items }) {
   return api.put(
     `/api/cart/${encodeURIComponent(access.sessionId)}`,
@@ -119,10 +150,12 @@ export function createCartMutationCoordinator({
   reload,
   adopt,
   onTerminalConflict,
+  onRejected,
+  onMissingCart,
 } = {}) {
   let queue = Promise.resolve();
 
-  async function execute(operation) {
+  async function executeAgainstCurrentCart(operation) {
     let snapshot = normalizeCartSnapshot(await getSnapshot());
     let desired = applyCartOperation(snapshot.items, operation);
 
@@ -136,7 +169,49 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: false });
       return { ...written, retried: false };
     } catch (error) {
-      if (!isCartWriteConflict(error)) throw error;
+      if (!isCartWriteConflict(error)) {
+        const invalidIdentities = invalidItemIdentities(error);
+        const targetIdentity = operationIdentity(operation);
+        const targetRejected = Boolean(
+          targetIdentity && invalidIdentities.has(targetIdentity)
+        );
+        const cleanedSnapshot = invalidIdentities.size
+          ? {
+              ...snapshot,
+              items: snapshot.items.filter(
+                (item) => !invalidIdentities.has(cartItemIdentity(item))
+              ),
+            }
+          : snapshot;
+
+        // Un artículo antiguo inválido no debe bloquear que se agregue otro
+        // producto comprable. Se retira solo el inválido y se reintenta una vez.
+        if (
+          isInvalidCartItems(error) &&
+          !targetRejected &&
+          cleanedSnapshot.items.length !== snapshot.items.length
+        ) {
+          const recovered = normalizeCartSnapshot(await write({
+            items: applyCartOperation(cleanedSnapshot.items, operation),
+            version: snapshot.version,
+            operation,
+            retry: true,
+          }));
+          adopt(recovered, { operation, recoveredInvalidItems: true });
+          onRejected?.(error, cleanedSnapshot, operation, {
+            recovered: true,
+            targetRejected: false,
+          });
+          return { ...recovered, retried: true, recoveredInvalidItems: true };
+        }
+
+        adopt(snapshot, { operation, rejected: true });
+        onRejected?.(error, snapshot, operation, {
+          recovered: false,
+          targetRejected,
+        });
+        throw error;
+      }
     }
 
     const reloaded = normalizeCartSnapshot(await reload());
@@ -153,7 +228,11 @@ export function createCartMutationCoordinator({
       adopt(written, { operation, retried: true });
       return { ...written, retried: true };
     } catch (error) {
-      if (!isCartWriteConflict(error)) throw error;
+      if (!isCartWriteConflict(error)) {
+        adopt(reloaded, { operation, rejected: true, reloaded: true });
+        onRejected?.(error, reloaded, operation);
+        throw error;
+      }
       const server = normalizeCartSnapshot(error?.response?.data || {});
       adopt(server, { operation, terminalConflict: true });
       onTerminalConflict?.(server, operation);
@@ -161,6 +240,17 @@ export function createCartMutationCoordinator({
       controlled.code = 'CART_WRITE_CONFLICT';
       controlled.response = error.response;
       throw controlled;
+    }
+  }
+
+  async function execute(operation) {
+    try {
+      return await executeAgainstCurrentCart(operation);
+    } catch (error) {
+      if (isCartAccessNotFound(error) && onMissingCart) {
+        return onMissingCart(operation, error);
+      }
+      throw error;
     }
   }
 

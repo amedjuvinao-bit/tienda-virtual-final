@@ -3,6 +3,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
+const {
+  readWompiWebhookApprovedComposition,
+  readWompiWebhookOrderComposition,
+} = require('./lib/readWompiWebhookComposition');
 
 const {
   calculateOrderPricing,
@@ -15,6 +22,9 @@ const {
   assertTotalsReconciled,
   calculateTotals,
 } = require('../services/electronicInvoiceIssuanceService');
+const {
+  evaluateApprovedPaymentAttempt,
+} = require('../services/paymentAttemptService');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const results = { ok: 0, warn: 0, fail: 0 };
@@ -197,6 +207,16 @@ function validateFactusPayload() {
   assertMoney(payload.items[0].price, 100000, 'Factus no recibió el precio original.');
   assertMoney(payload.items[0].discount_amount, 10000, 'Factus no recibió el descuento de línea.');
   assert(
+    JSON.stringify(payload.items[0].taxes) === JSON.stringify([{ code: '01', rate: '19.00' }]),
+    'El IVA gravado debe viajar únicamente en taxes con código y tarifa.'
+  );
+  ['tax_rate', 'unit_measure_id', 'standard_code_id', 'is_excluded', 'tribute_id'].forEach((field) => {
+    assert(
+      !Object.prototype.hasOwnProperty.call(payload.items[0], field),
+      `El payload Factus V2 no debe conservar el campo heredado ${field}.`
+    );
+  });
+  assert(
     !Object.prototype.hasOwnProperty.call(payload.items[0], 'discount_rate'),
     'Factus no debe recibir simultáneamente discount_rate y discount_amount.'
   );
@@ -206,6 +226,36 @@ function validateFactusPayload() {
   assertMoney(payload.totals.total, 117100, 'El total Factus no coincide.');
   assert(payload.payment_details[0].amount === '117100.00', 'El pago Factus no usa el total exacto.');
   ok('Factus recibe precio, descuento, base, IVA y pago conciliados');
+}
+
+function validateFactusExcludedPayload() {
+  const payload = buildFactusInvoicePayload({
+    order: {
+      _id: '64b000000000000000000011',
+      orderNumber: 'ORD-EXCLUIDA-01',
+      items: [baseItem(100000)],
+      subtotal: 100000,
+      shipping: 10000,
+      total: 110000,
+      taxes: { iva: { enabled: false, percent: 0, amount: 0 } },
+      customer: { name: 'Cliente', email: 'cliente@example.com' },
+    },
+  });
+
+  assert(payload.items.length === 2, 'La prueba excluida debe conservar producto y envío.');
+  payload.items.forEach((item) => {
+    assert(
+      JSON.stringify(item.taxes) === JSON.stringify([{ is_excluded: true }]),
+      'Un concepto excluido debe declarar is_excluded dentro de taxes y no IVA al 0 %.'
+    );
+    assert(
+      !Object.prototype.hasOwnProperty.call(item, 'is_excluded') &&
+        !Object.prototype.hasOwnProperty.call(item, 'tax_rate'),
+      'Un concepto excluido no debe mezclar los campos fiscales heredados con Factus V2.'
+    );
+  });
+
+  ok('Factus V2 recibe productos y envío excluidos con la estructura fiscal oficial');
 }
 
 function validateInvoiceReconciliationGuard() {
@@ -263,10 +313,67 @@ function validateInvoiceReconciliationGuard() {
   ok('La emisión se bloquea si orden, pago y factura no tienen el mismo total');
 }
 
+function validateStoreCreditInvoiceReconciliation() {
+  const order = {
+    subtotal: 100000,
+    shipping: 0,
+    total: 100000,
+    pricing: {
+      version: 2,
+      currency: 'COP',
+      subtotal: 100000,
+      productDiscount: 0,
+      subtotalAfterDiscount: 100000,
+      originalShipping: 0,
+      shippingDiscount: 0,
+      shipping: 0,
+      totalDiscount: 0,
+      taxableBase: 100000,
+      taxAmount: 0,
+      total: 100000,
+    },
+    taxes: { iva: { enabled: false, percent: 0, taxableBase: 100000, amount: 0 } },
+    payment: {
+      currency: 'COP',
+      amount: 40000,
+      splitPayments: [
+        { method: 'store_credit', amount: 60000 },
+        { method: 'wompi', amount: 40000 },
+      ],
+    },
+    storeCredit: { applied: true, amount: 60000, status: 'consumed' },
+  };
+  assertTotalsReconciled(order, calculateTotals(order));
+
+  const fullyPaid = {
+    ...order,
+    payment: {
+      currency: 'COP',
+      amount: 0,
+      splitPayments: [{ method: 'store_credit', amount: 100000 }],
+    },
+    storeCredit: { applied: true, amount: 100000, status: 'consumed' },
+  };
+  assertTotalsReconciled(fullyPaid, calculateTotals(fullyPaid));
+  ok('La factura concilia pagos parciales y totales realizados con saldo a favor');
+}
+
 function validateAtomicCheckoutAndGatewayGuards() {
-  const orders = readProjectFile('backend/routes/orders.js');
-  const payments = readProjectFile('backend/routes/payments.js');
-  const checkout = readProjectFile('frontend/src/pages/CheckoutPage.jsx');
+  const orderCreationComposition = [
+    readProjectFile('backend/routes/orders.js'),
+    readProjectFile('backend/controllers/orderCreationController.js'),
+    readProjectFile('backend/services/orderCreationTransactionService.js'),
+    readProjectFile('backend/services/orderCreationCouponService.js'),
+  ].join('\n');
+  const paymentComposition = [
+    readProjectFile('backend/routes/payments.js'),
+    readProjectFile('backend/controllers/wompiWebhookController.js'),
+    readWompiWebhookOrderComposition(),
+    readWompiWebhookApprovedComposition(),
+    readProjectFile('backend/services/paymentAttemptService.js'),
+    readProjectFile('backend/services/paymentAttempts/policy.js'),
+  ].join('\n');
+  const checkout = readCheckoutComposition();
   const main = readProjectFile('frontend/src/main.jsx');
 
   [
@@ -274,10 +381,83 @@ function validateAtomicCheckoutAndGatewayGuards() {
     'recordCouponRedemption',
     'amountInCents: Math.round(pricing.total * 100)',
     'coupon_applied',
-  ].forEach((needle) => assert(orders.includes(needle), `orders.js no contiene ${needle}.`));
-  assert(payments.includes('WOMPI_AMOUNT_MISMATCH'), 'Wompi no valida el valor confirmado.');
-  assert(payments.includes('WOMPI_CURRENCY_MISMATCH'), 'Wompi no valida la moneda confirmada.');
-  assert(checkout.includes("api.post('/api/orders/quote'"), 'Checkout no consume la cotización real.');
+  ].forEach((needle) =>
+    assert(
+      orderCreationComposition.includes(needle),
+      `La composición de creación de órdenes no contiene ${needle}.`
+    )
+  );
+  [
+    'createWompiWebhookController',
+    'claimApprovedPaymentAttempt',
+    'evaluateApprovedPaymentAttempt',
+    'PAYMENT_ATTEMPT_VALUE_MISMATCH',
+  ].forEach((needle) =>
+    assert(
+      paymentComposition.includes(needle),
+      `La composición Wompi no conserva ${needle}.`
+    )
+  );
+
+  const order = {
+    _id: '64b000000000000000000777',
+    orderNumber: 'ORDER-TOTALS-1',
+    payment: { status: 'pending_gateway' },
+  };
+  const merchantFingerprint = 'wompi:billing-totals-fixture';
+  const attempt = {
+    provider: 'wompi',
+    order: order._id,
+    orderNumber: order.orderNumber,
+    reference: 'ORDER-ORDER-TOTALS-1__TRY__1',
+    amountInCents: 12900000,
+    currency: 'COP',
+    merchantFingerprint,
+    state: 'issued',
+    active: true,
+    issuedBySystem: true,
+    storeCredit: { applied: false },
+  };
+  const approval = {
+    order,
+    attempt,
+    provider: 'wompi',
+    reference: attempt.reference,
+    transactionId: 'wompi-transaction-totals-1',
+    amountInCents: attempt.amountInCents,
+    currency: attempt.currency,
+    merchantFingerprint,
+  };
+  assert(
+    evaluateApprovedPaymentAttempt(approval).allowed === true,
+    'Wompi debe aceptar el monto y la moneda del intento exacto emitido.'
+  );
+  const amountMismatch = evaluateApprovedPaymentAttempt({
+    ...approval,
+    amountInCents: attempt.amountInCents - 1,
+  });
+  assert(
+    amountMismatch.allowed === false &&
+      amountMismatch.reconciliationRequired === true &&
+      amountMismatch.code === 'PAYMENT_ATTEMPT_VALUE_MISMATCH' &&
+      amountMismatch.expectedAmountInCents === attempt.amountInCents,
+    'Wompi no bloquea ni concilia un valor diferente al intento emitido.'
+  );
+  const currencyMismatch = evaluateApprovedPaymentAttempt({
+    ...approval,
+    currency: 'USD',
+  });
+  assert(
+    currencyMismatch.allowed === false &&
+      currencyMismatch.reconciliationRequired === true &&
+      currencyMismatch.code === 'PAYMENT_ATTEMPT_VALUE_MISMATCH' &&
+      currencyMismatch.expectedCurrency === 'COP',
+    'Wompi no bloquea ni concilia una moneda diferente al intento emitido.'
+  );
+  assert(
+    checkout.includes("'/api/orders/quote'"),
+    'Checkout no consume la cotización real.'
+  );
   assert(!main.includes('checkoutCouponBridge'), 'main.jsx todavía carga el bridge antiguo.');
   ok('Checkout, transacción y webhook usan los totales autoritativos');
 }
@@ -297,7 +477,9 @@ function main() {
     validateFreeShippingCoupon,
     validateCentAllocation,
     validateFactusPayload,
+    validateFactusExcludedPayload,
     validateInvoiceReconciliationGuard,
+    validateStoreCreditInvoiceReconciliation,
     validateAtomicCheckoutAndGatewayGuards,
     validatePackageScript,
   ].forEach((step) => {

@@ -8,7 +8,6 @@ import './admin/finance/financeLayoutFix.css';
 import './admin/billing/billingDocumentsLayout.css';
 import './admin/billing/billingLayoutStability.css';
 import './admin/orders/electronicInvoice/electronicInvoiceModalFix.css';
-import './admin/billing/billingGenerateConfirmBridge';
 
 // Toastify (el contenedor global se monta una sola vez dentro de App)
 import 'react-toastify/dist/ReactToastify.css';

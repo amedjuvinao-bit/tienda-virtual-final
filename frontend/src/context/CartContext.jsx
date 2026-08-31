@@ -247,6 +247,28 @@ export function CartProvider({ children }) {
     return createRemoteCart(createPayload.items);
   };
 
+  const renewCartAccess = async () => {
+    const access = getCartAccess();
+    if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
+    const { data } = await api.post(
+      `/api/cart/${encodeURIComponent(access.sessionId)}/access/refresh`,
+      null,
+      { headers: buildCartAccessHeaders(access) }
+    );
+    const sessionId = clean(data?.sessionId);
+    const token = clean(data?.cartAccessToken);
+    if (!storeCartAccess(sessionId, token)) {
+      throw new Error('CART_ACCESS_REFRESH_INVALID');
+    }
+    setApiSessionId(sessionId);
+    const version = clean(data?.version);
+    authoritativeRef.current = {
+      ...authoritativeRef.current,
+      version,
+    };
+    return { sessionId, token, version };
+  };
+
   const writeCartVersion = async ({ items, version }) => {
     const access = getCartAccess();
     if (!access) throw new Error('CART_ACCESS_NOT_FOUND');
@@ -259,6 +281,24 @@ export function CartProvider({ children }) {
     return {
       cart: response?.data?.cart,
       version: response?.data?.version,
+    };
+  };
+
+  const recoverMissingCart = async (operation) => {
+    clearCartAccess();
+    setApiSessionId('');
+    adoptSnapshot({ items: [], version: '' });
+
+    if (operation?.type === 'add' && operation.item) {
+      await createRemoteCart([toBackendItem(operation.item)]);
+    }
+
+    const message = 'El carrito anterior ya no existía. Iniciamos uno nuevo.';
+    setCartMessage(message);
+    toast.info(message, { toastId: 'cart-recreated' });
+    return {
+      ...authoritativeRef.current,
+      recoveredMissingCart: true,
     };
   };
 
@@ -286,6 +326,34 @@ export function CartProvider({ children }) {
       setCartMessage(message);
       toast.error(message, { toastId: 'cart-write-conflict' });
     },
+    onRejected: (error, _snapshot, operation, recovery = {}) => {
+      const invalidItems = Array.isArray(error?.response?.data?.items)
+        ? error.response.data.items
+        : [];
+      const affected = invalidItems[0] || {};
+      const productName = String(affected.title || operation?.item?.title || 'Este producto').trim();
+      const reasonMessages = {
+        OUT_OF_STOCK: 'se agotó',
+        INSUFFICIENT_STOCK: 'no tiene suficientes unidades disponibles',
+        INVALID_VARIANT: 'ya no tiene disponible la opción seleccionada',
+        PRODUCT_NOT_AVAILABLE: 'ya no está disponible',
+        PRODUCT_NOT_FOUND: 'ya no se encuentra en el catálogo',
+        INVALID_QUANTITY: 'tiene una cantidad no válida',
+        PRODUCT_PRICE_INVALID: 'requiere actualizar su precio',
+      };
+      const reason = reasonMessages[affected.invalidReason || affected.reason];
+      const message = recovery.recovered
+        ? `Retiramos “${productName}” porque ${reason || 'requiere revisión'}. El nuevo producto sí se agregó.`
+        : invalidItems.length
+          ? `${productName} ${reason || 'no se puede agregar en este momento'}.`
+          : 'No fue posible actualizar el carrito. Conservamos su estado anterior.';
+      setCartMessage(message);
+      const notify = invalidItems.length ? toast.warning : toast.error;
+      notify(message, {
+        toastId: invalidItems.length ? 'cart-item-unavailable' : 'cart-update-rejected',
+      });
+    },
+    onMissingCart: recoverMissingCart,
   });
 
   const enqueueCartOperation = (operation, { optimistic = true } = {}) => {
@@ -446,6 +514,11 @@ export function CartProvider({ children }) {
           { type: 'replace_validated', items: local },
           { optimistic: true }
         );
+      } else if (data?.version) {
+        authoritativeRef.current = {
+          ...authoritativeRef.current,
+          version: clean(data.version),
+        };
       }
 
       return {
@@ -454,11 +527,21 @@ export function CartProvider({ children }) {
         summary: data?.summary || calcSummary(cartRef.current),
         ok: !!data?.ok,
         mode: data?.mode || mode,
+        version: authoritativeRef.current.version || clean(data?.version),
+        orderSnapshotFingerprint: clean(data?.orderSnapshotFingerprint),
       };
     } catch (err) {
       console.error('Error al validar carrito:', err?.message);
       const current = cartRef.current;
-      return { items: current, adjustments: [], summary: calcSummary(current), ok: false, mode };
+      return {
+        items: current,
+        adjustments: [],
+        summary: calcSummary(current),
+        ok: false,
+        mode,
+        version: authoritativeRef.current.version,
+        orderSnapshotFingerprint: '',
+      };
     }
   };
 
@@ -481,6 +564,7 @@ export function CartProvider({ children }) {
         clearCart,
         validateCart,
         ensureCartReady,
+        renewCartAccess,
         syncCart,
         API_BASE: api.defaults.baseURL,
       }}

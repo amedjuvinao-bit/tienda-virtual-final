@@ -8,6 +8,14 @@ const QUICK_VIEW_LABELS = {
   pending: 'Pendientes',
   notPrinted: 'No impresas',
   archived: 'Archivadas',
+  attention: 'Atención inmediata',
+  awaiting_payment: 'Esperando pago',
+  prepare: 'Por preparar',
+  dispatch: 'Listas para despacho',
+  transit: 'En tránsito',
+  incidents: 'Con incidencias',
+  sla_risk: 'SLA en riesgo',
+  completed: 'Completadas',
 };
 
 function formatDateLabel(value) {

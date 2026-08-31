@@ -31,6 +31,7 @@ const BILLING_TESTS = [
   ['Notas crédito oficiales', 'testBillingCreditNotesOfficialModule.js'],
   ['Totales, IVA y cupones', 'testBillingTotalsModule.js'],
   ['Datos fiscales del checkout', 'testBillingFiscalCheckoutModule.js'],
+  ['Municipio fiscal de Órdenes', 'testOrderBillingMunicipalityModule.js'],
   ['Motor único e idempotencia', 'testBillingIdempotencyModule.js'],
   ['Recuperación y conciliación de facturas', 'testBillingInvoiceRecoveryModule.js'],
   ['Limpieza segura de pendientes en habilitación', 'testFactusPendingCleanup.js'],

@@ -207,6 +207,7 @@ function buildAuditPayload(req, res, rule, startedAt, extra = {}) {
       danger: Boolean(rule.danger),
       reserved: Boolean(rule.reserved),
       dynamic: Boolean(rule.dynamic),
+      requiredPermissions: rule.requiredPermissions || [permission],
       elapsedMs: Date.now() - startedAt,
     },
   };
@@ -236,6 +237,7 @@ function rejectUnknownPermission(req, res, rule) {
     error: 'UNKNOWN_PERMISSION',
     message: 'La ruta administrativa exige un permiso que no existe en el catálogo.',
     permission: rule.permission,
+    requiredPermissions: rule.requiredPermissions || [rule.permission],
     route: rule.path,
     method: rule.method,
   });
@@ -248,7 +250,8 @@ function adminAccessGate(req, res, next) {
 
   const rule = findAdminRoutePermission(
     req.method,
-    req.originalUrl || req.url
+    req.originalUrl || req.url,
+    req.query
   );
 
   if (!rule) {
@@ -262,7 +265,9 @@ function adminAccessGate(req, res, next) {
   attachAuditLogger(req, res, rule);
 
   return requireAdmin(req, res, () => {
-    return requirePermission(rule.permission)(req, res, next);
+    return requirePermission(
+      rule.requiredPermissions || [rule.permission]
+    )(req, res, next);
   });
 }
 

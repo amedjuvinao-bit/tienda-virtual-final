@@ -93,7 +93,47 @@ async function postInvoiceValidate({ credentials, tokenResult, payload }) {
   return { ok: response.ok, status: response.status, data };
 }
 
+function collectProviderErrorText(value, output = [], depth = 0) {
+  if (depth > 4 || value === undefined || value === null) return output;
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const message = cleanText(value, 500)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(
+        /\b(authorization|bearer|access[_ -]?token|client[_ -]?secret|password|technical[_ -]?key|software[_ -]?pin)\b\s*[:=]\s*[^\s,;]+/gi,
+        '$1: [dato protegido]'
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (message && !output.includes(message)) output.push(message);
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectProviderErrorText(item, output, depth + 1));
+    return output;
+  }
+
+  if (typeof value === 'object') {
+    Object.values(value).forEach((item) =>
+      collectProviderErrorText(item, output, depth + 1)
+    );
+  }
+
+  return output;
+}
+
 function providerMessage(result = {}) {
+  const validationMessages = [];
+  [result?.data?.errors, result?.data?.data?.errors].forEach((errors) =>
+    collectProviderErrorText(errors, validationMessages)
+  );
+
+  if (validationMessages.length) {
+    return cleanText(`Factus rechazó la factura: ${validationMessages.join(' ')}`, 1000);
+  }
+
   return (
     result?.data?.message ||
     result?.data?.error ||
@@ -126,6 +166,81 @@ function referenceCode(document = {}) {
       '',
     180
   );
+}
+
+function invoiceNumber(document = {}) {
+  return cleanText(document.number || document.invoice_number || '', 160);
+}
+
+function wasAlreadySentToDian(result = {}) {
+  const message = cleanText(result.error || result?.data?.message || '', 500)
+    .toLowerCase();
+  return message.includes('enviado a la dian');
+}
+
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function refreshPendingInvoiceUntilSettled({
+  credentials,
+  tokenResult,
+  pending,
+  attempts = 6,
+  delayMs = 5000,
+}) {
+  const number = invoiceNumber(pending);
+  const expectedReference = referenceCode(pending);
+
+  if (!number) {
+    return {
+      success: false,
+      code: 'FACTUS_PENDING_DIAN_NUMBER_MISSING',
+      error:
+        'Factus envió el documento a la DIAN, pero no devolvió el número necesario para actualizar su estado.',
+    };
+  }
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await fetchJsonWithTimeout(
+      `${credentials.apiUrl}/v2/bills/${encodeURIComponent(number)}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `${tokenResult.tokenType} ${tokenResult.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const listed = await listPendingInvoices({ credentials, tokenResult });
+    if (!listed.success) {
+      return {
+        success: false,
+        code: listed.code,
+        error: listed.error,
+      };
+    }
+
+    const stillPending = listed.documents.some(
+      (document) => referenceCode(document) === expectedReference
+    );
+    if (!stillPending) {
+      return { success: true, number, referenceCode: expectedReference };
+    }
+
+    if (attempt < attempts) await wait(delayMs);
+  }
+
+  return {
+    success: false,
+    code: 'FACTUS_PENDING_DIAN_PROCESSING',
+    number,
+    referenceCode: expectedReference,
+    error:
+      'Factus todavía está esperando la respuesta de la DIAN para el documento anterior. No se creó otra orden ni otro pago.',
+  };
 }
 
 function isPendingDocument(document = {}) {
@@ -182,6 +297,55 @@ async function listInvoicesByExactReference({ credentials, tokenResult, expected
     success: true,
     status: response.status,
     documents,
+    data,
+  };
+}
+
+async function listCreditNotesByExactReference({
+  credentials,
+  tokenResult,
+  expectedReference,
+}) {
+  const expected = cleanText(expectedReference, 180);
+  if (!expected) {
+    return {
+      success: false,
+      status: 400,
+      code: 'FACTUS_CREDIT_NOTE_REFERENCE_REQUIRED',
+      error: 'La conciliación requiere una referencia exacta de la nota crédito.',
+      documents: [],
+    };
+  }
+
+  const query = encodeURIComponent(expected);
+  const { response, data } = await fetchJsonWithTimeout(
+    `${credentials.apiUrl}/v2/credit-notes?filter[reference_code]=${query}&filter[per_page]=100`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `${tokenResult.tokenType} ${tokenResult.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return {
+      success: false,
+      status: response.status,
+      code: 'FACTUS_CREDIT_NOTE_RECONCILIATION_LOOKUP_FAILED',
+      error: data?.message || data?.error || `HTTP ${response.status}`,
+      documents: [],
+    };
+  }
+
+  return {
+    success: true,
+    status: response.status,
+    documents: extractList(data).filter(
+      (document) => referenceCode(document) === expected
+    ),
     data,
   };
 }
@@ -327,6 +491,43 @@ async function cleanupSinglePendingInvoiceInSandbox(data = {}) {
     });
 
     if (!deleted.success) {
+      if (wasAlreadySentToDian(deleted)) {
+        const settled = await refreshPendingInvoiceUntilSettled({
+          credentials,
+          tokenResult,
+          pending,
+          attempts: positiveInteger(data.settlementAttempts) || 6,
+          delayMs: Number.isFinite(Number(data.settlementDelayMs))
+            ? Math.max(0, Number(data.settlementDelayMs))
+            : 5000,
+        });
+
+        if (settled.success) {
+          return {
+            success: true,
+            provider: 'factus',
+            stage: 'pending_cleanup_dian_settled',
+            status: 200,
+            cleaned: false,
+            settled: true,
+            referenceCode: pendingReference,
+            invoiceNumber: settled.number,
+            message: 'Factus actualizó el documento que ya había enviado a la DIAN.',
+          };
+        }
+
+        return {
+          success: false,
+          provider: 'factus',
+          stage: 'pending_cleanup_dian_processing',
+          status: 409,
+          code: settled.code,
+          referenceCode: pendingReference,
+          invoiceNumber: settled.number || invoiceNumber(pending),
+          error: settled.error,
+        };
+      }
+
       return {
         success: false,
         provider: 'factus',
@@ -440,6 +641,71 @@ async function findInvoiceByReferenceFromFactus(data = {}) {
       status: Number(error?.status || 503),
       code: error?.code || 'FACTUS_RECONCILIATION_ERROR',
       error: error?.message || 'No fue posible conciliar la factura con Factus.',
+    };
+  }
+}
+
+async function findCreditNoteByReferenceFromFactus(data = {}) {
+  try {
+    const providerConfig = runtimeProviderConfig(data);
+    const credentials = validateProviderCredentials(providerConfig);
+    const tokenResult = await getFactusAccessToken(credentials);
+
+    if (!tokenResult.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'credit_note_reconciliation_auth',
+        ...tokenResult,
+      };
+    }
+
+    const listed = await listCreditNotesByExactReference({
+      credentials,
+      tokenResult,
+      expectedReference: data.referenceCode,
+    });
+
+    if (!listed.success) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'credit_note_reconciliation_lookup',
+        status: listed.status,
+        code: listed.code,
+        error: listed.error,
+      };
+    }
+
+    if (listed.documents.length > 1) {
+      return {
+        success: false,
+        provider: 'factus',
+        stage: 'credit_note_reconciliation_ambiguous',
+        status: 409,
+        code: 'FACTUS_CREDIT_NOTE_RECONCILIATION_AMBIGUOUS',
+        error:
+          'Factus devolvió más de una nota crédito con la misma referencia. Se requiere revisión manual.',
+      };
+    }
+
+    return {
+      success: true,
+      provider: 'factus',
+      stage: 'credit_note_reconciliation_lookup',
+      status: listed.status,
+      found: listed.documents.length === 1,
+      document: listed.documents[0] || null,
+      data: listed.data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      provider: 'factus',
+      stage: 'credit_note_reconciliation_exception',
+      status: Number(error?.status || 503),
+      code: error?.code || 'FACTUS_CREDIT_NOTE_RECONCILIATION_ERROR',
+      error: error?.message || 'No fue posible conciliar la nota crédito con Factus.',
     };
   }
 }
@@ -638,7 +904,9 @@ async function sendCreditNoteToFactus(creditNoteData = {}) {
 
 module.exports = {
   cleanupSinglePendingInvoiceInSandbox,
+  findCreditNoteByReferenceFromFactus,
   findInvoiceByReferenceFromFactus,
+  providerMessage,
   sendCreditNoteToFactus,
   sendInvoiceToFactus,
 };

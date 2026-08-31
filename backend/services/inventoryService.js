@@ -7,6 +7,7 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Product = require('../models/Product');
 const Branch = require('../models/Branch');
 const {
+  canonicalizeVariantKey,
   normalizeAttributes,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
@@ -64,12 +65,15 @@ function getVariantFromPayload(payload = {}, product = null) {
   const productInventory = Array.isArray(product?.inventory)
     ? product.inventory
     : [];
-  const requestedVariantKey = cleanLower(
+  const rawRequestedVariantKey = cleanLower(
     payload.variantKey ||
       payload.variantId ||
       payload.variant?.variantKey ||
       ''
   );
+  const requestedVariantKey = rawRequestedVariantKey
+    ? canonicalizeVariantKey(rawRequestedVariantKey) || rawRequestedVariantKey
+    : '';
   const productVariants = Array.isArray(product?.variants)
     ? product.variants
     : [];
@@ -77,7 +81,8 @@ function getVariantFromPayload(payload = {}, product = null) {
   const matchedProductVariant =
     (requestedVariantKey
       ? productVariants.find(
-          (item) => cleanLower(item?.variantKey) === requestedVariantKey
+          (item) =>
+            canonicalizeVariantKey(item?.variantKey) === requestedVariantKey
         )
       : null) ||
     productVariants.find((item) => {

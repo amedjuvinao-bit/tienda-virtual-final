@@ -3,6 +3,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
+const Order = require('../models/Order');
 
 const validateOrderPayload = require('../validators/orderPayload');
 const {
@@ -92,15 +96,43 @@ function baseOrderPayload() {
 }
 
 function validateNaturalPersonAndSameAddress() {
-  const result = validateOrderPayload(baseOrderPayload());
+  const payload = baseOrderPayload();
+  payload.customer.isFinalConsumer = false;
+  payload.billing.isFinalConsumer = false;
+  const result = validateOrderPayload(payload);
 
   assert(result.ok, `La persona natural válida fue rechazada: ${result.errors.join(' | ')}`);
+  assert(result.cleaned.customer.isFinalConsumer === false, 'La orden perdió la condición identificada del cliente.');
+  assert(result.cleaned.billing.isFinalConsumer === false, 'La orden perdió la condición fiscal de comprador identificado.');
   assert(result.cleaned.billing.documentType === 'CC', 'No se conservó el tipo de documento fiscal.');
   assert(result.cleaned.billing.documentNumber === '1234567890', 'No se conservó el documento fiscal.');
   assert(result.cleaned.billing.address === 'Calle 10 # 20-30', 'No se resolvió la dirección de envío como dirección fiscal.');
   assert(result.cleaned.billing.municipalityCode === '47001', 'No se conservó el código DIVIPOLA.');
 
   ok('Persona natural usa documento, correo y dirección fiscal resueltos');
+}
+
+function validateIdentifiedBuyerCannotBecomeFinalConsumer() {
+  const payload = baseOrderPayload();
+  payload.customer.isFinalConsumer = false;
+  payload.billing.isFinalConsumer = false;
+  const validated = validateOrderPayload(payload);
+  assert(validated.ok, validated.errors.join(' | '));
+
+  const customer = buildFactusCustomer({
+    source: 'web',
+    customer: validated.cleaned.customer,
+    billing: validated.cleaned.billing,
+  });
+
+  assert(customer.identification === '1234567890', 'Factus sustituyó el documento identificado.');
+  assert(customer.names === 'Ana Pérez', 'Factus sustituyó el nombre del comprador.');
+  assert(customer.email === 'ana@example.com', 'Factus eliminó el correo del comprador.');
+  assert(customer.address === 'Calle 10 # 20-30', 'Factus eliminó la dirección del comprador.');
+  assert(customer.municipality_code === '47001', 'Factus eliminó el municipio del comprador.');
+  assert(customer.identification !== '222222222222', 'El comprador identificado terminó como consumidor final.');
+
+  ok('Comprador identificado no puede degradarse a consumidor final');
 }
 
 function validateCompanyAndDifferentAddress() {
@@ -225,6 +257,43 @@ function validateFactusCompanyCustomer() {
   ok('Payload Factus V2 usa NIT, DV y razón social del comprador');
 }
 
+function validateFactusOfficialDocumentCatalog() {
+  const expectedCodes = {
+    RC: '11',
+    TI: '12',
+    CC: '13',
+    TE: '21',
+    CE: '22',
+    NIT: '31',
+    PP: '41',
+    DIE: '42',
+    PEP: '47',
+    PPT: '48',
+    NIT_EXTRANJERO: '50',
+    NUIP: '91',
+  };
+
+  Object.entries(expectedCodes).forEach(([documentType, expectedCode]) => {
+    const customer = buildFactusCustomer({
+      customer: { name: 'Cliente', lastname: 'Prueba' },
+      billing: {
+        personType: 'natural',
+        documentType,
+        documentNumber: '123456789',
+        municipalityCode: '47001',
+        countryCode: 'CO',
+      },
+    });
+
+    assert(
+      customer.identification_document_code === expectedCode,
+      `${documentType} no se tradujo al código Factus ${expectedCode}.`
+    );
+  });
+
+  ok('Catálogo oficial de identificación se traduce sin valores libres ni fallback incorrecto');
+}
+
 function validateInvoiceSnapshotUsesBillingFirst() {
   const snapshot = buildCustomerSnapshot({
     customer: {
@@ -254,15 +323,15 @@ function validateInvoiceSnapshotUsesBillingFirst() {
 }
 
 function validateCheckoutIntegration() {
-  const checkout = read('frontend/src/pages/CheckoutPage.jsx');
+  const checkout = readCheckoutComposition();
   const fields = read('frontend/src/checkout/dian/CheckoutDianCustomerFields.jsx');
-  const orderModel = read('backend/models/Order.js');
 
   [
     'CheckoutDianCustomerFields',
     'validateDianCustomer(resolvedDianCustomer)',
-    'personType: resolvedDianCustomer.personType',
-    'municipalityCode: resolvedDianCustomer.municipalityCode',
+    'const resolved = derived.resolvedDianCustomer',
+    'personType: resolved.personType',
+    'municipalityCode: resolved.municipalityCode',
   ].forEach((needle) => assert(checkout.includes(needle), `Checkout incompleto: falta ${needle}`));
 
   [
@@ -274,12 +343,18 @@ function validateCheckoutIntegration() {
   ].forEach((needle) => assert(fields.includes(needle), `Formulario fiscal incompleto: falta ${needle}`));
 
   [
-    'personType: String',
-    'documentNumber: String',
-    'businessName: String',
-    'municipalityCode: String',
-    'countryCode: String',
-  ].forEach((needle) => assert(orderModel.includes(needle), `Order no persiste ${needle}`));
+    'personType',
+    'documentNumber',
+    'businessName',
+    'municipalityCode',
+    'countryCode',
+  ].forEach((field) => {
+    const schemaPath = `billing.${field}`;
+    assert(
+      Order.schema.path(schemaPath)?.instance === 'String',
+      `Order no persiste ${schemaPath} como String`
+    );
+  });
 
   ok('Checkout muestra y persiste todos los datos fiscales profesionales');
 }
@@ -298,10 +373,12 @@ console.log('\nValidando datos fiscales reales y checkout de Facturación...');
 
 [
   validateNaturalPersonAndSameAddress,
+  validateIdentifiedBuyerCannotBecomeFinalConsumer,
   validateCompanyAndDifferentAddress,
   validateBackendRejectsIncompleteFiscalData,
   validateFactusNaturalCustomer,
   validateFactusCompanyCustomer,
+  validateFactusOfficialDocumentCatalog,
   validateInvoiceSnapshotUsesBillingFirst,
   validateCheckoutIntegration,
   validateScriptRegistration,

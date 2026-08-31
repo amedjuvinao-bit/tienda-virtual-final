@@ -77,6 +77,35 @@ export function getOrderSummary(order) {
   };
 }
 
+export function getOrderExchangeInfo(order) {
+  const payment = order?.payment || {};
+  const exchangeOrigin = order?.exchangeOrigin || {};
+  const tags = Array.isArray(order?.tags) ? order.tags : [];
+  const total = Number(order?.total || 0);
+  const sessionId = normalizeText(order?.sessionId);
+  const paymentMethod = normalizeText(payment.method);
+  const taggedAsExchange = tags.some((tag) => normalizeText(tag) === 'exchange');
+  const systemExchange =
+    normalizeText(order?.source) === 'system' &&
+    normalizeText(order?.saleType) === 'system_order' &&
+    taggedAsExchange;
+  const isExchange =
+    normalizeText(exchangeOrigin.type) === 'rma_exchange' ||
+    paymentMethod === 'exchange' ||
+    sessionId.startsWith('exchange:') ||
+    systemExchange;
+
+  return {
+    isExchange,
+    noCharge: isExchange && total <= 0,
+    returnNumber: cleanText(
+      exchangeOrigin.returnNumber || payment.reference,
+      ''
+    ),
+    originalOrderNumber: cleanText(exchangeOrigin.originalOrderNumber, ''),
+  };
+}
+
 export function getCustomerName(order) {
   const customer = order?.customer || {};
 
@@ -286,6 +315,7 @@ export function titleForEvent(event) {
     note_deleted: 'Nota eliminada',
     tags_updated: 'Etiquetas actualizadas',
     email_sent: 'Correo enviado',
+    whatsapp_opened: 'WhatsApp preparado',
     refund_created: 'Reembolso creado',
     order_retry_updated: 'Orden actualizada',
   };

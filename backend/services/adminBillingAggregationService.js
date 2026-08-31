@@ -229,15 +229,36 @@ function invoiceLookupStages(invoiceCollectionName) {
               },
             },
           },
+          { $sort: { createdAt: -1, _id: -1 } },
           { $limit: 1 },
-          { $project: { _id: 1 } },
+          {
+            $project: {
+              _id: 1,
+              status: 1,
+              errorMessage: 1,
+              providerErrors: 1,
+              emission: 1,
+              failedAt: 1,
+              updatedAt: 1,
+            },
+          },
         ],
         as: '_billingInvoiceMatch',
       },
     },
     {
+      $set: {
+        _billingInvoice: {
+          $arrayElemAt: ['$_billingInvoiceMatch', 0],
+        },
+      },
+    },
+    {
       $match: {
-        '_billingInvoiceMatch.0': { $exists: false },
+        $or: [
+          { '_billingInvoice._id': { $exists: false } },
+          { '_billingInvoice.status': { $in: ERROR_INVOICE_STATUSES } },
+        ],
       },
     },
   ];

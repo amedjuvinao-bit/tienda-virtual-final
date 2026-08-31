@@ -1,139 +1,184 @@
-// src/admin/orders/components/OrdersQuickViews.jsx
+import {
+  AlertTriangle,
+  BadgeCheck,
+  Boxes,
+  CircleDollarSign,
+  Clock3,
+  PackageCheck,
+  ScanLine,
+  Truck,
+} from 'lucide-react';
 
-const QUICK_VIEWS = [
-  {
-    key: 'all',
-    label: 'Todas',
-    description: 'Ver todas las órdenes',
-  },
-  {
-    key: 'today',
-    label: 'Hoy',
-    description: 'Órdenes creadas hoy',
-  },
-  {
-    key: 'last7',
-    label: 'Últimos 7 días',
-    description: 'Órdenes recientes',
-  },
-  {
-    key: 'paid',
-    label: 'Pagadas',
-    description: 'Órdenes pagadas',
-  },
-  {
-    key: 'pending',
-    label: 'Pendientes',
-    description: 'Órdenes pendientes',
-  },
-  {
-    key: 'notPrinted',
-    label: 'No impresas',
-    description: 'Órdenes sin marcar como impresas',
-  },
-  {
-    key: 'archived',
-    label: 'Archivadas',
-    description: 'Órdenes archivadas',
-  },
+const OPERATIONAL_VIEWS = [
+  { key: 'attention', label: 'Atención', countKey: 'attention', Icon: AlertTriangle, tone: 'critical' },
+  { key: 'awaiting_payment', label: 'Por pagar', countKey: 'awaitingPayment', Icon: CircleDollarSign, tone: 'neutral' },
+  { key: 'prepare', label: 'Preparar', countKey: 'prepare', Icon: Boxes, tone: 'active' },
+  { key: 'dispatch', label: 'Despachar', countKey: 'dispatch', Icon: PackageCheck, tone: 'active' },
+  { key: 'transit', label: 'En tránsito', countKey: 'transit', Icon: Truck, tone: 'neutral' },
+  { key: 'incidents', label: 'Incidencias', countKey: 'incidents', Icon: ScanLine, tone: 'critical' },
+  { key: 'sla_risk', label: 'Riesgo SLA', countKey: 'slaRisk', Icon: Clock3, tone: 'warning' },
+  { key: 'completed', label: 'Completadas', countKey: 'completed', Icon: BadgeCheck, tone: 'success' },
 ];
+
+const TONES = {
+  critical: { accent: '#be123c', soft: 'color-mix(in srgb, #fb7185 11%, var(--admin-card-bg))' },
+  warning: { accent: '#b45309', soft: 'color-mix(in srgb, #fbbf24 12%, var(--admin-card-bg))' },
+  active: { accent: 'var(--admin-primary)', soft: 'var(--admin-primary-soft-bg)' },
+  neutral: { accent: '#0369a1', soft: 'color-mix(in srgb, #38bdf8 9%, var(--admin-card-bg))' },
+  success: { accent: '#047857', soft: 'color-mix(in srgb, #34d399 9%, var(--admin-card-bg))' },
+};
 
 export default function OrdersQuickViews({
   quickView,
-  setQuickView,
   onApplyQuickView,
+  operationalSummary,
+  compact = false,
 }) {
-  const THEME = {
-    cardBg: 'var(--admin-card-bg)',
-    cardText: 'var(--admin-card-text)',
-    mutedText: 'var(--admin-card-muted-text)',
-    primary: 'var(--admin-primary)',
-    primaryText: 'var(--admin-primary-text)',
-    primarySoftBg: 'var(--admin-primary-soft-bg)',
-    primarySoftText: 'var(--admin-primary-soft-text)',
-    primarySoftBorder: 'var(--admin-primary-soft-border)',
-    cardBorder: 'var(--admin-card-border)',
-    inputBg: 'var(--admin-input-bg)',
-    inputText: 'var(--admin-input-text)',
-    inputBorder: 'var(--admin-input-border)',
+  const current = quickView || 'all';
+  const summary = operationalSummary || {};
+  const apply = (key) => {
+    if (typeof onApplyQuickView === 'function') onApplyQuickView(key);
   };
-
-  const currentQuickView = quickView || 'all';
-
-  const activeView =
-    QUICK_VIEWS.find((view) => view.key === currentQuickView) ||
-    QUICK_VIEWS[0];
-
-  const handleChange = (event) => {
-    const viewKey = event.target.value;
-
-    setQuickView(viewKey);
-
-    if (typeof onApplyQuickView === 'function') {
-      onApplyQuickView(viewKey);
-    }
-  };
+  const currentView = OPERATIONAL_VIEWS.find((view) => view.key === current);
+  const currentLabel = current === 'all' ? 'Todas las órdenes' : currentView?.label || 'Todas las órdenes';
+  const currentCount = current === 'all'
+    ? Number(summary.total || 0)
+    : Number(summary[currentView?.countKey] || 0);
 
   return (
-    <div
-      className="h-full rounded-[22px] border p-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]"
+    <section
+      aria-label="Centro de operaciones de órdenes"
+      className={`${compact ? '' : 'mb-4'} rounded-2xl border px-3 py-3 shadow-sm`}
       style={{
-        borderColor: THEME.cardBorder,
-        background: THEME.cardBg,
-        color: THEME.cardText,
+        borderColor: 'var(--admin-card-border)',
+        background: 'var(--admin-card-bg)',
+        color: 'var(--admin-card-text)',
       }}
     >
-      <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_260px] lg:items-center">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
         <div className="min-w-0">
-          <p
-            className="text-[11px] font-black uppercase tracking-[0.18em]"
-            style={{ color: THEME.primary }}
-          >
-            Vistas rápidas
-          </p>
-
-          <h3
-            className="mt-2 text-lg font-black leading-tight"
-            style={{ color: THEME.cardText }}
-          >
-            {activeView.label}
-          </h3>
-
-          <p
-            className="mt-1 text-sm leading-5"
-            style={{ color: THEME.mutedText }}
-          >
-            {activeView.description}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>
+              Flujo operativo
+            </span>
+            <span className="hidden text-[10px] sm:inline" style={{ color: 'var(--admin-card-muted-text)' }}>
+              · selecciona una cola para filtrar
+            </span>
+          </div>
+          <p className="mt-0.5 truncate text-xs font-bold md:hidden">
+            {currentLabel} · {currentCount}
           </p>
         </div>
-
-        <div>
-          <label
-            className="mb-2 block text-xs font-black"
-            style={{ color: THEME.cardText }}
+        {current !== 'all' ? (
+          <button
+            type="button"
+            onClick={() => apply('all')}
+            className="shrink-0 text-[10px] font-black underline-offset-4 hover:underline"
+            style={{ color: 'var(--admin-primary)' }}
           >
-            Seleccionar vista
-          </label>
-
-          <select
-            value={currentQuickView}
-            onChange={handleChange}
-            className="h-12 w-full rounded-2xl border px-4 text-sm font-black outline-none transition focus:ring-4"
-            style={{
-              borderColor: THEME.inputBorder || THEME.cardBorder,
-              background: THEME.inputBg || THEME.cardBg,
-              color: THEME.inputText || THEME.cardText,
-              '--tw-ring-color': 'var(--admin-primary-soft-bg)',
-            }}
-          >
-            {QUICK_VIEWS.map((view) => (
-              <option key={view.key} value={view.key}>
-                {view.label}
-              </option>
-            ))}
-          </select>
-        </div>
+            Ver todas
+          </button>
+        ) : null}
       </div>
-    </div>
+
+      <label className={compact ? 'hidden' : 'block md:hidden'}>
+        <span className="sr-only">Cola operativa</span>
+        <select
+          aria-label="Cola operativa"
+          value={current}
+          onChange={(event) => apply(event.target.value)}
+          className="h-11 w-full rounded-xl border px-3 text-xs font-bold"
+          style={{
+            borderColor: 'var(--admin-input-border)',
+            background: 'var(--admin-input-bg)',
+            color: 'var(--admin-input-text)',
+          }}
+        >
+          <option value="all">Todas las órdenes ({Number(summary.total || 0)})</option>
+          {OPERATIONAL_VIEWS.map((view) => (
+            <option key={view.key} value={view.key}>
+              {view.label} ({Number(summary[view.countKey] || 0)})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div
+        className={
+          compact
+            ? 'grid grid-cols-3 gap-1.5'
+            : 'hidden grid-cols-3 gap-1.5 md:grid lg:grid-cols-5 xl:grid-cols-9'
+        }
+      >
+        <QueueButton
+          active={current === 'all'}
+          count={Number(summary.total || 0)}
+          label="Todas"
+          onClick={() => apply('all')}
+        />
+        {OPERATIONAL_VIEWS.map((view) => (
+          <QueueButton
+            key={view.key}
+            active={current === view.key}
+            count={Number(summary[view.countKey] || 0)}
+            Icon={view.Icon}
+            label={view.label}
+            onClick={() => apply(view.key)}
+            tone={TONES[view.tone]}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QueueButton({ active, count, Icon, label, onClick, tone }) {
+  const resolvedTone = tone || {
+    accent: 'var(--admin-primary)',
+    soft: 'var(--admin-primary-soft-bg)',
+  };
+  const tooltipId = `orders-queue-${String(label)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')}-tooltip`;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${label} · ${count}`}
+      aria-describedby={tooltipId}
+      aria-pressed={active}
+      title={`${label} · ${count}`}
+      className="group relative flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl border px-2.5 text-left transition hover:border-[var(--admin-primary)]"
+      style={{
+        borderColor: active ? resolvedTone.accent : 'var(--admin-card-border)',
+        background: active ? resolvedTone.soft : 'var(--admin-input-bg)',
+        color: active ? resolvedTone.accent : 'var(--admin-card-text)',
+        boxShadow: active ? `inset 0 -2px 0 ${resolvedTone.accent}` : 'none',
+      }}
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
+        {Icon ? <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> : null}
+        <span className="truncate text-[10px] font-black">{label}</span>
+      </span>
+      <strong className="shrink-0 text-xs font-black tabular-nums">{count}</strong>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none absolute bottom-[calc(100%+7px)] left-1/2 z-[150] w-max max-w-[190px] -translate-x-1/2 rounded-lg border px-2.5 py-1.5 text-center text-[10px] font-black leading-tight opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--admin-primary) 32%, rgba(255,255,255,0.86))',
+          background: 'color-mix(in srgb, var(--admin-card-bg) 90%, transparent)',
+          color: 'var(--admin-card-text)',
+          backdropFilter: 'blur(16px) saturate(145%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(145%)',
+        }}
+      >
+        {label} · {count}
+      </span>
+    </button>
   );
 }

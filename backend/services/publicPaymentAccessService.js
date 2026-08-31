@@ -61,13 +61,16 @@ function safeEqual(left, right) {
 }
 
 function getPaymentAccessSecret(env = process.env) {
-  const secret = cleanText(
-    env.ORDER_PAYMENT_ACCESS_SECRET || env.JWT_SECRET,
-    1000
-  );
+  const production = cleanText(env.NODE_ENV, 40).toLowerCase() === 'production';
+  const dedicatedSecret = cleanText(env.ORDER_PAYMENT_ACCESS_SECRET, 1000);
+  const secret = production
+    ? dedicatedSecret
+    : dedicatedSecret || cleanText(env.JWT_SECRET, 1000);
   if (secret.length < 32) {
     const error = new Error(
-      'ORDER_PAYMENT_ACCESS_SECRET o JWT_SECRET debe tener al menos 32 caracteres.'
+      production
+        ? 'ORDER_PAYMENT_ACCESS_SECRET debe tener al menos 32 caracteres en producción.'
+        : 'ORDER_PAYMENT_ACCESS_SECRET o JWT_SECRET debe tener al menos 32 caracteres.'
     );
     error.code = 'PAYMENT_ACCESS_SECRET_MISCONFIGURED';
     throw error;
@@ -284,6 +287,7 @@ function extractWompiOrderNumber(reference) {
 
 function isWompiTransactionOwnedByOrder({
   order,
+  attempt,
   transaction,
   requestedTransactionId,
 } = {}) {
@@ -292,19 +296,40 @@ function isWompiTransactionOwnedByOrder({
   const storedTransactionId = cleanText(order?.payment?.transactionId, 120);
   const orderNumber = cleanText(order?.orderNumber, 80);
   const referenceOrderNumber = extractWompiOrderNumber(transaction?.reference);
-  const expectedAmountInCents = Math.round(Number(order?.total || 0) * 100);
+  const expectedPayableAmount =
+    order?.storeCredit?.applied === true &&
+    Number.isFinite(Number(order?.payment?.amount))
+    ? Number(order.payment.amount)
+    : Number(order?.total || 0);
+  const expectedAmountInCents = Math.round(expectedPayableAmount * 100);
   const transactionAmountInCents = Number(transaction?.amount_in_cents || 0);
   const expectedCurrency = cleanText(order?.payment?.currency || 'COP', 12).toUpperCase();
   const transactionCurrency = cleanText(transaction?.currency, 12).toUpperCase();
 
   if (
     !order ||
+    !attempt ||
     !isValidTransactionId(requestedId) ||
     !safeEqual(requestedId, transactionId) ||
     (storedTransactionId && !safeEqual(storedTransactionId, transactionId)) ||
     expectedAmountInCents <= 0 ||
-    transactionAmountInCents !== expectedAmountInCents ||
     !safeEqual(expectedCurrency, transactionCurrency)
+  ) {
+    return false;
+  }
+
+  const attemptOrderId = idValue(attempt.order);
+  const orderId = idValue(order?._id);
+  const attemptReference = cleanText(attempt.reference, 220);
+  const transactionReference = cleanText(transaction?.reference, 220);
+  const attemptCurrency = cleanText(attempt.currency, 12).toUpperCase();
+  const attemptTransactionId = cleanText(attempt.transactionId, 120);
+  if (
+    !safeEqual(attemptOrderId, orderId) ||
+    !safeEqual(attemptReference, transactionReference) ||
+    Number(attempt.amountInCents || 0) !== transactionAmountInCents ||
+    !safeEqual(attemptCurrency, transactionCurrency) ||
+    (attemptTransactionId && !safeEqual(attemptTransactionId, transactionId))
   ) {
     return false;
   }
@@ -377,6 +402,9 @@ function buildPublicThanksResponse({ order } = {}) {
     0
   );
   const customer = order?.customer || {};
+  const storeCreditActive =
+    order?.storeCredit?.applied === true &&
+    order?.storeCredit?.status !== 'released';
 
   return {
     ok: true,
@@ -395,6 +423,16 @@ function buildPublicThanksResponse({ order } = {}) {
     paymentProviderLabel: cleanText(order?.payment?.providerLabel, 80),
     paymentStatus: cleanText(order?.payment?.status, 40).toLowerCase(),
     currency: cleanText(order?.payment?.currency || 'COP', 12).toUpperCase(),
+    amountDue: Number(order?.payment?.amount ?? order?.total ?? 0),
+    storeCredit: {
+      applied: storeCreditActive,
+      amount: storeCreditActive ? Number(order?.storeCredit?.amount || 0) : 0,
+      currency: cleanText(
+        order?.storeCredit?.currency || order?.payment?.currency || 'COP',
+        12
+      ).toUpperCase(),
+      status: cleanText(order?.storeCredit?.status || 'none', 40).toLowerCase(),
+    },
     createdAt: order?.createdAt || null,
     updatedAt: order?.updatedAt || null,
   };

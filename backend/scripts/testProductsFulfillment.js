@@ -5,6 +5,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const {
+  readCheckoutComposition,
+} = require('./lib/readCheckoutComposition');
 
 const {
   normalizeDigitalDelivery,
@@ -18,7 +21,9 @@ const {
 const {
   buildDigitalAccessToken,
   buildDeterministicDeliveryId,
+  consumeDigitalDeliveryAccess,
   hashAccessToken,
+  processOrderFulfillmentAfterPayment,
   safeTokenMatch,
 } = require('../services/orderFulfillmentService');
 const {
@@ -177,32 +182,28 @@ function run() {
   assert(productForm.includes('bundleComponents'));
   ok('El formulario administra los datos operativos de los tres tipos');
 
-  const checkout = read('frontend/src/pages/CheckoutPage.jsx');
+  const checkout = readCheckoutComposition();
   assert(checkout.includes('cartRequiresShipping'));
   assert(checkout.includes('cartNeedsElectronicDelivery'));
   assert(checkout.includes("setDeliveryType('digital')"));
   assert(checkout.includes('Sin envío físico'));
   ok('El checkout omite dirección y costo cuando no hay entrega física');
 
-  const fulfillmentService = read(
-    'backend/services/orderFulfillmentService.js'
+  assert.strictEqual(
+    typeof processOrderFulfillmentAfterPayment,
+    'function'
   );
-  assert(
-    fulfillmentService.includes(
-      'processOrderFulfillmentAfterPayment'
-    )
+  assert.strictEqual(
+    typeof consumeDigitalDeliveryAccess,
+    'function'
   );
-  assert(
-    fulfillmentService.includes(
-      'consumeDigitalDeliveryAccess'
-    )
-  );
-  assert(fulfillmentService.includes('notificationStatus'));
   ok('El pago dispara entrega idempotente, correo y acceso controlado');
 
-  const reservationService = read(
-    'backend/services/inventoryReservationService.js'
-  );
+  const reservationService = [
+    'backend/services/inventoryReservationService.js',
+    'backend/services/inventoryReservation/catalog.js',
+    'backend/services/inventoryReservation/stockReservation.js',
+  ].map(read).join('\n');
   assert(reservationService.includes('expandReservableItems'));
   assert(reservationService.includes('bundleParentProduct'));
   ok('La reserva expande el combo hacia sus componentes reales');
@@ -221,21 +222,33 @@ function run() {
   ok('POS vende virtuales, descuenta el combo y activa su cumplimiento');
 
   const orderRoutes = read('backend/routes/orders.js');
-  const orderStatusService = read(
-    'backend/services/orderStatusTransitionService.js'
+  const orderCreationTransaction = read(
+    'backend/services/orderCreationTransactionService.js'
   );
+  const orderCreationComposition = `${orderRoutes}\n${orderCreationTransaction}`;
+  const orderMutationController = read(
+    'backend/controllers/orderAdminMutationController.js'
+  );
+  const orderFulfillmentController = read(
+    'backend/controllers/orderFulfillmentServiceController.js'
+  );
+  const orderStatusService = [
+    'backend/services/orderStatusTransitionService.js',
+    'backend/services/orderStatus/operationalEffects.js',
+    'backend/services/orderStatus/singleTransition.js',
+  ].map(read).join('\n');
   const permissionMap = read(
     'backend/security/adminRoutePermissionMap.js'
   );
-  assert(orderRoutes.includes('reservationRequired'));
-  assert(orderRoutes.includes('transitionOrderStatus'));
+  assert(orderCreationComposition.includes('reservationRequired'));
+  assert(orderMutationController.includes('transitionOrderStatus'));
   assert(orderStatusService.includes('confirmInventoryReservation'));
   assert(
     orderStatusService.includes(
       'processOrderFulfillmentAfterPayment'
     )
   );
-  assert(orderRoutes.includes('FULFILLMENT_EMAIL_REQUIRED'));
+  assert(orderCreationComposition.includes('FULFILLMENT_EMAIL_REQUIRED'));
   ok(
     'Las órdenes sin stock no reservan y el pago manual usa la transición segura'
   );
@@ -250,6 +263,9 @@ function run() {
       '/:id/fulfillment/services/:serviceId'
     )
   );
+  assert(orderRoutes.includes('updateOrderFulfillmentService'));
+  assert(orderFulfillmentController.includes('SERVICE_FULFILLMENT_STATUSES'));
+  assert(orderFulfillmentController.includes('requireWholeOrder: true'));
   assert(
     permissionMap.includes(
       '/api/orders/:id/fulfillment/services/:serviceId'

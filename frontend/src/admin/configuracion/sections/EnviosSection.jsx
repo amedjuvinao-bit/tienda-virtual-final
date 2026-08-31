@@ -1,9 +1,9 @@
 // src/admin/configuracion/sections/EnviosSection.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-import InfoCard from '../components/InfoCard';
-import EmptyHint from '../components/EmptyHint';
 import api from '../../../lib/api';
 import { fetchSiteSettings, saveSiteSettings } from '../../../lib/siteSettingsApi';
+import ShippingProvidersCard from './envios/ShippingProvidersCard';
+import './envios/ShippingCenter.css';
 
 function buildDefaultZone() {
   return {
@@ -94,6 +94,7 @@ function normalizeEnvios(raw) {
 export default function EnviosSection() {
   const [loading, setLoading] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [activeView, setActiveView] = useState('rates');
 
   const [form, setForm] = useState(() => normalizeEnvios({}));
 
@@ -167,8 +168,18 @@ export default function EnviosSection() {
       );
 
       if (selectedCountry?.code !== 'CO') {
-        setRegionsByZone((prev) => ({ ...prev, [zoneId]: [] }));
-        setCitiesByZone((prev) => ({ ...prev, [zoneId]: [] }));
+        setRegionsByZone((prev) => {
+          const current = prev[zoneId];
+          return Array.isArray(current) && current.length === 0
+            ? prev
+            : { ...prev, [zoneId]: [] };
+        });
+        setCitiesByZone((prev) => {
+          const current = prev[zoneId];
+          return Array.isArray(current) && current.length === 0
+            ? prev
+            : { ...prev, [zoneId]: [] };
+        });
         return;
       }
 
@@ -204,7 +215,12 @@ export default function EnviosSection() {
       );
 
       if (selectedCountry?.code !== 'CO' || !zone.department) {
-        setCitiesByZone((prev) => ({ ...prev, [zoneId]: [] }));
+        setCitiesByZone((prev) => {
+          const current = prev[zoneId];
+          return Array.isArray(current) && current.length === 0
+            ? prev
+            : { ...prev, [zoneId]: [] };
+        });
         return;
       }
 
@@ -425,408 +441,371 @@ export default function EnviosSection() {
     }
   };
 
+  const inputClass =
+    'shipping-field w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition';
+
   return (
-    <div className="grid gap-4">
-      <InfoCard
-        title="Configuración de envíos"
-        description="Define cómo el sistema calculará el valor del envío en checkout según ciudad, tarifa base y mínimo para envío gratis."
-      >
-        <div className="grid gap-5">
-          <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
-            <div>
-              <p className="font-semibold text-gray-800">Activar envíos</p>
-              <p className="text-sm text-gray-500">
-                Si lo desactivas, el checkout no cobrará envío.
+    <div className="shipping-center grid gap-4">
+      <section className="shipping-glass-hero overflow-hidden rounded-[28px] border">
+        <div className="px-5 py-5 md:px-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-2xl">
+              <p className="shipping-accent text-xs font-bold uppercase tracking-[0.18em]">
+                Centro de envíos
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Configura el envío sin mezclar procesos
+              </h2>
+              <p className="shipping-muted mt-1 text-sm leading-6">
+                Primero decide cuánto pagará el cliente. Después elige cómo se entregará el paquete.
               </p>
             </div>
 
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={() => handleChange('active', !form.active)}
-              className="h-5 w-5 accent-pink-500"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">
-                Modo de cálculo
-              </span>
-
-              <select
-                value={form.mode}
-                onChange={(e) => handleChange('mode', e.target.value)}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
+            <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[560px]">
+              <button
+                type="button"
+                onClick={() => setActiveView('rates')}
+                data-active={activeView === 'rates'}
+                className="shipping-nav-option group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition"
               >
-                <option value="fixed">Tarifa general fija</option>
-                <option value="zones">Tarifa por ciudad / zona</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">
-                Tiempo general estimado
-              </span>
-
-              <input
-                value={form.estimatedTime}
-                onChange={(e) => handleChange('estimatedTime', e.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                placeholder="Ej: 2 a 5 días hábiles"
-              />
-            </label>
-          </div>
-
-          {form.mode === 'fixed' && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-700">
-                  Tarifa fija general
+                <span className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">
+                  01
                 </span>
-
-                <input
-                  type="number"
-                  value={form.fixedPrice}
-                  onChange={(e) => handleChange('fixedPrice', e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                  placeholder="Ej: 12000"
-                />
-              </label>
-            </div>
-          )}
-
-          {form.mode === 'zones' && (
-            <div className="grid gap-4">
-              <div className="rounded-2xl border border-gray-200 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      Tarifas por ciudad / zona
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Aquí defines cuánto cuesta enviar a cada ciudad. En checkout el cliente solo escoge su ciudad y el sistema calcula el valor.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddZone}
-                    className="rounded-xl bg-pink-500 px-4 py-2 text-sm font-medium text-white hover:bg-pink-600"
-                  >
-                    + Agregar ciudad
-                  </button>
-                </div>
-
-                <div className="mt-4 grid gap-4">
-                  {form.zones.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
-                      Todavía no has agregado ciudades. Crea al menos una tarifa específica para que checkout pueda reconocerla.
-                    </div>
-                  ) : (
-                    form.zones.map((zone, index) => {
-                      const selectedCountry = countries.find(
-                        (c) =>
-                          c.name?.toLowerCase() ===
-                          String(zone.country || '').toLowerCase()
-                      );
-
-                      const isColombia = selectedCountry?.code === 'CO';
-                      const zoneRegions = Array.isArray(regionsByZone[zone.id])
-                        ? regionsByZone[zone.id]
-                        : [];
-                      const zoneCities = Array.isArray(citiesByZone[zone.id])
-                        ? citiesByZone[zone.id]
-                        : [];
-
-                      return (
-                        <div
-                          key={zone.id}
-                          className="rounded-xl border border-gray-200 p-4"
-                        >
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-gray-800">
-                              Ciudad / zona #{index + 1}
-                            </p>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveZone(zone.id)}
-                              className="text-sm font-medium text-red-500 hover:text-red-600"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <label className="block">
-                              <span className="mb-1 block text-sm font-medium text-gray-700">
-                                País
-                              </span>
-
-                              <select
-                                value={zone.country}
-                                onChange={(e) =>
-                                  handleZoneChange(zone.id, 'country', e.target.value)
-                                }
-                                disabled={countriesLoading}
-                                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                              >
-                                <option value="">
-                                  {countriesLoading
-                                    ? 'Cargando países...'
-                                    : 'Selecciona país'}
-                                </option>
-                                {countries.map((country) => (
-                                  <option key={country.code} value={country.name}>
-                                    {country.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            {isColombia ? (
-                              <label className="block">
-                                <span className="mb-1 block text-sm font-medium text-gray-700">
-                                  Departamento / región
-                                </span>
-
-                                <select
-                                  value={zone.department}
-                                  onChange={(e) =>
-                                    handleZoneChange(
-                                      zone.id,
-                                      'department',
-                                      e.target.value
-                                    )
-                                  }
-                                  disabled={regionsLoadingByZone[zone.id]}
-                                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                >
-                                  <option value="">
-                                    {regionsLoadingByZone[zone.id]
-                                      ? 'Cargando departamentos...'
-                                      : 'Selecciona departamento'}
-                                  </option>
-                                  {zoneRegions.map((region) => (
-                                    <option key={region.code} value={region.code}>
-                                      {region.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            ) : (
-                              <label className="block">
-                                <span className="mb-1 block text-sm font-medium text-gray-700">
-                                  Departamento / región
-                                </span>
-
-                                <input
-                                  value={zone.department}
-                                  onChange={(e) =>
-                                    handleZoneChange(
-                                      zone.id,
-                                      'department',
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                  placeholder="Ej: Magdalena"
-                                />
-                              </label>
-                            )}
-
-                            {isColombia ? (
-                              <label className="block">
-                                <span className="mb-1 block text-sm font-medium text-gray-700">
-                                  Ciudad
-                                </span>
-
-                                <select
-                                  value={zone.city}
-                                  onChange={(e) =>
-                                    handleZoneChange(zone.id, 'city', e.target.value)
-                                  }
-                                  disabled={!zone.department || citiesLoadingByZone[zone.id]}
-                                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                >
-                                  <option value="">
-                                    {!zone.department
-                                      ? 'Selecciona un departamento primero'
-                                      : citiesLoadingByZone[zone.id]
-                                        ? 'Cargando ciudades...'
-                                        : 'Selecciona ciudad'}
-                                  </option>
-                                  {zoneCities.map((city) => (
-                                    <option key={city.name} value={city.name}>
-                                      {city.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            ) : (
-                              <label className="block">
-                                <span className="mb-1 block text-sm font-medium text-gray-700">
-                                  Ciudad
-                                </span>
-
-                                <input
-                                  value={zone.city}
-                                  onChange={(e) =>
-                                    handleZoneChange(zone.id, 'city', e.target.value)
-                                  }
-                                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                  placeholder="Ej: Santa Marta"
-                                />
-                              </label>
-                            )}
-
-                            <label className="block">
-                              <span className="mb-1 block text-sm font-medium text-gray-700">
-                                Tarifa de envío
-                              </span>
-
-                              <input
-                                type="number"
-                                value={zone.price}
-                                onChange={(e) =>
-                                  handleZoneChange(zone.id, 'price', e.target.value)
-                                }
-                                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                placeholder="Ej: 12000"
-                              />
-                            </label>
-
-                            <label className="block md:col-span-2">
-                              <span className="mb-1 block text-sm font-medium text-gray-700">
-                                Tiempo estimado para esta ciudad
-                              </span>
-
-                              <input
-                                value={zone.eta}
-                                onChange={(e) =>
-                                  handleZoneChange(zone.id, 'eta', e.target.value)
-                                }
-                                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                                placeholder="Ej: 1 a 2 días hábiles"
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">
-                    Tarifa de respaldo
+                <span>
+                  <span className="block text-sm font-bold">Cobro en checkout</span>
+                  <span className="shipping-muted block text-xs">
+                    Tarifas, ciudades y envío gratis
                   </span>
+                </span>
+              </button>
 
-                  <input
-                    type="number"
-                    value={form.fallback.price}
-                    onChange={(e) =>
-                      handleNestedChange('fallback', 'price', e.target.value)
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    placeholder="Ej: 20000"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">
-                    Tiempo de respaldo
+              <button
+                type="button"
+                onClick={() => setActiveView('carrier')}
+                data-active={activeView === 'carrier'}
+                className="shipping-nav-option group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition"
+              >
+                <span className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">
+                  02
+                </span>
+                <span>
+                  <span className="block text-sm font-bold">Entrega del paquete</span>
+                  <span className="shipping-muted block text-xs">
+                    Manual o automática con Envia
                   </span>
-
-                  <input
-                    value={form.fallback.eta}
-                    onChange={(e) =>
-                      handleNestedChange('fallback', 'eta', e.target.value)
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    placeholder="Ej: 3 a 6 días hábiles"
-                  />
-                </label>
-              </div>
+                </span>
+              </button>
             </div>
-          )}
+          </div>
+        </div>
+      </section>
 
-          <div className="rounded-2xl border border-gray-200 p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold text-gray-800">
-                  Regla de envío gratis
-                </p>
-                <p className="text-sm text-gray-500">
-                  Si el pedido alcanza el mínimo configurado, el sistema ignora la tarifa fija o de ciudad y deja el envío en $0.
-                </p>
-              </div>
-
+      {activeView === 'rates' ? (
+        <section className="shipping-surface rounded-[28px] border p-4 shadow-sm md:p-5">
+          <div className="mb-5 flex flex-col gap-3 border-b border-gray-100 pb-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-xl font-black">¿Cuánto cobrará la tienda?</h3>
+              <p className="shipping-muted mt-1 text-sm">
+                Estas reglas solo calculan el valor que verá el cliente en el checkout.
+              </p>
+            </div>
+            <label className="shipping-page-surface flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3">
+              <span>
+                <span className="block text-sm font-bold text-gray-900">Cobrar envío</span>
+                <span className="block text-xs text-gray-500">Desactívalo solo si todos los envíos serán gratis</span>
+              </span>
               <input
                 type="checkbox"
-                checked={form.freeShipping.enabled}
-                onChange={() =>
-                  handleNestedChange(
-                    'freeShipping',
-                    'enabled',
-                    !form.freeShipping.enabled
-                  )
-                }
-                className="h-5 w-5 accent-pink-500"
+                checked={form.active}
+                onChange={() => handleChange('active', !form.active)}
+                className="h-5 w-5"
               />
-            </div>
+            </label>
+          </div>
 
-            {form.freeShipping.enabled && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">
-                    Compra mínima para envío gratis
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0">
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => handleChange('mode', 'fixed')}
+                  data-active={form.mode === 'fixed'}
+                  className="shipping-choice rounded-2xl border p-4 text-left transition"
+                >
+                  <span className="text-sm font-black">Una sola tarifa</span>
+                  <span className="mt-1 block text-xs leading-5 text-gray-500">
+                    El mismo precio para todas las ciudades.
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChange('mode', 'zones')}
+                  data-active={form.mode === 'zones'}
+                  className="shipping-choice rounded-2xl border p-4 text-left transition"
+                >
+                  <span className="text-sm font-black">Precio por ciudad</span>
+                  <span className="mt-1 block text-xs leading-5 text-gray-500">
+                    Define valores distintos según el destino.
+                  </span>
+                </button>
+              </div>
 
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-bold text-gray-700">
+                    Tiempo general estimado
+                  </span>
                   <input
-                    type="number"
-                    value={form.freeShipping.minimum}
-                    onChange={(e) =>
-                      handleNestedChange(
-                        'freeShipping',
-                        'minimum',
-                        e.target.value
-                      )
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    placeholder="Ej: 150000"
+                    value={form.estimatedTime}
+                    onChange={(e) => handleChange('estimatedTime', e.target.value)}
+                    className={inputClass}
+                    placeholder="Ej: 2 a 5 días hábiles"
                   />
                 </label>
+
+                {form.mode === 'fixed' && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-bold text-gray-700">
+                      Tarifa fija general
+                    </span>
+                    <input
+                      type="number"
+                      value={form.fixedPrice}
+                      onChange={(e) => handleChange('fixedPrice', e.target.value)}
+                      className={inputClass}
+                      placeholder="Ej: 12000"
+                    />
+                  </label>
+                )}
               </div>
-            )}
+
+              {form.mode === 'zones' && (
+                <div className="shipping-page-surface mt-5 overflow-hidden rounded-2xl border">
+                  <div className="shipping-surface flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black">Ciudades con precio especial</p>
+                      <p className="text-xs text-gray-500">
+                        {form.zones.length} {form.zones.length === 1 ? 'regla creada' : 'reglas creadas'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddZone}
+                      className="shipping-primary-action rounded-xl border px-4 py-2 text-sm font-bold transition"
+                    >
+                      + Agregar ciudad
+                    </button>
+                  </div>
+
+                  <div className="max-h-[520px] overflow-y-auto p-3">
+                    {form.zones.length === 0 ? (
+                      <div className="shipping-surface rounded-xl border border-dashed p-6 text-center">
+                        <p className="text-sm font-bold text-gray-800">Aún no hay ciudades</p>
+                        <p className="mt-1 text-xs text-gray-500">Agrega la primera y define su precio.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {form.zones.map((zone, index) => {
+                          const selectedCountry = countries.find(
+                            (country) =>
+                              country.name?.toLowerCase() ===
+                              String(zone.country || '').toLowerCase()
+                          );
+                          const isColombia = selectedCountry?.code === 'CO';
+                          const zoneRegions = Array.isArray(regionsByZone[zone.id])
+                            ? regionsByZone[zone.id]
+                            : [];
+                          const zoneCities = Array.isArray(citiesByZone[zone.id])
+                            ? citiesByZone[zone.id]
+                            : [];
+
+                          return (
+                            <article key={zone.id} className="shipping-surface rounded-2xl border p-4 shadow-sm">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-black text-gray-900">Destino {index + 1}</p>
+                                  <p className="text-xs text-gray-500">{zone.city || zone.department || 'Ubicación sin completar'}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveZone(zone.id)}
+                                  className="shipping-danger-text rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+
+                              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-bold text-gray-600">País</span>
+                                  <select
+                                    value={zone.country}
+                                    onChange={(e) => handleZoneChange(zone.id, 'country', e.target.value)}
+                                    disabled={countriesLoading}
+                                    className={inputClass}
+                                  >
+                                    <option value="">{countriesLoading ? 'Cargando...' : 'Selecciona país'}</option>
+                                    {countries.map((country) => (
+                                      <option key={country.code} value={country.name}>{country.name}</option>
+                                    ))}
+                                  </select>
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-bold text-gray-600">Departamento / región</span>
+                                  {isColombia ? (
+                                    <select
+                                      value={zone.department}
+                                      onChange={(e) => handleZoneChange(zone.id, 'department', e.target.value)}
+                                      disabled={regionsLoadingByZone[zone.id]}
+                                      className={inputClass}
+                                    >
+                                      <option value="">{regionsLoadingByZone[zone.id] ? 'Cargando...' : 'Selecciona departamento'}</option>
+                                      {zoneRegions.map((region) => (
+                                        <option key={region.code} value={region.code}>{region.name}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      value={zone.department}
+                                      onChange={(e) => handleZoneChange(zone.id, 'department', e.target.value)}
+                                      className={inputClass}
+                                      placeholder="Ej: Magdalena"
+                                    />
+                                  )}
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-bold text-gray-600">Ciudad</span>
+                                  {isColombia ? (
+                                    <select
+                                      value={zone.city}
+                                      onChange={(e) => handleZoneChange(zone.id, 'city', e.target.value)}
+                                      disabled={!zone.department || citiesLoadingByZone[zone.id]}
+                                      className={inputClass}
+                                    >
+                                      <option value="">{!zone.department ? 'Primero el departamento' : citiesLoadingByZone[zone.id] ? 'Cargando...' : 'Selecciona ciudad'}</option>
+                                      {zoneCities.map((city) => (
+                                        <option key={city.name} value={city.name}>{city.name}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      value={zone.city}
+                                      onChange={(e) => handleZoneChange(zone.id, 'city', e.target.value)}
+                                      className={inputClass}
+                                      placeholder="Ej: Santa Marta"
+                                    />
+                                  )}
+                                </label>
+
+                                <label className="block">
+                                  <span className="mb-1 block text-xs font-bold text-gray-600">Tarifa</span>
+                                  <input
+                                    type="number"
+                                    value={zone.price}
+                                    onChange={(e) => handleZoneChange(zone.id, 'price', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Ej: 12000"
+                                  />
+                                </label>
+
+                                <label className="block md:col-span-1 xl:col-span-2">
+                                  <span className="mb-1 block text-xs font-bold text-gray-600">Tiempo de entrega</span>
+                                  <input
+                                    value={zone.eta}
+                                    onChange={(e) => handleZoneChange(zone.id, 'eta', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Ej: 1 a 2 días hábiles"
+                                  />
+                                </label>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <aside className="grid content-start gap-3 xl:sticky xl:top-4">
+              <div className="shipping-preview rounded-2xl p-4">
+                <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">Así funcionará</p>
+                <p className="mt-2 text-sm font-semibold leading-6">
+                  {loadingConfig ? 'Cargando configuración...' : previewRules}
+                </p>
+              </div>
+
+              {form.mode === 'zones' && (
+                <div className="rounded-2xl border border-gray-200 p-4">
+                  <p className="text-sm font-black text-gray-900">Si una ciudad no está en la lista</p>
+                  <div className="mt-3 grid gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-bold text-gray-600">Tarifa de respaldo</span>
+                      <input
+                        type="number"
+                        value={form.fallback.price}
+                        onChange={(e) => handleNestedChange('fallback', 'price', e.target.value)}
+                        className={inputClass}
+                        placeholder="Ej: 20000"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-bold text-gray-600">Tiempo de respaldo</span>
+                      <input
+                        value={form.fallback.eta}
+                        onChange={(e) => handleNestedChange('fallback', 'eta', e.target.value)}
+                        className={inputClass}
+                        placeholder="Ej: 3 a 6 días hábiles"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="shipping-surface rounded-2xl border p-4">
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                  <span>
+                    <span className="block text-sm font-black text-gray-900">Envío gratis</span>
+                    <span className="mt-1 block text-xs leading-5 text-gray-500">Se aplicará al superar un valor mínimo.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={form.freeShipping.enabled}
+                    onChange={() => handleNestedChange('freeShipping', 'enabled', !form.freeShipping.enabled)}
+                    className="mt-0.5 h-5 w-5"
+                  />
+                </label>
+                {form.freeShipping.enabled && (
+                  <label className="mt-3 block">
+                    <span className="mb-1 block text-xs font-bold text-gray-600">Compra mínima</span>
+                    <input
+                      type="number"
+                      value={form.freeShipping.minimum}
+                      onChange={(e) => handleNestedChange('freeShipping', 'minimum', e.target.value)}
+                      className={inputClass}
+                      placeholder="Ej: 150000"
+                    />
+                  </label>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading}
+                className="shipping-primary-action w-full rounded-2xl border px-5 py-3 text-sm font-black transition disabled:opacity-60"
+              >
+                {loading ? 'Guardando...' : 'Guardar tarifas'}
+              </button>
+            </aside>
           </div>
-
-          <div className="rounded-xl border border-dashed border-pink-200 bg-pink-50/60 p-4">
-            <p className="text-sm font-semibold text-pink-700">
-              Vista lógica del sistema
-            </p>
-            <p className="mt-1 text-sm leading-6 text-gray-700">
-              {loadingConfig ? 'Cargando configuración...' : previewRules}
-            </p>
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="w-fit rounded-xl bg-pink-500 px-4 py-2 text-white hover:bg-pink-600 disabled:opacity-60"
-          >
-            {loading ? 'Guardando...' : 'Guardar configuración'}
-          </button>
-        </div>
-      </InfoCard>
-
-      <EmptyHint
-        title="Cómo funcionará en checkout"
-        text="El cliente solo escogerá país, departamento y ciudad. El sistema buscará la tarifa de esa ciudad; si el pedido supera el mínimo gratis, el envío será $0. Si la ciudad no existe en la tabla, usará la tarifa de respaldo."
-      />
+        </section>
+      ) : (
+        <ShippingProvidersCard />
+      )}
     </div>
   );
 }

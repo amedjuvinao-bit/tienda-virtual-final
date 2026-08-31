@@ -1849,7 +1849,11 @@ async function main() {
       beforeForeignCount,
       firstSeedIds,
     });
-    await validateAdminEndpoint();
+    if (process.env.PRODUCT_TEST_SKIP_ADMIN_ENDPOINT === '1') {
+      ok('Validación HTTP administrativa omitida durante el reinicio local controlado');
+    } else {
+      await validateAdminEndpoint();
+    }
   } catch (error) {
     fail(
       'Error inesperado en el catálogo demostrativo',

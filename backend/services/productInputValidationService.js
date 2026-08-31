@@ -8,6 +8,9 @@ const {
   normalizeProductType,
   shouldTrackInventory,
 } = require('../lib/products/productUniversalConfig');
+const {
+  validateProductCustoms,
+} = require('../lib/products/productCustomsConfig');
 
 const MAX_VARIANTS = 300;
 
@@ -486,6 +489,12 @@ async function validateAndNormalizeProductInput(
         errors,
       });
     }
+  }
+
+  if (hasOwn(payload, 'customs')) {
+    const validatedCustoms = validateProductCustoms(payload.customs);
+    payload.customs = validatedCustoms.customs;
+    errors.push(...validatedCustoms.errors);
   }
 
   if (hasOwn(payload, 'sku')) {

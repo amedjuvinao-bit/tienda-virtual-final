@@ -324,12 +324,14 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
         'orders:create',
         'orders:update',
         'orders:status',
+        'orders:fulfillment',
         'orders:mark_printed',
         'orders:archive',
         'orders:tags',
         'orders:customer_data',
         'orders:notes',
         'orders:email',
+        'orders:returns',
         'orders:export',
 
         'pos:view',
@@ -444,8 +446,10 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
 
         'orders:view',
         'orders:status',
+        'orders:fulfillment',
         'orders:mark_printed',
         'orders:notes',
+        'orders:returns',
 
         'products:view',
 
@@ -471,6 +475,7 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
         'dashboard:view',
 
         'orders:view',
+        'orders:confirm_manual_payment',
         'orders:customer_data',
         'orders:email',
         'orders:refund',
