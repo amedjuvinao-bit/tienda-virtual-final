@@ -180,6 +180,11 @@ assert.strictEqual(nextBusinessDate(2, new Date('2026-08-28T12:00:00Z')), '2026-
 assert.throws(() => choosePickupRate([]), /no devolvió una tarifa RMA/i);
 
 const allSource = sourceFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+assert(
+  allSource.includes('verifyCustomerContractWithoutRemoteFactus') &&
+    allSource.includes("cleanup.code === 'FACTUS_PENDING_DIAN_PROCESSING'"),
+  'La validación del cliente depende obligatoriamente del Sandbox externo de Factus.'
+);
 for (const token of [
   'findPurchasableInventoryItem',
   'issueCartAccess',
