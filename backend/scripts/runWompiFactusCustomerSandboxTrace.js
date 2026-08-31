@@ -100,11 +100,20 @@ async function run() {
       providerConfig: factus,
       confirm: true,
     });
-    assert(
-      cleanup.success === true,
-      cleanup.error ||
-        'No fue posible retirar de forma segura la factura pendiente de Factus Sandbox.'
-    );
+    if (cleanup.success !== true) {
+      const failure = new Error(
+        cleanup.error ||
+          'No fue posible retirar de forma segura la factura pendiente de Factus Sandbox.'
+      );
+      failure.code = cleanup.code || 'FACTUS_PENDING_CLEANUP_FAILED';
+      failure.details = {
+        stage: cleanup.stage,
+        status: cleanup.status,
+        pendingReferences: cleanup.pendingReferences || [],
+        referenceCode: cleanup.referenceCode || '',
+      };
+      throw failure;
+    }
     console.log(
       cleanup.cleaned
         ? `OK PREVIO: pendiente no validada ${cleanup.referenceCode} retirada de Factus Sandbox`
@@ -156,9 +165,11 @@ async function run() {
 
 run()
   .catch((error) => {
+    const code = error?.code || 'ERROR';
+    const message = error?.message || String(error);
     console.error(
       '\nFALLO PRUEBA WOMPI + FACTUS:',
-      error?.code || error?.message || error
+      message && message !== code ? `${code} — ${message}` : code
     );
     if (error?.details) console.error('Detalles:', error.details);
     console.error('La evidencia alcanzada queda conservada para revisión.');
