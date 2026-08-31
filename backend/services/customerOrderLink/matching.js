@@ -4,11 +4,8 @@ const mongoose = require('mongoose');
 
 const Customer = require('../../models/Customer');
 const {
-  cleanLower,
-  cleanUpper,
-  normalizePhone,
-  onlyDigits,
-} = require('./normalization');
+  buildCustomerIdentity,
+} = require('../../lib/customers/customerIdentity');
 
 function withSession(query, session) {
   return session && typeof query?.session === 'function'
@@ -26,9 +23,10 @@ async function findCustomerMatch(
       ? { _id: { $ne: new mongoose.Types.ObjectId(String(excludeId)) } }
       : {}),
   };
-  const document = onlyDigits(payload.normalizedDocument || payload.documentNumber);
-  const email = cleanLower(payload.normalizedEmail || payload.email, 180);
-  const phone = normalizePhone(payload.normalizedPhone || payload.phone);
+  const identity = buildCustomerIdentity(payload);
+  const document = identity.normalizedDocument;
+  const email = identity.normalizedEmail;
+  const phone = identity.normalizedPhone;
   const candidates = [
     document
       ? {
@@ -37,7 +35,7 @@ async function findCustomerMatch(
             ...base,
             normalizedDocument: document,
             ...(payload.documentType
-              ? { documentType: cleanUpper(payload.documentType, 40) }
+              ? { documentType: identity.documentType }
               : {}),
           },
         }
@@ -96,6 +94,37 @@ function fillMissingCustomerFields(customer, payload = {}) {
   if (payload.acceptsMarketing === true && customer.acceptsMarketing !== true) {
     customer.acceptsMarketing = true;
     changed = true;
+  }
+
+  const fiscalFields = [
+    'personType',
+    'businessName',
+    'verificationDigit',
+    'municipalityCode',
+    'departmentCode',
+    'countryCode',
+    'tributeCode',
+    'taxRegime',
+  ];
+  const currentFiscal = customer.fiscalProfile || {};
+  const incomingFiscal = payload.fiscalProfile || {};
+  for (const field of fiscalFields) {
+    if (!currentFiscal[field] && incomingFiscal[field]) {
+      currentFiscal[field] = incomingFiscal[field];
+      changed = true;
+    }
+  }
+  customer.fiscalProfile = currentFiscal;
+
+  if (payload.defaultBranch) {
+    const existingBranchIds = Array.isArray(customer.branchIds)
+      ? customer.branchIds.map(String)
+      : [];
+    const branchId = String(payload.defaultBranch);
+    if (!existingBranchIds.includes(branchId)) {
+      customer.branchIds = [...(customer.branchIds || []), payload.defaultBranch];
+      changed = true;
+    }
   }
 
   return changed;

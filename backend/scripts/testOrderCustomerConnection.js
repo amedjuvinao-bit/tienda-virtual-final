@@ -303,7 +303,7 @@ async function main() {
   await changingCustomer.validate();
   ok(
     'editar una identidad recalcula teléfono, correo y documento normalizados',
-    changingCustomer.normalizedPhone === '3001112233' &&
+    changingCustomer.normalizedPhone === '+573001112233' &&
       changingCustomer.normalizedEmail === 'nuevo@example.com' &&
       changingCustomer.normalizedDocument === '1234567'
   );

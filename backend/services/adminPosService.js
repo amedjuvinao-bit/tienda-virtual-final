@@ -28,6 +28,10 @@ const {
 const {
   normalizeProductCustoms,
 } = require('../lib/products/productCustomsConfig');
+const {
+  isActiveMongoTransaction,
+  isMongoDuplicateKeyError,
+} = require('../lib/customers/customerIdentity');
 
 const POS_PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other'];
 const DEFAULT_CURRENCY = 'COP';
@@ -488,7 +492,10 @@ function normalizePosPayload(payload = {}) {
   };
 }
 
-async function loadExistingCustomer(customerId, { session = null } = {}) {
+async function loadExistingCustomer(
+  customerId,
+  { session = null, branchId = null } = {}
+) {
   if (!customerId) return null;
 
   if (!isValidObjectId(customerId)) {
@@ -500,11 +507,22 @@ async function loadExistingCustomer(customerId, { session = null } = {}) {
     );
   }
 
+  const branchObjectId = branchId
+    ? toObjectId(branchId, 'branchId')
+    : null;
   const customer = await Customer.findOne({
     _id: toObjectId(customerId, 'customerId'),
     deletedAt: null,
     active: true,
     status: 'active',
+    ...(branchObjectId
+      ? {
+          $or: [
+            { branchIds: branchObjectId },
+            { defaultBranch: branchObjectId },
+          ],
+        }
+      : {}),
   }).session(session);
 
   if (!customer) {
@@ -549,13 +567,21 @@ function buildQuickCustomerPayload(payload = {}, branch, admin = {}) {
     acceptsMarketing: customer.acceptsMarketing === true || customer.wantsNewsletter === true,
     notes: cleanText(customer.notes || 'Cliente creado desde POS.', 1200),
     defaultBranch: branch?._id || null,
+    branchIds: branch?._id ? [branch._id] : [],
     createdByAdmin: getObjectIdValue(admin._id || admin.id || admin.adminUserId || admin.userId) || null,
   };
 }
 
-async function resolvePosCustomerForPreview(payload = {}, normalizedPayload = {}, { session = null } = {}) {
+async function resolvePosCustomerForPreview(
+  payload = {},
+  normalizedPayload = {},
+  { session = null, branch = null } = {}
+) {
   if (normalizedPayload.customerId) {
-    const customer = await loadExistingCustomer(normalizedPayload.customerId, { session });
+    const customer = await loadExistingCustomer(normalizedPayload.customerId, {
+      session,
+      branchId: branch?._id || normalizedPayload.branchId,
+    });
     return {
       customerMode: 'identified',
       quickSale: false,
@@ -584,7 +610,10 @@ async function resolvePosCustomerForPreview(payload = {}, normalizedPayload = {}
 
 async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, branch, admin = {}, { session = null } = {}) {
   if (normalizedPayload.customerId) {
-    const customer = await loadExistingCustomer(normalizedPayload.customerId, { session });
+    const customer = await loadExistingCustomer(normalizedPayload.customerId, {
+      session,
+      branchId: branch?._id,
+    });
     return {
       customerMode: 'identified',
       quickSale: false,
@@ -617,6 +646,18 @@ async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, b
         );
       }
 
+      const branchIds = new Set(
+        (Array.isArray(existingMatch.customer.branchIds)
+          ? existingMatch.customer.branchIds
+          : []).map(String)
+      );
+      branchIds.add(String(branch._id));
+      existingMatch.customer.branchIds = [...branchIds];
+      if (!existingMatch.customer.defaultBranch) {
+        existingMatch.customer.defaultBranch = branch._id;
+      }
+      await existingMatch.customer.save({ session });
+
       return {
         customerMode: 'identified',
         quickSale: false,
@@ -626,18 +667,55 @@ async function resolvePosCustomerForSale(payload = {}, normalizedPayload = {}, b
       };
     }
 
-    const createdCustomers = await Customer.create(
-      [quickCustomerPayload],
-      { session }
-    );
-    const customer = createdCustomers[0];
+    let customer = null;
+    let matchedBy = 'created';
+
+    try {
+      const createdCustomers = await Customer.create(
+        [quickCustomerPayload],
+        { session }
+      );
+      customer = createdCustomers[0];
+    } catch (error) {
+      if (!isMongoDuplicateKeyError(error)) throw error;
+
+      if (isActiveMongoTransaction(session)) {
+        throw createPosError(
+          'Otro proceso registró ese cliente al mismo tiempo. Reintenta la venta.',
+          'POS_CUSTOMER_DUPLICATE',
+          {},
+          409
+        );
+      }
+
+      const concurrentMatch = await findCustomerMatch(quickCustomerPayload, {
+        session,
+      });
+      if (!concurrentMatch?.customer) {
+        throw createPosError(
+          'Otro proceso registró ese cliente al mismo tiempo. Reintenta la venta.',
+          'POS_CUSTOMER_DUPLICATE',
+          {},
+          409
+        );
+      }
+      customer = concurrentMatch.customer;
+      matchedBy = concurrentMatch.matchedBy;
+      const concurrentBranchIds = new Set(
+        (Array.isArray(customer.branchIds) ? customer.branchIds : []).map(String)
+      );
+      concurrentBranchIds.add(String(branch._id));
+      customer.branchIds = [...concurrentBranchIds];
+      if (!customer.defaultBranch) customer.defaultBranch = branch._id;
+      await customer.save({ session });
+    }
 
     return {
       customerMode: 'identified',
       quickSale: false,
       customer,
       customerSnapshot: buildCustomerOrderSnapshot(customer),
-      matchedBy: 'created',
+      matchedBy,
     };
   }
 
@@ -1284,7 +1362,11 @@ async function preparePosSalePreview(payload = {}, options = {}) {
     discount: payload.discount,
     taxes: payload.taxes,
   });
-  const customerResolution = await resolvePosCustomerForPreview(payload, normalizedPayload, { session });
+  const customerResolution = await resolvePosCustomerForPreview(
+    payload,
+    normalizedPayload,
+    { session, branch }
+  );
   const needsElectronicContact = validatedItems.some(
     (item) =>
       ['digital', 'service'].includes(item.product?.productType) ||

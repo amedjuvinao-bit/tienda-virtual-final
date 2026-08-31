@@ -44,6 +44,14 @@ const EMPTY_FORM = {
   address: '',
   city: '',
   department: '',
+  personType: 'natural',
+  businessName: '',
+  dv: '',
+  municipalityCode: '',
+  departmentCode: '',
+  tributeCode: 'ZZ',
+  taxRegime: '',
+  taxResponsibilities: '',
   notes: '',
 };
 
@@ -135,6 +143,7 @@ function statusTone(value) {
 }
 
 function toEditForm(customer = {}) {
+  const fiscal = customer.fiscalProfile || {};
   return {
     fullName: customer.fullName || customer.displayName || '',
     phone: customer.phone || '',
@@ -144,6 +153,16 @@ function toEditForm(customer = {}) {
     address: customer.address || '',
     city: customer.city || '',
     department: customer.department || '',
+    personType: fiscal.personType || 'natural',
+    businessName: fiscal.businessName || '',
+    dv: fiscal.verificationDigit || fiscal.dv || '',
+    municipalityCode: fiscal.municipalityCode || '',
+    departmentCode: fiscal.departmentCode || '',
+    tributeCode: fiscal.tributeCode || 'ZZ',
+    taxRegime: fiscal.taxRegime || '',
+    taxResponsibilities: Array.isArray(fiscal.taxResponsibilities)
+      ? fiscal.taxResponsibilities.join(', ')
+      : '',
     notes: customer.notes || '',
   };
 }
@@ -404,7 +423,8 @@ function FollowUpList({ followUps, onDone, onDelete }) {
                 </div>
                 <p className="mt-3 text-sm font-black leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{item.note}</p>
                 {item.nextAction ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Próxima acción: {item.nextAction}</p> : null}
-                <p className="mt-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creado: {formatDate(item.createdAt)}{item.dueAt ? ` · Programado: ${formatDate(item.dueAt)}` : ''}</p>
+                <p className="mt-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Responsable: {item.assignedToAdmin?.name || item.createdByAdmin?.name || 'Administrador no identificado'}</p>
+                <p className="mt-1 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creado: {formatDate(item.createdAt)}{item.dueAt ? ` · Programado: ${formatDate(item.dueAt)}` : ''}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {item.status !== 'done' ? <button type="button" onClick={() => onDone(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Realizado</button> : null}
@@ -624,7 +644,20 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <Field label="Dirección"><TextInput value={editForm.address} onChange={(event) => updateField('address', event.target.value)} /></Field>
                     <Field label="Ciudad"><TextInput value={editForm.city} onChange={(event) => updateField('city', event.target.value)} /></Field>
                     <Field label="Departamento"><TextInput value={editForm.department} onChange={(event) => updateField('department', event.target.value)} /></Field>
-                    <Field label="Tipo doc."><select value={editForm.documentType} onChange={(event) => updateField('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field>
+                    <Field label="Tipo doc."><select value={editForm.documentType} onChange={(event) => updateField('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="PPT">PPT</option><option value="RC">Registro civil</option><option value="OTHER">Otro</option></select></Field>
+                  </div>
+                  <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: '#fff7fb' }}>
+                    <h4 className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Datos fiscales reutilizables</h4>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <Field label="Tipo de persona"><select value={editForm.personType} onChange={(event) => updateField('personType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="natural">Natural</option><option value="juridica">Jurídica</option></select></Field>
+                      <Field label="Razón social"><TextInput value={editForm.businessName} onChange={(event) => updateField('businessName', event.target.value)} /></Field>
+                      <Field label="Dígito verificación"><TextInput value={editForm.dv} maxLength={1} onChange={(event) => updateField('dv', event.target.value.replace(/\D/g, '').slice(0, 1))} /></Field>
+                      <Field label="Código municipio"><TextInput value={editForm.municipalityCode} onChange={(event) => updateField('municipalityCode', event.target.value)} /></Field>
+                      <Field label="Código departamento"><TextInput value={editForm.departmentCode} onChange={(event) => updateField('departmentCode', event.target.value)} /></Field>
+                      <Field label="Código tributo"><TextInput value={editForm.tributeCode} onChange={(event) => updateField('tributeCode', event.target.value)} /></Field>
+                      <Field label="Régimen fiscal"><TextInput value={editForm.taxRegime} onChange={(event) => updateField('taxRegime', event.target.value)} /></Field>
+                      <Field label="Responsabilidades tributarias"><TextInput value={editForm.taxResponsibilities} onChange={(event) => updateField('taxResponsibilities', event.target.value)} placeholder="R-99-PN, O-13" /></Field>
+                    </div>
                   </div>
                   <div className="mt-4"><Field label="Notas internas"><TextArea value={editForm.notes} onChange={(event) => updateField('notes', event.target.value)} /></Field></div>
                 </form>
@@ -687,9 +720,12 @@ export default function AdminCustomersPageTabbed() {
   const [customers, setCustomers] = useState([]);
   const [summary, setSummary] = useState(null);
   const [total, setTotal] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('all');
-  const [segmentFilter, setSegmentFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const pageLimit = 25;
+  const [searchTerm, setSearchTermState] = useState('');
+  const [sourceFilter, setSourceFilterState] = useState('all');
+  const [segmentFilter, setSegmentFilterState] = useState('all');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -707,19 +743,47 @@ export default function AdminCustomersPageTabbed() {
 
   const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const loadCustomers = async (q = searchTerm, source = sourceFilter, segment = segmentFilter) => {
+  const setSearchTerm = (value) => {
+    setPage(1);
+    setSearchTermState(value);
+  };
+  const setSourceFilter = (value) => {
+    setPage(1);
+    setSourceFilterState(value);
+  };
+  const setSegmentFilter = (value) => {
+    setPage(1);
+    setSegmentFilterState(value);
+  };
+
+  const loadCustomers = async (
+    requestedPage = page,
+    q = searchTerm,
+    source = sourceFilter,
+    segment = segmentFilter
+  ) => {
     try {
       setLoading(true);
       setError('');
-      const data = await getAdminCustomers({ q, status: 'active', source, segment, page: 1, limit: 50 });
+      const data = await getAdminCustomers({
+        q,
+        status: 'active',
+        source,
+        segment,
+        page: requestedPage,
+        limit: pageLimit,
+      });
       setCustomers(Array.isArray(data?.customers) ? data.customers : []);
       setSummary(data?.summary || null);
       setTotal(Number(data?.total || 0));
+      setPage(Number(data?.page || requestedPage));
+      setPages(Math.max(1, Number(data?.pages || 1)));
     } catch (err) {
       setError(err?.message || 'No fue posible cargar los clientes.');
       setCustomers([]);
       setSummary(null);
       setTotal(0);
+      setPages(1);
     } finally {
       setLoading(false);
     }
@@ -744,7 +808,7 @@ export default function AdminCustomersPageTabbed() {
     setCustomers((prev) => prev.map((customer) => customer.id === updatedCustomer.id ? { ...customer, ...updatedCustomer } : customer));
     setDetailData((prev) => prev ? { ...prev, customer: { ...prev.customer, ...updatedCustomer } } : prev);
     setSuccess('Cliente actualizado correctamente.');
-    loadCustomers(searchTerm, sourceFilter, segmentFilter);
+    loadCustomers(page, searchTerm, sourceFilter, segmentFilter);
   };
 
   const handleCreateCustomer = async (event) => {
@@ -761,7 +825,8 @@ export default function AdminCustomersPageTabbed() {
       setForm(EMPTY_FORM);
       setShowForm(false);
       setSuccess('Cliente creado correctamente.');
-      await loadCustomers(searchTerm, sourceFilter, segmentFilter);
+      setPage(1);
+      await loadCustomers(1, searchTerm, sourceFilter, segmentFilter);
     } catch (err) {
       setError(err?.message || 'No fue posible crear el cliente.');
     } finally {
@@ -770,6 +835,7 @@ export default function AdminCustomersPageTabbed() {
   };
 
   const resetFilters = () => {
+    setPage(1);
     setSourceFilter('all');
     setSegmentFilter('all');
     setSearchTerm('');
@@ -777,10 +843,10 @@ export default function AdminCustomersPageTabbed() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      loadCustomers(searchTerm, sourceFilter, segmentFilter);
+      loadCustomers(page, searchTerm, sourceFilter, segmentFilter);
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [searchTerm, sourceFilter, segmentFilter]);
+  }, [page, searchTerm, sourceFilter, segmentFilter]);
 
   return (
     <div className="min-h-full space-y-5">
@@ -789,9 +855,17 @@ export default function AdminCustomersPageTabbed() {
       <Card className="overflow-hidden p-5 lg:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-4"><IconBox icon={UserRound} /><div><div className="mb-2 inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em]" style={{ borderColor: 'rgba(236,72,153,0.22)', background: 'rgba(255,255,255,0.78)', color: 'var(--admin-primary)' }}><UsersRound className="h-3.5 w-3.5" /> CRM de clientes</div><h1 className="text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1><p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Administra clientes de POS y tienda web con una ficha comercial clara por pestañas.</p></div></div>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => loadCustomers(searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar</button><button type="button" onClick={() => setShowForm((prev) => !prev)} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg, var(--admin-primary), #be185d)', boxShadow: '0 18px 36px rgba(236,72,153,0.28)' }}><Plus className="h-4 w-4" /> Nuevo cliente</button></div>
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar</button><button type="button" onClick={() => setShowForm((prev) => !prev)} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg, var(--admin-primary), #be185d)', boxShadow: '0 18px 36px rgba(236,72,153,0.28)' }}><Plus className="h-4 w-4" /> Nuevo cliente</button></div>
         </div>
       </Card>
+
+      {pages > 1 ? (
+        <div className="flex flex-wrap items-center justify-end gap-3 rounded-2xl border bg-white px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.18)' }}>
+          <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-xl border px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}>Anterior</button>
+          <span className="text-xs font-black" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {pages}</span>
+          <button type="button" disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="rounded-xl border px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}>Siguiente</button>
+        </div>
+      ) : null}
 
       {error ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
       {success ? <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}

@@ -2,29 +2,21 @@
 
 const mongoose = require('mongoose');
 
+const {
+  DOCUMENT_TYPES,
+  buildCustomerIdentity,
+  cleanLower,
+  cleanPhone,
+  cleanText,
+  cleanUpper,
+} = require('../lib/customers/customerIdentity');
+const {
+  CUSTOMER_INDEX_DEFINITIONS,
+  cloneDefinitions,
+} = require('./customerIndexDefinitions');
+
 const CUSTOMER_SOURCES = ['pos', 'web', 'admin', 'import', 'system'];
 const CUSTOMER_STATUSES = ['active', 'inactive', 'blocked'];
-const DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'TI', 'PP', 'RC', 'DNI', 'OTHER', ''];
-
-function cleanText(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ');
-}
-
-function cleanLower(value) {
-  return cleanText(value).toLowerCase();
-}
-
-function cleanUpper(value) {
-  return cleanText(value).toUpperCase();
-}
-
-function cleanPhone(value) {
-  return cleanText(value).replace(/[^0-9+]/g, '');
-}
-
-function onlyDigits(value) {
-  return cleanText(value).replace(/\D/g, '');
-}
 
 function cleanMoney(value) {
   const number = Number(value);
@@ -47,12 +39,33 @@ const CustomerAddressSchema = new mongoose.Schema(
     label: { type: String, trim: true, default: 'Principal' },
     address: { type: String, trim: true, default: '' },
     city: { type: String, trim: true, default: '' },
+    cityCode: { type: String, trim: true, default: '' },
     department: { type: String, trim: true, default: '' },
+    departmentCode: { type: String, trim: true, default: '' },
     country: { type: String, trim: true, default: 'CO' },
     postalCode: { type: String, trim: true, default: '' },
     isDefault: { type: Boolean, default: true },
   },
   { _id: true }
+);
+
+const CustomerFiscalProfileSchema = new mongoose.Schema(
+  {
+    personType: {
+      type: String,
+      enum: ['', 'natural', 'juridica'],
+      default: '',
+    },
+    businessName: { type: String, trim: true, default: '' },
+    verificationDigit: { type: String, trim: true, default: '' },
+    municipalityCode: { type: String, trim: true, default: '' },
+    departmentCode: { type: String, trim: true, default: '' },
+    countryCode: { type: String, trim: true, uppercase: true, default: 'CO' },
+    tributeCode: { type: String, trim: true, uppercase: true, default: 'ZZ' },
+    taxRegime: { type: String, trim: true, default: '' },
+    taxResponsibilities: { type: [String], default: [] },
+  },
+  { _id: false }
 );
 
 const CustomerPurchaseStatsSchema = new mongoose.Schema(
@@ -75,8 +88,6 @@ const CustomerSchema = new mongoose.Schema(
       type: String,
       trim: true,
       uppercase: true,
-      unique: true,
-      sparse: true,
     },
 
     firstName: { type: String, trim: true, default: '' },
@@ -106,27 +117,33 @@ const CustomerSchema = new mongoose.Schema(
     country: { type: String, trim: true, uppercase: true, default: 'CO' },
     postalCode: { type: String, trim: true, default: '' },
     addresses: { type: [CustomerAddressSchema], default: [] },
+    fiscalProfile: {
+      type: CustomerFiscalProfileSchema,
+      default: () => ({}),
+    },
 
     source: {
       type: String,
       enum: CUSTOMER_SOURCES,
       default: 'admin',
-      index: true,
     },
     status: {
       type: String,
       enum: CUSTOMER_STATUSES,
       default: 'active',
-      index: true,
     },
-    active: { type: Boolean, default: true, index: true },
+    active: { type: Boolean, default: true },
 
     acceptsMarketing: { type: Boolean, default: false },
     notes: { type: String, trim: true, default: '' },
     tags: { type: [String], default: [] },
 
-    defaultBranch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
-    createdByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null, index: true },
+    defaultBranch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    branchIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+      default: [],
+    },
+    createdByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
     updatedByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
 
     stats: {
@@ -143,7 +160,7 @@ const CustomerSchema = new mongoose.Schema(
       }),
     },
 
-    deletedAt: { type: Date, default: null, index: true },
+    deletedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -151,12 +168,9 @@ const CustomerSchema = new mongoose.Schema(
   }
 );
 
-CustomerSchema.index({ fullName: 'text', phone: 'text', email: 'text', documentNumber: 'text', customerCode: 'text' });
-CustomerSchema.index({ normalizedPhone: 1 }, { partialFilterExpression: { normalizedPhone: { $type: 'string', $ne: '' } } });
-CustomerSchema.index({ normalizedEmail: 1 }, { partialFilterExpression: { normalizedEmail: { $type: 'string', $ne: '' } } });
-CustomerSchema.index({ documentType: 1, normalizedDocument: 1 }, { partialFilterExpression: { normalizedDocument: { $type: 'string', $ne: '' } } });
-CustomerSchema.index({ source: 1, status: 1, createdAt: -1 });
-CustomerSchema.index({ active: 1, deletedAt: 1, createdAt: -1 });
+cloneDefinitions(CUSTOMER_INDEX_DEFINITIONS).forEach(({ key, options }) => {
+  CustomerSchema.index(key, options);
+});
 
 CustomerSchema.pre('validate', function preValidateCustomer(next) {
   this.firstName = cleanText(this.firstName);
@@ -164,15 +178,17 @@ CustomerSchema.pre('validate', function preValidateCustomer(next) {
   this.fullName = cleanText(this.fullName || `${this.firstName} ${this.lastName}`);
   this.displayName = cleanText(this.displayName || this.fullName);
 
+  const identity = buildCustomerIdentity(this);
+
   this.phone = cleanPhone(this.phone);
-  this.normalizedPhone = cleanPhone(this.phone);
+  this.normalizedPhone = identity.normalizedPhone;
 
-  this.email = cleanLower(this.email);
-  this.normalizedEmail = cleanLower(this.email);
+  this.email = cleanLower(this.email, 180);
+  this.normalizedEmail = identity.normalizedEmail;
 
-  this.documentType = cleanUpper(this.documentType);
+  this.documentType = identity.documentType;
   this.documentNumber = cleanText(this.documentNumber);
-  this.normalizedDocument = onlyDigits(this.documentNumber);
+  this.normalizedDocument = identity.normalizedDocument;
 
   this.address = cleanText(this.address);
   this.city = cleanText(this.city);
@@ -180,9 +196,33 @@ CustomerSchema.pre('validate', function preValidateCustomer(next) {
   this.country = cleanUpper(this.country || 'CO');
   this.postalCode = cleanText(this.postalCode);
 
+  const fiscal = this.fiscalProfile || {};
+  fiscal.personType = cleanLower(fiscal.personType);
+  fiscal.businessName = cleanText(fiscal.businessName);
+  fiscal.verificationDigit = cleanText(fiscal.verificationDigit).replace(/\D/g, '').slice(0, 1);
+  fiscal.municipalityCode = cleanText(fiscal.municipalityCode);
+  fiscal.departmentCode = cleanText(fiscal.departmentCode);
+  fiscal.countryCode = cleanUpper(fiscal.countryCode || this.country || 'CO');
+  fiscal.tributeCode = cleanUpper(fiscal.tributeCode || 'ZZ');
+  fiscal.taxRegime = cleanText(fiscal.taxRegime);
+  fiscal.taxResponsibilities = Array.isArray(fiscal.taxResponsibilities)
+    ? [...new Set(fiscal.taxResponsibilities.map((item) => cleanUpper(item)).filter(Boolean))].slice(0, 12)
+    : [];
+  this.fiscalProfile = fiscal;
+
   this.source = cleanLower(this.source || 'admin');
   this.status = cleanLower(this.status || 'active');
   this.active = this.status === 'active' && this.deletedAt == null;
+
+  const branchIds = [
+    ...(Array.isArray(this.branchIds) ? this.branchIds : []),
+    this.defaultBranch,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+  this.branchIds = [...new Set(branchIds)].map(
+    (value) => new mongoose.Types.ObjectId(value)
+  );
 
   if (!this.customerCode) this.customerCode = buildCustomerCode();
 
@@ -216,9 +256,42 @@ CustomerSchema.methods.toOrderSnapshot = function toOrderSnapshot() {
     phone: this.phone || '',
     address: this.address || '',
     city: this.city || '',
+    municipalityCode: this.fiscalProfile?.municipalityCode || '',
     postalCode: this.postalCode || '',
     country: this.country || 'CO',
     department: this.department || '',
+    departmentCode: this.fiscalProfile?.departmentCode || '',
+  };
+};
+
+CustomerSchema.methods.toBillingSnapshot = function toBillingSnapshot() {
+  return {
+    personType: this.fiscalProfile?.personType || 'natural',
+    firstName: this.firstName || this.fullName || '',
+    lastName: this.lastName || '',
+    businessName: this.fiscalProfile?.businessName || '',
+    documentType: this.documentType || '',
+    documentNumber: this.documentNumber || '',
+    id: this.documentNumber || '',
+    dv: this.fiscalProfile?.verificationDigit || '',
+    email: this.email || '',
+    phone: this.phone || '',
+    address: this.address || '',
+    city: this.city || '',
+    cityCode: this.fiscalProfile?.municipalityCode || '',
+    municipalityCode: this.fiscalProfile?.municipalityCode || '',
+    department: this.department || '',
+    departmentCode: this.fiscalProfile?.departmentCode || '',
+    country: this.country || 'CO',
+    countryCode: this.fiscalProfile?.countryCode || this.country || 'CO',
+    postalCode: this.postalCode || '',
+    tributeCode: this.fiscalProfile?.tributeCode || 'ZZ',
+    taxRegime: this.fiscalProfile?.taxRegime || '',
+    taxResponsibilities: Array.isArray(
+      this.fiscalProfile?.taxResponsibilities
+    )
+      ? [...this.fiscalProfile.taxResponsibilities]
+      : [],
   };
 };
 

@@ -2,6 +2,11 @@
 
 const mongoose = require('mongoose');
 
+const {
+  CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS,
+  cloneDefinitions,
+} = require('./customerIndexDefinitions');
+
 const FOLLOW_UP_TYPES = [
   'note',
   'whatsapp',
@@ -30,21 +35,23 @@ const CustomerFollowUpSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Customer',
       required: true,
-      index: true,
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
     },
     type: {
       type: String,
       enum: FOLLOW_UP_TYPES,
       default: 'note',
       set: cleanLower,
-      index: true,
     },
     status: {
       type: String,
       enum: FOLLOW_UP_STATUSES,
       default: 'pending',
       set: cleanLower,
-      index: true,
     },
     note: {
       type: String,
@@ -61,7 +68,6 @@ const CustomerFollowUpSchema = new mongoose.Schema(
     dueAt: {
       type: Date,
       default: null,
-      index: true,
     },
     doneAt: {
       type: Date,
@@ -71,9 +77,13 @@ const CustomerFollowUpSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AdminUser',
       default: null,
-      index: true,
     },
     updatedByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+    assignedToAdmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AdminUser',
       default: null,
@@ -81,7 +91,6 @@ const CustomerFollowUpSchema = new mongoose.Schema(
     deletedAt: {
       type: Date,
       default: null,
-      index: true,
     },
   },
   {
@@ -90,8 +99,9 @@ const CustomerFollowUpSchema = new mongoose.Schema(
   }
 );
 
-CustomerFollowUpSchema.index({ customer: 1, status: 1, createdAt: -1 });
-CustomerFollowUpSchema.index({ customer: 1, deletedAt: 1, createdAt: -1 });
+cloneDefinitions(CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS).forEach(({ key, options }) => {
+  CustomerFollowUpSchema.index(key, options);
+});
 
 CustomerFollowUpSchema.pre('validate', function preValidateFollowUp(next) {
   this.type = cleanLower(this.type || 'note');

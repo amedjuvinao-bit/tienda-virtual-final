@@ -9,6 +9,16 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+function normalizeTextList(value) {
+  const entries = Array.isArray(value)
+    ? value
+    : cleanText(value)
+      .split(',')
+      .map((item) => item.trim());
+
+  return [...new Set(entries.map(cleanText).filter(Boolean))];
+}
+
 function buildCustomersApiErrorMessage(error, fallbackMessage) {
   const data = error?.response?.data || {};
 
@@ -64,6 +74,8 @@ function assertPayload(payload, message) {
 }
 
 export function normalizeCustomerPayload(payload = {}) {
+  const fiscalProfile = payload.fiscalProfile || {};
+
   return {
     firstName: cleanText(payload.firstName),
     lastName: cleanText(payload.lastName),
@@ -78,11 +90,55 @@ export function normalizeCustomerPayload(payload = {}) {
     department: cleanText(payload.department),
     country: cleanText(payload.country || 'CO').toUpperCase(),
     postalCode: cleanText(payload.postalCode),
-    source: cleanText(payload.source || 'admin').toLowerCase(),
-    status: cleanText(payload.status || 'active').toLowerCase(),
-    acceptsMarketing: payload.acceptsMarketing === true,
+    ...(Array.isArray(payload.addresses)
+      ? { addresses: payload.addresses }
+      : {}),
+    fiscalProfile: {
+      personType: cleanText(
+        fiscalProfile.personType || payload.personType
+      ).toLowerCase(),
+      businessName: cleanText(
+        fiscalProfile.businessName || payload.businessName
+      ),
+      verificationDigit: cleanText(
+        fiscalProfile.verificationDigit || fiscalProfile.dv || payload.dv
+      )
+        .replace(/\D/g, '')
+        .slice(0, 1),
+      municipalityCode: cleanText(
+        fiscalProfile.municipalityCode ||
+          fiscalProfile.cityCode ||
+          payload.municipalityCode ||
+          payload.cityCode
+      ),
+      departmentCode: cleanText(
+        fiscalProfile.departmentCode || payload.departmentCode
+      ),
+      countryCode: cleanText(
+        fiscalProfile.countryCode || payload.countryCode || payload.country || 'CO'
+      ).toUpperCase(),
+      tributeCode: cleanText(
+        fiscalProfile.tributeCode || payload.tributeCode || 'ZZ'
+      ).toUpperCase(),
+      taxRegime: cleanText(fiscalProfile.taxRegime || payload.taxRegime),
+      taxResponsibilities: normalizeTextList(
+        fiscalProfile.taxResponsibilities ?? payload.taxResponsibilities
+      ),
+    },
+    ...(payload.source !== undefined
+      ? { source: cleanText(payload.source).toLowerCase() }
+      : {}),
+    ...(payload.status !== undefined
+      ? { status: cleanText(payload.status).toLowerCase() }
+      : {}),
+    ...(payload.acceptsMarketing !== undefined
+      ? { acceptsMarketing: payload.acceptsMarketing === true }
+      : {}),
     notes: cleanText(payload.notes),
-    tags: Array.isArray(payload.tags) ? payload.tags : [],
+    ...(Array.isArray(payload.tags) ? { tags: payload.tags } : {}),
+    ...(cleanText(payload.branchId || payload.defaultBranch)
+      ? { branchId: cleanText(payload.branchId || payload.defaultBranch) }
+      : {}),
   };
 }
 
@@ -93,6 +149,9 @@ export function normalizeCustomerFollowUpPayload(payload = {}) {
     note: cleanText(payload.note || payload.message || payload.comment),
     nextAction: cleanText(payload.nextAction),
     dueAt: payload.dueAt || null,
+    ...(cleanText(payload.branchId)
+      ? { branchId: cleanText(payload.branchId) }
+      : {}),
   };
 }
 
@@ -104,6 +163,7 @@ export async function getAdminCustomers(params = {}) {
     segment: params.segment,
     page: params.page || 1,
     limit: params.limit || 20,
+    branchId: params.branchId,
   });
 
   try {
@@ -126,7 +186,7 @@ export async function searchAdminCustomers(q, options = {}) {
   });
 }
 
-export async function getAdminCustomer(customerId) {
+export async function getAdminCustomer(customerId, params = {}) {
   const cleanId = cleanText(customerId);
 
   if (!cleanId) {
@@ -134,7 +194,11 @@ export async function getAdminCustomer(customerId) {
   }
 
   try {
-    const response = await api.get(`${BASE_URL}/${cleanId}`);
+    const queryString = buildQueryParams({
+      branchId: params.branchId,
+      ordersLimit: params.ordersLimit,
+    });
+    const response = await api.get(`${BASE_URL}/${cleanId}${queryString}`);
 
     return response.data;
   } catch (error) {
@@ -182,6 +246,7 @@ export async function getAdminCustomerFollowUps(customerId, params = {}) {
   const queryString = buildQueryParams({
     status: params.status || 'all',
     limit: params.limit || 20,
+    branchId: params.branchId,
   });
 
   try {

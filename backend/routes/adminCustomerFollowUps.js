@@ -7,6 +7,11 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Customer = require('../models/Customer');
 const CustomerFollowUp = require('../models/CustomerFollowUp');
+const {
+  buildScopedCustomerFilter,
+  buildScopedFollowUpFilter,
+  resolveCustomerWriteBranch,
+} = require('../services/customerAdminScopeService');
 
 const router = express.Router();
 
@@ -64,12 +69,29 @@ function sendError(res, error) {
   });
 }
 
-async function loadCustomer(customerId) {
+function assertScopeAccess(access) {
+  if (access?.ok) return access;
+  throw createRouteError(
+    access?.message || 'No tienes acceso a clientes de esa sede.',
+    access?.error || 'CUSTOMER_BRANCH_FORBIDDEN',
+    access?.status || 403,
+    { branchIds: access?.branchIds || [] }
+  );
+}
+
+async function loadCustomer(req, customerId) {
   if (!customerId || !mongoose.Types.ObjectId.isValid(String(customerId))) {
     throw createRouteError('Cliente no válido.', 'CUSTOMER_INVALID_ID', 400, { customerId });
   }
 
-  const customer = await Customer.findOne({ _id: customerId, deletedAt: null });
+  const access = assertScopeAccess(
+    buildScopedCustomerFilter(
+      req,
+      { _id: customerId, deletedAt: null },
+      { requestedBranchId: req.query?.branchId }
+    )
+  );
+  const customer = await Customer.findOne(access.filter);
 
   if (!customer) {
     throw createRouteError('Cliente no encontrado.', 'CUSTOMER_NOT_FOUND', 404, { customerId });
@@ -97,6 +119,49 @@ function buildFollowUpPayload(body = {}) {
   };
 }
 
+function serializeAdmin(admin) {
+  if (!admin) return null;
+  if (typeof admin !== 'object') return { id: String(admin), name: '' };
+
+  const id = String(admin._id || admin.id || '');
+  const name = cleanText(
+    admin.displayName ||
+      `${admin.firstName || ''} ${admin.lastName || ''}` ||
+      admin.username
+  );
+
+  return {
+    id,
+    name: name || admin.username || '',
+    username: admin.username || '',
+    role: admin.role || '',
+  };
+}
+
+function resolveFollowUpBranch(req, customer, requestedBranchId) {
+  const access = assertScopeAccess(
+    resolveCustomerWriteBranch(req, requestedBranchId)
+  );
+  const customerBranchIds = new Set(
+    [
+      ...(Array.isArray(customer.branchIds) ? customer.branchIds : []),
+      customer.defaultBranch,
+    ]
+      .filter(Boolean)
+      .map(String)
+  );
+
+  if (access.branchId && customerBranchIds.has(String(access.branchId))) {
+    return access.branchId;
+  }
+
+  const allowedCustomerBranch = (access.branchIds || []).find((branchId) =>
+    customerBranchIds.has(String(branchId))
+  );
+
+  return allowedCustomerBranch || String(customer.defaultBranch || '') || '';
+}
+
 function serializeFollowUp(followUp = {}) {
   const raw = typeof followUp.toSafeObject === 'function'
     ? followUp.toSafeObject()
@@ -113,6 +178,10 @@ function serializeFollowUp(followUp = {}) {
     statusLabel: FOLLOW_UP_STATUSES[raw.status] || 'Pendiente',
     note: raw.note || '',
     nextAction: raw.nextAction || '',
+    branchId: raw.branch ? String(raw.branch) : null,
+    createdByAdmin: serializeAdmin(raw.createdByAdmin),
+    updatedByAdmin: serializeAdmin(raw.updatedByAdmin),
+    assignedToAdmin: serializeAdmin(raw.assignedToAdmin),
     dueAt: raw.dueAt || null,
     doneAt: raw.doneAt || null,
     createdAt: raw.createdAt || null,
@@ -124,7 +193,7 @@ router.use(requireAdmin);
 
 router.get('/:customerId', requirePermission('customers:view'), async (req, res) => {
   try {
-    const customer = await loadCustomer(req.params.customerId);
+    const customer = await loadCustomer(req, req.params.customerId);
     const limit = Math.min(Math.max(Number(req.query.limit || 20), 1), 50);
     const status = cleanLower(req.query.status || 'all');
     const filter = {
@@ -136,9 +205,13 @@ router.get('/:customerId', requirePermission('customers:view'), async (req, res)
       filter.status = status;
     }
 
-    const followUps = await CustomerFollowUp.find(filter)
+    const access = assertScopeAccess(buildScopedFollowUpFilter(req, filter));
+    const followUps = await CustomerFollowUp.find(access.filter)
       .sort({ createdAt: -1 })
-      .limit(limit);
+      .limit(limit)
+      .populate('createdByAdmin', 'username displayName firstName lastName role')
+      .populate('updatedByAdmin', 'username displayName firstName lastName role')
+      .populate('assignedToAdmin', 'username displayName firstName lastName role');
 
     return res.json({
       ok: true,
@@ -152,23 +225,32 @@ router.get('/:customerId', requirePermission('customers:view'), async (req, res)
 
 router.post('/:customerId', requirePermission('customers:update'), async (req, res) => {
   try {
-    const customer = await loadCustomer(req.params.customerId);
+    const customer = await loadCustomer(req, req.params.customerId);
     const payload = buildFollowUpPayload(req.body || {});
 
     if (!payload.note) {
       throw createRouteError('Debes escribir una nota de seguimiento.', 'FOLLOW_UP_NOTE_REQUIRED', 400);
     }
 
+    const adminId = getAdminId(req);
+    const branchId = resolveFollowUpBranch(
+      req,
+      customer,
+      req.body?.branchId
+    );
     const followUp = await CustomerFollowUp.create({
       ...payload,
       customer: customer._id,
-      createdByAdmin: getAdminId(req),
-      updatedByAdmin: getAdminId(req),
+      branch: branchId || null,
+      createdByAdmin: adminId,
+      updatedByAdmin: adminId,
+      assignedToAdmin: adminId,
     });
-
-    customer.notes = payload.note;
-    customer.updatedByAdmin = getAdminId(req);
-    await customer.save();
+    await followUp.populate([
+      { path: 'createdByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'updatedByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'assignedToAdmin', select: 'username displayName firstName lastName role' },
+    ]);
 
     return res.status(201).json({
       ok: true,
@@ -181,17 +263,18 @@ router.post('/:customerId', requirePermission('customers:update'), async (req, r
 
 router.put('/:customerId/:followUpId', requirePermission('customers:update'), async (req, res) => {
   try {
-    const customer = await loadCustomer(req.params.customerId);
+    const customer = await loadCustomer(req, req.params.customerId);
 
     if (!mongoose.Types.ObjectId.isValid(String(req.params.followUpId))) {
       throw createRouteError('Seguimiento no válido.', 'FOLLOW_UP_INVALID_ID', 400);
     }
 
-    const followUp = await CustomerFollowUp.findOne({
+    const access = assertScopeAccess(buildScopedFollowUpFilter(req, {
       _id: req.params.followUpId,
       customer: customer._id,
       deletedAt: null,
-    });
+    }));
+    const followUp = await CustomerFollowUp.findOne(access.filter);
 
     if (!followUp) {
       throw createRouteError('Seguimiento no encontrado.', 'FOLLOW_UP_NOT_FOUND', 404);
@@ -209,6 +292,11 @@ router.put('/:customerId/:followUpId', requirePermission('customers:update'), as
 
     followUp.updatedByAdmin = getAdminId(req);
     await followUp.save();
+    await followUp.populate([
+      { path: 'createdByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'updatedByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'assignedToAdmin', select: 'username displayName firstName lastName role' },
+    ]);
 
     return res.json({
       ok: true,
@@ -221,17 +309,18 @@ router.put('/:customerId/:followUpId', requirePermission('customers:update'), as
 
 router.delete('/:customerId/:followUpId', requirePermission('customers:update'), async (req, res) => {
   try {
-    const customer = await loadCustomer(req.params.customerId);
+    const customer = await loadCustomer(req, req.params.customerId);
 
     if (!mongoose.Types.ObjectId.isValid(String(req.params.followUpId))) {
       throw createRouteError('Seguimiento no válido.', 'FOLLOW_UP_INVALID_ID', 400);
     }
 
-    const followUp = await CustomerFollowUp.findOne({
+    const access = assertScopeAccess(buildScopedFollowUpFilter(req, {
       _id: req.params.followUpId,
       customer: customer._id,
       deletedAt: null,
-    });
+    }));
+    const followUp = await CustomerFollowUp.findOne(access.filter);
 
     if (!followUp) {
       throw createRouteError('Seguimiento no encontrado.', 'FOLLOW_UP_NOT_FOUND', 404);
