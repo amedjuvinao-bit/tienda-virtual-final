@@ -17,6 +17,8 @@
     "test:customer-identity-concurrency": "node scripts/testCustomerIdentityConcurrencyIntegration.js",
     "migrate:customer-integrity": "node scripts/migrateCustomerIntegrity.js",
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
+    "test:pos-level-plus-stage1": "node scripts/testPosLevelPlusStage1.js",
+    "test:pos-level-plus-stage1-integration": "node scripts/testPosLevelPlusStage1Integration.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",

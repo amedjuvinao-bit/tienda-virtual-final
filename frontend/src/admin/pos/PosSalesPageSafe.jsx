@@ -1,6 +1,6 @@
 // frontend/src/admin/pos/PosSalesPageSafe.jsx
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -21,7 +21,12 @@ import {
   Trash2,
   Wallet,
 } from 'lucide-react';
-import { createPosSale, getPosBootstrap, getPosProducts } from '../api/adminPosApi';
+import {
+  buildPosIdempotencyKey,
+  createPosSale,
+  getPosBootstrap,
+  getPosProducts,
+} from '../api/adminPosApi';
 import { getCurrentCashSession } from '../api/adminCashSessionApi';
 
 const REGISTER_CODE = 'CAJA POS';
@@ -305,6 +310,7 @@ export default function PosSalesPageSafe() {
   const [cashSession, setCashSession] = useState(null);
   const [cashLoading, setCashLoading] = useState(false);
   const [cashError, setCashError] = useState('');
+  const saleAttemptKeyRef = useRef('');
 
   const branches = useMemo(() => (Array.isArray(bootstrap?.branches) ? bootstrap.branches : []), [bootstrap]);
   const paymentMethods = useMemo(() => (Array.isArray(bootstrap?.paymentMethods) ? bootstrap.paymentMethods : []), [bootstrap]);
@@ -407,6 +413,9 @@ export default function PosSalesPageSafe() {
     }
 
     const soldItems = cartItems.map((item) => ({ ...item }));
+    const idempotencyKey =
+      saleAttemptKeyRef.current || buildPosIdempotencyKey('pos-sale');
+    saleAttemptKeyRef.current = idempotencyKey;
 
     try {
       setSaleLoading(true);
@@ -430,7 +439,7 @@ export default function PosSalesPageSafe() {
         })),
         payment: { method: paymentMethod, receivedAmount: cartSummary.total, amount: cartSummary.total },
         discount: { type: 'none', value: 0 },
-      });
+      }, { idempotencyKey });
 
       setProducts((prev) => prev.map((product) => {
         const sold = soldItems.find((item) => item.cartKey === rowKey(product));
@@ -443,6 +452,7 @@ export default function PosSalesPageSafe() {
       else await loadCashSession(branchId);
 
       setCartItems([]);
+      saleAttemptKeyRef.current = '';
       const number = orderNumber(data?.order || {});
       setSaleSuccess(number ? `Venta POS creada correctamente. Orden ${number}.` : 'Venta POS creada correctamente.');
     } catch (err) {
@@ -455,6 +465,20 @@ export default function PosSalesPageSafe() {
 
   useEffect(() => {
     loadBootstrap();
+  }, []);
+
+  useEffect(() => {
+    saleAttemptKeyRef.current = '';
+  }, [branchId, paymentMethod, cartItems]);
+
+  useEffect(() => {
+    const resetAttempt = () => {
+      saleAttemptKeyRef.current = '';
+    };
+    window.addEventListener('pos:customer-selection-changed', resetAttempt);
+    return () => {
+      window.removeEventListener('pos:customer-selection-changed', resetAttempt);
+    };
   }, []);
 
   useEffect(() => {

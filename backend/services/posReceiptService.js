@@ -7,7 +7,6 @@ const ElectronicInvoice = require('../models/ElectronicInvoice');
 const SiteSettings = require('../models/SiteSettings');
 const { sendMail } = require('../lib/mail/mailer');
 const { generateOrderPdf } = require('../lib/orderPdfGenerator');
-const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -131,7 +130,7 @@ function serializeInvoice(invoice = null) {
   };
 }
 
-async function loadPosOrder(orderId) {
+async function loadPosOrder(orderId, options = {}) {
   const cleanOrderId = getOrderId(orderId);
 
   if (!cleanOrderId) {
@@ -141,6 +140,13 @@ async function loadPosOrder(orderId) {
   const query = cleanOrderId.match(/^[0-9a-fA-F]{24}$/)
     ? { _id: cleanOrderId }
     : { orderNumber: cleanOrderId };
+
+  if (Array.isArray(options.branchIds)) {
+    const branchIds = options.branchIds
+      .map((branchId) => cleanText(branchId, 80))
+      .filter((branchId) => branchId.match(/^[0-9a-fA-F]{24}$/));
+    query.branch = { $in: branchIds };
+  }
 
   const order = await Order.findOne(query).lean();
 
@@ -160,30 +166,10 @@ async function loadInvoiceForOrder(order) {
   return ElectronicInvoice.findOne({ orderId: order._id }).lean();
 }
 
-async function maybeGenerateInvoice(order, shouldGenerate = false) {
-  let invoice = await loadInvoiceForOrder(order);
-
-  if (invoice?.status === 'generated') return invoice;
-  if (!shouldGenerate) return invoice;
-
-  const generated = await generateElectronicInvoiceAfterPayment({
-    orderId: order._id,
-    paymentProvider: 'pos',
-    transaction: {
-      payment_method_type: order.payment?.methodType || 'pos',
-      payment_method_name: order.payment?.methodLabel || 'Venta física',
-      payment_method: order.payment?.method || 'pos',
-      rawMethod: order.payment?.rawMethod || {},
-    },
-  });
-
-  return generated || invoice || loadInvoiceForOrder(order);
-}
-
 async function buildPosReceipt(orderId, options = {}) {
-  const order = await loadPosOrder(orderId);
+  const order = await loadPosOrder(orderId, options);
   const settings = await SiteSettings.findOne().lean().catch(() => null);
-  const invoice = await maybeGenerateInvoice(order, options.generateInvoice === true);
+  const invoice = await loadInvoiceForOrder(order);
   const store = getStoreInfo(settings || {});
   const items = mapOrderItems(order);
 
@@ -427,7 +413,9 @@ async function buildReceiptPdfBuffer(receipt) {
 }
 
 async function sendPosReceiptEmail(orderId, options = {}) {
-  const receipt = await buildPosReceipt(orderId, { generateInvoice: options.generateInvoice !== false });
+  const receipt = await buildPosReceipt(orderId, {
+    branchIds: options.branchIds,
+  });
   const to = getCustomerEmail({ customer: receipt.customer, billing: { email: receipt.customer.email } }, options.to);
 
   if (!to) {

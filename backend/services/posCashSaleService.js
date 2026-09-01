@@ -6,10 +6,13 @@ const CashSession = require('../models/CashSession');
 const Order = require('../models/Order');
 const { createPosSale, preparePosSalePreview, createPosError } = require('./adminPosService');
 const { recalculateCashSession } = require('./cashSessionService');
-const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 const {
-  processOrderFulfillmentAfterPayment,
-} = require('./orderFulfillmentService');
+  processFulfillmentOnce,
+} = require('./orderCreationPostCommitService');
+const {
+  beginPosSaleIdempotency,
+  completePosSaleIdempotency,
+} = require('./posSaleIdempotencyService');
 
 function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -94,10 +97,13 @@ async function attachOrderToCashSession(order, cashSession, registerCode, { sess
 
 async function createPosSaleWithCashSession(payload = {}, options = {}) {
   const externalSession = options.session || null;
-  const generateElectronicInvoice = options.generateElectronicInvoice === true;
   const admin = options.admin || {};
+  const idempotency = options.idempotency || null;
 
   const run = async (session) => {
+    const idempotencyRecord = idempotency
+      ? await beginPosSaleIdempotency(idempotency, { session })
+      : null;
     const preview = await preparePosSalePreview(payload, { session });
     const branch = preview.branch;
     const cashResolution = await resolveCashSessionForSale(payload, branch, { session });
@@ -106,7 +112,7 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
       ...options,
       admin,
       session,
-      generateElectronicInvoice: false,
+      paymentTransactionId: idempotency?.paymentTransactionId || '',
     });
 
     if (cashResolution.cashSession) {
@@ -123,6 +129,15 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
 
     result.cashRegisterCode = cashResolution.registerCode;
     result.cashSessionRequired = cashResolution.required;
+
+    if (idempotencyRecord) {
+      await completePosSaleIdempotency(
+        idempotencyRecord,
+        idempotency,
+        result,
+        { session }
+      );
+    }
 
     return result;
   };
@@ -148,10 +163,12 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
 
   if (!externalSession) {
     try {
-      await processOrderFulfillmentAfterPayment({
+      await processFulfillmentOnce({
         orderId: result.order._id,
         paymentProvider: 'pos',
         transaction: {
+          id: result.order.payment?.transactionId,
+          provider: 'pos',
           payment_method_type:
             result.order.payment?.methodType || 'pos',
           payment_method_name:
@@ -162,26 +179,9 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
       });
     } catch (error) {
       console.error(
-        '[posCashSaleService] Error preparando cumplimiento POS:',
+        '[posCashSaleService] Error registrando cumplimiento POS recuperable:',
         error.message
       );
-    }
-  }
-
-  if (generateElectronicInvoice) {
-    try {
-      await generateElectronicInvoiceAfterPayment({
-        orderId: result.order._id,
-        paymentProvider: 'pos',
-        transaction: {
-          payment_method_type: result.order.payment?.methodType || 'pos',
-          payment_method_name: result.order.payment?.methodLabel || 'Venta física',
-          payment_method: result.order.payment?.method || 'pos',
-          rawMethod: result.order.payment?.rawMethod || {},
-        },
-      });
-    } catch (error) {
-      console.error('[posCashSaleService] Error generando factura POS:', error.message);
     }
   }
 

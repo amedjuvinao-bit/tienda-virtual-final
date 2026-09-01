@@ -9,6 +9,9 @@ const {
   buildReceiptPdfBuffer,
   sendPosReceiptEmail,
 } = require('../services/posReceiptService');
+const {
+  buildPosResourceAccess,
+} = require('../services/adminPosAccessService');
 
 const router = express.Router();
 
@@ -35,9 +38,8 @@ router.use(requireAdmin);
 
 router.get('/sales/:id/receipt', requirePermission('pos:receipt'), async (req, res) => {
   try {
-    const receipt = await buildPosReceipt(req.params.id, {
-      generateInvoice: req.query.generateInvoice === 'true',
-    });
+    const access = buildPosResourceAccess(req);
+    const receipt = await buildPosReceipt(req.params.id, access);
 
     return res.json({
       ok: true,
@@ -50,9 +52,8 @@ router.get('/sales/:id/receipt', requirePermission('pos:receipt'), async (req, r
 
 router.get('/sales/:id/receipt/pdf', requirePermission('pos:receipt'), async (req, res) => {
   try {
-    const receipt = await buildPosReceipt(req.params.id, {
-      generateInvoice: req.query.generateInvoice === 'true',
-    });
+    const access = buildPosResourceAccess(req);
+    const receipt = await buildPosReceipt(req.params.id, access);
     const pdfBuffer = await buildReceiptPdfBuffer(receipt);
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -69,9 +70,10 @@ router.get('/sales/:id/receipt/pdf', requirePermission('pos:receipt'), async (re
 
 router.post('/sales/:id/send-email', requirePermission('pos:receipt'), async (req, res) => {
   try {
+    const access = buildPosResourceAccess(req);
     const result = await sendPosReceiptEmail(req.params.id, {
       to: cleanText(req.body?.to || ''),
-      generateInvoice: req.body?.generateInvoice !== false,
+      branchIds: access.branchIds,
     });
 
     return res.json({

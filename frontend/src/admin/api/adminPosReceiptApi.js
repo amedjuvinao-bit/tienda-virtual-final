@@ -35,12 +35,11 @@ function assertOrderId(orderOrId) {
   return orderId;
 }
 
-export async function getPosReceipt(orderOrId, options = {}) {
+export async function getPosReceipt(orderOrId) {
   const orderId = assertOrderId(orderOrId);
-  const query = options.generateInvoice === true ? '?generateInvoice=true' : '';
 
   try {
-    const response = await api.get(`${BASE_URL}/sales/${orderId}/receipt${query}`);
+    const response = await api.get(`${BASE_URL}/sales/${orderId}/receipt`);
     return response.data;
   } catch (error) {
     throwReceiptError(error, 'No fue posible cargar el comprobante POS.');
@@ -53,7 +52,6 @@ export async function sendPosReceiptEmail(orderOrId, options = {}) {
   try {
     const response = await api.post(`${BASE_URL}/sales/${orderId}/send-email`, {
       to: cleanText(options.to || ''),
-      generateInvoice: options.generateInvoice !== false,
     });
 
     return response.data;
@@ -62,12 +60,11 @@ export async function sendPosReceiptEmail(orderOrId, options = {}) {
   }
 }
 
-export async function openPosReceiptPdf(orderOrId, options = {}) {
+export async function openPosReceiptPdf(orderOrId) {
   const orderId = assertOrderId(orderOrId);
-  const query = options.generateInvoice === true ? '?generateInvoice=true' : '';
 
   try {
-    const response = await api.get(`${BASE_URL}/sales/${orderId}/receipt/pdf${query}`, {
+    const response = await api.get(`${BASE_URL}/sales/${orderId}/receipt/pdf`, {
       responseType: 'blob',
       headers: {
         Accept: 'application/pdf',

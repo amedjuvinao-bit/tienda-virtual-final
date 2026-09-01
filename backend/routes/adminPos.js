@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Branch = require('../models/Branch');
+const CashSession = require('../models/CashSession');
+const Order = require('../models/Order');
 const Product = require('../models/Product');
 const InventoryStock = require('../models/InventoryStock');
 const SiteSettings = require('../models/SiteSettings');
@@ -15,6 +17,14 @@ const {
   preparePosSalePreview,
 } = require('../services/adminPosService');
 const { createPosSaleWithCashSession } = require('../services/posCashSaleService');
+const {
+  assertPosBranchAccess,
+  buildPosBranchFilter,
+} = require('../services/adminPosAccessService');
+const {
+  buildPosSaleIdempotency,
+  inspectPosSaleIdempotency,
+} = require('../services/posSaleIdempotencyService');
 
 const router = express.Router();
 
@@ -88,46 +98,6 @@ function buildAdminContext(req) {
     adminRole: req.adminRole || req.adminProfile?.adminRole || '',
     canApprovePosDiscount: hasPermission(req, 'pos:discount:approve'),
   };
-}
-
-function normalizeBranchIds(req) {
-  const ids = new Set();
-
-  if (Array.isArray(req.adminBranches)) {
-    req.adminBranches.forEach((branchId) => {
-      if (branchId) ids.add(String(branchId));
-    });
-  }
-
-  if (req.adminDefaultBranch) ids.add(String(req.adminDefaultBranch));
-
-  return [...ids];
-}
-
-function shouldLimitBranches(req) {
-  const role = cleanText(req.adminRole).toLowerCase();
-
-  if (req.adminAuthType === 'legacy') return false;
-  if (role === 'owner' || role === 'admin') return false;
-
-  return normalizeBranchIds(req).length > 0;
-}
-
-function buildBranchFilter(req, extra = {}) {
-  const filter = {
-    deletedAt: null,
-    active: true,
-    status: 'active',
-    ...extra,
-  };
-
-  if (shouldLimitBranches(req)) {
-    filter._id = {
-      $in: normalizeBranchIds(req),
-    };
-  }
-
-  return filter;
 }
 
 function serializeBranch(branch = {}) {
@@ -227,6 +197,65 @@ function serializePreview(preview = {}) {
   };
 }
 
+function serializeOrder(order = {}) {
+  if (typeof order.toSafeObject === 'function') return order.toSafeObject();
+  if (typeof order.toObject === 'function') return order.toObject();
+  return order;
+}
+
+function serializePosSaleResult(result = {}, options = {}) {
+  return {
+    ok: true,
+    order: serializeOrder(result.order || {}),
+    movements: (result.movements || []).map((movement) =>
+      movement.toSafeObject
+        ? movement.toSafeObject()
+        : movement.toObject?.() || movement
+    ),
+    branch: serializeBranch(result.branch || {}),
+    cashSession: result.cashSession
+      ? serializeCashSession(result.cashSession)
+      : null,
+    cashRegisterCode: result.cashRegisterCode || '',
+    cashSessionRequired: result.cashSessionRequired === true,
+    idempotent: options.idempotent === true,
+    reused: options.reused === true,
+  };
+}
+
+async function loadReusedPosSale(orderId, req) {
+  const order = await Order.findById(orderId);
+
+  if (!order || order.source !== 'pos') {
+    throw createRouteError(
+      'La venta protegida no pudo recuperarse.',
+      'POS_IDEMPOTENCY_ORDER_NOT_FOUND',
+      409
+    );
+  }
+
+  assertPosBranchAccess(req, order.branch, { requireSell: true });
+
+  const [branch, cashSession] = await Promise.all([
+    Branch.findById(order.branch),
+    order.cashSession ? CashSession.findById(order.cashSession) : null,
+  ]);
+
+  return {
+    order,
+    movements: [],
+    branch: branch || {
+      _id: order.branch,
+      ...(order.branchSnapshot || {}),
+    },
+    cashSession,
+    cashRegisterCode:
+      cashSession?.cashRegisterCode || order.pos?.registerCode || '',
+    cashSessionRequired:
+      branch?.settings?.requireCashSessionForPos === true,
+  };
+}
+
 function sendError(res, error) {
   const status = Number(error?.statusCode || error?.status || 500);
 
@@ -265,12 +294,6 @@ async function loadBillingInfo() {
   };
 }
 
-function assertBranchAccess(req, branchId) {
-  if (!shouldLimitBranches(req)) return true;
-
-  return normalizeBranchIds(req).includes(String(branchId || ''));
-}
-
 async function loadPosBranch(req, branchId) {
   const cleanBranchId = cleanText(branchId || req.adminDefaultBranch || '');
 
@@ -284,10 +307,10 @@ async function loadPosBranch(req, branchId) {
   }
 
   const branch = await Branch.findOne(
-    buildBranchFilter(req, {
+    buildPosBranchFilter(req, {
       _id: cleanBranchId,
       'settings.allowPosSales': true,
-    })
+    }, { requestedBranchId: cleanBranchId })
   ).lean();
 
   if (!branch) {
@@ -330,7 +353,7 @@ router.use(requireAdmin);
 router.get('/bootstrap', requirePermission('pos:view'), async (req, res) => {
   try {
     const branches = await Branch.find(
-      buildBranchFilter(req, {
+      buildPosBranchFilter(req, {
         'settings.allowPosSales': true,
       })
     )
@@ -438,13 +461,7 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
   try {
     const preview = await preparePosSalePreview(req.body || {});
 
-    if (!assertBranchAccess(req, preview.branch?._id)) {
-      return res.status(403).json({
-        ok: false,
-        error: 'POS_BRANCH_NOT_ALLOWED',
-        message: 'No tienes acceso a la sede seleccionada.',
-      });
-    }
+    assertPosBranchAccess(req, preview.branch?._id);
 
     return res.json({
       ok: true,
@@ -457,32 +474,50 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
 
 router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
   try {
-    const preview = await preparePosSalePreview(req.body || {});
+    const admin = buildAdminContext(req);
+    const idempotency = buildPosSaleIdempotency({
+      key: req.headers['idempotency-key'],
+      payload: req.body || {},
+      admin,
+    });
+    const existing = await inspectPosSaleIdempotency(idempotency);
 
-    if (!assertBranchAccess(req, preview.branch?._id)) {
-      return res.status(403).json({
-        ok: false,
-        error: 'POS_BRANCH_NOT_ALLOWED',
-        message: 'No tienes acceso a la sede seleccionada.',
-      });
+    if (existing.action === 'conflict') {
+      throw createRouteError(
+        existing.message,
+        'POS_IDEMPOTENCY_CONFLICT',
+        409
+      );
     }
 
+    if (existing.action === 'in_progress') {
+      throw createRouteError(
+        'La misma venta todavía está siendo procesada. Reintenta en unos segundos con la misma clave.',
+        'POS_IDEMPOTENT_IN_PROGRESS',
+        409
+      );
+    }
+
+    if (existing.action === 'reuse') {
+      const reusedResult = await loadReusedPosSale(existing.orderId, req);
+      return res.status(200).json(
+        serializePosSaleResult(reusedResult, {
+          idempotent: true,
+          reused: true,
+        })
+      );
+    }
+
+    const preview = await preparePosSalePreview(req.body || {});
+
+    assertPosBranchAccess(req, preview.branch?._id, { requireSell: true });
+
     const result = await createPosSaleWithCashSession(req.body || {}, {
-      admin: buildAdminContext(req),
-      generateElectronicInvoice: req.body?.generateElectronicInvoice === true,
+      admin,
+      idempotency,
     });
 
-    return res.status(201).json({
-      ok: true,
-      order: result.order.toSafeObject ? result.order.toSafeObject() : result.order.toObject?.() || result.order,
-      movements: (result.movements || []).map((movement) =>
-        movement.toSafeObject ? movement.toSafeObject() : movement.toObject?.() || movement
-      ),
-      branch: serializeBranch(result.branch || {}),
-      cashSession: result.cashSession ? serializeCashSession(result.cashSession) : null,
-      cashRegisterCode: result.cashRegisterCode || '',
-      cashSessionRequired: result.cashSessionRequired === true,
-    });
+    return res.status(201).json(serializePosSaleResult(result));
   } catch (error) {
     return sendError(res, error);
   }

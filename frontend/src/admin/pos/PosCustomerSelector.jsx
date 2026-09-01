@@ -20,6 +20,7 @@ function cleanText(value) {
 function publishCustomerSelection(state) {
   if (typeof window === 'undefined') return;
   window.__rbPosCustomerSelection = state;
+  window.dispatchEvent(new CustomEvent('pos:customer-selection-changed'));
 }
 
 function findCustomerSlot() {

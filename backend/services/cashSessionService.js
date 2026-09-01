@@ -48,6 +48,69 @@ function createCashError(message, code = 'CASH_SESSION_ERROR', statusCode = 400,
   return error;
 }
 
+function isCashConcurrencyError(error) {
+  return (
+    error?.name === 'VersionError' ||
+    String(error?.code || '') === '112' ||
+    String(error?.codeName || '').toLowerCase() === 'writeconflict'
+  );
+}
+
+function cashConcurrencyError() {
+  return createCashError(
+    'La caja cambió mientras realizabas la operación. Actualiza y vuelve a intentarlo.',
+    'CASH_SESSION_CONFLICT',
+    409
+  );
+}
+
+async function saveCashSession(session, options = {}) {
+  try {
+    return options.session
+      ? await session.save({ session: options.session })
+      : await session.save();
+  } catch (error) {
+    if (isCashConcurrencyError(error)) throw cashConcurrencyError();
+    throw error;
+  }
+}
+
+function normalizeBranchScope(branchIds) {
+  if (!Array.isArray(branchIds)) return null;
+  return [...new Set(branchIds.map(toObjectId).filter(Boolean).map(String))]
+    .map((branchId) => new mongoose.Types.ObjectId(branchId));
+}
+
+function buildScopedCashSessionFilter(sessionId, options = {}) {
+  const objectId = toObjectId(sessionId);
+  if (!objectId) {
+    throw createCashError('Debes indicar una caja válida.', 'CASH_SESSION_ID_REQUIRED', 400);
+  }
+
+  const filter = { _id: objectId };
+  const branchScope = normalizeBranchScope(options.branchIds);
+  if (branchScope) filter.branch = { $in: branchScope };
+  return filter;
+}
+
+function assertCashSessionOperator(session, adminContext, options = {}) {
+  if (options.canSupervise === true) return true;
+
+  if (
+    adminContext?.id &&
+    String(session?.cashier || '') === String(adminContext.id)
+  ) {
+    return true;
+  }
+
+  throw createCashError(
+    'Solo el cajero responsable o un supervisor puede operar esta caja.',
+    'CASH_SESSION_OPERATOR_FORBIDDEN',
+    403,
+    { sessionId: String(session?._id || '') }
+  );
+}
+
 function normalizePaymentMethod(value) {
   const method = cleanLower(value || 'other', 40);
   return PAYMENT_TOTAL_KEYS.has(method) ? method : 'other';
@@ -326,13 +389,16 @@ async function recalculateCashSession(sessionOrId, options = {}) {
 
   session.salesSummary = buildCashSessionSalesSummary(orders, refunds);
 
-  if (dbSession) await session.save({ session: dbSession });
-  else await session.save();
+  await saveCashSession(session, { session: dbSession });
 
   return session;
 }
 
-async function getCurrentCashSession({ branchId, cashRegisterCode = 'CAJA PRINCIPAL' } = {}) {
+async function getCurrentCashSession({
+  branchId,
+  cashRegisterCode = 'CAJA PRINCIPAL',
+  branchIds,
+} = {}) {
   const branchObjectId = toObjectId(branchId);
 
   if (!branchObjectId) {
@@ -343,6 +409,15 @@ async function getCurrentCashSession({ branchId, cashRegisterCode = 'CAJA PRINCI
     branch: branchObjectId,
     status: 'open',
   };
+
+  const branchScope = normalizeBranchScope(branchIds);
+  if (branchScope && !branchScope.some((id) => String(id) === String(branchObjectId))) {
+    throw createCashError(
+      'No tienes acceso a la caja de esa sede.',
+      'CASH_BRANCH_FORBIDDEN',
+      403
+    );
+  }
 
   const registerCode = cleanUpper(cashRegisterCode || 'CAJA PRINCIPAL', 40);
   if (registerCode) filter.cashRegisterCode = registerCode;
@@ -400,30 +475,42 @@ async function openCashSession(payload = {}, { admin = {} } = {}) {
       : [],
   });
 
-  await session.save();
-  return session;
+  try {
+    await saveCashSession(session);
+    return session;
+  } catch (error) {
+    if (String(error?.code || '') === '11000') {
+      throw createCashError(
+        'Ya existe una caja abierta para esta sede y caja.',
+        'CASH_SESSION_ALREADY_OPEN',
+        409
+      );
+    }
+    throw error;
+  }
 }
 
-async function closeCashSession(sessionId, payload = {}, { admin = {} } = {}) {
-  const objectId = toObjectId(sessionId);
-
-  if (!objectId) {
-    throw createCashError('Debes indicar una caja válida.', 'CASH_SESSION_ID_REQUIRED', 400);
-  }
-
-  const session = await CashSession.findById(objectId);
+async function closeCashSession(sessionId, payload = {}, options = {}) {
+  const admin = options.admin || {};
+  const adminContext = await resolveAdminContext(admin);
+  const session = await CashSession.findOne(
+    buildScopedCashSessionFilter(sessionId, options)
+  );
 
   if (!session) {
-    throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
+    throw createCashError(
+      'Caja no encontrada dentro de tus sedes autorizadas.',
+      'CASH_SESSION_NOT_FOUND',
+      404
+    );
   }
 
   if (session.status !== 'open') {
     throw createCashError('Solo se puede cerrar una caja abierta.', 'CASH_SESSION_NOT_OPEN', 409);
   }
 
+  assertCashSessionOperator(session, adminContext, options);
   await recalculateCashSession(session);
-
-  const adminContext = await resolveAdminContext(admin);
 
   session.closeSession({
     countedCash: cleanMoney(payload.countedCash),
@@ -441,7 +528,7 @@ async function closeCashSession(sessionId, payload = {}, { admin = {} } = {}) {
     createdBySnapshot: adminContext.snapshot,
   });
 
-  await session.save();
+  await saveCashSession(session);
   return session;
 }
 
@@ -449,12 +536,26 @@ async function listCashSessions(filters = {}) {
   const page = Math.max(1, Number(filters.page || 1));
   const limit = Math.min(100, Math.max(1, Number(filters.limit || 20)));
   const query = {};
+  const branchScope = normalizeBranchScope(filters.branchIds);
+  if (branchScope) query.branch = { $in: branchScope };
 
   const status = cleanLower(filters.status || '', 20);
   if (status && status !== 'all') query.status = status;
 
   const branchObjectId = toObjectId(filters.branchId || filters.branch);
-  if (branchObjectId) query.branch = branchObjectId;
+  if (branchObjectId) {
+    if (
+      branchScope &&
+      !branchScope.some((branchId) => String(branchId) === String(branchObjectId))
+    ) {
+      throw createCashError(
+        'No tienes acceso a las cajas de esa sede.',
+        'CASH_BRANCH_FORBIDDEN',
+        403
+      );
+    }
+    query.branch = branchObjectId;
+  }
 
   const [sessions, total] = await Promise.all([
     CashSession.find(query)
@@ -473,17 +574,17 @@ async function listCashSessions(filters = {}) {
   };
 }
 
-async function getCashSessionById(sessionId) {
-  const objectId = toObjectId(sessionId);
-
-  if (!objectId) {
-    throw createCashError('Debes indicar una caja válida.', 'CASH_SESSION_ID_REQUIRED', 400);
-  }
-
-  const session = await CashSession.findById(objectId);
+async function getCashSessionById(sessionId, options = {}) {
+  const session = await CashSession.findOne(
+    buildScopedCashSessionFilter(sessionId, options)
+  );
 
   if (!session) {
-    throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
+    throw createCashError(
+      'Caja no encontrada dentro de tus sedes autorizadas.',
+      'CASH_SESSION_NOT_FOUND',
+      404
+    );
   }
 
   await recalculateCashSession(session);
@@ -491,6 +592,9 @@ async function getCashSessionById(sessionId) {
 }
 
 module.exports = {
+  assertCashSessionOperator,
+  buildScopedCashSessionFilter,
+  cashConcurrencyError,
   createCashError,
   serializeCashSession,
   openCashSession,
@@ -502,4 +606,7 @@ module.exports = {
   allocateRefundAcrossPayments,
   buildCashSessionSalesSummary,
   orderPaymentComponents,
+  isCashConcurrencyError,
+  normalizeBranchScope,
+  saveCashSession,
 };

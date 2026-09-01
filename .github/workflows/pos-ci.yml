@@ -1,0 +1,106 @@
+name: POS CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/pos-nivel-plus-etapa-1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pos-integrity:
+    name: Integridad de POS y caja
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar seguridad e idempotencia de Etapa 1
+        run: npm --prefix backend run test:pos-level-plus-stage1
+
+      - name: Conservar contratos base de POS y caja
+        run: |
+          node backend/scripts/testAdminPosServiceCalculations.js
+          node backend/scripts/testAdminPosPermissions.js
+          node backend/scripts/testAdminPosOrderModel.js
+          node backend/scripts/testCashSessionModel.js
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
+
+  pos-mongodb:
+    name: Concurrencia real de POS y caja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Iniciar MongoDB transaccional
+        run: |
+          docker run --detach \
+            --name pos-mongodb \
+            --publish 27017:27017 \
+            mongo:7 \
+            --replSet rs0 \
+            --bind_ip_all
+
+          for attempt in {1..30}; do
+            if docker exec pos-mongodb mongosh --quiet --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs pos-mongodb
+          exit 1
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Habilitar transacciones MongoDB
+        run: node backend/scripts/initMongoReplicaSet.js
+
+      - name: Validar transacciones e idempotencia real
+        env:
+          POS_STAGE1_MONGO_URI: mongodb://127.0.0.1:27017/pos_stage1_ci?replicaSet=rs0
+        run: npm --prefix backend run test:pos-level-plus-stage1-integration
+
+      - name: Detener MongoDB
+        if: always()
+        run: docker rm --force pos-mongodb

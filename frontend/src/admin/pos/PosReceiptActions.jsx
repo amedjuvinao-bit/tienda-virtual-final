@@ -172,7 +172,7 @@ export default function PosReceiptActions({ sale, onClose }) {
     try {
       setLoadingReceipt(true);
       setError('');
-      const data = await getPosReceipt(orderId, { generateInvoice: true });
+      const data = await getPosReceipt(orderId);
       setReceipt(data?.receipt || null);
     } catch (err) {
       setError(err?.message || 'No fue posible cargar el comprobante.');
@@ -185,7 +185,7 @@ export default function PosReceiptActions({ sale, onClose }) {
     try {
       setLoadingPrint(true);
       setError('');
-      await openPosReceiptPdf(orderId, { generateInvoice: true });
+      await openPosReceiptPdf(orderId);
     } catch (err) {
       setError(err?.message || 'No fue posible abrir el PDF.');
     } finally {
@@ -207,7 +207,7 @@ export default function PosReceiptActions({ sale, onClose }) {
         return;
       }
 
-      const data = await sendPosReceiptEmail(orderId, { to, generateInvoice: true });
+      const data = await sendPosReceiptEmail(orderId, { to });
       setStatusMessage(data?.message || `Comprobante enviado correctamente a ${to}.`);
     } catch (err) {
       setError(err?.message || 'No fue posible enviar el comprobante por correo.');

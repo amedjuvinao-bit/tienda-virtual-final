@@ -13,6 +13,10 @@ const {
   getCashSessionById,
 } = require('../services/cashSessionService');
 const { addManualCashMovement } = require('../services/cashMovementService');
+const {
+  assertPosBranchAccess,
+  buildCashSessionAccess,
+} = require('../services/adminPosAccessService');
 
 const router = express.Router();
 
@@ -49,9 +53,15 @@ router.use(requireAdmin);
 
 router.get('/current', requirePermission('pos:view'), async (req, res) => {
   try {
+    const branchId = req.query.branchId || req.query.branch;
+    assertPosBranchAccess(req, branchId);
+    const access = buildCashSessionAccess(req, {
+      requestedBranchId: branchId,
+    });
     const session = await getCurrentCashSession({
-      branchId: req.query.branchId || req.query.branch,
+      branchId,
       cashRegisterCode: req.query.cashRegisterCode || req.query.registerCode || 'CAJA PRINCIPAL',
+      branchIds: access.branchIds,
     });
 
     return res.json({
@@ -66,6 +76,11 @@ router.get('/current', requirePermission('pos:view'), async (req, res) => {
 
 router.post('/open', requirePermission('pos:sell'), async (req, res) => {
   try {
+    assertPosBranchAccess(
+      req,
+      req.body?.branchId || req.body?.branch,
+      { requireSell: true }
+    );
     const session = await openCashSession(req.body || {}, {
       admin: buildAdminContext(req),
     });
@@ -82,8 +97,10 @@ router.post('/open', requirePermission('pos:sell'), async (req, res) => {
 
 router.post('/:id/close', requirePermission('pos:sell'), async (req, res) => {
   try {
+    const access = buildCashSessionAccess(req, { requireSell: true });
     const session = await closeCashSession(req.params.id, req.body || {}, {
       admin: buildAdminContext(req),
+      ...access,
     });
 
     return res.json({
@@ -98,8 +115,10 @@ router.post('/:id/close', requirePermission('pos:sell'), async (req, res) => {
 
 router.post('/:id/movements', requirePermission('pos:sell'), async (req, res) => {
   try {
+    const access = buildCashSessionAccess(req, { requireSell: true });
     const session = await addManualCashMovement(req.params.id, req.body || {}, {
       admin: buildAdminContext(req),
+      ...access,
     });
 
     return res.status(201).json({
@@ -114,7 +133,12 @@ router.post('/:id/movements', requirePermission('pos:sell'), async (req, res) =>
 
 router.get('/', requirePermission('pos:view'), async (req, res) => {
   try {
-    const result = await listCashSessions(req.query || {});
+    const requestedBranchId = req.query.branchId || req.query.branch || '';
+    const access = buildCashSessionAccess(req, { requestedBranchId });
+    const result = await listCashSessions({
+      ...(req.query || {}),
+      branchIds: access.branchIds,
+    });
 
     return res.json({
       ok: true,
@@ -131,7 +155,8 @@ router.get('/', requirePermission('pos:view'), async (req, res) => {
 
 router.get('/:id', requirePermission('pos:view'), async (req, res) => {
   try {
-    const session = await getCashSessionById(req.params.id);
+    const access = buildCashSessionAccess(req);
+    const session = await getCashSessionById(req.params.id, access);
 
     return res.json({
       ok: true,

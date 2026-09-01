@@ -3,7 +3,13 @@
 const mongoose = require('mongoose');
 
 const CashSession = require('../models/CashSession');
-const { createCashError, recalculateCashSession } = require('./cashSessionService');
+const {
+  assertCashSessionOperator,
+  buildScopedCashSessionFilter,
+  createCashError,
+  recalculateCashSession,
+  saveCashSession,
+} = require('./cashSessionService');
 
 const MOVEMENT_CONFIG = {
   cash_in: { direction: 'in', label: 'Ingreso manual' },
@@ -87,17 +93,18 @@ function assertMovementDoesNotOverdrawCash(session, { amount, type, direction })
   }
 }
 
-async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {}) {
-  const objectId = toObjectId(sessionId);
-
-  if (!objectId) {
-    throw createCashError('Debes indicar una caja válida.', 'CASH_SESSION_ID_REQUIRED', 400);
-  }
-
-  const session = await CashSession.findById(objectId);
+async function addManualCashMovement(sessionId, payload = {}, options = {}) {
+  const admin = options.admin || {};
+  const session = await CashSession.findOne(
+    buildScopedCashSessionFilter(sessionId, options)
+  );
 
   if (!session) {
-    throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
+    throw createCashError(
+      'Caja no encontrada dentro de tus sedes autorizadas.',
+      'CASH_SESSION_NOT_FOUND',
+      404
+    );
   }
 
   if (session.status !== 'open') {
@@ -116,10 +123,14 @@ async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {
     throw createCashError('Debes escribir el motivo del movimiento.', 'CASH_MOVEMENT_REASON_REQUIRED', 400);
   }
 
+  const adminObjectId = toObjectId(admin.id || admin._id || admin.adminUserId);
+  assertCashSessionOperator(
+    session,
+    { id: adminObjectId },
+    options
+  );
   const recalculatedSession = await recalculateCashSession(session);
   assertMovementDoesNotOverdrawCash(recalculatedSession, { amount, type, direction });
-
-  const adminObjectId = toObjectId(admin.id || admin._id || admin.adminUserId);
 
   recalculatedSession.addCashMovement({
     type,
@@ -131,7 +142,7 @@ async function addManualCashMovement(sessionId, payload = {}, { admin = {} } = {
     createdBySnapshot: buildAdminSnapshot(admin),
   });
 
-  await recalculatedSession.save();
+  await saveCashSession(recalculatedSession);
   return recalculateCashSession(recalculatedSession);
 }
 

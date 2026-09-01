@@ -898,6 +898,95 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
 
   /* =========================================================
+   * POS / VENTAS FÍSICAS Y CAJA
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/pos/bootstrap',
+    permission: 'pos:view',
+    description: 'Consultar sedes, pagos y capacidades disponibles del POS.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/pos/products',
+    permission: 'pos:view',
+    description: 'Buscar productos disponibles para venta física.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/pos/sales/preview',
+    permission: 'pos:view',
+    description: 'Validar y calcular una venta POS antes de confirmarla.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/pos/sales',
+    permission: 'pos:sell',
+    description: 'Confirmar una venta POS con inventario y caja transaccionales.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/pos/sales/:id/receipt',
+    permission: 'pos:receipt',
+    description: 'Consultar el comprobante de una venta POS.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/pos/sales/:id/receipt/pdf',
+    permission: 'pos:receipt',
+    description: 'Generar el PDF del comprobante POS sin emitir factura electrónica.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/pos/sales/:id/send-email',
+    permission: 'pos:receipt',
+    description: 'Enviar el comprobante POS por correo sin emitir factura electrónica.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/cash-sessions/current',
+    permission: 'pos:view',
+    description: 'Consultar la caja abierta de una sede autorizada.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/cash-sessions',
+    permission: 'pos:view',
+    description: 'Listar sesiones de caja dentro de las sedes autorizadas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/cash-sessions/:id',
+    permission: 'pos:view',
+    description: 'Consultar una sesión de caja autorizada.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/open',
+    permission: 'pos:sell',
+    description: 'Abrir una caja en una sede autorizada.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/:id/close',
+    permission: 'pos:sell',
+    description: 'Cerrar una caja como responsable o supervisor.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/:id/movements',
+    permission: 'pos:sell',
+    description: 'Registrar un movimiento en una caja autorizada.',
+    audit: true,
+  },
+
+  /* =========================================================
    * CONFIGURACIÓN / APARIENCIA / SITE SETTINGS
    * ======================================================= */
   {

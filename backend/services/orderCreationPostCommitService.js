@@ -417,5 +417,6 @@ module.exports = {
   isFullyPaidStoreCreditOrder,
   processFullyPaidStoreCreditOrder:
     defaultService.processFullyPaidStoreCreditOrder,
+  processFulfillmentOnce: defaultService.processFulfillmentOnce,
   processPaidOrderEffects: defaultService.processPaidOrderEffects,
 };

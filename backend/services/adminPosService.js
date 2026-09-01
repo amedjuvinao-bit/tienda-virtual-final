@@ -1,5 +1,6 @@
 // backend/services/adminPosService.js
 
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const Branch = require('../models/Branch');
@@ -14,10 +15,9 @@ const {
   findCustomerMatch,
 } = require('./customerOrderLinkService');
 const Counter = require('../models/Counter');
-const { generateElectronicInvoiceAfterPayment } = require('./electronicInvoiceAfterPaymentService');
 const {
-  processOrderFulfillmentAfterPayment,
-} = require('./orderFulfillmentService');
+  processFulfillmentOnce,
+} = require('./orderCreationPostCommitService');
 const {
   getPublicFulfillmentView,
 } = require('../lib/products/productFulfillmentConfig');
@@ -1052,7 +1052,13 @@ function validateDiscountAuthorization({ normalizedPayload, admin = {}, maxPerce
   }
 }
 
-function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = {} }) {
+function buildPosOrderPayload({
+  normalizedPayload,
+  branch,
+  orderNumber,
+  admin = {},
+  paymentTransactionId = '',
+}) {
   const now = new Date();
   const adminId = getObjectIdValue(admin._id || admin.id || admin.adminUserId || admin.userId) || null;
   const adminSnapshot = buildAdminSnapshot(admin);
@@ -1092,6 +1098,10 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
           ['digital', 'service'].includes(component.productType)
         )
       )
+  );
+  const safePaymentTransactionId = cleanUpper(
+    paymentTransactionId || `POS-${crypto.randomUUID()}`,
+    120
   );
 
   return {
@@ -1153,7 +1163,7 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       methodType: normalizedPayload.payment.methodType,
       method: normalizedPayload.payment.method,
       methodLabel: normalizedPayload.payment.methodLabel,
-      transactionId: '',
+      transactionId: safePaymentTransactionId,
       reference: normalizedPayload.payment.reference,
       amountInCents: Math.round(normalizedPayload.total * 100),
       amount: normalizedPayload.total,
@@ -1171,6 +1181,22 @@ function buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin = 
       discountedAtCheckout: true,
       restockedOnFailure: false,
       restockedAt: null,
+    },
+    paymentProcessing: {
+      provider: 'pos',
+      approvedTransactionId: safePaymentTransactionId,
+      approvedAt: now,
+      inventory: {
+        status: 'confirmed',
+        confirmedAt: now,
+      },
+      fulfillment: {
+        status: hasVirtualFulfillment ? 'pending' : 'not_required',
+      },
+      invoice: {
+        status: 'not_required',
+        transactionId: safePaymentTransactionId,
+      },
     },
     tags: normalizedPayload.customerMode === 'identified'
       ? ['pos', 'venta física', 'cliente identificado']
@@ -1433,7 +1459,13 @@ async function createPosSale(payload = {}, options = {}) {
     normalizedPayload.billing = normalizePosBilling(payload.billing || customerResolution.customerSnapshot);
 
     const orderNumber = await getNextOrderNumber({ session });
-    const orderPayload = buildPosOrderPayload({ normalizedPayload, branch, orderNumber, admin });
+    const orderPayload = buildPosOrderPayload({
+      normalizedPayload,
+      branch,
+      orderNumber,
+      admin,
+      paymentTransactionId: options.paymentTransactionId,
+    });
     if (customerResolution.customer?._id) {
       orderPayload.customer = {
         ...(orderPayload.customer || {}),
@@ -1505,10 +1537,12 @@ async function createPosSale(payload = {}, options = {}) {
 
   if (!externalSession) {
     try {
-      await processOrderFulfillmentAfterPayment({
+      await processFulfillmentOnce({
         orderId: result.order._id,
         paymentProvider: 'pos',
         transaction: {
+          id: result.order.payment?.transactionId,
+          provider: 'pos',
           payment_method_type:
             result.order.payment?.methodType || 'pos',
           payment_method_name:
@@ -1519,26 +1553,9 @@ async function createPosSale(payload = {}, options = {}) {
       });
     } catch (error) {
       console.error(
-        '[adminPosService] Error preparando cumplimiento POS:',
+        '[adminPosService] Error registrando cumplimiento POS recuperable:',
         error.message
       );
-    }
-  }
-
-  if (options.generateElectronicInvoice === true) {
-    try {
-      await generateElectronicInvoiceAfterPayment({
-        orderId: result.order._id,
-        paymentProvider: 'pos',
-        transaction: {
-          payment_method_type: result.order.payment?.methodType || 'pos',
-          payment_method_name: result.order.payment?.methodLabel || 'Venta física',
-          payment_method: result.order.payment?.method || 'pos',
-          rawMethod: result.order.payment?.rawMethod || {},
-        },
-      });
-    } catch (error) {
-      console.error('[adminPosService] Error generando factura POS:', error.message);
     }
   }
 
