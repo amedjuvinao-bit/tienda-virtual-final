@@ -356,7 +356,7 @@ function CustomerRow({ customer, onOpenDetail }) {
 
   return (
     <article className="border-b transition-colors last:border-b-0 hover:bg-[#fff7fb]/70" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
-      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(250px,1.35fr)_minmax(210px,1fr)_110px_150px_minmax(150px,.8fr)_110px] lg:items-center">
+      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff7fb', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
           <div className="min-w-0">
@@ -1241,7 +1241,7 @@ export default function AdminCustomersPageTabbed() {
               </div>
             ) : null}
 
-            <div className="hidden border-b bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] lg:grid lg:grid-cols-[minmax(250px,1.35fr)_minmax(210px,1fr)_110px_150px_minmax(150px,.8fr)_110px] lg:gap-4" style={{ borderColor: 'rgba(148,163,184,0.18)', color: 'var(--admin-card-muted-text)' }}>
+            <div className="hidden border-b bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] lg:grid lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:gap-4" style={{ borderColor: 'rgba(148,163,184,0.18)', color: 'var(--admin-card-muted-text)' }}>
               <span>Cliente</span><span>Contacto</span><span>Compras</span><span>Venta neta</span><span>Estado CRM</span><span className="text-center">Acción</span>
             </div>
 
