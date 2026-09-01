@@ -1419,6 +1419,12 @@ router.get(
           nextAction: item.nextAction,
           dueAt: item.dueAt,
           doneAt: item.doneAt,
+          outcome: item.outcome || '',
+          outcomeNote: item.outcomeNote || '',
+          outcomeAt: item.outcomeAt || null,
+          outcomeHistory: Array.isArray(item.outcomeHistory)
+            ? item.outcomeHistory
+            : [],
           createdAt: item.createdAt,
         })),
         retention,
@@ -1589,6 +1595,8 @@ router.post(
           $set: {
             note: '[ANONIMIZADO]',
             nextAction: '',
+            outcomeNote: '',
+            outcomeHistory: [],
             deletedAt: anonymizedAt,
             updatedByAdmin: getAdminId(req),
           },

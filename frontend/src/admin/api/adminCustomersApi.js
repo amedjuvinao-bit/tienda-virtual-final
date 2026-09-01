@@ -192,6 +192,17 @@ export function normalizeCustomerFollowUpPayload(payload = {}) {
   };
 }
 
+export function normalizeCustomerFollowUpResultPayload(payload = {}) {
+  return {
+    outcome: cleanText(payload.outcome || payload.result).toLowerCase(),
+    outcomeNote: cleanText(
+      payload.outcomeNote || payload.resultNote || payload.note
+    ),
+    nextAction: cleanText(payload.nextAction),
+    dueAt: payload.dueAt || null,
+  };
+}
+
 export async function getAdminCustomers(params = {}) {
   const queryString = buildQueryParams({
     q: params.q,
@@ -497,6 +508,31 @@ export async function updateAdminCustomerFollowUp(customerId, followUpId, payloa
   }
 }
 
+export async function recordAdminCustomerFollowUpResult(
+  customerId,
+  followUpId,
+  payload
+) {
+  const cleanCustomerId = cleanText(customerId);
+  const cleanFollowUpId = cleanText(followUpId);
+
+  if (!cleanCustomerId || !cleanFollowUpId) {
+    throw new Error('Debes seleccionar una gestión válida.');
+  }
+
+  assertPayload(payload, 'El resultado de la gestión es obligatorio.');
+
+  try {
+    const response = await api.post(
+      `${FOLLOW_UPS_URL}/${cleanCustomerId}/${cleanFollowUpId}/result`,
+      normalizeCustomerFollowUpResultPayload(payload)
+    );
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible registrar el resultado de la gestión.');
+  }
+}
+
 export async function deleteAdminCustomerFollowUp(customerId, followUpId) {
   const cleanCustomerId = cleanText(customerId);
   const cleanFollowUpId = cleanText(followUpId);
@@ -544,11 +580,13 @@ const adminCustomersApi = {
   updateAdminCustomer,
   getAdminCustomerFollowUps,
   createAdminCustomerFollowUp,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomerFollowUp,
   deleteAdminCustomerFollowUp,
   createQuickPosCustomer,
   normalizeCustomerPayload,
   normalizeCustomerFollowUpPayload,
+  normalizeCustomerFollowUpResultPayload,
 };
 
 export default adminCustomersApi;

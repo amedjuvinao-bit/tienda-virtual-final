@@ -66,6 +66,7 @@ const SENSITIVE_BODY_KEYS = [
   'retentionHoldReason',
   'notes',
   'note',
+  'nextAction',
   'q',
   'search',
   'searchTerm',

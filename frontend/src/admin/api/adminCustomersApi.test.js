@@ -10,7 +10,9 @@ import {
   getAdminCustomerPrivacy,
   getAdminCustomerSavedSegments,
   normalizeCustomerFollowUpPayload,
+  normalizeCustomerFollowUpResultPayload,
   normalizeCustomerPayload,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomerConsent,
 } from './adminCustomersApi';
 
@@ -98,6 +100,42 @@ describe('adminCustomersApi Etapa 1', () => {
 
     expect(api.get).toHaveBeenCalledWith(
       '/api/admin/customer-follow-ups/queue?status=pending&priority=urgent&dueScope=overdue&assignedTo=me&page=2&limit=25'
+    );
+  });
+
+  it('registra un resultado CRM explícito sin invocar endpoints de pagos u órdenes', async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        result: { outcome: 'payment_confirmed', statusAfter: 'done' },
+      },
+    });
+
+    expect(
+      normalizeCustomerFollowUpResultPayload({
+        outcome: ' PAYMENT_CONFIRMED ',
+        outcomeNote: ' Cliente confirmó por WhatsApp ',
+      })
+    ).toEqual({
+      outcome: 'payment_confirmed',
+      outcomeNote: 'Cliente confirmó por WhatsApp',
+      nextAction: '',
+      dueAt: null,
+    });
+
+    await recordAdminCustomerFollowUpResult('customer-1', 'follow-up-1', {
+      outcome: 'payment_confirmed',
+      outcomeNote: 'Cliente confirmó por WhatsApp',
+    });
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/admin/customer-follow-ups/customer-1/follow-up-1/result',
+      {
+        outcome: 'payment_confirmed',
+        outcomeNote: 'Cliente confirmó por WhatsApp',
+        nextAction: '',
+        dueAt: null,
+      }
     );
   });
 

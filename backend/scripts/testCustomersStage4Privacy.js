@@ -237,7 +237,12 @@ async function main() {
   const followUps = read('backend/routes/adminCustomerFollowUps.js');
   ok(
     'crear, actualizar y eliminar seguimientos genera eventos del cliente',
-    ['follow_up_created', 'follow_up_updated', 'follow_up_deleted']
+    [
+      'follow_up_created',
+      'follow_up_updated',
+      'follow_up_result_recorded',
+      'follow_up_deleted',
+    ]
       .every((eventType) => followUps.includes(`eventType: '${eventType}'`))
   );
   ok(
@@ -250,6 +255,10 @@ async function main() {
     'listado, bandeja e historial de seguimiento dejan rastro de consulta',
     findAdminRoutePermission('GET', '/api/admin/customers')?.audit === true &&
       findAdminRoutePermission('GET', '/api/admin/customer-follow-ups/queue')?.audit === true &&
+      findAdminRoutePermission(
+        'POST',
+        '/api/admin/customer-follow-ups/64c000000000000000000001/64c000000000000000000002/result'
+      )?.audit === true &&
       findAdminRoutePermission(
         'GET',
         '/api/admin/customer-follow-ups/64c000000000000000000001'

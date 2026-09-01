@@ -6,6 +6,9 @@ const {
   CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS,
   cloneDefinitions,
 } = require('./customerIndexDefinitions');
+const {
+  FOLLOW_UP_RESULT_OUTCOMES,
+} = require('../lib/customers/customerFollowUpResultPolicy');
 
 const FOLLOW_UP_TYPES = [
   'note',
@@ -27,6 +30,7 @@ const FOLLOW_UP_PRIORITY_RANK = Object.freeze({
   high: 30,
   urgent: 40,
 });
+const FOLLOW_UP_OUTCOMES = ['', ...Object.keys(FOLLOW_UP_RESULT_OUTCOMES)];
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -35,6 +39,45 @@ function cleanText(value) {
 function cleanLower(value) {
   return cleanText(value).toLowerCase();
 }
+
+const FollowUpOutcomeHistorySchema = new mongoose.Schema(
+  {
+    outcome: {
+      type: String,
+      enum: Object.keys(FOLLOW_UP_RESULT_OUTCOMES),
+      required: true,
+      set: cleanLower,
+    },
+    note: {
+      type: String,
+      trim: true,
+      required: true,
+      maxlength: 2000,
+      set: cleanText,
+    },
+    statusAfter: {
+      type: String,
+      enum: ['pending', 'done'],
+      required: true,
+      set: cleanLower,
+    },
+    nextAction: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
+      set: cleanText,
+    },
+    dueAt: { type: Date, default: null },
+    recordedAt: { type: Date, required: true, default: Date.now },
+    recordedByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+  },
+  { _id: false }
+);
 
 const CustomerFollowUpSchema = new mongoose.Schema(
   {
@@ -91,6 +134,32 @@ const CustomerFollowUpSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    outcome: {
+      type: String,
+      enum: FOLLOW_UP_OUTCOMES,
+      default: '',
+      set: cleanLower,
+    },
+    outcomeNote: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 2000,
+      set: cleanText,
+    },
+    outcomeAt: {
+      type: Date,
+      default: null,
+    },
+    outcomeByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+    outcomeHistory: {
+      type: [FollowUpOutcomeHistorySchema],
+      default: [],
+    },
     createdByAdmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AdminUser',
@@ -130,9 +199,15 @@ CustomerFollowUpSchema.pre('validate', function preValidateFollowUp(next) {
   this.priorityRank = FOLLOW_UP_PRIORITY_RANK[this.priority];
   this.note = cleanText(this.note);
   this.nextAction = cleanText(this.nextAction);
+  this.outcome = cleanLower(this.outcome);
+  this.outcomeNote = cleanText(this.outcomeNote);
 
   if (!this.note) {
     this.invalidate('note', 'La nota de seguimiento es obligatoria.');
+  }
+
+  if (this.outcome && !this.outcomeNote) {
+    this.invalidate('outcomeNote', 'La nota del resultado es obligatoria.');
   }
 
   if (this.status === 'done' && !this.doneAt) {
@@ -156,3 +231,4 @@ CustomerFollowUpSchema.methods.toSafeObject = function toSafeObject() {
 module.exports = mongoose.models.CustomerFollowUp || mongoose.model('CustomerFollowUp', CustomerFollowUpSchema);
 module.exports.FOLLOW_UP_PRIORITIES = FOLLOW_UP_PRIORITIES;
 module.exports.FOLLOW_UP_PRIORITY_RANK = FOLLOW_UP_PRIORITY_RANK;
+module.exports.FOLLOW_UP_RESULT_OUTCOMES = FOLLOW_UP_RESULT_OUTCOMES;

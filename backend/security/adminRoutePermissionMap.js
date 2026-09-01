@@ -1361,6 +1361,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'POST',
+    path: '/api/admin/customer-follow-ups/:customerId/:followUpId/result',
+    permission: 'customers:update',
+    description: 'Registrar el resultado verificable de una gestión CRM.',
+    audit: true,
+  },
+  {
     method: 'PUT',
     path: '/api/admin/customer-follow-ups/:customerId/:followUpId',
     permission: 'customers:update',

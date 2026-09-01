@@ -12,6 +12,7 @@ const AUDIT_EVENT_TYPES = Object.freeze([
   'updated',
   'follow_up_created',
   'follow_up_updated',
+  'follow_up_result_recorded',
   'follow_up_deleted',
   'consent_changed',
   'exported',

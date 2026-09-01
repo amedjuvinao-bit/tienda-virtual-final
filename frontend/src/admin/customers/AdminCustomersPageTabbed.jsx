@@ -42,8 +42,8 @@ import {
   getAdminCustomerCrmAssignees,
   getAdminCustomerFollowUps,
   getAdminCustomers,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomer,
-  updateAdminCustomerFollowUp,
 } from '../api/adminCustomersApi';
 import {
   CUSTOMER_360_TABS,
@@ -52,6 +52,7 @@ import {
 import CustomerCrmWorkspace from './CustomerCrmWorkspace';
 import CustomerSavedSegments from './CustomerSavedSegments';
 import CustomerPrivacyPanel from './CustomerPrivacyPanel';
+import CustomerFollowUpResultModal from './CustomerFollowUpResultModal';
 
 const EMPTY_FORM = {
   fullName: '',
@@ -79,7 +80,6 @@ const EMPTY_FORM = {
 
 const EMPTY_FOLLOW_UP = {
   type: 'whatsapp',
-  status: 'pending',
   note: '',
   nextAction: '',
   dueAt: '',
@@ -145,12 +145,6 @@ const FOLLOW_UP_TYPES = [
   ['complaint', 'Reclamo'],
   ['task', 'Tarea'],
   ['other', 'Otro'],
-];
-
-const FOLLOW_UP_STATUSES = [
-  ['pending', 'Pendiente'],
-  ['done', 'Realizado'],
-  ['cancelled', 'Cancelado'],
 ];
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
@@ -469,7 +463,7 @@ function OrderList({ orders }) {
   );
 }
 
-function FollowUpList({ followUps, onDone, onDelete }) {
+function FollowUpList({ followUps, onResolve, onDelete }) {
   if (!followUps.length) {
     return <p className="rounded-2xl border p-5 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)', background: '#fff' }}>Sin gestiones registradas.</p>;
   }
@@ -491,9 +485,10 @@ function FollowUpList({ followUps, onDone, onDelete }) {
                 {item.nextAction ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Próxima acción: {item.nextAction}</p> : null}
                 <p className="mt-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Responsable: {item.assignedToAdmin?.name || item.createdByAdmin?.name || 'Administrador no identificado'}</p>
                 <p className="mt-1 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creado: {formatDate(item.createdAt)}{item.dueAt ? ` · Programado: ${formatDate(item.dueAt)}` : ''}</p>
+                {item.outcomeLabel ? <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-[10px] font-black uppercase text-emerald-700">Resultado: {item.outcomeLabel}</p>{item.outcomeNote ? <p className="mt-1 text-xs font-bold text-emerald-900">{item.outcomeNote}</p> : null}{item.outcomeAt ? <p className="mt-1 text-[10px] font-bold text-emerald-700">{formatDate(item.outcomeAt)} · {item.outcomeByAdmin?.name || 'Administrador'}</p> : null}</div> : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {item.status !== 'done' ? <button type="button" onClick={() => onDone(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Realizado</button> : null}
+                {item.status === 'pending' ? <button type="button" onClick={() => onResolve(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Registrar resultado</button> : null}
                 <button type="button" onClick={() => onDelete(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>Eliminar</button>
               </div>
             </div>
@@ -518,6 +513,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
   const [followError, setFollowError] = useState('');
   const [followForm, setFollowForm] = useState(EMPTY_FOLLOW_UP);
   const [followSaving, setFollowSaving] = useState(false);
+  const [resultItem, setResultItem] = useState(null);
   const [crmAssignees, setCrmAssignees] = useState([]);
   const [customer360, setCustomer360] = useState(null);
   const [customer360Loading, setCustomer360Loading] = useState(false);
@@ -675,10 +671,20 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
     }
   };
 
-  const markFollowDone = async (item) => {
-    if (!customer?.id || !item?.id) return;
-    await updateAdminCustomerFollowUp(customer.id, item.id, { ...item, status: 'done' });
-    await loadFollowUps();
+  const recordFollowUpResult = async (payload) => {
+    if (!customer?.id || !resultItem?.id) return;
+    try {
+      setFollowSaving(true);
+      await recordAdminCustomerFollowUpResult(
+        customer.id,
+        resultItem.id,
+        payload
+      );
+      setResultItem(null);
+      await loadFollowUps();
+    } finally {
+      setFollowSaving(false);
+    }
   };
 
   const removeFollowUp = async (item) => {
@@ -849,9 +855,8 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Nueva gestión</h3>
                     <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Registra una acción concreta: WhatsApp, llamada, pago, talla o tarea.</p>
                     {followError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{followError}</div> : null}
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div className="mt-5 grid gap-4 sm:grid-cols-3">
                       <Field label="Tipo"><select value={followForm.type} onChange={(event) => updateFollowField('type', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-                      <Field label="Estado"><select value={followForm.status} onChange={(event) => updateFollowField('status', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
                       <Field label="Prioridad"><select value={followForm.priority} onChange={(event) => updateFollowField('priority', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
                       <Field label="Responsable"><select value={followForm.assignedToAdmin} onChange={(event) => updateFollowField('assignedToAdmin', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="">Sin responsable</option>{crmAssignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></Field>
                     </div>
@@ -873,7 +878,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                       </div>
                       <button type="button" onClick={loadFollowUps} className="rounded-2xl border px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)', background: '#fff' }}>Actualizar</button>
                     </div>
-                    {followLoading ? <div className="rounded-2xl border p-5 text-center text-sm font-black" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)' }}>Cargando seguimiento...</div> : <FollowUpList followUps={followUps} onDone={markFollowDone} onDelete={removeFollowUp} />}
+                    {followLoading ? <div className="rounded-2xl border p-5 text-center text-sm font-black" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)' }}>Cargando seguimiento...</div> : <FollowUpList followUps={followUps} onResolve={(item) => setResultItem({ ...item, customerName: customerName(customer) })} onDelete={removeFollowUp} />}
                   </div>
                 </section>
               ) : null}
@@ -893,6 +898,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                 error={customer360Error}
                 onRetry={loadCustomer360Data}
               />
+              <CustomerFollowUpResultModal item={resultItem} saving={followSaving} onClose={() => setResultItem(null)} onSubmit={recordFollowUpResult} />
             </div>
           ) : null}
         </main>

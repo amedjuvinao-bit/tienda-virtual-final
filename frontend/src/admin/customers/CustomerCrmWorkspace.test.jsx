@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../api/adminCustomersApi', () => ({
   getAdminCustomerCrmAssignees: vi.fn(),
   getAdminCustomerCrmQueue: vi.fn(),
+  recordAdminCustomerFollowUpResult: vi.fn(),
   updateAdminCustomerFollowUp: vi.fn(),
 }));
 
 import {
   getAdminCustomerCrmAssignees,
   getAdminCustomerCrmQueue,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomerFollowUp,
 } from '../api/adminCustomersApi';
 import CustomerCrmWorkspace from './CustomerCrmWorkspace';
@@ -48,10 +50,11 @@ beforeEach(() => {
     followUps: [followUp],
   });
   updateAdminCustomerFollowUp.mockResolvedValue({ ok: true });
+  recordAdminCustomerFollowUpResult.mockResolvedValue({ ok: true });
 });
 
 describe('CustomerCrmWorkspace Etapa 3', () => {
-  it('centraliza vencidos, responsable y cierre de la gestión', async () => {
+  it('centraliza vencidos y exige un resultado verificable para cerrar', async () => {
     const onOpenCustomer = vi.fn();
     render(<CustomerCrmWorkspace onOpenCustomer={onOpenCustomer} />);
 
@@ -62,12 +65,67 @@ describe('CustomerCrmWorkspace Etapa 3', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cliente CRM' }));
     expect(onOpenCustomer).toHaveBeenCalledWith(followUp.customer);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Realizado' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar resultado' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Resultado de la gestión'), {
+      target: { value: 'payment_confirmed' },
+    });
+    fireEvent.change(screen.getByLabelText('Evidencia del resultado'), {
+      target: { value: 'Cliente confirmó el pago por WhatsApp' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
     await waitFor(() => {
-      expect(updateAdminCustomerFollowUp).toHaveBeenCalledWith(
+      expect(recordAdminCustomerFollowUpResult).toHaveBeenCalledWith(
         'customer-1',
         'follow-up-1',
-        expect.objectContaining({ status: 'done', priority: 'urgent' })
+        {
+          outcome: 'payment_confirmed',
+          outcomeNote: 'Cliente confirmó el pago por WhatsApp',
+          nextAction: '',
+          dueAt: null,
+        }
+      );
+    });
+    expect(updateAdminCustomerFollowUp).not.toHaveBeenCalledWith(
+      'customer-1',
+      'follow-up-1',
+      expect.objectContaining({ status: 'done' })
+    );
+  });
+
+  it('mantiene pendiente un intento sin respuesta y exige reprogramación', async () => {
+    render(<CustomerCrmWorkspace />);
+    expect(await screen.findByText('Cliente CRM')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar resultado' }));
+    fireEvent.change(screen.getByLabelText('Resultado de la gestión'), {
+      target: { value: 'no_answer' },
+    });
+    fireEvent.change(screen.getByLabelText('Evidencia del resultado'), {
+      target: { value: 'Se llamó dos veces y no respondió' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
+
+    expect(
+      await screen.findByText(/Indica la siguiente acción/i)
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Siguiente acción'), {
+      target: { value: 'Volver a llamar' },
+    });
+    fireEvent.change(screen.getByLabelText('Nueva fecha'), {
+      target: { value: '2099-09-01T10:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar resultado' }));
+
+    await waitFor(() => {
+      expect(recordAdminCustomerFollowUpResult).toHaveBeenCalledWith(
+        'customer-1',
+        'follow-up-1',
+        expect.objectContaining({
+          outcome: 'no_answer',
+          nextAction: 'Volver a llamar',
+          dueAt: '2099-09-01T10:00',
+        })
       );
     });
   });

@@ -23,6 +23,10 @@ const {
   protectCustomerData,
   recordCustomerAuditEvent,
 } = require('../services/customerPrivacyService');
+const {
+  FOLLOW_UP_RESULT_OUTCOMES,
+  normalizeCustomerFollowUpResult,
+} = require('../lib/customers/customerFollowUpResultPolicy');
 
 const router = express.Router();
 
@@ -233,6 +237,25 @@ function serializeFollowUp(followUp = {}, options = {}) {
     assignedToAdmin: serializeAdmin(raw.assignedToAdmin),
     dueAt: raw.dueAt || null,
     doneAt: raw.doneAt || null,
+    outcome: raw.outcome || '',
+    outcomeLabel:
+      FOLLOW_UP_RESULT_OUTCOMES[raw.outcome] ||
+      (raw.status === 'done' ? 'Cierre anterior sin resultado estructurado' : ''),
+    outcomeNote: raw.outcomeNote || '',
+    outcomeAt: raw.outcomeAt || null,
+    outcomeByAdmin: serializeAdmin(raw.outcomeByAdmin),
+    outcomeHistory: (Array.isArray(raw.outcomeHistory) ? raw.outcomeHistory : []).map(
+      (entry) => ({
+        outcome: entry.outcome || '',
+        outcomeLabel: FOLLOW_UP_RESULT_OUTCOMES[entry.outcome] || 'Resultado',
+        note: entry.note || '',
+        statusAfter: entry.statusAfter || 'pending',
+        nextAction: entry.nextAction || '',
+        dueAt: entry.dueAt || null,
+        recordedAt: entry.recordedAt || null,
+        recordedByAdmin: serializeAdmin(entry.recordedByAdmin),
+      })
+    ),
     createdAt: raw.createdAt || null,
     updatedAt: raw.updatedAt || null,
   };
@@ -284,6 +307,23 @@ async function recordCompletedCustomerContact(customer, followUp, adminId) {
     {
       $set: {
         crmLastContactAt: contactAt,
+        crmLastContactType: followUp.type || 'other',
+        crmUpdatedAt: new Date(),
+        updatedByAdmin: adminId || null,
+      },
+    }
+  );
+}
+
+async function recordCustomerResultContact(customer, followUp, adminId) {
+  if (!customer?._id || !followUp?.outcomeAt) return;
+  if (['no_answer', 'rescheduled'].includes(followUp.outcome)) return;
+
+  await Customer.updateOne(
+    { _id: customer._id, deletedAt: null },
+    {
+      $set: {
+        crmLastContactAt: followUp.outcomeAt,
         crmLastContactType: followUp.type || 'other',
         crmUpdatedAt: new Date(),
         updatedByAdmin: adminId || null,
@@ -370,7 +410,9 @@ router.get('/queue', requirePermission('customers:view'), async (req, res) => {
           )
           .populate('createdByAdmin', 'username displayName firstName lastName role')
           .populate('updatedByAdmin', 'username displayName firstName lastName role')
-          .populate('assignedToAdmin', 'username displayName firstName lastName role'),
+          .populate('assignedToAdmin', 'username displayName firstName lastName role')
+          .populate('outcomeByAdmin', 'username displayName firstName lastName role')
+          .populate('outcomeHistory.recordedByAdmin', 'username displayName firstName lastName role'),
         CustomerFollowUp.countDocuments(queueFilter),
         CustomerFollowUp.countDocuments(summaryFilter),
         CustomerFollowUp.countDocuments({
@@ -428,7 +470,9 @@ router.get('/:customerId', requirePermission('customers:view'), async (req, res)
       .limit(limit)
       .populate('createdByAdmin', 'username displayName firstName lastName role')
       .populate('updatedByAdmin', 'username displayName firstName lastName role')
-      .populate('assignedToAdmin', 'username displayName firstName lastName role');
+      .populate('assignedToAdmin', 'username displayName firstName lastName role')
+      .populate('outcomeByAdmin', 'username displayName firstName lastName role')
+      .populate('outcomeHistory.recordedByAdmin', 'username displayName firstName lastName role');
     await recordCustomerAuditEvent({
       req,
       customer,
@@ -458,6 +502,14 @@ router.post('/:customerId', requirePermission('customers:update'), async (req, r
 
     if (!payload.note) {
       throw createRouteError('Debes escribir una nota de seguimiento.', 'FOLLOW_UP_NOTE_REQUIRED', 400);
+    }
+
+    if (payload.status !== 'pending') {
+      throw createRouteError(
+        'Toda gestión nueva debe iniciar pendiente. Registra su resultado después de ejecutarla.',
+        'FOLLOW_UP_MUST_START_PENDING',
+        400
+      );
     }
 
     const adminId = getAdminId(req);
@@ -508,6 +560,8 @@ router.post('/:customerId', requirePermission('customers:update'), async (req, r
       { path: 'createdByAdmin', select: 'username displayName firstName lastName role' },
       { path: 'updatedByAdmin', select: 'username displayName firstName lastName role' },
       { path: 'assignedToAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'outcomeByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'outcomeHistory.recordedByAdmin', select: 'username displayName firstName lastName role' },
     ]);
 
     return res.status(201).json({
@@ -518,6 +572,147 @@ router.post('/:customerId', requirePermission('customers:update'), async (req, r
     return sendError(res, error);
   }
 });
+
+router.post(
+  '/:customerId/:followUpId/result',
+  requirePermission('customers:update'),
+  async (req, res) => {
+    try {
+      const customer = await loadCustomer(req, req.params.customerId);
+      const canViewSensitive = await canViewSensitiveCustomerData(req);
+
+      if (!mongoose.Types.ObjectId.isValid(String(req.params.followUpId))) {
+        throw createRouteError('Seguimiento no válido.', 'FOLLOW_UP_INVALID_ID', 400);
+      }
+
+      const access = assertScopeAccess(buildScopedFollowUpFilter(req, {
+        _id: req.params.followUpId,
+        customer: customer._id,
+        deletedAt: null,
+      }));
+      const followUp = await CustomerFollowUp.findOne(access.filter);
+
+      if (!followUp) {
+        throw createRouteError('Seguimiento no encontrado.', 'FOLLOW_UP_NOT_FOUND', 404);
+      }
+
+      if (followUp.status !== 'pending') {
+        throw createRouteError(
+          'La gestión ya está cerrada y no admite otro resultado.',
+          'FOLLOW_UP_ALREADY_CLOSED',
+          409,
+          { status: followUp.status }
+        );
+      }
+
+      const result = normalizeCustomerFollowUpResult(req.body || {});
+      const adminId = getAdminId(req);
+      const before = followUp.toObject();
+      const historyEntry = {
+        outcome: result.outcome,
+        note: result.note,
+        statusAfter: result.statusAfter,
+        nextAction: result.nextAction,
+        dueAt: result.dueAt,
+        recordedAt: result.recordedAt,
+        recordedByAdmin: adminId,
+      };
+      const setFields = {
+        status: result.statusAfter,
+        outcome: result.outcome,
+        outcomeNote: result.note,
+        outcomeAt: result.recordedAt,
+        outcomeByAdmin: adminId,
+        updatedByAdmin: adminId,
+        doneAt: result.statusAfter === 'done' ? result.recordedAt : null,
+      };
+
+      if (result.continuesPending) {
+        setFields.nextAction = result.nextAction;
+        setFields.dueAt = result.dueAt;
+      }
+
+      const updatedFollowUp = await CustomerFollowUp.findOneAndUpdate(
+        {
+          ...access.filter,
+          status: 'pending',
+          updatedAt: followUp.updatedAt,
+        },
+        {
+          $set: setFields,
+          $push: {
+            outcomeHistory: {
+              $each: [historyEntry],
+              $slice: -50,
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedFollowUp) {
+        throw createRouteError(
+          'La gestión cambió mientras registrabas el resultado. Actualiza la bandeja e inténtalo de nuevo.',
+          'FOLLOW_UP_RESULT_CONFLICT',
+          409
+        );
+      }
+
+      await recordCustomerResultContact(customer, updatedFollowUp, adminId);
+      const after = updatedFollowUp.toObject();
+      await recordCustomerAuditEvent({
+        req,
+        customer,
+        eventType: 'follow_up_result_recorded',
+        action: 'Resultado de gestión CRM registrado',
+        changes: buildAuditChanges(
+          { followUp: before },
+          { followUp: after },
+          [
+            'followUp.status',
+            'followUp.outcome',
+            'followUp.outcomeNote',
+            'followUp.outcomeAt',
+            'followUp.nextAction',
+            'followUp.dueAt',
+            'followUp.doneAt',
+          ]
+        ),
+        metadata: {
+          followUpId: String(updatedFollowUp._id),
+          outcome: result.outcome,
+          statusAfter: result.statusAfter,
+        },
+        branchId: updatedFollowUp.branch,
+      });
+      await updatedFollowUp.populate([
+        { path: 'createdByAdmin', select: 'username displayName firstName lastName role' },
+        { path: 'updatedByAdmin', select: 'username displayName firstName lastName role' },
+        { path: 'assignedToAdmin', select: 'username displayName firstName lastName role' },
+        { path: 'outcomeByAdmin', select: 'username displayName firstName lastName role' },
+        { path: 'outcomeHistory.recordedByAdmin', select: 'username displayName firstName lastName role' },
+      ]);
+
+      return res.json({
+        ok: true,
+        followUp: serializeFollowUp(updatedFollowUp, { canViewSensitive }),
+        result: {
+          outcome: result.outcome,
+          outcomeLabel: result.outcomeLabel,
+          statusAfter: result.statusAfter,
+          continuesPending: result.continuesPending,
+        },
+        sideEffects: {
+          paymentChanged: false,
+          orderChanged: false,
+          invoiceChanged: false,
+        },
+      });
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+);
 
 router.put('/:customerId/:followUpId', requirePermission('customers:update'), async (req, res) => {
   try {
@@ -545,6 +740,14 @@ router.put('/:customerId/:followUpId', requirePermission('customers:update'), as
 
     if (!payload.note) {
       throw createRouteError('Debes escribir una nota de seguimiento.', 'FOLLOW_UP_NOTE_REQUIRED', 400);
+    }
+
+    if (followUp.status !== 'done' && payload.status === 'done') {
+      throw createRouteError(
+        'Para completar una gestión usa Registrar resultado e indica qué ocurrió.',
+        'FOLLOW_UP_RESULT_REQUIRED',
+        400
+      );
     }
 
     Object.entries(payload).forEach(([key, value]) => {
@@ -592,6 +795,8 @@ router.put('/:customerId/:followUpId', requirePermission('customers:update'), as
       { path: 'createdByAdmin', select: 'username displayName firstName lastName role' },
       { path: 'updatedByAdmin', select: 'username displayName firstName lastName role' },
       { path: 'assignedToAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'outcomeByAdmin', select: 'username displayName firstName lastName role' },
+      { path: 'outcomeHistory.recordedByAdmin', select: 'username displayName firstName lastName role' },
     ]);
 
     return res.json({

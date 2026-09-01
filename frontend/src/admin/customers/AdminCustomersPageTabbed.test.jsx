@@ -15,6 +15,7 @@ vi.mock('../api/adminCustomersApi', () => ({
   getAdminCustomerFollowUps: vi.fn(),
   getAdminCustomerSavedSegments: vi.fn(),
   getAdminCustomers: vi.fn(),
+  recordAdminCustomerFollowUpResult: vi.fn(),
   updateAdminCustomer: vi.fn(),
   updateAdminCustomerFollowUp: vi.fn(),
 }));

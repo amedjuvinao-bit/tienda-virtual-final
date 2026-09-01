@@ -15,8 +15,10 @@ import {
 import {
   getAdminCustomerCrmAssignees,
   getAdminCustomerCrmQueue,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomerFollowUp,
 } from '../api/adminCustomersApi';
+import CustomerFollowUpResultModal from './CustomerFollowUpResultModal';
 
 const DUE_FILTERS = [
   ['all', 'Todos'],
@@ -84,6 +86,7 @@ export default function CustomerCrmWorkspace({ onOpenCustomer }) {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState('');
+  const [resultItem, setResultItem] = useState(null);
   const [error, setError] = useState('');
   const requestSequence = useRef(0);
 
@@ -148,6 +151,22 @@ export default function CustomerCrmWorkspace({ onOpenCustomer }) {
     }
   };
 
+  const recordResult = async (payload) => {
+    if (!resultItem?.customerId || !resultItem?.id) return;
+    try {
+      setSavingId(resultItem.id);
+      await recordAdminCustomerFollowUpResult(
+        resultItem.customerId,
+        resultItem.id,
+        payload
+      );
+      setResultItem(null);
+      await loadQueue();
+    } finally {
+      setSavingId('');
+    }
+  };
+
   return (
     <section className="rounded-[28px] border p-5 lg:p-6" style={{ borderColor: 'var(--admin-card-border)', background: 'linear-gradient(145deg, #fff, #fff7fb)' }}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -184,18 +203,20 @@ export default function CustomerCrmWorkspace({ onOpenCustomer }) {
               <button type="button" onClick={() => item.customer && onOpenCustomer?.(item.customer)} className="flex items-center gap-2 text-left font-black" style={{ color: 'var(--admin-card-text)' }}><UserRound className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} /> {item.customer?.fullName || 'Cliente no disponible'}</button>
               <p className="mt-2 text-sm font-bold leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{item.note}</p>
               <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{item.nextAction || item.typeLabel} · {formatDate(item.dueAt)}</p>
+              {item.outcomeLabel ? <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-[10px] font-black uppercase text-emerald-700">Último resultado: {item.outcomeLabel}</p>{item.outcomeNote ? <p className="mt-1 text-xs font-bold text-emerald-900">{item.outcomeNote}</p> : null}{item.outcomeAt ? <p className="mt-1 text-[10px] font-bold text-emerald-700">Registrado: {formatDate(item.outcomeAt)} · {item.outcomeByAdmin?.name || 'Administrador'}</p> : null}</div> : null}
             </div>
             <div className="flex flex-wrap gap-2"><span className={`rounded-xl border px-3 py-1.5 text-[10px] font-black uppercase ${priorityTone(item.priority)}`}>{item.priorityLabel}</span><span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black uppercase text-slate-600">{item.statusLabel}</span></div>
             <div className="grid gap-2">
-              <select disabled={savingId === item.id} value={item.assignedToAdmin?.id || 'unassigned'} onChange={(event) => updateTask(item, { assignedToAdmin: event.target.value })} className="rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><option value="unassigned">Sin responsable</option>{assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
-              <select disabled={savingId === item.id} value={item.priority || 'normal'} onChange={(event) => updateTask(item, { priority: event.target.value })} className="rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(236,72,153,0.18)' }}>{PRIORITIES.filter(([value]) => value !== 'all').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <select disabled={savingId === item.id || item.status !== 'pending'} value={item.assignedToAdmin?.id || 'unassigned'} onChange={(event) => updateTask(item, { assignedToAdmin: event.target.value })} className="rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><option value="unassigned">Sin responsable</option>{assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
+              <select disabled={savingId === item.id || item.status !== 'pending'} value={item.priority || 'normal'} onChange={(event) => updateTask(item, { priority: event.target.value })} className="rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.18)' }}>{PRIORITIES.filter(([value]) => value !== 'all').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             </div>
-            <button type="button" disabled={savingId === item.id || item.status === 'done'} onClick={() => updateTask(item, { status: 'done' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-50">{savingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />} Realizado</button>
+            {item.status === 'pending' ? <button type="button" disabled={savingId === item.id} onClick={() => setResultItem(item)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-50">{savingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />} Registrar resultado</button> : <span className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600"><BadgeCheck className="h-4 w-4" /> {item.outcomeLabel || 'Cierre sin resultado'}</span>}
           </article>
         )) : null}
       </div>
 
       {pages > 1 ? <div className="mt-4 flex items-center justify-end gap-3"><button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-xl border bg-white p-2 disabled:opacity-40" aria-label="Página anterior CRM"><ChevronLeft className="h-4 w-4" /></button><span className="text-xs font-black" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {pages}</span><button type="button" disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="rounded-xl border bg-white p-2 disabled:opacity-40" aria-label="Siguiente página CRM"><ChevronRight className="h-4 w-4" /></button></div> : null}
+      <CustomerFollowUpResultModal item={resultItem} saving={savingId === resultItem?.id} onClose={() => setResultItem(null)} onSubmit={recordResult} />
     </section>
   );
 }

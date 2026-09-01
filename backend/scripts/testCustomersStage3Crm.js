@@ -8,6 +8,9 @@ const Customer = require('../models/Customer');
 const CustomerFollowUp = require('../models/CustomerFollowUp');
 const AdminUser = require('../models/AdminUser');
 const { deriveMetrics } = require('../services/customerCommercialMetricsService');
+const {
+  normalizeCustomerFollowUpResult,
+} = require('../lib/customers/customerFollowUpResultPolicy');
 
 let controls = 0;
 
@@ -56,6 +59,42 @@ async function main() {
     'cada seguimiento persiste prioridad y rango estable para ordenar la bandeja',
     urgent.priority === 'urgent' && urgent.priorityRank === 40
   );
+  ok(
+    'cada seguimiento puede conservar resultado, evidencia, autor e historial',
+    CustomerFollowUp.schema.path('outcome') &&
+      CustomerFollowUp.schema.path('outcomeNote') &&
+      CustomerFollowUp.schema.path('outcomeAt') &&
+      CustomerFollowUp.schema.path('outcomeByAdmin') &&
+      CustomerFollowUp.schema.path('outcomeHistory')
+  );
+
+  const closedResult = normalizeCustomerFollowUpResult({
+    outcome: 'payment_confirmed',
+    outcomeNote: 'Cliente confirmó el pago por WhatsApp.',
+  }, { now: new Date('2026-09-01T12:00:00.000Z') });
+  ok(
+    'un resultado definitivo cierra solo la gestión CRM',
+    closedResult.statusAfter === 'done' &&
+      closedResult.continuesPending === false
+  );
+
+  const pendingResult = normalizeCustomerFollowUpResult({
+    outcome: 'no_answer',
+    outcomeNote: 'Se llamó dos veces sin respuesta.',
+    nextAction: 'Volver a llamar',
+    dueAt: '2026-09-02T15:00:00.000Z',
+  }, { now: new Date('2026-09-01T12:00:00.000Z') });
+  ok(
+    'sin respuesta exige reprogramación y conserva la gestión pendiente',
+    pendingResult.statusAfter === 'pending' &&
+      pendingResult.nextAction === 'Volver a llamar' &&
+      pendingResult.dueAt.toISOString() === '2026-09-02T15:00:00.000Z'
+  );
+  assert.throws(
+    () => normalizeCustomerFollowUpResult({ outcome: 'resolved', outcomeNote: '' }),
+    (error) => error.code === 'FOLLOW_UP_RESULT_NOTE_REQUIRED'
+  );
+  ok('el backend rechaza cierres sin evidencia escrita');
   ok(
     'Clientes tiene índices por etapa, prioridad, responsable y revisión',
     hasIndex(Customer.schema, 'customer_crm_stage_priority_recent') &&
@@ -119,6 +158,18 @@ async function main() {
     followUpRoutes.includes('recordCompletedCustomerContact') &&
       followUpRoutes.includes('crmLastContactAt: contactAt')
   );
+  ok(
+    'cerrar una gestión usa un endpoint de resultado y bloquea el atajo de estado',
+    followUpRoutes.includes("'/:customerId/:followUpId/result'") &&
+      followUpRoutes.includes('FOLLOW_UP_RESULT_REQUIRED') &&
+      followUpRoutes.includes('FOLLOW_UP_MUST_START_PENDING')
+  );
+  ok(
+    'el resultado CRM declara que no modifica pagos, órdenes ni facturas',
+    followUpRoutes.includes('paymentChanged: false') &&
+      followUpRoutes.includes('orderChanged: false') &&
+      followUpRoutes.includes('invoiceChanged: false')
+  );
 
   const customerRoutes = read('backend/routes/adminCustomers.js');
   ok(
@@ -151,6 +202,12 @@ async function main() {
     crmWorkspace.includes('Bandeja de seguimientos') &&
       crmWorkspace.includes('getAdminCustomerCrmQueue') &&
       crmWorkspace.includes('updateAdminCustomerFollowUp')
+  );
+  ok(
+    'la bandeja reemplaza el cierre ambiguo por un resultado documentado',
+    crmWorkspace.includes('Registrar resultado') &&
+      crmWorkspace.includes('recordAdminCustomerFollowUpResult') &&
+      !crmWorkspace.includes("status: 'done'")
   );
   ok(
     'la bandeja descarta respuestas antiguas cuando cambian los filtros',
