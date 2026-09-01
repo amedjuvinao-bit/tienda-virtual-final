@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   BadgeCheck,
@@ -51,6 +52,15 @@ export default function CustomerFollowUpResultModal({
     setError('');
   }, [item?.id]);
 
+  useEffect(() => {
+    if (!item || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [item]);
+
   const customerName = useMemo(
     () => item?.customer?.fullName || item?.customerName || 'Cliente',
     [item]
@@ -97,7 +107,7 @@ export default function CustomerFollowUpResultModal({
     }
   };
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-[180] flex items-center justify-center bg-slate-950/65 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="follow-up-result-title">
       <form onSubmit={submit} className="max-h-[92vh] w-full max-w-[660px] overflow-y-auto rounded-[30px] border bg-white p-5 shadow-2xl sm:p-7" style={{ borderColor: 'rgba(236,72,153,0.28)' }}>
         <div className="flex items-start justify-between gap-4">
@@ -151,4 +161,8 @@ export default function CustomerFollowUpResultModal({
       </form>
     </div>
   );
+
+  return typeof document === 'undefined'
+    ? modal
+    : createPortal(modal, document.body);
 }

@@ -67,6 +67,7 @@ describe('CustomerCrmWorkspace Etapa 3', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Registrar resultado' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog').parentElement).toBe(document.body);
     fireEvent.change(screen.getByLabelText('Resultado de la gestión'), {
       target: { value: 'payment_confirmed' },
     });
