@@ -416,7 +416,7 @@ function TabButton({ active, icon: Icon, children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-black transition"
+      className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-black transition"
       style={{
         borderColor: active ? 'var(--admin-primary)' : 'transparent',
         color: active ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)',
@@ -713,8 +713,8 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
           </div>
         </header>
 
-        <nav className="shrink-0 overflow-x-auto border-b px-5" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}>
-          <div className="flex min-w-max gap-1">
+        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-5 md:overflow-visible" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}>
+          <div className="flex min-w-max gap-1 md:min-w-0 md:flex-wrap">
             <TabButton active={activeTab === 'summary'} icon={UsersRound} onClick={() => selectTab('summary')}>Resumen</TabButton>
             <TabButton active={activeTab === 'edit'} icon={Edit3} onClick={() => selectTab('edit')}>Datos</TabButton>
             <TabButton active={activeTab === 'orders'} icon={ShoppingBag} onClick={() => selectTab('orders')}>Compras</TabButton>

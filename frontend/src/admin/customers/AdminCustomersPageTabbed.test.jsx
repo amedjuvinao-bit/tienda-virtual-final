@@ -223,6 +223,21 @@ describe('AdminCustomersPageTabbed Etapa 1', () => {
     expect(await screen.findByText('11 compra(s)')).toBeInTheDocument();
   });
 
+  it('mantiene visibles todas las secciones avanzadas en una barra adaptable', async () => {
+    render(<AdminCustomersPageTabbed />);
+    expect(await screen.findByText('Cliente página 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Detalle' }));
+
+    const navigation = await screen.findByRole('navigation', {
+      name: 'Secciones de la ficha del cliente',
+    });
+    expect(navigation.firstElementChild).toHaveClass('md:flex-wrap');
+    expect(screen.getByRole('button', { name: 'Saldos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Seguimiento' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actividad' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Privacidad' })).toBeInTheDocument();
+  });
+
   it('bloquea la edición visual de PII cuando el backend entrega una ficha enmascarada', async () => {
     getAdminCustomer.mockResolvedValueOnce({
       ok: true,
