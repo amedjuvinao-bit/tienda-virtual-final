@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, Loader2, Search, UserRound, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Search, UserRound, X } from 'lucide-react';
 import { searchAdminCustomers } from '../api/adminCustomersApi';
 
 const EMPTY_QUICK_CUSTOMER = {
@@ -220,14 +220,19 @@ function PosCustomerSelectorContent() {
             key={itemMode}
             type="button"
             onClick={() => changeMode(itemMode)}
-            className="rounded-2xl border px-4 py-3 text-sm font-black"
+            aria-pressed={mode === itemMode}
+            className="flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition-colors"
             style={{
               borderColor: mode === itemMode ? 'var(--admin-primary)' : 'var(--admin-card-border)',
-              background: mode === itemMode ? 'var(--admin-primary-soft-bg)' : 'var(--admin-page-bg)',
-              color: mode === itemMode ? 'var(--admin-primary)' : 'var(--admin-card-text)',
+              background: mode === itemMode ? 'var(--admin-primary)' : 'var(--admin-page-bg)',
+              color: mode === itemMode ? 'var(--admin-primary-text)' : 'var(--admin-card-text)',
+              boxShadow: mode === itemMode
+                ? '0 8px 18px color-mix(in srgb, var(--admin-primary) 24%, transparent)'
+                : 'none',
             }}
           >
-            {label}
+            {mode === itemMode ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+            <span>{label}</span>
           </button>
         ))}
       </div>
