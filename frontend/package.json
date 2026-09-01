@@ -29,6 +29,7 @@
     "test:orders-keyboard": "vitest run src/admin/orders/components/OrderDetailModal.keyboard.test.js src/admin/orders/components/orderDetail/hooks/useOrderDetailResources.test.jsx",
     "test:orders-whatsapp-assisted": "vitest run src/admin/orders/components/orderDetail/OrderWhatsAppPreview.test.jsx",
     "test:orders-customer-connection": "vitest run src/admin/orders/components/orderDetail/OrderDetailCustomerBilling.test.jsx",
+    "test:customers-module": "vitest run src/admin/api/adminCustomersApi.test.js src/admin/customers/AdminCustomersPageTabbed.test.jsx src/admin/customers/CustomerCrmWorkspace.test.jsx src/admin/customers/CustomerSavedSegments.test.jsx src/admin/customers/CustomerPrivacyPanel.test.jsx",
     "test:orders-manual-payment": "vitest run src/admin/orders/components/orderDetail/manualPaymentConfirmationModel.test.js src/admin/orders/components/orderDetail/hooks/useOrderManualPaymentConfirmation.test.jsx src/admin/orders/components/orderDetail/OrderManualPaymentConfirmationCard.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",

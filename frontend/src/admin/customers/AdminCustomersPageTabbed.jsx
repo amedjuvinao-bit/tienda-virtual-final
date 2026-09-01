@@ -1,10 +1,14 @@
 // frontend/src/admin/customers/AdminCustomersPageTabbed.jsx
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
+  Activity,
   AlertCircle,
   BadgeCheck,
+  BriefcaseBusiness,
   CalendarClock,
+  CreditCard,
   DollarSign,
   Edit3,
   Eye,
@@ -17,11 +21,18 @@ import {
   Phone,
   Plus,
   RefreshCw,
+  ReceiptText,
+  RotateCcw,
   Save,
   Search,
+  ShieldCheck,
   ShoppingBag,
+  ShoppingCart,
+  SlidersHorizontal,
+  Truck,
   UserRound,
   UsersRound,
+  WalletCards,
   X,
 } from 'lucide-react';
 import {
@@ -29,11 +40,21 @@ import {
   createAdminCustomerFollowUp,
   deleteAdminCustomerFollowUp,
   getAdminCustomer,
+  getAdminCustomer360,
+  getAdminCustomerCrmAssignees,
   getAdminCustomerFollowUps,
   getAdminCustomers,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomer,
-  updateAdminCustomerFollowUp,
 } from '../api/adminCustomersApi';
+import {
+  CUSTOMER_360_TABS,
+  Customer360TabContent,
+} from './Customer360Tabs';
+import CustomerCrmWorkspace from './CustomerCrmWorkspace';
+import CustomerSavedSegments from './CustomerSavedSegments';
+import CustomerPrivacyPanel from './CustomerPrivacyPanel';
+import CustomerFollowUpResultModal from './CustomerFollowUpResultModal';
 
 const EMPTY_FORM = {
   fullName: '',
@@ -44,15 +65,28 @@ const EMPTY_FORM = {
   address: '',
   city: '',
   department: '',
+  personType: 'natural',
+  businessName: '',
+  dv: '',
+  municipalityCode: '',
+  departmentCode: '',
+  tributeCode: 'ZZ',
+  taxRegime: '',
+  taxResponsibilities: '',
   notes: '',
+  crmStage: 'new',
+  crmPriority: 'normal',
+  crmOwnerAdmin: '',
+  crmNextReviewAt: '',
 };
 
 const EMPTY_FOLLOW_UP = {
   type: 'whatsapp',
-  status: 'pending',
   note: '',
   nextAction: '',
   dueAt: '',
+  priority: 'normal',
+  assignedToAdmin: '',
 };
 
 const SOURCE_FILTERS = [
@@ -68,6 +102,39 @@ const SEGMENT_FILTERS = [
   { key: 'without-purchases', label: 'Sin compras' },
   { key: 'with-email', label: 'Con correo' },
   { key: 'without-email', label: 'Sin correo' },
+  { key: 'vip', label: 'VIP' },
+  { key: 'recurrent', label: 'Recurrentes' },
+  { key: 'at-risk', label: 'En riesgo' },
+  { key: 'inactive-customers', label: 'Inactivos' },
+  { key: 'high-return', label: 'Alta devolución' },
+  { key: 'high-value', label: 'Ticket alto' },
+  { key: 'abandoned-cart', label: 'Carrito abandonado' },
+];
+
+const CRM_STAGES = [
+  ['all', 'Todas las etapas'],
+  ['prospect', 'Prospecto'],
+  ['new', 'Nuevo'],
+  ['active', 'Activo'],
+  ['loyal', 'Leal'],
+  ['at_risk', 'En riesgo'],
+  ['inactive', 'Inactivo'],
+  ['won_back', 'Recuperado'],
+];
+
+const CRM_PRIORITIES = [
+  ['all', 'Todas las prioridades'],
+  ['vip', 'VIP'],
+  ['high', 'Alta'],
+  ['normal', 'Normal'],
+  ['low', 'Baja'],
+];
+
+const FOLLOW_UP_PRIORITIES = [
+  ['urgent', 'Urgente'],
+  ['high', 'Alta'],
+  ['normal', 'Normal'],
+  ['low', 'Baja'],
 ];
 
 const FOLLOW_UP_TYPES = [
@@ -80,12 +147,6 @@ const FOLLOW_UP_TYPES = [
   ['complaint', 'Reclamo'],
   ['task', 'Tarea'],
   ['other', 'Otro'],
-];
-
-const FOLLOW_UP_STATUSES = [
-  ['pending', 'Pendiente'],
-  ['done', 'Realizado'],
-  ['cancelled', 'Cancelado'],
 ];
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
@@ -135,6 +196,7 @@ function statusTone(value) {
 }
 
 function toEditForm(customer = {}) {
+  const fiscal = customer.fiscalProfile || {};
   return {
     fullName: customer.fullName || customer.displayName || '',
     phone: customer.phone || '',
@@ -144,7 +206,23 @@ function toEditForm(customer = {}) {
     address: customer.address || '',
     city: customer.city || '',
     department: customer.department || '',
+    personType: fiscal.personType || 'natural',
+    businessName: fiscal.businessName || '',
+    dv: fiscal.verificationDigit || fiscal.dv || '',
+    municipalityCode: fiscal.municipalityCode || '',
+    departmentCode: fiscal.departmentCode || '',
+    tributeCode: fiscal.tributeCode || 'ZZ',
+    taxRegime: fiscal.taxRegime || '',
+    taxResponsibilities: Array.isArray(fiscal.taxResponsibilities)
+      ? fiscal.taxResponsibilities.join(', ')
+      : '',
     notes: customer.notes || '',
+    crmStage: customer.crmStage || 'new',
+    crmPriority: customer.crmPriority || 'normal',
+    crmOwnerAdmin: customer.crmOwnerAdmin?.id || '',
+    crmNextReviewAt: customer.crmNextReviewAt
+      ? new Date(customer.crmNextReviewAt).toISOString().slice(0, 16)
+      : '',
   };
 }
 
@@ -177,11 +255,11 @@ function buildLocalSummary(customers = [], total = 0) {
 function Card({ children, className = '', style = {} }) {
   return (
     <section
-      className={`rounded-[28px] border ${className}`}
+      className={`rounded-xl border ${className}`}
       style={{
         borderColor: 'var(--admin-card-border)',
-        background: 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(255,247,251,0.86))',
-        boxShadow: '0 18px 48px rgba(190, 24, 93, 0.08)',
+        background: '#fff',
+        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.05)',
         ...style,
       }}
     >
@@ -193,12 +271,12 @@ function Card({ children, className = '', style = {} }) {
 function IconBox({ icon: Icon }) {
   return (
     <span
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
       style={{
         borderColor: 'rgba(236, 72, 153, 0.22)',
         background: 'linear-gradient(135deg, #fff, #fdf2f8)',
         color: 'var(--admin-primary)',
-        boxShadow: '0 10px 24px rgba(236, 72, 153, 0.12)',
+        boxShadow: '0 6px 18px rgba(236, 72, 153, 0.08)',
       }}
     >
       <Icon className="h-5 w-5" />
@@ -269,63 +347,49 @@ function MetricCard({ icon: Icon, label, value, helper, highlight = false }) {
   );
 }
 
-function FilterPill({ active, children, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-2xl border px-4 py-2.5 text-xs font-black transition hover:-translate-y-0.5"
-      style={{
-        borderColor: active ? 'var(--admin-primary)' : 'rgba(236,72,153,0.20)',
-        background: active ? 'linear-gradient(135deg, var(--admin-primary), #be185d)' : 'rgba(255,255,255,0.78)',
-        color: active ? '#fff' : 'var(--admin-card-text)',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 function CustomerRow({ customer, onOpenDetail }) {
   const stats = customer.stats || {};
   const ordersCount = Number(stats.ordersCount || 0);
-  const totalSpent = Number(stats.totalSpent || 0);
+  const netSpent = Number(stats.netSpent ?? stats.totalSpent ?? 0);
   const tone = sourceTone(customer.source);
+  const crmStage = CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo';
 
   return (
-    <article className="rounded-[26px] border p-4 transition duration-200 hover:-translate-y-0.5" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff', boxShadow: '0 12px 28px rgba(190, 24, 93, 0.06)' }}>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(240px,.85fr)_minmax(260px,.8fr)_110px] xl:items-center">
+    <article className="border-b transition-colors last:border-b-0 hover:bg-[#fff7fb]/70" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff7fb', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
+            <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.customerCode || 'Sin código'}{customer.documentNumber ? ` · ${customer.documentType || 'DOC'} ${customer.documentNumber}` : ''}</p>
+            <span className="mt-2 inline-flex rounded-lg border px-2 py-1 text-[10px] font-black uppercase" style={{ background: tone.bg, color: tone.text, borderColor: tone.border }}>{sourceLabel(customer.source)}</span>
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.phone || 'Sin celular'}</span></p>
+          <p className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.email || 'Sin correo'}</span></p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Compras</p>
+          <p className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{ordersCount}</p>
+          <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'Sin compras'}</p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Venta neta</p>
+          <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{money(netSpent)}</p>
+          <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{Number(stats.posOrdersCount || 0)} POS · {Number(stats.webOrdersCount || 0)} web</p>
+        </div>
+
         <div className="min-w-0">
-          <div className="flex items-start gap-4">
-            <IconBox icon={UserRound} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
-              <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.customerCode || 'Sin código'} · creado {formatDate(customer.createdAt)}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {customer.documentNumber ? <Badge tone="primary">{customer.documentType || 'DOC'} {customer.documentNumber}</Badge> : <Badge tone="muted">Sin documento</Badge>}
-                <span className="inline-flex items-center rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em]" style={{ background: tone.bg, color: tone.text, borderColor: tone.border }}>{sourceLabel(customer.source)}</span>
-                {ordersCount > 0 ? <Badge tone="success">Comprador</Badge> : <Badge tone="muted">Sin compras</Badge>}
-              </div>
-            </div>
-          </div>
+          <p className="truncate text-xs font-black" style={{ color: customer.crmStage === 'at_risk' ? '#c2410c' : 'var(--admin-card-text)' }}>{crmStage}</p>
+          <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmPriority === 'vip' ? 'Prioridad VIP' : `Prioridad ${customer.crmPriority || 'normal'}`}</p>
+          <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmOwnerAdmin?.name || 'Sin responsable'}</p>
         </div>
 
-        <div className="rounded-3xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: 'rgba(255,247,251,0.60)' }}>
-          <p className="mb-3 text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Contacto</p>
-          <div className="space-y-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            <p className="flex items-center gap-2"><Phone className="h-4 w-4" /><span className="truncate">{customer.phone || 'Sin celular'}</span></p>
-            <p className="flex items-center gap-2"><Mail className="h-4 w-4" /><span className="truncate">{customer.email || 'Sin correo'}</span></p>
-            <p className="flex items-center gap-2"><CalendarClock className="h-4 w-4" /><span className="truncate">Última compra: {stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'sin registro'}</span></p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Compras</p><p className="mt-2 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{ordersCount}</p></div>
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>POS</p><p className="mt-2 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{Number(stats.posOrdersCount || 0)}</p></div>
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.22)', background: '#fff7fb' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Gastado</p><p className="mt-2 break-words text-sm font-black leading-tight" style={{ color: 'var(--admin-primary)' }}>{money(totalSpent)}</p></div>
-        </div>
-
-        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black transition hover:-translate-y-0.5" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>
+        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>
           <Eye className="h-4 w-4" /> Detalle
         </button>
       </div>
@@ -338,7 +402,7 @@ function TabButton({ active, icon: Icon, children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center justify-center gap-2 border-b-2 px-4 py-3 text-sm font-black transition"
+      className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-black transition lg:w-full lg:justify-start lg:rounded-xl lg:border-b-0 lg:border-l-2"
       style={{
         borderColor: active ? 'var(--admin-primary)' : 'transparent',
         color: active ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)',
@@ -385,7 +449,7 @@ function OrderList({ orders }) {
   );
 }
 
-function FollowUpList({ followUps, onDone, onDelete }) {
+function FollowUpList({ followUps, onResolve, onDelete }) {
   if (!followUps.length) {
     return <p className="rounded-2xl border p-5 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)', background: '#fff' }}>Sin gestiones registradas.</p>;
   }
@@ -401,13 +465,16 @@ function FollowUpList({ followUps, onDone, onDelete }) {
                 <div className="flex flex-wrap gap-2">
                   <span className="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style={{ borderColor: '#f9a8d4', background: '#fdf2f8', color: '#be185d' }}>{item.typeLabel || item.type || 'Nota'}</span>
                   <span className="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style={{ borderColor: tone.border, background: tone.bg, color: tone.text }}>{item.statusLabel || item.status || 'Pendiente'}</span>
+                  <span className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-black uppercase text-orange-700">{item.priorityLabel || item.priority || 'Normal'}</span>
                 </div>
                 <p className="mt-3 text-sm font-black leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{item.note}</p>
                 {item.nextAction ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Próxima acción: {item.nextAction}</p> : null}
-                <p className="mt-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creado: {formatDate(item.createdAt)}{item.dueAt ? ` · Programado: ${formatDate(item.dueAt)}` : ''}</p>
+                <p className="mt-2 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Responsable: {item.assignedToAdmin?.name || item.createdByAdmin?.name || 'Administrador no identificado'}</p>
+                <p className="mt-1 text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Creado: {formatDate(item.createdAt)}{item.dueAt ? ` · Programado: ${formatDate(item.dueAt)}` : ''}</p>
+                {item.outcomeLabel ? <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-[10px] font-black uppercase text-emerald-700">Resultado: {item.outcomeLabel}</p>{item.outcomeNote ? <p className="mt-1 text-xs font-bold text-emerald-900">{item.outcomeNote}</p> : null}{item.outcomeAt ? <p className="mt-1 text-[10px] font-bold text-emerald-700">{formatDate(item.outcomeAt)} · {item.outcomeByAdmin?.name || 'Administrador'}</p> : null}</div> : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {item.status !== 'done' ? <button type="button" onClick={() => onDone(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Realizado</button> : null}
+                {item.status === 'pending' ? <button type="button" onClick={() => onResolve(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Registrar resultado</button> : null}
                 <button type="button" onClick={() => onDelete(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>Eliminar</button>
               </div>
             </div>
@@ -432,17 +499,83 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
   const [followError, setFollowError] = useState('');
   const [followForm, setFollowForm] = useState(EMPTY_FOLLOW_UP);
   const [followSaving, setFollowSaving] = useState(false);
+  const [resultItem, setResultItem] = useState(null);
+  const [crmAssignees, setCrmAssignees] = useState([]);
+  const [customer360, setCustomer360] = useState(null);
+  const [customer360Loading, setCustomer360Loading] = useState(false);
+  const [customer360Error, setCustomer360Error] = useState('');
 
   const pendingFollowUps = followUps.filter((item) => item.status !== 'done' && item.status !== 'cancelled').length;
 
   useEffect(() => {
     if (customer?.id) {
-      setEditForm(toEditForm(customer));
       setEditError('');
       setEditSuccess('');
       setActiveTab('summary');
+      setCustomer360(null);
+      setCustomer360Error('');
+      setFollowForm({
+        ...EMPTY_FOLLOW_UP,
+        assignedToAdmin: customer.crmOwnerAdmin?.id || '',
+      });
     }
   }, [customer?.id]);
+
+  useEffect(() => {
+    if (customer?.id) setEditForm(toEditForm(customer));
+  }, [customer]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow || '';
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!customer?.id) return;
+    getAdminCustomerCrmAssignees()
+      .then((response) => setCrmAssignees(
+        Array.isArray(response?.assignees) ? response.assignees : []
+      ))
+      .catch(() => setCrmAssignees([]));
+  }, [customer?.id]);
+
+  const loadCustomer360Data = async () => {
+    if (!customer?.id || customer360Loading) return;
+    try {
+      setCustomer360Loading(true);
+      setCustomer360Error('');
+      const response = await getAdminCustomer360(customer.id, {
+        historyLimit: 100,
+      });
+      setCustomer360(response || null);
+    } catch (err) {
+      setCustomer360Error(
+        err?.message || 'No fue posible cargar la ficha 360°.'
+      );
+      setCustomer360(null);
+    } finally {
+      setCustomer360Loading(false);
+    }
+  };
+
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    if (CUSTOMER_360_TABS.has(tab) && !customer360 && !customer360Loading) {
+      loadCustomer360Data();
+    }
+  };
+
+  const refreshDetail = async () => {
+    if (!customer?.id) return;
+    await onRefresh(customer.id);
+    if (customer360 || CUSTOMER_360_TABS.has(activeTab)) {
+      await loadCustomer360Data();
+    }
+  };
 
   const loadFollowUps = async () => {
     if (!customer?.id) return;
@@ -478,13 +611,26 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
       setSaving(true);
       setEditError('');
       setEditSuccess('');
-      const response = await updateAdminCustomer(customer.id, {
+      const fullPayload = {
         ...customer,
         ...editForm,
         displayName: editForm.fullName,
         source: customer.source || 'admin',
         status: customer.status || 'active',
-      });
+      };
+      const response = await updateAdminCustomer(
+        customer.id,
+        data?.access?.sensitive
+          ? fullPayload
+          : {
+              status: customer.status || 'active',
+              tags: customer.tags || [],
+              crmStage: editForm.crmStage,
+              crmPriority: editForm.crmPriority,
+              crmOwnerAdmin: editForm.crmOwnerAdmin,
+              crmNextReviewAt: editForm.crmNextReviewAt || null,
+            }
+      );
       const updatedCustomer = response?.customer || null;
       setEditSuccess('Cliente actualizado correctamente.');
       if (updatedCustomer) onUpdated(updatedCustomer);
@@ -508,7 +654,10 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
       setFollowSaving(true);
       setFollowError('');
       await createAdminCustomerFollowUp(customer.id, followForm);
-      setFollowForm(EMPTY_FOLLOW_UP);
+      setFollowForm({
+        ...EMPTY_FOLLOW_UP,
+        assignedToAdmin: customer.crmOwnerAdmin?.id || '',
+      });
       await loadFollowUps();
     } catch (err) {
       setFollowError(err?.message || 'No fue posible guardar el seguimiento.');
@@ -517,10 +666,20 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
     }
   };
 
-  const markFollowDone = async (item) => {
-    if (!customer?.id || !item?.id) return;
-    await updateAdminCustomerFollowUp(customer.id, item.id, { ...item, status: 'done' });
-    await loadFollowUps();
+  const recordFollowUpResult = async (payload) => {
+    if (!customer?.id || !resultItem?.id) return;
+    try {
+      setFollowSaving(true);
+      await recordAdminCustomerFollowUpResult(
+        customer.id,
+        resultItem.id,
+        payload
+      );
+      setResultItem(null);
+      await loadFollowUps();
+    } finally {
+      setFollowSaving(false);
+    }
   };
 
   const removeFollowUp = async (item) => {
@@ -529,36 +688,48 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
     await loadFollowUps();
   };
 
-  return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 px-4 py-4 backdrop-blur-sm">
-      <section className="flex h-[86vh] max-h-[760px] w-full max-w-[1160px] flex-col overflow-hidden rounded-[32px] border" style={{ borderColor: 'rgba(236,72,153,0.28)', background: '#fff', boxShadow: '0 30px 90px rgba(15,23,42,0.30)' }}>
+  const modal = (
+    <div className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm md:p-4" role="dialog" aria-modal="true" aria-labelledby="customer-detail-title">
+      <section className="relative flex h-[calc(100vh-16px)] w-[calc(100vw-16px)] max-w-[1480px] flex-col overflow-hidden rounded-[24px] border md:h-[calc(100vh-34px)] md:w-[calc(100vw-34px)] md:rounded-[30px]" style={{ borderColor: 'rgba(236,72,153,0.28)', background: '#fff', boxShadow: '0 34px 110px rgba(15,23,42,0.34)' }}>
         <header className="shrink-0 border-b px-5 py-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'linear-gradient(135deg, #fff, #fff7fb)' }}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-4">
               <IconBox icon={UserRound} />
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Ficha comercial del cliente</p>
-                <h2 className="mt-1 truncate text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{customer ? customerName(customer) : 'Cliente'}</h2>
+                <h2 id="customer-detail-title" className="mt-1 truncate text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{customer ? customerName(customer) : 'Cliente'}</h2>
                 <p className="mt-1 truncate text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer?.customerCode || 'Consultando información...'}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {customer?.id ? <button type="button" onClick={() => onRefresh(customer.id)} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)', background: '#fff' }}><RefreshCw className="h-4 w-4" /> Actualizar</button> : null}
+              {customer?.id ? <button type="button" onClick={refreshDetail} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)', background: '#fff' }}><RefreshCw className="h-4 w-4" /> Actualizar</button> : null}
               <button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-card-text)', background: '#fff' }}><X className="h-4 w-4" /> Cerrar</button>
             </div>
           </div>
         </header>
 
-        <nav className="shrink-0 overflow-x-auto border-b px-5" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}>
-          <div className="flex min-w-max gap-1">
-            <TabButton active={activeTab === 'summary'} icon={UsersRound} onClick={() => setActiveTab('summary')}>Resumen</TabButton>
-            <TabButton active={activeTab === 'edit'} icon={Edit3} onClick={() => setActiveTab('edit')}>Datos</TabButton>
-            <TabButton active={activeTab === 'orders'} icon={ShoppingBag} onClick={() => setActiveTab('orders')}>Compras</TabButton>
-            <TabButton active={activeTab === 'follow'} icon={MessageSquareText} onClick={() => setActiveTab('follow')}>Seguimiento {pendingFollowUps ? `(${pendingFollowUps})` : ''}</TabButton>
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-3 lg:w-[230px] lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: 'linear-gradient(180deg, #fff, #fff7fb)' }}>
+          <div className="flex min-w-max gap-1 py-1 lg:min-w-0 lg:flex-col lg:py-0">
+            <p className="hidden px-4 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Ficha del cliente</p>
+            <TabButton active={activeTab === 'summary'} icon={UsersRound} onClick={() => selectTab('summary')}>Resumen</TabButton>
+            <TabButton active={activeTab === 'edit'} icon={Edit3} onClick={() => selectTab('edit')}>Datos</TabButton>
+            <p className="hidden px-4 pb-2 pt-5 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Historial comercial</p>
+            <TabButton active={activeTab === 'orders'} icon={ShoppingBag} onClick={() => selectTab('orders')}>Compras</TabButton>
+            <TabButton active={activeTab === 'payments'} icon={CreditCard} onClick={() => selectTab('payments')}>Pagos</TabButton>
+            <TabButton active={activeTab === 'billing'} icon={ReceiptText} onClick={() => selectTab('billing')}>Facturas</TabButton>
+            <TabButton active={activeTab === 'returns'} icon={RotateCcw} onClick={() => selectTab('returns')}>Devoluciones</TabButton>
+            <TabButton active={activeTab === 'shipping'} icon={Truck} onClick={() => selectTab('shipping')}>Envíos</TabButton>
+            <TabButton active={activeTab === 'carts'} icon={ShoppingCart} onClick={() => selectTab('carts')}>Carritos</TabButton>
+            <TabButton active={activeTab === 'credit'} icon={WalletCards} onClick={() => selectTab('credit')}>Saldos</TabButton>
+            <p className="hidden px-4 pb-2 pt-5 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Relación y control</p>
+            <TabButton active={activeTab === 'follow'} icon={MessageSquareText} onClick={() => selectTab('follow')}>Seguimiento {pendingFollowUps ? `(${pendingFollowUps})` : ''}</TabButton>
+            <TabButton active={activeTab === 'activity'} icon={Activity} onClick={() => selectTab('activity')}>Actividad</TabButton>
+            <TabButton active={activeTab === 'privacy'} icon={ShieldCheck} onClick={() => selectTab('privacy')}>Privacidad</TabButton>
           </div>
         </nav>
 
-        <main className="min-h-0 flex-1 overflow-hidden bg-[#fff7fb]/40 p-5">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#fff7fb]/40 p-4 lg:p-5">
           {loading ? <div className="flex h-full items-center justify-center rounded-3xl border bg-white" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 font-black">Cargando detalle...</p></div></div> : null}
           {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
 
@@ -568,9 +739,15 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                 <div className="h-full overflow-y-auto pr-1">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <MetricCard icon={ShoppingBag} label="Compras" value={Number(stats.ordersCount || 0)} helper={`POS: ${Number(stats.posOrdersCount || 0)} · Web: ${Number(stats.webOrdersCount || 0)}`} />
-                    <MetricCard icon={DollarSign} label="Total gastado" value={money(stats.totalSpent)} helper={`Última orden: ${stats.lastOrderNumber || 'Sin registro'}`} highlight />
+                    <MetricCard icon={DollarSign} label="Venta bruta" value={money(stats.grossSales ?? stats.totalSpent)} helper={`Reembolsado: ${money(stats.refundedAmount)}`} highlight />
                     <MetricCard icon={CalendarClock} label="Primera compra" value={stats.firstPurchaseAt ? formatDate(stats.firstPurchaseAt) : 'Sin registro'} />
                     <MetricCard icon={History} label="Última compra" value={stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'Sin registro'} />
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard icon={WalletCards} label="Venta neta" value={money(stats.netSpent ?? stats.totalSpent)} helper={`LTV: ${money(stats.lifetimeValue ?? stats.netSpent ?? stats.totalSpent)}`} highlight />
+                    <MetricCard icon={ReceiptText} label="Ticket promedio" value={money(stats.averageTicket)} />
+                    <MetricCard icon={RefreshCw} label="Frecuencia" value={stats.purchaseFrequencyDays ? `${stats.purchaseFrequencyDays} días` : 'Sin cálculo'} helper={`${Number(stats.purchasesPerYear || 0)} compra(s) / año`} />
+                    <MetricCard icon={RotateCcw} label="Tasa devolución" value={`${Number(stats.returnRate || 0)}%`} helper={`${Number(stats.returnOrdersCount || 0)} orden(es) con devolución`} />
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
@@ -590,9 +767,12 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                         <div className="flex flex-wrap gap-2">
                           <Badge tone="primary">{sourceLabel(customer.source)}</Badge>
                           <Badge tone={customer.status === 'active' ? 'success' : 'muted'}>{customer.status || 'active'}</Badge>
+                          <Badge tone="primary">{CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo'}</Badge>
+                          <Badge tone={customer.crmPriority === 'vip' ? 'primary' : 'default'}>{customer.crmPriority === 'vip' ? 'VIP' : `Prioridad ${customer.crmPriority || 'normal'}`}</Badge>
                           {customer.acceptsMarketing ? <Badge tone="success">Acepta marketing</Badge> : <Badge tone="muted">Sin marketing</Badge>}
                         </div>
                       </div>
+                      <p className="mt-3 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Responsable CRM: {customer.crmOwnerAdmin?.name || 'Sin responsable'}{customer.crmNextReviewAt ? ` · Próxima revisión: ${formatDate(customer.crmNextReviewAt)}` : ''}</p>
                       <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff7fb' }}>
                         <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Notas internas</p>
                         <p className="mt-2 text-sm font-bold leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{customer.notes || 'Sin notas internas.'}</p>
@@ -616,6 +796,8 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                   </div>
                   {editError ? <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{editError}</div> : null}
                   {editSuccess ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">{editSuccess}</div> : null}
+                  {!data?.access?.sensitive ? <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">Los datos personales y fiscales están enmascarados. Tu perfil puede actualizar la gestión CRM, pero necesita `customers:sensitive` para modificar esos datos.</div> : null}
+                  <fieldset disabled={!data?.access?.sensitive} className={!data?.access?.sensitive ? 'opacity-60' : ''}>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <Field label="Nombre"><TextInput value={editForm.fullName} onChange={(event) => updateField('fullName', event.target.value)} /></Field>
                     <Field label="Celular"><TextInput value={editForm.phone} onChange={(event) => updateField('phone', event.target.value)} /></Field>
@@ -624,9 +806,32 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <Field label="Dirección"><TextInput value={editForm.address} onChange={(event) => updateField('address', event.target.value)} /></Field>
                     <Field label="Ciudad"><TextInput value={editForm.city} onChange={(event) => updateField('city', event.target.value)} /></Field>
                     <Field label="Departamento"><TextInput value={editForm.department} onChange={(event) => updateField('department', event.target.value)} /></Field>
-                    <Field label="Tipo doc."><select value={editForm.documentType} onChange={(event) => updateField('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field>
+                    <Field label="Tipo doc."><select value={editForm.documentType} onChange={(event) => updateField('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="PPT">PPT</option><option value="RC">Registro civil</option><option value="OTHER">Otro</option></select></Field>
                   </div>
-                  <div className="mt-4"><Field label="Notas internas"><TextArea value={editForm.notes} onChange={(event) => updateField('notes', event.target.value)} /></Field></div>
+                  </fieldset>
+                  <fieldset disabled={!data?.access?.sensitive} className={`mt-5 rounded-3xl border p-4 ${!data?.access?.sensitive ? 'opacity-60' : ''}`} style={{ borderColor: 'rgba(236,72,153,0.16)', background: '#fff7fb' }}>
+                    <h4 className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Datos fiscales reutilizables</h4>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <Field label="Tipo de persona"><select value={editForm.personType} onChange={(event) => updateField('personType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="natural">Natural</option><option value="juridica">Jurídica</option></select></Field>
+                      <Field label="Razón social"><TextInput value={editForm.businessName} onChange={(event) => updateField('businessName', event.target.value)} /></Field>
+                      <Field label="Dígito verificación"><TextInput value={editForm.dv} maxLength={1} onChange={(event) => updateField('dv', event.target.value.replace(/\D/g, '').slice(0, 1))} /></Field>
+                      <Field label="Código municipio"><TextInput value={editForm.municipalityCode} onChange={(event) => updateField('municipalityCode', event.target.value)} /></Field>
+                      <Field label="Código departamento"><TextInput value={editForm.departmentCode} onChange={(event) => updateField('departmentCode', event.target.value)} /></Field>
+                      <Field label="Código tributo"><TextInput value={editForm.tributeCode} onChange={(event) => updateField('tributeCode', event.target.value)} /></Field>
+                      <Field label="Régimen fiscal"><TextInput value={editForm.taxRegime} onChange={(event) => updateField('taxRegime', event.target.value)} /></Field>
+                      <Field label="Responsabilidades tributarias"><TextInput value={editForm.taxResponsibilities} onChange={(event) => updateField('taxResponsibilities', event.target.value)} placeholder="R-99-PN, O-13" /></Field>
+                    </div>
+                  </fieldset>
+                  <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: '#fff' }}>
+                    <h4 className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Gestión CRM</h4>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <Field label="Etapa"><select value={editForm.crmStage} onChange={(event) => updateField('crmStage', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff' }}>{CRM_STAGES.filter(([value]) => value !== 'all').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                      <Field label="Prioridad"><select value={editForm.crmPriority} onChange={(event) => updateField('crmPriority', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff' }}>{CRM_PRIORITIES.filter(([value]) => value !== 'all').map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                      <Field label="Responsable"><select value={editForm.crmOwnerAdmin} onChange={(event) => updateField('crmOwnerAdmin', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff' }}><option value="">Sin responsable</option>{crmAssignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></Field>
+                      <Field label="Próxima revisión"><TextInput type="datetime-local" value={editForm.crmNextReviewAt} onChange={(event) => updateField('crmNextReviewAt', event.target.value)} /></Field>
+                    </div>
+                  </div>
+                  <div className={!data?.access?.sensitive ? 'mt-4 opacity-60' : 'mt-4'}><Field label="Notas internas"><TextArea disabled={!data?.access?.sensitive} value={editForm.notes} onChange={(event) => updateField('notes', event.target.value)} /></Field></div>
                 </form>
               ) : null}
 
@@ -636,8 +841,13 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <div>
                       <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Compras del cliente</h3>
                       <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Historial reciente de órdenes POS y web.</p>
+                      {orders.length < Number(stats.ordersCount || 0) ? (
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                          Mostrando {orders.length} de {Number(stats.ordersCount || 0)} compras confirmadas.
+                        </p>
+                      ) : null}
                     </div>
-                    <Badge tone="primary">{orders.length} orden(es)</Badge>
+                    <Badge tone="primary">{Number(stats.ordersCount || orders.length)} compra(s)</Badge>
                   </div>
                   <OrderList orders={orders} />
                 </section>
@@ -649,9 +859,10 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Nueva gestión</h3>
                     <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Registra una acción concreta: WhatsApp, llamada, pago, talla o tarea.</p>
                     {followError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{followError}</div> : null}
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div className="mt-5 grid gap-4 sm:grid-cols-3">
                       <Field label="Tipo"><select value={followForm.type} onChange={(event) => updateFollowField('type', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-                      <Field label="Estado"><select value={followForm.status} onChange={(event) => updateFollowField('status', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                      <Field label="Prioridad"><select value={followForm.priority} onChange={(event) => updateFollowField('priority', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}>{FOLLOW_UP_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                      <Field label="Responsable"><select value={followForm.assignedToAdmin} onChange={(event) => updateFollowField('assignedToAdmin', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="">Sin responsable</option>{crmAssignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></Field>
                     </div>
                     <div className="mt-4"><Field label="Nota"><TextArea value={followForm.note} onChange={(event) => updateFollowField('note', event.target.value)} placeholder="Ej: Cliente pidió talla 6. Confirmar disponibilidad mañana." /></Field></div>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -671,25 +882,55 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                       </div>
                       <button type="button" onClick={loadFollowUps} className="rounded-2xl border px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)', background: '#fff' }}>Actualizar</button>
                     </div>
-                    {followLoading ? <div className="rounded-2xl border p-5 text-center text-sm font-black" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)' }}>Cargando seguimiento...</div> : <FollowUpList followUps={followUps} onDone={markFollowDone} onDelete={removeFollowUp} />}
+                    {followLoading ? <div className="rounded-2xl border p-5 text-center text-sm font-black" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)' }}>Cargando seguimiento...</div> : <FollowUpList followUps={followUps} onResolve={(item) => setResultItem({ ...item, customerName: customerName(customer) })} onDelete={removeFollowUp} />}
                   </div>
                 </section>
               ) : null}
+
+              {activeTab === 'privacy' ? (
+                <CustomerPrivacyPanel
+                  customer={customer}
+                  access={data?.access || {}}
+                  onUpdated={onUpdated}
+                />
+              ) : null}
+
+              <Customer360TabContent
+                activeTab={activeTab}
+                data={customer360}
+                loading={customer360Loading}
+                error={customer360Error}
+                onRetry={loadCustomer360Data}
+              />
+              <CustomerFollowUpResultModal item={resultItem} saving={followSaving} onClose={() => setResultItem(null)} onSubmit={recordFollowUpResult} />
             </div>
           ) : null}
         </main>
+        </div>
       </section>
     </div>
   );
+
+  return typeof document === 'undefined'
+    ? modal
+    : createPortal(modal, document.body);
 }
 
 export default function AdminCustomersPageTabbed() {
   const [customers, setCustomers] = useState([]);
   const [summary, setSummary] = useState(null);
   const [total, setTotal] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('all');
-  const [segmentFilter, setSegmentFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const pageLimit = 25;
+  const [searchTerm, setSearchTermState] = useState('');
+  const [sourceFilter, setSourceFilterState] = useState('all');
+  const [segmentFilter, setSegmentFilterState] = useState('all');
+  const [crmStageFilter, setCrmStageFilterState] = useState('all');
+  const [crmPriorityFilter, setCrmPriorityFilterState] = useState('all');
+  const [crmOwnerFilter, setCrmOwnerFilterState] = useState('all');
+  const [workspaceView, setWorkspaceView] = useState('directory');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -704,22 +945,76 @@ export default function AdminCustomersPageTabbed() {
   const canSave = cleanText(form.fullName).length >= 3;
   const activeSourceLabel = SOURCE_FILTERS.find((item) => item.key === sourceFilter)?.label || 'Todos';
   const activeSegmentLabel = SEGMENT_FILTERS.find((item) => item.key === segmentFilter)?.label || 'Todos';
+  const currentSavedFilters = useMemo(() => ({
+    status: 'active',
+    source: sourceFilter,
+    segment: segmentFilter,
+    crmStage: crmStageFilter,
+    crmPriority: crmPriorityFilter,
+    crmOwner: crmOwnerFilter,
+  }), [sourceFilter, segmentFilter, crmStageFilter, crmPriorityFilter, crmOwnerFilter]);
 
   const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const loadCustomers = async (q = searchTerm, source = sourceFilter, segment = segmentFilter) => {
+  const setSearchTerm = (value) => {
+    setPage(1);
+    setSearchTermState(value);
+  };
+  const setSourceFilter = (value) => {
+    setPage(1);
+    setSourceFilterState(value);
+  };
+  const setSegmentFilter = (value) => {
+    setPage(1);
+    setSegmentFilterState(value);
+  };
+  const setCrmStageFilter = (value) => {
+    setPage(1);
+    setCrmStageFilterState(value);
+  };
+  const setCrmPriorityFilter = (value) => {
+    setPage(1);
+    setCrmPriorityFilterState(value);
+  };
+  const setCrmOwnerFilter = (value) => {
+    setPage(1);
+    setCrmOwnerFilterState(value);
+  };
+
+  const loadCustomers = async (
+    requestedPage = page,
+    q = searchTerm,
+    source = sourceFilter,
+    segment = segmentFilter,
+    crmStage = crmStageFilter,
+    crmPriority = crmPriorityFilter,
+    crmOwner = crmOwnerFilter
+  ) => {
     try {
       setLoading(true);
       setError('');
-      const data = await getAdminCustomers({ q, status: 'active', source, segment, page: 1, limit: 50 });
+      const data = await getAdminCustomers({
+        q,
+        status: 'active',
+        source,
+        segment,
+        crmStage,
+        crmPriority,
+        crmOwner,
+        page: requestedPage,
+        limit: pageLimit,
+      });
       setCustomers(Array.isArray(data?.customers) ? data.customers : []);
       setSummary(data?.summary || null);
       setTotal(Number(data?.total || 0));
+      setPage(Number(data?.page || requestedPage));
+      setPages(Math.max(1, Number(data?.pages || 1)));
     } catch (err) {
       setError(err?.message || 'No fue posible cargar los clientes.');
       setCustomers([]);
       setSummary(null);
       setTotal(0);
+      setPages(1);
     } finally {
       setLoading(false);
     }
@@ -731,7 +1026,7 @@ export default function AdminCustomersPageTabbed() {
     setDetailError('');
     setDetailLoading(true);
     try {
-      const data = await getAdminCustomer(customer.id);
+      const data = await getAdminCustomer(customer.id, { ordersLimit: 30 });
       setDetailData(data || { customer, recentOrders: [] });
     } catch (err) {
       setDetailError(err?.message || 'No fue posible cargar el detalle del cliente.');
@@ -744,7 +1039,7 @@ export default function AdminCustomersPageTabbed() {
     setCustomers((prev) => prev.map((customer) => customer.id === updatedCustomer.id ? { ...customer, ...updatedCustomer } : customer));
     setDetailData((prev) => prev ? { ...prev, customer: { ...prev.customer, ...updatedCustomer } } : prev);
     setSuccess('Cliente actualizado correctamente.');
-    loadCustomers(searchTerm, sourceFilter, segmentFilter);
+    loadCustomers(page, searchTerm, sourceFilter, segmentFilter);
   };
 
   const handleCreateCustomer = async (event) => {
@@ -761,7 +1056,8 @@ export default function AdminCustomersPageTabbed() {
       setForm(EMPTY_FORM);
       setShowForm(false);
       setSuccess('Cliente creado correctamente.');
-      await loadCustomers(searchTerm, sourceFilter, segmentFilter);
+      setPage(1);
+      await loadCustomers(1, searchTerm, sourceFilter, segmentFilter);
     } catch (err) {
       setError(err?.message || 'No fue posible crear el cliente.');
     } finally {
@@ -770,37 +1066,203 @@ export default function AdminCustomersPageTabbed() {
   };
 
   const resetFilters = () => {
+    setPage(1);
     setSourceFilter('all');
     setSegmentFilter('all');
+    setCrmStageFilter('all');
+    setCrmPriorityFilter('all');
+    setCrmOwnerFilter('all');
     setSearchTerm('');
+  };
+
+  const applySavedSegment = (filters = {}) => {
+    setPage(1);
+    setSourceFilterState(filters.source || 'all');
+    setSegmentFilterState(filters.segment || 'all');
+    setCrmStageFilterState(filters.crmStage || 'all');
+    setCrmPriorityFilterState(filters.crmPriority || 'all');
+    setCrmOwnerFilterState(filters.crmOwner || 'all');
   };
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      loadCustomers(searchTerm, sourceFilter, segmentFilter);
+      loadCustomers(
+        page,
+        searchTerm,
+        sourceFilter,
+        segmentFilter,
+        crmStageFilter,
+        crmPriorityFilter,
+        crmOwnerFilter
+      );
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [searchTerm, sourceFilter, segmentFilter]);
+  }, [
+    page,
+    searchTerm,
+    sourceFilter,
+    segmentFilter,
+    crmStageFilter,
+    crmPriorityFilter,
+    crmOwnerFilter,
+  ]);
 
   return (
-    <div className="min-h-full space-y-5">
-      {detailData ? <CustomerDetailModal data={detailData} loading={detailLoading} error={detailError} onClose={() => setDetailData(null)} onRefresh={(customerId) => openCustomerDetail({ id: customerId })} onUpdated={handleCustomerUpdated} /> : null}
+    <div className="min-h-full space-y-4">
+      {detailData ? (
+        <CustomerDetailModal
+          data={detailData}
+          loading={detailLoading}
+          error={detailError}
+          onClose={() => setDetailData(null)}
+          onRefresh={(customerId) => openCustomerDetail({ id: customerId })}
+          onUpdated={handleCustomerUpdated}
+        />
+      ) : null}
 
-      <Card className="overflow-hidden p-5 lg:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-start gap-4"><IconBox icon={UserRound} /><div><div className="mb-2 inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em]" style={{ borderColor: 'rgba(236,72,153,0.22)', background: 'rgba(255,255,255,0.78)', color: 'var(--admin-primary)' }}><UsersRound className="h-3.5 w-3.5" /> CRM de clientes</div><h1 className="text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1><p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Administra clientes de POS y tienda web con una ficha comercial clara por pestañas.</p></div></div>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => loadCustomers(searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar</button><button type="button" onClick={() => setShowForm((prev) => !prev)} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg, var(--admin-primary), #be185d)', boxShadow: '0 18px 36px rgba(236,72,153,0.28)' }}><Plus className="h-4 w-4" /> Nuevo cliente</button></div>
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
+          <div className="flex items-start gap-4">
+            <IconBox icon={UserRound} />
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Gestión comercial</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Consulta el directorio o trabaja los seguimientos CRM en espacios separados.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', color: 'var(--admin-primary)' }}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar
+            </button>
+            <button type="button" onClick={() => { setWorkspaceView('directory'); setShowForm((prev) => !prev); }} className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-black text-white transition hover:brightness-95" style={{ background: 'var(--admin-primary)' }}>
+              <Plus className="h-4 w-4" /> Nuevo cliente
+            </button>
+          </div>
         </div>
+        <nav aria-label="Vista de clientes" className="flex border-t" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+          <button type="button" onClick={() => setWorkspaceView('directory')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'directory' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'directory' ? '#fff7fb' : '#fff', color: workspaceView === 'directory' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+            <UsersRound className="h-4 w-4" /> Directorio
+          </button>
+          <button type="button" onClick={() => setWorkspaceView('crm')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'crm' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'crm' ? '#fff7fb' : '#fff', color: workspaceView === 'crm' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+            <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
+          </button>
+        </nav>
       </Card>
 
-      {error ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
-      {success ? <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
+      {error ? <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
+      {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
 
-      <div className="grid gap-3 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]"><MetricCard icon={DollarSign} label="Ventas clientes" value={money(safeSummary.totalSpent)} helper={safeSummary.newestCustomer ? `Último cliente: ${customerName(safeSummary.newestCustomer)}` : 'Sin cliente reciente'} highlight /><MetricCard icon={UsersRound} label="Total clientes" value={safeSummary.totalCustomers || 0} helper={`${safeSummary.withEmail || 0} con correo`} /><MetricCard icon={ShoppingBag} label="Clientes POS" value={safeSummary.posCustomers || 0} helper="Creados desde punto de venta" /><MetricCard icon={ShoppingBag} label="Clientes web" value={safeSummary.webCustomers || 0} helper="Pedidos tienda virtual" /><MetricCard icon={BadgeCheck} label="Con compras" value={safeSummary.withPurchases || 0} helper={`${safeSummary.totalOrders || 0} compras acumuladas`} /></div>
+      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
 
-      {showForm ? <Card className="p-5"><form className="space-y-4" onSubmit={handleCreateCustomer}><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Crear cliente</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Este cliente quedará disponible para seleccionarlo en el POS.</p></div><button type="submit" disabled={!canSave} className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar</button></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="Nombre completo"><TextInput value={form.fullName} onChange={(event) => updateForm('fullName', event.target.value)} placeholder="Nombre del cliente" /></Field><Field label="Celular"><TextInput value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="3000000000" /></Field><Field label="Tipo documento"><select value={form.documentType} onChange={(event) => updateForm('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field><Field label="Documento"><TextInput value={form.documentNumber} onChange={(event) => updateForm('documentNumber', event.target.value)} placeholder="Número" /></Field><Field label="Correo"><TextInput value={form.email} onChange={(event) => updateForm('email', event.target.value)} placeholder="correo@ejemplo.com" /></Field><Field label="Dirección"><TextInput value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="Dirección" /></Field><Field label="Ciudad"><TextInput value={form.city} onChange={(event) => updateForm('city', event.target.value)} placeholder="Ciudad" /></Field><Field label="Departamento"><TextInput value={form.department} onChange={(event) => updateForm('department', event.target.value)} placeholder="Departamento" /></Field></div><Field label="Notas"><TextArea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} placeholder="Observaciones internas del cliente" /></Field></form></Card> : null}
+      {workspaceView === 'directory' ? (
+        <>
+          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.04)' }}>
+            <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes activos</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.totalCustomers || 0}</p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.withEmail || 0} con correo registrado</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Venta acumulada</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-primary)' }}>{money(safeSummary.totalSpent)}</p>
+                <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.newestCustomer ? `Último: ${customerName(safeSummary.newestCustomer)}` : 'Sin cliente reciente'}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Actividad de compra</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.withPurchases || 0}</p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.totalOrders || 0} compras acumuladas</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Origen</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.posCustomers || 0} <span className="text-sm">POS</span> · {safeSummary.webCustomers || 0} <span className="text-sm">Web</span></p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes identificados por canal</p>
+              </div>
+            </div>
+          </section>
 
-      <Card className="overflow-hidden"><div className="border-b p-5 lg:p-6" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.7fr)] xl:items-start"><div><p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Segmentación</p><h2 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Listado de clientes</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{total} cliente(s) encontrado(s) · Origen: {activeSourceLabel} · Segmento: {activeSegmentLabel}</p></div><div className="flex items-center gap-3 rounded-[22px] border px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.22)', background: 'rgba(255,255,255,0.78)' }}><Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} /><input type="text" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, celular, correo o documento" className="w-full bg-transparent text-sm font-bold outline-none" style={{ color: 'var(--admin-card-text)' }} />{loading ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}</div></div><div className="mt-5 grid gap-3 xl:grid-cols-2"><div className="rounded-[24px] border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'rgba(255,255,255,0.66)' }}><p className="mb-3 text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Origen del cliente</p><div className="flex flex-wrap gap-2">{SOURCE_FILTERS.map((filter) => <FilterPill key={filter.key} active={sourceFilter === filter.key} onClick={() => setSourceFilter(filter.key)}>{filter.label}</FilterPill>)}</div></div><div className="rounded-[24px] border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'rgba(255,255,255,0.66)' }}><p className="mb-3 text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Segmento comercial</p><div className="flex flex-wrap gap-2">{SEGMENT_FILTERS.map((filter) => <FilterPill key={filter.key} active={segmentFilter === filter.key} onClick={() => setSegmentFilter(filter.key)}>{filter.label}</FilterPill>)}{(sourceFilter !== 'all' || segmentFilter !== 'all' || searchTerm) ? <FilterPill active={false} onClick={resetFilters}>Limpiar filtros</FilterPill> : null}</div></div></div></div><div className="p-5 lg:p-6">{loading ? <div className="rounded-[28px] border p-10 text-center" style={{ borderColor: 'rgba(236,72,153,0.18)', background: 'rgba(255,255,255,0.68)' }}><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Cargando clientes...</p></div> : customers.length === 0 ? <div className="rounded-[28px] border p-10 text-center" style={{ borderColor: 'rgba(236,72,153,0.18)', background: 'rgba(255,255,255,0.68)' }}><UserRound className="mx-auto h-9 w-9" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>No hay clientes para este filtro</p><p className="mx-auto mt-2 max-w-md text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cambia el filtro o crea un cliente nuevo.</p></div> : <div className="space-y-4">{customers.map((customer) => <CustomerRow key={customer.id} customer={customer} onOpenDetail={openCustomerDetail} />)}</div>}</div></Card>
+          {showForm ? (
+            <Card className="p-5">
+              <form className="space-y-4" onSubmit={handleCreateCustomer}>
+                <div className="flex items-start justify-between gap-3">
+                  <div><h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Crear cliente</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Este cliente quedará disponible para seleccionarlo en el POS.</p></div>
+                  <button type="submit" disabled={!canSave} className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar</button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Nombre completo"><TextInput value={form.fullName} onChange={(event) => updateForm('fullName', event.target.value)} placeholder="Nombre del cliente" /></Field>
+                  <Field label="Celular"><TextInput value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="3000000000" /></Field>
+                  <Field label="Tipo documento"><select value={form.documentType} onChange={(event) => updateForm('documentType', event.target.value)} className="w-full rounded-lg border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field>
+                  <Field label="Documento"><TextInput value={form.documentNumber} onChange={(event) => updateForm('documentNumber', event.target.value)} placeholder="Número" /></Field>
+                  <Field label="Correo"><TextInput value={form.email} onChange={(event) => updateForm('email', event.target.value)} placeholder="correo@ejemplo.com" /></Field>
+                  <Field label="Dirección"><TextInput value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="Dirección" /></Field>
+                  <Field label="Ciudad"><TextInput value={form.city} onChange={(event) => updateForm('city', event.target.value)} placeholder="Ciudad" /></Field>
+                  <Field label="Departamento"><TextInput value={form.department} onChange={(event) => updateForm('department', event.target.value)} placeholder="Departamento" /></Field>
+                </div>
+                <Field label="Notas"><TextArea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} placeholder="Observaciones internas del cliente" /></Field>
+              </form>
+            </Card>
+          ) : null}
+
+          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
+            <header className="grid gap-4 border-b p-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.65fr)] lg:items-center" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Directorio comercial</p>
+                <h2 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Listado de clientes</h2>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{total} resultado(s) · {activeSourceLabel} · {activeSegmentLabel}</p>
+              </div>
+              <label className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.22)' }}>
+                <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+                <input type="text" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, celular, correo o documento" className="w-full bg-transparent text-sm font-bold outline-none" style={{ color: 'var(--admin-card-text)' }} />
+                {loading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}
+              </label>
+            </header>
+
+            <div className="grid gap-3 border-b bg-slate-50/60 p-4 md:grid-cols-2 xl:grid-cols-[180px_minmax(240px,1fr)_auto_auto]" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <label>
+                <span className="sr-only">Origen del cliente</span>
+                <select aria-label="Origen del cliente" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{SOURCE_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>Origen: {filter.label}</option>)}</select>
+              </label>
+              <label>
+                <span className="sr-only">Segmento comercial</span>
+                <select aria-label="Segmento comercial" value={segmentFilter} onChange={(event) => setSegmentFilter(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{SEGMENT_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>Segmento: {filter.label}</option>)}</select>
+              </label>
+              <button type="button" aria-expanded={showAdvancedFilters} onClick={() => setShowAdvancedFilters((current) => !current)} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black" style={{ borderColor: showAdvancedFilters ? 'var(--admin-primary)' : 'rgba(148,163,184,0.26)', color: showAdvancedFilters ? 'var(--admin-primary)' : 'var(--admin-card-text)' }}><SlidersHorizontal className="h-4 w-4" /> Filtros avanzados</button>
+              <button type="button" onClick={resetFilters} className="rounded-lg border bg-white px-4 py-2.5 text-sm font-black" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-card-muted-text)' }}>Limpiar</button>
+            </div>
+
+            {showAdvancedFilters ? (
+              <div className="space-y-4 border-b bg-white p-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Field label="Etapa CRM"><select value={crmStageFilter} onChange={(event) => setCrmStageFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{CRM_STAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                  <Field label="Prioridad CRM"><select value={crmPriorityFilter} onChange={(event) => setCrmPriorityFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{CRM_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                  <Field label="Responsable"><select value={crmOwnerFilter} onChange={(event) => setCrmOwnerFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}><option value="all">Todos</option><option value="me">Mis clientes</option></select></Field>
+                </div>
+                <CustomerSavedSegments filters={currentSavedFilters} onApply={applySavedSegment} />
+              </div>
+            ) : null}
+
+            <div className="hidden border-b bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] lg:grid lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:gap-4" style={{ borderColor: 'rgba(148,163,184,0.18)', color: 'var(--admin-card-muted-text)' }}>
+              <span>Cliente</span><span>Contacto</span><span>Compras</span><span>Venta neta</span><span>Estado CRM</span><span className="text-center">Acción</span>
+            </div>
+
+            <div>
+              {loading ? <div className="p-10 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Cargando clientes...</p></div> : null}
+              {!loading && customers.length === 0 ? <div className="p-10 text-center"><UserRound className="mx-auto h-8 w-8" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>No hay clientes para este filtro</p><p className="mt-2 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cambia los filtros o crea un cliente nuevo.</p></div> : null}
+              {!loading ? customers.map((customer) => <CustomerRow key={customer.id} customer={customer} onOpenDetail={openCustomerDetail} />) : null}
+            </div>
+
+            {pages > 1 ? (
+              <footer className="flex flex-wrap items-center justify-between gap-3 border-t bg-slate-50/60 px-4 py-3" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+                <span className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {pages}</span>
+                <div className="flex gap-2">
+                  <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border bg-white px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-primary)' }}>Anterior</button>
+                  <button type="button" disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="rounded-lg border bg-white px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-primary)' }}>Siguiente</button>
+                </div>
+              </footer>
+            ) : null}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

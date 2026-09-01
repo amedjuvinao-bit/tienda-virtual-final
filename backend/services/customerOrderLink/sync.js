@@ -4,6 +4,10 @@ const mongoose = require('mongoose');
 
 const Customer = require('../../models/Customer');
 const {
+  isActiveMongoTransaction,
+  isMongoDuplicateKeyError,
+} = require('../../lib/customers/customerIdentity');
+const {
   buildCustomerPayloadFromOrder,
   cleanLower,
   hasCustomerIdentity,
@@ -95,22 +99,50 @@ async function syncCustomerMasterFromOrder(
   }
 
   if (!customer) {
-    const created = await CustomerModel.create(
-      [
-        {
-          ...payload,
-          source: cleanLower(order?.source, 40) === 'pos' ? 'pos' : 'web',
-          updatedByAdmin:
-            updatedByAdmin && mongoose.Types.ObjectId.isValid(String(updatedByAdmin))
-              ? updatedByAdmin
-              : null,
-        },
-      ],
-      { session }
-    );
-    customer = created[0];
-    matchedBy = 'created';
-  } else {
+    try {
+      const created = await CustomerModel.create(
+        [
+          {
+            ...payload,
+            source: cleanLower(order?.source, 40) === 'pos' ? 'pos' : 'web',
+            updatedByAdmin:
+              updatedByAdmin && mongoose.Types.ObjectId.isValid(String(updatedByAdmin))
+                ? updatedByAdmin
+                : null,
+          },
+        ],
+        { session }
+      );
+      customer = created[0];
+      matchedBy = 'created';
+    } catch (error) {
+      if (!isMongoDuplicateKeyError(error)) throw error;
+
+      if (isActiveMongoTransaction(session)) {
+        throw createCustomerLinkError(
+          'Otro proceso registró esa identidad al mismo tiempo. Reintenta la sincronización.',
+          'CUSTOMER_DUPLICATE',
+          409
+        );
+      }
+
+      const concurrentMatch = await findCustomerMatch(payload, {
+        session,
+        CustomerModel,
+      });
+      if (!concurrentMatch?.customer) {
+        throw createCustomerLinkError(
+          'Otro proceso registró esa identidad al mismo tiempo. Reintenta la sincronización.',
+          'CUSTOMER_DUPLICATE',
+          409
+        );
+      }
+      customer = concurrentMatch.customer;
+      matchedBy = concurrentMatch.matchedBy;
+    }
+  }
+
+  if (matchedBy !== 'created') {
     const writableFields = [
       'firstName',
       'lastName',
@@ -130,6 +162,17 @@ async function syncCustomerMasterFromOrder(
       customer[field] = payload[field] || '';
     });
     customer.acceptsMarketing = payload.acceptsMarketing === true;
+    customer.fiscalProfile = payload.fiscalProfile || customer.fiscalProfile;
+    if (!customer.defaultBranch && payload.defaultBranch) {
+      customer.defaultBranch = payload.defaultBranch;
+    }
+    if (payload.defaultBranch) {
+      const branchIds = new Set(
+        (Array.isArray(customer.branchIds) ? customer.branchIds : []).map(String)
+      );
+      branchIds.add(String(payload.defaultBranch));
+      customer.branchIds = [...branchIds];
+    }
     if (updatedByAdmin && mongoose.Types.ObjectId.isValid(String(updatedByAdmin))) {
       customer.updatedByAdmin = updatedByAdmin;
     }

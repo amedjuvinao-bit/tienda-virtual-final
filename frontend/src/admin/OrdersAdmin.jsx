@@ -1,5 +1,6 @@
 // frontend/src/admin/OrdersAdmin.jsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import OrderDetailModal from './orders/components/OrderDetailModal';
@@ -28,6 +29,13 @@ import {
 import './orders/ordersAdmin.css';
 
 export default function OrdersAdmin() {
+  const [searchParams] = useSearchParams();
+  const requestedOrderId = String(searchParams.get('openOrder') || '').trim();
+  const linkedOrderId = /^[a-f0-9]{24}$/i.test(requestedOrderId)
+    ? requestedOrderId
+    : '';
+  const linkedOrderNumber = String(searchParams.get('q') || '').trim();
+  const openedLinkedOrderRef = useRef('');
   const { isAuthenticated, adminToken, authLoading } = useAuth();
   const capabilities = useOrdersAdminCapabilities();
   const hasSession = !authLoading && isAuthenticated && Boolean(adminToken);
@@ -73,6 +81,36 @@ export default function OrdersAdmin() {
     requireSessionAndPermission,
     setData: query.setData,
   });
+
+  useEffect(() => {
+    if (!linkedOrderId) {
+      openedLinkedOrderRef.current = '';
+      return;
+    }
+    if (
+      authLoading ||
+      !hasSession ||
+      !capabilities.canView ||
+      openedLinkedOrderRef.current === linkedOrderId
+    ) return;
+
+    const linkedOrder = query.data.find(
+      (order) => String(order?._id || '') === linkedOrderId
+    ) || {
+      _id: linkedOrderId,
+      orderNumber: linkedOrderNumber,
+    };
+
+    openedLinkedOrderRef.current = linkedOrderId;
+    detail.openOrderDetail(linkedOrder);
+  }, [
+    authLoading,
+    capabilities.canView,
+    hasSession,
+    linkedOrderId,
+    linkedOrderNumber,
+    query.data,
+  ]);
 
   const from = query.total === 0
     ? 0

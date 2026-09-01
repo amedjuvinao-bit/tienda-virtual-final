@@ -1,47 +1,23 @@
 'use strict';
 
+const {
+  buildCustomerIdentity,
+  cleanLower,
+  cleanPhone,
+  cleanText,
+  cleanUpper,
+  normalizeDocumentNumber,
+  normalizeDocumentType,
+  normalizePhone,
+  onlyDigits,
+} = require('../../lib/customers/customerIdentity');
+
 const CONFIRMED_ORDER_STATUSES = new Set([
   'paid',
   'shipped',
   'delivered',
   'refunded',
 ]);
-
-function cleanText(value, max = 250) {
-  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
-}
-
-function cleanLower(value, max = 250) {
-  return cleanText(value, max).toLowerCase();
-}
-
-function cleanUpper(value, max = 80) {
-  return cleanText(value, max).toUpperCase();
-}
-
-function onlyDigits(value) {
-  return cleanText(value, 80).replace(/\D/g, '');
-}
-
-function normalizePhone(value) {
-  return cleanText(value, 80).replace(/[^0-9+]/g, '');
-}
-
-function normalizeDocumentType(value) {
-  const normalized = cleanUpper(value, 40);
-  const aliases = {
-    CEDULA: 'CC',
-    'CÉDULA': 'CC',
-    PASAPORTE: 'PP',
-    NIT: 'NIT',
-  };
-  const resolved = aliases[normalized] || normalized;
-  return ['CC', 'CE', 'NIT', 'TI', 'PP', 'RC', 'DNI', 'OTHER', ''].includes(resolved)
-    ? resolved
-    : resolved
-      ? 'OTHER'
-      : '';
-}
 
 function getRawOrder(order = {}) {
   return typeof order?.toObject === 'function'
@@ -114,7 +90,7 @@ function buildCustomerPayloadFromOrder(order = {}, { source = '' } = {}) {
         : ''),
     180
   );
-  const phoneCandidate = normalizePhone(
+  const phoneCandidate = cleanPhone(
     customer.phone ||
       billing.phone ||
       (!String(customer.emailOrPhone || '').includes('@')
@@ -122,20 +98,25 @@ function buildCustomerPayloadFromOrder(order = {}, { source = '' } = {}) {
         : '')
   );
 
+  const documentType = normalizeDocumentType(
+    customer.documentType || billing.documentType
+  );
+  const normalizedPhone = normalizePhone(phoneCandidate, {
+    defaultCountry: customer.country || billing.country || 'CO',
+  });
+
   return {
     fullName: fullName || 'Cliente sin nombre',
     displayName: fullName || 'Cliente sin nombre',
     firstName,
     lastName,
     phone: phoneCandidate,
-    normalizedPhone: phoneCandidate,
+    normalizedPhone,
     email: emailCandidate,
     normalizedEmail: emailCandidate,
-    documentType: normalizeDocumentType(
-      customer.documentType || billing.documentType
-    ),
+    documentType,
     documentNumber,
-    normalizedDocument: onlyDigits(documentNumber),
+    normalizedDocument: normalizeDocumentNumber(documentNumber, documentType),
     address: cleanText(customer.address || billing.address, 250),
     city: cleanText(customer.city || billing.city, 100),
     department: cleanText(customer.department || billing.department, 100),
@@ -145,14 +126,37 @@ function buildCustomerPayloadFromOrder(order = {}, { source = '' } = {}) {
     status: 'active',
     acceptsMarketing: customer.wantsNewsletter === true,
     defaultBranch: raw.branch || null,
+    branchIds: raw.branch ? [raw.branch] : [],
+    fiscalProfile: {
+      personType: cleanLower(billing.personType, 20),
+      businessName: cleanText(billing.businessName, 180),
+      verificationDigit: onlyDigits(billing.dv).slice(0, 1),
+      municipalityCode: cleanText(
+        billing.municipalityCode || billing.cityCode,
+        20
+      ),
+      departmentCode: cleanText(billing.departmentCode, 20),
+      countryCode: cleanUpper(
+        billing.countryCode || billing.country || customer.country || 'CO',
+        2
+      ),
+      tributeCode: cleanUpper(billing.tributeCode || 'ZZ', 20),
+      taxRegime: cleanText(billing.taxRegime, 100),
+      taxResponsibilities: Array.isArray(billing.taxResponsibilities)
+        ? billing.taxResponsibilities
+            .map((item) => cleanUpper(item, 40))
+            .filter(Boolean)
+        : [],
+    },
   };
 }
 
 function hasCustomerIdentity(payload = {}) {
+  const identity = buildCustomerIdentity(payload);
   return Boolean(
-    cleanLower(payload.normalizedEmail || payload.email, 180) ||
-      normalizePhone(payload.normalizedPhone || payload.phone) ||
-      onlyDigits(payload.normalizedDocument || payload.documentNumber)
+    identity.normalizedEmail ||
+      identity.normalizedPhone ||
+      identity.normalizedDocument
   );
 }
 

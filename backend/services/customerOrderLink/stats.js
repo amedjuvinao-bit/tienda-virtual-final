@@ -50,6 +50,10 @@ async function applyCustomerStatsForOrder(
     },
   };
 
+  if (order.branch) {
+    update.$addToSet = { branchIds: order.branch };
+  }
+
   await CustomerModel.updateOne({ _id: customerId }, update, { session });
   order.customerRelationship = {
     ...(order.customerRelationship?.toObject

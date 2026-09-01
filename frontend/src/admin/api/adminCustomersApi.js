@@ -9,6 +9,16 @@ function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+function normalizeTextList(value) {
+  const entries = Array.isArray(value)
+    ? value
+    : cleanText(value)
+      .split(',')
+      .map((item) => item.trim());
+
+  return [...new Set(entries.map(cleanText).filter(Boolean))];
+}
+
 function buildCustomersApiErrorMessage(error, fallbackMessage) {
   const data = error?.response?.data || {};
 
@@ -64,6 +74,8 @@ function assertPayload(payload, message) {
 }
 
 export function normalizeCustomerPayload(payload = {}) {
+  const fiscalProfile = payload.fiscalProfile || {};
+
   return {
     firstName: cleanText(payload.firstName),
     lastName: cleanText(payload.lastName),
@@ -78,11 +90,82 @@ export function normalizeCustomerPayload(payload = {}) {
     department: cleanText(payload.department),
     country: cleanText(payload.country || 'CO').toUpperCase(),
     postalCode: cleanText(payload.postalCode),
-    source: cleanText(payload.source || 'admin').toLowerCase(),
-    status: cleanText(payload.status || 'active').toLowerCase(),
-    acceptsMarketing: payload.acceptsMarketing === true,
+    ...(Array.isArray(payload.addresses)
+      ? { addresses: payload.addresses }
+      : {}),
+    fiscalProfile: {
+      personType: cleanText(
+        fiscalProfile.personType || payload.personType
+      ).toLowerCase(),
+      businessName: cleanText(
+        fiscalProfile.businessName || payload.businessName
+      ),
+      verificationDigit: cleanText(
+        fiscalProfile.verificationDigit || fiscalProfile.dv || payload.dv
+      )
+        .replace(/\D/g, '')
+        .slice(0, 1),
+      municipalityCode: cleanText(
+        fiscalProfile.municipalityCode ||
+          fiscalProfile.cityCode ||
+          payload.municipalityCode ||
+          payload.cityCode
+      ),
+      departmentCode: cleanText(
+        fiscalProfile.departmentCode || payload.departmentCode
+      ),
+      countryCode: cleanText(
+        fiscalProfile.countryCode || payload.countryCode || payload.country || 'CO'
+      ).toUpperCase(),
+      tributeCode: cleanText(
+        fiscalProfile.tributeCode || payload.tributeCode || 'ZZ'
+      ).toUpperCase(),
+      taxRegime: cleanText(fiscalProfile.taxRegime || payload.taxRegime),
+      taxResponsibilities: normalizeTextList(
+        fiscalProfile.taxResponsibilities ?? payload.taxResponsibilities
+      ),
+    },
+    ...(payload.source !== undefined
+      ? { source: cleanText(payload.source).toLowerCase() }
+      : {}),
+    ...(payload.status !== undefined
+      ? { status: cleanText(payload.status).toLowerCase() }
+      : {}),
+    ...(payload.acceptsMarketing !== undefined
+      ? { acceptsMarketing: payload.acceptsMarketing === true }
+      : {}),
     notes: cleanText(payload.notes),
-    tags: Array.isArray(payload.tags) ? payload.tags : [],
+    ...(Array.isArray(payload.tags) ? { tags: payload.tags } : {}),
+    ...(cleanText(payload.crmStage || payload.crm?.stage)
+      ? { crmStage: cleanText(payload.crmStage || payload.crm?.stage).toLowerCase() }
+      : {}),
+    ...(cleanText(payload.crmPriority || payload.crm?.priority)
+      ? {
+          crmPriority: cleanText(
+            payload.crmPriority || payload.crm?.priority
+          ).toLowerCase(),
+        }
+      : {}),
+    ...(payload.crmOwnerAdmin !== undefined || payload.crm?.ownerAdmin !== undefined
+      ? {
+          crmOwnerAdmin: cleanText(
+            payload.crmOwnerAdmin?.id ||
+              payload.crmOwnerAdmin?._id ||
+              payload.crmOwnerAdmin ||
+              payload.crm?.ownerAdmin?.id ||
+              payload.crm?.ownerAdmin
+          ),
+        }
+      : {}),
+    ...(payload.crmNextReviewAt !== undefined || payload.crm?.nextReviewAt !== undefined
+      ? {
+          crmNextReviewAt:
+            payload.crmNextReviewAt || payload.crm?.nextReviewAt || null,
+        }
+      : {}),
+    ...(cleanText(payload.branchId || payload.defaultBranch)
+      ? { branchId: cleanText(payload.branchId || payload.defaultBranch) }
+      : {}),
   };
 }
 
@@ -91,6 +174,30 @@ export function normalizeCustomerFollowUpPayload(payload = {}) {
     type: cleanText(payload.type || 'note').toLowerCase(),
     status: cleanText(payload.status || 'pending').toLowerCase(),
     note: cleanText(payload.note || payload.message || payload.comment),
+    nextAction: cleanText(payload.nextAction),
+    dueAt: payload.dueAt || null,
+    priority: cleanText(payload.priority || 'normal').toLowerCase(),
+    ...(payload.assignedToAdmin !== undefined
+      ? {
+          assignedToAdmin: cleanText(
+            payload.assignedToAdmin?.id ||
+              payload.assignedToAdmin?._id ||
+              payload.assignedToAdmin
+          ),
+        }
+      : {}),
+    ...(cleanText(payload.branchId)
+      ? { branchId: cleanText(payload.branchId) }
+      : {}),
+  };
+}
+
+export function normalizeCustomerFollowUpResultPayload(payload = {}) {
+  return {
+    outcome: cleanText(payload.outcome || payload.result).toLowerCase(),
+    outcomeNote: cleanText(
+      payload.outcomeNote || payload.resultNote || payload.note
+    ),
     nextAction: cleanText(payload.nextAction),
     dueAt: payload.dueAt || null,
   };
@@ -102,8 +209,12 @@ export async function getAdminCustomers(params = {}) {
     status: params.status,
     source: params.source,
     segment: params.segment,
+    crmStage: params.crmStage,
+    crmPriority: params.crmPriority,
+    crmOwner: params.crmOwner,
     page: params.page || 1,
     limit: params.limit || 20,
+    branchId: params.branchId,
   });
 
   try {
@@ -112,6 +223,82 @@ export async function getAdminCustomers(params = {}) {
     return response.data;
   } catch (error) {
     throwCustomersApiError(error, 'No fue posible cargar los clientes.');
+  }
+}
+
+export async function getAdminCustomerSavedSegments() {
+  try {
+    const response = await api.get(`${BASE_URL}/segments/saved`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar los segmentos guardados.');
+  }
+}
+
+export async function createAdminCustomerSavedSegment(payload = {}) {
+  try {
+    const response = await api.post(`${BASE_URL}/segments/saved`, {
+      name: cleanText(payload.name),
+      filters: payload.filters || {},
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible guardar el segmento.');
+  }
+}
+
+export async function updateAdminCustomerSavedSegment(segmentId, payload = {}) {
+  const cleanId = cleanText(segmentId);
+  if (!cleanId) throw new Error('Debes seleccionar un segmento válido.');
+  try {
+    const response = await api.put(`${BASE_URL}/segments/saved/${cleanId}`, {
+      name: cleanText(payload.name),
+      filters: payload.filters || {},
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible actualizar el segmento.');
+  }
+}
+
+export async function deleteAdminCustomerSavedSegment(segmentId) {
+  const cleanId = cleanText(segmentId);
+  if (!cleanId) throw new Error('Debes seleccionar un segmento válido.');
+  try {
+    const response = await api.delete(`${BASE_URL}/segments/saved/${cleanId}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible eliminar el segmento.');
+  }
+}
+
+export async function getAdminCustomerCrmAssignees(params = {}) {
+  const queryString = buildQueryParams({ branchId: params.branchId });
+  try {
+    const response = await api.get(`${FOLLOW_UPS_URL}/meta/assignees${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar los responsables CRM.');
+  }
+}
+
+export async function getAdminCustomerCrmQueue(params = {}) {
+  const queryString = buildQueryParams({
+    q: params.q,
+    status: params.status || 'pending',
+    type: params.type,
+    priority: params.priority,
+    dueScope: params.dueScope,
+    assignedTo: params.assignedTo,
+    branchId: params.branchId,
+    page: params.page || 1,
+    limit: params.limit || 25,
+  });
+  try {
+    const response = await api.get(`${FOLLOW_UPS_URL}/queue${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar la bandeja CRM.');
   }
 }
 
@@ -126,7 +313,7 @@ export async function searchAdminCustomers(q, options = {}) {
   });
 }
 
-export async function getAdminCustomer(customerId) {
+export async function getAdminCustomer(customerId, params = {}) {
   const cleanId = cleanText(customerId);
 
   if (!cleanId) {
@@ -134,11 +321,101 @@ export async function getAdminCustomer(customerId) {
   }
 
   try {
-    const response = await api.get(`${BASE_URL}/${cleanId}`);
+    const queryString = buildQueryParams({
+      branchId: params.branchId,
+      ordersLimit: params.ordersLimit,
+    });
+    const response = await api.get(`${BASE_URL}/${cleanId}${queryString}`);
 
     return response.data;
   } catch (error) {
     throwCustomersApiError(error, 'No fue posible consultar el cliente.');
+  }
+}
+
+export async function getAdminCustomer360(customerId, params = {}) {
+  const cleanId = cleanText(customerId);
+
+  if (!cleanId) {
+    throw new Error('Debes seleccionar un cliente válido.');
+  }
+
+  try {
+    const queryString = buildQueryParams({
+      branchId: params.branchId,
+      historyLimit: params.historyLimit || 100,
+    });
+    const response = await api.get(`${BASE_URL}/${cleanId}/360${queryString}`);
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(
+      error,
+      'No fue posible cargar la vista 360° del cliente.'
+    );
+  }
+}
+
+export async function getAdminCustomerPrivacy(customerId) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.get(`${BASE_URL}/${cleanId}/privacy`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible consultar la privacidad del cliente.');
+  }
+}
+
+export async function getAdminCustomerAudit(customerId, params = {}) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const queryString = buildQueryParams({ limit: params.limit || 100 });
+    const response = await api.get(`${BASE_URL}/${cleanId}/audit${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible consultar la auditoría del cliente.');
+  }
+}
+
+export async function exportAdminCustomerData(customerId) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.get(`${BASE_URL}/${cleanId}/export`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible exportar el expediente del cliente.');
+  }
+}
+
+export async function updateAdminCustomerConsent(customerId, payload = {}) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.post(`${BASE_URL}/${cleanId}/consent`, {
+      status: cleanText(payload.status).toLowerCase(),
+      source: cleanText(payload.source || 'admin').toLowerCase(),
+      proofReference: cleanText(payload.proofReference),
+      note: cleanText(payload.note),
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible registrar el consentimiento.');
+  }
+}
+
+export async function anonymizeAdminCustomer(customerId, confirmation) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.post(`${BASE_URL}/${cleanId}/anonymize`, {
+      confirmation: cleanText(confirmation),
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible anonimizar el cliente.');
   }
 }
 
@@ -182,6 +459,7 @@ export async function getAdminCustomerFollowUps(customerId, params = {}) {
   const queryString = buildQueryParams({
     status: params.status || 'all',
     limit: params.limit || 20,
+    branchId: params.branchId,
   });
 
   try {
@@ -230,6 +508,31 @@ export async function updateAdminCustomerFollowUp(customerId, followUpId, payloa
   }
 }
 
+export async function recordAdminCustomerFollowUpResult(
+  customerId,
+  followUpId,
+  payload
+) {
+  const cleanCustomerId = cleanText(customerId);
+  const cleanFollowUpId = cleanText(followUpId);
+
+  if (!cleanCustomerId || !cleanFollowUpId) {
+    throw new Error('Debes seleccionar una gestión válida.');
+  }
+
+  assertPayload(payload, 'El resultado de la gestión es obligatorio.');
+
+  try {
+    const response = await api.post(
+      `${FOLLOW_UPS_URL}/${cleanCustomerId}/${cleanFollowUpId}/result`,
+      normalizeCustomerFollowUpResultPayload(payload)
+    );
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible registrar el resultado de la gestión.');
+  }
+}
+
 export async function deleteAdminCustomerFollowUp(customerId, followUpId) {
   const cleanCustomerId = cleanText(customerId);
   const cleanFollowUpId = cleanText(followUpId);
@@ -259,17 +562,31 @@ export async function createQuickPosCustomer(payload) {
 
 const adminCustomersApi = {
   getAdminCustomers,
+  getAdminCustomerSavedSegments,
+  createAdminCustomerSavedSegment,
+  updateAdminCustomerSavedSegment,
+  deleteAdminCustomerSavedSegment,
   searchAdminCustomers,
   getAdminCustomer,
+  getAdminCustomer360,
+  getAdminCustomerPrivacy,
+  getAdminCustomerAudit,
+  exportAdminCustomerData,
+  updateAdminCustomerConsent,
+  anonymizeAdminCustomer,
+  getAdminCustomerCrmAssignees,
+  getAdminCustomerCrmQueue,
   createAdminCustomer,
   updateAdminCustomer,
   getAdminCustomerFollowUps,
   createAdminCustomerFollowUp,
+  recordAdminCustomerFollowUpResult,
   updateAdminCustomerFollowUp,
   deleteAdminCustomerFollowUp,
   createQuickPosCustomer,
   normalizeCustomerPayload,
   normalizeCustomerFollowUpPayload,
+  normalizeCustomerFollowUpResultPayload,
 };
 
 export default adminCustomersApi;

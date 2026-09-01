@@ -35,6 +35,8 @@ const DEFAULT_SECURITY = {
   lockMinutes: 15,
 };
 
+const CUSTOMER_SAVED_SEGMENT_LIMIT = 20;
+
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
@@ -133,6 +135,24 @@ const AssignedBranchSchema = new mongoose.Schema(
     },
   },
   { _id: false }
+);
+
+const CustomerSavedSegmentSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, required: true, maxlength: 80 },
+    normalizedName: { type: String, trim: true, lowercase: true, required: true },
+    filters: {
+      source: { type: String, trim: true, lowercase: true, default: 'all' },
+      segment: { type: String, trim: true, lowercase: true, default: 'all' },
+      status: { type: String, trim: true, lowercase: true, default: 'active' },
+      crmStage: { type: String, trim: true, lowercase: true, default: 'all' },
+      crmPriority: { type: String, trim: true, lowercase: true, default: 'all' },
+      crmOwner: { type: String, trim: true, default: 'all' },
+    },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
 );
 
 const AdminUserSchema = new mongoose.Schema(
@@ -294,6 +314,15 @@ const AdminUserSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
       default: null,
+    },
+
+    customerSavedSegments: {
+      type: [CustomerSavedSegmentSchema],
+      default: [],
+      validate: {
+        validator: (value) => !Array.isArray(value) || value.length <= CUSTOMER_SAVED_SEGMENT_LIMIT,
+        message: `Solo se permiten ${CUSTOMER_SAVED_SEGMENT_LIMIT} segmentos de Clientes por administrador.`,
+      },
     },
 
     status: {
@@ -466,6 +495,19 @@ AdminUserSchema.pre('validate', function (next) {
     this.documentNumber = normalizeText(this.documentNumber);
     this.role = normalizeRoleCode(this.role || 'seller');
     this.notes = normalizeText(this.notes);
+    this.customerSavedSegments = Array.isArray(this.customerSavedSegments)
+      ? this.customerSavedSegments.slice(0, CUSTOMER_SAVED_SEGMENT_LIMIT).map((segment) => {
+          segment.name = normalizeText(segment.name).slice(0, 80);
+          segment.normalizedName = normalizeLower(segment.name);
+          segment.filters.source = normalizeLower(segment.filters?.source || 'all');
+          segment.filters.segment = normalizeLower(segment.filters?.segment || 'all');
+          segment.filters.status = normalizeLower(segment.filters?.status || 'active');
+          segment.filters.crmStage = normalizeLower(segment.filters?.crmStage || 'all');
+          segment.filters.crmPriority = normalizeLower(segment.filters?.crmPriority || 'all');
+          segment.filters.crmOwner = normalizeText(segment.filters?.crmOwner || 'all');
+          return segment;
+        })
+      : [];
 
     if (!this.displayName) {
       const fullName = `${this.firstName || ''} ${this.lastName || ''}`.trim();

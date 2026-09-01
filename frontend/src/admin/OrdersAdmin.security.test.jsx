@@ -132,9 +132,9 @@ function deferred() {
   return { promise, resolve };
 }
 
-function renderOrders() {
+function renderOrders(initialEntry = '/admin/ordenes') {
   return render(
-    <MemoryRouter initialEntries={['/admin/ordenes']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <OrdersAdmin />
     </MemoryRouter>
   );
@@ -230,6 +230,31 @@ describe('OrdersAdmin con seguridad por sesión y permisos', () => {
     expect(state.api.post).not.toHaveBeenCalled();
     expect(state.api.patch).not.toHaveBeenCalled();
     expect(state.api.put).not.toHaveBeenCalled();
+  });
+
+  it('abre directamente una orden enlazada desde la ficha Cliente 360', async () => {
+    state.auth = {
+      isAuthenticated: true,
+      adminToken: 'header.payload.valid-admin-signature',
+      authLoading: false,
+    };
+    state.permissions = new Set(['orders:view']);
+
+    renderOrders(
+      `/admin/ordenes?q=${encodeURIComponent(ORDER.orderNumber)}&openOrder=${ORDER._id}`
+    );
+
+    expect(
+      await screen.findByRole('region', { name: 'Detalle de orden' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(`Detalle ${ORDER.orderNumber}`)).toBeInTheDocument();
+    expect(state.api.get).toHaveBeenCalledWith(
+      '/api/orders/admin',
+      expect.objectContaining({
+        params: expect.objectContaining({ q: ORDER.orderNumber }),
+      })
+    );
+    expect(state.api.get).toHaveBeenCalledWith(`/api/orders/${ORDER._id}`);
   });
 
   it('mantiene el botón flotante visible y permite mostrar u ocultar los filtros', async () => {

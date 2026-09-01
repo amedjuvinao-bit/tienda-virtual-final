@@ -4,6 +4,10 @@ const mongoose = require('mongoose');
 
 const Customer = require('../../models/Customer');
 const {
+  isActiveMongoTransaction,
+  isMongoDuplicateKeyError,
+} = require('../../lib/customers/customerIdentity');
+const {
   buildCustomerPayloadFromOrder,
   getRawOrder,
   hasCustomerIdentity,
@@ -104,8 +108,47 @@ async function resolveCustomerForOrder(
     };
   }
 
-  const created = await CustomerModel.create([payload], { session });
-  const customer = created[0];
+  let customer = null;
+
+  try {
+    const created = await CustomerModel.create([payload], { session });
+    customer = created[0];
+  } catch (error) {
+    if (!isMongoDuplicateKeyError(error)) throw error;
+
+    if (isActiveMongoTransaction(session)) {
+      throw createCustomerLinkError(
+        'Otro proceso registró esa identidad al mismo tiempo. Reintenta la operación.',
+        'CUSTOMER_DUPLICATE',
+        409
+      );
+    }
+
+    const concurrentMatch = await findCustomerMatch(payload, {
+      session,
+      CustomerModel,
+    });
+    if (!concurrentMatch?.customer) {
+      throw createCustomerLinkError(
+        'Otro proceso registró esa identidad al mismo tiempo. Reintenta la operación.',
+        'CUSTOMER_DUPLICATE',
+        409
+      );
+    }
+
+    customer = concurrentMatch.customer;
+    if (fillMissingCustomerFields(customer, payload)) {
+      await customer.save({ session });
+    }
+
+    return {
+      skipped: false,
+      created: false,
+      customer,
+      snapshot: customer.toOrderSnapshot(),
+      matchedBy: concurrentMatch.matchedBy,
+    };
+  }
 
   return {
     skipped: false,

@@ -45,6 +45,31 @@ const SENSITIVE_BODY_KEYS = [
   'factusClientId',
   'certificate',
   'certificatePassword',
+  // Datos personales y fiscales. El historial funcional de Clientes guarda
+  // huellas y vistas enmascaradas; el log administrativo global no debe
+  // duplicar PII cruda dentro del snapshot HTTP.
+  'email',
+  'phone',
+  'cellphone',
+  'mobile',
+  'documentNumber',
+  'firstName',
+  'lastName',
+  'fullName',
+  'displayName',
+  'businessName',
+  'address',
+  'postalCode',
+  'fiscalProfile',
+  'marketingConsent',
+  'proofReference',
+  'retentionHoldReason',
+  'notes',
+  'note',
+  'nextAction',
+  'q',
+  'search',
+  'searchTerm',
 ];
 
 function isPlainObject(value) {
@@ -68,9 +93,12 @@ function sanitizeValue(value, depth = 0) {
     for (const [key, itemValue] of Object.entries(value)) {
       const lowerKey = String(key || '').toLowerCase();
 
-      const isSensitive = SENSITIVE_BODY_KEYS.some((sensitiveKey) =>
-        lowerKey.includes(String(sensitiveKey).toLowerCase())
-      );
+      const isSensitive = SENSITIVE_BODY_KEYS.some((sensitiveKey) => {
+        const candidate = String(sensitiveKey).toLowerCase();
+        return candidate.length <= 2
+          ? lowerKey === candidate
+          : lowerKey.includes(candidate);
+      });
 
       result[key] = isSensitive
         ? '[REDACTED]'
@@ -143,6 +171,7 @@ function getResourceId(rule, req) {
   return (
     routeParams.id ||
     routeParams.orderId ||
+    routeParams.customerId ||
     routeParams.productId ||
     routeParams.userId ||
     routeParams.roleId ||
@@ -272,3 +301,4 @@ function adminAccessGate(req, res, next) {
 }
 
 module.exports = adminAccessGate;
+module.exports.sanitizeValue = sanitizeValue;
