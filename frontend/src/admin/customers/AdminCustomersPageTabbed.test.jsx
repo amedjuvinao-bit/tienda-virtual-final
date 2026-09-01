@@ -231,7 +231,14 @@ describe('AdminCustomersPageTabbed Etapa 1', () => {
     const navigation = await screen.findByRole('navigation', {
       name: 'Secciones de la ficha del cliente',
     });
-    expect(navigation.firstElementChild).toHaveClass('md:flex-wrap');
+    const dialog = screen.getByRole('dialog', { name: 'Cliente página 1' });
+    expect(dialog).toHaveClass('h-screen', 'w-screen');
+    expect(dialog.parentElement).toBe(document.body);
+    expect(navigation).toHaveClass('lg:w-[230px]');
+    expect(navigation.firstElementChild).toHaveClass('lg:flex-col');
+    expect(screen.getByText('Ficha del cliente')).toBeInTheDocument();
+    expect(screen.getByText('Historial comercial')).toBeInTheDocument();
+    expect(screen.getByText('Relación y control')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Saldos' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Seguimiento' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Actividad' })).toBeInTheDocument();

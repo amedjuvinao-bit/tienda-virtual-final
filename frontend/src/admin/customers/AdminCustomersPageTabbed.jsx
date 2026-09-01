@@ -1,6 +1,7 @@
 // frontend/src/admin/customers/AdminCustomersPageTabbed.jsx
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   AlertCircle,
@@ -416,7 +417,7 @@ function TabButton({ active, icon: Icon, children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-black transition"
+      className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-black transition lg:w-full lg:justify-start lg:rounded-xl lg:border-b-0 lg:border-l-2"
       style={{
         borderColor: active ? 'var(--admin-primary)' : 'transparent',
         color: active ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)',
@@ -538,6 +539,15 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
   useEffect(() => {
     if (customer?.id) setEditForm(toEditForm(customer));
   }, [customer]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow || '';
+    };
+  }, []);
 
   useEffect(() => {
     if (!customer?.id) return;
@@ -693,16 +703,16 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
     await loadFollowUps();
   };
 
-  return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 px-4 py-4 backdrop-blur-sm">
-      <section className="flex h-[86vh] max-h-[760px] w-full max-w-[1160px] flex-col overflow-hidden rounded-[32px] border" style={{ borderColor: 'rgba(236,72,153,0.28)', background: '#fff', boxShadow: '0 30px 90px rgba(15,23,42,0.30)' }}>
+  const modal = (
+    <div className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm md:p-4" role="dialog" aria-modal="true" aria-labelledby="customer-detail-title">
+      <section className="relative flex h-[calc(100vh-16px)] w-[calc(100vw-16px)] max-w-[1480px] flex-col overflow-hidden rounded-[24px] border md:h-[calc(100vh-34px)] md:w-[calc(100vw-34px)] md:rounded-[30px]" style={{ borderColor: 'rgba(236,72,153,0.28)', background: '#fff', boxShadow: '0 34px 110px rgba(15,23,42,0.34)' }}>
         <header className="shrink-0 border-b px-5 py-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'linear-gradient(135deg, #fff, #fff7fb)' }}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-4">
               <IconBox icon={UserRound} />
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Ficha comercial del cliente</p>
-                <h2 className="mt-1 truncate text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{customer ? customerName(customer) : 'Cliente'}</h2>
+                <h2 id="customer-detail-title" className="mt-1 truncate text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{customer ? customerName(customer) : 'Cliente'}</h2>
                 <p className="mt-1 truncate text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer?.customerCode || 'Consultando información...'}</p>
               </div>
             </div>
@@ -713,10 +723,13 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
           </div>
         </header>
 
-        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-5 md:overflow-visible" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}>
-          <div className="flex min-w-max gap-1 md:min-w-0 md:flex-wrap">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-3 lg:w-[230px] lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: 'linear-gradient(180deg, #fff, #fff7fb)' }}>
+          <div className="flex min-w-max gap-1 py-1 lg:min-w-0 lg:flex-col lg:py-0">
+            <p className="hidden px-4 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Ficha del cliente</p>
             <TabButton active={activeTab === 'summary'} icon={UsersRound} onClick={() => selectTab('summary')}>Resumen</TabButton>
             <TabButton active={activeTab === 'edit'} icon={Edit3} onClick={() => selectTab('edit')}>Datos</TabButton>
+            <p className="hidden px-4 pb-2 pt-5 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Historial comercial</p>
             <TabButton active={activeTab === 'orders'} icon={ShoppingBag} onClick={() => selectTab('orders')}>Compras</TabButton>
             <TabButton active={activeTab === 'payments'} icon={CreditCard} onClick={() => selectTab('payments')}>Pagos</TabButton>
             <TabButton active={activeTab === 'billing'} icon={ReceiptText} onClick={() => selectTab('billing')}>Facturas</TabButton>
@@ -724,13 +737,14 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
             <TabButton active={activeTab === 'shipping'} icon={Truck} onClick={() => selectTab('shipping')}>Envíos</TabButton>
             <TabButton active={activeTab === 'carts'} icon={ShoppingCart} onClick={() => selectTab('carts')}>Carritos</TabButton>
             <TabButton active={activeTab === 'credit'} icon={WalletCards} onClick={() => selectTab('credit')}>Saldos</TabButton>
+            <p className="hidden px-4 pb-2 pt-5 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Relación y control</p>
             <TabButton active={activeTab === 'follow'} icon={MessageSquareText} onClick={() => selectTab('follow')}>Seguimiento {pendingFollowUps ? `(${pendingFollowUps})` : ''}</TabButton>
             <TabButton active={activeTab === 'activity'} icon={Activity} onClick={() => selectTab('activity')}>Actividad</TabButton>
             <TabButton active={activeTab === 'privacy'} icon={ShieldCheck} onClick={() => selectTab('privacy')}>Privacidad</TabButton>
           </div>
         </nav>
 
-        <main className="min-h-0 flex-1 overflow-hidden bg-[#fff7fb]/40 p-5">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#fff7fb]/40 p-4 lg:p-5">
           {loading ? <div className="flex h-full items-center justify-center rounded-3xl border bg-white" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 font-black">Cargando detalle...</p></div></div> : null}
           {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
 
@@ -907,9 +921,14 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
             </div>
           ) : null}
         </main>
+        </div>
       </section>
     </div>
   );
+
+  return typeof document === 'undefined'
+    ? modal
+    : createPortal(modal, document.body);
 }
 
 export default function AdminCustomersPageTabbed() {
