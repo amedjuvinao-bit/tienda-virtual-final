@@ -81,9 +81,14 @@ function wasDeliveredBeforeClosure(order = {}) {
 }
 
 export function getOrderProgressPresentation(order = {}) {
-  const progress = getProgressPresentation(order?.status);
+  const orderStatus = normalizeProgressStatus(order?.status);
+  const progressStatus =
+    !TERMINAL_PROGRESS[orderStatus] && wasDeliveredBeforeClosure(order)
+      ? 'delivered'
+      : orderStatus;
+  const progress = getProgressPresentation(progressStatus);
   if (
-    normalizeProgressStatus(order?.status) === 'refunded' &&
+    orderStatus === 'refunded' &&
     wasDeliveredBeforeClosure(order)
   ) {
     return {

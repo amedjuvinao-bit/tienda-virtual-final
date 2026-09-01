@@ -799,6 +799,28 @@ describe('resumen decorativo original', () => {
     expect(screen.getByText('Datos rápidos')).toBeInTheDocument();
   });
 
+  it('muestra una venta POS pagada y entregada como 100% completada', () => {
+    const order = {
+      ...BASE_ORDER,
+      source: 'pos',
+      saleType: 'pos_sale',
+      status: 'paid',
+      fulfillmentStatus: 'delivered',
+      payment: { status: 'paid', method: 'cash' },
+    };
+    const model = buildOrderSummaryRailModel(order);
+
+    expect(model.progress).toMatchObject({
+      kind: 'delivery',
+      percent: 100,
+      summary: '100% completado',
+    });
+
+    render(<OrderDetailSummaryRail order={order} />);
+    expect(screen.getByText('100% completado')).toBeInTheDocument();
+    expect(screen.queryByText('40% completado')).not.toBeInTheDocument();
+  });
+
   it.each([
     ['refunded', 'Ciclo cerrado por reembolso', 'Reembolso conciliado'],
     ['cancelled', 'Ciclo cerrado por cancelación', 'Orden cancelada'],
