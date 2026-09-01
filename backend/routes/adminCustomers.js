@@ -40,6 +40,7 @@ const {
   serializeCrmAdmin,
 } = require('../services/customerCrmAdminService');
 const {
+  buildConfirmedCustomerIdentityOrderFilter,
   emptyCustomerCommercialMetrics,
   loadCustomerCommercialMetrics,
   loadCustomerIdentityCommercialMetrics,
@@ -589,10 +590,10 @@ function buildCustomerFilter(query = {}, options = {}) {
   return { filter, q, segment };
 }
 
-async function loadCustomerOrders(req, customer, limit = 10) {
+async function loadCustomerOrders(req, customer, limit = 30) {
   const access = buildScopedOrderFilter(
     req,
-    buildCustomerOrdersFilter(customer),
+    buildConfirmedCustomerIdentityOrderFilter(customer),
     { requestedBranchId: req.query?.branchId || '' }
   );
 
@@ -607,7 +608,7 @@ async function loadCustomerOrders(req, customer, limit = 10) {
 
   const orders = await Order.find(access.filter)
     .sort({ createdAt: -1 })
-    .limit(toPositiveInt(limit, 10, 30))
+    .limit(toPositiveInt(limit, 30, 30))
     .lean();
 
   return orders.map(serializeCustomerOrder);
@@ -1693,7 +1694,7 @@ router.get('/:id', requirePermission('customers:view'), async (req, res) => {
       loadCustomerOrders(
         req,
         customer,
-        req.query.ordersLimit || 10
+        req.query.ordersLimit || 30
       ),
       loadCustomerIdentityCommercialMetrics(req, customer),
     ]);

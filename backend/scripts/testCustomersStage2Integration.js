@@ -409,6 +409,11 @@ async function main() {
     routeSource.includes('loadCustomerIdentityCommercialMetrics(req, customer)')
   );
   ok(
+    'el historial de compras usa la misma identidad y solo órdenes confirmadas',
+    routeSource.includes('buildConfirmedCustomerIdentityOrderFilter(customer)') &&
+      routeSource.includes('req.query.ordersLimit || 30')
+  );
+  ok(
     'el endpoint 360 exige customers:view y se declara antes del detalle genérico',
     routeSource.indexOf("router.get('/:id/360'") > 0 &&
       routeSource.indexOf("router.get('/:id/360'") <

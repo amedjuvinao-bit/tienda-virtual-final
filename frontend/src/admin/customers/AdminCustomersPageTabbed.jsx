@@ -842,8 +842,13 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
                     <div>
                       <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Compras del cliente</h3>
                       <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Historial reciente de órdenes POS y web.</p>
+                      {orders.length < Number(stats.ordersCount || 0) ? (
+                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                          Mostrando {orders.length} de {Number(stats.ordersCount || 0)} compras confirmadas.
+                        </p>
+                      ) : null}
                     </div>
-                    <Badge tone="primary">{orders.length} orden(es)</Badge>
+                    <Badge tone="primary">{Number(stats.ordersCount || orders.length)} compra(s)</Badge>
                   </div>
                   <OrderList orders={orders} />
                 </section>
@@ -1016,7 +1021,7 @@ export default function AdminCustomersPageTabbed() {
     setDetailError('');
     setDetailLoading(true);
     try {
-      const data = await getAdminCustomer(customer.id);
+      const data = await getAdminCustomer(customer.id, { ordersLimit: 30 });
       setDetailData(data || { customer, recentOrders: [] });
     } catch (err) {
       setDetailError(err?.message || 'No fue posible cargar el detalle del cliente.');

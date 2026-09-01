@@ -188,6 +188,41 @@ describe('AdminCustomersPageTabbed Etapa 1', () => {
     );
   });
 
+  it('solicita hasta 30 compras confirmadas y conserva el total comercial', async () => {
+    getAdminCustomer.mockResolvedValueOnce({
+      ok: true,
+      customer: {
+        id: 'customer-1',
+        customerCode: 'CLI-1',
+        fullName: 'Cliente página 1',
+        status: 'active',
+        source: 'admin',
+        stats: { ordersCount: 11 },
+      },
+      recentOrders: Array.from({ length: 11 }, (_, index) => ({
+        id: `order-${index + 1}`,
+        orderNumber: String(index + 1).padStart(6, '0'),
+        status: 'paid',
+        total: 100000,
+        items: [],
+      })),
+    });
+
+    render(<AdminCustomersPageTabbed />);
+    expect(await screen.findByText('Cliente página 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Detalle' }));
+
+    await waitFor(() => {
+      expect(getAdminCustomer).toHaveBeenCalledWith(
+        'customer-1',
+        { ordersLimit: 30 }
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compras' }));
+    expect(await screen.findByText('11 compra(s)')).toBeInTheDocument();
+  });
+
   it('bloquea la edición visual de PII cuando el backend entrega una ficha enmascarada', async () => {
     getAdminCustomer.mockResolvedValueOnce({
       ok: true,
