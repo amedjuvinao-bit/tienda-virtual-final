@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 
 const Order = require('../models/Order');
+const { buildCustomerOrdersFilter } = require('./customerOrderIdentityFilter');
 const { buildScopedOrderFilter } = require('./orderAdminScopeService');
 
 const CONFIRMED_ORDER_STATUSES = Object.freeze([
@@ -54,6 +55,70 @@ function buildConfirmedCustomerOrderFilter(customerIds = []) {
       { status: { $in: [...CONFIRMED_ORDER_STATUSES] } },
     ],
   };
+}
+
+function buildConfirmedCustomerIdentityOrderFilter(customer = {}) {
+  return {
+    $and: [
+      buildCustomerOrdersFilter(customer),
+      {
+        $or: [
+          { 'payment.status': 'paid' },
+          { status: { $in: [...CONFIRMED_ORDER_STATUSES] } },
+        ],
+      },
+    ],
+  };
+}
+
+function buildCommercialMetricsPipeline(filter, groupBy) {
+  return [
+    { $match: filter },
+    { $sort: { createdAt: 1, _id: 1 } },
+    {
+      $group: {
+        _id: groupBy,
+        ordersCount: { $sum: 1 },
+        posOrdersCount: {
+          $sum: { $cond: [{ $eq: ['$source', 'pos'] }, 1, 0] },
+        },
+        webOrdersCount: {
+          $sum: { $cond: [{ $eq: ['$source', 'pos'] }, 0, 1] },
+        },
+        grossSales: { $sum: { $ifNull: ['$total', 0] } },
+        refundedAmount: {
+          $sum: { $ifNull: ['$refundControl.totalAmount', 0] },
+        },
+        returnOrdersCount: {
+          $sum: {
+            $cond: [
+              { $gt: [{ $ifNull: ['$returnControl.requestCount', 0] }, 0] },
+              1,
+              0,
+            ],
+          },
+        },
+        firstPurchaseAt: {
+          $first: { $ifNull: ['$payment.paidAt', '$createdAt'] },
+        },
+        lastPurchaseAt: {
+          $last: { $ifNull: ['$payment.paidAt', '$createdAt'] },
+        },
+        lastOrder: { $last: '$_id' },
+        lastOrderNumber: { $last: '$orderNumber' },
+      },
+    },
+  ];
+}
+
+function assertMetricsAccess(access = {}) {
+  if (access.ok) return access;
+  const error = new Error(
+    access.message || 'No tienes acceso a las métricas comerciales de esa sede.'
+  );
+  error.code = access.error || 'CUSTOMER_METRICS_BRANCH_FORBIDDEN';
+  error.statusCode = access.status || 403;
+  throw error;
 }
 
 function deriveMetrics(row = {}) {
@@ -113,62 +178,44 @@ async function loadCustomerCommercialMetrics(req, customerIds = []) {
       requireWholeOrder: true,
     }
   );
-  if (!access.ok) {
-    const error = new Error(
-      access.message || 'No tienes acceso a las métricas comerciales de esa sede.'
-    );
-    error.code = access.error || 'CUSTOMER_METRICS_BRANCH_FORBIDDEN';
-    error.statusCode = access.status || 403;
-    throw error;
-  }
+  assertMetricsAccess(access);
 
-  const rows = await Order.aggregate([
-    { $match: access.filter },
-    { $sort: { createdAt: 1, _id: 1 } },
-    {
-      $group: {
-        _id: '$customer.customerId',
-        ordersCount: { $sum: 1 },
-        posOrdersCount: {
-          $sum: { $cond: [{ $eq: ['$source', 'pos'] }, 1, 0] },
-        },
-        webOrdersCount: {
-          $sum: { $cond: [{ $eq: ['$source', 'pos'] }, 0, 1] },
-        },
-        grossSales: { $sum: { $ifNull: ['$total', 0] } },
-        refundedAmount: {
-          $sum: { $ifNull: ['$refundControl.totalAmount', 0] },
-        },
-        returnOrdersCount: {
-          $sum: {
-            $cond: [
-              { $gt: [{ $ifNull: ['$returnControl.requestCount', 0] }, 0] },
-              1,
-              0,
-            ],
-          },
-        },
-        firstPurchaseAt: {
-          $first: { $ifNull: ['$payment.paidAt', '$createdAt'] },
-        },
-        lastPurchaseAt: {
-          $last: { $ifNull: ['$payment.paidAt', '$createdAt'] },
-        },
-        lastOrder: { $last: '$_id' },
-        lastOrderNumber: { $last: '$orderNumber' },
-      },
-    },
-  ]);
+  const rows = await Order.aggregate(
+    buildCommercialMetricsPipeline(access.filter, '$customer.customerId')
+  );
 
   return new Map(
     rows.map((row) => [String(row._id), deriveMetrics(row)])
   );
 }
 
+async function loadCustomerIdentityCommercialMetrics(
+  req,
+  customer = {},
+  { OrderModel = Order } = {}
+) {
+  const access = buildScopedOrderFilter(
+    req,
+    buildConfirmedCustomerIdentityOrderFilter(customer),
+    {
+      requestedBranchId: req.query?.branchId || '',
+      requireWholeOrder: true,
+    }
+  );
+  assertMetricsAccess(access);
+
+  const rows = await OrderModel.aggregate(
+    buildCommercialMetricsPipeline(access.filter, null)
+  );
+  return deriveMetrics(rows[0] || {});
+}
+
 module.exports = {
   CONFIRMED_ORDER_STATUSES,
   buildConfirmedCustomerOrderFilter,
+  buildConfirmedCustomerIdentityOrderFilter,
   deriveMetrics,
   emptyCustomerCommercialMetrics,
   loadCustomerCommercialMetrics,
+  loadCustomerIdentityCommercialMetrics,
 };

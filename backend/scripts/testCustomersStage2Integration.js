@@ -12,6 +12,9 @@ const {
   resolveCustomer360Access,
 } = require('../services/customer360');
 const { serializeInvoice } = require('../services/customer360/presentation');
+const {
+  loadCustomerIdentityCommercialMetrics,
+} = require('../services/customerCommercialMetricsService');
 
 let controls = 0;
 
@@ -252,6 +255,33 @@ async function main() {
   };
   const repository = createFixtureRepository(fixtures);
   const allAllowed = async () => true;
+  let identityMetricsPipeline = null;
+  const identityMetrics = await loadCustomerIdentityCommercialMetrics(
+    ownerRequest,
+    customer,
+    {
+      OrderModel: {
+        aggregate: async (pipeline) => {
+          identityMetricsPipeline = pipeline;
+          return [{
+            ordersCount: 2,
+            posOrdersCount: 1,
+            webOrdersCount: 1,
+            grossSales: 140000,
+            refundedAmount: 20000,
+            firstPurchaseAt: new Date('2026-08-20T12:00:00.000Z'),
+            lastPurchaseAt: new Date('2026-08-21T12:00:00.000Z'),
+          }];
+        },
+      },
+    }
+  );
+  ok(
+    'el resumen individual usa la identidad completa y no solo customerId',
+    JSON.stringify(identityMetricsPipeline?.[0]?.$match || {}).includes('customer.email') &&
+      identityMetrics.ordersCount === 2 &&
+      identityMetrics.netSpent === 120000
+  );
   const detail = await loadCustomer360({
     req: ownerRequest,
     customer,
@@ -374,6 +404,10 @@ async function main() {
   );
 
   const routeSource = read('backend/routes/adminCustomers.js');
+  ok(
+    'el detalle comercial solicita métricas por identidad completa',
+    routeSource.includes('loadCustomerIdentityCommercialMetrics(req, customer)')
+  );
   ok(
     'el endpoint 360 exige customers:view y se declara antes del detalle genérico',
     routeSource.indexOf("router.get('/:id/360'") > 0 &&

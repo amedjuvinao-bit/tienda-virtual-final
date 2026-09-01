@@ -42,6 +42,7 @@ const {
 const {
   emptyCustomerCommercialMetrics,
   loadCustomerCommercialMetrics,
+  loadCustomerIdentityCommercialMetrics,
 } = require('../services/customerCommercialMetricsService');
 const {
   ABANDONED_WINDOW_MS,
@@ -1688,18 +1689,16 @@ router.get('/:id', requirePermission('customers:view'), async (req, res) => {
         hasCustomerPermission(req, 'customers:anonymize'),
       ]);
     const canAnonymize = canViewSensitive && hasAnonymizePermission;
-    const recentOrders = await loadCustomerOrders(
-      req,
-      customer,
-      req.query.ordersLimit || 10
-    );
+    const [recentOrders, identityStats] = await Promise.all([
+      loadCustomerOrders(
+        req,
+        customer,
+        req.query.ordersLimit || 10
+      ),
+      loadCustomerIdentityCommercialMetrics(req, customer),
+    ]);
     const detailAccess = assertScopeAccess(
       buildScopedCustomerFilter(req, { _id: customer._id, deletedAt: null })
-    );
-    const scopedStats = await loadScopedCustomerStats(
-      req,
-      [customer._id],
-      detailAccess
     );
     await recordCustomerAuditEvent({
       req,
@@ -1712,9 +1711,7 @@ router.get('/:id', requirePermission('customers:view'), async (req, res) => {
     return res.json({
       ok: true,
       customer: serializeProtectedCustomer(customer, {
-        stats:
-          scopedStats?.get(String(customer._id)) ||
-          emptyCustomerStats(),
+        stats: identityStats,
       }, canViewSensitive),
       recentOrders,
       access: {
@@ -1802,18 +1799,12 @@ router.put('/:id', requirePermission('customers:update'), async (req, res) => {
       'crmOwnerAdmin',
       'username displayName firstName lastName role branches defaultBranch'
     );
-    const detailAccess = assertScopeAccess(
-      buildScopedCustomerFilter(req, { _id: customer._id, deletedAt: null })
-    );
-    const scopedStats = await loadScopedCustomerStats(
+    const identityStats = await loadCustomerIdentityCommercialMetrics(
       req,
-      [customer._id],
-      detailAccess
+      customer
     );
     const updatedSnapshot = serializeCustomer(customer, {
-      stats:
-        scopedStats?.get(String(customer._id)) ||
-        emptyCustomerStats(),
+      stats: identityStats,
     });
     const requestedPaths = Object.keys(body).flatMap((key) => {
       if (key === 'fiscalProfile') {
