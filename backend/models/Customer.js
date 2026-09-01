@@ -17,6 +17,18 @@ const {
 
 const CUSTOMER_SOURCES = ['pos', 'web', 'admin', 'import', 'system'];
 const CUSTOMER_STATUSES = ['active', 'inactive', 'blocked'];
+const CUSTOMER_CRM_STAGES = [
+  'prospect',
+  'new',
+  'active',
+  'loyal',
+  'at_risk',
+  'inactive',
+  'won_back',
+];
+const CUSTOMER_CRM_PRIORITIES = ['low', 'normal', 'high', 'vip'];
+const CUSTOMER_PRIVACY_STATUSES = ['active', 'restricted', 'anonymized'];
+const CUSTOMER_CONSENT_STATUSES = ['unknown', 'granted', 'withdrawn'];
 
 function cleanMoney(value) {
   const number = Number(value);
@@ -82,6 +94,30 @@ const CustomerPurchaseStatsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const CustomerConsentHistorySchema = new mongoose.Schema(
+  {
+    status: { type: String, enum: CUSTOMER_CONSENT_STATUSES, required: true },
+    source: { type: String, trim: true, lowercase: true, default: 'admin' },
+    proofReference: { type: String, trim: true, default: '', maxlength: 240 },
+    note: { type: String, trim: true, default: '', maxlength: 500 },
+    recordedAt: { type: Date, default: Date.now },
+    recordedByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
+  },
+  { _id: true }
+);
+
+const CustomerMarketingConsentSchema = new mongoose.Schema(
+  {
+    status: { type: String, enum: CUSTOMER_CONSENT_STATUSES, default: 'unknown' },
+    source: { type: String, trim: true, lowercase: true, default: '' },
+    proofReference: { type: String, trim: true, default: '', maxlength: 240 },
+    updatedAt: { type: Date, default: null },
+    updatedByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
+    history: { type: [CustomerConsentHistorySchema], default: [] },
+  },
+  { _id: false }
+);
+
 const CustomerSchema = new mongoose.Schema(
   {
     customerCode: {
@@ -135,8 +171,42 @@ const CustomerSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
 
     acceptsMarketing: { type: Boolean, default: false },
+    marketingConsent: {
+      type: CustomerMarketingConsentSchema,
+      default: () => ({}),
+    },
     notes: { type: String, trim: true, default: '' },
     tags: { type: [String], default: [] },
+
+    crmStage: {
+      type: String,
+      enum: CUSTOMER_CRM_STAGES,
+      default: 'new',
+    },
+    crmPriority: {
+      type: String,
+      enum: CUSTOMER_CRM_PRIORITIES,
+      default: 'normal',
+    },
+    crmOwnerAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+    crmNextReviewAt: { type: Date, default: null },
+    crmLastContactAt: { type: Date, default: null },
+    crmLastContactType: { type: String, trim: true, lowercase: true, default: '' },
+    crmUpdatedAt: { type: Date, default: null },
+
+    privacyStatus: {
+      type: String,
+      enum: CUSTOMER_PRIVACY_STATUSES,
+      default: 'active',
+    },
+    retentionHoldUntil: { type: Date, default: null },
+    retentionHoldReason: { type: String, trim: true, default: '', maxlength: 500 },
+    anonymizedAt: { type: Date, default: null },
+    anonymizedByAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
 
     defaultBranch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     branchIds: {
@@ -229,6 +299,37 @@ CustomerSchema.pre('validate', function preValidateCustomer(next) {
   this.tags = Array.isArray(this.tags)
     ? [...new Set(this.tags.map((tag) => cleanLower(tag)).filter(Boolean))].slice(0, 12)
     : [];
+  this.crmStage = CUSTOMER_CRM_STAGES.includes(cleanLower(this.crmStage))
+    ? cleanLower(this.crmStage)
+    : 'new';
+  this.crmPriority = CUSTOMER_CRM_PRIORITIES.includes(cleanLower(this.crmPriority))
+    ? cleanLower(this.crmPriority)
+    : 'normal';
+  this.crmLastContactType = cleanLower(this.crmLastContactType);
+  this.privacyStatus = CUSTOMER_PRIVACY_STATUSES.includes(cleanLower(this.privacyStatus))
+    ? cleanLower(this.privacyStatus)
+    : 'active';
+
+  const consent = this.marketingConsent || {};
+  const normalizedConsentStatus = cleanLower(consent.status);
+  consent.status =
+    this.acceptsMarketing &&
+    normalizedConsentStatus === 'unknown' &&
+    !consent.updatedAt &&
+    !(Array.isArray(consent.history) && consent.history.length)
+      ? 'granted'
+      : CUSTOMER_CONSENT_STATUSES.includes(normalizedConsentStatus)
+        ? normalizedConsentStatus
+        : this.acceptsMarketing
+          ? 'granted'
+          : 'unknown';
+  consent.source = cleanLower(consent.source);
+  consent.proofReference = cleanText(consent.proofReference).slice(0, 240);
+  consent.history = Array.isArray(consent.history)
+    ? consent.history.slice(-50)
+    : [];
+  this.marketingConsent = consent;
+  this.acceptsMarketing = consent.status === 'granted';
 
   if (!this.fullName) {
     this.invalidate('fullName', 'El nombre del cliente es obligatorio.');
@@ -315,3 +416,7 @@ CustomerSchema.statics.buildGuestSnapshot = function buildGuestSnapshot() {
 };
 
 module.exports = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
+module.exports.CUSTOMER_CRM_STAGES = CUSTOMER_CRM_STAGES;
+module.exports.CUSTOMER_CRM_PRIORITIES = CUSTOMER_CRM_PRIORITIES;
+module.exports.CUSTOMER_CONSENT_STATUSES = CUSTOMER_CONSENT_STATUSES;
+module.exports.CUSTOMER_PRIVACY_STATUSES = CUSTOMER_PRIVACY_STATUSES;

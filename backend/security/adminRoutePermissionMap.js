@@ -1231,6 +1231,151 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
 
   /* =========================================================
+   * CLIENTES / CRM / PRIVACIDAD
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/customers/segments/saved',
+    permission: 'customers:view',
+    description: 'Listar segmentos personales guardados de Clientes.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/customers/segments/saved',
+    permission: 'customers:view',
+    description: 'Guardar un segmento personal de Clientes.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/customers/segments/saved/:segmentId',
+    permission: 'customers:view',
+    description: 'Actualizar un segmento personal de Clientes.',
+    audit: true,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/admin/customers/segments/saved/:segmentId',
+    permission: 'customers:view',
+    description: 'Eliminar un segmento personal de Clientes.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers/:id/360',
+    permission: 'customers:view',
+    description: 'Consultar la ficha 360 de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers/:id/privacy',
+    permission: 'customers:audit',
+    description: 'Consultar privacidad y conservación de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers/:id/audit',
+    permission: 'customers:audit',
+    description: 'Consultar historial inmutable de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers/:id/export',
+    permission: 'customers:export',
+    additionalPermissions: ['customers:sensitive'],
+    description: 'Exportar expediente personal de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/customers/:id/consent',
+    permission: 'customers:consent',
+    description: 'Registrar consentimiento comercial de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/customers/:id/anonymize',
+    permission: 'customers:anonymize',
+    additionalPermissions: ['customers:sensitive'],
+    description: 'Anonimizar datos personales de un cliente elegible.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers',
+    permission: 'customers:view',
+    description: 'Listar clientes con alcance administrativo.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/customers',
+    permission: 'customers:create',
+    description: 'Crear un cliente.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customers/:id',
+    permission: 'customers:view',
+    description: 'Consultar el detalle de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/customers/:id',
+    permission: 'customers:update',
+    description: 'Actualizar un cliente.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customer-follow-ups/meta/assignees',
+    permission: 'customers:view',
+    description: 'Listar responsables disponibles para CRM.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customer-follow-ups/queue',
+    permission: 'customers:view',
+    description: 'Consultar la bandeja general CRM.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/customer-follow-ups/:customerId',
+    permission: 'customers:view',
+    description: 'Consultar seguimientos de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/customer-follow-ups/:customerId',
+    permission: 'customers:update',
+    description: 'Crear seguimiento de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/customer-follow-ups/:customerId/:followUpId',
+    permission: 'customers:update',
+    description: 'Actualizar seguimiento de un cliente.',
+    audit: true,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/admin/customer-follow-ups/:customerId/:followUpId',
+    permission: 'customers:update',
+    description: 'Eliminar lógicamente seguimiento de un cliente.',
+    audit: true,
+  },
+
+  /* =========================================================
    * LOGS / AUDITORÍA
    * ======================================================= */
   {

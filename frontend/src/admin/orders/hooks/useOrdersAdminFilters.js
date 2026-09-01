@@ -17,10 +17,13 @@ export default function useOrdersAdminFilters({
   hasSession,
 }) {
   const [searchParams] = useSearchParams();
+  const initialQuery = String(
+    searchParams.get('q') || searchParams.get('orderNumber') || ''
+  ).trim();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
-  const [query, setQuery] = useState('');
-  const [typingQuery, setTypingQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
+  const [typingQuery, setTypingQuery] = useState(initialQuery);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [populate, setPopulate] = useState(true);
@@ -78,16 +81,27 @@ export default function useOrdersAdminFilters({
   };
 
   useEffect(() => {
+    const queryFromLink = String(
+      searchParams.get('q') || searchParams.get('orderNumber') || ''
+    ).trim();
     const statusFromDashboard = parseDashboardStatusParam(searchParams.get('status'));
-    if (!statusFromDashboard.length) return;
 
-    setStatusFilter((previous) => {
-      const sameLength = previous.length === statusFromDashboard.length;
-      const sameValues = sameLength && statusFromDashboard.every(
-        (status) => previous.includes(status)
-      );
-      return sameValues ? previous : statusFromDashboard;
-    });
+    setTypingQuery((previous) => (
+      previous === queryFromLink ? previous : queryFromLink
+    ));
+    setQuery((previous) => (
+      previous === queryFromLink ? previous : queryFromLink
+    ));
+
+    if (statusFromDashboard.length) {
+      setStatusFilter((previous) => {
+        const sameLength = previous.length === statusFromDashboard.length;
+        const sameValues = sameLength && statusFromDashboard.every(
+          (status) => previous.includes(status)
+        );
+        return sameValues ? previous : statusFromDashboard;
+      });
+    }
     setPage(1);
   }, [searchParams]);
 

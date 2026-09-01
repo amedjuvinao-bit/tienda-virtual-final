@@ -20,6 +20,13 @@ const FOLLOW_UP_TYPES = [
 ];
 
 const FOLLOW_UP_STATUSES = ['pending', 'done', 'cancelled'];
+const FOLLOW_UP_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const FOLLOW_UP_PRIORITY_RANK = Object.freeze({
+  low: 10,
+  normal: 20,
+  high: 30,
+  urgent: 40,
+});
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -52,6 +59,17 @@ const CustomerFollowUpSchema = new mongoose.Schema(
       enum: FOLLOW_UP_STATUSES,
       default: 'pending',
       set: cleanLower,
+    },
+    priority: {
+      type: String,
+      enum: FOLLOW_UP_PRIORITIES,
+      default: 'normal',
+      set: cleanLower,
+    },
+    priorityRank: {
+      type: Number,
+      enum: Object.values(FOLLOW_UP_PRIORITY_RANK),
+      default: FOLLOW_UP_PRIORITY_RANK.normal,
     },
     note: {
       type: String,
@@ -106,6 +124,10 @@ cloneDefinitions(CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS).forEach(({ key, options }
 CustomerFollowUpSchema.pre('validate', function preValidateFollowUp(next) {
   this.type = cleanLower(this.type || 'note');
   this.status = cleanLower(this.status || 'pending');
+  this.priority = FOLLOW_UP_PRIORITIES.includes(cleanLower(this.priority))
+    ? cleanLower(this.priority)
+    : 'normal';
+  this.priorityRank = FOLLOW_UP_PRIORITY_RANK[this.priority];
   this.note = cleanText(this.note);
   this.nextAction = cleanText(this.nextAction);
 
@@ -132,3 +154,5 @@ CustomerFollowUpSchema.methods.toSafeObject = function toSafeObject() {
 };
 
 module.exports = mongoose.models.CustomerFollowUp || mongoose.model('CustomerFollowUp', CustomerFollowUpSchema);
+module.exports.FOLLOW_UP_PRIORITIES = FOLLOW_UP_PRIORITIES;
+module.exports.FOLLOW_UP_PRIORITY_RANK = FOLLOW_UP_PRIORITY_RANK;

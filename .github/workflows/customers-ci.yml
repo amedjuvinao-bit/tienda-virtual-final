@@ -41,6 +41,15 @@ jobs:
       - name: Validar seguridad, identidad y contratos
         run: npm --prefix backend run test:customers-stage1
 
+      - name: Validar ficha Cliente 360
+        run: npm --prefix backend run test:customers-stage2
+
+      - name: Validar CRM comercial avanzado
+        run: npm --prefix backend run test:customers-stage3
+
+      - name: Validar auditoría y protección de datos
+        run: npm --prefix backend run test:customers-stage4
+
       - name: Validar migración de datos e índices
         run: npm --prefix backend run test:customer-integrity-migration
 

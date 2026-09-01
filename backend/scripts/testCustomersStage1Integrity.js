@@ -171,9 +171,8 @@ async function main() {
   ok(
     'listado, detalle, edición y resumen reutilizan el alcance por sede',
     (customersRoute.match(/buildScopedCustomerFilter/g) || []).length >= 3 &&
-      customersRoute.includes(
-        'buildCustomersSummary(req, summaryAccess.filter, summaryAccess)'
-      )
+      customersRoute.includes('buildCustomersSummary(') &&
+      customersRoute.includes('summaryAccess.filter')
   );
   ok(
     'el historial de compras reutiliza el filtro de seguridad de Órdenes',

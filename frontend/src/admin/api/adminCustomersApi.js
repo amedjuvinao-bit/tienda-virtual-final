@@ -136,6 +136,33 @@ export function normalizeCustomerPayload(payload = {}) {
       : {}),
     notes: cleanText(payload.notes),
     ...(Array.isArray(payload.tags) ? { tags: payload.tags } : {}),
+    ...(cleanText(payload.crmStage || payload.crm?.stage)
+      ? { crmStage: cleanText(payload.crmStage || payload.crm?.stage).toLowerCase() }
+      : {}),
+    ...(cleanText(payload.crmPriority || payload.crm?.priority)
+      ? {
+          crmPriority: cleanText(
+            payload.crmPriority || payload.crm?.priority
+          ).toLowerCase(),
+        }
+      : {}),
+    ...(payload.crmOwnerAdmin !== undefined || payload.crm?.ownerAdmin !== undefined
+      ? {
+          crmOwnerAdmin: cleanText(
+            payload.crmOwnerAdmin?.id ||
+              payload.crmOwnerAdmin?._id ||
+              payload.crmOwnerAdmin ||
+              payload.crm?.ownerAdmin?.id ||
+              payload.crm?.ownerAdmin
+          ),
+        }
+      : {}),
+    ...(payload.crmNextReviewAt !== undefined || payload.crm?.nextReviewAt !== undefined
+      ? {
+          crmNextReviewAt:
+            payload.crmNextReviewAt || payload.crm?.nextReviewAt || null,
+        }
+      : {}),
     ...(cleanText(payload.branchId || payload.defaultBranch)
       ? { branchId: cleanText(payload.branchId || payload.defaultBranch) }
       : {}),
@@ -149,6 +176,16 @@ export function normalizeCustomerFollowUpPayload(payload = {}) {
     note: cleanText(payload.note || payload.message || payload.comment),
     nextAction: cleanText(payload.nextAction),
     dueAt: payload.dueAt || null,
+    priority: cleanText(payload.priority || 'normal').toLowerCase(),
+    ...(payload.assignedToAdmin !== undefined
+      ? {
+          assignedToAdmin: cleanText(
+            payload.assignedToAdmin?.id ||
+              payload.assignedToAdmin?._id ||
+              payload.assignedToAdmin
+          ),
+        }
+      : {}),
     ...(cleanText(payload.branchId)
       ? { branchId: cleanText(payload.branchId) }
       : {}),
@@ -161,6 +198,9 @@ export async function getAdminCustomers(params = {}) {
     status: params.status,
     source: params.source,
     segment: params.segment,
+    crmStage: params.crmStage,
+    crmPriority: params.crmPriority,
+    crmOwner: params.crmOwner,
     page: params.page || 1,
     limit: params.limit || 20,
     branchId: params.branchId,
@@ -172,6 +212,82 @@ export async function getAdminCustomers(params = {}) {
     return response.data;
   } catch (error) {
     throwCustomersApiError(error, 'No fue posible cargar los clientes.');
+  }
+}
+
+export async function getAdminCustomerSavedSegments() {
+  try {
+    const response = await api.get(`${BASE_URL}/segments/saved`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar los segmentos guardados.');
+  }
+}
+
+export async function createAdminCustomerSavedSegment(payload = {}) {
+  try {
+    const response = await api.post(`${BASE_URL}/segments/saved`, {
+      name: cleanText(payload.name),
+      filters: payload.filters || {},
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible guardar el segmento.');
+  }
+}
+
+export async function updateAdminCustomerSavedSegment(segmentId, payload = {}) {
+  const cleanId = cleanText(segmentId);
+  if (!cleanId) throw new Error('Debes seleccionar un segmento válido.');
+  try {
+    const response = await api.put(`${BASE_URL}/segments/saved/${cleanId}`, {
+      name: cleanText(payload.name),
+      filters: payload.filters || {},
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible actualizar el segmento.');
+  }
+}
+
+export async function deleteAdminCustomerSavedSegment(segmentId) {
+  const cleanId = cleanText(segmentId);
+  if (!cleanId) throw new Error('Debes seleccionar un segmento válido.');
+  try {
+    const response = await api.delete(`${BASE_URL}/segments/saved/${cleanId}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible eliminar el segmento.');
+  }
+}
+
+export async function getAdminCustomerCrmAssignees(params = {}) {
+  const queryString = buildQueryParams({ branchId: params.branchId });
+  try {
+    const response = await api.get(`${FOLLOW_UPS_URL}/meta/assignees${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar los responsables CRM.');
+  }
+}
+
+export async function getAdminCustomerCrmQueue(params = {}) {
+  const queryString = buildQueryParams({
+    q: params.q,
+    status: params.status || 'pending',
+    type: params.type,
+    priority: params.priority,
+    dueScope: params.dueScope,
+    assignedTo: params.assignedTo,
+    branchId: params.branchId,
+    page: params.page || 1,
+    limit: params.limit || 25,
+  });
+  try {
+    const response = await api.get(`${FOLLOW_UPS_URL}/queue${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible cargar la bandeja CRM.');
   }
 }
 
@@ -203,6 +319,92 @@ export async function getAdminCustomer(customerId, params = {}) {
     return response.data;
   } catch (error) {
     throwCustomersApiError(error, 'No fue posible consultar el cliente.');
+  }
+}
+
+export async function getAdminCustomer360(customerId, params = {}) {
+  const cleanId = cleanText(customerId);
+
+  if (!cleanId) {
+    throw new Error('Debes seleccionar un cliente válido.');
+  }
+
+  try {
+    const queryString = buildQueryParams({
+      branchId: params.branchId,
+      historyLimit: params.historyLimit || 100,
+    });
+    const response = await api.get(`${BASE_URL}/${cleanId}/360${queryString}`);
+
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(
+      error,
+      'No fue posible cargar la vista 360° del cliente.'
+    );
+  }
+}
+
+export async function getAdminCustomerPrivacy(customerId) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.get(`${BASE_URL}/${cleanId}/privacy`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible consultar la privacidad del cliente.');
+  }
+}
+
+export async function getAdminCustomerAudit(customerId, params = {}) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const queryString = buildQueryParams({ limit: params.limit || 100 });
+    const response = await api.get(`${BASE_URL}/${cleanId}/audit${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible consultar la auditoría del cliente.');
+  }
+}
+
+export async function exportAdminCustomerData(customerId) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.get(`${BASE_URL}/${cleanId}/export`);
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible exportar el expediente del cliente.');
+  }
+}
+
+export async function updateAdminCustomerConsent(customerId, payload = {}) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.post(`${BASE_URL}/${cleanId}/consent`, {
+      status: cleanText(payload.status).toLowerCase(),
+      source: cleanText(payload.source || 'admin').toLowerCase(),
+      proofReference: cleanText(payload.proofReference),
+      note: cleanText(payload.note),
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible registrar el consentimiento.');
+  }
+}
+
+export async function anonymizeAdminCustomer(customerId, confirmation) {
+  const cleanId = cleanText(customerId);
+  if (!cleanId) throw new Error('Debes seleccionar un cliente válido.');
+  try {
+    const response = await api.post(`${BASE_URL}/${cleanId}/anonymize`, {
+      confirmation: cleanText(confirmation),
+    });
+    return response.data;
+  } catch (error) {
+    throwCustomersApiError(error, 'No fue posible anonimizar el cliente.');
   }
 }
 
@@ -324,8 +526,20 @@ export async function createQuickPosCustomer(payload) {
 
 const adminCustomersApi = {
   getAdminCustomers,
+  getAdminCustomerSavedSegments,
+  createAdminCustomerSavedSegment,
+  updateAdminCustomerSavedSegment,
+  deleteAdminCustomerSavedSegment,
   searchAdminCustomers,
   getAdminCustomer,
+  getAdminCustomer360,
+  getAdminCustomerPrivacy,
+  getAdminCustomerAudit,
+  exportAdminCustomerData,
+  updateAdminCustomerConsent,
+  anonymizeAdminCustomer,
+  getAdminCustomerCrmAssignees,
+  getAdminCustomerCrmQueue,
   createAdminCustomer,
   updateAdminCustomer,
   getAdminCustomerFollowUps,

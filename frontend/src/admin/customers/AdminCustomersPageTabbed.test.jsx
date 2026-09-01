@@ -5,15 +5,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../api/adminCustomersApi', () => ({
   createAdminCustomer: vi.fn(),
   createAdminCustomerFollowUp: vi.fn(),
+  createAdminCustomerSavedSegment: vi.fn(),
+  deleteAdminCustomerSavedSegment: vi.fn(),
   deleteAdminCustomerFollowUp: vi.fn(),
   getAdminCustomer: vi.fn(),
+  getAdminCustomer360: vi.fn(),
+  getAdminCustomerCrmAssignees: vi.fn(),
+  getAdminCustomerCrmQueue: vi.fn(),
   getAdminCustomerFollowUps: vi.fn(),
+  getAdminCustomerSavedSegments: vi.fn(),
   getAdminCustomers: vi.fn(),
   updateAdminCustomer: vi.fn(),
   updateAdminCustomerFollowUp: vi.fn(),
 }));
 
-import { getAdminCustomers } from '../api/adminCustomersApi';
+import {
+  getAdminCustomer,
+  getAdminCustomer360,
+  getAdminCustomerCrmAssignees,
+  getAdminCustomerCrmQueue,
+  getAdminCustomerFollowUps,
+  getAdminCustomerSavedSegments,
+  getAdminCustomers,
+} from '../api/adminCustomersApi';
 import AdminCustomersPageTabbed from './AdminCustomersPageTabbed';
 
 function responseForPage(page) {
@@ -52,6 +66,71 @@ beforeEach(() => {
   getAdminCustomers.mockImplementation(({ page }) =>
     Promise.resolve(responseForPage(page))
   );
+  getAdminCustomer.mockImplementation((customerId) => Promise.resolve({
+    ok: true,
+    customer: {
+      id: customerId,
+      customerCode: 'CLI-1',
+      fullName: 'Cliente página 1',
+      status: 'active',
+      source: 'admin',
+      stats: {},
+    },
+    recentOrders: [],
+  }));
+  getAdminCustomerFollowUps.mockResolvedValue({ ok: true, followUps: [] });
+  getAdminCustomerSavedSegments.mockResolvedValue({ ok: true, segments: [] });
+  getAdminCustomerCrmAssignees.mockResolvedValue({ ok: true, assignees: [] });
+  getAdminCustomerCrmQueue.mockResolvedValue({
+    ok: true,
+    page: 1,
+    pages: 1,
+    total: 0,
+    summary: {
+      pending: 0,
+      overdue: 0,
+      today: 0,
+      upcoming: 0,
+      unscheduled: 0,
+    },
+    followUps: [],
+  });
+  getAdminCustomer360.mockResolvedValue({
+    ok: true,
+    access: {
+      orders: true,
+      payments: true,
+      billing: true,
+      returns: true,
+      shipping: true,
+      carts: true,
+      storeCredit: true,
+      activity: true,
+    },
+    coverage: { totalOrders: 1, loadedOrders: 1, truncated: false },
+    summary: {
+      payments: {
+        paid: 1,
+        pending: 0,
+        failed: 0,
+        attempts: 1,
+        declinedAttempts: 0,
+        reconciliationRequired: 0,
+      },
+    },
+    payments: [
+      {
+        id: 'order-1',
+        orderId: 'order-1',
+        orderNumber: 'ORD-360-001',
+        status: 'paid',
+        provider: 'wompi',
+        amount: 120000,
+        attempts: [],
+      },
+    ],
+    activity: [],
+  });
 });
 
 describe('AdminCustomersPageTabbed Etapa 1', () => {
@@ -89,5 +168,52 @@ describe('AdminCustomersPageTabbed Etapa 1', () => {
         expect.objectContaining({ page: 1, q: 'María' })
       );
     });
+  });
+
+  it('carga bajo demanda la ficha 360 al abrir Pagos', async () => {
+    render(<AdminCustomersPageTabbed />);
+
+    expect(await screen.findByText('Cliente página 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Detalle' }));
+
+    expect(await screen.findByText('Ficha comercial del cliente')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pagos' }));
+
+    expect(await screen.findByText('Pagos del cliente')).toBeInTheDocument();
+    expect(screen.getByText('Orden ORD-360-001')).toBeInTheDocument();
+    expect(getAdminCustomer360).toHaveBeenCalledWith(
+      'customer-1',
+      { historyLimit: 100 }
+    );
+  });
+
+  it('bloquea la edición visual de PII cuando el backend entrega una ficha enmascarada', async () => {
+    getAdminCustomer.mockResolvedValueOnce({
+      ok: true,
+      customer: {
+        id: 'customer-1',
+        customerCode: 'CLI-1',
+        fullName: 'Cliente página 1',
+        phone: '••••••4567',
+        email: 'cl***@example.com',
+        documentNumber: '••••6789',
+        address: '[DIRECCIÓN PROTEGIDA]',
+        status: 'active',
+        source: 'admin',
+        stats: {},
+      },
+      access: { sensitive: false, masked: true },
+      recentOrders: [],
+    });
+
+    render(<AdminCustomersPageTabbed />);
+    expect(await screen.findByText('Cliente página 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Detalle' }));
+    expect(await screen.findByText('Ficha comercial del cliente')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Datos' }));
+
+    expect(screen.getByDisplayValue('••••••4567')).toBeDisabled();
+    expect(screen.getByDisplayValue('cl***@example.com')).toBeDisabled();
+    expect(screen.getByText(/necesita `customers:sensitive`/i)).toBeInTheDocument();
   });
 });

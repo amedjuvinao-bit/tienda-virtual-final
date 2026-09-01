@@ -32,6 +32,11 @@ function createMongoRepository(connection) {
               documentNumber: 1,
               normalizedDocument: 1,
               country: 1,
+              acceptsMarketing: 1,
+              marketingConsent: 1,
+              privacyStatus: 1,
+              crmStage: 1,
+              crmPriority: 1,
               defaultBranch: 1,
               branchIds: 1,
               deletedAt: 1,
@@ -97,6 +102,8 @@ function createMongoRepository(connection) {
               _id: 1,
               customer: 1,
               branch: 1,
+              priority: 1,
+              priorityRank: 1,
             },
           }
         )

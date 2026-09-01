@@ -112,10 +112,14 @@ const ADMIN_PERMISSION_MODULES = [
     description: 'Gestión de clientes y datos comerciales.',
     permissions: [
       permission('customers:view', 'Ver clientes', 'Permite consultar información de clientes.'),
+      permission('customers:sensitive', 'Ver datos sensibles', 'Permite ver documento, contacto, dirección, notas internas y datos fiscales sin enmascarar.', { audit: true, sensitive: true }),
       permission('customers:create', 'Crear clientes', 'Permite registrar clientes manualmente.', { audit: true, sensitive: true }),
       permission('customers:update', 'Editar clientes', 'Permite actualizar datos de clientes.', { audit: true, sensitive: true }),
+      permission('customers:consent', 'Gestionar consentimiento', 'Permite registrar otorgamiento o retiro del consentimiento comercial con evidencia.', { audit: true, sensitive: true }),
+      permission('customers:audit', 'Ver auditoría de clientes', 'Permite consultar el historial inmutable de accesos y cambios de cada cliente.', { audit: true, sensitive: true }),
       permission('customers:delete', 'Eliminar clientes', 'Permite eliminar o desactivar clientes.', { audit: true, sensitive: true, danger: true }),
-      permission('customers:export', 'Exportar clientes', 'Permite exportar reportes de clientes.', { audit: true }),
+      permission('customers:export', 'Exportar clientes', 'Permite exportar reportes y expedientes personales de clientes.', { audit: true, sensitive: true }),
+      permission('customers:anonymize', 'Anonimizar clientes', 'Permite anonimizar datos personales cuando la política de conservación lo autoriza.', { audit: true, sensitive: true, danger: true }),
     ],
   },
 

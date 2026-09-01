@@ -503,6 +503,26 @@ describe('composición de filtros de OrdersAdmin', () => {
     expect(result.current.params).not.toHaveProperty('status');
   });
 
+  it('inicia la búsqueda con la orden recibida por enlace profundo', () => {
+    const wrapper = ({ children }) => (
+      <MemoryRouter initialEntries={['/admin/ordenes?q=ORD-360-001']}>
+        {children}
+      </MemoryRouter>
+    );
+    const { result } = renderHook(
+      () => useOrdersAdminFilters({
+        authLoading: false,
+        canView: true,
+        canViewBranches: false,
+        hasSession: true,
+      }),
+      { wrapper }
+    );
+
+    expect(result.current.typingQuery).toBe('ORD-360-001');
+    expect(result.current.params.q).toBe('ORD-360-001');
+  });
+
   it('limita la selección a las órdenes visibles y la revoca sin capacidad', () => {
     const initialProps = {
       data: [{ _id: 'order-1' }, { _id: 'order-2' }],

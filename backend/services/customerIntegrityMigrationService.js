@@ -5,6 +5,7 @@ const {
   cleanUpper,
 } = require('../lib/customers/customerIdentity');
 const {
+  CUSTOMER_AUDIT_INDEX_DEFINITIONS,
   CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS,
   CUSTOMER_INDEX_DEFINITIONS,
   cloneDefinitions,
@@ -17,6 +18,24 @@ const {
 const APPLY_FLAG = '--apply-customer-integrity-migration';
 const PRODUCTION_CONFIRMATION_FLAG =
   '--confirm-production-customer-integrity-migration';
+const CRM_STAGES = new Set([
+  'prospect',
+  'new',
+  'active',
+  'loyal',
+  'at_risk',
+  'inactive',
+  'won_back',
+]);
+const CRM_PRIORITIES = new Set(['low', 'normal', 'high', 'vip']);
+const PRIVACY_STATUSES = new Set(['active', 'restricted', 'anonymized']);
+const CONSENT_STATUSES = new Set(['unknown', 'granted', 'withdrawn']);
+const FOLLOW_UP_PRIORITY_RANK = Object.freeze({
+  low: 10,
+  normal: 20,
+  high: 30,
+  urgent: 40,
+});
 
 class CustomerIntegrityMigrationError extends Error {
   constructor(code, message, details = {}) {
@@ -65,6 +84,9 @@ function buildIndexPlan() {
     ...cloneDefinitions(CUSTOMER_FOLLOW_UP_INDEX_DEFINITIONS).map(
       (definition) => ({ collection: 'customerfollowups', ...definition })
     ),
+    ...cloneDefinitions(CUSTOMER_AUDIT_INDEX_DEFINITIONS).map(
+      (definition) => ({ collection: 'customerauditevents', ...definition })
+    ),
   ];
 }
 
@@ -107,6 +129,38 @@ function analyzeCustomers(customers = [], orderBranchesByCustomer = new Map()) {
       orderBranchesByCustomer.get(String(customer._id || customer.id || '')) || []
     );
     const customerCode = cleanUpper(customer.customerCode, 80);
+    const currentCrmStage = String(customer.crmStage || '').trim().toLowerCase();
+    const currentCrmPriority = String(customer.crmPriority || '').trim().toLowerCase();
+    const crmStage = CRM_STAGES.has(currentCrmStage)
+      ? currentCrmStage
+      : Number(customer.stats?.ordersCount || 0) > 0
+        ? 'active'
+        : 'new';
+    const crmPriority = CRM_PRIORITIES.has(currentCrmPriority)
+      ? currentCrmPriority
+      : 'normal';
+    const currentPrivacyStatus = String(customer.privacyStatus || '').trim().toLowerCase();
+    const privacyStatus = PRIVACY_STATUSES.has(currentPrivacyStatus)
+      ? currentPrivacyStatus
+      : 'active';
+    const currentConsentStatus = String(customer.marketingConsent?.status || '')
+      .trim()
+      .toLowerCase();
+    const consentStatus = CONSENT_STATUSES.has(currentConsentStatus)
+      ? currentConsentStatus
+      : customer.acceptsMarketing === true
+        ? 'granted'
+        : 'unknown';
+    const marketingConsent = {
+      ...(customer.marketingConsent || {}),
+      status: consentStatus,
+      source: String(customer.marketingConsent?.source || (customer.acceptsMarketing ? 'legacy' : ''))
+        .trim()
+        .toLowerCase(),
+      history: Array.isArray(customer.marketingConsent?.history)
+        ? customer.marketingConsent.history.slice(-50)
+        : [],
+    };
     const documentKey = identity.normalizedDocument
       ? `${identity.documentType}:${identity.normalizedDocument}`
       : '';
@@ -131,6 +185,10 @@ function analyzeCustomers(customers = [], orderBranchesByCustomer = new Map()) {
       String(customer.normalizedPhone || '') !== identity.normalizedPhone ||
       String(customer.normalizedDocument || '') !== identity.normalizedDocument ||
       String(customer.documentType || '') !== identity.documentType ||
+      currentCrmStage !== crmStage ||
+      currentCrmPriority !== crmPriority ||
+      currentPrivacyStatus !== privacyStatus ||
+      currentConsentStatus !== consentStatus ||
       JSON.stringify(currentBranchIds.sort()) !== JSON.stringify([...branchIds].sort());
 
     if (changed) {
@@ -144,6 +202,11 @@ function analyzeCustomers(customers = [], orderBranchesByCustomer = new Map()) {
               normalizedDocument: identity.normalizedDocument,
               documentType: identity.documentType,
               branchIds,
+              crmStage,
+              crmPriority,
+              privacyStatus,
+              marketingConsent,
+              acceptsMarketing: consentStatus === 'granted',
             },
           },
         },
@@ -188,24 +251,41 @@ function analyzeFollowUps(
   let ambiguous = 0;
 
   for (const followUp of followUps) {
-    if (followUp.branch) continue;
-
+    const set = {};
     const customerId = String(followUp.customer || '');
     const scope = customerBranches.get(customerId);
     const branchId = scope?.defaultBranch ||
       (scope?.branchIds?.length === 1 ? scope.branchIds[0] : '');
 
-    if (!branchId) {
-      ambiguous += 1;
-      continue;
+    if (!followUp.branch) {
+      if (!branchId) {
+        ambiguous += 1;
+      } else {
+        set.branch = branchId;
+      }
     }
 
-    updates.push({
-      updateOne: {
-        filter: { _id: followUp._id, branch: null },
-        update: { $set: { branch: branchId } },
-      },
-    });
+    const currentPriority = String(followUp.priority || '').trim().toLowerCase();
+    const priority = Object.prototype.hasOwnProperty.call(
+      FOLLOW_UP_PRIORITY_RANK,
+      currentPriority
+    )
+      ? currentPriority
+      : 'normal';
+    const priorityRank = FOLLOW_UP_PRIORITY_RANK[priority];
+    if (currentPriority !== priority) set.priority = priority;
+    if (Number(followUp.priorityRank || 0) !== priorityRank) {
+      set.priorityRank = priorityRank;
+    }
+
+    if (Object.keys(set).length) {
+      updates.push({
+        updateOne: {
+          filter: { _id: followUp._id },
+          update: { $set: set },
+        },
+      });
+    }
   }
 
   return {
