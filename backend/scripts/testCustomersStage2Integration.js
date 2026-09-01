@@ -11,6 +11,7 @@ const {
   loadCustomer360,
   resolveCustomer360Access,
 } = require('../services/customer360');
+const { serializeInvoice } = require('../services/customer360/presentation');
 
 let controls = 0;
 
@@ -139,7 +140,9 @@ async function main() {
         orderNumber: 'ORD-360-PAID',
         status: 'accepted',
         invoiceNumber: 'SETT-360',
-        totals: { total: 100000, currency: 'COP' },
+        // Simula una factura histórica aceptada antes de guardar el snapshot
+        // fiscal de totales. La ficha debe recuperar el valor desde su orden.
+        totals: { currency: 'COP' },
         provider: { name: 'factus', isValidated: true },
         acceptedAt: new Date('2026-08-20T12:10:00.000Z'),
         creditNotes: [
@@ -267,6 +270,20 @@ async function main() {
     detail.invoices[0]?.validated === true &&
       detail.invoices[0]?.creditNotes?.length === 1 &&
       !Object.prototype.hasOwnProperty.call(detail.invoices[0], 'raw')
+  );
+  ok(
+    'facturación histórica recupera desde la orden un total fiscal ausente',
+    detail.invoices[0]?.total === 100000 &&
+      detail.invoices[0]?.totalSource === 'order'
+  );
+  const invoiceWithFiscalSnapshot = serializeInvoice(
+    { totals: { total: 95000, currency: 'COP' } },
+    { total: 100000 }
+  );
+  ok(
+    'el total fiscal guardado prevalece sobre el valor actual de la orden',
+    invoiceWithFiscalSnapshot.total === 95000 &&
+      invoiceWithFiscalSnapshot.totalSource === 'invoice'
   );
   ok(
     'venta neta descuenta el reembolso procesado una sola vez',

@@ -177,8 +177,12 @@ function serializeCreditNote(note = {}, invoice = {}) {
   };
 }
 
-function serializeInvoice(invoice = {}) {
+function serializeInvoice(invoice = {}, associatedOrder = {}) {
   const raw = toPlain(invoice);
+  const order = toPlain(associatedOrder);
+  const storedTotal = money(raw.totals?.total);
+  const orderTotal = money(order.total);
+  const recoveredFromOrder = storedTotal <= 0 && orderTotal > 0;
   return {
     id: asId(raw._id || raw.id),
     orderId: asId(raw.orderId),
@@ -189,7 +193,8 @@ function serializeInvoice(invoice = {}) {
     provider: cleanText(raw.provider?.name).toLowerCase(),
     providerStatus: cleanText(raw.provider?.status),
     validated: raw.provider?.isValidated === true || raw.status === 'accepted',
-    total: money(raw.totals?.total),
+    total: recoveredFromOrder ? orderTotal : storedTotal,
+    totalSource: recoveredFromOrder ? 'order' : 'invoice',
     currency: cleanText(raw.totals?.currency || 'COP').toUpperCase(),
     pdfUrl: cleanText(raw.pdfUrl || raw.provider?.links?.public_url),
     xmlUrl: cleanText(raw.xmlUrl),

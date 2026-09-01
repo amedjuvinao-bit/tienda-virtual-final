@@ -250,6 +250,9 @@ async function loadCustomer360({
   ]);
 
   const completeOrders = rawOrders.map(serializeOrder);
+  const completeOrdersById = new Map(
+    completeOrders.map((order) => [cleanText(order.id), order])
+  );
   const orders = completeOrders.map((order) =>
     redactOrderForAccess(order, access)
   );
@@ -266,7 +269,12 @@ async function loadCustomer360({
         return serializePayment(order, attemptsByOrder.get(orderId) || []);
       })
     : [];
-  const invoices = rawInvoices.map(serializeInvoice);
+  const invoices = rawInvoices.map((invoice) =>
+    serializeInvoice(
+      invoice,
+      completeOrdersById.get(cleanText(invoice?.orderId)) || {}
+    )
+  );
   const returns = rawReturns.map(serializeReturn);
   const refunds = rawRefunds.map(serializeRefund);
   const shipments = serializeShipments(rawOrders, rawShippingOperations);
