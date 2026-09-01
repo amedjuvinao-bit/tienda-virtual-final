@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
+  SlidersHorizontal,
   Truck,
   UserRound,
   UsersRound,
@@ -254,11 +255,11 @@ function buildLocalSummary(customers = [], total = 0) {
 function Card({ children, className = '', style = {} }) {
   return (
     <section
-      className={`rounded-[28px] border ${className}`}
+      className={`rounded-xl border ${className}`}
       style={{
         borderColor: 'var(--admin-card-border)',
-        background: 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(255,247,251,0.86))',
-        boxShadow: '0 18px 48px rgba(190, 24, 93, 0.08)',
+        background: '#fff',
+        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.05)',
         ...style,
       }}
     >
@@ -270,12 +271,12 @@ function Card({ children, className = '', style = {} }) {
 function IconBox({ icon: Icon }) {
   return (
     <span
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
       style={{
         borderColor: 'rgba(236, 72, 153, 0.22)',
         background: 'linear-gradient(135deg, #fff, #fdf2f8)',
         color: 'var(--admin-primary)',
-        boxShadow: '0 10px 24px rgba(236, 72, 153, 0.12)',
+        boxShadow: '0 6px 18px rgba(236, 72, 153, 0.08)',
       }}
     >
       <Icon className="h-5 w-5" />
@@ -346,65 +347,49 @@ function MetricCard({ icon: Icon, label, value, helper, highlight = false }) {
   );
 }
 
-function FilterPill({ active, children, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-2xl border px-4 py-2.5 text-xs font-black transition hover:-translate-y-0.5"
-      style={{
-        borderColor: active ? 'var(--admin-primary)' : 'rgba(236,72,153,0.20)',
-        background: active ? 'linear-gradient(135deg, var(--admin-primary), #be185d)' : 'rgba(255,255,255,0.78)',
-        color: active ? '#fff' : 'var(--admin-card-text)',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 function CustomerRow({ customer, onOpenDetail }) {
   const stats = customer.stats || {};
   const ordersCount = Number(stats.ordersCount || 0);
   const netSpent = Number(stats.netSpent ?? stats.totalSpent ?? 0);
   const tone = sourceTone(customer.source);
+  const crmStage = CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo';
 
   return (
-    <article className="rounded-[26px] border p-4 transition duration-200 hover:-translate-y-0.5" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff', boxShadow: '0 12px 28px rgba(190, 24, 93, 0.06)' }}>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(240px,.85fr)_minmax(260px,.8fr)_110px] xl:items-center">
+    <article className="border-b transition-colors last:border-b-0 hover:bg-[#fff7fb]/70" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(250px,1.35fr)_minmax(210px,1fr)_110px_150px_minmax(150px,.8fr)_110px] lg:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff7fb', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
+            <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.customerCode || 'Sin código'}{customer.documentNumber ? ` · ${customer.documentType || 'DOC'} ${customer.documentNumber}` : ''}</p>
+            <span className="mt-2 inline-flex rounded-lg border px-2 py-1 text-[10px] font-black uppercase" style={{ background: tone.bg, color: tone.text, borderColor: tone.border }}>{sourceLabel(customer.source)}</span>
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.phone || 'Sin celular'}</span></p>
+          <p className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.email || 'Sin correo'}</span></p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Compras</p>
+          <p className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{ordersCount}</p>
+          <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'Sin compras'}</p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Venta neta</p>
+          <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{money(netSpent)}</p>
+          <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{Number(stats.posOrdersCount || 0)} POS · {Number(stats.webOrdersCount || 0)} web</p>
+        </div>
+
         <div className="min-w-0">
-          <div className="flex items-start gap-4">
-            <IconBox icon={UserRound} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
-              <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.customerCode || 'Sin código'} · creado {formatDate(customer.createdAt)}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {customer.documentNumber ? <Badge tone="primary">{customer.documentType || 'DOC'} {customer.documentNumber}</Badge> : <Badge tone="muted">Sin documento</Badge>}
-                <span className="inline-flex items-center rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em]" style={{ background: tone.bg, color: tone.text, borderColor: tone.border }}>{sourceLabel(customer.source)}</span>
-                {ordersCount > 0 ? <Badge tone="success">Comprador</Badge> : <Badge tone="muted">Sin compras</Badge>}
-                <Badge tone={customer.crmPriority === 'vip' ? 'primary' : 'default'}>{customer.crmPriority === 'vip' ? 'VIP' : `Prioridad ${customer.crmPriority || 'normal'}`}</Badge>
-                <Badge tone={customer.crmStage === 'at_risk' ? 'warning' : 'default'}>{CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo'}</Badge>
-              </div>
-            </div>
-          </div>
+          <p className="truncate text-xs font-black" style={{ color: customer.crmStage === 'at_risk' ? '#c2410c' : 'var(--admin-card-text)' }}>{crmStage}</p>
+          <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmPriority === 'vip' ? 'Prioridad VIP' : `Prioridad ${customer.crmPriority || 'normal'}`}</p>
+          <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmOwnerAdmin?.name || 'Sin responsable'}</p>
         </div>
 
-        <div className="rounded-3xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: 'rgba(255,247,251,0.60)' }}>
-          <p className="mb-3 text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Contacto</p>
-          <div className="space-y-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            <p className="flex items-center gap-2"><Phone className="h-4 w-4" /><span className="truncate">{customer.phone || 'Sin celular'}</span></p>
-            <p className="flex items-center gap-2"><Mail className="h-4 w-4" /><span className="truncate">{customer.email || 'Sin correo'}</span></p>
-            <p className="flex items-center gap-2"><CalendarClock className="h-4 w-4" /><span className="truncate">Última compra: {stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'sin registro'}</span></p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Compras</p><p className="mt-2 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{ordersCount}</p></div>
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>POS</p><p className="mt-2 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{Number(stats.posOrdersCount || 0)}</p></div>
-          <div className="rounded-3xl border p-4 text-center" style={{ borderColor: 'rgba(236,72,153,0.22)', background: '#fff7fb' }}><p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Venta neta</p><p className="mt-2 break-words text-sm font-black leading-tight" style={{ color: 'var(--admin-primary)' }}>{money(netSpent)}</p></div>
-        </div>
-
-        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black transition hover:-translate-y-0.5" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>
+        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>
           <Eye className="h-4 w-4" /> Detalle
         </button>
       </div>
@@ -944,7 +929,8 @@ export default function AdminCustomersPageTabbed() {
   const [crmStageFilter, setCrmStageFilterState] = useState('all');
   const [crmPriorityFilter, setCrmPriorityFilterState] = useState('all');
   const [crmOwnerFilter, setCrmOwnerFilterState] = useState('all');
-  const [showCrmWorkspace, setShowCrmWorkspace] = useState(true);
+  const [workspaceView, setWorkspaceView] = useState('directory');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1122,48 +1108,161 @@ export default function AdminCustomersPageTabbed() {
   ]);
 
   return (
-    <div className="min-h-full space-y-5">
-      {detailData ? <CustomerDetailModal data={detailData} loading={detailLoading} error={detailError} onClose={() => setDetailData(null)} onRefresh={(customerId) => openCustomerDetail({ id: customerId })} onUpdated={handleCustomerUpdated} /> : null}
-
-      <Card className="overflow-hidden p-5 lg:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-start gap-4"><IconBox icon={UserRound} /><div><div className="mb-2 inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em]" style={{ borderColor: 'rgba(236,72,153,0.22)', background: 'rgba(255,255,255,0.78)', color: 'var(--admin-primary)' }}><UsersRound className="h-3.5 w-3.5" /> CRM de clientes</div><h1 className="text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1><p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Administra clientes de POS y tienda web con una ficha comercial clara por pestañas.</p></div></div>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setShowCrmWorkspace((current) => !current)} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black" style={{ borderColor: 'rgba(236,72,153,0.24)', background: showCrmWorkspace ? '#fdf2f8' : '#fff', color: 'var(--admin-primary)' }}><BriefcaseBusiness className="h-4 w-4" /> {showCrmWorkspace ? 'Ocultar bandeja CRM' : 'Bandeja CRM'}</button><button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar</button><button type="button" onClick={() => setShowForm((prev) => !prev)} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg, var(--admin-primary), #be185d)', boxShadow: '0 18px 36px rgba(236,72,153,0.28)' }}><Plus className="h-4 w-4" /> Nuevo cliente</button></div>
-        </div>
-      </Card>
-
-      {pages > 1 ? (
-        <div className="flex flex-wrap items-center justify-end gap-3 rounded-2xl border bg-white px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.18)' }}>
-          <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-xl border px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}>Anterior</button>
-          <span className="text-xs font-black" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {pages}</span>
-          <button type="button" disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="rounded-xl border px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}>Siguiente</button>
-        </div>
+    <div className="min-h-full space-y-4">
+      {detailData ? (
+        <CustomerDetailModal
+          data={detailData}
+          loading={detailLoading}
+          error={detailError}
+          onClose={() => setDetailData(null)}
+          onRefresh={(customerId) => openCustomerDetail({ id: customerId })}
+          onUpdated={handleCustomerUpdated}
+        />
       ) : null}
 
-      {error ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
-      {success ? <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
-
-      <div className="grid gap-3 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]"><MetricCard icon={DollarSign} label="Ventas clientes" value={money(safeSummary.totalSpent)} helper={safeSummary.newestCustomer ? `Último cliente: ${customerName(safeSummary.newestCustomer)}` : 'Sin cliente reciente'} highlight /><MetricCard icon={UsersRound} label="Total clientes" value={safeSummary.totalCustomers || 0} helper={`${safeSummary.withEmail || 0} con correo`} /><MetricCard icon={ShoppingBag} label="Clientes POS" value={safeSummary.posCustomers || 0} helper="Creados desde punto de venta" /><MetricCard icon={ShoppingBag} label="Clientes web" value={safeSummary.webCustomers || 0} helper="Pedidos tienda virtual" /><MetricCard icon={BadgeCheck} label="Con compras" value={safeSummary.withPurchases || 0} helper={`${safeSummary.totalOrders || 0} compras acumuladas`} /></div>
-
-      {showCrmWorkspace ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
-
-      {showForm ? <Card className="p-5"><form className="space-y-4" onSubmit={handleCreateCustomer}><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Crear cliente</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Este cliente quedará disponible para seleccionarlo en el POS.</p></div><button type="submit" disabled={!canSave} className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar</button></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="Nombre completo"><TextInput value={form.fullName} onChange={(event) => updateForm('fullName', event.target.value)} placeholder="Nombre del cliente" /></Field><Field label="Celular"><TextInput value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="3000000000" /></Field><Field label="Tipo documento"><select value={form.documentType} onChange={(event) => updateForm('documentType', event.target.value)} className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field><Field label="Documento"><TextInput value={form.documentNumber} onChange={(event) => updateForm('documentNumber', event.target.value)} placeholder="Número" /></Field><Field label="Correo"><TextInput value={form.email} onChange={(event) => updateForm('email', event.target.value)} placeholder="correo@ejemplo.com" /></Field><Field label="Dirección"><TextInput value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="Dirección" /></Field><Field label="Ciudad"><TextInput value={form.city} onChange={(event) => updateForm('city', event.target.value)} placeholder="Ciudad" /></Field><Field label="Departamento"><TextInput value={form.department} onChange={(event) => updateForm('department', event.target.value)} placeholder="Departamento" /></Field></div><Field label="Notas"><TextArea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} placeholder="Observaciones internas del cliente" /></Field></form></Card> : null}
-
-      <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
-          <Field label="Etapa CRM"><select value={crmStageFilter} onChange={(event) => setCrmStageFilter(event.target.value)} className="w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.20)' }}>{CRM_STAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-          <Field label="Prioridad CRM"><select value={crmPriorityFilter} onChange={(event) => setCrmPriorityFilter(event.target.value)} className="w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.20)' }}>{CRM_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-          <Field label="Responsable"><select value={crmOwnerFilter} onChange={(event) => setCrmOwnerFilter(event.target.value)} className="w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.20)' }}><option value="all">Todos</option><option value="me">Mis clientes</option></select></Field>
-          <button type="button" onClick={resetFilters} className="rounded-2xl border bg-white px-4 py-3 text-xs font-black" style={{ borderColor: 'rgba(236,72,153,0.20)', color: 'var(--admin-primary)' }}>Limpiar filtros</button>
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
+          <div className="flex items-start gap-4">
+            <IconBox icon={UserRound} />
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Gestión comercial</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Consulta el directorio o trabaja los seguimientos CRM en espacios separados.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', color: 'var(--admin-primary)' }}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar
+            </button>
+            <button type="button" onClick={() => { setWorkspaceView('directory'); setShowForm((prev) => !prev); }} className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-black text-white transition hover:brightness-95" style={{ background: 'var(--admin-primary)' }}>
+              <Plus className="h-4 w-4" /> Nuevo cliente
+            </button>
+          </div>
         </div>
+        <nav aria-label="Vista de clientes" className="flex border-t" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+          <button type="button" onClick={() => setWorkspaceView('directory')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'directory' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'directory' ? '#fff7fb' : '#fff', color: workspaceView === 'directory' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+            <UsersRound className="h-4 w-4" /> Directorio
+          </button>
+          <button type="button" onClick={() => setWorkspaceView('crm')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'crm' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'crm' ? '#fff7fb' : '#fff', color: workspaceView === 'crm' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+            <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
+          </button>
+        </nav>
       </Card>
 
-      <CustomerSavedSegments
-        filters={currentSavedFilters}
-        onApply={applySavedSegment}
-      />
+      {error ? <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
+      {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
 
-      <Card className="overflow-hidden"><div className="border-b p-5 lg:p-6" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.7fr)] xl:items-start"><div><p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Segmentación</p><h2 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Listado de clientes</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{total} cliente(s) encontrado(s) · Origen: {activeSourceLabel} · Segmento: {activeSegmentLabel}</p></div><div className="flex items-center gap-3 rounded-[22px] border px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.22)', background: 'rgba(255,255,255,0.78)' }}><Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} /><input type="text" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, celular, correo o documento" className="w-full bg-transparent text-sm font-bold outline-none" style={{ color: 'var(--admin-card-text)' }} />{loading ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}</div></div><div className="mt-5 grid gap-3 xl:grid-cols-2"><div className="rounded-[24px] border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'rgba(255,255,255,0.66)' }}><p className="mb-3 text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Origen del cliente</p><div className="flex flex-wrap gap-2">{SOURCE_FILTERS.map((filter) => <FilterPill key={filter.key} active={sourceFilter === filter.key} onClick={() => setSourceFilter(filter.key)}>{filter.label}</FilterPill>)}</div></div><div className="rounded-[24px] border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'rgba(255,255,255,0.66)' }}><p className="mb-3 text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Segmento comercial</p><div className="flex flex-wrap gap-2">{SEGMENT_FILTERS.map((filter) => <FilterPill key={filter.key} active={segmentFilter === filter.key} onClick={() => setSegmentFilter(filter.key)}>{filter.label}</FilterPill>)}</div></div></div></div><div className="p-5 lg:p-6">{loading ? <div className="rounded-[28px] border p-10 text-center" style={{ borderColor: 'rgba(236,72,153,0.18)', background: 'rgba(255,255,255,0.68)' }}><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Cargando clientes...</p></div> : customers.length === 0 ? <div className="rounded-[28px] border p-10 text-center" style={{ borderColor: 'rgba(236,72,153,0.18)', background: 'rgba(255,255,255,0.68)' }}><UserRound className="mx-auto h-9 w-9" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>No hay clientes para este filtro</p><p className="mx-auto mt-2 max-w-md text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cambia el filtro o crea un cliente nuevo.</p></div> : <div className="space-y-4">{customers.map((customer) => <CustomerRow key={customer.id} customer={customer} onOpenDetail={openCustomerDetail} />)}</div>}</div></Card>
+      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
+
+      {workspaceView === 'directory' ? (
+        <>
+          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.04)' }}>
+            <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes activos</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.totalCustomers || 0}</p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.withEmail || 0} con correo registrado</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Venta acumulada</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-primary)' }}>{money(safeSummary.totalSpent)}</p>
+                <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.newestCustomer ? `Último: ${customerName(safeSummary.newestCustomer)}` : 'Sin cliente reciente'}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Actividad de compra</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.withPurchases || 0}</p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{safeSummary.totalOrders || 0} compras acumuladas</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Origen</p>
+                <p className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{safeSummary.posCustomers || 0} <span className="text-sm">POS</span> · {safeSummary.webCustomers || 0} <span className="text-sm">Web</span></p>
+                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes identificados por canal</p>
+              </div>
+            </div>
+          </section>
+
+          {showForm ? (
+            <Card className="p-5">
+              <form className="space-y-4" onSubmit={handleCreateCustomer}>
+                <div className="flex items-start justify-between gap-3">
+                  <div><h2 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Crear cliente</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Este cliente quedará disponible para seleccionarlo en el POS.</p></div>
+                  <button type="submit" disabled={!canSave} className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar</button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Nombre completo"><TextInput value={form.fullName} onChange={(event) => updateForm('fullName', event.target.value)} placeholder="Nombre del cliente" /></Field>
+                  <Field label="Celular"><TextInput value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} placeholder="3000000000" /></Field>
+                  <Field label="Tipo documento"><select value={form.documentType} onChange={(event) => updateForm('documentType', event.target.value)} className="w-full rounded-lg border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.26)', background: '#fff', color: 'var(--admin-card-text)' }}><option value="CC">CC</option><option value="CE">CE</option><option value="TI">TI</option><option value="NIT">NIT</option><option value="PP">Pasaporte</option><option value="OTHER">Otro</option></select></Field>
+                  <Field label="Documento"><TextInput value={form.documentNumber} onChange={(event) => updateForm('documentNumber', event.target.value)} placeholder="Número" /></Field>
+                  <Field label="Correo"><TextInput value={form.email} onChange={(event) => updateForm('email', event.target.value)} placeholder="correo@ejemplo.com" /></Field>
+                  <Field label="Dirección"><TextInput value={form.address} onChange={(event) => updateForm('address', event.target.value)} placeholder="Dirección" /></Field>
+                  <Field label="Ciudad"><TextInput value={form.city} onChange={(event) => updateForm('city', event.target.value)} placeholder="Ciudad" /></Field>
+                  <Field label="Departamento"><TextInput value={form.department} onChange={(event) => updateForm('department', event.target.value)} placeholder="Departamento" /></Field>
+                </div>
+                <Field label="Notas"><TextArea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} placeholder="Observaciones internas del cliente" /></Field>
+              </form>
+            </Card>
+          ) : null}
+
+          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
+            <header className="grid gap-4 border-b p-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.65fr)] lg:items-center" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Directorio comercial</p>
+                <h2 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Listado de clientes</h2>
+                <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{total} resultado(s) · {activeSourceLabel} · {activeSegmentLabel}</p>
+              </div>
+              <label className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.22)' }}>
+                <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+                <input type="text" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nombre, celular, correo o documento" className="w-full bg-transparent text-sm font-bold outline-none" style={{ color: 'var(--admin-card-text)' }} />
+                {loading ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" style={{ color: 'var(--admin-primary)' }} /> : null}
+              </label>
+            </header>
+
+            <div className="grid gap-3 border-b bg-slate-50/60 p-4 md:grid-cols-2 xl:grid-cols-[180px_minmax(240px,1fr)_auto_auto]" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+              <label>
+                <span className="sr-only">Origen del cliente</span>
+                <select aria-label="Origen del cliente" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{SOURCE_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>Origen: {filter.label}</option>)}</select>
+              </label>
+              <label>
+                <span className="sr-only">Segmento comercial</span>
+                <select aria-label="Segmento comercial" value={segmentFilter} onChange={(event) => setSegmentFilter(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{SEGMENT_FILTERS.map((filter) => <option key={filter.key} value={filter.key}>Segmento: {filter.label}</option>)}</select>
+              </label>
+              <button type="button" aria-expanded={showAdvancedFilters} onClick={() => setShowAdvancedFilters((current) => !current)} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black" style={{ borderColor: showAdvancedFilters ? 'var(--admin-primary)' : 'rgba(148,163,184,0.26)', color: showAdvancedFilters ? 'var(--admin-primary)' : 'var(--admin-card-text)' }}><SlidersHorizontal className="h-4 w-4" /> Filtros avanzados</button>
+              <button type="button" onClick={resetFilters} className="rounded-lg border bg-white px-4 py-2.5 text-sm font-black" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-card-muted-text)' }}>Limpiar</button>
+            </div>
+
+            {showAdvancedFilters ? (
+              <div className="space-y-4 border-b bg-white p-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Field label="Etapa CRM"><select value={crmStageFilter} onChange={(event) => setCrmStageFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{CRM_STAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                  <Field label="Prioridad CRM"><select value={crmPriorityFilter} onChange={(event) => setCrmPriorityFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}>{CRM_PRIORITIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+                  <Field label="Responsable"><select value={crmOwnerFilter} onChange={(event) => setCrmOwnerFilter(event.target.value)} className="w-full rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.26)' }}><option value="all">Todos</option><option value="me">Mis clientes</option></select></Field>
+                </div>
+                <CustomerSavedSegments filters={currentSavedFilters} onApply={applySavedSegment} />
+              </div>
+            ) : null}
+
+            <div className="hidden border-b bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] lg:grid lg:grid-cols-[minmax(250px,1.35fr)_minmax(210px,1fr)_110px_150px_minmax(150px,.8fr)_110px] lg:gap-4" style={{ borderColor: 'rgba(148,163,184,0.18)', color: 'var(--admin-card-muted-text)' }}>
+              <span>Cliente</span><span>Contacto</span><span>Compras</span><span>Venta neta</span><span>Estado CRM</span><span className="text-center">Acción</span>
+            </div>
+
+            <div>
+              {loading ? <div className="p-10 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Cargando clientes...</p></div> : null}
+              {!loading && customers.length === 0 ? <div className="p-10 text-center"><UserRound className="mx-auto h-8 w-8" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>No hay clientes para este filtro</p><p className="mt-2 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cambia los filtros o crea un cliente nuevo.</p></div> : null}
+              {!loading ? customers.map((customer) => <CustomerRow key={customer.id} customer={customer} onOpenDetail={openCustomerDetail} />) : null}
+            </div>
+
+            {pages > 1 ? (
+              <footer className="flex flex-wrap items-center justify-between gap-3 border-t bg-slate-50/60 px-4 py-3" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+                <span className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Página {page} de {pages}</span>
+                <div className="flex gap-2">
+                  <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border bg-white px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-primary)' }}>Anterior</button>
+                  <button type="button" disabled={page >= pages || loading} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="rounded-lg border bg-white px-4 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'rgba(148,163,184,0.26)', color: 'var(--admin-primary)' }}>Siguiente</button>
+                </div>
+              </footer>
+            ) : null}
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -135,6 +135,30 @@ beforeEach(() => {
 });
 
 describe('AdminCustomersPageTabbed Etapa 1', () => {
+  it('separa el directorio de la bandeja de seguimientos', async () => {
+    render(<AdminCustomersPageTabbed />);
+
+    expect(await screen.findByText('Directorio comercial')).toBeInTheDocument();
+    expect(screen.queryByText('Bandeja de seguimientos')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Seguimientos CRM' }));
+
+    expect(await screen.findByText('Bandeja de seguimientos')).toBeInTheDocument();
+    expect(screen.queryByText('Directorio comercial')).not.toBeInTheDocument();
+  });
+
+  it('mantiene la segmentación avanzada fuera de la vista principal', async () => {
+    render(<AdminCustomersPageTabbed />);
+    expect(await screen.findByText('Directorio comercial')).toBeInTheDocument();
+
+    expect(screen.queryByLabelText('Etapa CRM')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros avanzados' }));
+
+    expect(screen.getByLabelText('Etapa CRM')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prioridad CRM')).toBeInTheDocument();
+    expect(screen.getByText('Segmentos guardados')).toBeInTheDocument();
+  });
+
   it('permite recorrer páginas posteriores a los primeros clientes', async () => {
     render(<AdminCustomersPageTabbed />);
 

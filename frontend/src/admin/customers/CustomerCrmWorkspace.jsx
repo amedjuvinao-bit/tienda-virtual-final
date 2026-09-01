@@ -59,10 +59,10 @@ function SummaryCard({ label, value, active, onClick, icon: Icon }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border p-4 text-left transition hover:-translate-y-0.5"
+      className="border-b-2 p-4 text-left transition hover:bg-pink-50/50"
       style={{
-        borderColor: active ? 'var(--admin-primary)' : 'rgba(236,72,153,0.16)',
-        background: active ? 'linear-gradient(135deg, #fdf2f8, #fff)' : '#fff',
+        borderColor: active ? 'var(--admin-primary)' : 'transparent',
+        background: active ? '#fff7fb' : '#fff',
       }}
     >
       <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.13em]" style={{ color: 'var(--admin-card-muted-text)' }}><Icon className="h-4 w-4" /> {label}</p>
@@ -168,17 +168,17 @@ export default function CustomerCrmWorkspace({ onOpenCustomer }) {
   };
 
   return (
-    <section className="rounded-[28px] border p-5 lg:p-6" style={{ borderColor: 'var(--admin-card-border)', background: 'linear-gradient(145deg, #fff, #fff7fb)' }}>
+    <section className="rounded-xl border bg-white p-5 lg:p-6" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Centro de trabajo CRM</p>
           <h2 className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>Bandeja de seguimientos</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Prioriza tareas vencidas, responsables y próximas acciones sin abrir cliente por cliente.</p>
         </div>
-        <button type="button" onClick={loadQueue} disabled={loading} className="inline-flex items-center gap-2 rounded-2xl border bg-white px-4 py-3 text-xs font-black disabled:opacity-50" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar</button>
+        <button type="button" onClick={loadQueue} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-xs font-black disabled:opacity-50" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-primary)' }}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar</button>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-5 grid overflow-hidden rounded-lg border sm:grid-cols-2 xl:grid-cols-5 xl:divide-x" style={{ borderColor: 'rgba(148,163,184,0.22)' }}>
         <SummaryCard icon={Clock3} label="Pendientes" value={summary.pending} active={filters.dueScope === 'all'} onClick={() => changeFilter('dueScope', 'all')} />
         <SummaryCard icon={AlertCircle} label="Vencidos" value={summary.overdue} active={filters.dueScope === 'overdue'} onClick={() => changeFilter('dueScope', 'overdue')} />
         <SummaryCard icon={CalendarClock} label="Para hoy" value={summary.today} active={filters.dueScope === 'today'} onClick={() => changeFilter('dueScope', 'today')} />
@@ -187,18 +187,18 @@ export default function CustomerCrmWorkspace({ onOpenCustomer }) {
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_190px_220px_170px]">
-        <label className="flex items-center gap-2 rounded-2xl border bg-white px-4 py-3" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><Search className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} /><input value={filters.q} onChange={(event) => changeFilter('q', event.target.value)} className="w-full bg-transparent text-sm font-bold outline-none" placeholder="Buscar cliente o gestión" /></label>
-        <select value={filters.priority} onChange={(event) => changeFilter('priority', event.target.value)} className="rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.18)' }}>{PRIORITIES.map(([value, label]) => <option key={value} value={value}>Prioridad: {label}</option>)}</select>
-        <select value={filters.assignedTo} onChange={(event) => changeFilter('assignedTo', event.target.value)} className="rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><option value="all">Todos los responsables</option><option value="me">Asignadas a mí</option><option value="unassigned">Sin responsable</option>{assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
-        <select value={filters.status} onChange={(event) => changeFilter('status', event.target.value)} className="rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><option value="pending">Pendientes</option><option value="done">Realizadas</option><option value="cancelled">Canceladas</option><option value="all">Todos los estados</option></select>
+        <label className="flex items-center gap-2 rounded-lg border bg-white px-4 py-3" style={{ borderColor: 'rgba(148,163,184,0.24)' }}><Search className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} /><input value={filters.q} onChange={(event) => changeFilter('q', event.target.value)} className="w-full bg-transparent text-sm font-bold outline-none" placeholder="Buscar cliente o gestión" /></label>
+        <select value={filters.priority} onChange={(event) => changeFilter('priority', event.target.value)} className="rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.24)' }}>{PRIORITIES.map(([value, label]) => <option key={value} value={value}>Prioridad: {label}</option>)}</select>
+        <select value={filters.assignedTo} onChange={(event) => changeFilter('assignedTo', event.target.value)} className="rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.24)' }}><option value="all">Todos los responsables</option><option value="me">Asignadas a mí</option><option value="unassigned">Sin responsable</option>{assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select>
+        <select value={filters.status} onChange={(event) => changeFilter('status', event.target.value)} className="rounded-lg border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(148,163,184,0.24)' }}><option value="pending">Pendientes</option><option value="done">Realizadas</option><option value="cancelled">Canceladas</option><option value="all">Todos los estados</option></select>
       </div>
 
-      {error ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
-      <div className="mt-4 space-y-3">
-        {loading ? <div className="rounded-3xl border bg-white p-8 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-2 text-sm font-black">Cargando seguimientos...</p></div> : null}
-        {!loading && !queue.length ? <div className="rounded-3xl border bg-white p-8 text-center text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)' }}>No hay gestiones para estos filtros.</div> : null}
+      {error ? <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
+      <div className="mt-4 overflow-hidden rounded-lg border" style={{ borderColor: 'rgba(148,163,184,0.22)' }}>
+        {loading ? <div className="bg-white p-8 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-2 text-sm font-black">Cargando seguimientos...</p></div> : null}
+        {!loading && !queue.length ? <div className="bg-white p-8 text-center text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay gestiones para estos filtros.</div> : null}
         {!loading ? queue.map((item) => (
-          <article key={item.id} className="grid gap-4 rounded-3xl border bg-white p-4 xl:grid-cols-[1.2fr_1fr_220px_auto] xl:items-center" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+          <article key={item.id} className="grid gap-4 border-b bg-white p-4 last:border-b-0 hover:bg-pink-50/30 xl:grid-cols-[1.2fr_1fr_220px_auto] xl:items-center" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
             <div className="min-w-0">
               <button type="button" onClick={() => item.customer && onOpenCustomer?.(item.customer)} className="flex items-center gap-2 text-left font-black" style={{ color: 'var(--admin-card-text)' }}><UserRound className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} /> {item.customer?.fullName || 'Cliente no disponible'}</button>
               <p className="mt-2 text-sm font-bold leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{item.note}</p>
