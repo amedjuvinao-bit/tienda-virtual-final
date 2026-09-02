@@ -57,11 +57,17 @@ async function processOrderFulfillmentAfterPayment(
   const relevantItems = collectRelevantFulfillmentItems(items);
 
   if (!relevantItems.length) {
+    const source = clean(order.source, 40).toLowerCase();
+    const saleType = clean(order.saleType, 40).toLowerCase();
+    const orderFulfillmentStatus = clean(order.fulfillmentStatus, 40).toLowerCase();
+    const isDeliveredPosSale =
+      (source === 'pos' || saleType.includes('pos')) &&
+      orderFulfillmentStatus === 'delivered';
     order.fulfillment = {
       ...(order.fulfillment?.toObject
         ? order.fulfillment.toObject()
         : order.fulfillment || {}),
-      status: 'processing',
+      status: isDeliveredPosSale ? 'delivered' : 'processing',
       processedAt: now,
       notificationStatus: 'not_required',
     };

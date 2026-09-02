@@ -78,6 +78,48 @@ describe('historia narrativa del detalle de la orden', () => {
     expect(screen.queryByText('Paso 5 de 5')).not.toBeInTheDocument();
   });
 
+  it('no solicita logística cuando la entrega POS definitiva convive con un estado operativo anterior', () => {
+    const order = {
+      ...BASE_ORDER,
+      source: 'pos',
+      saleType: 'pos_sale',
+      status: 'paid',
+      fulfillmentStatus: 'delivered',
+      pos: { confirmedAt: '2026-09-01T23:02:48.000Z' },
+      payment: {
+        status: 'paid',
+        paidAt: '2026-09-01T23:02:48.000Z',
+      },
+      fulfillment: {
+        status: 'processing',
+        shipments: [],
+      },
+    };
+
+    const story = buildOrderStory(order);
+    const operation = story.phases.find((phase) => phase.id === 'operation');
+    const delivery = story.phases.find((phase) => phase.id === 'delivery');
+    const overview = buildOrderOverview(order);
+
+    expect(operation).toMatchObject({
+      title: 'Venta física completada en sede',
+      state: 'complete',
+    });
+    expect(delivery).toMatchObject({
+      title: 'Entrega confirmada',
+      state: 'complete',
+    });
+    expect(story.current.title).toBe('Entrega completada con facturación pendiente');
+    expect(story.next).toMatchObject({
+      title: 'Completar facturación',
+      actionLabel: 'Revisar factura',
+      targetTab: 'payment',
+    });
+    expect(story.next.title).not.toBe('Preparar logística');
+    expect(overview.situation.find((item) => item.id === 'preparation')?.value)
+      .toBe('Venta física completada en sede');
+  });
+
   it('detiene la historia en pago cuando la transacción sigue pendiente', () => {
     const story = buildOrderStory({
       ...BASE_ORDER,

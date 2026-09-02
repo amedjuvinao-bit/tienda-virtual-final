@@ -864,6 +864,32 @@ async function main() {
         'select-order',
         'save',
       ]);
+
+      const deliveredPos = createFulfillmentFixture({
+        order: {
+          source: 'pos',
+          saleType: 'pos_sale',
+          fulfillmentStatus: 'delivered',
+          fulfillment: {
+            status: 'processing',
+            notificationStatus: 'pending',
+          },
+          items: [
+            {
+              _id: 'physical-pos-item',
+              productType: 'physical',
+              requiresShipping: true,
+            },
+          ],
+        },
+      });
+      const deliveredPosResult = await facade.processOrderFulfillmentAfterPayment(
+        { orderId: deliveredPos.order._id, now: deliveredPos.now },
+        deliveredPos.dependencies
+      );
+      assert.equal(deliveredPosResult.reason, 'no_digital_or_service_items');
+      assert.equal(deliveredPos.order.fulfillment.status, 'delivered');
+      assert.equal(deliveredPos.order.fulfillment.notificationStatus, 'not_required');
     });
 
     await check('el consumo incrementa una descarga con filtro atómico', async () => {

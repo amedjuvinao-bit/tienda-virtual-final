@@ -133,7 +133,8 @@ export function getFulfillmentState(order, paymentComplete) {
   const orderStatus = normalizeText(order?.status);
   const source = normalizeText(order?.source);
   const logisticsStatus = normalizeText(fulfillment?.logisticsSummary?.status);
-  const fulfillmentStatus = normalizeText(fulfillment.status || order?.fulfillmentStatus);
+  const fulfillmentStatus = normalizeText(fulfillment.status);
+  const orderFulfillmentStatus = normalizeText(order?.fulfillmentStatus);
   const shipmentStatuses = shipments.map((shipment) => normalizeText(shipment?.status));
   const hasIncident =
     logisticsStatus === 'exception' ||
@@ -168,7 +169,11 @@ export function getFulfillmentState(order, paymentComplete) {
     services.length > 0 &&
     services.every((service) => normalizeText(service?.status) === 'completed');
   const isPos = source === 'pos' || normalizeText(order?.saleType).includes('pos');
-  const finalDelivered = orderStatus === 'delivered' || fulfillmentStatus === 'delivered';
+  const finalDelivered =
+    orderStatus === 'delivered' ||
+    fulfillmentStatus === 'delivered' ||
+    orderFulfillmentStatus === 'delivered' ||
+    logisticsStatus === 'delivered';
   const delivered =
     finalDelivered ||
     allShipmentsDelivered ||
