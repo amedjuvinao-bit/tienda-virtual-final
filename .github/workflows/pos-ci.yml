@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/pos-nivel-plus-etapa-1
+      - feature/pos-nivel-plus-etapa-2
   pull_request:
     branches:
       - main
@@ -41,6 +42,9 @@ jobs:
       - name: Validar seguridad e idempotencia de Etapa 1
         run: npm --prefix backend run test:pos-level-plus-stage1
 
+      - name: Validar cobro comercial de Etapa 2
+        run: npm --prefix backend run test:pos-level-plus-stage2
+
       - name: Conservar contratos base de POS y caja
         run: |
           node backend/scripts/testAdminPosServiceCalculations.js
@@ -50,6 +54,9 @@ jobs:
 
       - name: Instalar frontend
         run: npm --prefix frontend ci
+
+      - name: Validar modelo de cobro de Etapa 2
+        run: npm --prefix frontend run test:pos-level-plus-stage2
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -100,6 +107,11 @@ jobs:
         env:
           POS_STAGE1_MONGO_URI: mongodb://127.0.0.1:27017/pos_stage1_ci?replicaSet=rs0
         run: npm --prefix backend run test:pos-level-plus-stage1-integration
+
+      - name: Validar cobro comercial real de Etapa 2
+        env:
+          POS_STAGE2_MONGO_URI: mongodb://127.0.0.1:27017/pos_stage2_ci?replicaSet=rs0
+        run: npm --prefix backend run test:pos-level-plus-stage2-integration
 
       - name: Detener MongoDB
         if: always()

@@ -227,24 +227,43 @@ function normalizePosItems(items = []) {
 
 function normalizePaymentPayload(payment = {}, total = 0) {
   const method = cleanLower(payment.method || payment.methodType || 'cash', 40);
-  const safeMethod = POS_PAYMENT_METHODS.includes(method) ? method : 'cash';
-  const amount = toMoney(payment.amount || total);
+  const safeTotal = toMoney(total);
+
+  if (!POS_PAYMENT_METHODS.includes(method)) {
+    throw createPosError(
+      'El medio de pago seleccionado no está habilitado para POS.',
+      'POS_PAYMENT_METHOD_INVALID',
+      { method },
+      400
+    );
+  }
+
+  const safeMethod = method;
+  const amount = toMoney(payment.amount ?? safeTotal);
   const receivedAmount = toMoney(payment.receivedAmount ?? payment.received ?? amount);
   const splitPayments = Array.isArray(payment.splitPayments)
     ? payment.splitPayments
         .map((split) => {
           const splitMethod = cleanLower(split.method || 'other', 40);
-          const safeSplitMethod = POS_PAYMENT_METHODS.includes(splitMethod)
-            ? splitMethod
-            : 'other';
+          const splitAmount = toMoney(split.amount);
+          const splitReceived = toMoney(split.receivedAmount ?? splitAmount);
+
+          if (!POS_PAYMENT_METHODS.includes(splitMethod) || splitMethod === 'mixed') {
+            throw createPosError(
+              'El pago mixto contiene un medio no permitido.',
+              'POS_SPLIT_PAYMENT_METHOD_INVALID',
+              { method: splitMethod },
+              400
+            );
+          }
 
           return {
-            method: safeSplitMethod,
-            methodLabel: cleanText(split.methodLabel || safeSplitMethod, 80),
-            amount: toMoney(split.amount),
+            method: splitMethod,
+            methodLabel: cleanText(split.methodLabel || splitMethod, 80),
+            amount: splitAmount,
             reference: cleanText(split.reference || '', 120),
-            receivedAmount: toMoney(split.receivedAmount || split.amount),
-            changeAmount: toMoney(split.changeAmount || 0),
+            receivedAmount: splitMethod === 'cash' ? splitReceived : splitAmount,
+            changeAmount: splitMethod === 'cash' ? Math.max(0, splitReceived - splitAmount) : 0,
           };
         })
         .filter((split) => split.amount > 0)
@@ -252,20 +271,67 @@ function normalizePaymentPayload(payment = {}, total = 0) {
 
   const splitTotal = splitPayments.reduce((sum, split) => sum + split.amount, 0);
 
-  if (safeMethod === 'mixed' && splitTotal !== toMoney(total)) {
+  if (safeMethod === 'mixed' && splitPayments.length < 2) {
     throw createPosError(
-      'La suma del pago mixto debe ser igual al total de la venta.',
-      'POS_INVALID_SPLIT_PAYMENT_TOTAL',
-      { splitTotal, total: toMoney(total) },
+      'El pago mixto debe distribuirse entre al menos dos medios.',
+      'POS_SPLIT_PAYMENT_METHODS_REQUIRED',
+      { splitCount: splitPayments.length },
       400
     );
   }
 
-  if (safeMethod !== 'mixed' && amount < toMoney(total)) {
+  if (safeMethod === 'mixed' && splitTotal !== safeTotal) {
     throw createPosError(
-      'El valor pagado no puede ser menor al total de la venta.',
-      'POS_PAYMENT_AMOUNT_TOO_LOW',
-      { amount, total: toMoney(total) },
+      'La suma del pago mixto debe ser igual al total de la venta.',
+      'POS_INVALID_SPLIT_PAYMENT_TOTAL',
+      { splitTotal, total: safeTotal },
+      400
+    );
+  }
+
+  if (safeMethod !== 'mixed' && amount !== safeTotal) {
+    throw createPosError(
+      'El valor aplicado al medio de pago debe coincidir con el total de la venta.',
+      'POS_PAYMENT_AMOUNT_MISMATCH',
+      { amount, total: safeTotal },
+      400
+    );
+  }
+
+  if (safeMethod === 'cash' && receivedAmount < safeTotal) {
+    throw createPosError(
+      'El efectivo recibido no cubre el total de la venta.',
+      'POS_PAYMENT_RECEIVED_TOO_LOW',
+      { receivedAmount, total: safeTotal },
+      400
+    );
+  }
+
+  const referenceRequiredMethods = new Set(['transfer', 'card', 'other']);
+  const reference = cleanText(payment.reference || '', 120);
+
+  if (referenceRequiredMethods.has(safeMethod) && reference.length < 3) {
+    throw createPosError(
+      'El medio de pago requiere una referencia o soporte verificable.',
+      'POS_PAYMENT_REFERENCE_REQUIRED',
+      { method: safeMethod },
+      400
+    );
+  }
+
+  const invalidSplit = splitPayments.find((split) => (
+    (split.method === 'cash' && split.receivedAmount < split.amount) ||
+    (referenceRequiredMethods.has(split.method) && split.reference.length < 3)
+  ));
+
+  if (safeMethod === 'mixed' && invalidSplit) {
+    const cashUnderpaid = invalidSplit.method === 'cash' && invalidSplit.receivedAmount < invalidSplit.amount;
+    throw createPosError(
+      cashUnderpaid
+        ? 'El efectivo recibido no cubre la parte en efectivo del pago mixto.'
+        : 'Cada medio electrónico del pago mixto requiere una referencia verificable.',
+      cashUnderpaid ? 'POS_SPLIT_CASH_RECEIVED_TOO_LOW' : 'POS_SPLIT_PAYMENT_REFERENCE_REQUIRED',
+      { method: invalidSplit.method },
       400
     );
   }
@@ -276,8 +342,8 @@ function normalizePaymentPayload(payment = {}, total = 0) {
     methodLabel: cleanText(payment.methodLabel || safeMethod, 80),
     amount: safeMethod === 'mixed' ? splitTotal : amount,
     receivedAmount: safeMethod === 'cash' ? receivedAmount : amount,
-    changeAmount: safeMethod === 'cash' ? Math.max(0, receivedAmount - toMoney(total)) : 0,
-    reference: cleanText(payment.reference || '', 120),
+    changeAmount: safeMethod === 'cash' ? Math.max(0, receivedAmount - safeTotal) : 0,
+    reference,
     splitPayments,
   };
 }
@@ -1040,6 +1106,24 @@ function validateDiscountAuthorization({ normalizedPayload, admin = {}, maxPerce
 
   if (!discountAmount || subtotal <= 0) return;
 
+  if (!admin.canApplyPosDiscount) {
+    throw createPosError(
+      'Tu perfil no tiene permiso para aplicar descuentos POS.',
+      'POS_DISCOUNT_PERMISSION_REQUIRED',
+      {},
+      403
+    );
+  }
+
+  if (cleanText(normalizedPayload.discount?.reason || '', 240).length < 3) {
+    throw createPosError(
+      'Todo descuento POS debe registrar un motivo comercial.',
+      'POS_DISCOUNT_REASON_REQUIRED',
+      {},
+      400
+    );
+  }
+
   const discountPercent = Math.round((discountAmount / subtotal) * 10000) / 100;
 
   if (discountPercent > maxPercent && !admin.canApprovePosDiscount) {
@@ -1103,6 +1187,13 @@ function buildPosOrderPayload({
     paymentTransactionId || `POS-${crypto.randomUUID()}`,
     120
   );
+  const recordedDiscount = toMoney(normalizedPayload.discount?.amount) > 0
+    ? {
+        ...normalizedPayload.discount,
+        authorizedBy: adminId,
+        authorizedBySnapshot: adminSnapshot,
+      }
+    : normalizedPayload.discount;
 
   return {
     sessionId: `pos_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1150,7 +1241,7 @@ function buildPosOrderPayload({
     taxes: normalizedPayload.taxes,
     customer: normalizedPayload.customer,
     billing: normalizedPayload.billing,
-    discount: normalizedPayload.discount,
+    discount: recordedDiscount,
     payment: {
       active: true,
       provider: 'pos',
@@ -1569,6 +1660,7 @@ module.exports = {
   normalizePosItems,
   normalizePaymentPayload,
   normalizeDiscountPayload,
+  validateDiscountAuthorization,
   normalizePosCustomer,
   calculatePosTotals,
   calculateTotalsFromNormalizedItems,

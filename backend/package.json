@@ -19,6 +19,8 @@
     "test:pos-inventory": "node scripts/testPosInventoryModule.js",
     "test:pos-level-plus-stage1": "node scripts/testPosLevelPlusStage1.js",
     "test:pos-level-plus-stage1-integration": "node scripts/testPosLevelPlusStage1Integration.js",
+    "test:pos-level-plus-stage2": "node scripts/testPosLevelPlusStage2.js",
+    "test:pos-level-plus-stage2-integration": "node scripts/testPosLevelPlusStage2Integration.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",

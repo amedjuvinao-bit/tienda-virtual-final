@@ -28,6 +28,16 @@ function formatDate(value) {
   return date.toLocaleString('es-CO', { hour12: false });
 }
 
+function paymentLabel(value) {
+  return {
+    cash: 'Efectivo',
+    transfer: 'Transferencia',
+    card: 'Tarjeta / Datáfono',
+    mixed: 'Pago mixto',
+    other: 'Otro',
+  }[value] || value || 'Pago POS';
+}
+
 function getOrderNumber(order = {}) {
   if (!order || typeof order !== 'object') return '';
   return order.orderNumber || order.number || order.receiptNumber || order._id || order.id || '';
@@ -102,10 +112,21 @@ function ReceiptModal({ receipt, onClose, onPrint, onSendEmail, loadingPrint, lo
             </div>
             <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
               <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Pago</p>
-              <p className="mt-2 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{receipt.payment?.methodLabel || receipt.payment?.method || 'Pago POS'}</p>
-              <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                Recibido {money(receipt.payment?.receivedAmount)} · Cambio {money(receipt.payment?.changeAmount)}
-              </p>
+              <p className="mt-2 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{receipt.payment?.methodLabel || paymentLabel(receipt.payment?.method)}</p>
+              {receipt.payment?.method === 'cash' ? <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Recibido {money(receipt.payment?.receivedAmount)} · Cambio {money(receipt.payment?.changeAmount)}</p> : null}
+              {receipt.payment?.reference ? <p className="mt-1 break-all text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Referencia: {receipt.payment.reference}</p> : null}
+              {receipt.payment?.method === 'mixed' && Array.isArray(receipt.payment?.splitPayments) ? (
+                <div className="mt-2 divide-y" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  {receipt.payment.splitPayments.map((split, index) => (
+                    <div key={`${split.method}-${index}`} className="flex items-start justify-between gap-2 py-2 text-xs">
+                      <span className="min-w-0 font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        {split.methodLabel || paymentLabel(split.method)}{split.reference ? ` · ${split.reference}` : ''}{split.changeAmount > 0 ? ` · Cambio ${money(split.changeAmount)}` : ''}
+                      </span>
+                      <strong className="shrink-0" style={{ color: 'var(--admin-card-text)' }}>{money(split.amount)}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 

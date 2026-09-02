@@ -26,8 +26,18 @@ import {
   createPosSale,
   getPosBootstrap,
   getPosProducts,
+  previewPosSale,
 } from '../api/adminPosApi';
 import { getCurrentCashSession } from '../api/adminCashSessionApi';
+import PosCheckoutPanel from './PosCheckoutPanel';
+import PosSaleReviewModal from './PosSaleReviewModal';
+import {
+  buildPosCommercialPayload,
+  createInitialDiscount,
+  createInitialPaymentDetails,
+  paymentLabel,
+  validatePosCheckout,
+} from './posCheckoutModel';
 
 const REGISTER_CODE = 'CAJA POS';
 
@@ -39,17 +49,6 @@ const moneyFormatter = new Intl.NumberFormat('es-CO', {
 
 function money(value) {
   return moneyFormatter.format(Number(value || 0));
-}
-
-function paymentLabel(value) {
-  const map = {
-    cash: 'Efectivo',
-    transfer: 'Transferencia',
-    card: 'Tarjeta / Datáfono',
-    mixed: 'Pago mixto',
-    other: 'Otro',
-  };
-  return map[value] || value || 'Pago';
 }
 
 function rowKey(product = {}) {
@@ -304,6 +303,11 @@ export default function PosSalesPageSafe() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState('');
   const [cartItems, setCartItems] = useState([]);
+  const [paymentDetails, setPaymentDetails] = useState(createInitialPaymentDetails);
+  const [discount, setDiscount] = useState(createInitialDiscount);
+  const [checkoutErrors, setCheckoutErrors] = useState({});
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [saleReview, setSaleReview] = useState(null);
   const [saleLoading, setSaleLoading] = useState(false);
   const [saleError, setSaleError] = useState('');
   const [saleSuccess, setSaleSuccess] = useState('');
@@ -316,24 +320,40 @@ export default function PosSalesPageSafe() {
   const paymentMethods = useMemo(() => (Array.isArray(bootstrap?.paymentMethods) ? bootstrap.paymentMethods : []), [bootstrap]);
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === branchId) || bootstrap?.defaultBranch || null, [branches, bootstrap?.defaultBranch, branchId]);
   const billingActive = bootstrap?.billing?.electronicBillingActive === true;
+  const permissions = bootstrap?.permissions || {};
   const cashSessionRequired = selectedBranch?.settings?.requireCashSessionForPos === true;
   const hasOpenCashSession = Boolean(cashSession?.id && cashSession?.status === 'open');
-  const canConfirmSale = cartItems.length > 0 && !saleLoading && !cashLoading && (!cashSessionRequired || hasOpenCashSession);
+  const canReviewSale = cartItems.length > 0 && !saleLoading && !reviewLoading && !cashLoading && (!cashSessionRequired || hasOpenCashSession);
 
   const cartByKey = useMemo(() => cartItems.reduce((acc, item) => {
     acc[item.cartKey] = item;
     return acc;
   }, {}), [cartItems]);
 
-  const cartSummary = useMemo(() => {
+  const merchandiseSummary = useMemo(() => {
     const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
     const totalItems = cartItems.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
-    return { subtotal, discount: 0, total: subtotal, totalItems };
+    return { subtotal, totalItems };
   }, [cartItems]);
+
+  const checkoutValidation = useMemo(() => validatePosCheckout({
+    subtotal: merchandiseSummary.subtotal,
+    discount,
+    paymentMethod,
+    paymentDetails,
+    permissions,
+  }), [discount, merchandiseSummary.subtotal, paymentDetails, paymentMethod, permissions]);
+
+  const cartSummary = useMemo(() => ({
+    ...checkoutValidation.summary,
+    totalItems: merchandiseSummary.totalItems,
+  }), [checkoutValidation.summary, merchandiseSummary.totalItems]);
 
   const clearMessages = () => {
     setSaleError('');
     setSaleSuccess('');
+    setCheckoutErrors({});
+    setSaleReview(null);
   };
 
   const loadCashSession = async (nextBranchId = branchId) => {
@@ -404,15 +424,56 @@ export default function PosSalesPageSafe() {
     setCartItems((prev) => prev.filter((item) => item.cartKey !== key));
   };
 
-  const confirmSale = async () => {
-    if (saleLoading || !branchId || cartItems.length === 0) return;
+  const buildCurrentPayload = () => buildPosCommercialPayload({
+    branchId,
+    cartItems: cartItems.map((item) => ({
+      ...item,
+      variantLabel: item.variantLabel || variantLabel(item),
+    })),
+    paymentMethod,
+    paymentDetails,
+    discount,
+    total: checkoutValidation.summary.total,
+    registerCode: REGISTER_CODE,
+  });
+
+  const reviewSale = async () => {
+    if (reviewLoading || saleLoading || !branchId || cartItems.length === 0) return;
 
     if (cashSessionRequired && !hasOpenCashSession) {
       setSaleError('Debes abrir caja antes de confirmar ventas POS. Entra a Caja y abre CAJA POS.');
       return;
     }
 
-    const soldItems = cartItems.map((item) => ({ ...item }));
+    if (!checkoutValidation.valid) {
+      setCheckoutErrors(checkoutValidation.errors);
+      setSaleError(checkoutValidation.errors.payment || checkoutValidation.errors.discount || checkoutValidation.errors.cart || 'Revisa los datos del cobro.');
+      return;
+    }
+
+    try {
+      setReviewLoading(true);
+      setCheckoutErrors({});
+      setSaleError('');
+      setSaleSuccess('');
+      const payload = buildCurrentPayload();
+      const data = await previewPosSale(payload);
+      setSaleReview({
+        preview: data?.preview || null,
+        payload,
+        soldItems: cartItems.map((item) => ({ ...item })),
+      });
+    } catch (err) {
+      setSaleError(err?.message || 'No fue posible revisar la venta POS.');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const confirmSale = async () => {
+    if (saleLoading || !saleReview?.payload || !saleReview?.preview) return;
+
+    const soldItems = saleReview.soldItems || [];
     const idempotencyKey =
       saleAttemptKeyRef.current || buildPosIdempotencyKey('pos-sale');
     saleAttemptKeyRef.current = idempotencyKey;
@@ -421,25 +482,7 @@ export default function PosSalesPageSafe() {
       setSaleLoading(true);
       setSaleError('');
       setSaleSuccess('');
-      const data = await createPosSale({
-        branchId,
-        customerMode: 'guest',
-        registerCode: REGISTER_CODE,
-        cashRegisterCode: REGISTER_CODE,
-        items: soldItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          size: item.size || '',
-          color: item.color || '',
-          variantKey: item.variantKey || item.variantId || '',
-          variantLabel: item.variantLabel || variantLabel(item),
-          variantAttributes: Array.isArray(item.variantAttributes)
-            ? item.variantAttributes
-            : [],
-        })),
-        payment: { method: paymentMethod, receivedAmount: cartSummary.total, amount: cartSummary.total },
-        discount: { type: 'none', value: 0 },
-      }, { idempotencyKey });
+      const data = await createPosSale(saleReview.payload, { idempotencyKey });
 
       setProducts((prev) => prev.map((product) => {
         const sold = soldItems.find((item) => item.cartKey === rowKey(product));
@@ -452,11 +495,16 @@ export default function PosSalesPageSafe() {
       else await loadCashSession(branchId);
 
       setCartItems([]);
+      setPaymentDetails(createInitialPaymentDetails());
+      setDiscount(createInitialDiscount());
+      setCheckoutErrors({});
+      setSaleReview(null);
       saleAttemptKeyRef.current = '';
       const number = orderNumber(data?.order || {});
       setSaleSuccess(number ? `Venta POS creada correctamente. Orden ${number}.` : 'Venta POS creada correctamente.');
     } catch (err) {
       setSaleError(err?.message || 'No fue posible confirmar la venta POS.');
+      setSaleReview(null);
       await loadCashSession(branchId);
     } finally {
       setSaleLoading(false);
@@ -469,11 +517,13 @@ export default function PosSalesPageSafe() {
 
   useEffect(() => {
     saleAttemptKeyRef.current = '';
-  }, [branchId, paymentMethod, cartItems]);
+    setSaleReview(null);
+  }, [branchId, cartItems, discount, paymentDetails, paymentMethod]);
 
   useEffect(() => {
     const resetAttempt = () => {
       saleAttemptKeyRef.current = '';
+      setSaleReview(null);
     };
     window.addEventListener('pos:customer-selection-changed', resetAttempt);
     return () => {
@@ -483,6 +533,10 @@ export default function PosSalesPageSafe() {
 
   useEffect(() => {
     setCartItems([]);
+    setPaymentDetails(createInitialPaymentDetails());
+    setDiscount(createInitialDiscount());
+    setCheckoutErrors({});
+    setSaleReview(null);
     setSaleError('');
     setSaleSuccess('');
     if (branchId && !loading) loadCashSession(branchId);
@@ -560,18 +614,16 @@ export default function PosSalesPageSafe() {
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
             <div className="space-y-5">
               <Card className="p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                  <div className="flex-1">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.65fr)] lg:items-end">
+                  <div>
                     <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Sede de venta</label>
                     <select value={branchId} onChange={(event) => setBranchId(event.target.value)} disabled={saleLoading} className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none disabled:opacity-60" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }}>
                       {branches.length === 0 ? <option value="">No hay sedes habilitadas para POS</option> : branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
                     </select>
                   </div>
-                  <div className="flex-1">
-                    <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Método de pago</label>
-                    <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} disabled={saleLoading} className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none disabled:opacity-60" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }}>
-                      {paymentMethods.map((method) => <option key={method.key} value={method.key}>{method.label}</option>)}
-                    </select>
+                  <div className="rounded-xl border px-4 py-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
+                    <p className="text-xs font-black" style={{ color: 'var(--admin-card-text)' }}>Cobro protegido</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>El medio, el descuento y el cambio se validan antes de crear la orden.</p>
                   </div>
                 </div>
               </Card>
@@ -601,22 +653,52 @@ export default function PosSalesPageSafe() {
               <div className="space-y-4 p-5">
                 {cartItems.length === 0 ? <div className="rounded-2xl border p-5 text-center" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}><ReceiptText className="mx-auto h-8 w-8" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>Sin productos agregados</p><p className="mt-1 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Agrega productos desde el buscador para calcular la venta.</p></div> : <div className="space-y-3">{cartItems.map((item) => <CartRow key={item.cartKey} item={item} disabled={saleLoading} onAdd={addProduct} onSub={subProduct} onRemove={removeProduct} />)}</div>}
                 {cashSessionRequired && !hasOpenCashSession ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><LockKeyhole className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Caja cerrada</p><p className="mt-1">Abre CAJA POS en el módulo Caja para poder vender.</p></div></div> : null}
-                {saleError ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">No se pudo confirmar la venta</p><p className="mt-1">{saleError}</p></div></div> : null}
+                <PosCheckoutPanel
+                  subtotal={merchandiseSummary.subtotal}
+                  paymentMethods={paymentMethods}
+                  paymentMethod={paymentMethod}
+                  paymentDetails={paymentDetails}
+                  discount={discount}
+                  permissions={permissions}
+                  validationErrors={checkoutErrors}
+                  disabled={saleLoading || reviewLoading || cartItems.length === 0}
+                  onPaymentMethodChange={(nextMethod) => {
+                    clearMessages();
+                    setPaymentMethod(nextMethod);
+                    setPaymentDetails((current) => ({ ...current, reference: '' }));
+                  }}
+                  onPaymentDetailsChange={(nextDetails) => {
+                    clearMessages();
+                    setPaymentDetails(nextDetails);
+                  }}
+                  onDiscountChange={(nextDiscount) => {
+                    clearMessages();
+                    setDiscount(nextDiscount);
+                  }}
+                />
+                {saleError ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Revisa la venta</p><p className="mt-1">{saleError}</p></div></div> : null}
                 <div className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
                   <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--admin-card-muted-text)' }}>Subtotal</span><strong style={{ color: 'var(--admin-card-text)' }}>{money(cartSummary.subtotal)}</strong></div>
-                  <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--admin-card-muted-text)' }}>Descuento</span><strong style={{ color: 'var(--admin-card-text)' }}>{money(cartSummary.discount)}</strong></div>
+                  <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--admin-card-muted-text)' }}>Descuento</span><strong style={{ color: 'var(--admin-card-text)' }}>- {money(cartSummary.discount)}</strong></div>
                   <div className="h-px" style={{ background: 'var(--admin-card-border)' }} />
                   <div className="flex items-center justify-between text-base"><span className="font-black" style={{ color: 'var(--admin-card-text)' }}>Total</span><strong className="text-xl" style={{ color: 'var(--admin-primary)' }}>{money(cartSummary.total)}</strong></div>
                 </div>
-                <button type="button" disabled={!canConfirmSale} onClick={confirmSale} className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>
-                  {saleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BadgeCheck className="h-5 w-5" />}
-                  {saleLoading ? 'Confirmando venta...' : cashSessionRequired && !hasOpenCashSession ? 'Abre caja para vender' : 'Confirmar venta'}
+                <button type="button" disabled={!canReviewSale} onClick={reviewSale} className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>
+                  {reviewLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BadgeCheck className="h-5 w-5" />}
+                  {reviewLoading ? 'Validando venta...' : cashSessionRequired && !hasOpenCashSession ? 'Abre caja para vender' : 'Revisar y cobrar'}
                 </button>
               </div>
             </Card>
           </div>
         </>
       )}
+      <PosSaleReviewModal
+        review={saleReview}
+        saving={saleLoading}
+        error={saleError}
+        onClose={() => { if (!saleLoading) setSaleReview(null); }}
+        onConfirm={confirmSale}
+      />
     </div>
   );
 }

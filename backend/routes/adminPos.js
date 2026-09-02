@@ -15,6 +15,7 @@ const { serializeCashSession } = require('../services/cashSessionService');
 const {
   POS_PAYMENT_METHODS,
   preparePosSalePreview,
+  validateDiscountAuthorization,
 } = require('../services/adminPosService');
 const { createPosSaleWithCashSession } = require('../services/posCashSaleService');
 const {
@@ -96,6 +97,7 @@ function buildAdminContext(req) {
       '',
     role: req.adminProfile?.role || 'admin',
     adminRole: req.adminRole || req.adminProfile?.adminRole || '',
+    canApplyPosDiscount: hasPermission(req, 'pos:discount'),
     canApprovePosDiscount: hasPermission(req, 'pos:discount:approve'),
   };
 }
@@ -462,6 +464,10 @@ router.post('/sales/preview', requirePermission('pos:view'), async (req, res) =>
     const preview = await preparePosSalePreview(req.body || {});
 
     assertPosBranchAccess(req, preview.branch?._id);
+    validateDiscountAuthorization({
+      normalizedPayload: preview,
+      admin: buildAdminContext(req),
+    });
 
     return res.json({
       ok: true,
@@ -511,6 +517,7 @@ router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
     const preview = await preparePosSalePreview(req.body || {});
 
     assertPosBranchAccess(req, preview.branch?._id, { requireSell: true });
+    validateDiscountAuthorization({ normalizedPayload: preview, admin });
 
     const result = await createPosSaleWithCashSession(req.body || {}, {
       admin,

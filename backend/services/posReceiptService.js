@@ -199,9 +199,18 @@ async function buildPosReceipt(orderId, options = {}) {
     payment: {
       method: order.payment?.method || '',
       methodLabel: order.payment?.methodLabel || order.payment?.method || '',
+      reference: cleanText(order.payment?.reference || '', 120),
       amount: Number(order.payment?.amount || order.total || 0),
       receivedAmount: Number(order.payment?.receivedAmount || order.payment?.amount || order.total || 0),
       changeAmount: Number(order.payment?.changeAmount || 0),
+      splitPayments: (Array.isArray(order.payment?.splitPayments) ? order.payment.splitPayments : []).map((split) => ({
+        method: cleanText(split.method || '', 40).toLowerCase(),
+        methodLabel: cleanText(split.methodLabel || split.method || '', 80),
+        reference: cleanText(split.reference || '', 120),
+        amount: Number(split.amount || 0),
+        receivedAmount: Number(split.receivedAmount || split.amount || 0),
+        changeAmount: Number(split.changeAmount || 0),
+      })),
       paidAt: order.payment?.paidAt || order.createdAt || null,
     },
     items,
@@ -217,6 +226,13 @@ async function buildPosReceipt(orderId, options = {}) {
 }
 
 function buildReceiptText(receipt) {
+  const splitLines = receipt.payment.method === 'mixed'
+    ? receipt.payment.splitPayments.map((split) => (
+        `- ${split.methodLabel || split.method}: ${money(split.amount)}` +
+        `${split.reference ? ` | Ref. ${split.reference}` : ''}` +
+        `${split.changeAmount > 0 ? ` | Cambio ${money(split.changeAmount)}` : ''}`
+      ))
+    : [];
   const lines = [
     receipt.store.name,
     `Comprobante POS ${receipt.order.receiptNumber}`,
@@ -231,8 +247,14 @@ function buildReceiptText(receipt) {
     '',
     `Total: ${money(receipt.totals.total)}`,
     `Pago: ${receipt.payment.methodLabel || receipt.payment.method}`,
-    `Recibido: ${money(receipt.payment.receivedAmount)}`,
-    `Cambio: ${money(receipt.payment.changeAmount)}`,
+    ...(receipt.payment.method === 'cash'
+      ? [
+          `Recibido: ${money(receipt.payment.receivedAmount)}`,
+          `Cambio: ${money(receipt.payment.changeAmount)}`,
+        ]
+      : []),
+    ...(receipt.payment.reference ? [`Referencia: ${receipt.payment.reference}`] : []),
+    ...splitLines,
     '',
     receipt.invoice.exists
       ? `Factura electronica: ${receipt.invoice.invoiceNumber || receipt.invoice.status}`
@@ -252,6 +274,15 @@ function escapeHtml(value) {
 
 function buildReceiptHtml(receipt) {
   const invoiceLinks = [];
+  const splitPaymentHtml = receipt.payment.method === 'mixed'
+    ? `<div style="margin-top:8px;">${receipt.payment.splitPayments.map((split) => `
+        <p style="margin:4px 0;">
+          <strong>${escapeHtml(split.methodLabel || split.method)}:</strong> ${money(split.amount)}
+          ${split.reference ? ` · Ref. ${escapeHtml(split.reference)}` : ''}
+          ${split.changeAmount > 0 ? ` · Cambio ${money(split.changeAmount)}` : ''}
+        </p>
+      `).join('')}</div>`
+    : '';
   if (receipt.invoice.pdfUrl) invoiceLinks.push(`<li><a href="${escapeHtml(receipt.invoice.pdfUrl)}">Descargar factura PDF</a></li>`);
   if (receipt.invoice.xmlUrl) invoiceLinks.push(`<li><a href="${escapeHtml(receipt.invoice.xmlUrl)}">Descargar factura XML</a></li>`);
 
@@ -297,7 +328,9 @@ function buildReceiptHtml(receipt) {
         <p><strong>Impuestos:</strong> ${money(receipt.totals.taxes)}</p>
         <p style="font-size:18px;"><strong>Total pagado:</strong> ${money(receipt.totals.total)}</p>
         <p><strong>Método de pago:</strong> ${escapeHtml(receipt.payment.methodLabel || receipt.payment.method)}</p>
-        <p><strong>Cambio:</strong> ${money(receipt.payment.changeAmount)}</p>
+        ${receipt.payment.method === 'cash' ? `<p><strong>Recibido:</strong> ${money(receipt.payment.receivedAmount)}</p><p><strong>Cambio:</strong> ${money(receipt.payment.changeAmount)}</p>` : ''}
+        ${receipt.payment.reference ? `<p><strong>Referencia:</strong> ${escapeHtml(receipt.payment.reference)}</p>` : ''}
+        ${splitPaymentHtml}
       </div>
 
       <div style="border:1px solid #eee;border-radius:14px;padding:16px;">
