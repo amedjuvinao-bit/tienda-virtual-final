@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, Mail, Printer, ReceiptText, Send, X } from 'lucide-react';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import {
   getPosReceipt,
   openPosReceiptPdf,
@@ -20,6 +21,10 @@ function money(value) {
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(value));
 }
 
 function formatDate(value) {
@@ -180,6 +185,9 @@ export default function PosReceiptActions({ sale, onClose }) {
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [loadingPrint, setLoadingPrint] = useState(false);
   const [loadingEmail, setLoadingEmail] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [emailInputError, setEmailInputError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -214,24 +222,40 @@ export default function PosReceiptActions({ sale, onClose }) {
     }
   };
 
+  const openEmailDialog = () => {
+    const defaultEmail = cleanText(receipt?.customer?.email || order?.customer?.email || order?.billing?.email || '');
+    setEmailDraft(defaultEmail);
+    setEmailInputError('');
+    setError('');
+    setStatusMessage('');
+    setEmailDialogOpen(true);
+  };
+
+  const closeEmailDialog = () => {
+    if (loadingEmail) return;
+    setEmailDialogOpen(false);
+    setEmailInputError('');
+  };
+
   const emailReceipt = async () => {
+    const to = cleanText(emailDraft);
+
+    if (!isValidEmail(to)) {
+      setEmailInputError('Escribe un correo válido. Ejemplo: cliente@correo.com');
+      return;
+    }
+
     try {
       setLoadingEmail(true);
       setError('');
+      setEmailInputError('');
       setStatusMessage('');
-
-      const defaultEmail = cleanText(receipt?.customer?.email || order?.customer?.email || order?.billing?.email || '');
-      const to = defaultEmail || cleanText(window.prompt('Correo destino para enviar el comprobante:', '') || '');
-
-      if (!to) {
-        setError('Debes indicar un correo destino para enviar el comprobante.');
-        return;
-      }
 
       const data = await sendPosReceiptEmail(orderId, { to });
       setStatusMessage(data?.message || `Comprobante enviado correctamente a ${to}.`);
+      setEmailDialogOpen(false);
     } catch (err) {
-      setError(err?.message || 'No fue posible enviar el comprobante por correo.');
+      setEmailInputError(err?.message || 'No fue posible enviar el comprobante por correo.');
     } finally {
       setLoadingEmail(false);
     }
@@ -263,7 +287,7 @@ export default function PosReceiptActions({ sale, onClose }) {
           <Button variant="ghost" onClick={printReceipt} disabled={loadingPrint}>
             <Printer className="h-4 w-4" /> {loadingPrint ? 'Abriendo...' : 'Imprimir'}
           </Button>
-          <Button onClick={emailReceipt} disabled={loadingEmail}>
+          <Button onClick={openEmailDialog} disabled={loadingEmail}>
             <Mail className="h-4 w-4" /> {loadingEmail ? 'Enviando...' : 'Enviar por correo'}
           </Button>
         </div>
@@ -281,10 +305,52 @@ export default function PosReceiptActions({ sale, onClose }) {
         receipt={receipt}
         onClose={() => setReceipt(null)}
         onPrint={printReceipt}
-        onSendEmail={emailReceipt}
+        onSendEmail={openEmailDialog}
         loadingPrint={loadingPrint}
         loadingEmail={loadingEmail}
       />
+
+      <ConfirmDialog
+        show={emailDialogOpen}
+        onClose={closeEmailDialog}
+        onConfirm={emailReceipt}
+        title="Enviar comprobante por correo"
+        confirmLabel="Enviar comprobante"
+        cancelLabel="Cancelar"
+        tone="info"
+        confirmDisabled={!cleanText(emailDraft)}
+        loading={loadingEmail}
+      >
+        <label htmlFor="pos-receipt-email" className="block text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+          Correo del destinatario
+        </label>
+        <div
+          className="mt-2 flex items-center gap-3 rounded-2xl border px-4 py-3 focus-within:ring-2"
+          style={{ borderColor: emailInputError ? '#ef4444' : 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}
+        >
+          <Mail className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+          <input
+            id="pos-receipt-email"
+            type="email"
+            autoFocus
+            value={emailDraft}
+            onChange={(event) => {
+              setEmailDraft(event.target.value);
+              if (emailInputError) setEmailInputError('');
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !loadingEmail) emailReceipt();
+            }}
+            placeholder="cliente@correo.com"
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none"
+            style={{ color: 'var(--admin-card-text)' }}
+          />
+        </div>
+        {emailInputError ? <p className="mt-2 text-xs font-bold text-red-600">{emailInputError}</p> : null}
+        <p className="mt-3 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          Se enviará el comprobante de la orden {number} a esta dirección.
+        </p>
+      </ConfirmDialog>
     </>
   );
 }

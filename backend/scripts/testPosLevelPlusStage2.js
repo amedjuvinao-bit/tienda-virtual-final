@@ -184,6 +184,7 @@ function main() {
   const posUi = read('frontend/src/admin/pos/PosSalesPageSafe.jsx');
   const checkoutUi = read('frontend/src/admin/pos/PosCheckoutPanel.jsx');
   const reviewUi = read('frontend/src/admin/pos/PosSaleReviewModal.jsx');
+  const receiptUi = read('frontend/src/admin/pos/PosReceiptActions.jsx');
   const receiptService = read('backend/services/posReceiptService.js');
   const posRoute = read('backend/routes/adminPos.js');
   const posService = read('backend/services/adminPosService.js');
@@ -195,6 +196,12 @@ function main() {
       reviewUi.includes('La venta aún no ha sido creada')
   );
   ok(
+    'la revisión final se monta sobre la ventana y bloquea el desplazamiento del fondo',
+    reviewUi.includes('createPortal(') &&
+      reviewUi.includes('document.body.style.overflow = \'hidden\'') &&
+      reviewUi.includes('document.body,')
+  );
+  ok(
     'la interfaz expone efectivo, pago mixto y descuentos sin duplicar la página POS',
     checkoutUi.includes('Efectivo recibido') &&
       checkoutUi.includes('MixedPaymentEditor') &&
@@ -203,6 +210,13 @@ function main() {
   ok(
     'el comprobante conserva referencias y desglose del pago mixto',
     receiptService.includes('splitPayments:') && receiptService.includes('reference: cleanText')
+  );
+  ok(
+    'el correo del comprobante usa la ventana emergente del proyecto',
+    receiptUi.includes("import ConfirmDialog from '../../components/ConfirmDialog'") &&
+      receiptUi.includes('<ConfirmDialog') &&
+      receiptUi.includes('Correo del destinatario') &&
+      !receiptUi.includes('window.prompt(')
   );
   ok(
     'la previsualización y la venta validan permiso de descuento',

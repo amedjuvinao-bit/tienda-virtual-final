@@ -40,9 +40,12 @@ export default function ConfirmDialog({
   onConfirm,
   title = 'Confirmación',
   message,
+  children,
   confirmLabel,
   cancelLabel = 'Cancelar',
   tone = 'danger',
+  confirmDisabled = false,
+  loading = false,
 }) {
   const config = TONE_CONFIG[tone] || TONE_CONFIG.danger;
   const Icon = config.icon;
@@ -54,7 +57,7 @@ export default function ConfirmDialog({
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape' && !loading) onClose?.();
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -63,19 +66,19 @@ export default function ConfirmDialog({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [show, onClose]);
+  }, [show, onClose, loading]);
 
   if (!show) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex min-h-screen items-center justify-center px-4 py-6"
+      className="fixed inset-0 z-[100000] flex min-h-screen items-center justify-center px-4 py-6"
       role="presentation"
     >
       <button
         type="button"
         className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-[4px]"
-        onClick={onClose}
+        onClick={loading ? undefined : onClose}
         aria-label="Cerrar confirmación"
       />
 
@@ -113,18 +116,21 @@ export default function ConfirmDialog({
             <h3 className="mt-1 text-xl font-black leading-tight">
               {title}
             </h3>
-            <p
-              className="mt-3 text-sm font-semibold leading-relaxed"
-              style={{ color: 'var(--admin-card-muted-text, #64748b)' }}
-            >
-              {message || '¿Deseas continuar con esta acción?'}
-            </p>
+            {!children ? (
+              <p
+                className="mt-3 text-sm font-semibold leading-relaxed"
+                style={{ color: 'var(--admin-card-muted-text, #64748b)' }}
+              >
+                {message || '¿Deseas continuar con esta acción?'}
+              </p>
+            ) : null}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border transition hover:-translate-y-0.5"
+            disabled={loading}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: 'var(--admin-button-soft-border, #f9a8d4)',
               background: 'var(--admin-button-soft-bg, #fff1f2)',
@@ -136,6 +142,8 @@ export default function ConfirmDialog({
           </button>
         </div>
 
+        {children ? <div className="px-6 pb-6">{children}</div> : null}
+
         <div
           className="flex flex-wrap justify-end gap-3 border-t px-6 py-4"
           style={{ borderColor: 'var(--admin-card-border, #f9a8d4)' }}
@@ -143,7 +151,8 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border px-5 text-sm font-black transition hover:-translate-y-0.5"
+            disabled={loading}
+            className="inline-flex min-h-11 items-center justify-center rounded-full border px-5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: 'var(--admin-button-soft-border, #f9a8d4)',
               background: 'var(--admin-button-soft-bg, #fff1f2)',
@@ -156,7 +165,8 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5"
+            disabled={loading || confirmDisabled}
+            className="inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               background:
                 'linear-gradient(135deg, var(--admin-button-bg, var(--admin-primary, #ec4899)), color-mix(in srgb, var(--admin-button-bg, var(--admin-primary, #ec4899)) 72%, #0f172a 28%))',
@@ -164,7 +174,7 @@ export default function ConfirmDialog({
               textShadow: '0 1px 8px rgba(0,0,0,0.35)',
             }}
           >
-            {confirmLabel || config.confirmText}
+            {loading ? 'Procesando…' : (confirmLabel || config.confirmText)}
           </button>
         </div>
 

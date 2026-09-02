@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, BadgeCheck, Loader2, X } from 'lucide-react';
 import { paymentLabel } from './posCheckoutModel';
 
@@ -46,21 +47,26 @@ function PaymentSummary({ payment = {} }) {
 export default function PosSaleReviewModal({ review, saving = false, error = '', onClose, onConfirm }) {
   useEffect(() => {
     if (!review) return undefined;
+    const previousOverflow = document.body.style.overflow;
     const onKeyDown = (event) => {
       if (event.key === 'Escape' && !saving) onClose();
     };
+    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [onClose, review, saving]);
 
-  if (!review) return null;
+  if (!review || typeof document === 'undefined') return null;
 
   const preview = review.preview || {};
   const items = Array.isArray(preview.items) ? preview.items : [];
   const payment = preview.payment || review.payload?.payment || {};
   const discount = preview.discount || review.payload?.discount || {};
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6" role="presentation">
       <section
         role="dialog"
@@ -124,6 +130,7 @@ export default function PosSaleReviewModal({ review, saving = false, error = '',
           </button>
         </footer>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
