@@ -21,11 +21,19 @@ const { createPosSaleWithCashSession } = require('../services/posCashSaleService
 const {
   assertPosBranchAccess,
   buildPosBranchFilter,
+  buildPosResourceAccess,
 } = require('../services/adminPosAccessService');
 const {
   buildPosSaleIdempotency,
   inspectPosSaleIdempotency,
 } = require('../services/posSaleIdempotencyService');
+const {
+  closeHeldSale,
+  createHeldSale,
+  listHeldSales,
+  listPosSalesHistory,
+  touchHeldSale,
+} = require('../services/posOperationsService');
 
 const router = express.Router();
 
@@ -395,8 +403,99 @@ router.get('/bootstrap', requirePermission('pos:view'), async (req, res) => {
         canDiscount: hasPermission(req, 'pos:discount'),
         canApproveDiscount: hasPermission(req, 'pos:discount:approve'),
         canReceipt: hasPermission(req, 'pos:receipt'),
+        canManageOrders: hasPermission(req, 'orders:view'),
+        canUpdateOrderStatus: hasPermission(req, 'orders:status'),
+        canRefundOrders: hasPermission(req, 'orders:refund'),
       },
       billing,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get('/held-sales', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const branchId = cleanText(req.query.branchId || '');
+    const access = buildPosResourceAccess(req, {
+      requestedBranchId: branchId,
+    });
+    const sales = await listHeldSales({
+      branchIds: access.branchIds,
+      branchId,
+      q: req.query.q,
+      limit: req.query.limit,
+    });
+
+    return res.json({
+      ok: true,
+      heldSales: sales,
+      total: sales.length,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/held-sales', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const branchId = cleanText(req.body?.branchId || '');
+    assertPosBranchAccess(req, branchId, { requireSell: true });
+    const heldSale = await createHeldSale(req.body || {}, {
+      admin: buildAdminContext(req),
+    });
+
+    return res.status(201).json({ ok: true, heldSale });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/held-sales/:id/open', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const access = buildPosResourceAccess(req, { requireSell: true });
+    const heldSale = await touchHeldSale(req.params.id, {
+      branchIds: access.branchIds,
+    });
+
+    return res.json({ ok: true, heldSale });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.patch('/held-sales/:id/close', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const access = buildPosResourceAccess(req, { requireSell: true });
+    const heldSale = await closeHeldSale(req.params.id, {
+      reason: req.body?.reason,
+      orderId: req.body?.orderId,
+      branchIds: access.branchIds,
+    });
+
+    return res.json({ ok: true, heldSale });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get('/sales/history', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const branchId = cleanText(req.query.branchId || '');
+    const access = buildPosResourceAccess(req, {
+      requestedBranchId: branchId,
+    });
+    const sales = await listPosSalesHistory({
+      branchIds: access.branchIds,
+      branchId,
+      q: req.query.q,
+      limit: req.query.limit,
+    });
+
+    return res.json({
+      ok: true,
+      sales,
+      total: sales.length,
     });
   } catch (error) {
     return sendError(res, error);

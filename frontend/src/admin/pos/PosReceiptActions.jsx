@@ -1,6 +1,7 @@
 // frontend/src/admin/pos/PosReceiptActions.jsx
 
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, Mail, Printer, ReceiptText, Send, X } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import {
@@ -74,12 +75,26 @@ function Button({ children, onClick, disabled = false, variant = 'primary' }) {
 }
 
 function ReceiptModal({ receipt, onClose, onPrint, onSendEmail, loadingPrint, loadingEmail }) {
+  React.useEffect(() => {
+    if (!receipt) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [receipt, onClose]);
+
   if (!receipt) return null;
 
   const items = Array.isArray(receipt.items) ? receipt.items : [];
 
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[110000] flex min-h-screen items-center justify-center bg-black/45 p-4 backdrop-blur-[3px]">
       <div
         className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-3xl border"
         style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}
@@ -176,11 +191,12 @@ function ReceiptModal({ receipt, onClose, onPrint, onSendEmail, loadingPrint, lo
           <Button onClick={onSendEmail} disabled={loadingEmail}><Send className="h-4 w-4" /> {loadingEmail ? 'Enviando...' : 'Enviar por correo'}</Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
-export default function PosReceiptActions({ sale, onClose }) {
+export default function PosReceiptActions({ sale, onClose, compact = false }) {
   const [receipt, setReceipt] = useState(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [loadingPrint, setLoadingPrint] = useState(false);
@@ -261,6 +277,82 @@ export default function PosReceiptActions({ sale, onClose }) {
     }
   };
 
+  const overlays = (
+    <>
+      <ReceiptModal
+        receipt={receipt}
+        onClose={() => setReceipt(null)}
+        onPrint={printReceipt}
+        onSendEmail={openEmailDialog}
+        loadingPrint={loadingPrint}
+        loadingEmail={loadingEmail}
+      />
+
+      <ConfirmDialog
+        show={emailDialogOpen}
+        onClose={closeEmailDialog}
+        onConfirm={emailReceipt}
+        title="Enviar comprobante por correo"
+        confirmLabel="Enviar comprobante"
+        cancelLabel="Cancelar"
+        tone="info"
+        confirmDisabled={!cleanText(emailDraft)}
+        loading={loadingEmail}
+      >
+        <label htmlFor={`pos-receipt-email-${orderId}`} className="block text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+          Correo del destinatario
+        </label>
+        <div
+          className="mt-2 flex items-center gap-3 rounded-2xl border px-4 py-3 focus-within:ring-2"
+          style={{ borderColor: emailInputError ? '#ef4444' : 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}
+        >
+          <Mail className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+          <input
+            id={`pos-receipt-email-${orderId}`}
+            type="email"
+            autoFocus
+            value={emailDraft}
+            onChange={(event) => {
+              setEmailDraft(event.target.value);
+              if (emailInputError) setEmailInputError('');
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !loadingEmail) emailReceipt();
+            }}
+            placeholder="cliente@correo.com"
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none"
+            style={{ color: 'var(--admin-card-text)' }}
+          />
+        </div>
+        {emailInputError ? <p className="mt-2 text-xs font-bold text-red-600">{emailInputError}</p> : null}
+        <p className="mt-3 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          Se enviará el comprobante de la orden {number} a esta dirección.
+        </p>
+      </ConfirmDialog>
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={loadReceipt} disabled={loadingReceipt}>
+            <ReceiptText className="h-4 w-4" /> {loadingReceipt ? 'Cargando...' : 'Ver'}
+          </Button>
+          <Button variant="ghost" onClick={printReceipt} disabled={loadingPrint}>
+            <Printer className="h-4 w-4" /> {loadingPrint ? 'Abriendo...' : 'Imprimir'}
+          </Button>
+          <Button onClick={openEmailDialog} disabled={loadingEmail}>
+            <Mail className="h-4 w-4" /> {loadingEmail ? 'Enviando...' : 'Enviar'}
+          </Button>
+        </div>
+        {statusMessage ? <p className="text-xs font-black text-emerald-700">{statusMessage}</p> : null}
+        {error ? <p className="text-xs font-bold text-red-700">{error}</p> : null}
+        {overlays}
+      </div>
+    );
+  }
+
   return (
     <>
       <section
@@ -301,56 +393,7 @@ export default function PosReceiptActions({ sale, onClose }) {
         ) : null}
       </section>
 
-      <ReceiptModal
-        receipt={receipt}
-        onClose={() => setReceipt(null)}
-        onPrint={printReceipt}
-        onSendEmail={openEmailDialog}
-        loadingPrint={loadingPrint}
-        loadingEmail={loadingEmail}
-      />
-
-      <ConfirmDialog
-        show={emailDialogOpen}
-        onClose={closeEmailDialog}
-        onConfirm={emailReceipt}
-        title="Enviar comprobante por correo"
-        confirmLabel="Enviar comprobante"
-        cancelLabel="Cancelar"
-        tone="info"
-        confirmDisabled={!cleanText(emailDraft)}
-        loading={loadingEmail}
-      >
-        <label htmlFor="pos-receipt-email" className="block text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
-          Correo del destinatario
-        </label>
-        <div
-          className="mt-2 flex items-center gap-3 rounded-2xl border px-4 py-3 focus-within:ring-2"
-          style={{ borderColor: emailInputError ? '#ef4444' : 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}
-        >
-          <Mail className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
-          <input
-            id="pos-receipt-email"
-            type="email"
-            autoFocus
-            value={emailDraft}
-            onChange={(event) => {
-              setEmailDraft(event.target.value);
-              if (emailInputError) setEmailInputError('');
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !loadingEmail) emailReceipt();
-            }}
-            placeholder="cliente@correo.com"
-            className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none"
-            style={{ color: 'var(--admin-card-text)' }}
-          />
-        </div>
-        {emailInputError ? <p className="mt-2 text-xs font-bold text-red-600">{emailInputError}</p> : null}
-        <p className="mt-3 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-          Se enviará el comprobante de la orden {number} a esta dirección.
-        </p>
-      </ConfirmDialog>
+      {overlays}
     </>
   );
 }

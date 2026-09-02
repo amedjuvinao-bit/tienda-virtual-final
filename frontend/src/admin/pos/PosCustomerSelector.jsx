@@ -103,6 +103,34 @@ function PosCustomerSelectorContent() {
   }, [mode, selectedCustomer, quickCustomer]);
 
   useEffect(() => {
+    const restoreSelection = (event) => {
+      const selection = event?.detail || {};
+      const nextMode = ['guest', 'existing', 'quick'].includes(selection.mode)
+        ? selection.mode
+        : 'guest';
+      const nextSelected = nextMode === 'existing'
+        ? selection.selectedCustomer || null
+        : null;
+      const nextQuick = nextMode === 'quick'
+        ? { ...EMPTY_QUICK_CUSTOMER, ...(selection.quickCustomer || {}) }
+        : EMPTY_QUICK_CUSTOMER;
+
+      setMode(nextMode);
+      setSelectedCustomer(nextSelected);
+      setQuickCustomer(nextQuick);
+      setSearchTerm(nextSelected?.fullName || nextSelected?.displayName || '');
+      setResults([]);
+      setError('');
+      setValidationError('');
+    };
+
+    window.addEventListener('pos:restore-customer-selection', restoreSelection);
+    return () => {
+      window.removeEventListener('pos:restore-customer-selection', restoreSelection);
+    };
+  }, []);
+
+  useEffect(() => {
     const onSaleError = (event) => {
       const message = cleanText(event?.detail?.message || '');
       if (message && isCustomerError(message)) {

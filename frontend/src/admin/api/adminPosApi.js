@@ -96,6 +96,11 @@ function emitPosSaleCreated(data) {
   }));
 }
 
+function emitHeldSalesChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('pos:held-sales-changed'));
+}
+
 function getSelectedPosCustomerPayload(payload = {}) {
   if (payload.customerId || payload.customerMode === 'identified') return payload;
   if (typeof window === 'undefined') return payload;
@@ -180,6 +185,14 @@ function buildQueryParams(params = {}) {
   const queryString = query.toString();
 
   return queryString ? `?${queryString}` : '';
+}
+
+function throwPosOperationsError(error, fallbackMessage) {
+  const message = buildPosApiErrorMessage(error, fallbackMessage);
+  const enhancedError = new Error(message);
+  enhancedError.originalError = error;
+  enhancedError.response = error?.response;
+  throw enhancedError;
 }
 
 async function refreshCashSessionAfterSale(saleData = {}, payload = {}) {
@@ -293,11 +306,88 @@ export async function createPosSale(payload, options = {}) {
   }
 }
 
+export function getCurrentPosCustomerSelection() {
+  if (typeof window === 'undefined') return { mode: 'guest' };
+  const selection = window.__rbPosCustomerSelection || {};
+
+  return {
+    mode: selection.mode || 'guest',
+    selectedCustomer: selection.selectedCustomer || null,
+    quickCustomer: selection.quickCustomer || null,
+  };
+}
+
+export async function getPosHeldSales({ branchId, q = '', limit = 30 } = {}) {
+  try {
+    const queryString = buildQueryParams({ branchId, q, limit });
+    const response = await api.get(`${BASE_URL}/held-sales${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible consultar las ventas en espera.');
+  }
+}
+
+export async function createPosHeldSale(payload = {}) {
+  assertPayload(payload, 'Los datos de la venta en espera son obligatorios.');
+
+  try {
+    const response = await api.post(`${BASE_URL}/held-sales`, payload);
+    emitHeldSalesChanged();
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible guardar la venta en espera.');
+  }
+}
+
+export async function openPosHeldSale(id) {
+  const cleanId = cleanText(id);
+  if (!cleanId) throw new Error('La venta en espera no tiene un identificador válido.');
+
+  try {
+    const response = await api.post(`${BASE_URL}/held-sales/${cleanId}/open`);
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible recuperar la venta en espera.');
+  }
+}
+
+export async function closePosHeldSale(id, { reason = 'discarded', orderId = '' } = {}) {
+  const cleanId = cleanText(id);
+  if (!cleanId) throw new Error('La venta en espera no tiene un identificador válido.');
+
+  try {
+    const response = await api.patch(`${BASE_URL}/held-sales/${cleanId}/close`, {
+      reason,
+      orderId,
+    });
+    emitHeldSalesChanged();
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible cerrar la venta en espera.');
+  }
+}
+
+export async function getPosSalesHistory({ branchId, q = '', limit = 30 } = {}) {
+  try {
+    const queryString = buildQueryParams({ branchId, q, limit });
+    const response = await api.get(`${BASE_URL}/sales/history${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible consultar el historial POS.');
+  }
+}
+
 const adminPosApi = {
   getPosBootstrap,
   getPosProducts,
   previewPosSale,
   createPosSale,
+  getCurrentPosCustomerSelection,
+  getPosHeldSales,
+  createPosHeldSale,
+  openPosHeldSale,
+  closePosHeldSale,
+  getPosSalesHistory,
   buildPosIdempotencyKey,
 };
 

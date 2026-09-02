@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import {
   buildPosIdempotencyKey,
+  closePosHeldSale,
   createPosSale,
   getPosBootstrap,
   getPosProducts,
@@ -30,6 +31,7 @@ import {
 } from '../api/adminPosApi';
 import { getCurrentCashSession } from '../api/adminCashSessionApi';
 import PosCheckoutPanel from './PosCheckoutPanel';
+import PosOperationsPanel from './PosOperationsPanel';
 import PosSaleReviewModal from './PosSaleReviewModal';
 import {
   buildPosCommercialPayload,
@@ -314,6 +316,7 @@ export default function PosSalesPageSafe() {
   const [cashSession, setCashSession] = useState(null);
   const [cashLoading, setCashLoading] = useState(false);
   const [cashError, setCashError] = useState('');
+  const [currentHeldSaleId, setCurrentHeldSaleId] = useState('');
   const saleAttemptKeyRef = useRef('');
 
   const branches = useMemo(() => (Array.isArray(bootstrap?.branches) ? bootstrap.branches : []), [bootstrap]);
@@ -354,6 +357,66 @@ export default function PosSalesPageSafe() {
     setSaleSuccess('');
     setCheckoutErrors({});
     setSaleReview(null);
+  };
+
+  const restoreCustomerSelection = (selection = { mode: 'guest' }) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('pos:restore-customer-selection', {
+      detail: selection,
+    }));
+  };
+
+  const clearCurrentSale = ({ resetCustomer = true } = {}) => {
+    setCartItems([]);
+    setPaymentDetails(createInitialPaymentDetails());
+    setDiscount(createInitialDiscount());
+    setCheckoutErrors({});
+    setSaleReview(null);
+    setCurrentHeldSaleId('');
+    saleAttemptKeyRef.current = '';
+    if (resetCustomer) restoreCustomerSelection({ mode: 'guest' });
+  };
+
+  const holdCurrentSale = (heldSale) => {
+    clearCurrentSale();
+    setSaleError('');
+    setSaleSuccess(`Venta ${heldSale?.code || ''} guardada en espera. El puesto quedó listo para una nueva venta.`);
+  };
+
+  const restoreHeldSale = (heldSale = {}) => {
+    const restoredItems = Array.isArray(heldSale.items)
+      ? heldSale.items.map((item) => ({
+          ...item,
+          cartKey: rowKey(item),
+          quantity: Math.max(1, Number(item.quantity || 1)),
+          availableStock: Math.max(Number(item.availableStock || 0), Number(item.quantity || 1)),
+          price: Number(item.price ?? item.unitPrice ?? 0),
+        }))
+      : [];
+
+    setCartItems(restoredItems);
+    setPaymentMethod(heldSale.paymentMethod || 'cash');
+    setPaymentDetails({
+      ...createInitialPaymentDetails(),
+      ...(heldSale.paymentDetails || {}),
+      splitPayments: Array.isArray(heldSale.paymentDetails?.splitPayments)
+        ? heldSale.paymentDetails.splitPayments.map((split, index) => ({
+            ...split,
+            id: split.id || `restored-${index}-${split.method || 'payment'}`,
+          }))
+        : createInitialPaymentDetails().splitPayments,
+    });
+    setDiscount({
+      ...createInitialDiscount(),
+      ...(heldSale.discount || {}),
+    });
+    setCurrentHeldSaleId(heldSale.id || '');
+    setCheckoutErrors({});
+    setSaleReview(null);
+    setSaleError('');
+    setSaleSuccess(`Venta ${heldSale.code || ''} recuperada. Revisa los datos y el stock antes de cobrar.`);
+    saleAttemptKeyRef.current = '';
+    restoreCustomerSelection(heldSale.customerSelection || { mode: 'guest' });
   };
 
   const loadCashSession = async (nextBranchId = branchId) => {
@@ -484,6 +547,19 @@ export default function PosSalesPageSafe() {
       setSaleSuccess('');
       const data = await createPosSale(saleReview.payload, { idempotencyKey });
 
+      let heldSaleCloseWarning = '';
+      if (currentHeldSaleId) {
+        try {
+          await closePosHeldSale(currentHeldSaleId, {
+            reason: 'sold',
+            orderId: data?.order?._id || data?.order?.id || '',
+          });
+        } catch (closeError) {
+          console.warn('[PosSalesPage] La venta se creó, pero no se cerró su espera:', closeError?.message || closeError);
+          heldSaleCloseWarning = ' La venta fue cobrada, pero debes descartar manualmente su registro en espera.';
+        }
+      }
+
       setProducts((prev) => prev.map((product) => {
         const sold = soldItems.find((item) => item.cartKey === rowKey(product));
         if (!sold) return product;
@@ -494,14 +570,9 @@ export default function PosSalesPageSafe() {
       if (data?.cashSession) setCashSession(data.cashSession);
       else await loadCashSession(branchId);
 
-      setCartItems([]);
-      setPaymentDetails(createInitialPaymentDetails());
-      setDiscount(createInitialDiscount());
-      setCheckoutErrors({});
-      setSaleReview(null);
-      saleAttemptKeyRef.current = '';
+      clearCurrentSale();
       const number = orderNumber(data?.order || {});
-      setSaleSuccess(number ? `Venta POS creada correctamente. Orden ${number}.` : 'Venta POS creada correctamente.');
+      setSaleSuccess(number ? `Venta POS creada correctamente. Orden ${number}.${heldSaleCloseWarning}` : `Venta POS creada correctamente.${heldSaleCloseWarning}`);
     } catch (err) {
       setSaleError(err?.message || 'No fue posible confirmar la venta POS.');
       setSaleReview(null);
@@ -539,6 +610,8 @@ export default function PosSalesPageSafe() {
     setSaleReview(null);
     setSaleError('');
     setSaleSuccess('');
+    setCurrentHeldSaleId('');
+    restoreCustomerSelection({ mode: 'guest' });
     if (branchId && !loading) loadCashSession(branchId);
   }, [branchId]);
 
@@ -609,6 +682,21 @@ export default function PosSalesPageSafe() {
             required={cashSessionRequired}
             branchName={selectedBranch?.name || ''}
             onRefresh={() => loadCashSession(branchId)}
+          />
+
+          <PosOperationsPanel
+            branchId={branchId}
+            branchName={selectedBranch?.name || ''}
+            cartItems={cartItems}
+            paymentMethod={paymentMethod}
+            paymentDetails={paymentDetails}
+            discount={discount}
+            permissions={permissions}
+            currentHeldSaleId={currentHeldSaleId}
+            disabled={saleLoading || reviewLoading}
+            onHeld={holdCurrentSale}
+            onRestore={restoreHeldSale}
+            onDiscardCurrent={() => clearCurrentSale()}
           />
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
