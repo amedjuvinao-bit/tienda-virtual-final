@@ -92,6 +92,8 @@ async function main() {
 
   try {
     const scenario = await seedScenario();
+    assert.equal(scenario.product.trackInventory, true);
+    assert.equal(scenario.product.allowBackorder, false);
     const session = await mongoose.startSession();
     let result;
 
@@ -152,6 +154,7 @@ async function main() {
     }
 
     const order = await Order.findById(result.order._id).lean();
+    assert.equal(result.movements.length, 1);
     assert.equal(order.total, 90000);
     assert.equal(order.discount.amount, 10000);
     assert.equal(order.discount.reason, 'Fidelización CI');
