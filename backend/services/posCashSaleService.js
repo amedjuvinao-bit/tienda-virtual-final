@@ -122,7 +122,9 @@ async function createPosSaleWithCashSession(payload = {}, options = {}) {
         cashResolution.registerCode,
         { session }
       );
-      result.cashSession = await recalculateCashSession(cashResolution.cashSession, { session });
+      // Recargar por ID dentro de la transacción evita guardar una instancia
+      // anterior al alta de la orden y conserva el control optimista de versión.
+      result.cashSession = await recalculateCashSession(cashResolution.cashSession._id, { session });
     } else {
       result.cashSession = null;
     }
