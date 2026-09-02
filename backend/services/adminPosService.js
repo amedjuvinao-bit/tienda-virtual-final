@@ -514,7 +514,7 @@ function normalizePosBilling(billing = {}) {
   };
 }
 
-function normalizePosPayload(payload = {}) {
+function normalizePosPayload(payload = {}, { deferPaymentValidation = false } = {}) {
   const branchId = getObjectIdValue(payload.branchId || payload.branch || payload.sede);
   const rawItems = Array.isArray(payload.items)
     ? payload.items
@@ -528,7 +528,9 @@ function normalizePosPayload(payload = {}) {
     taxes: payload.taxes,
   });
 
-  const payment = normalizePaymentPayload(payload.payment || {}, calculated.total);
+  const payment = deferPaymentValidation
+    ? null
+    : normalizePaymentPayload(payload.payment || {}, calculated.total);
   const requestedCustomerMode = cleanLower(payload.customerMode || payload.pos?.customerMode || '', 40);
   const customerId = normalizeCustomerIdFromPayload(payload);
   const customerSnapshot = normalizePosCustomer(payload.customer || {});
@@ -1471,7 +1473,9 @@ async function syncProductTotalStock(productId, { session = null } = {}) {
 
 async function preparePosSalePreview(payload = {}, options = {}) {
   const session = options.session || null;
-  const normalizedPayload = normalizePosPayload(payload);
+  // Los precios enviados por el navegador no son autoritativos. La validación
+  // del pago se difiere hasta recalcular el total con producto e inventario.
+  const normalizedPayload = normalizePosPayload(payload, { deferPaymentValidation: true });
   const branch = await validatePosBranch(normalizedPayload.branchId, { session });
   const validatedItems = await loadAndValidatePosItems(normalizedPayload.items, branch, { session });
   const recalculated = calculateTotalsFromNormalizedItems({
