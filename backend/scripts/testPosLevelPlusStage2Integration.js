@@ -54,19 +54,25 @@ async function seedScenario() {
     variantAxes: [],
     variants: [],
   });
-  const stock = await InventoryStock.create({
+  const stock = await InventoryStock.findOne({
     branch: branch._id,
-    branchSnapshot: { name: branch.name, code: branch.code, type: branch.type },
     product: product._id,
-    productSnapshot: { title: product.title, sku: product.sku },
     variantKey: 'default__default',
-    variant: { label: 'Sin variante', size: '', color: '' },
-    stock: 5,
-    reservedStock: 0,
-    availableStock: 5,
-    active: true,
     deletedAt: null,
+  }) || new InventoryStock({
+    branch: branch._id,
+    product: product._id,
+    variantKey: 'default__default',
   });
+  stock.branchSnapshot = { name: branch.name, code: branch.code, type: branch.type };
+  stock.productSnapshot = { title: product.title, sku: product.sku };
+  stock.variant = { label: 'Sin variante', size: '', color: '' };
+  stock.stock = 5;
+  stock.reservedStock = 0;
+  stock.availableStock = 5;
+  stock.active = true;
+  stock.deletedAt = null;
+  await stock.save();
   const cashSession = await CashSession.create({
     sessionCode: 'CAJA-STAGE2-CI-0001',
     branch: branch._id,
