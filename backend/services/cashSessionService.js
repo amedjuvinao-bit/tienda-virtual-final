@@ -70,7 +70,16 @@ async function saveCashSession(session, options = {}) {
       ? await session.save({ session: options.session })
       : await session.save();
   } catch (error) {
-    if (isCashConcurrencyError(error)) throw cashConcurrencyError();
+    if (isCashConcurrencyError(error)) {
+      if (
+        options.session &&
+        typeof error?.hasErrorLabel === 'function' &&
+        error.hasErrorLabel('TransientTransactionError')
+      ) {
+        throw error;
+      }
+      throw cashConcurrencyError();
+    }
     throw error;
   }
 }
@@ -388,10 +397,46 @@ async function recalculateCashSession(sessionOrId, options = {}) {
   const refunds = await refundsQuery;
 
   session.salesSummary = buildCashSessionSalesSummary(orders, refunds);
+  await session.validate();
 
-  await saveCashSession(session, { session: dbSession });
+  const currentVersion = Number(session.__v || 0);
+  const salesSummary = session.salesSummary?.toObject
+    ? session.salesSummary.toObject({ depopulate: true })
+    : session.salesSummary;
+  let updatedSession;
 
-  return session;
+  try {
+    updatedSession = await CashSession.findOneAndUpdate(
+      { _id: session._id, __v: currentVersion },
+      {
+        $set: {
+          salesSummary,
+          expectedCash: session.expectedCash,
+        },
+        $inc: { __v: 1 },
+      },
+      {
+        new: true,
+        runValidators: true,
+        session: dbSession,
+      }
+    );
+  } catch (error) {
+    if (
+      dbSession &&
+      isCashConcurrencyError(error) &&
+      typeof error?.hasErrorLabel === 'function' &&
+      error.hasErrorLabel('TransientTransactionError')
+    ) {
+      throw error;
+    }
+    if (isCashConcurrencyError(error)) throw cashConcurrencyError();
+    throw error;
+  }
+
+  if (!updatedSession) throw cashConcurrencyError();
+
+  return updatedSession;
 }
 
 async function getCurrentCashSession({
