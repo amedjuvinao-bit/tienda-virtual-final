@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPosShiftReportCsv,
+  formatPosReportDateTime,
   getPaymentRows,
   getPosReportStatus,
+  getPosShiftReportFilename,
   POS_REPORT_RANGES,
 } from './posShiftReportModel';
 
@@ -55,5 +57,24 @@ describe('posShiftReportModel', () => {
     expect(csv).toContain('"Venta neta";"68500"');
     expect(csv).toContain('"Efectivo esperado";"97500"');
     expect(csv).toContain('"Facturas pendientes";"1"');
+  });
+
+  it('exporta fechas y nombre de archivo con el día vigente en Colombia', () => {
+    const colombiaNightReport = {
+      ...report,
+      generatedAt: '2026-09-03T02:12:30.553Z',
+      period: {
+        start: '2026-07-07T03:47:35.479Z',
+        end: '2026-09-03T02:12:30.553Z',
+        timezone: 'America/Bogota',
+      },
+    };
+    const csv = buildPosShiftReportCsv(colombiaNightReport);
+
+    expect(formatPosReportDateTime(colombiaNightReport.generatedAt)).toBe('2026-09-02 21:12:30');
+    expect(csv).toContain('"Periodo desde";"2026-07-06 22:47:35"');
+    expect(csv).toContain('"Periodo hasta";"2026-09-02 21:12:30"');
+    expect(csv).toContain('"Generado";"2026-09-02 21:12:30"');
+    expect(getPosShiftReportFilename(colombiaNightReport)).toBe('jornada-pos-principal-2026-09-02.csv');
   });
 });
