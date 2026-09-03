@@ -985,6 +985,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Registrar un movimiento en una caja autorizada.',
     audit: true,
   },
+  {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/:id/movements/:movementId/review',
+    permission: 'pos:sell',
+    description: 'Aprobar o rechazar un movimiento pendiente como supervisor de caja.',
+    audit: true,
+  },
 
   /* =========================================================
    * CONFIGURACIÓN / APARIENCIA / SITE SETTINGS

@@ -10,6 +10,7 @@ import {
   getCurrentCashSession,
   listCashSessions,
   openCashSession,
+  reviewCashMovement,
 } from '../api/adminCashSessionApi';
 import CashSessionsPageReport from './CashSessionsPageReport';
 
@@ -24,6 +25,7 @@ vi.mock('../api/adminCashSessionApi', () => ({
   getCurrentCashSession: vi.fn(),
   listCashSessions: vi.fn(),
   openCashSession: vi.fn(),
+  reviewCashMovement: vi.fn(),
 }));
 
 const branch = {
@@ -65,6 +67,7 @@ beforeEach(() => {
     session: { ...openSession, status: 'closed', countedCash: 78500, differenceAmount: 0 },
   });
   getCashSessionById.mockResolvedValue({ session: openSession });
+  reviewCashMovement.mockResolvedValue({ session: openSession });
 });
 
 afterEach(() => {

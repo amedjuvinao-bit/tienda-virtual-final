@@ -15,6 +15,16 @@ const CASH_MOVEMENT_TYPES = [
   'adjustment',
   'closing',
 ];
+const CASH_MOVEMENT_APPROVAL_STATUSES = [
+  'not_required',
+  'pending',
+  'approved',
+  'rejected',
+];
+
+function isAppliedCashMovement(movement = {}) {
+  return !['pending', 'rejected'].includes(cleanLower(movement.approvalStatus));
+}
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -121,9 +131,21 @@ const CashMovementSchema = new mongoose.Schema(
     },
     reason: { type: String, trim: true, maxlength: 300, default: '' },
     reference: { type: String, trim: true, maxlength: 120, default: '' },
+    approvalRequired: { type: Boolean, default: false },
+    approvalStatus: {
+      type: String,
+      enum: CASH_MOVEMENT_APPROVAL_STATUSES,
+      default: 'not_required',
+      trim: true,
+      lowercase: true,
+    },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
     createdBySnapshot: { type: AdminSnapshotSchema, default: () => ({}) },
     createdAt: { type: Date, default: Date.now },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
+    reviewedBySnapshot: { type: AdminSnapshotSchema, default: () => ({}) },
+    reviewedAt: { type: Date, default: null },
+    reviewNotes: { type: String, trim: true, maxlength: 300, default: '' },
   },
   { _id: true }
 );
@@ -348,11 +370,13 @@ CashSessionSchema.pre('validate', function beforeValidate(next) {
       this.salesSummary.paymentTotals.total = paymentTotal;
     }
 
-    const cashMovementsIn = this.cashMovements
+    const appliedMovements = this.cashMovements.filter(isAppliedCashMovement);
+
+    const cashMovementsIn = appliedMovements
       .filter((movement) => movement.direction === 'in')
       .reduce((total, movement) => total + cleanMoney(movement.amount), 0);
 
-    const cashMovementsOut = this.cashMovements
+    const cashMovementsOut = appliedMovements
       .filter((movement) => movement.direction === 'out')
       .reduce((total, movement) => total + cleanMoney(movement.amount), 0);
 
@@ -423,8 +447,14 @@ CashSessionSchema.methods.addCashMovement = function addCashMovement(movement = 
     direction: cleanLower(movement.direction || 'neutral'),
     reason: cleanText(movement.reason || ''),
     reference: cleanText(movement.reference || ''),
+    approvalRequired: movement.approvalRequired === true,
+    approvalStatus: cleanLower(movement.approvalStatus || 'not_required'),
     createdBy: movement.createdBy || null,
     createdBySnapshot: movement.createdBySnapshot || {},
+    reviewedBy: movement.reviewedBy || null,
+    reviewedBySnapshot: movement.reviewedBySnapshot || {},
+    reviewedAt: movement.reviewedAt || null,
+    reviewNotes: cleanText(movement.reviewNotes || ''),
   });
 
   return this;
@@ -444,6 +474,10 @@ CashSessionSchema.statics.getMovementTypes = function getMovementTypes() {
   return [...CASH_MOVEMENT_TYPES];
 };
 
+CashSessionSchema.statics.getMovementApprovalStatuses = function getMovementApprovalStatuses() {
+  return [...CASH_MOVEMENT_APPROVAL_STATUSES];
+};
+
 CashSessionSchema.statics.buildSessionCode = buildSessionCode;
 
 CashSessionSchema.set('toJSON', {
@@ -460,4 +494,8 @@ CashSessionSchema.set('toObject', {
   versionKey: false,
 });
 
-module.exports = mongoose.models.CashSession || mongoose.model('CashSession', CashSessionSchema);
+const CashSession = mongoose.models.CashSession || mongoose.model('CashSession', CashSessionSchema);
+
+CashSession.isAppliedCashMovement = isAppliedCashMovement;
+
+module.exports = CashSession;

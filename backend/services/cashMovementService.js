@@ -94,6 +94,10 @@ function assertMovementDoesNotOverdrawCash(session, { amount, type, direction })
   }
 }
 
+function movementRequiresSupervisorApproval({ direction } = {}, options = {}) {
+  return direction === 'out' && options.canSupervise !== true;
+}
+
 async function addManualCashMovement(sessionId, payload = {}, options = {}) {
   const admin = options.admin || {};
   const session = await CashSession.findOne(
@@ -133,7 +137,11 @@ async function addManualCashMovement(sessionId, payload = {}, options = {}) {
     options
   );
   const recalculatedSession = await recalculateCashSession(session);
-  assertMovementDoesNotOverdrawCash(recalculatedSession, { amount, type, direction });
+  const approvalRequired = movementRequiresSupervisorApproval({ type, direction }, options);
+
+  if (!approvalRequired) {
+    assertMovementDoesNotOverdrawCash(recalculatedSession, { amount, type, direction });
+  }
 
   recalculatedSession.addCashMovement({
     type,
@@ -143,13 +151,110 @@ async function addManualCashMovement(sessionId, payload = {}, options = {}) {
     reference: cleanText(payload.reference || '', 120),
     createdBy: adminObjectId || null,
     createdBySnapshot: buildAdminSnapshot(admin),
+    approvalRequired,
+    approvalStatus: approvalRequired ? 'pending' : 'not_required',
   });
 
   await saveCashSession(recalculatedSession);
+  const movement = recalculatedSession.cashMovements.at(-1);
+  recalculatedSession.$locals.cashMovementOutcome = {
+    movementId: String(movement?._id || ''),
+    approvalRequired,
+    approvalStatus: movement?.approvalStatus || 'not_required',
+  };
+  return recalculatedSession;
+}
+
+async function reviewCashMovement(sessionId, movementId, payload = {}, options = {}) {
+  if (options.canSupervise !== true) {
+    throw createCashError(
+      'Solo un supervisor de caja puede aprobar o rechazar este movimiento.',
+      'CASH_MOVEMENT_REVIEW_FORBIDDEN',
+      403
+    );
+  }
+
+  const session = await CashSession.findOne(
+    buildScopedCashSessionFilter(sessionId, options)
+  );
+
+  if (!session) {
+    throw createCashError(
+      'Caja no encontrada dentro de tus sedes autorizadas.',
+      'CASH_SESSION_NOT_FOUND',
+      404
+    );
+  }
+
+  if (session.status !== 'open') {
+    throw createCashError(
+      'Los movimientos solo pueden revisarse mientras la caja está abierta.',
+      'CASH_SESSION_NOT_OPEN',
+      409
+    );
+  }
+
+  const decision = cleanLower(payload.decision, 20);
+  if (!['approve', 'reject'].includes(decision)) {
+    throw createCashError(
+      'La decisión debe ser aprobar o rechazar.',
+      'CASH_MOVEMENT_REVIEW_DECISION_INVALID',
+      400
+    );
+  }
+
+  const reviewNotes = cleanText(payload.reviewNotes || payload.notes || '', 300);
+  if (decision === 'reject' && !reviewNotes) {
+    throw createCashError(
+      'Debes indicar el motivo del rechazo.',
+      'CASH_MOVEMENT_REVIEW_NOTES_REQUIRED',
+      400
+    );
+  }
+
+  const recalculatedSession = await recalculateCashSession(session);
+  const movement = recalculatedSession.cashMovements.id(toObjectId(movementId));
+
+  if (!movement) {
+    throw createCashError(
+      'El movimiento indicado no existe en esta caja.',
+      'CASH_MOVEMENT_NOT_FOUND',
+      404
+    );
+  }
+
+  if (movement.approvalStatus !== 'pending') {
+    throw createCashError(
+      'Este movimiento ya fue revisado y no admite una segunda decisión.',
+      'CASH_MOVEMENT_ALREADY_REVIEWED',
+      409,
+      { approvalStatus: movement.approvalStatus }
+    );
+  }
+
+  if (decision === 'approve') {
+    assertMovementDoesNotOverdrawCash(recalculatedSession, movement);
+  }
+
+  const adminObjectId = toObjectId(options.admin?.id || options.admin?._id || options.admin?.adminUserId);
+  movement.approvalStatus = decision === 'approve' ? 'approved' : 'rejected';
+  movement.reviewedBy = adminObjectId || null;
+  movement.reviewedBySnapshot = buildAdminSnapshot(options.admin || {});
+  movement.reviewedAt = new Date();
+  movement.reviewNotes = reviewNotes;
+
+  await saveCashSession(recalculatedSession);
+  recalculatedSession.$locals.cashMovementOutcome = {
+    movementId: String(movement._id),
+    approvalRequired: true,
+    approvalStatus: movement.approvalStatus,
+  };
   return recalculatedSession;
 }
 
 module.exports = {
   MOVEMENT_CONFIG,
   addManualCashMovement,
+  movementRequiresSupervisorApproval,
+  reviewCashMovement,
 };

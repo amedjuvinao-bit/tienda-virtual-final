@@ -6,15 +6,20 @@ import {
   Banknote,
   Building2,
   CheckCircle2,
+  Clock3,
   CreditCard,
+  EyeOff,
   FileText,
   History,
   LockKeyhole,
   Printer,
   RefreshCw,
+  ShieldCheck,
   Smartphone,
   UnlockKeyhole,
+  UserCheck,
   Wallet,
+  XCircle,
 } from 'lucide-react';
 
 import { getPosBootstrap } from '../api/adminPosApi';
@@ -25,6 +30,7 @@ import {
   getCurrentCashSession,
   listCashSessions,
   openCashSession,
+  reviewCashMovement,
 } from '../api/adminCashSessionApi';
 
 const REGISTER_CODE = 'CAJA POS';
@@ -34,6 +40,7 @@ const MOVEMENT_TYPES = [
   { key: 'cash_out', label: 'Salida manual', note: 'Resta del efectivo esperado' },
   { key: 'expense', label: 'Gasto pequeño', note: 'Resta del efectivo esperado' },
   { key: 'withdrawal', label: 'Retiro de efectivo', note: 'Resta del efectivo esperado' },
+  { key: 'adjustment_out', type: 'adjustment', direction: 'out', label: 'Ajuste negativo', note: 'Requiere aprobación y resta del efectivo esperado' },
   { key: 'adjustment', label: 'Ajuste informativo', note: 'No cambia el efectivo esperado' },
 ];
 
@@ -45,6 +52,10 @@ const moneyFormatter = new Intl.NumberFormat('es-CO', {
 
 function money(value) {
   return moneyFormatter.format(Number(value || 0));
+}
+
+function visibleMoney(value, hiddenLabel = 'Oculto') {
+  return value === null || value === undefined ? hiddenLabel : money(value);
 }
 
 function clean(value) {
@@ -69,7 +80,9 @@ function paymentTotals(session) {
   return session?.salesSummary?.paymentTotals || {};
 }
 
-function movementLabel(type) {
+function movementLabel(type, direction = '') {
+  if (type === 'adjustment' && direction === 'out') return 'Ajuste negativo';
+  if (type === 'adjustment' && direction === 'in') return 'Ajuste positivo';
   const found = MOVEMENT_TYPES.find((item) => item.key === type);
   if (found) return found.label;
   if (type === 'opening') return 'Apertura';
@@ -101,9 +114,26 @@ function getMovements(session) {
   return Array.isArray(session?.cashMovements) ? session.cashMovements : [];
 }
 
+function isAppliedMovement(movement) {
+  return !['pending', 'rejected'].includes(movement?.approvalStatus);
+}
+
+function movementApprovalLabel(movement) {
+  if (movement?.approvalStatus === 'pending') return 'Pendiente de aprobación';
+  if (movement?.approvalStatus === 'approved') return 'Aprobado';
+  if (movement?.approvalStatus === 'rejected') return 'Rechazado';
+  return 'Aplicado';
+}
+
+function movementApprovalColors(movement) {
+  if (movement?.approvalStatus === 'pending') return { background: '#fffbeb', color: '#b45309', borderColor: '#fde68a' };
+  if (movement?.approvalStatus === 'rejected') return { background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' };
+  return { background: '#ecfdf5', color: '#047857', borderColor: '#bbf7d0' };
+}
+
 function sumMovements(session, direction) {
   return getMovements(session)
-    .filter((movement) => movement.direction === direction)
+    .filter((movement) => movement.direction === direction && isAppliedMovement(movement))
     .reduce((total, movement) => total + Number(movement.amount || 0), 0);
 }
 
@@ -117,9 +147,13 @@ function buildReportHtml(session) {
   const rows = movements
     .map((movement) => `
       <tr>
-        <td>${escapeHtml(movementLabel(movement.type))}</td>
+        <td>${escapeHtml(movementLabel(movement.type, movement.direction))}</td>
         <td>${escapeHtml(movement.reason || 'Sin motivo')}</td>
         <td>${escapeHtml(movement.reference || '—')}</td>
+        <td>
+          ${escapeHtml(movementApprovalLabel(movement))}
+          ${movement.reviewedAt ? `<div class="muted">${escapeHtml(movement.reviewedBySnapshot?.displayName || 'Supervisor')} · ${escapeHtml(formatDate(movement.reviewedAt))}${movement.reviewNotes ? ` · ${escapeHtml(movement.reviewNotes)}` : ''}</div>` : ''}
+        </td>
         <td>${escapeHtml(formatDate(movement.createdAt))}</td>
         <td class="right ${movement.direction === 'out' ? 'red' : movement.direction === 'in' ? 'green' : ''}">${escapeHtml(movementAmountText(movement))}</td>
       </tr>
@@ -165,14 +199,14 @@ function buildReportHtml(session) {
     <div class="grid">
       <div class="box"><div class="label">Apertura</div><div class="value">${escapeHtml(money(session?.openingAmount))}</div></div>
       <div class="box"><div class="label">Ventas POS</div><div class="value">${escapeHtml(money(session?.salesSummary?.netSales))}</div></div>
-      <div class="box"><div class="label">Esperado</div><div class="value">${escapeHtml(money(session?.expectedCash))}</div></div>
-      <div class="box"><div class="label">Diferencia</div><div class="value">${escapeHtml(money(session?.differenceAmount))}</div></div>
+      <div class="box"><div class="label">Esperado</div><div class="value">${escapeHtml(visibleMoney(session?.expectedCash))}</div></div>
+      <div class="box"><div class="label">Diferencia</div><div class="value">${escapeHtml(visibleMoney(session?.differenceAmount))}</div></div>
     </div>
 
     <h2>Datos de apertura y cierre</h2>
     <table>
       <tr><th>Apertura</th><th>Cierre</th><th>Estado</th><th>Contado</th></tr>
-      <tr><td>${escapeHtml(formatDate(session?.openedAt))}</td><td>${escapeHtml(formatDate(session?.closedAt))}</td><td>${escapeHtml(session?.status || '')}</td><td class="right">${escapeHtml(money(session?.countedCash))}</td></tr>
+      <tr><td>${escapeHtml(formatDate(session?.openedAt))}</td><td>${escapeHtml(formatDate(session?.closedAt))}</td><td>${escapeHtml(session?.status || '')}</td><td class="right">${escapeHtml(visibleMoney(session?.countedCash))}</td></tr>
     </table>
 
     <h2>Ventas y pagos</h2>
@@ -181,10 +215,10 @@ function buildReportHtml(session) {
       <tr>
         <td>${escapeHtml(session?.salesSummary?.ordersCount || 0)}</td>
         <td>${escapeHtml(session?.salesSummary?.itemsCount || 0)}</td>
-        <td class="right">${escapeHtml(money(totals.cash))}</td>
-        <td class="right">${escapeHtml(money(totals.transfer))}</td>
-        <td class="right">${escapeHtml(money(totals.card))}</td>
-        <td class="right">${escapeHtml(money(session?.salesSummary?.netSales))}</td>
+        <td class="right">${escapeHtml(visibleMoney(totals.cash))}</td>
+        <td class="right">${escapeHtml(visibleMoney(totals.transfer))}</td>
+        <td class="right">${escapeHtml(visibleMoney(totals.card))}</td>
+        <td class="right">${escapeHtml(visibleMoney(session?.salesSummary?.netSales))}</td>
       </tr>
     </table>
 
@@ -196,8 +230,8 @@ function buildReportHtml(session) {
       <div class="box"><div class="label">Generado</div><div class="value" style="font-size:12px">${escapeHtml(formatDate(new Date()))}</div></div>
     </div>
     <table>
-      <tr><th>Tipo</th><th>Motivo</th><th>Referencia</th><th>Fecha</th><th class="right">Valor</th></tr>
-      ${rows || '<tr><td colspan="5">Sin movimientos registrados.</td></tr>'}
+      <tr><th>Tipo</th><th>Motivo</th><th>Referencia</th><th>Estado</th><th>Fecha</th><th class="right">Valor</th></tr>
+      ${rows || '<tr><td colspan="6">Sin movimientos registrados.</td></tr>'}
     </table>
 
     <div class="footer">
@@ -352,29 +386,56 @@ function SessionStats({ session }) {
   const totals = paymentTotals(session);
   const difference = Number(session?.differenceAmount || 0);
   const differenceLabel = difference > 0 ? 'Sobrante' : difference < 0 ? 'Faltante' : 'Sin diferencia';
+  const blindCountActive = session?.cashControl?.blindCountActive === true;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={Banknote} label="Efectivo esperado" value={money(session?.expectedCash)} helper="Monto esperado al cierre" />
+        <Stat icon={blindCountActive ? EyeOff : Banknote} label="Efectivo esperado" value={visibleMoney(session?.expectedCash)} helper={blindCountActive ? 'Se revelará después del cierre' : 'Monto esperado al cierre'} />
         <Stat icon={Wallet} label="Ventas" value={String(session?.salesSummary?.ordersCount || 0)} helper="Órdenes POS asociadas" />
-        <Stat icon={CreditCard} label="Total vendido" value={money(session?.salesSummary?.netSales)} helper="Ventas netas" />
-        <Stat icon={LockKeyhole} label={differenceLabel} value={money(Math.abs(difference))} helper="Diferencia al cerrar" />
+        <Stat icon={CreditCard} label="Total vendido" value={visibleMoney(session?.salesSummary?.netSales)} helper={blindCountActive ? 'Protegido durante el arqueo' : 'Ventas netas'} />
+        <Stat icon={LockKeyhole} label={blindCountActive ? 'Diferencia' : differenceLabel} value={blindCountActive ? 'Pendiente' : money(Math.abs(difference))} helper="Se calcula al cerrar" />
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={Banknote} label="Efectivo" value={money(totals.cash)} />
-        <Stat icon={Smartphone} label="Transferencia" value={money(totals.transfer)} />
-        <Stat icon={CreditCard} label="Tarjeta" value={money(totals.card)} />
-        <Stat icon={Wallet} label="Otros pagos" value={money((totals.mixed || 0) + (totals.other || 0))} />
+        <Stat icon={Banknote} label="Efectivo" value={visibleMoney(totals.cash)} />
+        <Stat icon={Smartphone} label="Transferencia" value={visibleMoney(totals.transfer)} />
+        <Stat icon={CreditCard} label="Tarjeta" value={visibleMoney(totals.card)} />
+        <Stat icon={Wallet} label="Otros pagos" value={blindCountActive ? 'Oculto' : money((totals.mixed || 0) + (totals.other || 0))} />
       </div>
     </div>
   );
 }
 
-function MovementsBox({ session, form, setForm, disabled, onSubmit }) {
+function ProfessionalControlBanner({ session }) {
+  const control = session?.cashControl || {};
+  const pending = Number(control.pendingMovementsCount || 0);
+  const blind = control.blindCountActive === true;
+
+  return (
+    <div className="mb-5 grid gap-3 lg:grid-cols-2">
+      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: blind ? '#bfdbfe' : '#bbf7d0', background: blind ? '#eff6ff' : '#ecfdf5', color: blind ? '#1d4ed8' : '#047857' }}>
+        {blind ? <EyeOff className="mt-0.5 h-5 w-5 shrink-0" /> : <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />}
+        <div>
+          <p className="text-sm font-black">{blind ? 'Conteo ciego activo' : 'Vista de supervisión'}</p>
+          <p className="mt-1 text-xs font-bold">{blind ? 'El esperado y los totales monetarios se revelan al cerrar.' : 'Puedes consultar el esperado y revisar solicitudes del cajero.'}</p>
+        </div>
+      </div>
+      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: pending ? '#fde68a' : '#bbf7d0', background: pending ? '#fffbeb' : '#ecfdf5', color: pending ? '#b45309' : '#047857' }}>
+        {pending ? <Clock3 className="mt-0.5 h-5 w-5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
+        <div>
+          <p className="text-sm font-black">{pending ? `${pending} movimiento(s) por revisar` : 'Sin aprobaciones pendientes'}</p>
+          <p className="mt-1 text-xs font-bold">{pending ? 'La caja no podrá cerrarse hasta resolverlos.' : 'El cierre está libre de solicitudes abiertas.'}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MovementsBox({ session, form, setForm, disabled, onSubmit, onReview }) {
   const movements = getMovements(session).slice().reverse().slice(0, 8);
   const selectedType = MOVEMENT_TYPES.find((item) => item.key === form.type) || MOVEMENT_TYPES[0];
+  const canReview = session?.cashControl?.canReviewMovements === true;
 
   return (
     <div className="mt-5 rounded-3xl border p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
@@ -410,22 +471,74 @@ function MovementsBox({ session, form, setForm, disabled, onSubmit }) {
         ) : (
           <div className="divide-y" style={{ borderColor: 'var(--admin-card-border)' }}>
             {movements.map((movement, index) => (
-              <div key={movement._id || `${movement.type}-${movement.createdAt}-${index}`} className="grid gap-3 p-4 md:grid-cols-[1fr_160px_140px] md:items-center">
+              <div key={movement._id || `${movement.type}-${movement.createdAt}-${index}`} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_170px_140px_auto] md:items-center">
                 <div>
-                  <p className="text-sm font-black">{movementLabel(movement.type)}</p>
+                  <p className="text-sm font-black">{movementLabel(movement.type, movement.direction)}</p>
                   <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
                     {movement.reason || 'Sin motivo'}{movement.reference ? ` · Ref: ${movement.reference}` : ''}
                   </p>
+                  {movement.reviewedAt ? (
+                    <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                      Revisó {movement.reviewedBySnapshot?.displayName || 'Supervisor'} · {formatDate(movement.reviewedAt)}{movement.reviewNotes ? ` · ${movement.reviewNotes}` : ''}
+                    </p>
+                  ) : null}
                 </div>
-                <p className="text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(movement.createdAt)}</p>
+                <div>
+                  <span className="inline-flex rounded-full border px-3 py-1 text-xs font-black" style={movementApprovalColors(movement)}>{movementApprovalLabel(movement)}</span>
+                  <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(movement.createdAt)}</p>
+                </div>
                 <p className="text-right text-sm font-black" style={{ color: movement.direction === 'out' ? '#b91c1c' : movement.direction === 'in' ? '#047857' : 'var(--admin-card-text)' }}>
                   {movementAmountText(movement)}
                 </p>
+                <div className="flex min-w-[150px] justify-end gap-2">
+                  {movement.approvalStatus === 'pending' && canReview ? (
+                    <>
+                      <button type="button" disabled={disabled} onClick={() => onReview(movement, 'approve')} className="rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-60" style={{ borderColor: '#bbf7d0', color: '#047857' }}>Aprobar</button>
+                      <button type="button" disabled={disabled} onClick={() => onReview(movement, 'reject')} className="rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-60" style={{ borderColor: '#fecaca', color: '#b91c1c' }}>Rechazar</button>
+                    </>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MovementReviewDialog({ review, notes, setNotes, saving, onCancel, onConfirm }) {
+  if (!review?.movement) return null;
+  const rejecting = review.decision === 'reject';
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-label={rejecting ? 'Rechazar movimiento de caja' : 'Aprobar movimiento de caja'}>
+      <Card className="w-full max-w-lg overflow-hidden">
+        <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: rejecting ? '#fecaca' : '#bbf7d0', color: rejecting ? '#b91c1c' : '#047857' }}>
+              {rejecting ? <XCircle className="h-5 w-5" /> : <UserCheck className="h-5 w-5" />}
+            </span>
+            <div>
+              <h2 className="text-xl font-black">{rejecting ? 'Rechazar movimiento' : 'Aprobar movimiento'}</h2>
+              <p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{movementLabel(review.movement.type, review.movement.direction)} · {movementAmountText(review.movement)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="rounded-2xl border p-4 text-sm" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <p className="font-black">{review.movement.reason || 'Sin motivo'}</p>
+            <p className="mt-1 font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Solicitó {review.movement.createdBySnapshot?.displayName || 'Cajero'} · {formatDate(review.movement.createdAt)}</p>
+          </div>
+          <Field label={rejecting ? 'Motivo del rechazo' : 'Nota de aprobación (opcional)'}>
+            <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} placeholder={rejecting ? 'Explica por qué se rechaza la solicitud' : 'Ejemplo: soporte verificado'} autoFocus />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel} disabled={saving}>Volver</Button>
+            <Button onClick={onConfirm} disabled={saving || (rejecting && !clean(notes))}>{saving ? 'Guardando...' : rejecting ? 'Confirmar rechazo' : 'Confirmar aprobación'}</Button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -460,14 +573,14 @@ function ReportPanel({ session, onClose }) {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Stat icon={UnlockKeyhole} label="Apertura" value={money(session.openingAmount)} helper={formatDate(session.openedAt)} />
           <Stat icon={CreditCard} label="Ventas POS" value={money(session.salesSummary?.netSales)} helper={`${session.salesSummary?.ordersCount || 0} orden(es)`} />
-          <Stat icon={Banknote} label="Esperado" value={money(session.expectedCash)} helper="Monto final esperado" />
-          <Stat icon={LockKeyhole} label="Contado" value={money(session.countedCash)} helper={`Diferencia ${money(session.differenceAmount)}`} />
+          <Stat icon={Banknote} label="Esperado" value={visibleMoney(session.expectedCash)} helper="Monto final esperado" />
+          <Stat icon={LockKeyhole} label="Contado" value={visibleMoney(session.countedCash)} helper={`Diferencia ${visibleMoney(session.differenceAmount)}`} />
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Stat icon={Banknote} label="Efectivo" value={money(totals.cash)} />
-          <Stat icon={Smartphone} label="Transferencia" value={money(totals.transfer)} />
-          <Stat icon={CreditCard} label="Tarjeta" value={money(totals.card)} />
+          <Stat icon={Banknote} label="Efectivo" value={visibleMoney(totals.cash)} />
+          <Stat icon={Smartphone} label="Transferencia" value={visibleMoney(totals.transfer)} />
+          <Stat icon={CreditCard} label="Tarjeta" value={visibleMoney(totals.card)} />
           <Stat icon={Wallet} label="Movimientos" value={`${movementSign({ direction: 'in' })}${money(manualIn)} / -${money(manualOut)}`} />
         </div>
 
@@ -482,10 +595,16 @@ function ReportPanel({ session, onClose }) {
               {movements.map((movement, index) => (
                 <div key={movement._id || `${movement.type}-${movement.createdAt}-${index}`} className="grid gap-3 p-4 md:grid-cols-[1fr_180px_160px] md:items-center">
                   <div>
-                    <p className="text-sm font-black">{movementLabel(movement.type)}</p>
+                    <p className="text-sm font-black">{movementLabel(movement.type, movement.direction)}</p>
                     <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
                       {movement.reason || 'Sin motivo'}{movement.reference ? ` · Ref: ${movement.reference}` : ''}
                     </p>
+                    <p className="mt-1 text-xs font-black" style={{ color: movementApprovalColors(movement).color }}>{movementApprovalLabel(movement)}</p>
+                    {movement.reviewedAt ? (
+                      <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        Revisó {movement.reviewedBySnapshot?.displayName || 'Supervisor'} · {formatDate(movement.reviewedAt)}{movement.reviewNotes ? ` · ${movement.reviewNotes}` : ''}
+                      </p>
+                    ) : null}
                   </div>
                   <p className="text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(movement.createdAt)}</p>
                   <p className="text-right text-sm font-black" style={{ color: movement.direction === 'out' ? '#b91c1c' : movement.direction === 'in' ? '#047857' : 'var(--admin-card-text)' }}>
@@ -543,9 +662,9 @@ function HistoryTable({ sessions, onReport }) {
                 <td className="px-5 py-4"><span className="rounded-full px-3 py-1 text-xs font-black uppercase" style={{ background: session.status === 'open' ? '#ecfdf5' : 'var(--admin-primary-soft-bg)', color: session.status === 'open' ? '#047857' : 'var(--admin-card-muted-text)' }}>{session.status === 'open' ? 'Abierta' : session.status === 'closed' ? 'Cerrada' : session.status}</span></td>
                 <td className="px-5 py-4 font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(session.openedAt)}</td>
                 <td className="px-5 py-4 font-black">{session.salesSummary?.ordersCount || 0}</td>
-                <td className="px-5 py-4 font-black">{money(session.expectedCash)}</td>
-                <td className="px-5 py-4 font-black">{money(session.countedCash)}</td>
-                <td className="px-5 py-4 font-black">{money(session.differenceAmount)}</td>
+                <td className="px-5 py-4 font-black">{visibleMoney(session.expectedCash)}</td>
+                <td className="px-5 py-4 font-black">{visibleMoney(session.countedCash)}</td>
+                <td className="px-5 py-4 font-black">{visibleMoney(session.differenceAmount)}</td>
               </tr>
             ))}
           </tbody>
@@ -570,12 +689,16 @@ export default function CashSessionsPageReport() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [movementSaving, setMovementSaving] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [movementReview, setMovementReview] = useState(null);
+  const [reviewNotes, setReviewNotes] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
+  const pendingMovementsCount = Number(currentSession?.cashControl?.pendingMovementsCount || 0);
 
   const refreshForBranch = useCallback(async (branchId = selectedBranchId, registerCode = cashRegisterCode) => {
     if (!branchId) return;
@@ -587,7 +710,7 @@ export default function CashSessionsPageReport() {
     const session = current?.session || null;
     setCurrentSession(session);
     setSessions(Array.isArray(history?.sessions) ? history.sessions : []);
-    setCountedCash(session?.expectedCash ? String(session.expectedCash) : '');
+    setCountedCash('');
   }, [cashRegisterCode, selectedBranchId]);
 
   const loadData = useCallback(async () => {
@@ -611,6 +734,26 @@ export default function CashSessionsPageReport() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!movementReview) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !reviewSaving) {
+        setMovementReview(null);
+        setReviewNotes('');
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [movementReview, reviewSaving]);
 
   const handleBranchChange = async (event) => {
     const branchId = event.target.value;
@@ -667,15 +810,60 @@ export default function CashSessionsPageReport() {
       setMovementSaving(true);
       setError('');
       setSuccess('');
-      const response = await addCashMovement(currentSession.id, movementForm);
+      const movementType = MOVEMENT_TYPES.find((item) => item.key === movementForm.type) || MOVEMENT_TYPES[0];
+      const response = await addCashMovement(currentSession.id, {
+        ...movementForm,
+        type: movementType.type || movementType.key,
+        direction: movementType.direction || '',
+      });
       setCurrentSession(response?.session || null);
       setMovementForm({ type: movementForm.type, amount: '', reason: '', reference: '' });
-      setSuccess('Movimiento de caja registrado correctamente.');
+      setSuccess(response?.message || 'Movimiento de caja registrado correctamente.');
       await refreshForBranch(selectedBranchId, cashRegisterCode);
     } catch (err) {
       setError(err?.message || 'No fue posible registrar el movimiento de caja.');
     } finally {
       setMovementSaving(false);
+    }
+  };
+
+  const openMovementReview = (movement, decision) => {
+    setMovementReview({ movement, decision });
+    setReviewNotes('');
+  };
+
+  const closeMovementReview = () => {
+    if (reviewSaving) return;
+    setMovementReview(null);
+    setReviewNotes('');
+  };
+
+  const confirmMovementReview = async () => {
+    const movement = movementReview?.movement;
+    const decision = movementReview?.decision;
+    if (!currentSession?.id || !movement?._id || !decision) return;
+    if (decision === 'reject' && !clean(reviewNotes)) {
+      setError('Debes indicar el motivo del rechazo.');
+      return;
+    }
+
+    try {
+      setReviewSaving(true);
+      setError('');
+      setSuccess('');
+      const response = await reviewCashMovement(currentSession.id, movement._id, {
+        decision,
+        reviewNotes,
+      });
+      setCurrentSession(response?.session || null);
+      setMovementReview(null);
+      setReviewNotes('');
+      setSuccess(response?.message || 'Movimiento revisado correctamente.');
+      await refreshForBranch(selectedBranchId, cashRegisterCode);
+    } catch (err) {
+      setError(err?.message || 'No fue posible revisar el movimiento de caja.');
+    } finally {
+      setReviewSaving(false);
     }
   };
 
@@ -746,23 +934,24 @@ export default function CashSessionsPageReport() {
               <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Controla apertura, ventas POS, movimientos manuales, cierre y reporte de caja.</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={handleRefresh} disabled={loading || saving || movementSaving}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar caja</Button>
+          <Button variant="ghost" onClick={handleRefresh} disabled={loading || saving || movementSaving || reviewSaving}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar caja</Button>
         </div>
       </Card>
 
       {error ? <Message type="error">{error}</Message> : null}
       {success ? <Message>{success}</Message> : null}
+      <MovementReviewDialog review={movementReview} notes={reviewNotes} setNotes={setReviewNotes} saving={reviewSaving} onCancel={closeMovementReview} onConfirm={confirmMovementReview} />
 
       <Card className="p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px_220px]">
           <Field label="Sede">
-            <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving}>
+            <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving || reviewSaving}>
               {branches.length === 0 ? <option value="">Sin sedes POS</option> : null}
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
             </Select>
           </Field>
           <Field label="Código de caja">
-            <Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving || movementSaving || hasOpenSession} />
+            <Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving || movementSaving || reviewSaving || hasOpenSession} />
           </Field>
           <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
             <div className="flex items-center gap-3"><Building2 className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} /><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Estado sede</p><p className="text-sm font-black">{selectedBranch?.settings?.requireCashSessionForPos ? 'Exige caja abierta' : 'Caja opcional'}</p></div></div>
@@ -791,13 +980,21 @@ export default function CashSessionsPageReport() {
             </div>
           </div>
 
+          <ProfessionalControlBanner session={currentSession} />
           <SessionStats session={currentSession} />
-          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving} onSubmit={handleMovement} />
+          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving || reviewSaving} onSubmit={handleMovement} onReview={openMovementReview} />
+
+          {pendingMovementsCount > 0 ? (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold" style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}>
+              <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
+              <span>El cierre está bloqueado hasta que un supervisor apruebe o rechace los {pendingMovementsCount} movimiento(s) pendientes.</span>
+            </div>
+          ) : null}
 
           <form onSubmit={handleCloseCash} className="mt-5 grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_auto] lg:items-end">
-            <Field label="Efectivo contado"><Input type="number" min="0" step="100" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} disabled={saving || movementSaving} /></Field>
-            <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving} /></Field>
-            <Button type="submit" disabled={saving || movementSaving}><LockKeyhole className="h-4 w-4" /> {saving ? 'Cerrando...' : 'Cerrar caja'}</Button>
+            <Field label="Efectivo contado"><Input type="number" min="0" step="100" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
+            <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
+            <Button type="submit" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0}><LockKeyhole className="h-4 w-4" /> {saving ? 'Cerrando...' : pendingMovementsCount > 0 ? 'Cierre bloqueado' : 'Cerrar caja'}</Button>
           </form>
         </Card>
       ) : (

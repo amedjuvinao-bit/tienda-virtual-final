@@ -75,7 +75,7 @@ async function main() {
       amount: 10000,
       reason: 'Retiro operativo controlado',
       reference: 'RET-STAGE0',
-    }, { admin, branchIds: [branch._id] });
+    }, { admin, branchIds: [branch._id], canSupervise: true });
     assert.equal(afterWithdrawal.expectedCash, 40000);
     console.log('OK 03 el retiro descuenta el efectivo esperado una sola vez');
 

@@ -79,6 +79,24 @@ export async function addCashMovement(sessionId, payload = {}) {
   }
 }
 
+export async function reviewCashMovement(sessionId, movementId, payload = {}) {
+  try {
+    const cleanSessionId = cleanText(sessionId);
+    const cleanMovementId = cleanText(movementId);
+    const response = await api.post(
+      `${BASE_URL}/${cleanSessionId}/movements/${cleanMovementId}/review`,
+      {
+        decision: cleanText(payload.decision),
+        reviewNotes: cleanText(payload.reviewNotes || ''),
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    normalizeError(error, 'No fue posible revisar el movimiento de caja.');
+  }
+}
+
 export async function listCashSessions(params = {}) {
   try {
     const query = new URLSearchParams();
@@ -109,6 +127,7 @@ const adminCashSessionApi = {
   openCashSession,
   closeCashSession,
   addCashMovement,
+  reviewCashMovement,
   listCashSessions,
   getCashSessionById,
 };

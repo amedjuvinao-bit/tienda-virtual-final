@@ -12,7 +12,10 @@ const {
   listCashSessions,
   getCashSessionById,
 } = require('../services/cashSessionService');
-const { addManualCashMovement } = require('../services/cashMovementService');
+const {
+  addManualCashMovement,
+  reviewCashMovement,
+} = require('../services/cashMovementService');
 const {
   assertPosBranchAccess,
   buildCashSessionAccess,
@@ -49,6 +52,13 @@ function sendError(res, error) {
   });
 }
 
+function serializeForAccess(session, access = {}) {
+  return serializeCashSession(session, {
+    canSupervise: access.canSupervise === true,
+    blindCount: access.canSupervise !== true,
+  });
+}
+
 router.use(requireAdmin);
 
 router.get('/current', requirePermission('pos:view'), async (req, res) => {
@@ -67,7 +77,8 @@ router.get('/current', requirePermission('pos:view'), async (req, res) => {
     return res.json({
       ok: true,
       hasOpenSession: Boolean(session),
-      session: session ? serializeCashSession(session) : null,
+      session: session ? serializeForAccess(session, access) : null,
+      access: { canSupervise: access.canSupervise === true },
     });
   } catch (error) {
     return sendError(res, error);
@@ -76,18 +87,23 @@ router.get('/current', requirePermission('pos:view'), async (req, res) => {
 
 router.post('/open', requirePermission('pos:sell'), async (req, res) => {
   try {
+    const branchId = req.body?.branchId || req.body?.branch;
     assertPosBranchAccess(
       req,
-      req.body?.branchId || req.body?.branch,
+      branchId,
       { requireSell: true }
     );
+    const access = buildCashSessionAccess(req, {
+      requestedBranchId: branchId,
+      requireSell: true,
+    });
     const session = await openCashSession(req.body || {}, {
       admin: buildAdminContext(req),
     });
 
     return res.status(201).json({
       ok: true,
-      session: serializeCashSession(session),
+      session: serializeForAccess(session, access),
       message: 'Caja abierta correctamente.',
     });
   } catch (error) {
@@ -105,7 +121,7 @@ router.post('/:id/close', requirePermission('pos:sell'), async (req, res) => {
 
     return res.json({
       ok: true,
-      session: serializeCashSession(session),
+      session: serializeForAccess(session, access),
       message: 'Caja cerrada correctamente.',
     });
   } catch (error) {
@@ -120,11 +136,43 @@ router.post('/:id/movements', requirePermission('pos:sell'), async (req, res) =>
       admin: buildAdminContext(req),
       ...access,
     });
+    const outcome = session.$locals.cashMovementOutcome || {};
 
     return res.status(201).json({
       ok: true,
-      session: serializeCashSession(session),
-      message: 'Movimiento de caja registrado correctamente.',
+      session: serializeForAccess(session, access),
+      movement: outcome,
+      requiresApproval: outcome.approvalRequired === true,
+      message: outcome.approvalRequired === true
+        ? 'Movimiento enviado a aprobación. Todavía no afecta el efectivo esperado.'
+        : 'Movimiento de caja registrado correctamente.',
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/:id/movements/:movementId/review', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const access = buildCashSessionAccess(req, { requireSell: true });
+    const session = await reviewCashMovement(
+      req.params.id,
+      req.params.movementId,
+      req.body || {},
+      {
+        admin: buildAdminContext(req),
+        ...access,
+      }
+    );
+    const outcome = session.$locals.cashMovementOutcome || {};
+
+    return res.json({
+      ok: true,
+      session: serializeForAccess(session, access),
+      movement: outcome,
+      message: outcome.approvalStatus === 'approved'
+        ? 'Movimiento aprobado y aplicado a la caja.'
+        : 'Movimiento rechazado sin modificar el efectivo esperado.',
     });
   } catch (error) {
     return sendError(res, error);
@@ -142,7 +190,7 @@ router.get('/', requirePermission('pos:view'), async (req, res) => {
 
     return res.json({
       ok: true,
-      sessions: result.sessions.map(serializeCashSession),
+      sessions: result.sessions.map((session) => serializeForAccess(session, access)),
       page: result.page,
       limit: result.limit,
       total: result.total,
@@ -160,7 +208,7 @@ router.get('/:id', requirePermission('pos:view'), async (req, res) => {
 
     return res.json({
       ok: true,
-      session: serializeCashSession(session),
+      session: serializeForAccess(session, access),
     });
   } catch (error) {
     return sendError(res, error);

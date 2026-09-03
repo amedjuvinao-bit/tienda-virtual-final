@@ -334,12 +334,42 @@ function buildAdminSnapshot(admin = {}) {
   };
 }
 
-function serializeCashSession(session = {}) {
+function getPendingCashMovements(session = {}) {
+  const movements = Array.isArray(session?.cashMovements) ? session.cashMovements : [];
+  return movements.filter((movement) => cleanLower(movement?.approvalStatus, 30) === 'pending');
+}
+
+function buildBlindSalesSummary(summary = {}) {
+  return {
+    ordersCount: Number(summary?.ordersCount || 0),
+    cancelledOrdersCount: Number(summary?.cancelledOrdersCount || 0),
+    refundedOrdersCount: Number(summary?.refundedOrdersCount || 0),
+    itemsCount: Number(summary?.itemsCount || 0),
+    grossSales: null,
+    discounts: null,
+    refunds: null,
+    netSales: null,
+    paymentTotals: {
+      cash: null,
+      transfer: null,
+      card: null,
+      mixed: null,
+      other: null,
+      total: null,
+    },
+  };
+}
+
+function serializeCashSession(session = {}, options = {}) {
   const doc = typeof session.toSafeObject === 'function'
     ? session.toSafeObject()
     : session.toObject
       ? session.toObject({ virtuals: true })
       : { ...session };
+
+  const canSupervise = options.canSupervise !== false;
+  const blindCountActive = doc.status === 'open' && options.blindCount === true;
+  const pendingMovementsCount = getPendingCashMovements(doc).length;
 
   return {
     id: String(doc._id || doc.id || ''),
@@ -354,11 +384,19 @@ function serializeCashSession(session = {}) {
     openedAt: doc.openedAt || null,
     closedAt: doc.closedAt || null,
     openingAmount: Number(doc.openingAmount || 0),
-    expectedCash: Number(doc.expectedCash || 0),
-    countedCash: Number(doc.countedCash || 0),
-    differenceAmount: Number(doc.differenceAmount || 0),
-    salesSummary: doc.salesSummary || {},
+    expectedCash: blindCountActive ? null : Number(doc.expectedCash || 0),
+    countedCash: blindCountActive ? null : Number(doc.countedCash || 0),
+    differenceAmount: blindCountActive ? null : Number(doc.differenceAmount || 0),
+    salesSummary: blindCountActive
+      ? buildBlindSalesSummary(doc.salesSummary || {})
+      : doc.salesSummary || {},
     cashMovements: Array.isArray(doc.cashMovements) ? doc.cashMovements : [],
+    cashControl: {
+      blindCountActive,
+      canSupervise,
+      canReviewMovements: canSupervise,
+      pendingMovementsCount,
+    },
     openedBy: doc.openedBy ? String(doc.openedBy) : '',
     openedBySnapshot: doc.openedBySnapshot || {},
     closedBy: doc.closedBy ? String(doc.closedBy) : '',
@@ -642,6 +680,20 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
   }
 
   assertCashSessionOperator(session, adminContext, options);
+
+  const pendingMovements = getPendingCashMovements(session);
+  if (pendingMovements.length > 0) {
+    throw createCashError(
+      'Debes aprobar o rechazar los movimientos pendientes antes de cerrar la caja.',
+      'CASH_PENDING_MOVEMENTS',
+      409,
+      {
+        pendingMovementsCount: pendingMovements.length,
+        movementIds: pendingMovements.map((movement) => String(movement?._id || '')).filter(Boolean),
+      }
+    );
+  }
+
   const recalculatedSession = await recalculateCashSession(session);
 
   recalculatedSession.closeSession({
@@ -737,6 +789,7 @@ module.exports = {
   getCurrentCashSession,
   listCashSessions,
   getCashSessionById,
+  getPendingCashMovements,
   recalculateCashSession,
   allocateRefundAcrossPayments,
   buildCashSessionSalesSummary,
