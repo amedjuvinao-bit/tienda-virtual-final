@@ -35,6 +35,40 @@ function cleanMoney(value) {
   return Math.max(0, Math.round(number));
 }
 
+function parseCashAmount(
+  value,
+  {
+    required = false,
+    allowZero = true,
+    field = 'monto',
+    code = 'CASH_AMOUNT_INVALID',
+  } = {}
+) {
+  const isEmpty = value === undefined || value === null || String(value).trim() === '';
+
+  if (isEmpty) {
+    if (!required) return 0;
+    throw createCashError(`Debes indicar el ${field}.`, code, 400, { field });
+  }
+
+  const number = Number(value);
+  const rounded = Math.round(number);
+  if (!Number.isFinite(number) || !Number.isSafeInteger(rounded) || number < 0) {
+    throw createCashError(
+      `El ${field} debe ser un valor válido mayor o igual a cero.`,
+      code,
+      400,
+      { field }
+    );
+  }
+
+  if (!allowZero && rounded <= 0) {
+    throw createCashError(`El ${field} debe ser mayor que cero.`, code, 400, { field });
+  }
+
+  return rounded;
+}
+
 function toObjectId(value) {
   const id = cleanText(value, 80);
   return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
@@ -123,6 +157,32 @@ function assertCashSessionOperator(session, adminContext, options = {}) {
 function normalizePaymentMethod(value) {
   const method = cleanLower(value || 'other', 40);
   return PAYMENT_TOTAL_KEYS.has(method) ? method : 'other';
+}
+
+function isFinalCashSession(session = {}) {
+  return ['closed', 'cancelled'].includes(cleanLower(session?.status, 20));
+}
+
+function comparableSalesSummary(summary = {}) {
+  const payments = summary?.paymentTotals || {};
+  return {
+    ordersCount: Number(summary?.ordersCount || 0),
+    cancelledOrdersCount: Number(summary?.cancelledOrdersCount || 0),
+    refundedOrdersCount: Number(summary?.refundedOrdersCount || 0),
+    itemsCount: Number(summary?.itemsCount || 0),
+    grossSales: cleanMoney(summary?.grossSales),
+    discounts: cleanMoney(summary?.discounts),
+    refunds: cleanMoney(summary?.refunds),
+    netSales: cleanMoney(summary?.netSales),
+    paymentTotals: {
+      cash: cleanMoney(payments?.cash),
+      transfer: cleanMoney(payments?.transfer),
+      card: cleanMoney(payments?.card),
+      mixed: cleanMoney(payments?.mixed),
+      other: cleanMoney(payments?.other),
+      total: cleanMoney(payments?.total),
+    },
+  };
 }
 
 function orderPaymentComponents(order = {}) {
@@ -305,6 +365,9 @@ function serializeCashSession(session = {}) {
     closedBySnapshot: doc.closedBySnapshot || {},
     openingNotes: doc.openingNotes || '',
     closingNotes: doc.closingNotes || '',
+    cancelledAt: doc.cancelledAt || null,
+    cancelledBy: doc.cancelledBy ? String(doc.cancelledBy) : '',
+    cancelledReason: doc.cancelledReason || '',
     createdAt: doc.createdAt || null,
     updatedAt: doc.updatedAt || null,
   };
@@ -380,6 +443,18 @@ async function recalculateCashSession(sessionOrId, options = {}) {
     throw createCashError('Caja no encontrada.', 'CASH_SESSION_NOT_FOUND', 404);
   }
 
+  if (isFinalCashSession(session)) {
+    if (options.requireOpen === true) {
+      throw createCashError(
+        'La caja ya está cerrada. El ajuste debe registrarse en una caja abierta.',
+        'CASH_SESSION_FINAL_ADJUSTMENT_REQUIRED',
+        409,
+        { sessionId: String(session._id || ''), status: session.status }
+      );
+    }
+    return session;
+  }
+
   const ordersQuery = Order.find({
     source: 'pos',
     cashSession: session._id,
@@ -396,8 +471,18 @@ async function recalculateCashSession(sessionOrId, options = {}) {
   if (dbSession) refundsQuery.session(dbSession);
   const refunds = await refundsQuery;
 
+  const previousSummary = comparableSalesSummary(session.salesSummary);
+  const previousExpectedCash = cleanMoney(session.expectedCash);
   session.salesSummary = buildCashSessionSalesSummary(orders, refunds);
   await session.validate();
+
+  const nextSummary = comparableSalesSummary(session.salesSummary);
+  if (
+    JSON.stringify(previousSummary) === JSON.stringify(nextSummary) &&
+    previousExpectedCash === cleanMoney(session.expectedCash)
+  ) {
+    return session;
+  }
 
   const currentVersion = Number(session.__v || 0);
   const salesSummary = session.salesSummary?.toObject
@@ -471,8 +556,7 @@ async function getCurrentCashSession({
 
   if (!session) return null;
 
-  await recalculateCashSession(session);
-  return session;
+  return recalculateCashSession(session);
 }
 
 async function openCashSession(payload = {}, { admin = {} } = {}) {
@@ -495,7 +579,10 @@ async function openCashSession(payload = {}, { admin = {} } = {}) {
     );
   }
 
-  const openingAmount = cleanMoney(payload.openingAmount);
+  const openingAmount = parseCashAmount(payload.openingAmount, {
+    field: 'monto inicial',
+    code: 'CASH_OPENING_AMOUNT_INVALID',
+  });
 
   const session = new CashSession({
     branch: branch._id,
@@ -555,26 +642,30 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
   }
 
   assertCashSessionOperator(session, adminContext, options);
-  await recalculateCashSession(session);
+  const recalculatedSession = await recalculateCashSession(session);
 
-  session.closeSession({
-    countedCash: cleanMoney(payload.countedCash),
+  recalculatedSession.closeSession({
+    countedCash: parseCashAmount(payload.countedCash, {
+      required: true,
+      field: 'efectivo contado',
+      code: 'CASH_COUNTED_AMOUNT_REQUIRED',
+    }),
     closedBy: adminContext.id,
     closedBySnapshot: adminContext.snapshot,
     closingNotes: cleanText(payload.closingNotes || '', 1000),
   });
 
-  session.cashMovements.push({
+  recalculatedSession.cashMovements.push({
     type: 'closing',
-    amount: cleanMoney(payload.countedCash),
+    amount: recalculatedSession.countedCash,
     direction: 'neutral',
     reason: 'Cierre de caja',
     createdBy: adminContext.id,
     createdBySnapshot: adminContext.snapshot,
   });
 
-  await saveCashSession(session);
-  return session;
+  await saveCashSession(recalculatedSession);
+  return recalculatedSession;
 }
 
 async function listCashSessions(filters = {}) {
@@ -632,8 +723,7 @@ async function getCashSessionById(sessionId, options = {}) {
     );
   }
 
-  await recalculateCashSession(session);
-  return session;
+  return recalculateCashSession(session);
 }
 
 module.exports = {
@@ -652,6 +742,8 @@ module.exports = {
   buildCashSessionSalesSummary,
   orderPaymentComponents,
   isCashConcurrencyError,
+  isFinalCashSession,
   normalizeBranchScope,
+  parseCashAmount,
   saveCashSession,
 };

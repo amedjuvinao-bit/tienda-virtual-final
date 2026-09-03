@@ -7,6 +7,7 @@ const {
   assertCashSessionOperator,
   buildScopedCashSessionFilter,
   createCashError,
+  parseCashAmount,
   recalculateCashSession,
   saveCashSession,
 } = require('./cashSessionService');
@@ -111,10 +112,12 @@ async function addManualCashMovement(sessionId, payload = {}, options = {}) {
     throw createCashError('Solo se pueden registrar movimientos en una caja abierta.', 'CASH_SESSION_NOT_OPEN', 409);
   }
 
-  const amount = cleanMoney(payload.amount);
-  if (amount <= 0) {
-    throw createCashError('El monto del movimiento debe ser mayor que cero.', 'CASH_MOVEMENT_AMOUNT_REQUIRED', 400);
-  }
+  const amount = parseCashAmount(payload.amount, {
+    required: true,
+    allowZero: false,
+    field: 'monto del movimiento',
+    code: 'CASH_MOVEMENT_AMOUNT_REQUIRED',
+  });
 
   const { type, direction } = resolveMovementConfig(payload.type, payload.direction);
   const reason = cleanText(payload.reason || payload.notes || '', 300);
@@ -143,7 +146,7 @@ async function addManualCashMovement(sessionId, payload = {}, options = {}) {
   });
 
   await saveCashSession(recalculatedSession);
-  return recalculateCashSession(recalculatedSession);
+  return recalculatedSession;
 }
 
 module.exports = {

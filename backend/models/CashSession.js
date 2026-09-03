@@ -1,6 +1,9 @@
 // backend/models/CashSession.js
 
 const mongoose = require('mongoose');
+const {
+  CASH_SESSION_INDEX_DEFINITIONS,
+} = require('./cashSessionIndexDefinitions');
 
 const CASH_SESSION_STATUSES = ['open', 'closed', 'cancelled'];
 const CASH_MOVEMENT_TYPES = [
@@ -38,10 +41,16 @@ function cleanSignedMoney(value) {
 }
 
 function buildSessionCode() {
-  const date = new Date();
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
+  const dateParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type) => dateParts.find((entry) => entry.type === type)?.value || '';
+  const y = part('year');
+  const m = part('month');
+  const d = part('day');
   const random = Math.random().toString(36).slice(2, 8).toUpperCase();
 
   return `CAJA-${y}${m}${d}-${random}`;
@@ -124,11 +133,9 @@ const CashSessionSchema = new mongoose.Schema(
     sessionCode: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       uppercase: true,
       default: buildSessionCode,
-      index: true,
     },
 
     status: {
@@ -289,16 +296,17 @@ const CashSessionSchema = new mongoose.Schema(
   }
 );
 
-CashSessionSchema.index(
-  { branch: 1, cashRegisterCode: 1, status: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { status: 'open' },
-  }
-);
-CashSessionSchema.index({ branch: 1, openedAt: -1 });
-CashSessionSchema.index({ cashier: 1, openedAt: -1 });
-CashSessionSchema.index({ status: 1, openedAt: -1 });
+for (const definition of CASH_SESSION_INDEX_DEFINITIONS) {
+  CashSessionSchema.index(
+    { ...definition.key },
+    {
+      ...definition.options,
+      ...(definition.options.partialFilterExpression
+        ? { partialFilterExpression: { ...definition.options.partialFilterExpression } }
+        : {}),
+    }
+  );
+}
 
 CashSessionSchema.virtual('isOpen').get(function isOpen() {
   return this.status === 'open';

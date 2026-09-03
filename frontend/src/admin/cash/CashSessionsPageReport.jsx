@@ -33,6 +33,7 @@ const MOVEMENT_TYPES = [
   { key: 'cash_in', label: 'Ingreso manual', note: 'Suma al efectivo esperado' },
   { key: 'cash_out', label: 'Salida manual', note: 'Resta del efectivo esperado' },
   { key: 'expense', label: 'Gasto pequeño', note: 'Resta del efectivo esperado' },
+  { key: 'withdrawal', label: 'Retiro de efectivo', note: 'Resta del efectivo esperado' },
   { key: 'adjustment', label: 'Ajuste informativo', note: 'No cambia el efectivo esperado' },
 ];
 
@@ -58,7 +59,10 @@ function numberValue(value) {
 function formatDate(value) {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('es-CO', { hour12: false });
+  return date.toLocaleString('es-CO', {
+    hour12: false,
+    timeZone: 'America/Bogota',
+  });
 }
 
 function paymentTotals(session) {
@@ -694,6 +698,10 @@ export default function CashSessionsPageReport() {
   const handleCloseCash = async (event) => {
     event.preventDefault();
     if (!currentSession?.id) return;
+    if (!clean(countedCash)) {
+      setError('Debes ingresar el efectivo contado antes de cerrar la caja.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -762,7 +770,16 @@ export default function CashSessionsPageReport() {
         </div>
       </Card>
 
-      {reportSession ? <div id="cash-report-panel"><ReportPanel session={reportSession} onClose={() => setReportSession(null)} /></div> : null}
+      {reportSession ? (
+        <div
+          id="cash-report-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reporte de cierre de caja"
+        >
+          <ReportPanel session={reportSession} onClose={() => setReportSession(null)} />
+        </div>
+      ) : null}
 
       {hasOpenSession ? (
         <Card className="p-5">

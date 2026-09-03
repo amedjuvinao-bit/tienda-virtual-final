@@ -172,7 +172,10 @@ async function refreshOrderRefundReconciliation(refundId, options = {}) {
 
   if (order.cashSession) {
     try {
-      await recalculateCashSession(order.cashSession, { session });
+      await recalculateCashSession(order.cashSession, {
+        session,
+        requireOpen: true,
+      });
       refund.reconciliation.cash = {
         ...(refund.reconciliation?.cash?.toObject?.() || refund.reconciliation?.cash || {}),
         state: 'completed',
