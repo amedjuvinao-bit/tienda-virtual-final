@@ -120,6 +120,7 @@ function main() {
   const operations = read('frontend/src/admin/pos/PosOperationsPanel.jsx');
   const reportPanel = read('frontend/src/admin/pos/PosShiftReportPanel.jsx');
   const reportModel = read('frontend/src/admin/pos/posShiftReportModel.js');
+  const integrationTest = read('backend/scripts/testPosLevelPlusStage4Integration.js');
 
   ok('el reporte exige permiso pos:view', route.includes("router.get('/shift-summary', requirePermission('pos:view')"));
   ok('el endpoint aplica alcance de sede antes de consultar', route.includes('buildPosResourceAccess') && route.includes('requestedBranchId: branchId'));
@@ -128,6 +129,11 @@ function main() {
   ok('Jornada enlaza Caja y Finanzas sin duplicar sus acciones', reportPanel.includes('to="/admin/caja"') && reportPanel.includes('to="/admin/finanzas"'));
   ok('el reporte puede descargarse como CSV reutilizable', reportModel.includes('buildPosShiftReportCsv') && reportPanel.includes('downloadPosShiftReportCsv'));
   ok('la API del panel consume el endpoint protegido', api.includes('function getPosShiftSummary') && api.includes('/shift-summary'));
+  ok('la prueba de integración usa números únicos para respetar el índice real de órdenes', [
+    "orderNumber: 'STAGE4-CASH'",
+    "orderNumber: 'STAGE4-MIXED'",
+    "orderNumber: 'STAGE4-OTHER-BRANCH'",
+  ].every((value) => integrationTest.includes(value)));
 
   console.log(`\nEtapa 4 POS validada: ${controls} controles superados.`);
 }

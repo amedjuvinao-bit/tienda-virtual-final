@@ -82,6 +82,8 @@ async function main() {
     await Order.collection.insertMany([
       {
         _id: cashOrderId,
+        sessionId: 'pos-stage4-cash',
+        orderNumber: 'STAGE4-CASH',
         source: 'pos',
         status: 'paid',
         branch: branch._id,
@@ -98,6 +100,8 @@ async function main() {
       },
       {
         _id: mixedOrderId,
+        sessionId: 'pos-stage4-mixed',
+        orderNumber: 'STAGE4-MIXED',
         source: 'pos',
         status: 'refunded',
         branch: branch._id,
@@ -121,6 +125,8 @@ async function main() {
       },
       {
         _id: new mongoose.Types.ObjectId(),
+        sessionId: 'pos-stage4-other-branch',
+        orderNumber: 'STAGE4-OTHER-BRANCH',
         source: 'pos',
         status: 'paid',
         branch: otherBranch._id,
