@@ -516,36 +516,36 @@ function HistoryTable({ sessions, onReport }) {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full min-w-[860px] text-left text-sm">
           <thead>
             <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-              <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Caja</th>
+              <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Caja y reporte</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Estado</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Apertura</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Ventas</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Esperado</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Contado</th>
               <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Diferencia</th>
-              <th className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em]">Reporte</th>
             </tr>
           </thead>
           <tbody>
             {sessions.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Todavía no hay movimientos de caja.</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Todavía no hay movimientos de caja.</td></tr>
             ) : sessions.map((session) => (
               <tr key={session.id} className="border-t" style={{ borderColor: 'var(--admin-card-border)' }}>
-                <td className="px-5 py-4 font-black"><p>{session.cashRegisterCode}</p><p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{session.sessionCode}</p></td>
+                <td className="px-5 py-4 font-black">
+                  <p>{session.cashRegisterCode}</p>
+                  <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{session.sessionCode}</p>
+                  <button type="button" onClick={() => onReport(session.id)} className="mt-2 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}>
+                    <FileText className="h-4 w-4" /> Ver reporte
+                  </button>
+                </td>
                 <td className="px-5 py-4"><span className="rounded-full px-3 py-1 text-xs font-black uppercase" style={{ background: session.status === 'open' ? '#ecfdf5' : 'var(--admin-primary-soft-bg)', color: session.status === 'open' ? '#047857' : 'var(--admin-card-muted-text)' }}>{session.status === 'open' ? 'Abierta' : session.status === 'closed' ? 'Cerrada' : session.status}</span></td>
                 <td className="px-5 py-4 font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(session.openedAt)}</td>
                 <td className="px-5 py-4 font-black">{session.salesSummary?.ordersCount || 0}</td>
                 <td className="px-5 py-4 font-black">{money(session.expectedCash)}</td>
                 <td className="px-5 py-4 font-black">{money(session.countedCash)}</td>
                 <td className="px-5 py-4 font-black">{money(session.differenceAmount)}</td>
-                <td className="px-5 py-4">
-                  <button type="button" onClick={() => onReport(session.id)} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}>
-                    <FileText className="h-4 w-4" /> Ver
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>

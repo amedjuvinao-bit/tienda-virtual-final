@@ -132,4 +132,25 @@ describe('CashSessionsPageReport Etapa 0', () => {
 
     expect(screen.getByRole('dialog', { name: 'Reporte de cierre de caja' })).toBeInTheDocument();
   });
+
+  it('mantiene visible y operativo el acceso al reporte desde el histórico', async () => {
+    const closedSession = {
+      ...openSession,
+      id: 'cash-session-closed',
+      status: 'closed',
+      countedCash: 78500,
+      differenceAmount: 0,
+    };
+    listCashSessions.mockResolvedValue({ sessions: [closedSession] });
+    getCashSessionById.mockResolvedValue({ session: closedSession });
+    render(<CashSessionsPageReport />);
+
+    const reportButton = await screen.findByRole('button', { name: 'Ver reporte' });
+    fireEvent.click(reportButton);
+
+    await waitFor(() => {
+      expect(getCashSessionById).toHaveBeenCalledWith(closedSession.id);
+    });
+    expect(screen.getByRole('dialog', { name: 'Reporte de cierre de caja' })).toBeInTheDocument();
+  });
 });
