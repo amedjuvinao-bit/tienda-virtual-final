@@ -377,6 +377,27 @@ export async function getPosSalesHistory({ branchId, q = '', limit = 30 } = {}) 
   }
 }
 
+export async function getPosShiftSummary({
+  branchId,
+  range = 'current_shift',
+  cashRegisterCode = DEFAULT_REGISTER_CODE,
+} = {}) {
+  const cleanBranchId = cleanText(branchId);
+  if (!cleanBranchId) throw new Error('Debes seleccionar una sede para consultar la jornada POS.');
+
+  try {
+    const queryString = buildQueryParams({
+      branchId: cleanBranchId,
+      range,
+      cashRegisterCode,
+    });
+    const response = await api.get(`${BASE_URL}/shift-summary${queryString}`);
+    return response.data;
+  } catch (error) {
+    throwPosOperationsError(error, 'No fue posible consultar el control de jornada POS.');
+  }
+}
+
 const adminPosApi = {
   getPosBootstrap,
   getPosProducts,
@@ -388,6 +409,7 @@ const adminPosApi = {
   openPosHeldSale,
   closePosHeldSale,
   getPosSalesHistory,
+  getPosShiftSummary,
   buildPosIdempotencyKey,
 };
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   ArchiveRestore,
+  BarChart3,
   Clock3,
   ExternalLink,
   History,
@@ -25,6 +26,7 @@ import {
   openPosHeldSale,
 } from '../api/adminPosApi';
 import PosReceiptActions from './PosReceiptActions';
+import PosShiftReportPanel from './PosShiftReportPanel';
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -121,6 +123,16 @@ function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
 
   if (!view) return null;
 
+  const heading = view === 'shift'
+    ? {
+        title: 'Control de jornada y conciliación',
+        description: 'Supervisa ventas, medios de pago, caja y pendientes operativos desde una sola vista.',
+      }
+    : {
+        title: 'Continuidad e historial de ventas',
+        description: 'Recupera una venta o consulta su trazabilidad sin abandonar el punto de venta.',
+      };
+
   return createPortal(
     <div className="fixed inset-0 z-[90000] flex min-h-screen items-center justify-center p-3 sm:p-5">
       <button type="button" onClick={onClose} className="absolute inset-0 bg-black/55 backdrop-blur-[4px]" aria-label="Cerrar operaciones POS" />
@@ -134,15 +146,15 @@ function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
         <header className="flex flex-col gap-4 border-b px-5 py-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-primary)' }}>Centro operativo POS</p>
-            <h2 className="mt-1 text-2xl font-black">Continuidad e historial de ventas</h2>
-            <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Recupera una venta o consulta su trazabilidad sin abandonar el punto de venta.</p>
+            <h2 className="mt-1 text-2xl font-black">{heading.title}</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{heading.description}</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }} aria-label="Cerrar">
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        <nav className="grid grid-cols-2 border-b px-5 pt-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+        <nav className="grid grid-cols-3 border-b px-2 pt-3 sm:px-5" style={{ borderColor: 'var(--admin-card-border)' }}>
           <button
             type="button"
             onClick={() => onViewChange('held')}
@@ -158,6 +170,14 @@ function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
             style={{ borderColor: view === 'history' ? 'var(--admin-primary)' : 'transparent', color: view === 'history' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}
           >
             <History className="h-4 w-4" /> Historial POS
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewChange('shift')}
+            className="flex items-center justify-center gap-2 border-b-2 px-2 py-3 text-xs font-black sm:px-4 sm:text-sm"
+            style={{ borderColor: view === 'shift' ? 'var(--admin-primary)' : 'transparent', color: view === 'shift' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}
+          >
+            <BarChart3 className="h-4 w-4" /> Jornada
           </button>
         </nav>
 
@@ -254,7 +274,7 @@ export default function PosOperationsPanel({
     setError('');
     setMessage('');
     if (nextView === 'held') loadHeld();
-    else loadHistory();
+    else if (nextView === 'history') loadHistory();
   };
 
   const changeView = (nextView) => openView(nextView);
@@ -347,12 +367,15 @@ export default function PosOperationsPanel({
             <ActionButton onClick={() => openView('history')} disabled={!branchId}>
               <History className="h-4 w-4" /> Historial
             </ActionButton>
+            <ActionButton onClick={() => openView('shift')} disabled={!branchId}>
+              <BarChart3 className="h-4 w-4" /> Jornada
+            </ActionButton>
           </div>
         </div>
       </section>
 
       <OperationsModal view={view} onViewChange={changeView} onClose={() => setView('')} heldCount={heldSales.length}>
-        <form onSubmit={search} className="mb-4 flex flex-col gap-3 sm:flex-row">
+        {view !== 'shift' ? <form onSubmit={search} className="mb-4 flex flex-col gap-3 sm:flex-row">
           <div className="flex min-h-11 flex-1 items-center gap-3 rounded-2xl border px-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
             <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={view === 'held' ? 'Buscar por código, nota o cliente' : 'Buscar por orden, cliente, celular o referencia'} className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none" />
@@ -364,12 +387,14 @@ export default function PosOperationsPanel({
           >
             Buscar
           </ActionButton>
-        </form>
+        </form> : null}
 
         {message ? <p className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{message}</p> : null}
         {error ? <p className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p> : null}
 
-        {view === 'held' ? (
+        {view === 'shift' ? (
+          <PosShiftReportPanel branchId={branchId} />
+        ) : view === 'held' ? (
           heldLoading ? (
             <div className="py-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-bold">Cargando ventas en espera...</p></div>
           ) : heldSales.length === 0 ? (

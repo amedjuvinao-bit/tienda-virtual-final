@@ -34,6 +34,7 @@ const {
   listPosSalesHistory,
   touchHeldSale,
 } = require('../services/posOperationsService');
+const { buildPosShiftSummary } = require('../services/posShiftReportService');
 
 const router = express.Router();
 
@@ -497,6 +498,30 @@ router.get('/sales/history', requirePermission('pos:view'), async (req, res) => 
       sales,
       total: sales.length,
     });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get('/shift-summary', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const branchId = cleanText(req.query.branchId || '');
+    const [branch, billing] = await Promise.all([
+      loadPosBranch(req, branchId),
+      loadBillingInfo(),
+    ]);
+    const access = buildPosResourceAccess(req, {
+      requestedBranchId: branchId,
+    });
+    const report = await buildPosShiftSummary({
+      branch,
+      branchIds: access.branchIds,
+      range: req.query.range,
+      cashRegisterCode: req.query.cashRegisterCode || 'CAJA POS',
+      billingActive: billing.electronicBillingActive,
+    });
+
+    return res.json({ ok: true, report });
   } catch (error) {
     return sendError(res, error);
   }

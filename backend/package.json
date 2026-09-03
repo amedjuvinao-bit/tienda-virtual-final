@@ -23,6 +23,8 @@
     "test:pos-level-plus-stage2-integration": "node scripts/testPosLevelPlusStage2Integration.js",
     "test:pos-level-plus-stage3": "node scripts/testPosLevelPlusStage3.js",
     "test:pos-level-plus-stage3-integration": "node scripts/testPosLevelPlusStage3Integration.js",
+    "test:pos-level-plus-stage4": "node scripts/testPosLevelPlusStage4.js",
+    "test:pos-level-plus-stage4-integration": "node scripts/testPosLevelPlusStage4Integration.js",
     "migrate:pos-held-sale-indexes": "node scripts/migratePosHeldSaleIndexes.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
