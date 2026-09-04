@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const CashSession = require('../models/CashSession');
 const Order = require('../models/Order');
 const { createPosSale, preparePosSalePreview, createPosError } = require('./adminPosService');
-const { recalculateCashSession } = require('./cashSessionService');
+const { recalculateCashSession, getPendingCashClosingReview } = require('./cashSessionService');
 const {
   processFulfillmentOnce,
 } = require('./orderCreationPostCommitService');
@@ -59,6 +59,15 @@ async function resolveCashSessionForSale(payload = {}, branch, { session = null 
         branchName: branch.name || '',
         cashRegisterCode: registerCode,
       },
+      409
+    );
+  }
+
+  if (cashSession && getPendingCashClosingReview(cashSession)) {
+    throw createPosError(
+      'La caja está congelada mientras un supervisor revisa el arqueo de cierre.',
+      'POS_CASH_CLOSING_REVIEW_PENDING',
+      { cashSessionId: String(cashSession._id || ''), cashRegisterCode: registerCode },
       409
     );
   }

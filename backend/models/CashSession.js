@@ -21,6 +21,7 @@ const CASH_MOVEMENT_APPROVAL_STATUSES = [
   'approved',
   'rejected',
 ];
+const CASH_CLOSING_REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
 
 function isAppliedCashMovement(movement = {}) {
   return !['pending', 'rejected'].includes(cleanLower(movement.approvalStatus));
@@ -150,6 +151,55 @@ const CashMovementSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const CashDenominationSchema = new mongoose.Schema(
+  {
+    value: { type: Number, required: true, min: 1, set: cleanMoney },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      validate: { validator: Number.isInteger, message: 'La cantidad debe ser un entero.' },
+    },
+    subtotal: { type: Number, required: true, min: 0, default: 0, set: cleanMoney },
+  },
+  { _id: false }
+);
+
+const CashCountSchema = new mongoose.Schema(
+  {
+    mode: { type: String, enum: ['manual', 'denominations'], default: 'manual' },
+    denominations: { type: [CashDenominationSchema], default: [] },
+    total: { type: Number, min: 0, default: 0, set: cleanMoney },
+  },
+  { _id: false }
+);
+
+const CashClosingReviewSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: CASH_CLOSING_REVIEW_STATUSES,
+      required: true,
+      default: 'pending',
+    },
+    countedCash: { type: Number, min: 0, required: true, set: cleanMoney },
+    expectedCash: { type: Number, min: 0, required: true, set: cleanMoney },
+    differenceAmount: { type: Number, required: true, set: cleanSignedMoney },
+    toleranceAmount: { type: Number, min: 0, required: true, set: cleanMoney },
+    cashCount: { type: CashCountSchema, default: () => ({}) },
+    closingNotes: { type: String, trim: true, maxlength: 1000, default: '' },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
+    requestedBySnapshot: { type: AdminSnapshotSchema, default: () => ({}) },
+    requestedAt: { type: Date, default: Date.now },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminUser', default: null },
+    reviewedBySnapshot: { type: AdminSnapshotSchema, default: () => ({}) },
+    reviewedAt: { type: Date, default: null },
+    reviewNotes: { type: String, trim: true, maxlength: 300, default: '' },
+  },
+  { _id: true }
+);
+
 const CashSessionSchema = new mongoose.Schema(
   {
     sessionCode: {
@@ -244,6 +294,16 @@ const CashSessionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       set: cleanSignedMoney,
+    },
+
+    cashCount: {
+      type: CashCountSchema,
+      default: () => ({ mode: 'manual', denominations: [], total: 0 }),
+    },
+
+    closingReviews: {
+      type: [CashClosingReviewSchema],
+      default: [],
     },
 
     salesSummary: {
@@ -402,6 +462,7 @@ CashSessionSchema.pre('validate', function beforeValidate(next) {
 
 CashSessionSchema.methods.closeSession = function closeSession({
   countedCash,
+  cashCount = null,
   closedBy = null,
   closedBySnapshot = {},
   closingNotes = '',
@@ -412,6 +473,11 @@ CashSessionSchema.methods.closeSession = function closeSession({
 
   this.status = 'closed';
   this.countedCash = cleanMoney(countedCash);
+  this.cashCount = cashCount || {
+    mode: 'manual',
+    denominations: [],
+    total: cleanMoney(countedCash),
+  };
   this.closedBy = closedBy;
   this.closedBySnapshot = closedBySnapshot;
   this.closingNotes = cleanText(closingNotes);
@@ -476,6 +542,10 @@ CashSessionSchema.statics.getMovementTypes = function getMovementTypes() {
 
 CashSessionSchema.statics.getMovementApprovalStatuses = function getMovementApprovalStatuses() {
   return [...CASH_MOVEMENT_APPROVAL_STATUSES];
+};
+
+CashSessionSchema.statics.getClosingReviewStatuses = function getClosingReviewStatuses() {
+  return [...CASH_CLOSING_REVIEW_STATUSES];
 };
 
 CashSessionSchema.statics.buildSessionCode = buildSessionCode;

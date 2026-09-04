@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import api from '../../lib/api';
-import { reviewCashMovement } from './adminCashSessionApi';
+import { closeCashSession, reviewCashClosing, reviewCashMovement } from './adminCashSessionApi';
 
 vi.mock('../../lib/api', () => ({
   default: {
@@ -12,6 +12,33 @@ vi.mock('../../lib/api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('adminCashSessionApi Etapa 2', () => {
+  it('envía cantidades de denominaciones sin confiar en subtotales', async () => {
+    api.post.mockResolvedValueOnce({ data: { ok: true, requiresApproval: false } });
+    await closeCashSession(' cash-2 ', {
+      countedCash: 100000,
+      denominations: [{ value: 50000, quantity: 2, subtotal: 100000 }],
+      closingNotes: ' Conteo exacto ',
+    });
+    expect(api.post).toHaveBeenCalledWith('/api/admin/cash-sessions/cash-2/close', {
+      countedCash: 100000,
+      denominations: [{ value: 50000, quantity: 2 }],
+      closingNotes: 'Conteo exacto',
+    });
+  });
+
+  it('envía la decisión de supervisión al arqueo exacto', async () => {
+    api.post.mockResolvedValueOnce({ data: { ok: true } });
+    await reviewCashClosing(' cash-2 ', ' review-2 ', {
+      decision: ' approve ', reviewNotes: ' Diferencia verificada ',
+    });
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/admin/cash-sessions/cash-2/closing-reviews/review-2/review',
+      { decision: 'approve', reviewNotes: 'Diferencia verificada' }
+    );
+  });
 });
 
 describe('adminCashSessionApi Etapa 1', () => {

@@ -8,6 +8,7 @@ const {
   serializeCashSession,
   openCashSession,
   closeCashSession,
+  reviewCashClosing,
   getCurrentCashSession,
   listCashSessions,
   getCashSessionById,
@@ -119,10 +120,36 @@ router.post('/:id/close', requirePermission('pos:sell'), async (req, res) => {
       ...access,
     });
 
+    const outcome = session.$locals.cashClosingOutcome || {};
+    return res.status(outcome.requiresApproval === true ? 202 : 200).json({
+      ok: true,
+      session: serializeForAccess(session, access),
+      closing: outcome,
+      requiresApproval: outcome.requiresApproval === true,
+      message: outcome.requiresApproval === true
+        ? 'Arqueo enviado a supervisión. La caja queda congelada hasta la decisión.'
+        : 'Caja cerrada correctamente.',
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/:id/closing-reviews/:reviewId/review', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const access = buildCashSessionAccess(req, { requireSell: true });
+    const session = await reviewCashClosing(req.params.id, req.params.reviewId, req.body || {}, {
+      admin: buildAdminContext(req),
+      ...access,
+    });
+    const outcome = session.$locals.cashClosingOutcome || {};
     return res.json({
       ok: true,
       session: serializeForAccess(session, access),
-      message: 'Caja cerrada correctamente.',
+      closing: outcome,
+      message: outcome.decision === 'approve'
+        ? 'Arqueo aprobado y caja cerrada correctamente.'
+        : 'Arqueo rechazado. El cajero puede realizar un nuevo conteo.',
     });
   } catch (error) {
     return sendError(res, error);

@@ -992,6 +992,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Aprobar o rechazar un movimiento pendiente como supervisor de caja.',
     audit: true,
   },
+  {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/:id/closing-reviews/:reviewId/review',
+    permission: 'pos:sell',
+    description: 'Aprobar o rechazar un arqueo extraordinario como supervisor de caja.',
+    audit: true,
+  },
 
   /* =========================================================
    * CONFIGURACIÓN / APARIENCIA / SITE SETTINGS

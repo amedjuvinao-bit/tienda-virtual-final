@@ -29,6 +29,8 @@
     "test:cash-level-plus-stage0-integration": "node scripts/testCashLevelPlusStage0Integration.js",
     "test:cash-level-plus-stage1": "node scripts/testCashLevelPlusStage1.js",
     "test:cash-level-plus-stage1-integration": "node scripts/testCashLevelPlusStage1Integration.js",
+    "test:cash-level-plus-stage2": "node scripts/testCashLevelPlusStage2.js",
+    "test:cash-level-plus-stage2-integration": "node scripts/testCashLevelPlusStage2Integration.js",
     "migrate:cash-session-indexes": "node scripts/migrateCashSessionIndexes.js",
     "migrate:pos-held-sale-indexes": "node scripts/migratePosHeldSaleIndexes.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",

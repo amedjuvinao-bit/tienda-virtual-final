@@ -8,6 +8,7 @@ const {
   buildScopedCashSessionFilter,
   createCashError,
   parseCashAmount,
+  getPendingCashClosingReview,
   recalculateCashSession,
   saveCashSession,
 } = require('./cashSessionService');
@@ -114,6 +115,14 @@ async function addManualCashMovement(sessionId, payload = {}, options = {}) {
 
   if (session.status !== 'open') {
     throw createCashError('Solo se pueden registrar movimientos en una caja abierta.', 'CASH_SESSION_NOT_OPEN', 409);
+  }
+
+  if (getPendingCashClosingReview(session)) {
+    throw createCashError(
+      'La caja está congelada mientras un supervisor revisa el arqueo de cierre.',
+      'CASH_CLOSING_REVIEW_PENDING',
+      409
+    );
   }
 
   const amount = parseCashAmount(payload.amount, {

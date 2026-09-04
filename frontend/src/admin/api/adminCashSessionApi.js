@@ -53,12 +53,35 @@ export async function closeCashSession(sessionId, payload = {}) {
     const cleanId = cleanText(sessionId);
     const response = await api.post(`${BASE_URL}/${cleanId}/close`, {
       countedCash: Number(payload.countedCash || 0),
+      denominations: Array.isArray(payload.denominations)
+        ? payload.denominations.map((entry) => ({
+            value: Number(entry.value || 0),
+            quantity: Number(entry.quantity || 0),
+          }))
+        : [],
       closingNotes: cleanText(payload.closingNotes || ''),
     });
 
     return response.data;
   } catch (error) {
     normalizeError(error, 'No fue posible cerrar la caja.');
+  }
+}
+
+export async function reviewCashClosing(sessionId, reviewId, payload = {}) {
+  try {
+    const cleanSessionId = cleanText(sessionId);
+    const cleanReviewId = cleanText(reviewId);
+    const response = await api.post(
+      `${BASE_URL}/${cleanSessionId}/closing-reviews/${cleanReviewId}/review`,
+      {
+        decision: cleanText(payload.decision),
+        reviewNotes: cleanText(payload.reviewNotes || ''),
+      }
+    );
+    return response.data;
+  } catch (error) {
+    normalizeError(error, 'No fue posible revisar el arqueo de cierre.');
   }
 }
 
@@ -128,6 +151,7 @@ const adminCashSessionApi = {
   closeCashSession,
   addCashMovement,
   reviewCashMovement,
+  reviewCashClosing,
   listCashSessions,
   getCashSessionById,
 };

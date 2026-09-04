@@ -30,10 +30,16 @@ import {
   getCurrentCashSession,
   listCashSessions,
   openCashSession,
+  reviewCashClosing,
   reviewCashMovement,
 } from '../api/adminCashSessionApi';
 
 const REGISTER_CODE = 'CAJA POS';
+const CASH_DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50];
+
+function emptyDenominationCounts() {
+  return Object.fromEntries(CASH_DENOMINATIONS.map((value) => [value, '']));
+}
 
 const MOVEMENT_TYPES = [
   { key: 'cash_in', label: 'Ingreso manual', note: 'Suma al efectivo esperado' },
@@ -144,6 +150,16 @@ function buildReportHtml(session) {
   const manualOut = sumMovements(session, 'out');
   const difference = Number(session?.differenceAmount || 0);
   const differenceLabel = difference > 0 ? 'Sobrante' : difference < 0 ? 'Faltante' : 'Sin diferencia';
+  const denominations = Array.isArray(session?.cashCount?.denominations)
+    ? session.cashCount.denominations.filter((entry) => Number(entry.quantity || 0) > 0)
+    : [];
+  const closingReviews = Array.isArray(session?.closingReviews) ? session.closingReviews : [];
+  const denominationRows = denominations.map((entry) => `
+    <tr><td>${escapeHtml(money(entry.value))}</td><td class="right">${escapeHtml(entry.quantity)}</td><td class="right">${escapeHtml(money(entry.subtotal))}</td></tr>
+  `).join('');
+  const reviewRows = closingReviews.map((review) => `
+    <tr><td>${escapeHtml(review.status || '')}</td><td>${escapeHtml(review.requestedBySnapshot?.displayName || 'Cajero')}</td><td class="right">${escapeHtml(money(review.countedCash))}</td><td class="right">${escapeHtml(visibleMoney(review.differenceAmount))}</td><td>${escapeHtml(review.reviewedBySnapshot?.displayName || '—')}${review.reviewNotes ? ` · ${escapeHtml(review.reviewNotes)}` : ''}</td></tr>
+  `).join('');
   const rows = movements
     .map((movement) => `
       <tr>
@@ -208,6 +224,14 @@ function buildReportHtml(session) {
       <tr><th>Apertura</th><th>Cierre</th><th>Estado</th><th>Contado</th></tr>
       <tr><td>${escapeHtml(formatDate(session?.openedAt))}</td><td>${escapeHtml(formatDate(session?.closedAt))}</td><td>${escapeHtml(session?.status || '')}</td><td class="right">${escapeHtml(visibleMoney(session?.countedCash))}</td></tr>
     </table>
+
+    <h2>Arqueo por denominaciones</h2>
+    <table>
+      <tr><th>Denominación</th><th class="right">Cantidad</th><th class="right">Subtotal</th></tr>
+      ${denominationRows || '<tr><td colspan="3">Cierre manual sin desglose de denominaciones.</td></tr>'}
+    </table>
+
+    ${closingReviews.length ? `<h2>Revisión de diferencias</h2><table><tr><th>Estado</th><th>Solicitó</th><th class="right">Contado</th><th class="right">Diferencia</th><th>Supervisión</th></tr>${reviewRows}</table>` : ''}
 
     <h2>Ventas y pagos</h2>
     <table>
@@ -411,6 +435,7 @@ function ProfessionalControlBanner({ session }) {
   const control = session?.cashControl || {};
   const pending = Number(control.pendingMovementsCount || 0);
   const blind = control.blindCountActive === true;
+  const closingLocked = control.closingLocked === true;
 
   return (
     <div className="mb-5 grid gap-3 lg:grid-cols-2">
@@ -421,11 +446,11 @@ function ProfessionalControlBanner({ session }) {
           <p className="mt-1 text-xs font-bold">{blind ? 'El esperado y los totales monetarios se revelan al cerrar.' : 'Puedes consultar el esperado y revisar solicitudes del cajero.'}</p>
         </div>
       </div>
-      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: pending ? '#fde68a' : '#bbf7d0', background: pending ? '#fffbeb' : '#ecfdf5', color: pending ? '#b45309' : '#047857' }}>
-        {pending ? <Clock3 className="mt-0.5 h-5 w-5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
+      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: pending || closingLocked ? '#fde68a' : '#bbf7d0', background: pending || closingLocked ? '#fffbeb' : '#ecfdf5', color: pending || closingLocked ? '#b45309' : '#047857' }}>
+        {pending || closingLocked ? <Clock3 className="mt-0.5 h-5 w-5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
         <div>
-          <p className="text-sm font-black">{pending ? `${pending} movimiento(s) por revisar` : 'Sin aprobaciones pendientes'}</p>
-          <p className="mt-1 text-xs font-bold">{pending ? 'La caja no podrá cerrarse hasta resolverlos.' : 'El cierre está libre de solicitudes abiertas.'}</p>
+          <p className="text-sm font-black">{closingLocked ? 'Arqueo pendiente de supervisión' : pending ? `${pending} movimiento(s) por revisar` : 'Sin aprobaciones pendientes'}</p>
+          <p className="mt-1 text-xs font-bold">{closingLocked ? 'Ventas y movimientos están congelados hasta la decisión.' : pending ? 'La caja no podrá cerrarse hasta resolverlos.' : 'El cierre está libre de solicitudes abiertas.'}</p>
         </div>
       </div>
     </div>
@@ -550,6 +575,10 @@ function ReportPanel({ session, onClose }) {
   const movements = getMovements(session);
   const manualIn = sumMovements(session, 'in');
   const manualOut = sumMovements(session, 'out');
+  const denominations = Array.isArray(session?.cashCount?.denominations)
+    ? session.cashCount.denominations.filter((entry) => Number(entry.quantity || 0) > 0)
+    : [];
+  const closingReviews = Array.isArray(session?.closingReviews) ? session.closingReviews : [];
 
   return (
     <Card className="overflow-hidden border-2" style={{ borderColor: 'var(--admin-primary)' }}>
@@ -593,6 +622,24 @@ function ReportPanel({ session, onClose }) {
             )}
           />
         </div>
+
+        {denominations.length > 0 ? (
+          <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}><h3 className="text-sm font-black uppercase tracking-[0.12em]">Arqueo por denominaciones</h3></div>
+            <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {denominations.map((entry) => <div key={entry.value} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-bold" style={{ borderColor: 'var(--admin-card-border)' }}><span>{money(entry.value)} × {entry.quantity}</span><span>{money(entry.subtotal)}</span></div>)}
+            </div>
+          </div>
+        ) : null}
+
+        {closingReviews.length > 0 ? (
+          <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <div className="border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}><h3 className="text-sm font-black uppercase tracking-[0.12em]">Revisión de diferencias</h3></div>
+            <div className="divide-y" style={{ borderColor: 'var(--admin-card-border)' }}>
+              {closingReviews.map((review) => <div key={review._id} className="grid gap-2 p-4 text-sm md:grid-cols-[1fr_160px_1fr]"><div><p className="font-black">{review.status === 'approved' ? 'Aprobado' : review.status === 'rejected' ? 'Rechazado' : 'Pendiente'}</p><p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{review.requestedBySnapshot?.displayName || 'Cajero'} · {formatDate(review.requestedAt)}</p></div><p className="font-black">{money(review.countedCash)} · {visibleMoney(review.differenceAmount)}</p><p className="font-bold">{review.reviewedBySnapshot?.displayName || 'Sin revisión'}{review.reviewNotes ? ` · ${review.reviewNotes}` : ''}</p></div>)}
+            </div>
+          </div>
+        ) : null}
 
         <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
           <div className="border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}>
@@ -691,6 +738,7 @@ export default function CashSessionsPageReport() {
   const [openingAmount, setOpeningAmount] = useState('50000');
   const [openingNotes, setOpeningNotes] = useState('');
   const [countedCash, setCountedCash] = useState('');
+  const [denominationCounts, setDenominationCounts] = useState(emptyDenominationCounts);
   const [closingNotes, setClosingNotes] = useState('');
   const [movementForm, setMovementForm] = useState({ type: 'cash_in', amount: '', reason: '', reference: '' });
   const [currentSession, setCurrentSession] = useState(null);
@@ -702,6 +750,7 @@ export default function CashSessionsPageReport() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [movementReview, setMovementReview] = useState(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [closingReviewNotes, setClosingReviewNotes] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -709,6 +758,25 @@ export default function CashSessionsPageReport() {
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
   const pendingMovementsCount = Number(currentSession?.cashControl?.pendingMovementsCount || 0);
+  const closingLocked = currentSession?.cashControl?.closingLocked === true;
+  const pendingClosingReview = useMemo(
+    () => (Array.isArray(currentSession?.closingReviews)
+      ? currentSession.closingReviews.find((review) => review.status === 'pending') || null
+      : null),
+    [currentSession]
+  );
+  const denominationRows = useMemo(
+    () => CASH_DENOMINATIONS.map((value) => ({
+      value,
+      quantity: numberValue(denominationCounts[value]),
+      subtotal: value * numberValue(denominationCounts[value]),
+    })),
+    [denominationCounts]
+  );
+  const denominationTotal = useMemo(
+    () => denominationRows.reduce((sum, entry) => sum + entry.subtotal, 0),
+    [denominationRows]
+  );
 
   const refreshForBranch = useCallback(async (branchId = selectedBranchId, registerCode = cashRegisterCode) => {
     if (!branchId) return;
@@ -721,6 +789,7 @@ export default function CashSessionsPageReport() {
     setCurrentSession(session);
     setSessions(Array.isArray(history?.sessions) ? history.sessions : []);
     setCountedCash('');
+    setDenominationCounts(emptyDenominationCounts());
   }, [cashRegisterCode, selectedBranchId]);
 
   const loadData = useCallback(async () => {
@@ -896,27 +965,67 @@ export default function CashSessionsPageReport() {
   const handleCloseCash = async (event) => {
     event.preventDefault();
     if (!currentSession?.id) return;
-    if (!clean(countedCash)) {
+    const hasDenominationEntry = Object.values(denominationCounts).some((value) => clean(value) !== '');
+    if (!clean(countedCash) && !hasDenominationEntry) {
       setError('Debes ingresar el efectivo contado antes de cerrar la caja.');
       return;
     }
-
     try {
       setSaving(true);
       setError('');
       setSuccess('');
-      const response = await closeCashSession(currentSession.id, { countedCash: numberValue(countedCash), closingNotes });
+      const response = await closeCashSession(currentSession.id, {
+        countedCash: denominationTotal,
+        denominations: denominationRows,
+        closingNotes,
+      });
       const closedSession = response?.session || null;
-      setCurrentSession(null);
       setClosingNotes('');
       setCountedCash('');
-      setReportSession(closedSession);
-      setSuccess(`Caja cerrada correctamente. Diferencia: ${money(closedSession?.differenceAmount || 0)}. Ya puedes ver o imprimir el reporte.`);
+      setDenominationCounts(emptyDenominationCounts());
+      if (response?.requiresApproval) {
+        setCurrentSession(closedSession);
+        setSuccess(response?.message || 'Arqueo enviado a supervisión.');
+      } else {
+        setCurrentSession(null);
+        setReportSession(closedSession);
+        setSuccess(`Caja cerrada correctamente. Diferencia: ${money(closedSession?.differenceAmount || 0)}. Ya puedes ver o imprimir el reporte.`);
+      }
       await refreshForBranch(selectedBranchId, cashRegisterCode);
     } catch (err) {
       setError(err?.message || 'No fue posible cerrar la caja.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleClosingReview = async (decision) => {
+    if (!currentSession?.id || !pendingClosingReview?._id) return;
+    if (!clean(closingReviewNotes)) {
+      setError('Debes registrar una observación de supervisión.');
+      return;
+    }
+    try {
+      setReviewSaving(true);
+      setError('');
+      setSuccess('');
+      const response = await reviewCashClosing(currentSession.id, pendingClosingReview._id, {
+        decision,
+        reviewNotes: closingReviewNotes,
+      });
+      setClosingReviewNotes('');
+      if (decision === 'approve') {
+        setCurrentSession(null);
+        setReportSession(response?.session || null);
+      } else {
+        setCurrentSession(response?.session || null);
+      }
+      setSuccess(response?.message || 'Arqueo revisado correctamente.');
+      await refreshForBranch(selectedBranchId, cashRegisterCode);
+    } catch (err) {
+      setError(err?.message || 'No fue posible revisar el arqueo.');
+    } finally {
+      setReviewSaving(false);
     }
   };
 
@@ -992,7 +1101,36 @@ export default function CashSessionsPageReport() {
 
           <ProfessionalControlBanner session={currentSession} />
           <SessionStats session={currentSession} />
-          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving || reviewSaving} onSubmit={handleMovement} onReview={openMovementReview} />
+          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving || reviewSaving || closingLocked} onSubmit={handleMovement} onReview={openMovementReview} />
+
+          {pendingClosingReview ? (
+            <div className="mt-5 rounded-3xl border p-5" style={{ borderColor: '#fde68a', background: '#fffbeb' }}>
+              <div className="flex items-start gap-3" style={{ color: '#b45309' }}>
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-sm font-black">Arqueo extraordinario pendiente</p>
+                  <p className="mt-1 text-xs font-bold">
+                    Contado: {money(pendingClosingReview.countedCash)}
+                    {pendingClosingReview.differenceAmount !== null && pendingClosingReview.differenceAmount !== undefined
+                      ? ` · Diferencia: ${money(pendingClosingReview.differenceAmount)}`
+                      : ''}
+                    {' · '}Tolerancia: {money(pendingClosingReview.toleranceAmount)}
+                  </p>
+                </div>
+              </div>
+              {currentSession?.cashControl?.canReviewClosing ? (
+                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+                  <Field label="Observación de supervisión">
+                    <Input value={closingReviewNotes} onChange={(event) => setClosingReviewNotes(event.target.value)} placeholder="Explica la decisión" disabled={reviewSaving} />
+                  </Field>
+                  <Button type="button" variant="ghost" onClick={() => handleClosingReview('reject')} disabled={reviewSaving}><XCircle className="h-4 w-4" /> Rechazar</Button>
+                  <Button type="button" onClick={() => handleClosingReview('approve')} disabled={reviewSaving}><CheckCircle2 className="h-4 w-4" /> Aprobar y cerrar</Button>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm font-bold" style={{ color: '#b45309' }}>Un supervisor debe aprobar o rechazar este conteo. Mientras tanto no se pueden registrar ventas ni movimientos.</p>
+              )}
+            </div>
+          ) : null}
 
           {pendingMovementsCount > 0 ? (
             <div className="mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold" style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}>
@@ -1001,11 +1139,34 @@ export default function CashSessionsPageReport() {
             </div>
           ) : null}
 
-          <form onSubmit={handleCloseCash} className="mt-5 grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_auto] lg:items-end">
-            <Field label="Efectivo contado"><Input type="number" min="0" step="100" value={countedCash} onChange={(event) => setCountedCash(event.target.value)} disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
-            <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
-            <Button type="submit" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0}><LockKeyhole className="h-4 w-4" /> {saving ? 'Cerrando...' : pendingMovementsCount > 0 ? 'Cierre bloqueado' : 'Cerrar caja'}</Button>
-          </form>
+          {!closingLocked ? (
+            <form onSubmit={handleCloseCash} className="mt-5 rounded-3xl border p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Arqueo por denominaciones</p>
+                  <h3 className="mt-1 text-lg font-black">Cuenta billetes y monedas</h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>El sistema calcula el efectivo contado sin revelar el esperado al cajero.</p>
+                </div>
+                <div className="rounded-2xl border px-4 py-3 text-right" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                  <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Total contado</p>
+                  <p className="mt-1 text-xl font-black">{money(denominationTotal)}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {denominationRows.map((entry) => (
+                  <label key={entry.value} className="rounded-2xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                    <span className="flex items-center justify-between gap-2 text-sm font-black"><span>{money(entry.value)}</span><span style={{ color: 'var(--admin-primary)' }}>{money(entry.subtotal)}</span></span>
+                    <Input className="mt-2" type="number" min="0" step="1" inputMode="numeric" aria-label={`Cantidad de ${money(entry.value)}`} value={denominationCounts[entry.value]} onChange={(event) => setDenominationCounts((previous) => ({ ...previous, [entry.value]: event.target.value }))} disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} placeholder="Cantidad" />
+                  </label>
+                ))}
+              </div>
+              <input className="sr-only" type="number" aria-label="Efectivo contado" value={countedCash} readOnly tabIndex={-1} />
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
+                <Button type="submit" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0}><LockKeyhole className="h-4 w-4" /> {saving ? 'Procesando arqueo...' : pendingMovementsCount > 0 ? 'Cierre bloqueado' : 'Cerrar caja'}</Button>
+              </div>
+            </form>
+          ) : null}
         </Card>
       ) : (
         <Card className="p-5">

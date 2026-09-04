@@ -16,6 +16,8 @@ const CASH_SALE_STATUSES = new Set([
   'refunded',
 ]);
 const PAYMENT_TOTAL_KEYS = new Set(['cash', 'transfer', 'card', 'mixed', 'other']);
+const CASH_DENOMINATIONS = Object.freeze([100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50]);
+const DEFAULT_CASH_VARIANCE_TOLERANCE = 1000;
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -339,6 +341,79 @@ function getPendingCashMovements(session = {}) {
   return movements.filter((movement) => cleanLower(movement?.approvalStatus, 30) === 'pending');
 }
 
+function getPendingCashClosingReview(session = {}) {
+  const reviews = Array.isArray(session?.closingReviews) ? session.closingReviews : [];
+  return reviews.find((review) => cleanLower(review?.status, 30) === 'pending') || null;
+}
+
+function getCashVarianceTolerance() {
+  const raw = cleanText(process.env.CASH_VARIANCE_TOLERANCE, 30);
+  if (!raw) return DEFAULT_CASH_VARIANCE_TOLERANCE;
+  const configured = Number(raw);
+  return Number.isSafeInteger(configured) && configured >= 0
+    ? configured
+    : DEFAULT_CASH_VARIANCE_TOLERANCE;
+}
+
+function parseCashCount(payload = {}) {
+  const raw = Array.isArray(payload.denominations)
+    ? payload.denominations
+    : Array.isArray(payload.cashCount?.denominations)
+      ? payload.cashCount.denominations
+      : [];
+
+  if (!raw.length) {
+    const total = parseCashAmount(payload.countedCash, {
+      required: true,
+      field: 'efectivo contado',
+      code: 'CASH_COUNTED_AMOUNT_REQUIRED',
+    });
+    return { mode: 'manual', denominations: [], total };
+  }
+
+  const allowed = new Set(CASH_DENOMINATIONS);
+  const seen = new Set();
+  const denominations = raw.map((entry = {}) => {
+    const value = Number(entry.value ?? entry.denomination);
+    const quantity = Number(entry.quantity);
+    if (!allowed.has(value) || seen.has(value)) {
+      throw createCashError(
+        'El arqueo contiene una denominación inválida o repetida.',
+        'CASH_DENOMINATION_INVALID',
+        400,
+        { value }
+      );
+    }
+    if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 100000) {
+      throw createCashError(
+        'La cantidad de cada denominación debe ser un entero válido.',
+        'CASH_DENOMINATION_QUANTITY_INVALID',
+        400,
+        { value, quantity }
+      );
+    }
+    seen.add(value);
+    const subtotal = value * quantity;
+    if (!Number.isSafeInteger(subtotal)) {
+      throw createCashError('El total del arqueo excede el valor permitido.', 'CASH_COUNT_TOTAL_INVALID', 400);
+    }
+    return { value, quantity, subtotal };
+  });
+  const total = denominations.reduce((sum, entry) => sum + entry.subtotal, 0);
+  if (!Number.isSafeInteger(total)) {
+    throw createCashError('El total del arqueo excede el valor permitido.', 'CASH_COUNT_TOTAL_INVALID', 400);
+  }
+  if (payload.countedCash !== undefined && Number(payload.countedCash) !== total) {
+    throw createCashError(
+      'El total contado no coincide con la suma de denominaciones.',
+      'CASH_COUNT_TOTAL_MISMATCH',
+      400,
+      { countedCash: Number(payload.countedCash), denominationsTotal: total }
+    );
+  }
+  return { mode: 'denominations', denominations, total };
+}
+
 function buildBlindSalesSummary(summary = {}) {
   return {
     ordersCount: Number(summary?.ordersCount || 0),
@@ -370,6 +445,14 @@ function serializeCashSession(session = {}, options = {}) {
   const canSupervise = options.canSupervise !== false;
   const blindCountActive = doc.status === 'open' && options.blindCount === true;
   const pendingMovementsCount = getPendingCashMovements(doc).length;
+  const pendingClosingReview = getPendingCashClosingReview(doc);
+  const closingReviews = Array.isArray(doc.closingReviews)
+    ? doc.closingReviews.map((review) => ({
+        ...review,
+        expectedCash: blindCountActive ? null : Number(review.expectedCash || 0),
+        differenceAmount: blindCountActive ? null : Number(review.differenceAmount || 0),
+      }))
+    : [];
 
   return {
     id: String(doc._id || doc.id || ''),
@@ -387,6 +470,8 @@ function serializeCashSession(session = {}, options = {}) {
     expectedCash: blindCountActive ? null : Number(doc.expectedCash || 0),
     countedCash: blindCountActive ? null : Number(doc.countedCash || 0),
     differenceAmount: blindCountActive ? null : Number(doc.differenceAmount || 0),
+    cashCount: blindCountActive ? null : doc.cashCount || {},
+    closingReviews,
     salesSummary: blindCountActive
       ? buildBlindSalesSummary(doc.salesSummary || {})
       : doc.salesSummary || {},
@@ -396,6 +481,11 @@ function serializeCashSession(session = {}, options = {}) {
       canSupervise,
       canReviewMovements: canSupervise,
       pendingMovementsCount,
+      closingLocked: Boolean(pendingClosingReview),
+      pendingClosingReviewId: pendingClosingReview ? String(pendingClosingReview._id || '') : '',
+      pendingClosingReviewStatus: pendingClosingReview?.status || '',
+      canReviewClosing: canSupervise,
+      varianceTolerance: getCashVarianceTolerance(),
     },
     openedBy: doc.openedBy ? String(doc.openedBy) : '',
     openedBySnapshot: doc.openedBySnapshot || {},
@@ -681,6 +771,14 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
 
   assertCashSessionOperator(session, adminContext, options);
 
+  if (getPendingCashClosingReview(session)) {
+    throw createCashError(
+      'Este arqueo ya está pendiente de revisión por un supervisor.',
+      'CASH_CLOSING_REVIEW_PENDING',
+      409
+    );
+  }
+
   const pendingMovements = getPendingCashMovements(session);
   if (pendingMovements.length > 0) {
     throw createCashError(
@@ -696,15 +794,42 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
 
   const recalculatedSession = await recalculateCashSession(session);
 
+  const cashCount = parseCashCount(payload);
+  const differenceAmount = cashCount.total - cleanMoney(recalculatedSession.expectedCash);
+  const toleranceAmount = getCashVarianceTolerance();
+  const closingNotes = cleanText(payload.closingNotes || '', 1000);
+
+  if (Math.abs(differenceAmount) > toleranceAmount && options.canSupervise !== true) {
+    recalculatedSession.closingReviews.push({
+      status: 'pending',
+      countedCash: cashCount.total,
+      expectedCash: recalculatedSession.expectedCash,
+      differenceAmount,
+      toleranceAmount,
+      cashCount,
+      closingNotes,
+      requestedBy: adminContext.id,
+      requestedBySnapshot: adminContext.snapshot,
+      requestedAt: new Date(),
+    });
+    await saveCashSession(recalculatedSession);
+    const review = recalculatedSession.closingReviews.at(-1);
+    recalculatedSession.$locals.cashClosingOutcome = {
+      closed: false,
+      requiresApproval: true,
+      reviewId: String(review?._id || ''),
+      differenceAmount,
+      toleranceAmount,
+    };
+    return recalculatedSession;
+  }
+
   recalculatedSession.closeSession({
-    countedCash: parseCashAmount(payload.countedCash, {
-      required: true,
-      field: 'efectivo contado',
-      code: 'CASH_COUNTED_AMOUNT_REQUIRED',
-    }),
+    countedCash: cashCount.total,
+    cashCount,
     closedBy: adminContext.id,
     closedBySnapshot: adminContext.snapshot,
-    closingNotes: cleanText(payload.closingNotes || '', 1000),
+    closingNotes,
   });
 
   recalculatedSession.cashMovements.push({
@@ -717,7 +842,79 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
   });
 
   await saveCashSession(recalculatedSession);
+  recalculatedSession.$locals.cashClosingOutcome = {
+    closed: true,
+    requiresApproval: false,
+    differenceAmount,
+    toleranceAmount,
+  };
   return recalculatedSession;
+}
+
+async function reviewCashClosing(sessionId, reviewId, payload = {}, options = {}) {
+  if (options.canSupervise !== true) {
+    throw createCashError('Solo un supervisor puede revisar este arqueo.', 'CASH_CLOSING_REVIEW_FORBIDDEN', 403);
+  }
+  const session = await CashSession.findOne(buildScopedCashSessionFilter(sessionId, options));
+  if (!session) {
+    throw createCashError('Caja no encontrada dentro de tus sedes autorizadas.', 'CASH_SESSION_NOT_FOUND', 404);
+  }
+  if (session.status !== 'open') {
+    throw createCashError('El arqueo solo puede revisarse con la caja abierta.', 'CASH_SESSION_NOT_OPEN', 409);
+  }
+  const recalculated = await recalculateCashSession(session);
+  const review = recalculated.closingReviews.id(toObjectId(reviewId));
+  if (!review) {
+    throw createCashError('La solicitud de cierre no existe.', 'CASH_CLOSING_REVIEW_NOT_FOUND', 404);
+  }
+  if (review.status !== 'pending') {
+    throw createCashError('Esta solicitud de cierre ya fue revisada.', 'CASH_CLOSING_REVIEW_ALREADY_REVIEWED', 409);
+  }
+  const decision = cleanLower(payload.decision, 20);
+  if (!['approve', 'reject'].includes(decision)) {
+    throw createCashError('La decisión debe ser aprobar o rechazar.', 'CASH_CLOSING_REVIEW_DECISION_INVALID', 400);
+  }
+  const reviewNotes = cleanText(payload.reviewNotes || payload.notes || '', 300);
+  if (!reviewNotes) {
+    throw createCashError('Debes registrar una observación de supervisión.', 'CASH_CLOSING_REVIEW_NOTES_REQUIRED', 400);
+  }
+  const adminContext = await resolveAdminContext(options.admin || {});
+  review.status = decision === 'approve' ? 'approved' : 'rejected';
+  review.reviewedBy = adminContext.id;
+  review.reviewedBySnapshot = adminContext.snapshot;
+  review.reviewedAt = new Date();
+  review.reviewNotes = reviewNotes;
+
+  if (decision === 'approve') {
+    const currentDifference = cleanMoney(review.countedCash) - cleanMoney(recalculated.expectedCash);
+    if (currentDifference !== Number(review.differenceAmount || 0)) {
+      throw createCashError(
+        'El efectivo esperado cambió desde la solicitud. Rechaza el arqueo y solicita un nuevo conteo.',
+        'CASH_CLOSING_REVIEW_STALE',
+        409,
+        { requestedDifference: review.differenceAmount, currentDifference }
+      );
+    }
+    recalculated.closeSession({
+      countedCash: review.countedCash,
+      cashCount: review.cashCount,
+      closedBy: adminContext.id,
+      closedBySnapshot: adminContext.snapshot,
+      closingNotes: review.closingNotes,
+    });
+    recalculated.cashMovements.push({
+      type: 'closing', amount: review.countedCash, direction: 'neutral',
+      reason: 'Cierre de caja aprobado por supervisor',
+      createdBy: adminContext.id, createdBySnapshot: adminContext.snapshot,
+    });
+    await saveCashSession(recalculated);
+    recalculated.$locals.cashClosingOutcome = { closed: true, requiresApproval: false, reviewId: String(review._id), decision };
+    return recalculated;
+  }
+
+  await saveCashSession(recalculated);
+  recalculated.$locals.cashClosingOutcome = { closed: false, requiresApproval: false, reviewId: String(review._id), decision };
+  return recalculated;
 }
 
 async function listCashSessions(filters = {}) {
@@ -786,10 +983,15 @@ module.exports = {
   serializeCashSession,
   openCashSession,
   closeCashSession,
+  reviewCashClosing,
   getCurrentCashSession,
   listCashSessions,
   getCashSessionById,
   getPendingCashMovements,
+  getPendingCashClosingReview,
+  parseCashCount,
+  getCashVarianceTolerance,
+  CASH_DENOMINATIONS,
   recalculateCashSession,
   allocateRefundAcrossPayments,
   buildCashSessionSalesSummary,
