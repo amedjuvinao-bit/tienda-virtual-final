@@ -127,13 +127,27 @@ describe('CashSessionsPageReport Etapa 0', () => {
   });
 
   it('presenta el reporte como un diálogo accesible', async () => {
-    getCurrentCashSession.mockResolvedValue({ session: openSession });
+    getCurrentCashSession.mockResolvedValue({
+      session: {
+        ...openSession,
+        cashMovements: [{
+          _id: 'movement-approved',
+          type: 'withdrawal',
+          direction: 'out',
+          amount: 50000,
+          approvalStatus: 'approved',
+          reason: 'Salida aprobada',
+        }],
+      },
+    });
     render(<CashSessionsPageReport />);
 
     await screen.findByText(openSession.sessionCode);
     fireEvent.click(screen.getByRole('button', { name: /vista reporte/i }));
 
     expect(screen.getByRole('dialog', { name: 'Reporte de cierre de caja' })).toBeInTheDocument();
+    expect(screen.getByText(/Entradas \+\$\s*0/)).toBeInTheDocument();
+    expect(screen.getByText(/Salidas -\$\s*50[.]000/)).toBeInTheDocument();
   });
 
   it('mantiene visible y operativo el acceso al reporte desde el histórico', async () => {

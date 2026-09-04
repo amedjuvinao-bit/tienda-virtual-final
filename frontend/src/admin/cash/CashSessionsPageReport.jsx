@@ -365,7 +365,7 @@ function Message({ type = 'success', children }) {
   );
 }
 
-function Stat({ icon: Icon, label, value, helper }) {
+function Stat({ icon: Icon, label, value, helper, wrapValue = false }) {
   return (
     <div className="rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
       <div className="flex items-center gap-3">
@@ -374,7 +374,7 @@ function Stat({ icon: Icon, label, value, helper }) {
         </span>
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>{label}</p>
-          <p className="mt-1 truncate text-lg font-black">{value}</p>
+          <p className={`mt-1 text-lg font-black ${wrapValue ? '' : 'truncate'}`}>{value}</p>
           {helper ? <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{helper}</p> : null}
         </div>
       </div>
@@ -581,7 +581,17 @@ function ReportPanel({ session, onClose }) {
           <Stat icon={Banknote} label="Efectivo" value={visibleMoney(totals.cash)} />
           <Stat icon={Smartphone} label="Transferencia" value={visibleMoney(totals.transfer)} />
           <Stat icon={CreditCard} label="Tarjeta" value={visibleMoney(totals.card)} />
-          <Stat icon={Wallet} label="Movimientos" value={`${movementSign({ direction: 'in' })}${money(manualIn)} / -${money(manualOut)}`} />
+          <Stat
+            icon={Wallet}
+            label="Movimientos"
+            wrapValue
+            value={(
+              <span className="flex flex-col gap-1 text-sm leading-tight">
+                <span style={{ color: '#047857' }}>Entradas +{money(manualIn)}</span>
+                <span style={{ color: '#b91c1c' }}>Salidas -{money(manualOut)}</span>
+              </span>
+            )}
+          />
         </div>
 
         <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
