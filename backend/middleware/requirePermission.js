@@ -25,13 +25,16 @@
  */
 
 const AdminRole = require('../models/AdminRole');
+const {
+  canonicalPermission,
+} = require('../security/adminPermissionCatalog');
 
 function normalizeText(value) {
   return String(value || '').trim();
 }
 
 function normalizePermission(value) {
-  return normalizeText(value).toLowerCase().replace(/\s+/g, ':');
+  return canonicalPermission(normalizeText(value));
 }
 
 function normalizeRole(value) {

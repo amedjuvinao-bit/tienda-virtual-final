@@ -9,6 +9,7 @@ const CashSession = require('../models/CashSession');
 const { serializeCashSession } = require('../services/cashSessionService');
 const { movementRequiresSupervisorApproval } = require('../services/cashMovementService');
 const { canSuperviseCashSession } = require('../services/adminPosAccessService');
+const requirePermission = require('../middleware/requirePermission');
 
 let controls = 0;
 
@@ -23,6 +24,18 @@ function read(relativePath) {
 }
 
 async function main() {
+  const legacyCashierRequest = {
+    adminUser: 'cajero.legado',
+    adminRole: 'cashier',
+    adminPermissions: ['pos:create'],
+    adminRolePermissionsLoaded: true,
+    adminRolePermissions: [],
+  };
+  ok(
+    'el permiso histórico pos:create autoriza las rutas canónicas pos:sell',
+    await requirePermission.hasEffectivePermission(legacyCashierRequest, 'pos:sell')
+  );
+
   const branchId = new mongoose.Types.ObjectId();
   const cashierId = new mongoose.Types.ObjectId();
   const session = new CashSession({
