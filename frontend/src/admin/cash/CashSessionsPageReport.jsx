@@ -26,6 +26,7 @@ import { getPosBootstrap } from '../api/adminPosApi';
 import {
   addCashMovement,
   closeCashSession,
+  getCashJourneySummary,
   getCashSessionById,
   getCurrentCashSession,
   listCashSessions,
@@ -154,11 +155,16 @@ function buildReportHtml(session) {
     ? session.cashCount.denominations.filter((entry) => Number(entry.quantity || 0) > 0)
     : [];
   const closingReviews = Array.isArray(session?.closingReviews) ? session.closingReviews : [];
+  const reconciliation = session?.reconciliation || {};
+  const reconciliationChecks = Array.isArray(reconciliation?.checks) ? reconciliation.checks : [];
   const denominationRows = denominations.map((entry) => `
     <tr><td>${escapeHtml(money(entry.value))}</td><td class="right">${escapeHtml(entry.quantity)}</td><td class="right">${escapeHtml(money(entry.subtotal))}</td></tr>
   `).join('');
   const reviewRows = closingReviews.map((review) => `
     <tr><td>${escapeHtml(review.status || '')}</td><td>${escapeHtml(review.requestedBySnapshot?.displayName || 'Cajero')}</td><td class="right">${escapeHtml(money(review.countedCash))}</td><td class="right">${escapeHtml(visibleMoney(review.differenceAmount))}</td><td>${escapeHtml(review.reviewedBySnapshot?.displayName || '—')}${review.reviewNotes ? ` · ${escapeHtml(review.reviewNotes)}` : ''}</td></tr>
+  `).join('');
+  const reconciliationRows = reconciliationChecks.map((item) => `
+    <tr><td>${escapeHtml(item.label || item.code || '')}</td><td>${escapeHtml(item.status === 'ok' ? 'Correcto' : item.status === 'attention' ? 'Atención' : 'Inconsistencia')}</td><td class="right">${escapeHtml(money(item.expected))}</td><td class="right">${escapeHtml(money(item.actual))}</td><td>${escapeHtml(item.message || '')}</td></tr>
   `).join('');
   const rows = movements
     .map((movement) => `
@@ -233,6 +239,8 @@ function buildReportHtml(session) {
 
     ${closingReviews.length ? `<h2>Revisión de diferencias</h2><table><tr><th>Estado</th><th>Solicitó</th><th class="right">Contado</th><th class="right">Diferencia</th><th>Supervisión</th></tr>${reviewRows}</table>` : ''}
 
+    ${reconciliationChecks.length ? `<h2>Conciliación automática</h2><table><tr><th>Control</th><th>Estado</th><th class="right">Esperado</th><th class="right">Real</th><th>Resultado</th></tr>${reconciliationRows}</table>` : ''}
+
     <h2>Ventas y pagos</h2>
     <table>
       <tr><th>Órdenes</th><th>Artículos</th><th>Efectivo</th><th>Transferencia</th><th>Tarjeta</th><th>Total</th></tr>
@@ -280,15 +288,17 @@ function printReport(session) {
   setTimeout(() => reportWindow.print(), 350);
 }
 
-function Card({ children, className = '' }) {
+function Card({ children, className = '', style = {}, ...props }) {
   return (
     <section
+      {...props}
       className={`rounded-3xl border ${className}`}
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
         color: 'var(--admin-card-text)',
         boxShadow: 'var(--admin-shadow-card, 0 18px 50px rgba(15, 23, 42, 0.08))',
+        ...style,
       }}
     >
       {children}
@@ -457,6 +467,76 @@ function ProfessionalControlBanner({ session }) {
   );
 }
 
+function reconciliationPresentation(status) {
+  if (status === 'critical') return { label: 'Requiere revisión', color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' };
+  if (status === 'attention') return { label: 'Con novedades', color: '#b45309', background: '#fffbeb', borderColor: '#fde68a' };
+  return { label: 'Jornada conciliada', color: '#047857', background: '#ecfdf5', borderColor: '#bbf7d0' };
+}
+
+function CashJourneyPanel({ summary, range, onRangeChange, loading }) {
+  if (!summary) return null;
+  const totals = summary.totals || {};
+  const payments = totals.paymentTotals || {};
+  const presentation = reconciliationPresentation(summary.status);
+  const rows = Array.isArray(summary.sessions) ? summary.sessions.slice(0, 6) : [];
+
+  return (
+    <Card className="overflow-hidden" data-testid="cash-journey-stage3">
+      <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: presentation.borderColor, color: presentation.color, background: presentation.background }}><ShieldCheck className="h-5 w-5" /></span>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Etapa 3 · Control de jornada</p>
+              <h2 className="mt-1 text-xl font-black">Conciliación automática de caja</h2>
+              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cruza sesiones, ventas POS, medios de pago, movimientos y arqueos desde el servidor.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => onRangeChange('today')} disabled={loading} className="rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: range === 'today' ? 'var(--admin-primary)' : 'var(--admin-card-border)', color: range === 'today' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)', background: 'var(--admin-card-bg)' }}>Hoy</button>
+            <button type="button" onClick={() => onRangeChange('last_7_days')} disabled={loading} className="rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: range === 'last_7_days' ? 'var(--admin-primary)' : 'var(--admin-card-border)', color: range === 'last_7_days' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)', background: 'var(--admin-card-bg)' }}>Últimos 7 días</button>
+            <span className="inline-flex rounded-xl border px-3 py-2 text-xs font-black" style={{ color: presentation.color, background: presentation.background, borderColor: presentation.borderColor }}>{presentation.label}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Stat icon={History} label="Cajas" value={String(totals.sessionsCount || 0)} helper={`${totals.closedSessionsCount || 0} cerradas · ${totals.openSessionsCount || 0} abiertas`} />
+          <Stat icon={Wallet} label="Ventas conciliadas" value={money(totals.netSales)} helper={`${totals.ordersCount || 0} órdenes POS`} />
+          <Stat icon={Banknote} label="Efectivo contado" value={money(totals.countedCash)} helper={`Esperado ${money(totals.expectedCash)}`} />
+          <Stat icon={AlertCircle} label="Diferencia acumulada" value={money(Math.abs(Number(totals.differenceAmount || 0)))} helper={`Faltantes ${money(totals.shortages)} · Sobrantes ${money(totals.overages)}`} wrapValue />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Stat icon={Banknote} label="Efectivo" value={money(payments.cash)} />
+          <Stat icon={Smartphone} label="Transferencia" value={money(payments.transfer)} />
+          <Stat icon={CreditCard} label="Tarjeta" value={money(payments.card)} />
+          <Stat icon={Wallet} label="Mixto / otros" value={money(Number(payments.mixed || 0) + Number(payments.other || 0))} />
+          <Stat icon={ShieldCheck} label="Total medios" value={money(payments.total)} />
+        </div>
+
+        {Array.isArray(summary.alerts) && summary.alerts.length > 0 ? (
+          <div className="space-y-2">
+            {summary.alerts.map((alert) => <div key={alert.code} className="flex items-start gap-3 rounded-2xl border p-3 text-sm font-bold" style={{ borderColor: alert.severity === 'critical' ? '#fecaca' : '#fde68a', background: alert.severity === 'critical' ? '#fef2f2' : '#fffbeb', color: alert.severity === 'critical' ? '#b91c1c' : '#b45309' }}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{alert.message}</span></div>)}
+          </div>
+        ) : (
+          <div className="flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /><span>No se detectaron inconsistencias en el período seleccionado.</span></div>
+        )}
+
+        {rows.length > 0 ? (
+          <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead><tr style={{ color: 'var(--admin-card-muted-text)' }}><th className="px-4 py-3 text-xs font-black uppercase">Sesión</th><th className="px-4 py-3 text-xs font-black uppercase">Cajero</th><th className="px-4 py-3 text-xs font-black uppercase">Ventas</th><th className="px-4 py-3 text-xs font-black uppercase">Esperado</th><th className="px-4 py-3 text-xs font-black uppercase">Contado</th><th className="px-4 py-3 text-xs font-black uppercase">Control</th></tr></thead>
+              <tbody>{rows.map((row) => { const rowPresentation = reconciliationPresentation(row.reconciliationStatus); return <tr key={row.id} className="border-t" style={{ borderColor: 'var(--admin-card-border)' }}><td className="px-4 py-3"><p className="font-black">{row.sessionCode}</p><p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(row.openedAt)}</p></td><td className="px-4 py-3 font-bold">{row.cashierSnapshot?.displayName || 'Administrador'}</td><td className="px-4 py-3 font-black">{money(row.netSales)}</td><td className="px-4 py-3 font-black">{money(row.expectedCash)}</td><td className="px-4 py-3 font-black">{row.status === 'closed' ? money(row.countedCash) : 'Pendiente'}</td><td className="px-4 py-3"><span className="inline-flex rounded-xl border px-2 py-1 text-xs font-black" style={{ color: rowPresentation.color, background: rowPresentation.background, borderColor: rowPresentation.borderColor }}>{rowPresentation.label}</span></td></tr>; })}</tbody>
+            </table>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 function MovementsBox({ session, form, setForm, disabled, onSubmit, onReview }) {
   const movements = getMovements(session).slice().reverse().slice(0, 8);
   const selectedType = MOVEMENT_TYPES.find((item) => item.key === form.type) || MOVEMENT_TYPES[0];
@@ -579,6 +659,8 @@ function ReportPanel({ session, onClose }) {
     ? session.cashCount.denominations.filter((entry) => Number(entry.quantity || 0) > 0)
     : [];
   const closingReviews = Array.isArray(session?.closingReviews) ? session.closingReviews : [];
+  const reconciliation = session?.reconciliation || {};
+  const reconciliationChecks = Array.isArray(reconciliation?.checks) ? reconciliation.checks : [];
 
   return (
     <Card className="overflow-hidden border-2" style={{ borderColor: 'var(--admin-primary)' }}>
@@ -637,6 +719,18 @@ function ReportPanel({ session, onClose }) {
             <div className="border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}><h3 className="text-sm font-black uppercase tracking-[0.12em]">Revisión de diferencias</h3></div>
             <div className="divide-y" style={{ borderColor: 'var(--admin-card-border)' }}>
               {closingReviews.map((review) => <div key={review._id} className="grid gap-2 p-4 text-sm md:grid-cols-[1fr_160px_1fr]"><div><p className="font-black">{review.status === 'approved' ? 'Aprobado' : review.status === 'rejected' ? 'Rechazado' : 'Pendiente'}</p><p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{review.requestedBySnapshot?.displayName || 'Cajero'} · {formatDate(review.requestedAt)}</p></div><p className="font-black">{money(review.countedCash)} · {visibleMoney(review.differenceAmount)}</p><p className="font-bold">{review.reviewedBySnapshot?.displayName || 'Sin revisión'}{review.reviewNotes ? ` · ${review.reviewNotes}` : ''}</p></div>)}
+            </div>
+          </div>
+        ) : null}
+
+        {reconciliationChecks.length > 0 ? (
+          <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)' }} data-testid="cash-report-reconciliation">
+            <div className="border-b px-4 py-3" style={{ borderColor: 'var(--admin-card-border)' }}><h3 className="text-sm font-black uppercase tracking-[0.12em]">Conciliación automática</h3></div>
+            <div className="divide-y" style={{ borderColor: 'var(--admin-card-border)' }}>
+              {reconciliationChecks.map((item) => {
+                const presentation = reconciliationPresentation(item.status === 'ok' ? 'healthy' : item.status);
+                return <div key={item.code} className="grid gap-2 p-4 text-sm md:grid-cols-[minmax(0,1fr)_130px_180px]"><div><p className="font-black">{item.label || item.code}</p><p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{item.message}</p></div><span className="h-fit w-fit rounded-xl border px-2 py-1 text-xs font-black" style={{ color: presentation.color, background: presentation.background, borderColor: presentation.borderColor }}>{item.status === 'ok' ? 'Correcto' : item.status === 'attention' ? 'Atención' : 'Inconsistencia'}</span><p className="font-black md:text-right">Esperado {money(item.expected)} · Real {money(item.actual)}</p></div>;
+              })}
             </div>
           </div>
         ) : null}
@@ -754,6 +848,9 @@ export default function CashSessionsPageReport() {
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [canSupervise, setCanSupervise] = useState(false);
+  const [journeyRange, setJourneyRange] = useState('today');
+  const [journeySummary, setJourneySummary] = useState(null);
 
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
@@ -784,13 +881,19 @@ export default function CashSessionsPageReport() {
       getCurrentCashSession({ branchId, cashRegisterCode: registerCode }),
       listCashSessions({ branchId, limit: 12 }),
     ]);
+    const supervisorAccess = current?.access?.canSupervise === true;
+    const journey = supervisorAccess
+      ? await getCashJourneySummary({ branchId, range: journeyRange })
+      : null;
 
     const session = current?.session || null;
+    setCanSupervise(supervisorAccess);
+    setJourneySummary(journey?.summary || null);
     setCurrentSession(session);
     setSessions(Array.isArray(history?.sessions) ? history.sessions : []);
     setCountedCash('');
     setDenominationCounts(emptyDenominationCounts());
-  }, [cashRegisterCode, selectedBranchId]);
+  }, [cashRegisterCode, journeyRange, selectedBranchId]);
 
   const loadData = useCallback(async () => {
     try {
@@ -1042,6 +1145,11 @@ export default function CashSessionsPageReport() {
     }
   };
 
+  const handleJourneyRangeChange = (nextRange) => {
+    if (nextRange === journeyRange) return;
+    setJourneyRange(nextRange);
+  };
+
   return (
     <section className="space-y-5">
       <Card className="p-5">
@@ -1077,6 +1185,8 @@ export default function CashSessionsPageReport() {
           </div>
         </div>
       </Card>
+
+      {canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} /> : null}
 
       {reportSession ? (
         <div

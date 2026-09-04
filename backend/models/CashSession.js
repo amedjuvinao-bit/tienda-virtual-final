@@ -200,6 +200,48 @@ const CashClosingReviewSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const CashReconciliationCheckSchema = new mongoose.Schema(
+  {
+    code: { type: String, trim: true, lowercase: true, required: true },
+    label: { type: String, trim: true, default: '' },
+    status: { type: String, enum: ['ok', 'attention', 'critical'], default: 'ok' },
+    expected: { type: Number, default: 0, set: cleanSignedMoney },
+    actual: { type: Number, default: 0, set: cleanSignedMoney },
+    difference: { type: Number, default: 0, set: cleanSignedMoney },
+    message: { type: String, trim: true, maxlength: 500, default: '' },
+  },
+  { _id: false }
+);
+
+const CashReconciliationSchema = new mongoose.Schema(
+  {
+    version: { type: String, trim: true, default: 'cash-reconciliation-v1' },
+    status: {
+      type: String,
+      enum: ['in_progress', 'balanced', 'attention', 'critical'],
+      default: 'in_progress',
+    },
+    generatedAt: { type: Date, default: null },
+    serverAuthoritative: { type: Boolean, default: true },
+    final: { type: Boolean, default: false },
+    openingAmount: { type: Number, default: 0, min: 0, set: cleanMoney },
+    cashSales: { type: Number, default: 0, min: 0, set: cleanMoney },
+    cashIn: { type: Number, default: 0, min: 0, set: cleanMoney },
+    cashOut: { type: Number, default: 0, min: 0, set: cleanMoney },
+    calculatedExpectedCash: { type: Number, default: 0, min: 0, set: cleanMoney },
+    storedExpectedCash: { type: Number, default: 0, min: 0, set: cleanMoney },
+    countedCash: { type: Number, default: 0, min: 0, set: cleanMoney },
+    differenceAmount: { type: Number, default: 0, set: cleanSignedMoney },
+    netSales: { type: Number, default: 0, min: 0, set: cleanMoney },
+    paymentTotal: { type: Number, default: 0, min: 0, set: cleanMoney },
+    ordersCount: { type: Number, default: 0, min: 0 },
+    pendingMovements: { type: Number, default: 0, min: 0 },
+    pendingClosingReviews: { type: Number, default: 0, min: 0 },
+    checks: { type: [CashReconciliationCheckSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const CashSessionSchema = new mongoose.Schema(
   {
     sessionCode: {
@@ -309,6 +351,11 @@ const CashSessionSchema = new mongoose.Schema(
     salesSummary: {
       type: SalesSummarySchema,
       default: () => ({}),
+    },
+
+    reconciliation: {
+      type: CashReconciliationSchema,
+      default: null,
     },
 
     cashMovements: {

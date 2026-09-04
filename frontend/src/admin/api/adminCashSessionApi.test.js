@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import api from '../../lib/api';
-import { closeCashSession, reviewCashClosing, reviewCashMovement } from './adminCashSessionApi';
+import { closeCashSession, getCashJourneySummary, reviewCashClosing, reviewCashMovement } from './adminCashSessionApi';
 
 vi.mock('../../lib/api', () => ({
   default: {
@@ -38,6 +38,15 @@ describe('adminCashSessionApi Etapa 2', () => {
       '/api/admin/cash-sessions/cash-2/closing-reviews/review-2/review',
       { decision: 'approve', reviewNotes: 'Diferencia verificada' }
     );
+  });
+});
+
+describe('adminCashSessionApi Etapa 3', () => {
+  it('consulta el consolidado por sede y período', async () => {
+    api.get.mockResolvedValueOnce({ data: { ok: true, summary: { status: 'healthy' } } });
+    await expect(getCashJourneySummary({ branchId: ' branch-3 ', range: ' last_7_days ' }))
+      .resolves.toMatchObject({ ok: true });
+    expect(api.get).toHaveBeenCalledWith('/api/admin/cash-sessions/journey-summary?branchId=branch-3&range=last_7_days');
   });
 });
 

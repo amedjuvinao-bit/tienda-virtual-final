@@ -12,7 +12,9 @@ const {
   getCurrentCashSession,
   listCashSessions,
   getCashSessionById,
+  getCashVarianceTolerance,
 } = require('../services/cashSessionService');
+const { buildCashJourneySummary } = require('../services/cashReconciliationService');
 const {
   addManualCashMovement,
   reviewCashMovement,
@@ -61,6 +63,29 @@ function serializeForAccess(session, access = {}) {
 }
 
 router.use(requireAdmin);
+
+router.get('/journey-summary', requirePermission('pos:view'), async (req, res) => {
+  try {
+    const branchId = req.query.branchId || req.query.branch;
+    assertPosBranchAccess(req, branchId);
+    const access = buildCashSessionAccess(req, { requestedBranchId: branchId });
+    if (access.canSupervise !== true) {
+      const error = new Error('Solo un supervisor puede consultar el consolidado monetario de caja.');
+      error.code = 'CASH_JOURNEY_FORBIDDEN';
+      error.statusCode = 403;
+      throw error;
+    }
+    const summary = await buildCashJourneySummary({
+      branchId,
+      branchIds: access.branchIds,
+      range: req.query.range || 'today',
+      toleranceAmount: getCashVarianceTolerance(),
+    });
+    return res.json({ ok: true, summary });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
 
 router.get('/current', requirePermission('pos:view'), async (req, res) => {
   try {

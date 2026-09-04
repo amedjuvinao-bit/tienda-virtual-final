@@ -954,6 +954,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/cash-sessions/journey-summary',
+    permission: 'pos:view',
+    description: 'Consultar el consolidado conciliado de jornadas de caja como supervisor.',
+  },
+  {
+    method: 'GET',
     path: '/api/admin/cash-sessions',
     permission: 'pos:view',
     description: 'Listar sesiones de caja dentro de las sedes autorizadas.',

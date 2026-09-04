@@ -7,6 +7,7 @@ const Branch = require('../models/Branch');
 const AdminUser = require('../models/AdminUser');
 const Order = require('../models/Order');
 const OrderRefund = require('../models/OrderRefund');
+const { buildCashReconciliation } = require('./cashReconciliationService');
 
 const CASH_SALE_STATUSES = new Set([
   'paid',
@@ -453,6 +454,18 @@ function serializeCashSession(session = {}, options = {}) {
         differenceAmount: blindCountActive ? null : Number(review.differenceAmount || 0),
       }))
     : [];
+  const reconciliation = doc.reconciliation?.version
+    ? doc.reconciliation
+    : buildCashReconciliation(doc, { toleranceAmount: getCashVarianceTolerance() });
+  const visibleReconciliation = blindCountActive
+    ? {
+        version: reconciliation.version || 'cash-reconciliation-v1',
+        status: 'protected',
+        generatedAt: reconciliation.generatedAt || null,
+        serverAuthoritative: true,
+        final: false,
+      }
+    : reconciliation;
 
   return {
     id: String(doc._id || doc.id || ''),
@@ -472,6 +485,7 @@ function serializeCashSession(session = {}, options = {}) {
     differenceAmount: blindCountActive ? null : Number(doc.differenceAmount || 0),
     cashCount: blindCountActive ? null : doc.cashCount || {},
     closingReviews,
+    reconciliation: visibleReconciliation,
     salesSummary: blindCountActive
       ? buildBlindSalesSummary(doc.salesSummary || {})
       : doc.salesSummary || {},
@@ -841,6 +855,10 @@ async function closeCashSession(sessionId, payload = {}, options = {}) {
     createdBySnapshot: adminContext.snapshot,
   });
 
+  recalculatedSession.reconciliation = buildCashReconciliation(recalculatedSession, {
+    toleranceAmount,
+  });
+
   await saveCashSession(recalculatedSession);
   recalculatedSession.$locals.cashClosingOutcome = {
     closed: true,
@@ -906,6 +924,9 @@ async function reviewCashClosing(sessionId, reviewId, payload = {}, options = {}
       type: 'closing', amount: review.countedCash, direction: 'neutral',
       reason: 'Cierre de caja aprobado por supervisor',
       createdBy: adminContext.id, createdBySnapshot: adminContext.snapshot,
+    });
+    recalculated.reconciliation = buildCashReconciliation(recalculated, {
+      toleranceAmount: review.toleranceAmount,
     });
     await saveCashSession(recalculated);
     recalculated.$locals.cashClosingOutcome = { closed: true, requiresApproval: false, reviewId: String(review._id), decision };

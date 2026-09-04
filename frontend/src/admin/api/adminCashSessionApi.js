@@ -32,6 +32,18 @@ export async function getCurrentCashSession({ branchId, cashRegisterCode = 'CAJA
   }
 }
 
+export async function getCashJourneySummary({ branchId, range = 'today' } = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (branchId) params.set('branchId', cleanText(branchId));
+    params.set('range', cleanText(range || 'today'));
+    const response = await api.get(`${BASE_URL}/journey-summary?${params.toString()}`);
+    return response.data;
+  } catch (error) {
+    normalizeError(error, 'No fue posible consultar el control consolidado de caja.');
+  }
+}
+
 export async function openCashSession(payload = {}) {
   try {
     const response = await api.post(`${BASE_URL}/open`, {
@@ -147,6 +159,7 @@ export async function getCashSessionById(sessionId) {
 
 const adminCashSessionApi = {
   getCurrentCashSession,
+  getCashJourneySummary,
   openCashSession,
   closeCashSession,
   addCashMovement,
