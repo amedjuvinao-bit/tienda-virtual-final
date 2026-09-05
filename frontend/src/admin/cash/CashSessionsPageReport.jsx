@@ -406,7 +406,7 @@ function Message({ type = 'success', children }) {
 
 function Stat({ icon: Icon, label, value, helper, wrapValue = false }) {
   return (
-    <div className="rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+    <div className="cash-stat rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}>
           <Icon className="h-5 w-5" />
@@ -428,15 +428,15 @@ function SessionStats({ session }) {
   const blindCountActive = session?.cashControl?.blindCountActive === true;
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="cash-session-summary">
+      <div className="cash-session-stats grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Stat icon={blindCountActive ? EyeOff : Banknote} label="Efectivo esperado" value={visibleMoney(session?.expectedCash)} helper={blindCountActive ? 'Se revelará después del cierre' : 'Monto esperado al cierre'} />
         <Stat icon={Wallet} label="Ventas" value={String(session?.salesSummary?.ordersCount || 0)} helper="Órdenes POS asociadas" />
         <Stat icon={CreditCard} label="Total vendido" value={visibleMoney(session?.salesSummary?.netSales)} helper={blindCountActive ? 'Protegido durante el arqueo' : 'Ventas netas'} />
         <Stat icon={LockKeyhole} label={blindCountActive ? 'Diferencia' : differenceLabel} value={blindCountActive ? 'Pendiente' : money(Math.abs(difference))} helper="Se calcula al cerrar" />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="cash-payment-stats grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Stat icon={Banknote} label="Efectivo" value={visibleMoney(totals.cash)} />
         <Stat icon={Smartphone} label="Transferencia" value={visibleMoney(totals.transfer)} />
         <Stat icon={CreditCard} label="Tarjeta" value={visibleMoney(totals.card)} />
@@ -453,15 +453,15 @@ function ProfessionalControlBanner({ session }) {
   const closingLocked = control.closingLocked === true;
 
   return (
-    <div className="mb-5 grid gap-3 lg:grid-cols-2">
-      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: blind ? '#bfdbfe' : '#bbf7d0', background: blind ? '#eff6ff' : '#ecfdf5', color: blind ? '#1d4ed8' : '#047857' }}>
+    <div className="cash-control-strip mb-5">
+      <div className="cash-control-strip__item" style={{ color: blind ? '#1d4ed8' : '#047857' }}>
         {blind ? <EyeOff className="mt-0.5 h-5 w-5 shrink-0" /> : <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />}
         <div>
           <p className="text-sm font-black">{blind ? 'Conteo ciego activo' : 'Vista de supervisión'}</p>
           <p className="mt-1 text-xs font-bold">{blind ? 'El esperado y los totales monetarios se revelan al cerrar.' : 'Puedes consultar el esperado y revisar solicitudes del cajero.'}</p>
         </div>
       </div>
-      <div className="flex items-start gap-3 rounded-2xl border p-4" style={{ borderColor: pending || closingLocked ? '#fde68a' : '#bbf7d0', background: pending || closingLocked ? '#fffbeb' : '#ecfdf5', color: pending || closingLocked ? '#b45309' : '#047857' }}>
+      <div className="cash-control-strip__item" style={{ color: pending || closingLocked ? '#b45309' : '#047857' }}>
         {pending || closingLocked ? <Clock3 className="mt-0.5 h-5 w-5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
         <div>
           <p className="text-sm font-black">{closingLocked ? 'Arqueo pendiente de supervisión' : pending ? `${pending} movimiento(s) por revisar` : 'Sin aprobaciones pendientes'}</p>
@@ -514,14 +514,14 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading, certifying, 
       </div>
 
       <div className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="cash-journey-metrics grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Stat icon={History} label="Cajas" value={String(totals.sessionsCount || 0)} helper={`${totals.closedSessionsCount || 0} cerradas · ${totals.openSessionsCount || 0} abiertas`} />
           <Stat icon={Wallet} label="Ventas conciliadas" value={money(totals.netSales)} helper={`${totals.ordersCount || 0} órdenes POS`} />
           <Stat icon={Banknote} label="Efectivo contado" value={money(totals.countedCash)} helper={`Esperado ${money(totals.expectedCash)}`} />
           <Stat icon={AlertCircle} label="Diferencia acumulada" value={money(Math.abs(Number(totals.differenceAmount || 0)))} helper={`Faltantes ${money(totals.shortages)} · Sobrantes ${money(totals.overages)}`} wrapValue />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="cash-payment-summary grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Stat icon={Banknote} label="Efectivo" value={money(payments.cash)} />
           <Stat icon={Smartphone} label="Transferencia" value={money(payments.transfer)} />
           <Stat icon={CreditCard} label="Tarjeta" value={money(payments.card)} />
@@ -1397,18 +1397,18 @@ export default function CashSessionsPageReport() {
         ) : (
           <Card className="cash-opening p-6">
             <div className="cash-opening__intro">
-              <span className="cash-opening__icon"><UnlockKeyhole className="h-7 w-7" /></span>
               <div>
                 <p className="cash-eyebrow">Inicio de jornada</p>
                 <h2 className="mt-1 text-2xl font-black">Abrir caja</h2>
-                <p className="mt-2 max-w-xl text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Registra el fondo inicial y deja la caja lista para recibir ventas del POS.</p>
+                <p className="mt-2 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Registra el fondo inicial para comenzar a vender en el POS.</p>
               </div>
+              <span className="cash-opening__requirement"><ShieldCheck className="h-4 w-4" /> Requerida para vender</span>
             </div>
             <form onSubmit={handleOpenCash} className="cash-opening__form">
-              <Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field>
-              <Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field>
-              <Field label="Observación de apertura"><Input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal" disabled={saving || loading} /></Field>
-              <Button type="submit" disabled={saving || loading || !selectedBranchId}><UnlockKeyhole className="h-4 w-4" /> {saving ? 'Abriendo...' : 'Abrir caja'}</Button>
+              <div className="cash-opening__code"><Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field></div>
+              <div className="cash-opening__amount"><Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field></div>
+              <div className="cash-opening__notes"><Field label="Observación de apertura"><Input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal" disabled={saving || loading} /></Field></div>
+              <div className="cash-opening__submit"><Button type="submit" disabled={saving || loading || !selectedBranchId}><UnlockKeyhole className="h-4 w-4" /> {saving ? 'Abriendo...' : 'Abrir caja'}</Button></div>
             </form>
           </Card>
         )

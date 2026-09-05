@@ -24,26 +24,26 @@
   width: 100%;
   max-width: 1600px;
   margin-inline: auto;
+  container: cash-workspace / inline-size;
 }
 
 .cash-workspace__hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 20px 22px 16px;
+  gap: 20px;
+  padding: 18px 22px;
 }
 
 .cash-workspace__hero-icon,
-.cash-opening__icon,
 .cash-journey-finished__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
   color: var(--admin-primary);
   background: var(--admin-primary-soft-bg);
   border: 1px solid var(--admin-card-border);
@@ -57,15 +57,15 @@
 }
 
 .cash-workspace__status {
-  min-height: 46px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
-  border: 1px solid var(--admin-card-border);
-  border-radius: 16px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 0;
   color: var(--admin-primary);
-  background: var(--admin-card-bg);
+  background: transparent;
 }
 
 .cash-workspace__status span,
@@ -89,8 +89,8 @@
 
 .cash-workspace__tabs {
   display: flex;
-  gap: 6px;
-  padding: 0 20px;
+  gap: 24px;
+  padding: 0 22px;
   border-top: 1px solid var(--admin-card-border);
   overflow-x: auto;
 }
@@ -102,19 +102,19 @@
   justify-content: center;
   flex: 0 0 auto;
   gap: 8px;
-  min-height: 52px;
-  padding: 0 16px;
+  min-height: 48px;
+  padding: 0 2px;
   color: var(--admin-card-muted-text);
   font-size: 13px;
   font-weight: 900;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 
 .cash-workspace__tabs button:hover,
 .cash-workspace__tabs button[aria-current='page'] {
   color: var(--admin-primary);
-  background: var(--admin-primary-soft-bg);
+  background: transparent;
   border-bottom-color: var(--admin-primary);
 }
 
@@ -179,12 +179,12 @@
 
 .cash-operation-action {
   display: flex;
-  min-height: 106px;
+  min-height: 78px;
   align-items: center;
   gap: 14px;
-  padding: 18px;
+  padding: 14px 16px;
   border: 1px solid var(--admin-card-border);
-  border-radius: 20px;
+  border-radius: 16px;
   color: var(--admin-card-text);
   background: var(--admin-card-bg);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
@@ -205,12 +205,12 @@
 
 .cash-operation-action__icon {
   display: inline-flex;
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border-radius: 15px;
+  border-radius: 12px;
   color: var(--admin-primary);
   background: var(--admin-primary-soft-bg);
 }
@@ -236,23 +236,116 @@
 }
 
 .cash-opening {
-  display: grid;
-  grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr);
-  align-items: center;
-  gap: 30px;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .cash-opening__intro {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--admin-card-border);
+}
+
+.cash-opening__requirement {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .cash-opening__form {
   display: grid;
-  grid-template-columns: minmax(150px, .7fr) minmax(150px, .7fr) minmax(220px, 1.2fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: end;
-  gap: 12px;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.cash-opening__code,
+.cash-opening__amount,
+.cash-opening__notes,
+.cash-opening__submit {
+  min-width: 0;
+}
+
+.cash-opening__submit button {
+  width: 100%;
+  white-space: nowrap;
+  color: #fff !important;
+}
+
+.cash-session-summary,
+.cash-journey-metrics,
+.cash-payment-summary {
+  overflow: hidden;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 18px;
+  background: var(--admin-card-bg);
+}
+
+.cash-session-summary .cash-session-stats,
+.cash-session-summary .cash-payment-stats,
+.cash-journey-metrics,
+.cash-payment-summary {
+  gap: 0 !important;
+}
+
+.cash-session-summary .cash-payment-stats {
+  border-top: 1px solid var(--admin-card-border);
+  background: var(--admin-page-bg);
+}
+
+.cash-workspace .cash-stat {
+  min-width: 0;
+  padding: 13px 15px;
+  border: 0 !important;
+  border-right: 1px solid var(--admin-card-border) !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.cash-workspace .cash-stat:last-child {
+  border-right: 0 !important;
+}
+
+.cash-workspace .cash-stat > div > span:first-child {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--admin-primary-soft-bg);
+}
+
+.cash-workspace .cash-stat p.text-lg {
+  font-size: 1rem;
+}
+
+.cash-control-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 16px;
+  background: var(--admin-page-bg);
+}
+
+.cash-control-strip__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 15px;
+}
+
+.cash-control-strip__item + .cash-control-strip__item {
+  border-left: 1px solid var(--admin-card-border);
 }
 
 .cash-journey-finished {
@@ -496,5 +589,51 @@
 
   .cash-denominations {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container cash-workspace (max-width: 900px) {
+  .cash-workspace__hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cash-workspace__context {
+    width: 100%;
+    grid-template-columns: minmax(220px, 1fr) auto auto;
+  }
+
+  .cash-operation__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cash-session-stats,
+  .cash-payment-stats,
+  .cash-journey-metrics,
+  .cash-payment-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .cash-workspace .cash-stat:nth-child(2n) {
+    border-right: 0 !important;
+  }
+
+  .cash-workspace .cash-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--admin-card-border) !important;
+  }
+}
+
+@container cash-workspace (max-width: 620px) {
+  .cash-workspace__context,
+  .cash-opening__form,
+  .cash-operation__actions,
+  .cash-control-strip,
+  .cash-counting-form__footer {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-control-strip__item + .cash-control-strip__item {
+    border-top: 1px solid var(--admin-card-border);
+    border-left: 0;
   }
 }
