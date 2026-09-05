@@ -134,7 +134,7 @@ describe('CashSessionsPageReport Etapa 1', () => {
 
     expect(await screen.findByText('Conteo ciego activo')).toBeInTheDocument();
     expect(screen.getAllByText('Oculto').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('Efectivo contado')).toHaveValue(null);
+    expect(screen.queryByLabelText('Efectivo contado')).not.toBeInTheDocument();
     expect(screen.queryByText('$ 78.500')).not.toBeInTheDocument();
   });
 
@@ -142,14 +142,15 @@ describe('CashSessionsPageReport Etapa 1', () => {
     getCurrentCashSession.mockResolvedValue({ session: blindSession });
     render(<CashSessionsPageReport />);
 
-    const closeButton = await screen.findByRole('button', { name: 'Cierre bloqueado' });
+    const closeButton = await screen.findByRole('button', { name: /Cierre bloqueado/i });
     expect(closeButton).toBeDisabled();
-    expect(screen.getByText(/la caja no podrá cerrarse hasta resolverlos/i)).toBeInTheDocument();
+    expect(screen.getByText(/primero deben resolverse los movimientos pendientes/i)).toBeInTheDocument();
   });
 
   it('permite al supervisor aprobar una solicitud desde un diálogo accesible', async () => {
     render(<CashSessionsPageReport />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /Registrar movimiento/i }));
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     expect(screen.getByRole('dialog', { name: 'Aprobar movimiento de caja' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Nota de aprobación (opcional)'), { target: { value: 'Soporte verificado' } });
@@ -167,6 +168,7 @@ describe('CashSessionsPageReport Etapa 1', () => {
   it('exige un motivo antes de confirmar el rechazo', async () => {
     render(<CashSessionsPageReport />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /Registrar movimiento/i }));
     fireEvent.click(await screen.findByRole('button', { name: 'Rechazar' }));
     const confirmButton = screen.getByRole('button', { name: 'Confirmar rechazo' });
     expect(confirmButton).toBeDisabled();
@@ -188,6 +190,7 @@ describe('CashSessionsPageReport Etapa 1', () => {
     render(<CashSessionsPageReport />);
 
     await screen.findByText('Conteo ciego activo');
+    fireEvent.click(screen.getByRole('button', { name: /Registrar movimiento/i }));
     fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'adjustment_out' } });
     fireEvent.change(screen.getByLabelText('Monto'), { target: { value: '10000' } });
     fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Traslado a bóveda' } });

@@ -45,6 +45,7 @@ afterEach(() => {
 describe('CashSessionsPageReport Etapa 2', () => {
   it('calcula y envía el arqueo por denominaciones', async () => {
     render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Realizar arqueo/i }));
     expect(await screen.findByText('Arqueo por denominaciones')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Cantidad de.*50\.000/), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar caja' }));

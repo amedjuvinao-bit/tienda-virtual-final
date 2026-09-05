@@ -1,11 +1,13 @@
 // frontend/src/admin/cash/CashSessionsPageReport.jsx
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
+  ArrowRight,
   Banknote,
-  Building2,
   CheckCircle2,
+  ClipboardCheck,
   Clock3,
   CreditCard,
   EyeOff,
@@ -16,9 +18,11 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
+  Store,
   UnlockKeyhole,
   UserCheck,
   Wallet,
+  X,
   XCircle,
 } from 'lucide-react';
 
@@ -649,12 +653,55 @@ function MovementsBox({ session, form, setForm, disabled, onSubmit, onReview }) 
   );
 }
 
+function WorkspaceDialog({ label, title, description, icon: Icon, onClose, children, wide = false }) {
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="cash-workspace-dialog" role="dialog" aria-modal="true" aria-label={label}>
+      <section className={`cash-workspace-dialog__panel ${wide ? 'cash-workspace-dialog__panel--wide' : ''}`}>
+        <header className="cash-workspace-dialog__header">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="cash-workspace-dialog__icon"><Icon className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-black">{title}</h2>
+              {description ? <p className="mt-1 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>{description}</p> : null}
+            </div>
+          </div>
+          <button type="button" className="cash-workspace-dialog__close" onClick={onClose} aria-label={`Cerrar ${label}`}>
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+        <div className="cash-workspace-dialog__body">{children}</div>
+      </section>
+    </div>,
+    document.body
+  );
+}
+
+function OperationAction({ icon: Icon, title, description, action, tone = 'primary', badge, disabled = false }) {
+  return (
+    <button type="button" className={`cash-operation-action cash-operation-action--${tone}`} onClick={action} disabled={disabled}>
+      <span className="cash-operation-action__icon"><Icon className="h-6 w-6" /></span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="flex items-center gap-2">
+          <span className="block text-base font-black">{title}</span>
+          {badge ? <span className="cash-operation-action__badge">{badge}</span> : null}
+        </span>
+        <span className="mt-1 block text-sm font-medium">{description}</span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0" />
+    </button>
+  );
+}
+
 function MovementReviewDialog({ review, notes, setNotes, saving, onCancel, onConfirm }) {
   if (!review?.movement) return null;
   const rejecting = review.decision === 'reject';
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-label={rejecting ? 'Rechazar movimiento de caja' : 'Aprobar movimiento de caja'}>
+  if (typeof document === 'undefined') return null;
+
+  return createPortal((
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-label={rejecting ? 'Rechazar movimiento de caja' : 'Aprobar movimiento de caja'}>
       <Card className="w-full max-w-lg overflow-hidden">
         <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
           <div className="flex items-start gap-3">
@@ -682,7 +729,7 @@ function MovementReviewDialog({ review, notes, setNotes, saving, onCancel, onCon
         </div>
       </Card>
     </div>
-  );
+  ), document.body);
 }
 
 function ReportPanel({ session, onClose }) {
@@ -863,6 +910,8 @@ function HistoryTable({ sessions, onReport }) {
 }
 
 export default function CashSessionsPageReport() {
+  const [activeView, setActiveView] = useState('operation');
+  const [operationDialog, setOperationDialog] = useState(null);
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [cashRegisterCode, setCashRegisterCode] = useState(REGISTER_CODE);
@@ -888,11 +937,13 @@ export default function CashSessionsPageReport() {
   const [canSupervise, setCanSupervise] = useState(false);
   const [journeyRange, setJourneyRange] = useState('today');
   const [journeySummary, setJourneySummary] = useState(null);
+  const [todayJourneyClose, setTodayJourneyClose] = useState(null);
   const [journeyCloseNotes, setJourneyCloseNotes] = useState('');
   const [journeyCertifying, setJourneyCertifying] = useState(false);
 
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
+  const journeyCertified = Boolean(todayJourneyClose);
   const pendingMovementsCount = Number(currentSession?.cashControl?.pendingMovementsCount || 0);
   const closingLocked = currentSession?.cashControl?.closingLocked === true;
   const pendingClosingReview = useMemo(
@@ -914,7 +965,7 @@ export default function CashSessionsPageReport() {
     [denominationRows]
   );
 
-  const refreshForBranch = useCallback(async (branchId = selectedBranchId, registerCode = cashRegisterCode) => {
+  const refreshForBranch = useCallback(async (branchId = selectedBranchId, registerCode = cashRegisterCode, range = journeyRange) => {
     if (!branchId) return;
     const [current, history] = await Promise.all([
       getCurrentCashSession({ branchId, cashRegisterCode: registerCode }),
@@ -922,12 +973,13 @@ export default function CashSessionsPageReport() {
     ]);
     const supervisorAccess = current?.access?.canSupervise === true;
     const journey = supervisorAccess
-      ? await getCashJourneySummary({ branchId, range: journeyRange })
+      ? await getCashJourneySummary({ branchId, range })
       : null;
 
     const session = current?.session || null;
     setCanSupervise(supervisorAccess);
     setJourneySummary(journey?.summary || null);
+    if (range === 'today') setTodayJourneyClose(journey?.summary?.journeyClose || null);
     setCurrentSession(session);
     setSessions(Array.isArray(history?.sessions) ? history.sessions : []);
     setCountedCash('');
@@ -957,13 +1009,19 @@ export default function CashSessionsPageReport() {
   }, [loadData]);
 
   useEffect(() => {
-    if (!movementReview) return undefined;
+    if (!movementReview && !reportSession && !operationDialog) return undefined;
 
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !reviewSaving) {
-        setMovementReview(null);
-        setReviewNotes('');
+      if (event.key === 'Escape' && !reviewSaving && !saving && !movementSaving) {
+        if (movementReview) {
+          setMovementReview(null);
+          setReviewNotes('');
+        } else if (reportSession) {
+          setReportSession(null);
+        } else {
+          setOperationDialog(null);
+        }
       }
     };
 
@@ -974,16 +1032,20 @@ export default function CashSessionsPageReport() {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [movementReview, reviewSaving]);
+  }, [movementReview, movementSaving, operationDialog, reportSession, reviewSaving, saving]);
 
   const handleBranchChange = async (event) => {
     const branchId = event.target.value;
     setSelectedBranchId(branchId);
+    setActiveView('operation');
+    setOperationDialog(null);
+    setJourneyRange('today');
+    setTodayJourneyClose(null);
     setSuccess('');
     setError('');
     try {
       setLoading(true);
-      await refreshForBranch(branchId, cashRegisterCode);
+      await refreshForBranch(branchId, cashRegisterCode, 'today');
     } catch (err) {
       setError(err?.message || 'No fue posible consultar la caja de la sede.');
     } finally {
@@ -1094,9 +1156,6 @@ export default function CashSessionsPageReport() {
       setError('');
       const response = await getCashSessionById(sessionId);
       setReportSession(response?.session || null);
-      window.setTimeout(() => {
-        document.getElementById('cash-report-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 80);
     } catch (err) {
       setError(err?.message || 'No fue posible cargar el reporte de cierre.');
     } finally {
@@ -1133,6 +1192,7 @@ export default function CashSessionsPageReport() {
         setReportSession(closedSession);
         setSuccess(`Caja cerrada correctamente. Diferencia: ${money(closedSession?.differenceAmount || 0)}. Ya puedes ver o imprimir el reporte.`);
       }
+      setOperationDialog(null);
       await refreshForBranch(selectedBranchId, cashRegisterCode);
     } catch (err) {
       setError(err?.message || 'No fue posible cerrar la caja.');
@@ -1162,6 +1222,7 @@ export default function CashSessionsPageReport() {
       } else {
         setCurrentSession(response?.session || null);
       }
+      setOperationDialog(null);
       setSuccess(response?.message || 'Arqueo revisado correctamente.');
       await refreshForBranch(selectedBranchId, cashRegisterCode);
     } catch (err) {
@@ -1197,6 +1258,7 @@ export default function CashSessionsPageReport() {
       setSuccess('');
       const response = await certifyCashJourney({ branchId: selectedBranchId, notes: journeyCloseNotes });
       setJourneySummary((previous) => previous ? { ...previous, journeyClose: response?.journeyClose || null } : previous);
+      setTodayJourneyClose(response?.journeyClose || null);
       setJourneyCloseNotes('');
       setSuccess(response?.message || 'Jornada certificada correctamente.');
       await refreshForBranch(selectedBranchId, cashRegisterCode);
@@ -1207,147 +1269,189 @@ export default function CashSessionsPageReport() {
     }
   };
 
+  const navigation = [
+    { key: 'operation', label: 'Operación', icon: Wallet },
+    ...(canSupervise ? [{ key: 'reconciliation', label: 'Conciliación y cierre', icon: ShieldCheck }] : []),
+    { key: 'history', label: 'Histórico', icon: History },
+  ];
+
   return (
-    <section className="space-y-5">
-      <Card className="p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}><Wallet className="h-6 w-6" /></span>
-            <div>
-              <h1 className="text-2xl font-black">Caja y cierre diario</h1>
-              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Controla apertura, ventas POS, movimientos manuales, cierre y reporte de caja.</p>
+    <section className="cash-workspace space-y-4">
+      <Card className="cash-workspace__header overflow-hidden">
+        <div className="cash-workspace__hero">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="cash-workspace__hero-icon"><Wallet className="h-6 w-6" /></span>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-black">Caja</h1>
+              <p className="mt-1 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>
+                {hasOpenSession ? `Sesión activa · ${currentSession.sessionCode}` : journeyCertified ? 'Jornada finalizada y certificada' : 'Lista para iniciar la operación'}
+              </p>
             </div>
           </div>
-          <Button variant="ghost" onClick={handleRefresh} disabled={loading || saving || movementSaving || reviewSaving}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar caja</Button>
+          <div className="cash-workspace__context">
+            <Field label="Sede">
+              <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving || reviewSaving}>
+                {branches.length === 0 ? <option value="">Sin sedes POS</option> : null}
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
+              </Select>
+            </Field>
+            <div className="cash-workspace__status">
+              <Store className="h-5 w-5" />
+              <div>
+                <span>{hasOpenSession ? 'Caja abierta' : journeyCertified ? 'Jornada cerrada' : 'Caja cerrada'}</span>
+                <small>{selectedBranch?.name || 'Sin sede seleccionada'}</small>
+              </div>
+            </div>
+            <Button variant="ghost" onClick={handleRefresh} disabled={loading || saving || movementSaving || reviewSaving}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
+            </Button>
+          </div>
         </div>
+
+        <nav className="cash-workspace__tabs" aria-label="Secciones de caja">
+          {navigation.map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" onClick={() => setActiveView(key)} aria-current={activeView === key ? 'page' : undefined}>
+              <Icon className="h-4 w-4" /> {label}
+              {key === 'history' && sessions.length ? <span>{sessions.length}</span> : null}
+              {key === 'reconciliation' && journeySummary?.status === 'attention' ? <span className="cash-workspace__alert-dot">!</span> : null}
+            </button>
+          ))}
+        </nav>
       </Card>
 
-      {error ? <Message type="error">{error}</Message> : null}
-      {success ? <Message>{success}</Message> : null}
+      {error && !operationDialog ? <Message type="error">{error}</Message> : null}
+      {success && !operationDialog ? <Message>{success}</Message> : null}
+      {reportLoading ? <Message>Generando reporte de cierre...</Message> : null}
+
       <MovementReviewDialog review={movementReview} notes={reviewNotes} setNotes={setReviewNotes} saving={reviewSaving} onCancel={closeMovementReview} onConfirm={confirmMovementReview} />
 
-      <Card className="p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px_220px]">
-          <Field label="Sede">
-            <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving || reviewSaving}>
-              {branches.length === 0 ? <option value="">Sin sedes POS</option> : null}
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
-            </Select>
-          </Field>
-          <Field label="Código de caja">
-            <Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving || movementSaving || reviewSaving || hasOpenSession} />
-          </Field>
-          <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
-            <div className="flex items-center gap-3"><Building2 className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} /><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Estado sede</p><p className="text-sm font-black">{selectedBranch?.settings?.requireCashSessionForPos ? 'Exige caja abierta' : 'Caja opcional'}</p></div></div>
-          </div>
-        </div>
-      </Card>
-
-      {canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} certifying={journeyCertifying} notes={journeyCloseNotes} setNotes={setJourneyCloseNotes} onCertify={handleCertifyJourney} /> : null}
-
-      {reportSession ? (
-        <div
-          id="cash-report-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Reporte de cierre de caja"
-        >
+      {reportSession && typeof document !== 'undefined' ? createPortal(
+        <div id="cash-report-panel" role="dialog" aria-modal="true" aria-label="Reporte de cierre de caja">
           <ReportPanel session={reportSession} onClose={() => setReportSession(null)} />
-        </div>
+        </div>,
+        document.body
       ) : null}
 
-      {hasOpenSession ? (
-        <Card className="p-5">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div><p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Caja abierta</p><h2 className="mt-1 text-xl font-black">{currentSession.sessionCode}</h2><p className="mt-1 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Apertura: {formatDate(currentSession.openedAt)} · Cajero: {currentSession.cashierSnapshot?.displayName || 'Administrador'}</p></div>
+      {activeView === 'operation' ? (
+        hasOpenSession ? (
+          <Card className="cash-operation p-5">
+            <div className="cash-operation__heading">
+              <div>
+                <p className="cash-eyebrow">Operación en curso</p>
+                <h2 className="mt-1 text-xl font-black">{currentSession.sessionCode}</h2>
+                <p className="mt-1 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>
+                  {currentSession.cashierSnapshot?.displayName || 'Administrador'} · Abierta {formatDate(currentSession.openedAt)}
+                </p>
+              </div>
+              <span className="cash-status-pill cash-status-pill--open"><UnlockKeyhole className="h-4 w-4" /> Abierta</span>
+            </div>
+
+            <ProfessionalControlBanner session={currentSession} />
+            <SessionStats session={currentSession} />
+
+            {pendingClosingReview ? (
+              <div className="mt-4 rounded-3xl border p-5" style={{ borderColor: '#fde68a', background: '#fffbeb' }}>
+                <div className="flex items-start gap-3" style={{ color: '#b45309' }}>
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-black">Arqueo extraordinario pendiente</p>
+                    <p className="mt-1 text-xs font-bold">Contado: {money(pendingClosingReview.countedCash)}{pendingClosingReview.differenceAmount !== null && pendingClosingReview.differenceAmount !== undefined ? ` · Diferencia: ${money(pendingClosingReview.differenceAmount)}` : ''} · Tolerancia: {money(pendingClosingReview.toleranceAmount)}</p>
+                  </div>
+                </div>
+                {currentSession?.cashControl?.canReviewClosing ? (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+                    <Field label="Observación de supervisión"><Input value={closingReviewNotes} onChange={(event) => setClosingReviewNotes(event.target.value)} placeholder="Explica la decisión" disabled={reviewSaving} /></Field>
+                    <Button type="button" variant="ghost" onClick={() => handleClosingReview('reject')} disabled={reviewSaving}><XCircle className="h-4 w-4" /> Rechazar</Button>
+                    <Button type="button" onClick={() => handleClosingReview('approve')} disabled={reviewSaving}><CheckCircle2 className="h-4 w-4" /> Aprobar y cerrar</Button>
+                  </div>
+                ) : <p className="mt-3 text-sm font-bold" style={{ color: '#b45309' }}>Un supervisor debe revisar este conteo. La operación permanece congelada.</p>}
+              </div>
+            ) : (
+              <div className="cash-operation__actions">
+                <OperationAction icon={Banknote} title="Registrar movimiento" description="Ingresos, gastos, retiros y ajustes de efectivo." action={() => setOperationDialog('movement')} badge={pendingMovementsCount ? `${pendingMovementsCount} pendiente${pendingMovementsCount === 1 ? '' : 's'}` : ''} />
+                <OperationAction icon={ClipboardCheck} title={pendingMovementsCount ? 'Cierre bloqueado' : 'Realizar arqueo'} description={pendingMovementsCount ? 'Primero deben resolverse los movimientos pendientes.' : 'Cuenta billetes y monedas para cerrar la caja.'} action={() => setOperationDialog('closing')} tone="closing" disabled={pendingMovementsCount > 0} />
+                <OperationAction icon={FileText} title="Ver reporte actual" description="Consulta el resumen de la sesión sin salir de la operación." action={() => setReportSession(currentSession)} tone="neutral" />
+              </div>
+            )}
+
+            {pendingMovementsCount > 0 ? (
+              <div className="mt-4 flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold" style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}>
+                <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
+                <span>Hay {pendingMovementsCount} movimiento(s) pendiente(s). Revísalos en “Registrar movimiento” antes de cerrar.</span>
+              </div>
+            ) : null}
+          </Card>
+        ) : journeyCertified ? (
+          <Card className="cash-journey-finished p-6">
+            <span className="cash-journey-finished__icon"><CheckCircle2 className="h-8 w-8" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="cash-eyebrow">Operación finalizada</p>
+              <h2 className="mt-1 text-2xl font-black">La jornada de esta sede ya fue certificada</h2>
+              <p className="mt-2 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>No se pueden abrir nuevas cajas hoy. Consulta el certificado o los cierres anteriores desde las secciones correspondientes.</p>
+            </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={() => setReportSession(currentSession)}><FileText className="h-4 w-4" /> Vista reporte</Button>
-              <span className="inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}><UnlockKeyhole className="h-4 w-4" /> Abierta</span>
+              {canSupervise ? <Button onClick={() => setActiveView('reconciliation')}><ShieldCheck className="h-4 w-4" /> Ver certificado</Button> : null}
+              <Button variant="ghost" onClick={() => setActiveView('history')}><History className="h-4 w-4" /> Ver histórico</Button>
             </div>
-          </div>
-
-          <ProfessionalControlBanner session={currentSession} />
-          <SessionStats session={currentSession} />
-          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving || reviewSaving || closingLocked} onSubmit={handleMovement} onReview={openMovementReview} />
-
-          {pendingClosingReview ? (
-            <div className="mt-5 rounded-3xl border p-5" style={{ borderColor: '#fde68a', background: '#fffbeb' }}>
-              <div className="flex items-start gap-3" style={{ color: '#b45309' }}>
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-sm font-black">Arqueo extraordinario pendiente</p>
-                  <p className="mt-1 text-xs font-bold">
-                    Contado: {money(pendingClosingReview.countedCash)}
-                    {pendingClosingReview.differenceAmount !== null && pendingClosingReview.differenceAmount !== undefined
-                      ? ` · Diferencia: ${money(pendingClosingReview.differenceAmount)}`
-                      : ''}
-                    {' · '}Tolerancia: {money(pendingClosingReview.toleranceAmount)}
-                  </p>
-                </div>
+          </Card>
+        ) : (
+          <Card className="cash-opening p-6">
+            <div className="cash-opening__intro">
+              <span className="cash-opening__icon"><UnlockKeyhole className="h-7 w-7" /></span>
+              <div>
+                <p className="cash-eyebrow">Inicio de jornada</p>
+                <h2 className="mt-1 text-2xl font-black">Abrir caja</h2>
+                <p className="mt-2 max-w-xl text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Registra el fondo inicial y deja la caja lista para recibir ventas del POS.</p>
               </div>
-              {currentSession?.cashControl?.canReviewClosing ? (
-                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
-                  <Field label="Observación de supervisión">
-                    <Input value={closingReviewNotes} onChange={(event) => setClosingReviewNotes(event.target.value)} placeholder="Explica la decisión" disabled={reviewSaving} />
-                  </Field>
-                  <Button type="button" variant="ghost" onClick={() => handleClosingReview('reject')} disabled={reviewSaving}><XCircle className="h-4 w-4" /> Rechazar</Button>
-                  <Button type="button" onClick={() => handleClosingReview('approve')} disabled={reviewSaving}><CheckCircle2 className="h-4 w-4" /> Aprobar y cerrar</Button>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm font-bold" style={{ color: '#b45309' }}>Un supervisor debe aprobar o rechazar este conteo. Mientras tanto no se pueden registrar ventas ni movimientos.</p>
-              )}
             </div>
-          ) : null}
-
-          {pendingMovementsCount > 0 ? (
-            <div className="mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold" style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}>
-              <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
-              <span>El cierre está bloqueado hasta que un supervisor apruebe o rechace los {pendingMovementsCount} movimiento(s) pendientes.</span>
-            </div>
-          ) : null}
-
-          {!closingLocked ? (
-            <form onSubmit={handleCloseCash} className="mt-5 rounded-3xl border p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Arqueo por denominaciones</p>
-                  <h3 className="mt-1 text-lg font-black">Cuenta billetes y monedas</h3>
-                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>El sistema calcula el efectivo contado sin revelar el esperado al cajero.</p>
-                </div>
-                <div className="rounded-2xl border px-4 py-3 text-right" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                  <p className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Total contado</p>
-                  <p className="mt-1 text-xl font-black">{money(denominationTotal)}</p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {denominationRows.map((entry) => (
-                  <label key={entry.value} className="rounded-2xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                    <span className="flex items-center justify-between gap-2 text-sm font-black"><span>{money(entry.value)}</span><span style={{ color: 'var(--admin-primary)' }}>{money(entry.subtotal)}</span></span>
-                    <Input className="mt-2" type="number" min="0" step="1" inputMode="numeric" aria-label={`Cantidad de ${money(entry.value)}`} value={denominationCounts[entry.value]} onChange={(event) => setDenominationCounts((previous) => ({ ...previous, [entry.value]: event.target.value }))} disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} placeholder="Cantidad" />
-                  </label>
-                ))}
-              </div>
-              <input className="sr-only" type="number" aria-label="Efectivo contado" value={countedCash} readOnly tabIndex={-1} />
-              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
-                <Button type="submit" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0}><LockKeyhole className="h-4 w-4" /> {saving ? 'Procesando arqueo...' : pendingMovementsCount > 0 ? 'Cierre bloqueado' : 'Cerrar caja'}</Button>
-              </div>
+            <form onSubmit={handleOpenCash} className="cash-opening__form">
+              <Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field>
+              <Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field>
+              <Field label="Observación de apertura"><Input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal" disabled={saving || loading} /></Field>
+              <Button type="submit" disabled={saving || loading || !selectedBranchId}><UnlockKeyhole className="h-4 w-4" /> {saving ? 'Abriendo...' : 'Abrir caja'}</Button>
             </form>
-          ) : null}
-        </Card>
-      ) : (
-        <Card className="p-5">
-          <div className="mb-5 flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}><UnlockKeyhole className="h-6 w-6" /></span><div><h2 className="text-xl font-black">Abrir caja</h2><p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Abre la caja antes de vender en POS. El código debe coincidir con el POS: CAJA POS.</p></div></div>
-          <form onSubmit={handleOpenCash} className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_auto] lg:items-end">
-            <Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field>
-            <Field label="Observación de apertura"><Textarea value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal de la tienda" disabled={saving || loading} /></Field>
-            <Button type="submit" disabled={saving || loading || !selectedBranchId}><UnlockKeyhole className="h-4 w-4" /> {saving ? 'Abriendo...' : 'Abrir caja'}</Button>
-          </form>
-        </Card>
-      )}
+          </Card>
+        )
+      ) : null}
 
-      {reportLoading ? <Message>Generando reporte de cierre...</Message> : null}
-      <HistoryTable sessions={sessions} onReport={openReport} />
+      {activeView === 'reconciliation' && canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} certifying={journeyCertifying} notes={journeyCloseNotes} setNotes={setJourneyCloseNotes} onCertify={handleCertifyJourney} /> : null}
+      {activeView === 'history' ? <HistoryTable sessions={sessions} onReport={openReport} /> : null}
+
+      {operationDialog === 'movement' && currentSession ? (
+        <WorkspaceDialog label="Movimientos de caja" title="Movimientos de efectivo" description="Registra y revisa ingresos, salidas, gastos y ajustes." icon={Banknote} onClose={() => setOperationDialog(null)} wide>
+          {error ? <div className="mb-4"><Message type="error">{error}</Message></div> : null}
+          {success ? <div className="mb-4"><Message>{success}</Message></div> : null}
+          <MovementsBox session={currentSession} form={movementForm} setForm={setMovementForm} disabled={saving || movementSaving || reviewSaving || closingLocked} onSubmit={handleMovement} onReview={openMovementReview} />
+        </WorkspaceDialog>
+      ) : null}
+
+      {operationDialog === 'closing' && currentSession && !closingLocked ? (
+        <WorkspaceDialog label="Arqueo y cierre de caja" title="Arqueo por denominaciones" description="Cuenta el efectivo. El sistema calculará el total y validará la diferencia." icon={ClipboardCheck} onClose={() => !saving && setOperationDialog(null)} wide>
+          <form onSubmit={handleCloseCash} className="cash-counting-form">
+            {error ? <Message type="error">{error}</Message> : null}
+            <div className="cash-counting-form__total">
+              <div><p className="cash-eyebrow">Total contado</p><p className="mt-1 text-3xl font-black">{money(denominationTotal)}</p></div>
+              <p className="max-w-sm text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Ingresa únicamente la cantidad física de cada billete o moneda.</p>
+            </div>
+            <div className="cash-denominations">
+              {denominationRows.map((entry) => (
+                <label key={entry.value} className="cash-denomination">
+                  <span><strong>{money(entry.value)}</strong><small>{money(entry.subtotal)}</small></span>
+                  <Input type="number" min="0" step="1" inputMode="numeric" aria-label={`Cantidad de ${money(entry.value)}`} value={denominationCounts[entry.value]} onChange={(event) => setDenominationCounts((previous) => ({ ...previous, [entry.value]: event.target.value }))} disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} placeholder="0" />
+                </label>
+              ))}
+            </div>
+            <input className="sr-only" type="number" aria-label="Efectivo contado" value={countedCash} readOnly tabIndex={-1} />
+            <div className="cash-counting-form__footer">
+              <Field label="Observación de cierre"><Textarea value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Ejemplo: cierre sin novedades" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0} /></Field>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="ghost" onClick={() => setOperationDialog(null)} disabled={saving}>Cancelar</Button>
+                <Button type="submit" disabled={saving || movementSaving || reviewSaving || pendingMovementsCount > 0}><LockKeyhole className="h-4 w-4" /> {saving ? 'Procesando...' : pendingMovementsCount > 0 ? 'Cierre bloqueado' : 'Cerrar caja'}</Button>
+              </div>
+            </div>
+          </form>
+        </WorkspaceDialog>
+      ) : null}
     </section>
   );
 }

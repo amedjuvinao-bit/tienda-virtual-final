@@ -50,6 +50,7 @@ afterEach(() => {
 describe('CashSessionsPageReport Etapa 4', () => {
   it('permite al supervisor certificar una jornada completamente conciliada', async () => {
     render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
     const button = await screen.findByRole('button', { name: 'Certificar jornada' });
     await waitFor(() => expect(button).not.toBeDisabled());
     expect(screen.getByText('Control de jornada · Cierre operativo')).toBeInTheDocument();
@@ -62,6 +63,9 @@ describe('CashSessionsPageReport Etapa 4', () => {
   it('muestra la certificación y su huella auditable', async () => {
     getCashJourneySummary.mockResolvedValue({ summary: { ...baseSummary, journeyClose: certificate } });
     render(<CashSessionsPageReport />);
+    expect(await screen.findByText('La jornada de esta sede ya fue certificada')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Abrir caja' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
     expect(await screen.findByText('Jornada certificada')).toBeInTheDocument();
     expect(screen.getByText('Huella: 1234567890abcdef')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Certificar jornada' })).not.toBeInTheDocument();
@@ -72,6 +76,7 @@ describe('CashSessionsPageReport Etapa 4', () => {
       summary: { ...baseSummary, status: 'attention', totals: { ...baseSummary.totals, openSessionsCount: 1 } },
     });
     render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
     const button = await screen.findByRole('button', { name: 'Certificar jornada' });
     expect(button).toBeDisabled();
     expect(screen.getByText('Cierra todas las cajas.')).toBeInTheDocument();

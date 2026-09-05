@@ -99,12 +99,13 @@ describe('CashSessionsPageReport Etapa 0', () => {
     render(<CashSessionsPageReport />);
 
     expect(await screen.findByText(openSession.sessionCode)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Registrar movimiento/i }));
     const typeSelect = screen.getByLabelText('Tipo');
     expect(screen.getByRole('option', { name: 'Retiro de efectivo' })).toBeInTheDocument();
     fireEvent.change(typeSelect, { target: { value: 'withdrawal' } });
     fireEvent.change(screen.getByLabelText('Monto'), { target: { value: '10000' } });
     fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Traslado a bóveda' } });
-    fireEvent.click(screen.getByRole('button', { name: /registrar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
       expect(addCashMovement).toHaveBeenCalledWith(openSession.id, expect.objectContaining({
@@ -120,6 +121,7 @@ describe('CashSessionsPageReport Etapa 0', () => {
     render(<CashSessionsPageReport />);
 
     await screen.findByText(openSession.sessionCode);
+    fireEvent.click(screen.getByRole('button', { name: /Realizar arqueo/i }));
     fireEvent.change(screen.getByLabelText('Efectivo contado'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: /cerrar caja/i }));
 
@@ -144,9 +146,11 @@ describe('CashSessionsPageReport Etapa 0', () => {
     render(<CashSessionsPageReport />);
 
     await screen.findByText(openSession.sessionCode);
-    fireEvent.click(screen.getByRole('button', { name: /vista reporte/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ver reporte actual/i }));
 
-    expect(screen.getByRole('dialog', { name: 'Reporte de cierre de caja' })).toBeInTheDocument();
+    const reportDialog = screen.getByRole('dialog', { name: 'Reporte de cierre de caja' });
+    expect(reportDialog).toBeInTheDocument();
+    expect(reportDialog.parentElement).toBe(document.body);
     expect(screen.getByText(/Entradas \+\$\s*0/)).toBeInTheDocument();
     expect(screen.getByText(/Salidas -\$\s*50[.]000/)).toBeInTheDocument();
   });
@@ -163,6 +167,7 @@ describe('CashSessionsPageReport Etapa 0', () => {
     getCashSessionById.mockResolvedValue({ session: closedSession });
     render(<CashSessionsPageReport />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /Histórico/i }));
     const reportButton = await screen.findByRole('button', { name: 'Ver reporte' });
     fireEvent.click(reportButton);
 

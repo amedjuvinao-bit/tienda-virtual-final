@@ -50,6 +50,7 @@ afterEach(() => {
 describe('CashSessionsPageReport Etapa 3', () => {
   it('presenta el consolidado autoritativo al supervisor', async () => {
     render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
     expect(await screen.findByText('Conciliación automática de caja')).toBeInTheDocument();
     expect(screen.getAllByText('$ 120.000').length).toBeGreaterThan(0);
     expect(screen.getByText('CAJA-20260904-STAGE3')).toBeInTheDocument();
@@ -59,6 +60,7 @@ describe('CashSessionsPageReport Etapa 3', () => {
 
   it('permite consultar los últimos siete días', async () => {
     render(<CashSessionsPageReport />);
+    fireEvent.click(await screen.findByRole('button', { name: /Conciliación y cierre/i }));
     await screen.findByText('Conciliación automática de caja');
     const rangeButton = screen.getByRole('button', { name: 'Últimos 7 días' });
     await waitFor(() => expect(rangeButton).not.toBeDisabled());
