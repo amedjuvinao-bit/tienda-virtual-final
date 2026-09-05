@@ -18,7 +18,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
-  Store,
   UnlockKeyhole,
   UserCheck,
   Wallet,
@@ -297,7 +296,7 @@ function Card({ children, className = '', style = {}, ...props }) {
   return (
     <section
       {...props}
-      className={`rounded-3xl border ${className}`}
+      className={`cash-card rounded-[18px] border ${className}`}
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -326,7 +325,7 @@ function Input(props) {
   return (
     <input
       {...props}
-      className={`w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none transition ${props.className || ''}`}
+      className={`w-full rounded-xl border px-4 py-3 text-sm font-bold outline-none transition ${props.className || ''}`}
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -341,7 +340,7 @@ function Select(props) {
   return (
     <select
       {...props}
-      className="w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none transition"
+      className="w-full rounded-xl border px-4 py-3 text-sm font-bold outline-none transition"
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -355,7 +354,7 @@ function Textarea(props) {
   return (
     <textarea
       {...props}
-      className="min-h-[96px] w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none transition"
+      className="min-h-[96px] w-full resize-none rounded-xl border px-4 py-3 text-sm font-bold outline-none transition"
       style={{
         borderColor: 'var(--admin-card-border)',
         background: 'var(--admin-card-bg)',
@@ -374,7 +373,7 @@ function Button({ children, disabled, onClick, type = 'button', variant = 'prima
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
       style={{
         borderColor: primary ? 'var(--admin-primary)' : 'var(--admin-card-border)',
         background: primary ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
@@ -391,7 +390,7 @@ function Message({ type = 'success', children }) {
 
   return (
     <div
-      className="flex items-start gap-3 rounded-2xl border p-4 text-sm font-bold"
+      className="flex items-start gap-3 rounded-xl border p-4 text-sm font-bold"
       style={{
         borderColor: error ? '#fecaca' : '#bbf7d0',
         background: error ? '#fef2f2' : '#ecfdf5',
@@ -1270,50 +1269,48 @@ export default function CashSessionsPageReport() {
   };
 
   const navigation = [
-    { key: 'operation', label: 'Operación', icon: Wallet },
-    ...(canSupervise ? [{ key: 'reconciliation', label: 'Conciliación y cierre', icon: ShieldCheck }] : []),
-    { key: 'history', label: 'Histórico', icon: History },
+    { key: 'operation', label: 'Operación' },
+    ...(canSupervise ? [{ key: 'reconciliation', label: 'Conciliación y cierre' }] : []),
+    { key: 'history', label: 'Histórico' },
   ];
 
   return (
     <section className="cash-workspace space-y-4">
       <Card className="cash-workspace__header overflow-hidden">
         <div className="cash-workspace__hero">
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="cash-workspace__hero-icon"><Wallet className="h-6 w-6" /></span>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-black">Caja</h1>
-              <p className="mt-1 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>
-                {hasOpenSession ? `Sesión activa · ${currentSession.sessionCode}` : journeyCertified ? 'Jornada finalizada y certificada' : 'Lista para iniciar la operación'}
-              </p>
+          <div className="cash-workspace__identity">
+            <p className="cash-eyebrow">Control operativo</p>
+            <div className="cash-workspace__title-row">
+              <h1>Caja</h1>
+              <span className={`cash-workspace__state ${hasOpenSession ? 'is-open' : journeyCertified ? 'is-certified' : 'is-closed'}`}>
+                {hasOpenSession ? 'Caja abierta' : journeyCertified ? 'Cierre certificado' : 'Caja cerrada'}
+              </span>
             </div>
+            <p className="cash-workspace__summary">
+              {hasOpenSession ? `Sesión activa · ${currentSession.sessionCode}` : journeyCertified ? 'La operación de hoy ya fue finalizada' : 'Lista para iniciar la operación'}
+            </p>
           </div>
           <div className="cash-workspace__context">
-            <Field label="Sede">
+            <label className="cash-workspace__branch">
+              <span>Sede operativa</span>
               <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving || reviewSaving}>
                 {branches.length === 0 ? <option value="">Sin sedes POS</option> : null}
                 {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
               </Select>
-            </Field>
-            <div className="cash-workspace__status">
-              <Store className="h-5 w-5" />
-              <div>
-                <span>{hasOpenSession ? 'Caja abierta' : journeyCertified ? 'Jornada cerrada' : 'Caja cerrada'}</span>
-                <small>{selectedBranch?.name || 'Sin sede seleccionada'}</small>
-              </div>
-            </div>
-            <Button variant="ghost" onClick={handleRefresh} disabled={loading || saving || movementSaving || reviewSaving}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
-            </Button>
+            </label>
+            <button className="cash-workspace__refresh" type="button" onClick={handleRefresh} disabled={loading || saving || movementSaving || reviewSaving}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Actualizar</span>
+            </button>
           </div>
         </div>
 
         <nav className="cash-workspace__tabs" aria-label="Secciones de caja">
-          {navigation.map(({ key, label, icon: Icon }) => (
+          {navigation.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setActiveView(key)} aria-current={activeView === key ? 'page' : undefined}>
-              <Icon className="h-4 w-4" /> {label}
-              {key === 'history' && sessions.length ? <span>{sessions.length}</span> : null}
-              {key === 'reconciliation' && journeySummary?.status === 'attention' ? <span className="cash-workspace__alert-dot">!</span> : null}
+              {label}
+              {key === 'history' && sessions.length ? <small>{sessions.length}</small> : null}
+              {key === 'reconciliation' && journeySummary?.status === 'attention' ? <small className="cash-workspace__alert-text">Revisar</small> : null}
             </button>
           ))}
         </nav>
