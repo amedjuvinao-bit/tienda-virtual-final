@@ -365,15 +365,16 @@ function Textarea(props) {
   );
 }
 
-function Button({ children, disabled, onClick, type = 'button', variant = 'primary' }) {
+function Button({ children, className = '', disabled, onClick, type = 'button', variant = 'primary', ...props }) {
   const primary = variant === 'primary';
 
   return (
     <button
+      {...props}
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       style={{
         borderColor: primary ? 'var(--admin-primary)' : 'var(--admin-card-border)',
         background: primary ? 'var(--admin-primary)' : 'var(--admin-card-bg)',
@@ -1399,13 +1400,12 @@ export default function CashSessionsPageReport() {
                 <h2 className="mt-1 text-2xl font-black">Abrir caja</h2>
                 <p className="mt-2 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Registra el fondo inicial para comenzar a vender en el POS.</p>
               </div>
-              <span className="cash-opening__requirement"><ShieldCheck className="h-4 w-4" /> Requerida para vender</span>
             </div>
             <form onSubmit={handleOpenCash} className="cash-opening__form">
               <div className="cash-opening__code"><Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field></div>
               <div className="cash-opening__amount"><Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field></div>
               <div className="cash-opening__notes"><Field label="Observación de apertura"><Input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal" disabled={saving || loading} /></Field></div>
-              <div className="cash-opening__submit"><Button type="submit" disabled={saving || loading || !selectedBranchId}><UnlockKeyhole className="h-4 w-4" /> {saving ? 'Abriendo...' : 'Abrir caja'}</Button></div>
+              <div className="cash-opening__submit"><Button aria-label="Abrir caja" className="cash-opening__button" type="submit" disabled={saving || loading || !selectedBranchId}>{saving ? 'Iniciando...' : 'Iniciar jornada'} <ArrowRight className="h-4 w-4" /></Button></div>
             </form>
           </Card>
         )
