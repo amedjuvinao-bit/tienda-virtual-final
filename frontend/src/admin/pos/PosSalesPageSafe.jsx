@@ -53,6 +53,10 @@ function money(value) {
   return moneyFormatter.format(Number(value || 0));
 }
 
+function protectedMoney(value, hidden = false) {
+  return hidden || value === null || value === undefined ? 'Oculto' : money(value);
+}
+
 function rowKey(product = {}) {
   return product.id || `${product.productId || ''}:${product.variantKey || 'default__default'}`;
 }
@@ -131,9 +135,10 @@ function ProductImage({ product }) {
   );
 }
 
-function CashStatusPanel({ session, loading, error, required, branchName, onRefresh }) {
+export function CashStatusPanel({ session, loading, error, required, branchName, onRefresh }) {
   const open = Boolean(session?.id && session?.status === 'open');
   const totals = getPaymentTotals(session);
+  const blindCountActive = session?.cashControl?.blindCountActive === true;
 
   return (
     <Card className="p-4">
@@ -159,7 +164,7 @@ function CashStatusPanel({ session, loading, error, required, branchName, onRefr
               <>
                 <p className="mt-1 text-sm font-black text-emerald-700">Caja abierta: {session.cashRegisterCode || REGISTER_CODE}</p>
                 <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                  {session.sessionCode} · Ventas {session.salesSummary?.ordersCount || 0} · Efectivo esperado {money(session.expectedCash)}
+                  {session.sessionCode} · Ventas {session.salesSummary?.ordersCount || 0} · Efectivo esperado {protectedMoney(session.expectedCash, blindCountActive)}
                 </p>
               </>
             ) : (
@@ -180,15 +185,15 @@ function CashStatusPanel({ session, loading, error, required, branchName, onRefr
           <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[430px]">
             <div className="rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
               <p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Efectivo</p>
-              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{money(totals.cash)}</p>
+              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{protectedMoney(totals.cash, blindCountActive)}</p>
             </div>
             <div className="rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
               <p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Total vendido</p>
-              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{money(session.salesSummary?.netSales)}</p>
+              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{protectedMoney(session.salesSummary?.netSales, blindCountActive)}</p>
             </div>
             <div className="rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
               <p className="text-[11px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Esperado</p>
-              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{money(session.expectedCash)}</p>
+              <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{protectedMoney(session.expectedCash, blindCountActive)}</p>
             </div>
           </div>
         ) : null}
@@ -692,6 +697,7 @@ export default function PosSalesPageSafe() {
             paymentDetails={paymentDetails}
             discount={discount}
             permissions={permissions}
+            canSuperviseCash={permissions.canSuperviseCash === true}
             currentHeldSaleId={currentHeldSaleId}
             disabled={saleLoading || reviewLoading}
             onHeld={holdCurrentSale}

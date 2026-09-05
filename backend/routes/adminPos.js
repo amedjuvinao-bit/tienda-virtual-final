@@ -20,8 +20,10 @@ const {
 const { createPosSaleWithCashSession } = require('../services/posCashSaleService');
 const {
   assertPosBranchAccess,
+  buildCashSessionAccess,
   buildPosBranchFilter,
   buildPosResourceAccess,
+  canSuperviseCashSession,
 } = require('../services/adminPosAccessService');
 const {
   buildPosSaleIdempotency,
@@ -215,6 +217,7 @@ function serializeOrder(order = {}) {
 }
 
 function serializePosSaleResult(result = {}, options = {}) {
+  const cashAccess = options.cashAccess || {};
   return {
     ok: true,
     order: serializeOrder(result.order || {}),
@@ -225,7 +228,10 @@ function serializePosSaleResult(result = {}, options = {}) {
     ),
     branch: serializeBranch(result.branch || {}),
     cashSession: result.cashSession
-      ? serializeCashSession(result.cashSession)
+      ? serializeCashSession(result.cashSession, {
+          canSupervise: cashAccess.canSupervise === true,
+          blindCount: cashAccess.canSupervise !== true,
+        })
       : null,
     cashRegisterCode: result.cashRegisterCode || '',
     cashSessionRequired: result.cashSessionRequired === true,
@@ -407,6 +413,7 @@ router.get('/bootstrap', requirePermission('pos:view'), async (req, res) => {
         canManageOrders: hasPermission(req, 'orders:view'),
         canUpdateOrderStatus: hasPermission(req, 'orders:status'),
         canRefundOrders: hasPermission(req, 'orders:refund'),
+        canSuperviseCash: canSuperviseCashSession(req),
       },
       billing,
     });
@@ -505,6 +512,13 @@ router.get('/sales/history', requirePermission('pos:view'), async (req, res) => 
 
 router.get('/shift-summary', requirePermission('pos:view'), async (req, res) => {
   try {
+    if (!canSuperviseCashSession(req)) {
+      throw createRouteError(
+        'Solo un supervisor puede consultar el control monetario de la jornada.',
+        'POS_SHIFT_SUMMARY_FORBIDDEN',
+        403
+      );
+    }
     const branchId = cleanText(req.query.branchId || '');
     const [branch, billing] = await Promise.all([
       loadPosBranch(req, branchId),
@@ -630,10 +644,15 @@ router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
 
     if (existing.action === 'reuse') {
       const reusedResult = await loadReusedPosSale(existing.orderId, req);
+      const cashAccess = buildCashSessionAccess(req, {
+        requestedBranchId: reusedResult.branch?._id || reusedResult.order?.branch,
+        requireSell: true,
+      });
       return res.status(200).json(
         serializePosSaleResult(reusedResult, {
           idempotent: true,
           reused: true,
+          cashAccess,
         })
       );
     }
@@ -648,7 +667,11 @@ router.post('/sales', requirePermission('pos:sell'), async (req, res) => {
       idempotency,
     });
 
-    return res.status(201).json(serializePosSaleResult(result));
+    const cashAccess = buildCashSessionAccess(req, {
+      requestedBranchId: result.branch?._id || preview.branch?._id,
+      requireSell: true,
+    });
+    return res.status(201).json(serializePosSaleResult(result, { cashAccess }));
   } catch (error) {
     return sendError(res, error);
   }

@@ -35,7 +35,7 @@
     "test:cash-level-plus-stage0": "vitest run src/admin/cash/CashSessionsPageReport.test.jsx",
     "test:cash-level-plus-stage1": "vitest run src/admin/cash/CashSessionsPageStage1.test.jsx src/admin/api/adminCashSessionApi.test.js",
     "test:cash-level-plus-stage2": "vitest run src/admin/cash/CashSessionsPageStage2.test.jsx src/admin/api/adminCashSessionApi.test.js",
-    "test:cash-level-plus-stage3": "vitest run src/admin/cash/CashSessionsPageStage3.test.jsx src/admin/api/adminCashSessionApi.test.js",
+    "test:cash-level-plus-stage3": "vitest run src/admin/cash/CashSessionsPageStage3.test.jsx src/admin/pos/PosCashVisibilityStage3.test.jsx src/admin/api/adminCashSessionApi.test.js",
     "test:orders-manual-payment": "vitest run src/admin/orders/components/orderDetail/manualPaymentConfirmationModel.test.js src/admin/orders/components/orderDetail/hooks/useOrderManualPaymentConfirmation.test.jsx src/admin/orders/components/orderDetail/OrderManualPaymentConfirmationCard.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",

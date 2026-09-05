@@ -104,7 +104,7 @@ function ActionButton({ children, onClick, disabled = false, primary = false }) 
   );
 }
 
-function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
+function OperationsModal({ view, onViewChange, onClose, children, heldCount, canSuperviseCash }) {
   useEffect(() => {
     if (!view) return undefined;
     const previousOverflow = document.body.style.overflow;
@@ -154,7 +154,7 @@ function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
           </button>
         </header>
 
-        <nav className="grid grid-cols-3 border-b px-2 pt-3 sm:px-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+        <nav className={`grid ${canSuperviseCash ? 'grid-cols-3' : 'grid-cols-2'} border-b px-2 pt-3 sm:px-5`} style={{ borderColor: 'var(--admin-card-border)' }}>
           <button
             type="button"
             onClick={() => onViewChange('held')}
@@ -171,14 +171,16 @@ function OperationsModal({ view, onViewChange, onClose, children, heldCount }) {
           >
             <History className="h-4 w-4" /> Historial POS
           </button>
-          <button
-            type="button"
-            onClick={() => onViewChange('shift')}
-            className="flex items-center justify-center gap-2 border-b-2 px-2 py-3 text-xs font-black sm:px-4 sm:text-sm"
-            style={{ borderColor: view === 'shift' ? 'var(--admin-primary)' : 'transparent', color: view === 'shift' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}
-          >
-            <BarChart3 className="h-4 w-4" /> Jornada
-          </button>
+          {canSuperviseCash ? (
+            <button
+              type="button"
+              onClick={() => onViewChange('shift')}
+              className="flex items-center justify-center gap-2 border-b-2 px-2 py-3 text-xs font-black sm:px-4 sm:text-sm"
+              style={{ borderColor: view === 'shift' ? 'var(--admin-primary)' : 'transparent', color: view === 'shift' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}
+            >
+              <BarChart3 className="h-4 w-4" /> Jornada
+            </button>
+          ) : null}
         </nav>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
@@ -206,6 +208,7 @@ export default function PosOperationsPanel({
   paymentDetails,
   discount,
   permissions = {},
+  canSuperviseCash = false,
   currentHeldSaleId = '',
   disabled = false,
   onHeld,
@@ -367,14 +370,16 @@ export default function PosOperationsPanel({
             <ActionButton onClick={() => openView('history')} disabled={!branchId}>
               <History className="h-4 w-4" /> Historial
             </ActionButton>
-            <ActionButton onClick={() => openView('shift')} disabled={!branchId}>
-              <BarChart3 className="h-4 w-4" /> Jornada
-            </ActionButton>
+            {canSuperviseCash ? (
+              <ActionButton onClick={() => openView('shift')} disabled={!branchId}>
+                <BarChart3 className="h-4 w-4" /> Jornada
+              </ActionButton>
+            ) : null}
           </div>
         </div>
       </section>
 
-      <OperationsModal view={view} onViewChange={changeView} onClose={() => setView('')} heldCount={heldSales.length}>
+      <OperationsModal view={view} onViewChange={changeView} onClose={() => setView('')} heldCount={heldSales.length} canSuperviseCash={canSuperviseCash}>
         {view !== 'shift' ? <form onSubmit={search} className="mb-4 flex flex-col gap-3 sm:flex-row">
           <div className="flex min-h-11 flex-1 items-center gap-3 rounded-2xl border px-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
             <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />

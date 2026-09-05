@@ -74,11 +74,17 @@ function main() {
   const permissionMap = source('backend/security/adminRoutePermissionMap.js');
   const api = source('frontend/src/admin/api/adminCashSessionApi.js');
   const page = source('frontend/src/admin/cash/CashSessionsPageReport.jsx');
+  const posRoutes = source('backend/routes/adminPos.js');
+  const posPage = source('frontend/src/admin/pos/PosSalesPageSafe.jsx');
+  const posOperations = source('frontend/src/admin/pos/PosOperationsPanel.jsx');
   ok('el cierre conserva una instantánea autoritativa', model.includes('CashReconciliationSchema') && source('backend/services/cashSessionService.js').includes('recalculatedSession.reconciliation = buildCashReconciliation'));
   ok('el consolidado limita alcance, rango y volumen', service.includes('branchIds') && service.includes("limit(500)") && service.includes('SUMMARY_RANGES'));
   ok('la ruta de jornada exige supervisión y está declarada', routes.includes("router.get('/journey-summary'") && routes.includes('CASH_JOURNEY_FORBIDDEN') && permissionMap.includes('consolidado conciliado'));
   ok('la interfaz consume el consolidado sin cálculo manual', api.includes('getCashJourneySummary') && page.includes('Conciliación automática de caja'));
   ok('el reporte imprime los controles de conciliación', page.includes('cash-report-reconciliation') && page.includes('<h2>Conciliación automática</h2>'));
+  ok('las respuestas de venta POS conservan el conteo ciego', posRoutes.includes('blindCount: cashAccess.canSupervise !== true'));
+  ok('el resumen monetario POS exige supervisión', posRoutes.includes('POS_SHIFT_SUMMARY_FORBIDDEN') && posRoutes.includes('canSuperviseCashSession(req)'));
+  ok('el POS presenta valores protegidos como ocultos', posPage.includes('protectedMoney') && posPage.includes('Efectivo esperado {protectedMoney') && posOperations.includes('canSuperviseCash ?'));
 
   console.log(`\nEtapa 3 Caja validada: ${passed} controles superados.`);
 }

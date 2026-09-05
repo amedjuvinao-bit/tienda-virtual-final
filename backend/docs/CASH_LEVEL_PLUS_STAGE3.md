@@ -25,6 +25,7 @@ La vista de supervisión permite consultar hoy o los últimos siete días y cons
 - detalle por caja y cajero.
 
 El cajero no recibe este consolidado monetario y la conciliación de una caja abierta permanece protegida durante el conteo ciego.
+La misma protección se conserva dentro del POS: los importes protegidos se muestran como `Oculto`, las respuestas posteriores a una venta no revelan el esperado y el acceso a `Jornada` queda reservado a supervisores.
 
 ## Verificación
 
