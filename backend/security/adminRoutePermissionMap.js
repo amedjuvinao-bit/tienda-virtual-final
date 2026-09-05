@@ -959,6 +959,13 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Consultar el consolidado conciliado de jornadas de caja como supervisor.',
   },
   {
+    method: 'POST',
+    path: '/api/admin/cash-sessions/journey-close',
+    permission: 'pos:sell',
+    description: 'Certificar el cierre diario consolidado de una sede como supervisor.',
+    audit: true,
+  },
+  {
     method: 'GET',
     path: '/api/admin/cash-sessions',
     permission: 'pos:view',

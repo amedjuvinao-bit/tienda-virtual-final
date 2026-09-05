@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 
 const CashSession = require('../models/CashSession');
+const CashJourneyClose = require('../models/CashJourneyClose');
 const Branch = require('../models/Branch');
 const AdminUser = require('../models/AdminUser');
 const Order = require('../models/Order');
@@ -705,6 +706,22 @@ async function openCashSession(payload = {}, { admin = {} } = {}) {
   const branch = await resolveBranch(payload.branchId || payload.branch);
   const adminContext = await resolveAdminContext(admin);
   const cashRegisterCode = cleanUpper(payload.cashRegisterCode || 'CAJA PRINCIPAL', 40);
+
+  const businessDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const certifiedJourney = await CashJourneyClose.findOne({
+    branch: branch._id,
+    businessDate,
+  }).select({ _id: 1, businessDate: 1 }).lean();
+  if (certifiedJourney) {
+    throw createCashError(
+      'La jornada de caja de hoy ya fue certificada. No se pueden abrir nuevas cajas en esta sede.',
+      'CASH_JOURNEY_ALREADY_CERTIFIED',
+      409,
+      { businessDate, journeyCloseId: String(certifiedJourney._id) }
+    );
+  }
 
   const existingOpen = await CashSession.findOne({
     branch: branch._id,

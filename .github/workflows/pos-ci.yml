@@ -61,6 +61,9 @@ jobs:
       - name: Validar conciliación y jornada de Caja Etapa 3
         run: npm --prefix backend run test:cash-level-plus-stage3
 
+      - name: Validar cierre diario certificado de Caja Etapa 4
+        run: npm --prefix backend run test:cash-level-plus-stage4
+
       - name: Conservar contratos base de POS y caja
         run: |
           node backend/scripts/testAdminPosServiceCalculations.js
@@ -85,6 +88,9 @@ jobs:
 
       - name: Validar interfaz de Caja Etapa 3
         run: npm --prefix frontend run test:cash-level-plus-stage3
+
+      - name: Validar interfaz de Caja Etapa 4
+        run: npm --prefix frontend run test:cash-level-plus-stage4
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -160,6 +166,11 @@ jobs:
         env:
           CASH_STAGE3_MONGO_URI: mongodb://127.0.0.1:27017/cash_stage3_ci?replicaSet=rs0
         run: npm --prefix backend run test:cash-level-plus-stage3-integration
+
+      - name: Validar certificación diaria real de Caja Etapa 4
+        env:
+          CASH_STAGE4_MONGO_URI: mongodb://127.0.0.1:27017/cash_stage4_ci?replicaSet=rs0
+        run: npm --prefix backend run test:cash-level-plus-stage4-integration
 
       - name: Detener MongoDB
         if: always()

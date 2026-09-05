@@ -12,7 +12,7 @@ import CashSessionsPageReport from './CashSessionsPageReport';
 
 vi.mock('../api/adminPosApi', () => ({ getPosBootstrap: vi.fn() }));
 vi.mock('../api/adminCashSessionApi', () => ({
-  addCashMovement: vi.fn(), closeCashSession: vi.fn(), getCashJourneySummary: vi.fn(),
+  addCashMovement: vi.fn(), certifyCashJourney: vi.fn(), closeCashSession: vi.fn(), getCashJourneySummary: vi.fn(),
   getCashSessionById: vi.fn(), getCurrentCashSession: vi.fn(), listCashSessions: vi.fn(),
   openCashSession: vi.fn(), reviewCashClosing: vi.fn(), reviewCashMovement: vi.fn(),
 }));

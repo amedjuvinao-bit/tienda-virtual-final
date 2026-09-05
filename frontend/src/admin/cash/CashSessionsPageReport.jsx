@@ -25,6 +25,7 @@ import {
 import { getPosBootstrap } from '../api/adminPosApi';
 import {
   addCashMovement,
+  certifyCashJourney,
   closeCashSession,
   getCashJourneySummary,
   getCashSessionById,
@@ -473,12 +474,20 @@ function reconciliationPresentation(status) {
   return { label: 'Jornada conciliada', color: '#047857', background: '#ecfdf5', borderColor: '#bbf7d0' };
 }
 
-function CashJourneyPanel({ summary, range, onRangeChange, loading }) {
+function CashJourneyPanel({ summary, range, onRangeChange, loading, certifying, notes, setNotes, onCertify }) {
   if (!summary) return null;
   const totals = summary.totals || {};
   const payments = totals.paymentTotals || {};
   const presentation = reconciliationPresentation(summary.status);
   const rows = Array.isArray(summary.sessions) ? summary.sessions.slice(0, 6) : [];
+  const journeyClose = summary.journeyClose || null;
+  const closeBlockers = [];
+  if (!Number(totals.sessionsCount || 0)) closeBlockers.push('Aún no hay cajas en la jornada.');
+  if (Number(totals.openSessionsCount || 0)) closeBlockers.push('Cierra todas las cajas.');
+  if (Number(totals.pendingReviewCount || 0)) closeBlockers.push('Resuelve los arqueos pendientes.');
+  if (Number(summary.issueCounts?.critical || 0)) closeBlockers.push('Corrige las inconsistencias críticas.');
+  const requiresNotes = Number(totals.shortages || 0) > 0 || Number(totals.overages || 0) > 0;
+  const canCertify = range === 'today' && !journeyClose && closeBlockers.length === 0 && (!requiresNotes || clean(notes));
 
   return (
     <Card className="overflow-hidden" data-testid="cash-journey-stage3">
@@ -487,7 +496,7 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading }) {
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: presentation.borderColor, color: presentation.color, background: presentation.background }}><ShieldCheck className="h-5 w-5" /></span>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Etapa 3 · Control de jornada</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Etapa 4 · Cierre operativo certificado</p>
               <h2 className="mt-1 text-xl font-black">Conciliación automática de caja</h2>
               <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cruza sesiones, ventas POS, medios de pago, movimientos y arqueos desde el servidor.</p>
             </div>
@@ -530,6 +539,34 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading }) {
               <thead><tr style={{ color: 'var(--admin-card-muted-text)' }}><th className="px-4 py-3 text-xs font-black uppercase">Sesión</th><th className="px-4 py-3 text-xs font-black uppercase">Cajero</th><th className="px-4 py-3 text-xs font-black uppercase">Ventas</th><th className="px-4 py-3 text-xs font-black uppercase">Esperado</th><th className="px-4 py-3 text-xs font-black uppercase">Contado</th><th className="px-4 py-3 text-xs font-black uppercase">Control</th></tr></thead>
               <tbody>{rows.map((row) => { const rowPresentation = reconciliationPresentation(row.reconciliationStatus); return <tr key={row.id} className="border-t" style={{ borderColor: 'var(--admin-card-border)' }}><td className="px-4 py-3"><p className="font-black">{row.sessionCode}</p><p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(row.openedAt)}</p></td><td className="px-4 py-3 font-bold">{row.cashierSnapshot?.displayName || 'Administrador'}</td><td className="px-4 py-3 font-black">{money(row.netSales)}</td><td className="px-4 py-3 font-black">{money(row.expectedCash)}</td><td className="px-4 py-3 font-black">{row.status === 'closed' ? money(row.countedCash) : 'Pendiente'}</td><td className="px-4 py-3"><span className="inline-flex rounded-xl border px-2 py-1 text-xs font-black" style={{ color: rowPresentation.color, background: rowPresentation.background, borderColor: rowPresentation.borderColor }}>{rowPresentation.label}</span></td></tr>; })}</tbody>
             </table>
+          </div>
+        ) : null}
+
+        {range === 'today' ? (
+          <div className="rounded-3xl border p-5" data-testid="cash-journey-close-stage4" style={{ borderColor: journeyClose ? '#bbf7d0' : 'var(--admin-card-border)', background: journeyClose ? '#ecfdf5' : 'var(--admin-page-bg)' }}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: journeyClose ? '#bbf7d0' : 'var(--admin-card-border)', color: journeyClose ? '#047857' : 'var(--admin-primary)', background: 'var(--admin-card-bg)' }}><ShieldCheck className="h-5 w-5" /></span>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Cierre diario</p>
+                  <h3 className="mt-1 text-lg font-black">{journeyClose ? 'Jornada certificada' : 'Certificar jornada'}</h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>{journeyClose ? `Certificó ${journeyClose.certifiedBySnapshot?.displayName || 'Supervisor'} · ${formatDate(journeyClose.certifiedAt)}` : 'Congela el consolidado del día y evita nuevas aperturas de caja en esta sede.'}</p>
+                </div>
+              </div>
+              {journeyClose ? <span className="inline-flex rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: '#bbf7d0', color: '#047857', background: '#fff' }}>Certificado {journeyClose.businessDate}</span> : null}
+            </div>
+            {journeyClose ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="rounded-2xl border p-3 text-sm font-bold" style={{ borderColor: '#bbf7d0', background: '#fff', color: '#047857' }}>{journeyClose.notes || 'Jornada cerrada sin novedades.'}</div>
+                <div className="rounded-2xl border p-3 text-xs font-bold" style={{ borderColor: '#bbf7d0', background: '#fff', color: 'var(--admin-card-muted-text)' }}>Huella: {String(journeyClose.contentDigest || '').slice(0, 16)}</div>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <Field label={requiresNotes ? 'Observación obligatoria por diferencias' : 'Observación final (opcional)'}><Input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={requiresNotes ? 'Explica el faltante o sobrante antes de certificar' : 'Ejemplo: jornada revisada sin novedades'} disabled={loading || certifying} /></Field>
+                <Button onClick={onCertify} disabled={loading || certifying || !canCertify}><ShieldCheck className="h-4 w-4" /> {certifying ? 'Certificando...' : 'Certificar jornada'}</Button>
+              </div>
+            )}
+            {!journeyClose && closeBlockers.length > 0 ? <p className="mt-3 text-sm font-bold" style={{ color: '#b45309' }}>{closeBlockers.join(' ')}</p> : null}
           </div>
         ) : null}
       </div>
@@ -851,6 +888,8 @@ export default function CashSessionsPageReport() {
   const [canSupervise, setCanSupervise] = useState(false);
   const [journeyRange, setJourneyRange] = useState('today');
   const [journeySummary, setJourneySummary] = useState(null);
+  const [journeyCloseNotes, setJourneyCloseNotes] = useState('');
+  const [journeyCertifying, setJourneyCertifying] = useState(false);
 
   const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
@@ -1150,6 +1189,24 @@ export default function CashSessionsPageReport() {
     setJourneyRange(nextRange);
   };
 
+  const handleCertifyJourney = async () => {
+    if (!selectedBranchId) return;
+    try {
+      setJourneyCertifying(true);
+      setError('');
+      setSuccess('');
+      const response = await certifyCashJourney({ branchId: selectedBranchId, notes: journeyCloseNotes });
+      setJourneySummary((previous) => previous ? { ...previous, journeyClose: response?.journeyClose || null } : previous);
+      setJourneyCloseNotes('');
+      setSuccess(response?.message || 'Jornada certificada correctamente.');
+      await refreshForBranch(selectedBranchId, cashRegisterCode);
+    } catch (err) {
+      setError(err?.message || 'No fue posible certificar el cierre diario de caja.');
+    } finally {
+      setJourneyCertifying(false);
+    }
+  };
+
   return (
     <section className="space-y-5">
       <Card className="p-5">
@@ -1186,7 +1243,7 @@ export default function CashSessionsPageReport() {
         </div>
       </Card>
 
-      {canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} /> : null}
+      {canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} certifying={journeyCertifying} notes={journeyCloseNotes} setNotes={setJourneyCloseNotes} onCertify={handleCertifyJourney} /> : null}
 
       {reportSession ? (
         <div

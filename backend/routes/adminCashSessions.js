@@ -16,6 +16,11 @@ const {
 } = require('../services/cashSessionService');
 const { buildCashJourneySummary } = require('../services/cashReconciliationService');
 const {
+  certifyCashJourney,
+  getCashJourneyClose,
+  serializeJourneyClose,
+} = require('../services/cashJourneyCloseService');
+const {
   addManualCashMovement,
   reviewCashMovement,
 } = require('../services/cashMovementService');
@@ -81,7 +86,41 @@ router.get('/journey-summary', requirePermission('pos:view'), async (req, res) =
       range: req.query.range || 'today',
       toleranceAmount: getCashVarianceTolerance(),
     });
-    return res.json({ ok: true, summary });
+    const journeyClose = await getCashJourneyClose({ branchId });
+    return res.json({
+      ok: true,
+      summary: { ...summary, journeyClose: serializeJourneyClose(journeyClose) },
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.post('/journey-close', requirePermission('pos:sell'), async (req, res) => {
+  try {
+    const branchId = req.body?.branchId || req.body?.branch;
+    assertPosBranchAccess(req, branchId, { requireSell: true });
+    const access = buildCashSessionAccess(req, { requestedBranchId: branchId, requireSell: true });
+    if (access.canSupervise !== true) {
+      const error = new Error('Solo un supervisor puede certificar el cierre diario de caja.');
+      error.code = 'CASH_JOURNEY_CLOSE_FORBIDDEN';
+      error.statusCode = 403;
+      throw error;
+    }
+    const outcome = await certifyCashJourney({
+      branchId,
+      branchIds: access.branchIds,
+      notes: req.body?.notes,
+      admin: buildAdminContext(req),
+    });
+    return res.status(outcome.alreadyCertified ? 200 : 201).json({
+      ok: true,
+      alreadyCertified: outcome.alreadyCertified,
+      journeyClose: serializeJourneyClose(outcome.close),
+      message: outcome.alreadyCertified
+        ? 'La jornada ya estaba certificada.'
+        : 'Jornada certificada. El cierre diario quedó protegido contra nuevas aperturas.',
+    });
   } catch (error) {
     return sendError(res, error);
   }

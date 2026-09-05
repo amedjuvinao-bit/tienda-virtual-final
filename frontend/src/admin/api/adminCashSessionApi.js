@@ -44,6 +44,18 @@ export async function getCashJourneySummary({ branchId, range = 'today' } = {}) 
   }
 }
 
+export async function certifyCashJourney({ branchId, notes = '' } = {}) {
+  try {
+    const response = await api.post(`${BASE_URL}/journey-close`, {
+      branchId: cleanText(branchId),
+      notes: cleanText(notes),
+    });
+    return response.data;
+  } catch (error) {
+    normalizeError(error, 'No fue posible certificar el cierre diario de caja.');
+  }
+}
+
 export async function openCashSession(payload = {}) {
   try {
     const response = await api.post(`${BASE_URL}/open`, {
@@ -160,6 +172,7 @@ export async function getCashSessionById(sessionId) {
 const adminCashSessionApi = {
   getCurrentCashSession,
   getCashJourneySummary,
+  certifyCashJourney,
   openCashSession,
   closeCashSession,
   addCashMovement,

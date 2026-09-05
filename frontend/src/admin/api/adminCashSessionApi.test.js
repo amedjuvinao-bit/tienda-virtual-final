@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import api from '../../lib/api';
-import { closeCashSession, getCashJourneySummary, reviewCashClosing, reviewCashMovement } from './adminCashSessionApi';
+import { certifyCashJourney, closeCashSession, getCashJourneySummary, reviewCashClosing, reviewCashMovement } from './adminCashSessionApi';
 
 vi.mock('../../lib/api', () => ({
   default: {
@@ -47,6 +47,17 @@ describe('adminCashSessionApi Etapa 3', () => {
     await expect(getCashJourneySummary({ branchId: ' branch-3 ', range: ' last_7_days ' }))
       .resolves.toMatchObject({ ok: true });
     expect(api.get).toHaveBeenCalledWith('/api/admin/cash-sessions/journey-summary?branchId=branch-3&range=last_7_days');
+  });
+});
+
+describe('adminCashSessionApi Etapa 4', () => {
+  it('envía la certificación diaria normalizada al servidor', async () => {
+    api.post.mockResolvedValueOnce({ data: { ok: true, journeyClose: { status: 'certified' } } });
+    await expect(certifyCashJourney({ branchId: ' branch-4 ', notes: ' Jornada validada ' }))
+      .resolves.toMatchObject({ ok: true });
+    expect(api.post).toHaveBeenCalledWith('/api/admin/cash-sessions/journey-close', {
+      branchId: 'branch-4', notes: 'Jornada validada',
+    });
   });
 });
 

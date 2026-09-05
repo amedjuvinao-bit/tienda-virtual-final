@@ -20,6 +20,7 @@ vi.mock('../api/adminPosApi', () => ({
 
 vi.mock('../api/adminCashSessionApi', () => ({
   addCashMovement: vi.fn(),
+  certifyCashJourney: vi.fn(),
   closeCashSession: vi.fn(),
   getCashSessionById: vi.fn(),
   getCurrentCashSession: vi.fn(),
