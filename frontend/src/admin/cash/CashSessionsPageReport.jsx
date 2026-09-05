@@ -496,7 +496,7 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading, certifying, 
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: presentation.borderColor, color: presentation.color, background: presentation.background }}><ShieldCheck className="h-5 w-5" /></span>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Etapa 4 · Cierre operativo certificado</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>Control de jornada · Cierre operativo</p>
               <h2 className="mt-1 text-xl font-black">Conciliación automática de caja</h2>
               <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Cruza sesiones, ventas POS, medios de pago, movimientos y arqueos desde el servidor.</p>
             </div>

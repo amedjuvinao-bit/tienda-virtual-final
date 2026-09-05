@@ -52,6 +52,8 @@ describe('CashSessionsPageReport Etapa 4', () => {
     render(<CashSessionsPageReport />);
     const button = await screen.findByRole('button', { name: 'Certificar jornada' });
     await waitFor(() => expect(button).not.toBeDisabled());
+    expect(screen.getByText('Control de jornada · Cierre operativo')).toBeInTheDocument();
+    expect(screen.queryByText(/Etapa 4/i)).not.toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Ejemplo: jornada revisada sin novedades'), { target: { value: 'Jornada revisada' } });
     fireEvent.click(button);
     await waitFor(() => expect(certifyCashJourney).toHaveBeenCalledWith({ branchId: branch.id, notes: 'Jornada revisada' }));
