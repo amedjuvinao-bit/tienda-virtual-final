@@ -494,7 +494,7 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading, certifying, 
   const canCertify = range === 'today' && !journeyClose && closeBlockers.length === 0 && (!requiresNotes || clean(notes));
 
   return (
-    <Card className="overflow-hidden" data-testid="cash-journey-stage3">
+    <section className="cash-journey-view overflow-hidden" data-testid="cash-journey-stage3">
       <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
@@ -574,7 +574,7 @@ function CashJourneyPanel({ summary, range, onRangeChange, loading, certifying, 
           </div>
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -857,7 +857,7 @@ function ReportPanel({ session, onClose }) {
 
 function HistoryTable({ sessions, onReport }) {
   return (
-    <Card className="overflow-hidden">
+    <section className="cash-history-view overflow-hidden">
       <div className="border-b p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-primary)' }}>
@@ -905,7 +905,7 @@ function HistoryTable({ sessions, onReport }) {
           </tbody>
         </table>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -941,7 +941,6 @@ export default function CashSessionsPageReport() {
   const [journeyCloseNotes, setJourneyCloseNotes] = useState('');
   const [journeyCertifying, setJourneyCertifying] = useState(false);
 
-  const selectedBranch = useMemo(() => branches.find((branch) => branch.id === selectedBranchId) || null, [branches, selectedBranchId]);
   const hasOpenSession = Boolean(currentSession?.id && currentSession.status === 'open');
   const journeyCertified = Boolean(todayJourneyClose);
   const pendingMovementsCount = Number(currentSession?.cashControl?.pendingMovementsCount || 0);
@@ -1269,31 +1268,33 @@ export default function CashSessionsPageReport() {
     }
   };
 
-  const navigation = [
-    { key: 'operation', label: 'Operación' },
-    ...(canSupervise ? [{ key: 'reconciliation', label: 'Conciliación y cierre' }] : []),
-    { key: 'history', label: 'Histórico' },
+  const activeJourneyStep = journeyCertified || activeView === 'reconciliation'
+    ? 4
+    : closingLocked
+      ? 3
+      : hasOpenSession
+        ? 2
+        : 1;
+
+  const journeySteps = [
+    { number: 1, title: 'Apertura', helper: 'Preparar efectivo' },
+    { number: 2, title: 'Operación', helper: 'Ventas y movimientos' },
+    { number: 3, title: 'Arqueo', helper: 'Validar saldos' },
+    { number: 4, title: 'Cierre', helper: 'Certificar jornada' },
   ];
 
   return (
-    <section className="cash-workspace space-y-4">
-      <Card className="cash-workspace__header overflow-hidden">
-        <div className="cash-workspace__hero">
+    <section className="cash-workspace">
+      <Card className="cash-workspace__shell overflow-hidden">
+        <header className="cash-workspace__hero">
           <div className="cash-workspace__identity">
             <p className="cash-eyebrow">Control operativo</p>
-            <div className="cash-workspace__title-row">
-              <h1>Caja</h1>
-              <span className={`cash-workspace__state ${hasOpenSession ? 'is-open' : journeyCertified ? 'is-certified' : 'is-closed'}`}>
-                {hasOpenSession ? 'Caja abierta' : journeyCertified ? 'Cierre certificado' : 'Caja cerrada'}
-              </span>
-            </div>
-            <p className="cash-workspace__summary">
-              {hasOpenSession ? `Sesión activa · ${currentSession.sessionCode}` : journeyCertified ? 'La operación de hoy ya fue finalizada' : 'Lista para iniciar la operación'}
-            </p>
+            <h1>Caja</h1>
+            <p className="cash-workspace__summary">Abre, opera y cierra la jornada desde un solo espacio.</p>
           </div>
           <div className="cash-workspace__context">
             <label className="cash-workspace__branch">
-              <span>Sede operativa</span>
+              <span>Sede activa</span>
               <Select value={selectedBranchId} onChange={handleBranchChange} disabled={loading || saving || movementSaving || reviewSaving}>
                 {branches.length === 0 ? <option value="">Sin sedes POS</option> : null}
                 {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} - {branch.code}</option>)}
@@ -1304,35 +1305,30 @@ export default function CashSessionsPageReport() {
               <span>Actualizar</span>
             </button>
           </div>
+        </header>
+
+        <div className="cash-journey-progress" aria-label="Flujo de la jornada">
+          {journeySteps.map((step) => (
+            <div
+              key={step.number}
+              className={`cash-journey-progress__step ${step.number === activeJourneyStep ? 'is-active' : ''} ${step.number < activeJourneyStep ? 'is-complete' : ''}`}
+              aria-current={step.number === activeJourneyStep ? 'step' : undefined}
+            >
+              <strong>{String(step.number).padStart(2, '0')} · {step.title}</strong>
+              <span>{step.helper}</span>
+            </div>
+          ))}
         </div>
 
-        <nav className="cash-workspace__tabs" aria-label="Secciones de caja">
-          {navigation.map(({ key, label }) => (
-            <button key={key} type="button" onClick={() => setActiveView(key)} aria-current={activeView === key ? 'page' : undefined}>
-              {label}
-              {key === 'history' && sessions.length ? <small>{sessions.length}</small> : null}
-              {key === 'reconciliation' && journeySummary?.status === 'attention' ? <small className="cash-workspace__alert-text">Revisar</small> : null}
-            </button>
-          ))}
-        </nav>
-      </Card>
+        <div className="cash-workspace__body">
+          {error && !operationDialog ? <Message type="error">{error}</Message> : null}
+          {success && !operationDialog ? <Message>{success}</Message> : null}
+          {reportLoading ? <Message>Generando reporte de cierre...</Message> : null}
 
-      {error && !operationDialog ? <Message type="error">{error}</Message> : null}
-      {success && !operationDialog ? <Message>{success}</Message> : null}
-      {reportLoading ? <Message>Generando reporte de cierre...</Message> : null}
-
-      <MovementReviewDialog review={movementReview} notes={reviewNotes} setNotes={setReviewNotes} saving={reviewSaving} onCancel={closeMovementReview} onConfirm={confirmMovementReview} />
-
-      {reportSession && typeof document !== 'undefined' ? createPortal(
-        <div id="cash-report-panel" role="dialog" aria-modal="true" aria-label="Reporte de cierre de caja">
-          <ReportPanel session={reportSession} onClose={() => setReportSession(null)} />
-        </div>,
-        document.body
-      ) : null}
-
-      {activeView === 'operation' ? (
-        hasOpenSession ? (
-          <Card className="cash-operation p-5">
+          {activeView === 'operation' ? (
+            hasOpenSession ? (
+              <section className="cash-operation cash-main-state">
+                <div className="cash-current-state cash-current-state--open">Caja abierta · operación activa</div>
             <div className="cash-operation__heading">
               <div>
                 <p className="cash-eyebrow">Operación en curso</p>
@@ -1378,9 +1374,9 @@ export default function CashSessionsPageReport() {
                 <span>Hay {pendingMovementsCount} movimiento(s) pendiente(s). Revísalos en “Registrar movimiento” antes de cerrar.</span>
               </div>
             ) : null}
-          </Card>
-        ) : journeyCertified ? (
-          <Card className="cash-journey-finished p-6">
+              </section>
+            ) : journeyCertified ? (
+          <section className="cash-journey-finished cash-main-state">
             <span className="cash-journey-finished__icon"><CheckCircle2 className="h-8 w-8" /></span>
             <div className="min-w-0 flex-1">
               <p className="cash-eyebrow">Operación finalizada</p>
@@ -1391,28 +1387,61 @@ export default function CashSessionsPageReport() {
               {canSupervise ? <Button onClick={() => setActiveView('reconciliation')}><ShieldCheck className="h-4 w-4" /> Ver certificado</Button> : null}
               <Button variant="ghost" onClick={() => setActiveView('history')}><History className="h-4 w-4" /> Ver histórico</Button>
             </div>
-          </Card>
+          </section>
         ) : (
-          <Card className="cash-opening p-6">
-            <div className="cash-opening__intro">
-              <div>
-                <p className="cash-eyebrow">Inicio de jornada</p>
-                <h2 className="mt-1 text-2xl font-black">Abrir caja</h2>
-                <p className="mt-2 text-sm font-medium" style={{ color: 'var(--admin-card-muted-text)' }}>Registra el fondo inicial para comenzar a vender en el POS.</p>
+          <section className="cash-opening cash-main-state">
+            <div className="cash-opening__workspace">
+              <div className="cash-opening__main">
+                <div className="cash-current-state">Sin caja abierta · lista para comenzar</div>
+                <h2><span aria-hidden="true">Comienza la jornada</span><span className="sr-only">Abrir caja</span></h2>
+                <p className="cash-opening__description">Registra el fondo inicial. Después de abrir, esta misma área mostrará la operación activa sin cargar toda la pantalla con secciones innecesarias.</p>
+
+                <form onSubmit={handleOpenCash} className="cash-opening__form">
+                  <div className="cash-opening__code"><Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field></div>
+                  <div className="cash-opening__amount"><Field label="Fondo inicial"><Input aria-label="Monto inicial" type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field></div>
+                  <div className="cash-opening__notes"><Field label="Observación"><Textarea value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Opcional: relevo de turno, responsable o novedad inicial" disabled={saving || loading} /></Field></div>
+                  <div className="cash-opening__submit"><Button aria-label="Abrir caja" className="cash-opening__button" type="submit" disabled={saving || loading || !selectedBranchId}>{saving ? 'Iniciando...' : 'Iniciar jornada'} <ArrowRight className="h-4 w-4" /></Button></div>
+                </form>
               </div>
+
+              <aside className="cash-opening__guide" aria-label="Validaciones antes de iniciar">
+                <h3>Antes de iniciar</h3>
+                <div><CheckCircle2 className="h-4 w-4" /><span>La sede seleccionada es la correcta.</span></div>
+                <div><CheckCircle2 className="h-4 w-4" /><span>El efectivo inicial fue contado físicamente.</span></div>
+                <div><CheckCircle2 className="h-4 w-4" /><span>No existe otra caja abierta en esta jornada.</span></div>
+              </aside>
             </div>
-            <form onSubmit={handleOpenCash} className="cash-opening__form">
-              <div className="cash-opening__code"><Field label="Código de caja"><Input value={cashRegisterCode} onChange={(event) => setCashRegisterCode(event.target.value)} disabled={loading || saving} /></Field></div>
-              <div className="cash-opening__amount"><Field label="Monto inicial"><Input type="number" min="0" step="100" value={openingAmount} onChange={(event) => setOpeningAmount(event.target.value)} disabled={saving || loading} /></Field></div>
-              <div className="cash-opening__notes"><Field label="Observación de apertura"><Input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ejemplo: apertura normal" disabled={saving || loading} /></Field></div>
-              <div className="cash-opening__submit"><Button aria-label="Abrir caja" className="cash-opening__button" type="submit" disabled={saving || loading || !selectedBranchId}>{saving ? 'Iniciando...' : 'Iniciar jornada'} <ArrowRight className="h-4 w-4" /></Button></div>
-            </form>
-          </Card>
+          </section>
         )
       ) : null}
 
       {activeView === 'reconciliation' && canSupervise ? <CashJourneyPanel summary={journeySummary} range={journeyRange} onRangeChange={handleJourneyRangeChange} loading={loading} certifying={journeyCertifying} notes={journeyCloseNotes} setNotes={setJourneyCloseNotes} onCertify={handleCertifyJourney} /> : null}
       {activeView === 'history' ? <HistoryTable sessions={sessions} onReport={openReport} /> : null}
+        </div>
+
+        <nav className="cash-quick-access" aria-label="Consultas de caja">
+          <button type="button" onClick={() => setActiveView('operation')} aria-current={activeView === 'operation' ? 'page' : undefined}>
+            <span><strong>Operación del día</strong><small>Apertura, movimientos y arqueo</small></span><ArrowRight className="h-4 w-4" />
+          </button>
+          {canSupervise ? (
+            <button type="button" onClick={() => setActiveView('reconciliation')} aria-current={activeView === 'reconciliation' ? 'page' : undefined}>
+              <span><strong>Conciliación y cierre</strong><small>Revisión y certificación de la jornada</small></span><ArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+          <button type="button" onClick={() => setActiveView('history')} aria-current={activeView === 'history' ? 'page' : undefined}>
+            <span><strong>Histórico</strong><small>{sessions.length ? `${sessions.length} cajas recientes` : 'Cajas y certificados anteriores'}</small></span><ArrowRight className="h-4 w-4" />
+          </button>
+        </nav>
+      </Card>
+
+      <MovementReviewDialog review={movementReview} notes={reviewNotes} setNotes={setReviewNotes} saving={reviewSaving} onCancel={closeMovementReview} onConfirm={confirmMovementReview} />
+
+      {reportSession && typeof document !== 'undefined' ? createPortal(
+        <div id="cash-report-panel" role="dialog" aria-modal="true" aria-label="Reporte de cierre de caja">
+          <ReportPanel session={reportSession} onClose={() => setReportSession(null)} />
+        </div>,
+        document.body
+      ) : null}
 
       {operationDialog === 'movement' && currentSession ? (
         <WorkspaceDialog label="Movimientos de caja" title="Movimientos de efectivo" description="Registra y revisa ingresos, salidas, gastos y ajustes." icon={Banknote} onClose={() => setOperationDialog(null)} wide>
