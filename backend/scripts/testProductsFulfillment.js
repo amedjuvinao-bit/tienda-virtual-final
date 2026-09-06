@@ -214,11 +214,11 @@ function run() {
   assert(posService.includes('POS_FULFILLMENT_EMAIL_REQUIRED'));
   assert(posService.includes('getPublicFulfillmentView'));
   assert(posService.includes('+bundleComponents'));
-  assert(posService.includes('processOrderFulfillmentAfterPayment'));
+  assert(posService.includes('processFulfillmentOnce'));
   const posCashService = read(
     'backend/services/posCashSaleService.js'
   );
-  assert(posCashService.includes('processOrderFulfillmentAfterPayment'));
+  assert(posCashService.includes('processFulfillmentOnce'));
   ok('POS vende virtuales, descuenta el combo y activa su cumplimiento');
 
   const orderRoutes = read('backend/routes/orders.js');
