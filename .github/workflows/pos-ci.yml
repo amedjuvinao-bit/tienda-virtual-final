@@ -10,6 +10,7 @@ on:
       - feature/caja-nivel-plus-etapa-1
       - feature/caja-nivel-plus-etapa-2
       - feature/caja-nivel-plus-etapa-3
+      - feature/caja-nivel-plus-etapa-4
   pull_request:
     branches:
       - main
