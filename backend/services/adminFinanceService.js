@@ -2,13 +2,18 @@
 const mongoose = require('mongoose');
 
 const Order = require('../models/Order');
-const Product = require('../models/Product');
 const CashSession = require('../models/CashSession');
 const FinanceExpense = require('../models/FinanceExpense');
-const { resolveVariantCommercialSnapshot } = require('../lib/products/productVariantConfig');
+const Branch = require('../models/Branch');
+const {
+  createRevenueFacts,
+} = require('./adminFinance/revenueFacts');
+const {
+  createProfitFacts,
+} = require('./adminFinance/profitFacts');
 const { formatLocalDate, resolveDateRange, safeDate } = require('../utils/dateRange');
 
-const CANCELLED_ORDER_STATUSES = ['cancelled', 'canceled', 'failed', 'refunded'];
+const CANCELLED_ORDER_STATUSES = ['cancelled', 'canceled', 'failed'];
 
 function clean(value) {
   return String(value || '').trim();
@@ -46,14 +51,75 @@ function toObjectId(value) {
   return new mongoose.Types.ObjectId(String(value));
 }
 
+function normalizeBranchIds(values) {
+  if (!Array.isArray(values)) return null;
+  const ids = [];
+  const seen = new Set();
+
+  for (const value of values) {
+    const id = toObjectId(value);
+    if (!id || seen.has(String(id))) continue;
+    seen.add(String(id));
+    ids.push(id);
+  }
+
+  return ids;
+}
+
 function escapeRegex(value) {
   return clean(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function buildBranchFilter(query = {}) {
+  if (Object.prototype.hasOwnProperty.call(query, 'branchIds')) {
+    const scopedIds = normalizeBranchIds(query.branchIds);
+    if (scopedIds === null) return {};
+    return { branch: { $in: scopedIds } };
+  }
+
   const branchId = query.branchId || query.branch || '';
   const branch = toObjectId(branchId);
   return branch ? { branch } : {};
+}
+
+function buildExpenseResourceFilter(expenseId, scope = {}) {
+  const filter = {
+    _id: toObjectId(expenseId),
+    deletedAt: null,
+  };
+  const branchIds = normalizeBranchIds(scope.branchIds);
+  if (branchIds !== null) filter.branch = { $in: branchIds };
+  return filter;
+}
+
+async function resolveExpenseBranch(branchId) {
+  const objectId = toObjectId(branchId);
+  if (!objectId) return { branch: null, snapshot: {} };
+
+  const branch = await Branch.findOne({
+    _id: objectId,
+    deletedAt: null,
+    active: true,
+    status: 'active',
+  })
+    .select('name code type')
+    .lean();
+
+  if (!branch) {
+    const error = new Error('La sede seleccionada no existe o no está activa.');
+    error.code = 'FINANCE_BRANCH_NOT_AVAILABLE';
+    error.status = 409;
+    throw error;
+  }
+
+  return {
+    branch: branch._id,
+    snapshot: {
+      name: branch.name || '',
+      code: branch.code || '',
+      type: branch.type || '',
+    },
+  };
 }
 
 function buildPaidOrdersFilter(query = {}) {
@@ -62,14 +128,42 @@ function buildPaidOrdersFilter(query = {}) {
 
   return {
     ...branchFilter,
-    createdAt: { $gte: dateRange.from, $lte: dateRange.to },
     status: { $nin: CANCELLED_ORDER_STATUSES },
-    $or: [
-      { 'payment.status': 'paid' },
-      { status: 'paid' },
-      { source: 'pos', saleType: 'pos_sale' },
+    $and: [
+      {
+        $or: [
+          { 'payment.status': 'paid' },
+          { status: 'paid' },
+        ],
+      },
+      {
+        $or: [
+          { 'payment.paidAt': { $gte: dateRange.from, $lte: dateRange.to } },
+          {
+            'payment.paidAt': null,
+            'paymentProcessing.approvedAt': {
+              $gte: dateRange.from,
+              $lte: dateRange.to,
+            },
+          },
+          {
+            'payment.paidAt': null,
+            'paymentProcessing.approvedAt': null,
+            createdAt: { $gte: dateRange.from, $lte: dateRange.to },
+          },
+        ],
+      },
     ],
   };
+}
+
+function getOrderFinancialDate(order = {}) {
+  return (
+    safeDate(order.payment?.paidAt) ||
+    safeDate(order.paymentProcessing?.approvedAt) ||
+    safeDate(order.createdAt) ||
+    new Date(0)
+  );
 }
 
 function getOrderAmount(order = {}) {
@@ -83,6 +177,45 @@ function getOrderAmount(order = {}) {
     0,
     money(order.subtotal) + money(order.shipping) - money(order.discount?.amount)
   );
+}
+
+function getOrderPaymentParts(order = {}, targetAmount = getOrderAmount(order)) {
+  const total = Number(targetAmount || 0);
+  const splits = Array.isArray(order.payment?.splitPayments)
+    ? order.payment.splitPayments
+        .map((item) => ({
+          key: cleanLower(item?.method || 'otro') || 'otro',
+          label: clean(item?.methodLabel || item?.method || 'Otro') || 'Otro',
+          amount: money(item?.amount),
+        }))
+        .filter((item) => item.amount > 0)
+    : [];
+  const splitTotal = splits.reduce((sum, item) => sum + item.amount, 0);
+
+  if (splits.length && splitTotal > 0) {
+    let allocated = 0;
+    return splits.map((item, index) => {
+      const amount = index === splits.length - 1
+        ? signedMoney(total - allocated)
+        : signedMoney((item.amount / splitTotal) * total);
+      allocated += amount;
+      return { ...item, amount, share: item.amount / splitTotal };
+    });
+  }
+
+  const key = cleanLower(
+    order.payment?.method ||
+      order.payment?.methodType ||
+      order.payment?.provider ||
+      'sin_metodo'
+  );
+
+  return [{
+    key: key || 'sin_metodo',
+    label: clean(order.payment?.methodLabel || key || 'Sin método'),
+    amount: signedMoney(total),
+    share: 1,
+  }];
 }
 
 function getItemQty(item = {}) {
@@ -142,38 +275,24 @@ async function getPaidOrders(query = {}) {
   return Order.find(filter).sort({ createdAt: -1 }).lean();
 }
 
-async function loadProductMapFromOrders(orders = []) {
-  const ids = [];
-  const seen = new Set();
-
-  for (const order of orders) {
-    for (const item of getOrderItems(order)) {
-      const id = getProductIdFromItem(item);
-      if (!id || !isValidObjectId(id) || seen.has(id)) continue;
-      seen.add(id);
-      ids.push(toObjectId(id));
-    }
-  }
-
-  if (!ids.length) return new Map();
-  const products = await Product.find({ _id: { $in: ids } }).lean();
-  return new Map(products.map((product) => [String(product._id), product]));
-}
-
-function resolveItemCost(product, item = {}) {
-  if (!product) return 0;
-
-  const snapshot = resolveVariantCommercialSnapshot(product, {
-    variantKey: item.variantKey || item.variantId || '',
-    size: item.size || '',
-    color: item.color || '',
-  });
-
-  const variantCost = money(snapshot?.cost);
-  if (variantCost > 0) return variantCost;
-
-  return money(product.averageCost || product.cost || 0);
-}
+const {
+  applySalesCorrections,
+  correctionTotal,
+  loadFinancialCorrectionContext,
+} = createRevenueFacts({
+  bucketKey,
+  buildBranchFilter,
+  clean,
+  cleanLower,
+  getOrderAmount,
+  getOrderPaymentParts,
+  money,
+  pct,
+  resolveDateRange,
+  safeDate,
+  signedMoney,
+  toObjectId,
+});
 
 function summarizeSalesFromOrders(orders = []) {
   const bySource = new Map();
@@ -197,13 +316,7 @@ function summarizeSalesFromOrders(orders = []) {
     const orderTaxes = money(order.taxes?.iva?.amount);
     const orderItems = getOrderItems(order);
     const orderItemsCount = orderItems.reduce((acc, item) => acc + getItemQty(item), 0);
-    const paymentMethod = cleanLower(
-      order.payment?.method ||
-        order.payment?.methodType ||
-        order.payment?.provider ||
-        'sin_metodo'
-    );
-    const dayKey = bucketKey(order.createdAt);
+    const dayKey = bucketKey(getOrderFinancialDate(order));
 
     revenue += amount;
     subtotal += orderSubtotal;
@@ -224,10 +337,13 @@ function summarizeSalesFromOrders(orders = []) {
       orders: 1,
       items: orderItemsCount,
     });
-    addGroupedAmount(byPaymentMethod, paymentMethod, amount, {
-      orders: 1,
-      items: orderItemsCount,
-    });
+    for (const paymentPart of getOrderPaymentParts(order, amount)) {
+      addGroupedAmount(byPaymentMethod, paymentPart.key, paymentPart.amount, {
+        label: paymentPart.label,
+        orders: 1,
+        items: orderItemsCount,
+      });
+    }
 
     const current = byDay.get(dayKey) || {
       date: dayKey,
@@ -264,75 +380,25 @@ function summarizeSalesFromOrders(orders = []) {
   };
 }
 
-async function summarizeProfitFromOrders(orders = []) {
-  const productMap = await loadProductMapFromOrders(orders);
-  const byProduct = new Map();
-  const bySource = new Map();
-
-  let revenue = 0;
-  let cogs = 0;
-  let itemsCount = 0;
-
-  for (const order of orders) {
-    const orderRevenue = getOrderAmount(order);
-    revenue += orderRevenue;
-
-    for (const item of getOrderItems(order)) {
-      const qty = getItemQty(item);
-      if (qty <= 0) continue;
-
-      const productId = getProductIdFromItem(item);
-      const product = productMap.get(String(productId));
-      const unitCost = resolveItemCost(product, item);
-      const unitPrice = getItemUnitPrice(item) || (qty ? orderRevenue / qty : 0);
-      const itemRevenue = money(unitPrice * qty);
-      const itemCost = money(unitCost * qty);
-      const title = clean(item.title || product?.title || 'Producto sin nombre');
-
-      cogs += itemCost;
-      itemsCount += qty;
-
-      const productKey = productId || title;
-      const currentProduct = byProduct.get(productKey) || {
-        productId: productId || '',
-        title,
-        qty: 0,
-        revenue: 0,
-        cogs: 0,
-        grossProfit: 0,
-      };
-      currentProduct.qty += qty;
-      currentProduct.revenue += itemRevenue;
-      currentProduct.cogs += itemCost;
-      currentProduct.grossProfit = currentProduct.revenue - currentProduct.cogs;
-      byProduct.set(productKey, currentProduct);
-    }
-
-    addGroupedAmount(bySource, order.source || 'online', orderRevenue, { orders: 1 });
-  }
-
-  const grossProfit = revenue - cogs;
-
-  return {
-    ordersCount: orders.length,
-    itemsCount,
-    revenue: money(revenue),
-    cogs: money(cogs),
-    grossProfit: signedMoney(grossProfit),
-    grossMarginPercent: pct(grossProfit, revenue),
-    bySource: mapToBreakdown(bySource, revenue),
-    byProduct: Array.from(byProduct.values())
-      .map((row) => ({
-        ...row,
-        revenue: money(row.revenue),
-        cogs: money(row.cogs),
-        grossProfit: signedMoney(row.grossProfit),
-        grossMarginPercent: pct(row.grossProfit, row.revenue),
-      }))
-      .sort((a, b) => Number(b.grossProfit || 0) - Number(a.grossProfit || 0))
-      .slice(0, 30),
-  };
-}
+const {
+  financeCostKey,
+  resolveItemCost,
+  summarizeProfitFromOrders,
+} = createProfitFacts({
+  clean,
+  cleanLower,
+  correctionTotal,
+  getItemQty,
+  getItemUnitPrice,
+  getOrderAmount,
+  getOrderItems,
+  getProductIdFromItem,
+  isValidObjectId,
+  money,
+  pct,
+  signedMoney,
+  toObjectId,
+});
 
 function getCashMovementTotals(sessions = []) {
   const byType = new Map();
@@ -525,7 +591,15 @@ async function listExpenses(query = {}) {
 }
 
 async function createExpense(payload = {}, actor = {}) {
-  const branchId = toObjectId(payload.branch || payload.branchId);
+  const amount = Number(payload.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    const error = new Error('El valor del gasto debe ser mayor a cero.');
+    error.code = 'FINANCE_EXPENSE_AMOUNT_INVALID';
+    error.status = 400;
+    throw error;
+  }
+
+  const branchInfo = await resolveExpenseBranch(payload.branch || payload.branchId);
   const expense = new FinanceExpense({
     date: safeDate(payload.date) || new Date(),
     amount: payload.amount,
@@ -539,8 +613,8 @@ async function createExpense(payload = {}, actor = {}) {
     paymentMethod: payload.paymentMethod,
     status: payload.status || 'paid',
     source: 'manual',
-    branch: branchId,
-    branchSnapshot: payload.branchSnapshot || {},
+    branch: branchInfo.branch,
+    branchSnapshot: branchInfo.snapshot,
     tags: payload.tags,
     attachments: Array.isArray(payload.attachments) ? payload.attachments.slice(0, 8) : [],
     notes: payload.notes,
@@ -552,14 +626,16 @@ async function createExpense(payload = {}, actor = {}) {
   return expense.toSafeObject();
 }
 
-async function updateExpense(expenseId, payload = {}, actor = {}) {
+async function updateExpense(expenseId, payload = {}, actor = {}, scope = {}) {
   if (!isValidObjectId(expenseId)) {
     const error = new Error('ID de gasto inválido.');
     error.status = 400;
     throw error;
   }
 
-  const expense = await FinanceExpense.findOne({ _id: toObjectId(expenseId), deletedAt: null });
+  const expense = await FinanceExpense.findOne(
+    buildExpenseResourceFilter(expenseId, scope)
+  );
   if (!expense) {
     const error = new Error('Gasto no encontrado.');
     error.status = 404;
@@ -582,15 +658,26 @@ async function updateExpense(expenseId, payload = {}, actor = {}) {
     'notes',
   ];
 
+  if (payload.amount !== undefined) {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      const error = new Error('El valor del gasto debe ser mayor a cero.');
+      error.code = 'FINANCE_EXPENSE_AMOUNT_INVALID';
+      error.status = 400;
+      throw error;
+    }
+  }
+
   for (const field of editable) {
     if (payload[field] !== undefined) expense[field] = payload[field];
   }
 
   if (payload.date !== undefined) expense.date = safeDate(payload.date) || expense.date;
   if (payload.branch !== undefined || payload.branchId !== undefined) {
-    expense.branch = toObjectId(payload.branch || payload.branchId);
+    const branchInfo = await resolveExpenseBranch(payload.branch || payload.branchId);
+    expense.branch = branchInfo.branch;
+    expense.branchSnapshot = branchInfo.snapshot;
   }
-  if (payload.branchSnapshot !== undefined) expense.branchSnapshot = payload.branchSnapshot || {};
 
   expense.updatedBy = actor.adminUserId && isValidObjectId(actor.adminUserId) ? toObjectId(actor.adminUserId) : null;
 
@@ -598,14 +685,16 @@ async function updateExpense(expenseId, payload = {}, actor = {}) {
   return expense.toSafeObject();
 }
 
-async function cancelExpense(expenseId, actor = {}) {
+async function cancelExpense(expenseId, actor = {}, scope = {}) {
   if (!isValidObjectId(expenseId)) {
     const error = new Error('ID de gasto inválido.');
     error.status = 400;
     throw error;
   }
 
-  const expense = await FinanceExpense.findOne({ _id: toObjectId(expenseId), deletedAt: null });
+  const expense = await FinanceExpense.findOne(
+    buildExpenseResourceFilter(expenseId, scope)
+  );
   if (!expense) {
     const error = new Error('Gasto no encontrado.');
     error.status = 404;
@@ -623,7 +712,11 @@ async function cancelExpense(expenseId, actor = {}) {
 async function getSalesReport(query = {}) {
   const dateRange = resolveDateRange(query);
   const orders = await getPaidOrders(query);
-  const summary = summarizeSalesFromOrders(orders);
+  const correctionContext = await loadFinancialCorrectionContext(query, orders);
+  const summary = applySalesCorrections(
+    summarizeSalesFromOrders(orders),
+    correctionContext
+  );
 
   return {
     dateRange,
@@ -636,8 +729,15 @@ async function getSalesReport(query = {}) {
       saleType: order.saleType,
       status: order.status,
       paymentStatus: order.payment?.status || '',
-      total: getOrderAmount(order),
-      createdAt: order.createdAt,
+      grossTotal: getOrderAmount(order),
+      refundedAmount: money(
+        correctionContext.correctionsByOrder.get(String(order._id))?.amount
+      ),
+      total: signedMoney(
+        getOrderAmount(order) -
+          money(correctionContext.correctionsByOrder.get(String(order._id))?.amount)
+      ),
+      createdAt: getOrderFinancialDate(order),
       branchSnapshot: order.branchSnapshot || {},
     })),
   };
@@ -646,7 +746,8 @@ async function getSalesReport(query = {}) {
 async function getProfitReport(query = {}) {
   const dateRange = resolveDateRange(query);
   const orders = await getPaidOrders(query);
-  const profit = await summarizeProfitFromOrders(orders);
+  const correctionContext = await loadFinancialCorrectionContext(query, orders);
+  const profit = await summarizeProfitFromOrders(orders, correctionContext);
 
   return {
     dateRange,
@@ -696,9 +797,14 @@ async function getFinanceSummary(query = {}) {
     dateRange,
     kpis: {
       revenue: sales.revenue,
+      grossRevenue: sales.grossRevenue,
+      refunds: sales.refunds,
+      refundedOrdersCount: sales.refundedOrdersCount,
       ordersCount: sales.ordersCount,
       averageTicket: sales.averageTicket,
       cogs: profit.cogs,
+      grossCogs: profit.grossCogs,
+      returnedCogs: profit.returnedCogs,
       grossProfit: profit.grossProfit,
       grossMarginPercent: profit.grossMarginPercent,
       operatingExpenses: money(operatingExpenses),
@@ -707,6 +813,7 @@ async function getFinanceSummary(query = {}) {
       netProfit,
       netMarginPercent: pct(netProfit, sales.revenue),
       cashDifference: cash.differenceAmount,
+      costQuality: profit.costQuality,
     },
     sales: {
       bySource: sales.bySource,
@@ -785,4 +892,13 @@ module.exports = {
   updateExpense,
   cancelExpense,
   buildFinanceCsv,
+  __test: {
+    applySalesCorrections,
+    buildPaidOrdersFilter,
+    financeCostKey,
+    getOrderFinancialDate,
+    getOrderPaymentParts,
+    resolveItemCost,
+    summarizeSalesFromOrders,
+  },
 };

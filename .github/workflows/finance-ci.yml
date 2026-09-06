@@ -1,0 +1,87 @@
+name: Finanzas CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/finanzas-nivel-plus-etapa-0
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: finance-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finance-integrity:
+    name: Integridad y seguridad de Finanzas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar seguridad y exactitud de Etapa 0
+        run: npm --prefix backend run test:finance-level-plus-stage0
+
+      - name: Instalar frontend
+        run: npm --prefix frontend ci
+
+      - name: Validar presentación financiera de Etapa 0
+        run: npm --prefix frontend run test:finance-level-plus-stage0
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
+
+  finance-mongodb:
+    name: Hechos financieros reales en MongoDB
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Validar sedes, devoluciones, notas crédito y costos históricos
+        env:
+          FINANCE_STAGE0_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage0_ci
+        run: npm --prefix backend run test:finance-level-plus-stage0-integration

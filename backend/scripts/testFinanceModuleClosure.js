@@ -62,6 +62,7 @@ function validateBackendStaticWiring() {
 
   [
     '/summary',
+    '/branches',
     '/sales',
     '/profit',
     '/cash',
@@ -137,6 +138,7 @@ function validateFrontendStaticWiring() {
     '/api/admin/finance/cash',
     '/api/admin/finance/expenses',
     '/api/admin/finance/export',
+    '/api/admin/finance/branches',
     'responseType',
     'blob',
     'api.post',
@@ -167,12 +169,28 @@ function validateFrontendStaticWiring() {
     'Ventas POS vs Web',
     'Resumen de caja',
     'Utilidad neta',
+    'Ingresos netos',
+    'Costo histórico incompleto',
   ].forEach((needle) => assertIncludes(pageFile, needle, `AdminFinancePage no contiene ${needle}`));
 
   assertIncludesAny(pageFile, ['Métodos de pago', 'Metodos de pago'], 'AdminFinancePage no muestra metodos de pago.');
   assert(!pageFile.includes('showExpenseForm'), 'Quedo estado viejo showExpenseForm; el gasto debe abrirse en modal.');
 
   ok('Frontend Finanzas tiene ruta, permisos, API, modal, filtros, exportacion y acciones de gastos');
+}
+
+function runStage0Contract() {
+  const scriptPath = path.join(PROJECT_ROOT, 'backend', 'scripts', 'testFinanceLevelPlusStage0.js');
+  assert(fs.existsSync(scriptPath), 'No existe backend/scripts/testFinanceLevelPlusStage0.js');
+
+  const output = execFileSync(process.execPath, [scriptPath], {
+    cwd: path.join(PROJECT_ROOT, 'backend'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  process.stdout.write(output);
+  assertIncludes(output, 'Etapa 0 Finanzas validada:', 'La Etapa 0 de Finanzas no terminó correctamente.');
+  ok('Contrato de seguridad y exactitud de Finanzas Etapa 0 finalizó correctamente');
 }
 
 function runBackendFunctionalTest() {
@@ -204,6 +222,7 @@ function main() {
   try {
     validateBackendStaticWiring();
     validateFrontendStaticWiring();
+    runStage0Contract();
     runBackendFunctionalTest();
     ok('Modulo Finanzas cumple condiciones tecnicas para cierre funcional');
   } catch (error) {

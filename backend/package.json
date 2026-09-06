@@ -195,6 +195,8 @@
     "test:products-final-closure": "node scripts/testProductsFinalClosure.js",
     "test:finance-admin": "node scripts/testFinanceAdminModule.js",
     "test:finance-module": "node scripts/testFinanceModuleClosure.js",
+    "test:finance-level-plus-stage0": "node scripts/testFinanceLevelPlusStage0.js",
+    "test:finance-level-plus-stage0-integration": "node scripts/testFinanceLevelPlusStage0Integration.js",
     "test:coupons-backend": "node scripts/testCouponsBackendModule.js",
     "test:coupons-checkout": "node scripts/testCouponsCheckoutModule.js",
     "test:coupons-admin": "node scripts/testCouponsAdminFrontendModule.js",

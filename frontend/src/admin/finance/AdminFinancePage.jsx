@@ -37,6 +37,7 @@ import {
   getFinanceSummary,
   updateFinanceExpense,
 } from './api/financeApi';
+import useAdminPermissions from '../security/useAdminPermissions';
 
 const RANGE_OPTIONS = [
   { value: 'today', label: 'Hoy' },
@@ -490,6 +491,9 @@ function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, savin
 }
 
 export default function AdminFinancePage() {
+  const { can } = useAdminPermissions();
+  const canManageExpenses = can('finance:expenses');
+  const canExport = can('finance:export');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [summary, setSummary] = useState(null);
   const [sales, setSales] = useState(null);
@@ -648,16 +652,18 @@ export default function AdminFinancePage() {
 
   return (
     <div style={styles.page}>
-      <ExpenseModal
-        open={expenseModalOpen}
-        branches={branches}
-        form={expenseForm}
-        setForm={setExpenseForm}
-        onSubmit={handleExpenseSubmit}
-        onCancel={closeExpenseModal}
-        saving={savingExpense}
-        editing={Boolean(editingExpense)}
-      />
+      {canManageExpenses ? (
+        <ExpenseModal
+          open={expenseModalOpen}
+          branches={branches}
+          form={expenseForm}
+          setForm={setExpenseForm}
+          onSubmit={handleExpenseSubmit}
+          onCancel={closeExpenseModal}
+          saving={savingExpense}
+          editing={Boolean(editingExpense)}
+        />
+      ) : null}
 
       <div style={styles.shell}>
         <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
@@ -669,18 +675,24 @@ export default function AdminFinancePage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => handleExport('sales')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
-                {exporting === 'sales' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Ventas CSV
-              </button>
-              <button type="button" onClick={() => handleExport('expenses')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
-                {exporting === 'expenses' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-                Gastos CSV
-              </button>
-              <button type="button" onClick={openCreateExpenseForm} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
-                <Plus className="h-4 w-4" />
-                Nuevo gasto
-              </button>
+              {canExport ? (
+                <>
+                  <button type="button" onClick={() => handleExport('sales')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
+                    {exporting === 'sales' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    Ventas CSV
+                  </button>
+                  <button type="button" onClick={() => handleExport('expenses')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
+                    {exporting === 'expenses' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                    Gastos CSV
+                  </button>
+                </>
+              ) : null}
+              {canManageExpenses ? (
+                <button type="button" onClick={openCreateExpenseForm} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
+                  <Plus className="h-4 w-4" />
+                  Nuevo gasto
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -745,9 +757,21 @@ export default function AdminFinancePage() {
           </div>
         ) : (
           <div className="space-y-5 px-5 py-5 md:px-7 md:py-6">
+            {(kpis.costQuality?.usesEstimatedCosts || kpis.costQuality?.hasMissingCosts) && (
+              <div className="flex items-start gap-3 border-l-4 px-4 py-3 text-sm" style={{ ...styles.softCard, borderLeftColor: 'var(--admin-warning)' }} role="status">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-warning-text)' }} />
+                <div>
+                  <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>Costo histórico incompleto</p>
+                  <p className="mt-1 font-semibold" style={styles.muted}>
+                    {kpis.costQuality?.estimatedCostItems || 0} producto(s) usan el costo actual como estimación y {kpis.costQuality?.missingCostItems || 0} no tienen costo disponible. La utilidad los identifica para no presentarlos como datos certificados.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FinanceMetricCard icon={ArrowUpRight} label="Ingresos" value={formatCurrency(kpis.revenue)} sub={`${formatNumber(kpis.ordersCount)} órdenes · Ticket ${formatCurrency(kpis.averageTicket)}`} tone="success" />
-              <FinanceMetricCard icon={ReceiptText} label="Costos" value={formatCurrency(kpis.cogs)} sub={`Margen bruto ${formatPercent(kpis.grossMarginPercent)}`} tone="primary" />
+              <FinanceMetricCard icon={ArrowUpRight} label="Ingresos netos" value={formatCurrency(kpis.revenue)} sub={`Bruto ${formatCurrency(kpis.grossRevenue)} · Devoluciones ${formatCurrency(kpis.refunds)}`} tone="success" />
+              <FinanceMetricCard icon={ReceiptText} label="Costos netos" value={formatCurrency(kpis.cogs)} sub={`Costo devuelto ${formatCurrency(kpis.returnedCogs)} · Margen ${formatPercent(kpis.grossMarginPercent)}`} tone="primary" />
               <FinanceMetricCard icon={ArrowDownRight} label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} tone="warning" />
               <FinanceMetricCard icon={CircleDollarSign} label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
             </div>
@@ -832,10 +856,14 @@ export default function AdminFinancePage() {
                   <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}><Landmark className="h-7 w-7" /></span>
                   <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Control de gastos operativos</h3>
                   <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>Registra gastos manuales para que la utilidad neta combine ventas, costos, caja y egresos reales.</p>
-                  <button type="button" onClick={openCreateExpenseForm} className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
-                    <Plus className="h-4 w-4" />
-                    Registrar gasto
-                  </button>
+                  {canManageExpenses ? (
+                    <button type="button" onClick={openCreateExpenseForm} className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
+                      <Plus className="h-4 w-4" />
+                      Registrar gasto
+                    </button>
+                  ) : (
+                    <p className="mt-5 text-xs font-bold" style={styles.muted}>Consulta habilitada en modo de solo lectura.</p>
+                  )}
                 </div>
               </div>
 
@@ -859,7 +887,7 @@ export default function AdminFinancePage() {
                           <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Categoría</th>
                           <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Tipo</th>
                           <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
-                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                          {canManageExpenses ? <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th> : null}
                         </tr>
                       </thead>
                       <tbody>
@@ -872,12 +900,14 @@ export default function AdminFinancePage() {
                             </td>
                             <td className="px-3 py-3"><span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('neutral')}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</span></td>
                             <td className="px-3 py-3 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Editar</button>
-                                <button type="button" onClick={() => handleCancelExpense(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button>
-                              </div>
-                            </td>
+                            {canManageExpenses ? (
+                              <td className="px-3 py-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Editar</button>
+                                  <button type="button" onClick={() => handleCancelExpense(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button>
+                                </div>
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>

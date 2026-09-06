@@ -1,6 +1,9 @@
 const InventoryMovement = require('../../models/InventoryMovement');
 const InventoryStock = require('../../models/InventoryStock');
 const Product = require('../../models/Product');
+const {
+  resolveVariantCommercialSnapshot,
+} = require('../../lib/products/productVariantConfig');
 const { resolveReservationStockVariant } = require('./stockUpdates');
 const { cleanUpper, toNumber, toObjectId } = require('./support');
 
@@ -61,6 +64,23 @@ async function createSaleOutMovementFromReservationItem({
     inventoryStock,
     reservationItem.variantKey
   );
+  const product = await Product.findById(reservationItem.product)
+    .select('cost averageCost variants')
+    .session(session)
+    .lean();
+  const commercialSnapshot = resolveVariantCommercialSnapshot(product || {}, {
+    variantKey: stockIdentity.variantKey,
+    size: stockIdentity.size,
+    color: stockIdentity.color,
+    attributes: stockIdentity.attributes,
+  });
+  const unitCost = Math.max(
+    0,
+    toNumber(
+      commercialSnapshot?.cost || product?.averageCost || product?.cost,
+      0
+    )
+  );
 
   const movement = new InventoryMovement({
     type: 'sale_out',
@@ -99,8 +119,8 @@ async function createSaleOutMovementFromReservationItem({
       after: 0,
     },
 
-    unitCost: 0,
-    totalCost: 0,
+    unitCost,
+    totalCost: unitCost * quantity,
 
     reason: 'Salida automática por venta confirmada',
     notes: `Reserva ${reservation.reservationCode || reservation._id} confirmada.`,

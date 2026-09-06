@@ -1,18 +1,45 @@
 // backend/routes/adminFinance.js
 const express = require('express');
+const mongoose = require('mongoose');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
+const Branch = require('../models/Branch');
 const financeService = require('../services/adminFinanceService');
+const {
+  financeScopeQuery,
+  resolveFinanceBranchAccess,
+  resolveFinanceWriteBranch,
+} = require('../services/adminFinanceAccessService');
 
 const router = express.Router();
 
 function sendError(res, error, fallback = 'Error procesando finanzas.') {
   const status = Number(error?.status || error?.statusCode || 500);
+
+  if (status >= 500) {
+    console.error('[adminFinance] Error:', error);
+  }
+
   return res.status(status).json({
     ok: false,
-    message: error?.message || fallback,
+    error: error?.code || 'FINANCE_ROUTE_ERROR',
+    message: status >= 500 ? fallback : error?.message || fallback,
+    ...(status < 500 && error?.details ? { details: error.details } : {}),
   });
+}
+
+function noStore(res) {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+}
+
+function scopedQuery(req) {
+  return financeScopeQuery(req, req.query || {}).query;
+}
+
+function expenseResourceScope(req) {
+  return resolveFinanceBranchAccess(req, { requestedBranchId: '' });
 }
 
 function getActor(req) {
@@ -30,11 +57,43 @@ function getActor(req) {
 router.use(requireAdmin);
 
 router.get(
-  '/summary',
-  requirePermission.any(['finance:view', 'reports:view']),
+  '/branches',
+  requirePermission('finance:view'),
   async (req, res) => {
     try {
-      const data = await financeService.getFinanceSummary(req.query || {});
+      noStore(res);
+      const access = resolveFinanceBranchAccess(req, { requestedBranchId: '' });
+      const filter = {
+        deletedAt: null,
+        active: true,
+        status: 'active',
+      };
+      if (Array.isArray(access.branchIds)) {
+        filter._id = {
+          $in: access.branchIds.map(
+            (branchId) => new mongoose.Types.ObjectId(branchId)
+          ),
+        };
+      }
+
+      const data = await Branch.find(filter)
+        .select('name code type isMain isDefaultForOnlineOrders')
+        .sort({ isMain: -1, name: 1 })
+        .lean();
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error obteniendo sedes financieras.');
+    }
+  }
+);
+
+router.get(
+  '/summary',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const data = await financeService.getFinanceSummary(scopedQuery(req));
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo resumen financiero.');
@@ -44,10 +103,11 @@ router.get(
 
 router.get(
   '/sales',
-  requirePermission.any(['finance:view', 'reports:view']),
+  requirePermission('finance:view'),
   async (req, res) => {
     try {
-      const data = await financeService.getSalesReport(req.query || {});
+      noStore(res);
+      const data = await financeService.getSalesReport(scopedQuery(req));
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo ventas financieras.');
@@ -57,10 +117,11 @@ router.get(
 
 router.get(
   '/profit',
-  requirePermission.any(['finance:view', 'reports:view']),
+  requirePermission('finance:view'),
   async (req, res) => {
     try {
-      const data = await financeService.getProfitReport(req.query || {});
+      noStore(res);
+      const data = await financeService.getProfitReport(scopedQuery(req));
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error calculando utilidad.');
@@ -70,10 +131,11 @@ router.get(
 
 router.get(
   '/cash',
-  requirePermission.any(['finance:view', 'reports:view']),
+  requirePermission('finance:view'),
   async (req, res) => {
     try {
-      const data = await financeService.getCashReport(req.query || {});
+      noStore(res);
+      const data = await financeService.getCashReport(scopedQuery(req));
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo caja financiera.');
@@ -83,10 +145,11 @@ router.get(
 
 router.get(
   '/expenses',
-  requirePermission.any(['finance:view', 'finance:expenses']),
+  requirePermission('finance:view'),
   async (req, res) => {
     try {
-      const data = await financeService.getExpensesReport(req.query || {});
+      noStore(res);
+      const data = await financeService.getExpensesReport(scopedQuery(req));
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo gastos.');
@@ -99,7 +162,14 @@ router.post(
   requirePermission('finance:expenses'),
   async (req, res) => {
     try {
-      const data = await financeService.createExpense(req.body || {}, getActor(req));
+      const writeAccess = resolveFinanceWriteBranch(
+        req,
+        req.body?.branchId ?? req.body?.branch ?? ''
+      );
+      const data = await financeService.createExpense(
+        { ...req.body, branchId: writeAccess.branchId },
+        getActor(req)
+      );
       res.status(201).json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error creando gasto.');
@@ -112,7 +182,21 @@ router.put(
   requirePermission('finance:expenses'),
   async (req, res) => {
     try {
-      const data = await financeService.updateExpense(req.params.id, req.body || {}, getActor(req));
+      const resourceAccess = expenseResourceScope(req);
+      let payload = req.body || {};
+      if (payload.branchId !== undefined || payload.branch !== undefined) {
+        const writeAccess = resolveFinanceWriteBranch(
+          req,
+          payload.branchId ?? payload.branch ?? ''
+        );
+        payload = { ...payload, branchId: writeAccess.branchId };
+      }
+      const data = await financeService.updateExpense(
+        req.params.id,
+        payload,
+        getActor(req),
+        { branchIds: resourceAccess.branchIds }
+      );
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error actualizando gasto.');
@@ -125,7 +209,12 @@ router.delete(
   requirePermission('finance:expenses'),
   async (req, res) => {
     try {
-      const data = await financeService.cancelExpense(req.params.id, getActor(req));
+      const resourceAccess = expenseResourceScope(req);
+      const data = await financeService.cancelExpense(
+        req.params.id,
+        getActor(req),
+        { branchIds: resourceAccess.branchIds }
+      );
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error anulando gasto.');
@@ -135,11 +224,12 @@ router.delete(
 
 router.get(
   '/export',
-  requirePermission.any(['finance:export', 'reports:export']),
+  requirePermission('finance:export'),
   async (req, res) => {
     try {
+      noStore(res);
       const type = req.query?.type || 'sales';
-      const csv = await financeService.buildFinanceCsv(type, req.query || {});
+      const csv = await financeService.buildFinanceCsv(type, scopedQuery(req));
       const filename = type === 'expenses' ? 'finance-expenses.csv' : 'finance-sales.csv';
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

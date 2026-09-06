@@ -59,7 +59,7 @@ export async function exportFinanceCsv(type = 'sales', params = {}) {
 }
 
 export async function getAdminBranches(params = {}) {
-  const response = await api.get('/api/admin/branches', {
+  const response = await api.get('/api/admin/finance/branches', {
     params: {
       limit: 100,
       status: 'active',

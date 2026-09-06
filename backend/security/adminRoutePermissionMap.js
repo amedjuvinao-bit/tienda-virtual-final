@@ -865,6 +865,75 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
 
   /* =========================================================
+   * FINANZAS
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/finance/branches',
+    permission: 'finance:view',
+    description: 'Listar únicamente las sedes disponibles para el usuario financiero.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/summary',
+    permission: 'finance:view',
+    description: 'Consultar el resumen financiero dentro de las sedes autorizadas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/sales',
+    permission: 'finance:view',
+    description: 'Consultar ventas financieras dentro de las sedes autorizadas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/profit',
+    permission: 'finance:view',
+    description: 'Consultar rentabilidad y costos históricos autorizados.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/cash',
+    permission: 'finance:view',
+    description: 'Consultar consolidado financiero de caja por sedes autorizadas.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/expenses',
+    permission: 'finance:view',
+    description: 'Consultar gastos dentro de las sedes autorizadas.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/finance/expenses',
+    permission: 'finance:expenses',
+    description: 'Registrar un gasto en una sede autorizada.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/finance/expenses/:id',
+    permission: 'finance:expenses',
+    description: 'Modificar un gasto dentro de las sedes autorizadas.',
+    audit: true,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/admin/finance/expenses/:id',
+    permission: 'finance:expenses',
+    description: 'Anular un gasto dentro de las sedes autorizadas.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/export',
+    permission: 'finance:export',
+    description: 'Exportar información financiera de sedes autorizadas.',
+    audit: true,
+  },
+
+  /* =========================================================
    * PÁGINAS
    * ======================================================= */
   {
