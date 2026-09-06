@@ -371,8 +371,16 @@ function validateUnifiedEntryPoints() {
   assert(payu.includes("paymentProvider: 'payu'"), 'PayU no identifica el origen.');
   assert(adminPos.includes("paymentProvider: 'pos'"), 'POS administrativo no identifica el origen.');
   assert(cashPos.includes("paymentProvider: 'pos'"), 'POS con caja no identifica el origen.');
-  assert(posReceipt.includes('electronicInvoiceAfterPaymentService'), 'El comprobante POS no usa el motor único.');
-  ok('Administración, Wompi, PayU y POS comparten el mismo motor');
+  assert(
+    !posReceipt.includes('electronicInvoiceAfterPaymentService'),
+    'El comprobante POS no debe iniciar una emisión electrónica.'
+  );
+  assert(
+    posReceipt.includes("const ElectronicInvoice = require('../models/ElectronicInvoice');") &&
+      posReceipt.includes('ElectronicInvoice.findOne'),
+    'El comprobante POS debe consultar el documento electrónico ya emitido.'
+  );
+  ok('Administración, Wompi, PayU y ventas POS comparten el motor; el comprobante solo consulta');
 }
 
 function validateFailureLifecycle() {

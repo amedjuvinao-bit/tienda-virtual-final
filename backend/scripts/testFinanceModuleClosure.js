@@ -120,7 +120,11 @@ function validateFrontendStaticWiring() {
   const apiFile = readProjectFile('frontend/src/admin/finance/api/financeApi.js');
   const pageFile = readProjectFile('frontend/src/admin/finance/AdminFinancePage.jsx');
 
-  assertIncludes(appFile, 'import AdminFinancePage', 'App.jsx no importa AdminFinancePage.');
+  assertIncludes(
+    appFile,
+    "const AdminFinancePage = lazy(() => import('./admin/finance/AdminFinancePage'));",
+    'App.jsx no carga AdminFinancePage mediante importación diferida.'
+  );
   assertIncludes(appFile, 'path="finanzas"', 'App.jsx no registra /admin/finanzas.');
   assertIncludes(appFile, 'protectAdminContent(<AdminFinancePage />)', 'La ruta Finanzas no esta protegida por permisos.');
 

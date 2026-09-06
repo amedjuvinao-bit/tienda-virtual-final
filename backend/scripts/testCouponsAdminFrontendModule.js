@@ -106,7 +106,11 @@ function validateSecureCodeGenerator() {
 
 function validateRoutingAndMenu() {
   const app = readProjectFile('frontend/src/App.jsx');
-  assertIncludes(app, "import AdminCouponsPage from './admin/coupons/AdminCouponsPage';", 'App.jsx no importa AdminCouponsPage');
+  assertIncludes(
+    app,
+    "const AdminCouponsPage = lazy(() => import('./admin/coupons/AdminCouponsPage'));",
+    'App.jsx no carga AdminCouponsPage mediante importación diferida'
+  );
   assertMatches(app, /<Route\s+path="cupones"\s+element=\{protectAdminContent\(<AdminCouponsPage\s*\/?\>\)\}/, 'App.jsx no registra la ruta /admin/cupones');
 
   const layout = readProjectFile('frontend/src/admin/AdminLayout.js');
