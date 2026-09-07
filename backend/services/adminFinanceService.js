@@ -519,15 +519,19 @@ function summarizeCashSessions(sessions = []) {
 function buildExpenseFilter(query = {}) {
   const dateRange = resolveDateRange(query);
   const branchFilter = buildBranchFilter(query);
+  const status = cleanLower(query.status || '');
   const filter = {
     ...branchFilter,
-    deletedAt: null,
     date: { $gte: dateRange.from, $lte: dateRange.to },
   };
 
-  const status = cleanLower(query.status || '');
-  if (status && status !== 'all') filter.status = status;
-  else filter.status = { $ne: 'cancelled' };
+  if (status && status !== 'all') {
+    filter.status = status;
+    if (status !== 'cancelled') filter.deletedAt = null;
+  } else if (status !== 'all') {
+    filter.status = { $ne: 'cancelled' };
+    filter.deletedAt = null;
+  }
 
   const type = cleanLower(query.type || '');
   if (type && type !== 'all') filter.type = type;
@@ -553,8 +557,7 @@ function buildExpenseFilter(query = {}) {
 }
 
 async function getManualExpensesTotal(query = {}) {
-  const filter = buildExpenseFilter({ ...query, status: query.expenseStatus || 'all' });
-  filter.status = { $nin: ['cancelled', 'draft'] };
+  const filter = buildExpenseFilter({ ...query, status: 'paid' });
 
   const rows = await FinanceExpense.aggregate([
     { $match: filter },
@@ -565,6 +568,35 @@ async function getManualExpensesTotal(query = {}) {
     amount: money(rows[0]?.amount),
     count: Number(rows[0]?.count || 0),
   };
+}
+
+async function getExpenseWorkflowSummary(query = {}) {
+  const filter = buildExpenseFilter({ ...query, status: 'all' });
+  const rows = await FinanceExpense.aggregate([
+    { $match: filter },
+    {
+      $group: {
+        _id: '$status',
+        amount: { $sum: '$amount' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const statuses = ['pending', 'paid', 'rejected', 'cancelled'];
+  const summary = Object.fromEntries(
+    statuses.map((status) => [status, { count: 0, amount: 0 }])
+  );
+
+  for (const row of rows) {
+    const status = cleanLower(row?._id);
+    if (!summary[status]) continue;
+    summary[status] = {
+      count: Number(row.count || 0),
+      amount: money(row.amount),
+    };
+  }
+
+  return summary;
 }
 
 async function listExpenses(query = {}) {
@@ -613,6 +645,19 @@ async function createExpense(payload = {}, actor = {}) {
     paymentMethod: payload.paymentMethod,
     status: payload.status || 'paid',
     source: 'manual',
+    requestKey: payload.requestKey,
+    revision: payload.revision,
+    submittedAt: payload.submittedAt,
+    reviewedBy: payload.reviewedBy,
+    reviewedBySnapshot: payload.reviewedBySnapshot,
+    reviewedAt: payload.reviewedAt,
+    reviewNotes: payload.reviewNotes,
+    selfApprovalOverride: payload.selfApprovalOverride,
+    cancelledAt: payload.cancelledAt,
+    cancelledBy: payload.cancelledBy,
+    cancelledBySnapshot: payload.cancelledBySnapshot,
+    cancellationReason: payload.cancellationReason,
+    workflow: Array.isArray(payload.workflow) ? payload.workflow : [],
     branch: branchInfo.branch,
     branchSnapshot: branchInfo.snapshot,
     tags: payload.tags,
@@ -652,7 +697,6 @@ async function updateExpense(expenseId, payload = {}, actor = {}, scope = {}) {
     'invoiceNumber',
     'reference',
     'paymentMethod',
-    'status',
     'tags',
     'attachments',
     'notes',
@@ -768,13 +812,17 @@ async function getCashReport(query = {}) {
 
 async function getExpensesReport(query = {}) {
   const dateRange = resolveDateRange(query);
-  const list = await listExpenses(query);
-  const manualTotals = await getManualExpensesTotal(query);
+  const [list, manualTotals, workflow] = await Promise.all([
+    listExpenses(query),
+    getManualExpensesTotal(query),
+    getExpenseWorkflowSummary(query),
+  ]);
 
   return {
     dateRange,
     manualTotal: manualTotals.amount,
     manualCount: manualTotals.count,
+    workflow,
     ...list,
   };
 }
@@ -838,6 +886,7 @@ async function getFinanceSummary(query = {}) {
     expenses: {
       manualTotal: expenses.manualTotal,
       manualCount: expenses.manualCount,
+      workflow: expenses.workflow,
       latest: expenses.data,
     },
   };
@@ -855,8 +904,23 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
   const cleanType = cleanLower(type || 'sales');
 
   if (cleanType === 'expenses') {
-    const result = await listExpenses({ ...query, limit: 1000 });
-    return buildCsv(result.data, [
+    const result = await listExpenses({
+      ...query,
+      status: query.status || 'all',
+      limit: 1000,
+    });
+    const rows = result.data.map((expense) => ({
+      ...expense,
+      requester:
+        expense.createdBySnapshot?.displayName ||
+        expense.createdBySnapshot?.username ||
+        '',
+      reviewer:
+        expense.reviewedBySnapshot?.displayName ||
+        expense.reviewedBySnapshot?.username ||
+        '',
+    }));
+    return buildCsv(rows, [
       { key: 'date', label: 'Fecha' },
       { key: 'amount', label: 'Valor' },
       { key: 'type', label: 'Tipo' },
@@ -865,6 +929,11 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
       { key: 'status', label: 'Estado' },
       { key: 'description', label: 'Descripcion' },
       { key: 'reference', label: 'Referencia' },
+      { key: 'requester', label: 'Solicitado por' },
+      { key: 'reviewer', label: 'Revisado por' },
+      { key: 'reviewNotes', label: 'Nota de revision' },
+      { key: 'cancellationReason', label: 'Motivo de anulacion' },
+      { key: 'revision', label: 'Version' },
     ]);
   }
 
@@ -887,11 +956,13 @@ module.exports = {
   getProfitReport,
   getCashReport,
   getExpensesReport,
+  getExpenseWorkflowSummary,
   listExpenses,
   createExpense,
   updateExpense,
   cancelExpense,
   buildFinanceCsv,
+  resolveExpenseBranch,
   __test: {
     applySalesCorrections,
     buildPaidOrdersFilter,

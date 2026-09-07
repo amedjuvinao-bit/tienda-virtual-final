@@ -70,6 +70,8 @@ function validateBackendStaticWiring() {
     '/export',
     'finance:view',
     'finance:expenses',
+    'finance:expenses:approve',
+    'finance:expenses:cancel',
     'finance:export',
   ].forEach((needle) => assertIncludes(routeFile, needle, `adminFinance.js no contiene ${needle}`));
 
@@ -109,6 +111,8 @@ function validateBackendStaticWiring() {
   [
     'finance:view',
     'finance:expenses',
+    'finance:expenses:approve',
+    'finance:expenses:cancel',
     'finance:export',
   ].forEach((needle) => assertIncludes(permissionFile, needle, `Catalogo backend no contiene ${needle}`));
 
@@ -163,7 +167,9 @@ function validateFrontendStaticWiring() {
     'getFinanceCash',
     'getFinanceExpenses',
     'Nuevo gasto',
-    'Registrar gasto',
+    'Enviar a aprobación',
+    'reviewFinanceExpense',
+    'Solicitudes y aprobaciones',
     'Ventas CSV',
     'Gastos CSV',
     'Ventas POS vs Web',

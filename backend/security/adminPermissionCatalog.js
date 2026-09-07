@@ -168,7 +168,9 @@ const ADMIN_PERMISSION_MODULES = [
     description: 'Ingresos, gastos, caja, costos, utilidad y reportes financieros de la tienda.',
     permissions: [
       permission('finance:view', 'Ver finanzas', 'Permite consultar resumen financiero, ventas, caja, costos y utilidad.'),
-      permission('finance:expenses', 'Gestionar gastos', 'Permite crear, editar o anular gastos operativos.', { audit: true, sensitive: true }),
+      permission('finance:expenses', 'Solicitar gastos', 'Permite registrar y corregir solicitudes de gastos operativos antes de su aprobación.', { audit: true, sensitive: true }),
+      permission('finance:expenses:approve', 'Aprobar gastos', 'Permite aprobar o rechazar solicitudes de gastos con trazabilidad de la decisión.', { audit: true, sensitive: true, danger: true }),
+      permission('finance:expenses:cancel', 'Anular gastos', 'Permite anular gastos mediante una justificación obligatoria y auditable.', { audit: true, sensitive: true, danger: true }),
       permission('finance:export', 'Exportar finanzas', 'Permite descargar reportes financieros.', { audit: true, sensitive: true }),
     ],
   },

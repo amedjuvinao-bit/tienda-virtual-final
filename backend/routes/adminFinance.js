@@ -6,6 +6,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const Branch = require('../models/Branch');
 const financeService = require('../services/adminFinanceService');
+const financeExpenseWorkflow = require('../services/adminFinanceExpenseWorkflowService');
 const {
   financeScopeQuery,
   resolveFinanceBranchAccess,
@@ -166,7 +167,7 @@ router.post(
         req,
         req.body?.branchId ?? req.body?.branch ?? ''
       );
-      const data = await financeService.createExpense(
+      const data = await financeExpenseWorkflow.requestExpense(
         { ...req.body, branchId: writeAccess.branchId },
         getActor(req)
       );
@@ -191,7 +192,7 @@ router.put(
         );
         payload = { ...payload, branchId: writeAccess.branchId };
       }
-      const data = await financeService.updateExpense(
+      const data = await financeExpenseWorkflow.updateExpenseRequest(
         req.params.id,
         payload,
         getActor(req),
@@ -206,18 +207,38 @@ router.put(
 
 router.delete(
   '/expenses/:id',
-  requirePermission('finance:expenses'),
+  requirePermission('finance:expenses:cancel'),
   async (req, res) => {
     try {
       const resourceAccess = expenseResourceScope(req);
-      const data = await financeService.cancelExpense(
+      const data = await financeExpenseWorkflow.cancelExpenseRequest(
         req.params.id,
+        req.body || {},
         getActor(req),
         { branchIds: resourceAccess.branchIds }
       );
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error anulando gasto.');
+    }
+  }
+);
+
+router.post(
+  '/expenses/:id/review',
+  requirePermission('finance:expenses:approve'),
+  async (req, res) => {
+    try {
+      const resourceAccess = expenseResourceScope(req);
+      const data = await financeExpenseWorkflow.reviewExpenseRequest(
+        req.params.id,
+        req.body || {},
+        getActor(req),
+        { branchIds: resourceAccess.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error revisando gasto.');
     }
   }
 );

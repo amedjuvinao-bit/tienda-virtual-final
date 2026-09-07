@@ -7,12 +7,14 @@ import {
   ArrowUpRight,
   Banknote,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
+  Clock3,
   Download,
   Edit3,
   FileSpreadsheet,
   Filter,
-  Landmark,
+  History,
   Loader2,
   Plus,
   ReceiptText,
@@ -20,8 +22,10 @@ import {
   ShieldCheck,
   Store,
   Trash2,
+  UserCheck,
   WalletCards,
   X,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -35,6 +39,7 @@ import {
   getFinanceProfit,
   getFinanceSales,
   getFinanceSummary,
+  reviewFinanceExpense,
   updateFinanceExpense,
 } from './api/financeApi';
 import useAdminPermissions from '../security/useAdminPermissions';
@@ -70,6 +75,31 @@ const PAYMENT_METHODS = [
   { value: 'other', label: 'Otro' },
 ];
 
+const EXPENSE_STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'pending', label: 'Pendientes' },
+  { value: 'paid', label: 'Aprobados' },
+  { value: 'rejected', label: 'Rechazados' },
+  { value: 'cancelled', label: 'Anulados' },
+];
+
+const EXPENSE_STATUS_META = {
+  pending: { label: 'Pendiente', tone: 'warning' },
+  paid: { label: 'Aprobado', tone: 'success' },
+  rejected: { label: 'Rechazado', tone: 'danger' },
+  cancelled: { label: 'Anulado', tone: 'neutral' },
+  draft: { label: 'Borrador', tone: 'neutral' },
+};
+
+const WORKFLOW_ACTION_LABELS = {
+  submitted: 'Solicitud enviada',
+  updated: 'Solicitud actualizada',
+  resubmitted: 'Solicitud reenviada',
+  approved: 'Gasto aprobado',
+  rejected: 'Gasto rechazado',
+  cancelled: 'Gasto anulado',
+};
+
 const emptyExpenseForm = {
   date: '',
   amount: '',
@@ -83,7 +113,13 @@ const emptyExpenseForm = {
   paymentMethod: 'cash',
   branchId: '',
   notes: '',
+  requestKey: '',
 };
+
+function createRequestKey() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `finance-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 function todayInputValue() {
   const now = new Date();
@@ -122,6 +158,19 @@ function formatDate(value) {
   });
 }
 
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function getLabel(options, value, fallback = '—') {
   return options.find((item) => item.value === value)?.label || fallback;
 }
@@ -153,6 +202,24 @@ function getExpenseBranchId(expense, fallback = '') {
   return fallback;
 }
 
+function getAdminId(adminUser) {
+  return String(adminUser?.id || adminUser?._id || adminUser?.profile?._id || '');
+}
+
+function getExpenseCreatorId(expense) {
+  if (typeof expense?.createdBy === 'object') {
+    return String(expense.createdBy?._id || expense.createdBy?.id || '');
+  }
+  return String(expense?.createdBy || '');
+}
+
+function expenseStatusMeta(status) {
+  return EXPENSE_STATUS_META[status] || {
+    label: status || 'Sin estado',
+    tone: 'neutral',
+  };
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -172,19 +239,19 @@ function toneStyle(tone = 'neutral') {
       borderColor: 'var(--admin-primary-soft-border)',
     },
     success: {
-      background: 'color-mix(in srgb, #22c55e 13%, var(--admin-card-bg))',
-      color: 'color-mix(in srgb, #22c55e 76%, var(--admin-card-text))',
-      borderColor: 'color-mix(in srgb, #22c55e 55%, var(--admin-card-border))',
+      background: 'var(--admin-success-soft-bg)',
+      color: 'var(--admin-success-text)',
+      borderColor: 'var(--admin-success-border)',
     },
     warning: {
       background: 'var(--admin-warning-soft-bg)',
       color: 'var(--admin-warning-text)',
-      borderColor: 'color-mix(in srgb, var(--admin-warning) 58%, var(--admin-card-border))',
+      borderColor: 'var(--admin-warning-border)',
     },
     danger: {
       background: 'var(--admin-danger-soft-bg)',
       color: 'var(--admin-danger-text)',
-      borderColor: 'color-mix(in srgb, var(--admin-danger) 58%, var(--admin-card-border))',
+      borderColor: 'var(--admin-danger-border)',
     },
     neutral: {
       background: 'var(--admin-button-soft-bg)',
@@ -248,15 +315,11 @@ const styles = {
     letterSpacing: '0.22em',
   },
   primaryButton: {
-    border:
-      '1px solid color-mix(in srgb, var(--admin-button-bg) 72%, rgba(255,255,255,0.45) 28%)',
+    border: '1px solid var(--admin-button-bg)',
     borderRadius: 999,
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-button-bg) 88%, #0f172a 12%), color-mix(in srgb, var(--admin-button-bg) 66%, #0f172a 34%))',
-    color: '#ffffff',
-    boxShadow:
-      '0 14px 30px color-mix(in srgb, var(--admin-button-bg) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.28)',
-    textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-text)',
+    boxShadow: '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 20%, transparent)',
   },
   softButton: {
     border: '1px solid var(--admin-button-soft-border)',
@@ -265,13 +328,10 @@ const styles = {
     color: 'var(--admin-card-text)',
   },
   dangerButton: {
-    border:
-      '1px solid color-mix(in srgb, var(--admin-danger) 70%, rgba(255,255,255,0.30) 30%)',
+    border: '1px solid var(--admin-danger)',
     borderRadius: 999,
-    background:
-      'linear-gradient(135deg, var(--admin-danger), color-mix(in srgb, var(--admin-danger) 78%, #0f172a 22%))',
-    color: '#ffffff',
-    textShadow: '0 1px 8px rgba(0,0,0,0.38)',
+    background: 'var(--admin-danger)',
+    color: 'var(--admin-danger-text-on-bg)',
   },
   modalOverlay: {
     background: 'rgba(0,0,0,0.58)',
@@ -374,6 +434,12 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div className="border-l-4 px-4 py-3 text-sm font-semibold" style={{ ...styles.softCard, borderLeftColor: 'var(--admin-primary)' }} role="status">
+        {editing
+          ? 'Los cambios conservarán la trazabilidad y la solicitud volverá a revisión cuando haya sido rechazada.'
+          : 'La solicitud quedará pendiente y solo afectará la utilidad cuando una persona autorizada la apruebe.'}
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Fecha
@@ -425,7 +491,7 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
 
       <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
         Descripción
-        <textarea value={form.description} onChange={(event) => update('description', event.target.value)} className="min-h-[92px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal" style={styles.textarea} placeholder="Detalle del gasto" />
+        <textarea value={form.description} onChange={(event) => update('description', event.target.value)} className="min-h-[92px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal" style={styles.textarea} placeholder="Explica claramente el concepto del gasto" required />
       </label>
 
       <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
@@ -439,7 +505,7 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
         </button>
         <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.primaryButton}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-          {editing ? 'Guardar cambios' : 'Registrar gasto'}
+          {editing ? 'Guardar solicitud' : 'Enviar a aprobación'}
         </button>
       </div>
     </form>
@@ -490,11 +556,182 @@ function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, savin
   );
 }
 
+function ExpenseActionModal({
+  action,
+  expense,
+  notes,
+  setNotes,
+  onConfirm,
+  onCancel,
+  saving,
+  selfApproval = false,
+}) {
+  const open = Boolean(action && expense);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  const rejecting = action === 'reject';
+  const cancelling = action === 'cancel';
+  const requiresNotes = rejecting || cancelling || selfApproval;
+  const title = cancelling
+    ? 'Anular gasto'
+    : rejecting
+      ? 'Rechazar solicitud'
+      : 'Aprobar solicitud';
+  const description = cancelling
+    ? 'La anulación retirará este valor del resultado financiero y conservará el historial completo.'
+    : rejecting
+      ? 'La solicitud volverá a quien la registró para que pueda corregirla y reenviarla.'
+      : selfApproval
+        ? 'Como propietario estás resolviendo tu propia solicitud. La justificación quedará marcada como excepción de control.'
+        : 'Al aprobar, el gasto será reconocido en la utilidad del periodo.';
+  const Icon = cancelling || rejecting ? XCircle : UserCheck;
+  const tone = cancelling || rejecting ? 'danger' : 'success';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto p-4" style={styles.modalOverlay} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="w-full max-w-xl overflow-hidden" style={styles.modalCard}>
+        <div className="flex items-start gap-4 px-5 py-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border" style={toneStyle(tone)}>
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{title}</h3>
+            <p className="mt-1 text-sm font-semibold leading-relaxed" style={styles.muted}>{description}</p>
+          </div>
+          <button type="button" onClick={onCancel} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={styles.softButton} aria-label="Cerrar decisión">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]" style={styles.softCard}>
+            <div className="min-w-0 p-4">
+              <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'Gasto'}</p>
+              <p className="mt-1 text-xs font-semibold" style={styles.muted}>{expense.description || 'Sin descripción'}</p>
+              <p className="mt-2 text-xs font-bold" style={styles.muted}>Solicitó {expense.createdBySnapshot?.displayName || expense.createdBySnapshot?.username || 'Administrador'}</p>
+            </div>
+            <p className="p-4 text-lg font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</p>
+          </div>
+
+          <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+            {cancelling ? 'Motivo de anulación' : rejecting ? 'Motivo del rechazo' : selfApproval ? 'Justificación de la excepción' : 'Nota de aprobación'}
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              className="min-h-[100px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
+              style={styles.textarea}
+              placeholder={requiresNotes ? 'Escribe una justificación clara' : 'Opcional: deja constancia de la verificación realizada'}
+              required={requiresNotes}
+              autoFocus
+            />
+          </label>
+
+          <div className="flex justify-end gap-2 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-black" style={styles.softButton}>Volver</button>
+            <button type="button" onClick={onConfirm} disabled={saving || (requiresNotes && !notes.trim())} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black disabled:opacity-60" style={tone === 'danger' ? styles.dangerButton : styles.primaryButton}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+              {saving ? 'Guardando…' : cancelling ? 'Confirmar anulación' : rejecting ? 'Confirmar rechazo' : 'Confirmar aprobación'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ExpenseHistoryModal({ expense, onClose }) {
+  const open = Boolean(expense);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const events = Array.isArray(expense.workflow) ? expense.workflow : [];
+  const statusMeta = expenseStatusMeta(expense.status);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto p-4" style={styles.modalOverlay} role="dialog" aria-modal="true" aria-label="Trazabilidad del gasto">
+      <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden" style={styles.modalCard}>
+        <div className="flex items-start justify-between gap-4 px-5 py-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={styles.eyebrow}>Trazabilidad financiera</p>
+            <h3 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'Gasto'} · {formatCurrency(expense.amount)}</h3>
+            <p className="mt-1 text-sm font-semibold" style={styles.muted}>Versión {Number(expense.revision || 0)} · {statusMeta.label}</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={styles.softButton} aria-label="Cerrar trazabilidad">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-5 py-5">
+          {events.length === 0 ? (
+            <p className="py-8 text-center text-sm font-semibold" style={styles.muted}>Este registro pertenece al historial anterior y no tiene eventos detallados.</p>
+          ) : (
+            <div className="space-y-3">
+              {events.map((event, index) => {
+                const eventTone = event.action === 'approved' ? 'success' : ['rejected', 'cancelled'].includes(event.action) ? 'danger' : event.action === 'submitted' || event.action === 'resubmitted' ? 'warning' : 'neutral';
+                return (
+                  <div key={event._id || `${event.action}-${index}`} className="grid gap-3 p-4 sm:grid-cols-[auto_1fr_auto]" style={styles.softCard}>
+                    <span className="grid h-9 w-9 place-items-center rounded-xl border" style={toneStyle(eventTone)}>
+                      {event.action === 'approved' ? <CheckCircle2 className="h-4 w-4" /> : ['rejected', 'cancelled'].includes(event.action) ? <XCircle className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
+                    </span>
+                    <div>
+                      <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{WORKFLOW_ACTION_LABELS[event.action] || event.action}</p>
+                      <p className="mt-1 text-xs font-semibold" style={styles.muted}>{event.actorSnapshot?.displayName || event.actorSnapshot?.username || 'Administrador'}{event.selfApprovalOverride ? ' · Excepción del propietario' : ''}</p>
+                      {event.notes ? <p className="mt-2 text-xs font-semibold leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{event.notes}</p> : null}
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-xs font-bold" style={styles.muted}>{formatDateTime(event.at)}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase" style={styles.muted}>Versión {Number(event.revision || 0)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function AdminFinancePage() {
-  const { can } = useAdminPermissions();
+  const { can, adminUser, role } = useAdminPermissions();
   const canManageExpenses = can('finance:expenses');
+  const canApproveExpenses = can('finance:expenses:approve');
+  const canCancelExpenses = can('finance:expenses:cancel');
   const canExport = can('finance:export');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
+  const [expenseStatus, setExpenseStatus] = useState('all');
   const [summary, setSummary] = useState(null);
   const [sales, setSales] = useState(null);
   const [profit, setProfit] = useState(null);
@@ -507,7 +744,11 @@ export default function AdminFinancePage() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
-  const [expenseForm, setExpenseForm] = useState({ ...emptyExpenseForm, date: todayInputValue() });
+  const [expenseForm, setExpenseForm] = useState({ ...emptyExpenseForm, date: todayInputValue(), requestKey: createRequestKey() });
+  const [expenseAction, setExpenseAction] = useState(null);
+  const [expenseActionNotes, setExpenseActionNotes] = useState('');
+  const [savingExpenseAction, setSavingExpenseAction] = useState(false);
+  const [historyExpense, setHistoryExpense] = useState(null);
 
   const queryParams = useMemo(() => buildFinanceParams(filters), [filters]);
   const kpis = summary?.kpis || {};
@@ -515,6 +756,9 @@ export default function AdminFinancePage() {
   const paymentRows = sales?.byPaymentMethod || summary?.sales?.byPaymentMethod || [];
   const topProducts = profit?.byProduct || summary?.profit?.byProduct || [];
   const expenseRows = Array.isArray(expenses?.data) ? expenses.data : summary?.expenses?.latest || [];
+  const workflowSummary = expenses?.workflow || summary?.expenses?.workflow || {};
+  const currentAdminId = getAdminId(adminUser);
+  const isOwner = String(role || adminUser?.adminRole || '').toLowerCase() === 'owner';
 
   const activePeriodLabel = filters.dateFrom || filters.dateTo
     ? `${filters.dateFrom || 'Inicio'} → ${filters.dateTo || 'Hoy'}`
@@ -530,7 +774,7 @@ export default function AdminFinancePage() {
         getFinanceSales(queryParams),
         getFinanceProfit(queryParams),
         getFinanceCash(queryParams),
-        getFinanceExpenses({ ...queryParams, limit: 20 }),
+        getFinanceExpenses({ ...queryParams, status: expenseStatus, limit: 20 }),
         getAdminBranches().catch(() => []),
       ]);
 
@@ -546,7 +790,7 @@ export default function AdminFinancePage() {
     } finally {
       setLoading(false);
     }
-  }, [queryParams]);
+  }, [expenseStatus, queryParams]);
 
   useEffect(() => {
     loadFinance();
@@ -558,13 +802,13 @@ export default function AdminFinancePage() {
 
   const closeExpenseModal = useCallback(() => {
     setEditingExpense(null);
-    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '' });
+    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '', requestKey: createRequestKey() });
     setExpenseModalOpen(false);
   }, [filters.branchId]);
 
   const openCreateExpenseForm = () => {
     setEditingExpense(null);
-    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '' });
+    setExpenseForm({ ...emptyExpenseForm, date: todayInputValue(), branchId: filters.branchId || '', requestKey: createRequestKey() });
     setExpenseModalOpen(true);
   };
 
@@ -583,6 +827,7 @@ export default function AdminFinancePage() {
       paymentMethod: expense?.paymentMethod || 'cash',
       branchId: getExpenseBranchId(expense, filters.branchId || ''),
       notes: expense?.notes || '',
+      requestKey: expense?.requestKey || '',
     });
     setExpenseModalOpen(true);
   };
@@ -595,18 +840,29 @@ export default function AdminFinancePage() {
       toast.error('El valor del gasto debe ser mayor a cero');
       return;
     }
+    if (!expenseForm.description.trim()) {
+      toast.error('Debes explicar el concepto del gasto');
+      return;
+    }
 
     setSavingExpense(true);
 
     try {
-      const payload = { ...expenseForm, amount, branchId: expenseForm.branchId || null };
+      const payload = {
+        ...expenseForm,
+        amount,
+        branchId: expenseForm.branchId || null,
+        ...(editingExpense?._id
+          ? { expectedRevision: Number(editingExpense.revision || 0) }
+          : {}),
+      };
 
       if (editingExpense?._id) {
         await updateFinanceExpense(editingExpense._id, payload);
-        toast.success('Gasto actualizado');
+        toast.success(editingExpense.status === 'rejected' ? 'Solicitud corregida y reenviada' : 'Solicitud actualizada');
       } else {
         await createFinanceExpense(payload);
-        toast.success('Gasto registrado');
+        toast.success('Gasto enviado a aprobación');
       }
 
       closeExpenseModal();
@@ -619,18 +875,48 @@ export default function AdminFinancePage() {
     }
   };
 
-  const handleCancelExpense = async (expense) => {
-    if (!expense?._id) return;
-    const ok = window.confirm('¿Seguro que deseas anular este gasto?');
-    if (!ok) return;
+  const closeExpenseAction = useCallback(() => {
+    if (savingExpenseAction) return;
+    setExpenseAction(null);
+    setExpenseActionNotes('');
+  }, [savingExpenseAction]);
 
+  const openExpenseAction = (expense, action) => {
+    setExpenseAction({ expense, action });
+    setExpenseActionNotes('');
+  };
+
+  const handleExpenseAction = async () => {
+    const expense = expenseAction?.expense;
+    const action = expenseAction?.action;
+    if (!expense?._id || !action) return;
+
+    setSavingExpenseAction(true);
     try {
-      await cancelFinanceExpense(expense._id);
-      toast.success('Gasto anulado');
+      if (action === 'cancel') {
+        await cancelFinanceExpense(expense._id, {
+          expectedRevision: Number(expense.revision || 0),
+          cancellationReason: expenseActionNotes,
+        });
+        toast.success('Gasto anulado con trazabilidad');
+      } else {
+        await reviewFinanceExpense(expense._id, {
+          expectedRevision: Number(expense.revision || 0),
+          decision: action,
+          reviewNotes: expenseActionNotes,
+        });
+        toast.success(action === 'approve' ? 'Gasto aprobado' : 'Solicitud rechazada');
+      }
+
+      setExpenseAction(null);
+      setExpenseActionNotes('');
       await loadFinance();
     } catch (err) {
-      console.error('Error anulando gasto:', err);
-      toast.error(err?.response?.data?.message || err?.userMessage || 'No se pudo anular el gasto');
+      console.error('Error resolviendo gasto financiero:', err);
+      toast.error(err?.response?.data?.message || err?.userMessage || 'No se pudo completar la decisión');
+      if (err?.response?.status === 409) await loadFinance();
+    } finally {
+      setSavingExpenseAction(false);
     }
   };
 
@@ -664,6 +950,27 @@ export default function AdminFinancePage() {
           editing={Boolean(editingExpense)}
         />
       ) : null}
+
+      <ExpenseActionModal
+        action={expenseAction?.action || ''}
+        expense={expenseAction?.expense || null}
+        notes={expenseActionNotes}
+        setNotes={setExpenseActionNotes}
+        onConfirm={handleExpenseAction}
+        onCancel={closeExpenseAction}
+        saving={savingExpenseAction}
+        selfApproval={Boolean(
+          expenseAction?.action === 'approve' &&
+            currentAdminId &&
+            getExpenseCreatorId(expenseAction?.expense) === currentAdminId &&
+            isOwner
+        )}
+      />
+
+      <ExpenseHistoryModal
+        expense={historyExpense}
+        onClose={() => setHistoryExpense(null)}
+      />
 
       <div style={styles.shell}>
         <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
@@ -850,71 +1157,104 @@ export default function AdminFinancePage() {
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-              <div className="p-4" style={styles.card}>
-                <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
-                  <span className="grid h-14 w-14 place-items-center rounded-3xl border" style={toneStyle('primary')}><Landmark className="h-7 w-7" /></span>
-                  <h3 className="mt-4 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Control de gastos operativos</h3>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed" style={styles.muted}>Registra gastos manuales para que la utilidad neta combine ventas, costos, caja y egresos reales.</p>
-                  {canManageExpenses ? (
-                    <button type="button" onClick={openCreateExpenseForm} className="mt-5 inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
-                      <Plus className="h-4 w-4" />
-                      Registrar gasto
-                    </button>
-                  ) : (
-                    <p className="mt-5 text-xs font-bold" style={styles.muted}>Consulta habilitada en modo de solo lectura.</p>
-                  )}
+            <div className="overflow-hidden" style={styles.card}>
+              <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-4 md:px-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Control de gastos</p>
+                  <h3 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Solicitudes y aprobaciones</h3>
+                  <p className="mt-1 text-sm font-semibold" style={styles.muted}>Solo los gastos aprobados se incluyen en la utilidad neta.</p>
                 </div>
+
+                <label className="w-full space-y-1 text-xs font-black uppercase tracking-[0.08em] sm:w-[220px]" style={styles.muted}>
+                  Mostrar
+                  <select value={expenseStatus} onChange={(event) => setExpenseStatus(event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+                    {EXPENSE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
               </div>
 
-              <div className="p-4" style={styles.card}>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Gastos</p>
-                    <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Últimos registros</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
+                {[
+                  { key: 'pending', label: 'Pendientes', tone: 'warning' },
+                  { key: 'paid', label: 'Aprobados', tone: 'success' },
+                  { key: 'rejected', label: 'Rechazados', tone: 'danger' },
+                  { key: 'cancelled', label: 'Anulados', tone: 'neutral' },
+                ].map((item, index) => (
+                  <div key={item.key} className="px-4 py-3 md:px-5" style={{ borderRight: index === 3 ? 'none' : '1px solid var(--admin-card-border)' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ background: toneStyle(item.tone).color }} />
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em]" style={styles.muted}>{item.label}</p>
+                    </div>
+                    <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatNumber(workflowSummary[item.key]?.count || 0)} · {formatCurrency(workflowSummary[item.key]?.amount || 0)}</p>
                   </div>
-                  <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('warning')}>{formatCurrency(expenses?.manualTotal || summary?.expenses?.manualTotal)}</span>
-                </div>
+                ))}
+              </div>
 
-                {expenseRows.length === 0 ? (
-                  <p className="py-10 text-center text-sm font-semibold" style={styles.muted}>No hay gastos registrados en este periodo.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-left text-sm">
-                      <thead>
-                        <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fecha</th>
-                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Categoría</th>
-                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Tipo</th>
-                          <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
-                          {canManageExpenses ? <th className="px-3 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th> : null}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {expenseRows.map((expense) => (
+              {expenseRows.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Clock3 className="mx-auto h-7 w-7" style={styles.muted} />
+                  <p className="mt-3 text-sm font-semibold" style={styles.muted}>No hay gastos en este estado y periodo.</p>
+                  {canManageExpenses && expenseStatus === 'all' ? (
+                    <button type="button" onClick={openCreateExpenseForm} className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-black" style={styles.primaryButton}><Plus className="h-4 w-4" />Nueva solicitud</button>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1040px] text-left text-sm">
+                    <thead>
+                      <tr style={{ color: 'var(--admin-card-muted-text)' }}>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fecha</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Solicitud</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Responsables</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenseRows.map((expense) => {
+                        const statusMeta = expenseStatusMeta(expense.status);
+                        const creatorId = getExpenseCreatorId(expense);
+                        const ownExpense = Boolean(currentAdminId && creatorId === currentAdminId);
+                        const privilegedEditor = ['owner', 'admin'].includes(String(role || adminUser?.adminRole || '').toLowerCase());
+                        const editable = canManageExpenses && ['pending', 'rejected'].includes(expense.status) && (ownExpense || privilegedEditor || !creatorId);
+                        const reviewable = canApproveExpenses && expense.status === 'pending' && (!ownExpense || isOwner);
+                        const cancellable = canCancelExpenses && ['pending', 'rejected', 'paid'].includes(expense.status);
+
+                        return (
                           <tr key={expense._id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                            <td className="px-3 py-3 font-bold" style={{ color: 'var(--admin-card-text)' }}>{formatDate(expense.date)}</td>
-                            <td className="px-3 py-3">
-                              <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
-                              <p className="max-w-[260px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
+                            <td className="px-4 py-4 font-bold" style={{ color: 'var(--admin-card-text)' }}>
+                              {formatDate(expense.date)}
+                              <p className="mt-1 text-[10px] font-bold" style={styles.muted}>v{Number(expense.revision || 0)}</p>
                             </td>
-                            <td className="px-3 py-3"><span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('neutral')}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</span></td>
-                            <td className="px-3 py-3 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
-                            {canManageExpenses ? (
-                              <td className="px-3 py-3">
-                                <div className="flex flex-wrap gap-2">
-                                  <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Editar</button>
-                                  <button type="button" onClick={() => handleCancelExpense(expense)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black transition hover:-translate-y-0.5" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button>
-                                </div>
-                              </td>
-                            ) : null}
+                            <td className="px-4 py-4">
+                              <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
+                              <p className="mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
+                              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
+                            </td>
+                            <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
+                            <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
+                            <td className="px-4 py-4">
+                              <p className="text-xs font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.createdBySnapshot?.displayName || expense.createdBySnapshot?.username || 'Registro anterior'}</p>
+                              <p className="mt-1 text-xs font-semibold" style={styles.muted}>{expense.reviewedBySnapshot?.displayName || expense.reviewedBySnapshot?.username ? `Revisó ${expense.reviewedBySnapshot.displayName || expense.reviewedBySnapshot.username}` : 'Sin revisión'}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => setHistoryExpense(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><History className="h-3.5 w-3.5" />Historial</button>
+                                {editable ? <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Corregir</button> : null}
+                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'approve')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.primaryButton}><CheckCircle2 className="h-3.5 w-3.5" />Aprobar</button> : null}
+                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'reject')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><XCircle className="h-3.5 w-3.5" />Rechazar</button> : null}
+                                {cancellable ? <button type="button" onClick={() => openExpenseAction(expense, 'cancel')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button> : null}
+                              </div>
+                              {canApproveExpenses && expense.status === 'pending' && ownExpense && !isOwner ? <p className="mt-2 max-w-[240px] text-[10px] font-bold" style={styles.muted}>Debe revisarlo otra persona autorizada.</p> : null}
+                            </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">

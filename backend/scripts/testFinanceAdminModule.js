@@ -332,8 +332,10 @@ async function validateStaticWiring() {
 
   assert(ADMIN_PERMISSION_KEYS.includes('finance:view'), 'Falta permiso finance:view.');
   assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses'), 'Falta permiso finance:expenses.');
+  assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses:approve'), 'Falta permiso finance:expenses:approve.');
+  assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses:cancel'), 'Falta permiso finance:expenses:cancel.');
   assert(ADMIN_PERMISSION_KEYS.includes('finance:export'), 'Falta permiso finance:export.');
-  assert(getPermissionsByModule('finance').length === 3, 'Catalogo de permisos finanzas incompleto.');
+  assert(getPermissionsByModule('finance').length === 5, 'Catalogo de permisos finanzas incompleto.');
   ok('Permisos financieros registrados en catalogo admin');
 }
 
@@ -406,15 +408,19 @@ async function main() {
   } catch (error) {
     fail('Error inesperado en prueba Backend Finanzas', error);
   } finally {
-    await cleanup({ temporaryBranchId: branchInfo?.temporary ? branchInfo.branch._id : null });
-    ok('Limpieza final de datos temporales');
+    if (mongoose.connection.readyState === 1) {
+      await cleanup({ temporaryBranchId: branchInfo?.temporary ? branchInfo.branch._id : null });
+      ok('Limpieza final de datos temporales');
+    } else {
+      warn('Limpieza omitida porque MongoDB no llegó a conectarse');
+    }
 
     console.log('\n=== Resultado final ===');
     console.log(`OK: ${results.ok}`);
     console.log(`WARN: ${results.warn}`);
     console.log(`FAIL: ${results.fail}`);
 
-    if (mongoose.connection.readyState === 1) {
+    if (mongoose.connection.readyState !== 0) {
       await mongoose.disconnect();
     }
 

@@ -920,8 +920,16 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   {
     method: 'DELETE',
     path: '/api/admin/finance/expenses/:id',
-    permission: 'finance:expenses',
-    description: 'Anular un gasto dentro de las sedes autorizadas.',
+    permission: 'finance:expenses:cancel',
+    description: 'Anular justificadamente un gasto dentro de las sedes autorizadas.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/finance/expenses/:id/review',
+    permission: 'finance:expenses:approve',
+    description: 'Aprobar o rechazar una solicitud de gasto dentro de las sedes autorizadas.',
     audit: true,
     danger: true,
   },

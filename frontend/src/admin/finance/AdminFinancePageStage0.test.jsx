@@ -26,12 +26,15 @@ vi.mock('./api/financeApi', () => ({
   getFinanceProfit: vi.fn(),
   getFinanceSales: vi.fn(),
   getFinanceSummary: vi.fn(),
+  reviewFinanceExpense: vi.fn(),
   updateFinanceExpense: vi.fn(),
 }));
 
 vi.mock('../security/useAdminPermissions', () => ({
   default: () => ({
     can: (permission) => permissionState.granted.has(permission),
+    adminUser: { id: 'admin-stage0', adminRole: 'manager' },
+    role: 'manager',
   }),
 }));
 
@@ -121,6 +124,8 @@ describe('Finanzas Nivel Plus · Etapa 0', () => {
     expect(screen.queryByRole('button', { name: 'Ventas CSV' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Gastos CSV' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Nuevo gasto' })).not.toBeInTheDocument();
-    expect(screen.getByText('Consulta habilitada en modo de solo lectura.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anular' })).not.toBeInTheDocument();
   });
 });

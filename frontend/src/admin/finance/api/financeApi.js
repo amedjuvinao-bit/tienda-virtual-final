@@ -41,8 +41,18 @@ export async function updateFinanceExpense(id, payload = {}) {
   return unwrap(response);
 }
 
-export async function cancelFinanceExpense(id) {
-  const response = await api.delete(`/api/admin/finance/expenses/${id}`);
+export async function cancelFinanceExpense(id, payload = {}) {
+  const response = await api.delete(`/api/admin/finance/expenses/${id}`, {
+    data: payload,
+  });
+  return unwrap(response);
+}
+
+export async function reviewFinanceExpense(id, payload = {}) {
+  const response = await api.post(
+    `/api/admin/finance/expenses/${id}/review`,
+    payload
+  );
   return unwrap(response);
 }
 
@@ -79,6 +89,7 @@ export default {
   createFinanceExpense,
   updateFinanceExpense,
   cancelFinanceExpense,
+  reviewFinanceExpense,
   exportFinanceCsv,
   getAdminBranches,
 };

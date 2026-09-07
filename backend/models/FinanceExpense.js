@@ -1,7 +1,15 @@
 // backend/models/FinanceExpense.js
 const mongoose = require('mongoose');
 
-const EXPENSE_STATUSES = ['draft', 'pending', 'paid', 'cancelled'];
+const EXPENSE_STATUSES = ['draft', 'pending', 'paid', 'rejected', 'cancelled'];
+const EXPENSE_WORKFLOW_ACTIONS = [
+  'submitted',
+  'updated',
+  'resubmitted',
+  'approved',
+  'rejected',
+  'cancelled',
+];
 const EXPENSE_SOURCES = ['manual', 'cash_session', 'inventory', 'system'];
 const EXPENSE_TYPES = [
   'operating',
@@ -74,6 +82,56 @@ const AttachmentSchema = new mongoose.Schema(
     type: { type: String, trim: true, default: '' },
   },
   { _id: false }
+);
+
+const WorkflowEventSchema = new mongoose.Schema(
+  {
+    action: {
+      type: String,
+      enum: EXPENSE_WORKFLOW_ACTIONS,
+      required: true,
+    },
+    fromStatus: {
+      type: String,
+      enum: ['', ...EXPENSE_STATUSES],
+      default: '',
+    },
+    toStatus: {
+      type: String,
+      enum: EXPENSE_STATUSES,
+      required: true,
+    },
+    actor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+    actorSnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({ username: '', displayName: '', role: '', adminRole: '' }),
+    },
+    at: {
+      type: Date,
+      default: Date.now,
+      required: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
+    },
+    revision: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    selfApprovalOverride: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: true }
 );
 
 const FinanceExpenseSchema = new mongoose.Schema(
@@ -164,6 +222,86 @@ const FinanceExpenseSchema = new mongoose.Schema(
       index: true,
     },
 
+    requestKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: 128,
+      default: undefined,
+    },
+
+    revision: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    submittedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    reviewedBySnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({ username: '', displayName: '', role: '', adminRole: '' }),
+    },
+
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+
+    reviewNotes: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
+    },
+
+    selfApprovalOverride: {
+      type: Boolean,
+      default: false,
+    },
+
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancelledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    cancelledBySnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({ username: '', displayName: '', role: '', adminRole: '' }),
+    },
+
+    cancellationReason: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
+    },
+
+    workflow: {
+      type: [WorkflowEventSchema],
+      default: [],
+      validate: [
+        (events) => Array.isArray(events) && events.length <= 80,
+        'Máximo 80 eventos de flujo por gasto.',
+      ],
+    },
+
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
@@ -244,6 +382,16 @@ FinanceExpenseSchema.index({ type: 1, category: 1, date: -1 });
 FinanceExpenseSchema.index({ branch: 1, date: -1 });
 FinanceExpenseSchema.index({ source: 1, date: -1 });
 FinanceExpenseSchema.index({ deletedAt: 1, date: -1 });
+FinanceExpenseSchema.index({ branch: 1, status: 1, date: -1 });
+FinanceExpenseSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+FinanceExpenseSchema.index(
+  { requestKey: 1 },
+  {
+    unique: true,
+    name: 'requestKey_1_unique_present',
+    partialFilterExpression: { requestKey: { $exists: true } },
+  }
+);
 
 FinanceExpenseSchema.pre('validate', function financeExpensePreValidate(next) {
   try {
@@ -258,6 +406,10 @@ FinanceExpenseSchema.pre('validate', function financeExpensePreValidate(next) {
     this.paymentMethod = PAYMENT_METHODS.includes(cleanLower(this.paymentMethod)) ? cleanLower(this.paymentMethod) : '';
     this.status = EXPENSE_STATUSES.includes(cleanLower(this.status)) ? cleanLower(this.status) : 'paid';
     this.source = EXPENSE_SOURCES.includes(cleanLower(this.source)) ? cleanLower(this.source) : 'manual';
+    this.requestKey = cleanLower(this.requestKey, 128) || undefined;
+    this.revision = Math.max(0, Math.floor(Number(this.revision || 0)));
+    this.reviewNotes = cleanText(this.reviewNotes, 500);
+    this.cancellationReason = cleanText(this.cancellationReason, 500);
     this.tags = normalizeTags(this.tags);
     this.notes = cleanText(this.notes, 1000);
 

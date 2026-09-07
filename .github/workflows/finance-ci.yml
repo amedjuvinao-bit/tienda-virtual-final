@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/finanzas-nivel-plus-etapa-0
+      - feature/finanzas-nivel-plus-etapa-1
   pull_request:
     branches:
       - main
@@ -41,11 +42,20 @@ jobs:
       - name: Validar seguridad y exactitud de Etapa 0
         run: npm --prefix backend run test:finance-level-plus-stage0
 
+      - name: Validar gobierno de gastos de Etapa 1
+        run: npm --prefix backend run test:finance-level-plus-stage1
+
+      - name: Revisar migración aditiva de gastos
+        run: npm --prefix backend run migrate:finance-expense-indexes
+
       - name: Instalar frontend
         run: npm --prefix frontend ci
 
       - name: Validar presentación financiera de Etapa 0
         run: npm --prefix frontend run test:finance-level-plus-stage0
+
+      - name: Validar solicitudes y aprobaciones de Etapa 1
+        run: npm --prefix frontend run test:finance-level-plus-stage1
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -85,3 +95,13 @@ jobs:
         env:
           FINANCE_STAGE0_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage0_ci
         run: npm --prefix backend run test:finance-level-plus-stage0-integration
+
+      - name: Aplicar índices financieros en la base aislada
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/finance_stage1_ci
+        run: npm --prefix backend run migrate:finance-expense-indexes -- --apply-finance-expense-index-migration
+
+      - name: Validar solicitudes, decisiones y concurrencia de gastos
+        env:
+          FINANCE_STAGE1_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage1_ci
+        run: npm --prefix backend run test:finance-level-plus-stage1-integration
