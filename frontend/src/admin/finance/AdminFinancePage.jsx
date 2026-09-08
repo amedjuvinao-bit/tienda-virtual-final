@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
@@ -35,6 +36,7 @@ import {
   exportFinanceCsv,
   getAdminBranches,
   getFinanceCash,
+  getFinanceCostCenters,
   getFinanceExpenses,
   getFinanceProfit,
   getFinanceSales,
@@ -43,6 +45,7 @@ import {
   updateFinanceExpense,
 } from './api/financeApi';
 import useAdminPermissions from '../security/useAdminPermissions';
+import FinanceBudgetPanel from './FinanceBudgetPanel';
 
 const RANGE_OPTIONS = [
   { value: 'today', label: 'Hoy' },
@@ -112,6 +115,7 @@ const emptyExpenseForm = {
   reference: '',
   paymentMethod: 'cash',
   branchId: '',
+  costCenterId: '',
   notes: '',
   requestKey: '',
 };
@@ -200,6 +204,13 @@ function getExpenseBranchId(expense, fallback = '') {
   if (expense.branch) return String(expense.branch);
   if (expense.branchId) return String(expense.branchId);
   return fallback;
+}
+
+function getExpenseCostCenterId(expense) {
+  if (typeof expense?.costCenter === 'object') {
+    return String(expense.costCenter?._id || expense.costCenter?.id || '');
+  }
+  return String(expense?.costCenter || expense?.costCenterId || '');
 }
 
 function getAdminId(adminUser) {
@@ -429,7 +440,7 @@ function BreakdownList({ title, rows = [], emptyText = 'Sin datos para este peri
   );
 }
 
-function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, editing }) {
+function ExpenseForm({ branches, costCenters, form, setForm, onSubmit, onCancel, saving, editing }) {
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
@@ -455,6 +466,14 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
           Tipo
           <select value={form.type} onChange={(event) => update('type', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
             {EXPENSE_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+          Centro de costo
+          <select value={form.costCenterId} onChange={(event) => update('costCenterId', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+            <option value="">Sin asignar</option>
+            {costCenters.filter((center) => center.status === 'active').map((center) => <option key={center._id} value={center._id}>{center.name}</option>)}
           </select>
         </label>
 
@@ -512,7 +531,7 @@ function ExpenseForm({ branches, form, setForm, onSubmit, onCancel, saving, edit
   );
 }
 
-function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, saving, editing }) {
+function ExpenseModal({ open, branches, costCenters, form, setForm, onSubmit, onCancel, saving, editing }) {
   useEffect(() => {
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
@@ -548,7 +567,7 @@ function ExpenseModal({ open, branches, form, setForm, onSubmit, onCancel, savin
         </div>
 
         <div className="overflow-y-auto px-5 py-5 md:px-6" style={{ maxHeight: 'calc(100vh - 13rem)' }}>
-          <ExpenseForm branches={branches} form={form} setForm={setForm} onSubmit={onSubmit} onCancel={onCancel} saving={saving} editing={editing} />
+          <ExpenseForm branches={branches} costCenters={costCenters} form={form} setForm={setForm} onSubmit={onSubmit} onCancel={onCancel} saving={saving} editing={editing} />
         </div>
       </div>
     </div>,
@@ -561,10 +580,13 @@ function ExpenseActionModal({
   expense,
   notes,
   setNotes,
+  budgetOverrideReason,
+  setBudgetOverrideReason,
   onConfirm,
   onCancel,
   saving,
   selfApproval = false,
+  canOverrideBudget = false,
 }) {
   const open = Boolean(action && expense);
 
@@ -586,6 +608,10 @@ function ExpenseActionModal({
 
   const rejecting = action === 'reject';
   const cancelling = action === 'cancel';
+  const budgetOutcome = expense?.budgetEvaluation?.outcome || '';
+  const budgetException =
+    action === 'approve' && ['unbudgeted', 'exceeded'].includes(budgetOutcome);
+  const budgetBlocked = budgetException && !canOverrideBudget;
   const requiresNotes = rejecting || cancelling || selfApproval;
   const title = cancelling
     ? 'Anular gasto'
@@ -641,9 +667,41 @@ function ExpenseActionModal({
             />
           </label>
 
+          {budgetException ? (
+            <div className="space-y-3 border-l-4 px-4 py-3" style={{ ...styles.softCard, borderLeftColor: 'var(--admin-warning)' }} role="status">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-warning-text)' }} />
+                <div>
+                  <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>
+                    {budgetOutcome === 'exceeded' ? 'Esta aprobación supera el presupuesto' : 'Este gasto no tiene presupuesto activo'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold" style={styles.muted}>
+                    {budgetBlocked
+                      ? 'Necesitas el permiso para autorizar excepciones presupuestales.'
+                      : 'La excepción quedará registrada con tu identidad y justificación.'}
+                  </p>
+                </div>
+              </div>
+              {canOverrideBudget ? (
+                <label className="block space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+                  Justificación presupuestal
+                  <textarea
+                    aria-label="Justificación presupuestal"
+                    value={budgetOverrideReason}
+                    onChange={(event) => setBudgetOverrideReason(event.target.value)}
+                    className="min-h-[82px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal"
+                    style={styles.textarea}
+                    placeholder="Explica por qué debe autorizarse fuera del límite"
+                    required
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex justify-end gap-2 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
             <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-black" style={styles.softButton}>Volver</button>
-            <button type="button" onClick={onConfirm} disabled={saving || (requiresNotes && !notes.trim())} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black disabled:opacity-60" style={tone === 'danger' ? styles.dangerButton : styles.primaryButton}>
+            <button type="button" onClick={onConfirm} disabled={saving || budgetBlocked || (requiresNotes && !notes.trim()) || (budgetException && canOverrideBudget && !budgetOverrideReason.trim())} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-black disabled:opacity-60" style={tone === 'danger' ? styles.dangerButton : styles.primaryButton}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
               {saving ? 'Guardando…' : cancelling ? 'Confirmar anulación' : rejecting ? 'Confirmar rechazo' : 'Confirmar aprobación'}
             </button>
@@ -707,6 +765,7 @@ function ExpenseHistoryModal({ expense, onClose }) {
                       <p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{WORKFLOW_ACTION_LABELS[event.action] || event.action}</p>
                       <p className="mt-1 text-xs font-semibold" style={styles.muted}>{event.actorSnapshot?.displayName || event.actorSnapshot?.username || 'Administrador'}{event.selfApprovalOverride ? ' · Excepción del propietario' : ''}</p>
                       {event.notes ? <p className="mt-2 text-xs font-semibold leading-relaxed" style={{ color: 'var(--admin-card-text)' }}>{event.notes}</p> : null}
+                      {event.budgetOverrideUsed ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-warning-text)' }}>Excepción presupuestal: {event.budgetOverrideReason || 'Justificación registrada'}</p> : null}
                     </div>
                     <div className="text-left sm:text-right">
                       <p className="text-xs font-bold" style={styles.muted}>{formatDateTime(event.at)}</p>
@@ -729,6 +788,8 @@ export default function AdminFinancePage() {
   const canManageExpenses = can('finance:expenses');
   const canApproveExpenses = can('finance:expenses:approve');
   const canCancelExpenses = can('finance:expenses:cancel');
+  const canManageBudgets = can('finance:budgets:manage');
+  const canOverrideBudget = can('finance:budgets:override');
   const canExport = can('finance:export');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [expenseStatus, setExpenseStatus] = useState('all');
@@ -738,6 +799,8 @@ export default function AdminFinancePage() {
   const [cash, setCash] = useState(null);
   const [expenses, setExpenses] = useState(null);
   const [branches, setBranches] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
+  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState('');
@@ -747,6 +810,7 @@ export default function AdminFinancePage() {
   const [expenseForm, setExpenseForm] = useState({ ...emptyExpenseForm, date: todayInputValue(), requestKey: createRequestKey() });
   const [expenseAction, setExpenseAction] = useState(null);
   const [expenseActionNotes, setExpenseActionNotes] = useState('');
+  const [budgetOverrideReason, setBudgetOverrideReason] = useState('');
   const [savingExpenseAction, setSavingExpenseAction] = useState(false);
   const [historyExpense, setHistoryExpense] = useState(null);
 
@@ -764,18 +828,24 @@ export default function AdminFinancePage() {
     ? `${filters.dateFrom || 'Inicio'} → ${filters.dateTo || 'Hoy'}`
     : getRangeLabel(filters.range);
 
+  const refreshCostCenters = useCallback(async () => {
+    const data = await getFinanceCostCenters({ status: 'all' }).catch(() => []);
+    setCostCenters(Array.isArray(data) ? data : []);
+  }, []);
+
   const loadFinance = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const [summaryData, salesData, profitData, cashData, expensesData, branchesData] = await Promise.all([
+      const [summaryData, salesData, profitData, cashData, expensesData, branchesData, costCentersData] = await Promise.all([
         getFinanceSummary(queryParams),
         getFinanceSales(queryParams),
         getFinanceProfit(queryParams),
         getFinanceCash(queryParams),
         getFinanceExpenses({ ...queryParams, status: expenseStatus, limit: 20 }),
         getAdminBranches().catch(() => []),
+        getFinanceCostCenters({ status: 'all' }).catch(() => []),
       ]);
 
       setSummary(summaryData || null);
@@ -784,6 +854,8 @@ export default function AdminFinancePage() {
       setCash(cashData || null);
       setExpenses(expensesData || null);
       setBranches(Array.isArray(branchesData) ? branchesData : []);
+      setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
+      setBudgetRefreshKey((value) => value + 1);
     } catch (err) {
       console.error('Error cargando finanzas admin:', err);
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudo cargar el módulo financiero.');
@@ -826,6 +898,7 @@ export default function AdminFinancePage() {
       reference: expense?.reference || '',
       paymentMethod: expense?.paymentMethod || 'cash',
       branchId: getExpenseBranchId(expense, filters.branchId || ''),
+      costCenterId: getExpenseCostCenterId(expense),
       notes: expense?.notes || '',
       requestKey: expense?.requestKey || '',
     });
@@ -879,11 +952,13 @@ export default function AdminFinancePage() {
     if (savingExpenseAction) return;
     setExpenseAction(null);
     setExpenseActionNotes('');
+    setBudgetOverrideReason('');
   }, [savingExpenseAction]);
 
   const openExpenseAction = (expense, action) => {
     setExpenseAction({ expense, action });
     setExpenseActionNotes('');
+    setBudgetOverrideReason('');
   };
 
   const handleExpenseAction = async () => {
@@ -904,17 +979,40 @@ export default function AdminFinancePage() {
           expectedRevision: Number(expense.revision || 0),
           decision: action,
           reviewNotes: expenseActionNotes,
+          ...(action === 'approve' && budgetOverrideReason.trim()
+            ? { budgetOverrideReason: budgetOverrideReason.trim() }
+            : {}),
         });
         toast.success(action === 'approve' ? 'Gasto aprobado' : 'Solicitud rechazada');
       }
 
       setExpenseAction(null);
       setExpenseActionNotes('');
+      setBudgetOverrideReason('');
       await loadFinance();
     } catch (err) {
       console.error('Error resolviendo gasto financiero:', err);
       toast.error(err?.response?.data?.message || err?.userMessage || 'No se pudo completar la decisión');
-      if (err?.response?.status === 409) await loadFinance();
+      const errorCode = err?.response?.data?.error;
+      if (
+        action === 'approve' &&
+        ['FINANCE_BUDGET_LIMIT_EXCEEDED', 'FINANCE_BUDGET_REQUIRED_FOR_APPROVAL'].includes(errorCode)
+      ) {
+        setExpenseAction((current) => current ? {
+          ...current,
+          expense: {
+            ...current.expense,
+            budgetEvaluation: {
+              ...(current.expense?.budgetEvaluation || {}),
+              outcome: errorCode === 'FINANCE_BUDGET_LIMIT_EXCEEDED'
+                ? 'exceeded'
+                : 'unbudgeted',
+            },
+          },
+        } : current);
+      } else if (err?.response?.status === 409) {
+        await loadFinance();
+      }
     } finally {
       setSavingExpenseAction(false);
     }
@@ -942,6 +1040,7 @@ export default function AdminFinancePage() {
         <ExpenseModal
           open={expenseModalOpen}
           branches={branches}
+          costCenters={costCenters}
           form={expenseForm}
           setForm={setExpenseForm}
           onSubmit={handleExpenseSubmit}
@@ -956,6 +1055,8 @@ export default function AdminFinancePage() {
         expense={expenseAction?.expense || null}
         notes={expenseActionNotes}
         setNotes={setExpenseActionNotes}
+        budgetOverrideReason={budgetOverrideReason}
+        setBudgetOverrideReason={setBudgetOverrideReason}
         onConfirm={handleExpenseAction}
         onCancel={closeExpenseAction}
         saving={savingExpenseAction}
@@ -965,6 +1066,7 @@ export default function AdminFinancePage() {
             getExpenseCreatorId(expenseAction?.expense) === currentAdminId &&
             isOwner
         )}
+        canOverrideBudget={canOverrideBudget}
       />
 
       <ExpenseHistoryModal
@@ -1082,6 +1184,15 @@ export default function AdminFinancePage() {
               <FinanceMetricCard icon={ArrowDownRight} label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} tone="warning" />
               <FinanceMetricCard icon={CircleDollarSign} label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
             </div>
+
+            <FinanceBudgetPanel
+              branches={branches}
+              selectedBranchId={filters.branchId}
+              costCenters={costCenters}
+              canManage={canManageBudgets}
+              refreshKey={budgetRefreshKey}
+              onDataChanged={refreshCostCenters}
+            />
 
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <BreakdownList title="Ventas POS vs Web" rows={sourceRows} />
@@ -1231,6 +1342,7 @@ export default function AdminFinancePage() {
                               <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
                               <p className="mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
                               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
+                              {expense.costCenterSnapshot?.name ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-primary)' }}>{expense.costCenterSnapshot.name}</p> : null}
                             </td>
                             <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
                             <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>

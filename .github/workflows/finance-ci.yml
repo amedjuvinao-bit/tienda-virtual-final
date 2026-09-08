@@ -6,6 +6,7 @@ on:
       - main
       - feature/finanzas-nivel-plus-etapa-0
       - feature/finanzas-nivel-plus-etapa-1
+      - feature/finanzas-nivel-plus-etapa-2
   pull_request:
     branches:
       - main
@@ -45,8 +46,14 @@ jobs:
       - name: Validar gobierno de gastos de Etapa 1
         run: npm --prefix backend run test:finance-level-plus-stage1
 
+      - name: Validar presupuestos y centros de costo de Etapa 2
+        run: npm --prefix backend run test:finance-level-plus-stage2
+
       - name: Revisar migración aditiva de gastos
         run: npm --prefix backend run migrate:finance-expense-indexes
+
+      - name: Revisar migración aditiva de presupuestos
+        run: npm --prefix backend run migrate:finance-budget-indexes
 
       - name: Instalar frontend
         run: npm --prefix frontend ci
@@ -56,6 +63,9 @@ jobs:
 
       - name: Validar solicitudes y aprobaciones de Etapa 1
         run: npm --prefix frontend run test:finance-level-plus-stage1
+
+      - name: Validar control presupuestal de Etapa 2
+        run: npm --prefix frontend run test:finance-level-plus-stage2
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -105,3 +115,13 @@ jobs:
         env:
           FINANCE_STAGE1_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage1_ci
         run: npm --prefix backend run test:finance-level-plus-stage1-integration
+
+      - name: Aplicar índices presupuestales en la base aislada
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/finance_stage2_ci
+        run: npm --prefix backend run migrate:finance-budget-indexes -- --apply-finance-budget-index-migration
+
+      - name: Validar límites, excepciones y concurrencia presupuestal
+        env:
+          FINANCE_STAGE2_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage2_ci
+        run: npm --prefix backend run test:finance-level-plus-stage2-integration

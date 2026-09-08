@@ -330,12 +330,32 @@ async function validateStaticWiring() {
   assert(indexFile.includes('/api/admin/finance'), 'index.js no monta /api/admin/finance.');
   ok('Ruta /api/admin/finance esta montada en index.js');
 
-  assert(ADMIN_PERMISSION_KEYS.includes('finance:view'), 'Falta permiso finance:view.');
-  assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses'), 'Falta permiso finance:expenses.');
-  assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses:approve'), 'Falta permiso finance:expenses:approve.');
-  assert(ADMIN_PERMISSION_KEYS.includes('finance:expenses:cancel'), 'Falta permiso finance:expenses:cancel.');
-  assert(ADMIN_PERMISSION_KEYS.includes('finance:export'), 'Falta permiso finance:export.');
-  assert(getPermissionsByModule('finance').length === 5, 'Catalogo de permisos finanzas incompleto.');
+  const requiredFinancePermissions = [
+    'finance:view',
+    'finance:expenses',
+    'finance:expenses:approve',
+    'finance:expenses:cancel',
+    'finance:budgets:manage',
+    'finance:budgets:override',
+    'finance:export',
+  ];
+  requiredFinancePermissions.forEach((permission) => {
+    assert(ADMIN_PERMISSION_KEYS.includes(permission), `Falta permiso ${permission}.`);
+  });
+
+  const financePermissions = getPermissionsByModule('finance').map(
+    (permission) => permission.key
+  );
+  assert(
+    requiredFinancePermissions.every((permission) =>
+      financePermissions.includes(permission)
+    ),
+    'Catalogo de permisos finanzas incompleto.'
+  );
+  assert(
+    new Set(financePermissions).size === financePermissions.length,
+    'El catalogo de permisos finanzas contiene claves duplicadas.'
+  );
   ok('Permisos financieros registrados en catalogo admin');
 }
 

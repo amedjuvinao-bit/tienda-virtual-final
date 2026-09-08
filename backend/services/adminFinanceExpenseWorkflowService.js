@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 
 const FinanceExpense = require('../models/FinanceExpense');
 const financeService = require('./adminFinanceService');
+const financeBudgetService = require('./adminFinanceBudgetService');
 const { safeDate } = require('../utils/dateRange');
 
 const REVIEW_DECISIONS = new Set(['approve', 'reject']);
@@ -86,6 +87,7 @@ function actorContext(actor = {}) {
     snapshot,
     privileged: ['owner', 'admin'].includes(snapshot.adminRole),
     owner: snapshot.adminRole === 'owner',
+    canOverrideBudget: actor.canOverrideBudget === true,
   };
 }
 
@@ -231,6 +233,9 @@ function workflowEvent({
   notes = '',
   revision,
   selfApprovalOverride = false,
+  budgetOutcome = '',
+  budgetOverrideUsed = false,
+  budgetOverrideReason = '',
   at = new Date(),
 }) {
   return {
@@ -243,6 +248,9 @@ function workflowEvent({
     notes: cleanText(notes, 500),
     revision,
     selfApprovalOverride,
+    budgetOutcome,
+    budgetOverrideUsed,
+    budgetOverrideReason: cleanText(budgetOverrideReason, 500),
   };
 }
 
@@ -290,6 +298,14 @@ async function requestExpense(payload = {}, actor = {}) {
   }
 
   const normalized = normalizeExpenseData(payload);
+  const branchInfo = await financeService.resolveExpenseBranch(
+    payload.branchId ?? payload.branch
+  );
+  const planning = await financeBudgetService.prepareExpensePlanning({
+    ...normalized,
+    branch: branchInfo.branch,
+    costCenterId: payload.costCenterId ?? payload.costCenter,
+  });
   const now = new Date();
   const submitted = workflowEvent({
     action: 'submitted',
@@ -309,6 +325,7 @@ async function requestExpense(payload = {}, actor = {}) {
         requestKey,
         revision: 0,
         submittedAt: now,
+        ...planning,
         workflow: [submitted],
       },
       actor
@@ -364,6 +381,22 @@ async function updateExpenseRequest(
     };
   }
 
+  const effectiveBranch = branchRequested
+    ? branchUpdate.branch
+    : expense.branch;
+  const costCenterRequested =
+    payload.costCenterId !== undefined || payload.costCenter !== undefined;
+  const planning = await financeBudgetService.prepareExpensePlanning(
+    {
+      ...normalized,
+      branch: effectiveBranch,
+      costCenterId: costCenterRequested
+        ? payload.costCenterId ?? payload.costCenter
+        : expense.costCenter,
+    },
+    { excludeExpenseId: expense._id }
+  );
+
   const nextRevision = revision + 1;
   const resubmitting = expense.status === 'rejected';
   const nextStatus = 'pending';
@@ -390,6 +423,7 @@ async function updateExpenseRequest(
       $set: {
         ...normalized,
         ...branchUpdate,
+        ...planning,
         status: nextStatus,
         updatedBy: editor.id,
         ...(resubmitting
@@ -399,6 +433,7 @@ async function updateExpenseRequest(
               reviewedAt: null,
               reviewNotes: '',
               selfApprovalOverride: false,
+              budgetOverride: { used: false },
               submittedAt: new Date(),
             }
           : {}),
@@ -482,51 +517,71 @@ async function reviewExpenseRequest(
   const now = new Date();
   const nextStatus = decision === 'approve' ? 'paid' : 'rejected';
   const nextRevision = revision + 1;
-  const event = workflowEvent({
-    action: decision === 'approve' ? 'approved' : 'rejected',
-    fromStatus: 'pending',
-    toStatus: nextStatus,
-    actor: reviewer,
-    notes: reviewNotes,
-    revision: nextRevision,
-    selfApprovalOverride: selfApproval,
-    at: now,
-  });
+  const persistDecision = async (
+    budgetEvaluation = expense.budgetEvaluation || {},
+    budgetOverride = expense.budgetOverride || { used: false }
+  ) => {
+    const event = workflowEvent({
+      action: decision === 'approve' ? 'approved' : 'rejected',
+      fromStatus: 'pending',
+      toStatus: nextStatus,
+      actor: reviewer,
+      notes: reviewNotes,
+      revision: nextRevision,
+      selfApprovalOverride: selfApproval,
+      budgetOutcome: budgetEvaluation?.outcome || '',
+      budgetOverrideUsed: budgetOverride?.used === true,
+      budgetOverrideReason: budgetOverride?.reason || '',
+      at: now,
+    });
 
-  const updated = await FinanceExpense.findOneAndUpdate(
-    {
-      ...buildResourceFilter(expenseId, scope),
-      revision,
-      status: 'pending',
-    },
-    {
-      $set: {
-        status: nextStatus,
-        reviewedBy: reviewer.id,
-        reviewedBySnapshot: reviewer.snapshot,
-        reviewedAt: now,
-        reviewNotes,
-        selfApprovalOverride: selfApproval,
-        updatedBy: reviewer.id,
+    const updated = await FinanceExpense.findOneAndUpdate(
+      {
+        ...buildResourceFilter(expenseId, scope),
+        revision,
+        status: 'pending',
       },
-      $inc: { revision: 1 },
-      $push: { workflow: event },
-    },
-    { new: true, runValidators: true }
-  );
-
-  if (!updated) {
-    const latest = await loadExpense(expenseId, scope);
-    assertCurrentRevision(latest, revision);
-    throw createFinanceWorkflowError(
-      'El gasto ya recibió una decisión en otra sesión.',
-      'FINANCE_EXPENSE_ALREADY_REVIEWED',
-      409,
-      { currentStatus: latest.status }
+      {
+        $set: {
+          status: nextStatus,
+          reviewedBy: reviewer.id,
+          reviewedBySnapshot: reviewer.snapshot,
+          reviewedAt: now,
+          reviewNotes,
+          selfApprovalOverride: selfApproval,
+          updatedBy: reviewer.id,
+          ...(decision === 'approve'
+            ? { budgetEvaluation, budgetOverride }
+            : {}),
+        },
+        $inc: { revision: 1 },
+        $push: { workflow: event },
+      },
+      { new: true, runValidators: true }
     );
-  }
 
-  return updated.toSafeObject();
+    if (!updated) {
+      const latest = await loadExpense(expenseId, scope);
+      assertCurrentRevision(latest, revision);
+      throw createFinanceWorkflowError(
+        'El gasto ya recibió una decisión en otra sesión.',
+        'FINANCE_EXPENSE_ALREADY_REVIEWED',
+        409,
+        { currentStatus: latest.status }
+      );
+    }
+
+    return updated.toSafeObject();
+  };
+
+  if (decision === 'reject') return persistDecision();
+
+  return financeBudgetService.runExpenseApprovalControl({
+    expense,
+    actor: reviewer,
+    overrideReason: payload.budgetOverrideReason,
+    approve: persistDecision,
+  });
 }
 
 async function cancelExpenseRequest(

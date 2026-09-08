@@ -660,6 +660,10 @@ async function createExpense(payload = {}, actor = {}) {
     workflow: Array.isArray(payload.workflow) ? payload.workflow : [],
     branch: branchInfo.branch,
     branchSnapshot: branchInfo.snapshot,
+    costCenter: payload.costCenter,
+    costCenterSnapshot: payload.costCenterSnapshot,
+    budgetEvaluation: payload.budgetEvaluation,
+    budgetOverride: payload.budgetOverride,
     tags: payload.tags,
     attachments: Array.isArray(payload.attachments) ? payload.attachments.slice(0, 8) : [],
     notes: payload.notes,
@@ -911,6 +915,9 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
     });
     const rows = result.data.map((expense) => ({
       ...expense,
+      costCenterName: expense.costCenterSnapshot?.name || '',
+      budgetOutcome: expense.budgetEvaluation?.outcome || '',
+      budgetOverrideReason: expense.budgetOverride?.reason || '',
       requester:
         expense.createdBySnapshot?.displayName ||
         expense.createdBySnapshot?.username ||
@@ -925,6 +932,7 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
       { key: 'amount', label: 'Valor' },
       { key: 'type', label: 'Tipo' },
       { key: 'category', label: 'Categoria' },
+      { key: 'costCenterName', label: 'Centro de costo' },
       { key: 'paymentMethod', label: 'Metodo de pago' },
       { key: 'status', label: 'Estado' },
       { key: 'description', label: 'Descripcion' },
@@ -932,6 +940,8 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
       { key: 'requester', label: 'Solicitado por' },
       { key: 'reviewer', label: 'Revisado por' },
       { key: 'reviewNotes', label: 'Nota de revision' },
+      { key: 'budgetOutcome', label: 'Estado presupuestal' },
+      { key: 'budgetOverrideReason', label: 'Justificacion presupuestal' },
       { key: 'cancellationReason', label: 'Motivo de anulacion' },
       { key: 'revision', label: 'Version' },
     ]);

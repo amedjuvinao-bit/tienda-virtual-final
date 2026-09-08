@@ -7,6 +7,7 @@ const requirePermission = require('../middleware/requirePermission');
 const Branch = require('../models/Branch');
 const financeService = require('../services/adminFinanceService');
 const financeExpenseWorkflow = require('../services/adminFinanceExpenseWorkflowService');
+const financeBudgetService = require('../services/adminFinanceBudgetService');
 const {
   financeScopeQuery,
   resolveFinanceBranchAccess,
@@ -55,6 +56,16 @@ function getActor(req) {
   };
 }
 
+async function getBudgetAwareActor(req) {
+  return {
+    ...getActor(req),
+    canOverrideBudget: await requirePermission.hasEffectivePermission(
+      req,
+      'finance:budgets:override'
+    ),
+  };
+}
+
 router.use(requireAdmin);
 
 router.get(
@@ -84,6 +95,130 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error obteniendo sedes financieras.');
+    }
+  }
+);
+
+router.get(
+  '/cost-centers',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const data = await financeBudgetService.listCostCenters(req.query || {});
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error obteniendo centros de costo.');
+    }
+  }
+);
+
+router.post(
+  '/cost-centers',
+  requirePermission('finance:budgets:manage'),
+  async (req, res) => {
+    try {
+      const data = await financeBudgetService.createCostCenter(
+        req.body || {},
+        getActor(req)
+      );
+      res.status(201).json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error creando centro de costo.');
+    }
+  }
+);
+
+router.put(
+  '/cost-centers/:id',
+  requirePermission('finance:budgets:manage'),
+  async (req, res) => {
+    try {
+      const data = await financeBudgetService.updateCostCenter(
+        req.params.id,
+        req.body || {},
+        getActor(req)
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error actualizando centro de costo.');
+    }
+  }
+);
+
+router.get(
+  '/budgets',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const scoped = financeScopeQuery(req, req.query || {});
+      const data = await financeBudgetService.listBudgets(
+        scoped.query,
+        { branchIds: scoped.access.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error obteniendo presupuestos.');
+    }
+  }
+);
+
+router.post(
+  '/budgets',
+  requirePermission('finance:budgets:manage'),
+  async (req, res) => {
+    try {
+      const writeAccess = resolveFinanceWriteBranch(
+        req,
+        req.body?.branchId ?? req.body?.branch ?? ''
+      );
+      const data = await financeBudgetService.createBudget(
+        { ...req.body, branchId: writeAccess.branchId },
+        getActor(req)
+      );
+      res.status(201).json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error creando presupuesto.');
+    }
+  }
+);
+
+router.put(
+  '/budgets/:id',
+  requirePermission('finance:budgets:manage'),
+  async (req, res) => {
+    try {
+      const access = resolveFinanceBranchAccess(req, {
+        requestedBranchId: '',
+      });
+      const data = await financeBudgetService.updateBudget(
+        req.params.id,
+        req.body || {},
+        getActor(req),
+        { branchIds: access.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error actualizando presupuesto.');
+    }
+  }
+);
+
+router.get(
+  '/budget-control',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const scoped = financeScopeQuery(req, req.query || {});
+      const data = await financeBudgetService.getBudgetControl(
+        scoped.query,
+        { branchIds: scoped.access.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error calculando control presupuestal.');
     }
   }
 );
@@ -233,7 +368,7 @@ router.post(
       const data = await financeExpenseWorkflow.reviewExpenseRequest(
         req.params.id,
         req.body || {},
-        getActor(req),
+        await getBudgetAwareActor(req),
         { branchIds: resourceAccess.branchIds }
       );
       res.json({ ok: true, data });

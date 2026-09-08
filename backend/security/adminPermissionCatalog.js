@@ -171,6 +171,8 @@ const ADMIN_PERMISSION_MODULES = [
       permission('finance:expenses', 'Solicitar gastos', 'Permite registrar y corregir solicitudes de gastos operativos antes de su aprobación.', { audit: true, sensitive: true }),
       permission('finance:expenses:approve', 'Aprobar gastos', 'Permite aprobar o rechazar solicitudes de gastos con trazabilidad de la decisión.', { audit: true, sensitive: true, danger: true }),
       permission('finance:expenses:cancel', 'Anular gastos', 'Permite anular gastos mediante una justificación obligatoria y auditable.', { audit: true, sensitive: true, danger: true }),
+      permission('finance:budgets:manage', 'Gestionar presupuestos', 'Permite crear y ajustar centros de costo, límites mensuales y alertas presupuestales.', { audit: true, sensitive: true }),
+      permission('finance:budgets:override', 'Autorizar exceso presupuestal', 'Permite aprobar gastos sin presupuesto o por encima del límite mediante justificación auditable.', { audit: true, sensitive: true, danger: true }),
       permission('finance:export', 'Exportar finanzas', 'Permite descargar reportes financieros.', { audit: true, sensitive: true }),
     ],
   },

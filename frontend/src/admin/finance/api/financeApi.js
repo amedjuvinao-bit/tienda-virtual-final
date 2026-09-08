@@ -80,6 +80,44 @@ export async function getAdminBranches(params = {}) {
   return Array.isArray(response?.data?.data) ? response.data.data : [];
 }
 
+export async function getFinanceCostCenters(params = {}) {
+  const response = await api.get('/api/admin/finance/cost-centers', { params });
+  return unwrap(response) || [];
+}
+
+export async function createFinanceCostCenter(payload = {}) {
+  const response = await api.post('/api/admin/finance/cost-centers', payload);
+  return unwrap(response);
+}
+
+export async function updateFinanceCostCenter(id, payload = {}) {
+  const response = await api.put(
+    `/api/admin/finance/cost-centers/${id}`,
+    payload
+  );
+  return unwrap(response);
+}
+
+export async function getFinanceBudgets(params = {}) {
+  const response = await api.get('/api/admin/finance/budgets', { params });
+  return unwrap(response) || [];
+}
+
+export async function getFinanceBudgetControl(params = {}) {
+  const response = await api.get('/api/admin/finance/budget-control', { params });
+  return unwrap(response);
+}
+
+export async function createFinanceBudget(payload = {}) {
+  const response = await api.post('/api/admin/finance/budgets', payload);
+  return unwrap(response);
+}
+
+export async function updateFinanceBudget(id, payload = {}) {
+  const response = await api.put(`/api/admin/finance/budgets/${id}`, payload);
+  return unwrap(response);
+}
+
 export default {
   getFinanceSummary,
   getFinanceSales,
@@ -92,4 +130,11 @@ export default {
   reviewFinanceExpense,
   exportFinanceCsv,
   getAdminBranches,
+  getFinanceCostCenters,
+  createFinanceCostCenter,
+  updateFinanceCostCenter,
+  getFinanceBudgets,
+  getFinanceBudgetControl,
+  createFinanceBudget,
+  updateFinanceBudget,
 };

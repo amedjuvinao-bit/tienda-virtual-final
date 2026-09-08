@@ -107,7 +107,7 @@ function validateAccountingAndInterface() {
 
   ok('solo los gastos pagados afectan la utilidad', service.includes("buildExpenseFilter({ ...query, status: 'paid' })"));
   ok('el reporte separa montos por estado del flujo', service.includes('getExpenseWorkflowSummary') && service.includes("['pending', 'paid', 'rejected', 'cancelled']"));
-  ok('una aprobación simultánea se protege con estado y revisión', workflow.includes("revision,\n      status: 'pending'") && workflow.includes("$inc: { revision: 1 }"));
+  ok('una aprobación simultánea se protege con estado y revisión', /revision,\s+status: 'pending'/.test(workflow) && workflow.includes("$inc: { revision: 1 }"));
   ok('el solicitante no propietario no puede autoaprobarse', workflow.includes('FINANCE_EXPENSE_SELF_APPROVAL_FORBIDDEN'));
   ok('la excepción del propietario exige justificación', workflow.includes('FINANCE_EXPENSE_SELF_APPROVAL_REASON_REQUIRED') && workflow.includes('selfApprovalOverride'));
   ok('rechazo y anulación exigen motivos explícitos', workflow.includes('FINANCE_EXPENSE_REVIEW_NOTES_REQUIRED') && workflow.includes('FINANCE_EXPENSE_CANCELLATION_REASON_REQUIRED'));

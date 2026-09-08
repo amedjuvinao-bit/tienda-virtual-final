@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAdminBranches,
   getFinanceCash,
+  getFinanceBudgetControl,
+  getFinanceCostCenters,
   getFinanceExpenses,
   getFinanceProfit,
   getFinanceSales,
@@ -18,16 +20,22 @@ const permissionState = vi.hoisted(() => ({
 
 vi.mock('./api/financeApi', () => ({
   cancelFinanceExpense: vi.fn(),
+  createFinanceBudget: vi.fn(),
+  createFinanceCostCenter: vi.fn(),
   createFinanceExpense: vi.fn(),
   exportFinanceCsv: vi.fn(),
   getAdminBranches: vi.fn(),
   getFinanceCash: vi.fn(),
+  getFinanceBudgetControl: vi.fn(),
+  getFinanceCostCenters: vi.fn(),
   getFinanceExpenses: vi.fn(),
   getFinanceProfit: vi.fn(),
   getFinanceSales: vi.fn(),
   getFinanceSummary: vi.fn(),
   reviewFinanceExpense: vi.fn(),
   updateFinanceExpense: vi.fn(),
+  updateFinanceBudget: vi.fn(),
+  updateFinanceCostCenter: vi.fn(),
 }));
 
 vi.mock('../security/useAdminPermissions', () => ({
@@ -89,6 +97,8 @@ beforeEach(() => {
   getFinanceSales.mockResolvedValue({ bySource: [], byPaymentMethod: [] });
   getFinanceProfit.mockResolvedValue({ byProduct: [] });
   getFinanceCash.mockResolvedValue({ paymentTotals: {}, movements: {} });
+  getFinanceBudgetControl.mockResolvedValue({ summary: {}, lines: [], unbudgeted: [] });
+  getFinanceCostCenters.mockResolvedValue([]);
   getFinanceExpenses.mockResolvedValue({ data: [], manualTotal: 10000 });
   getAdminBranches.mockResolvedValue([]);
 });

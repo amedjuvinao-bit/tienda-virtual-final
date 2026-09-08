@@ -24,6 +24,14 @@ const EXPENSE_TYPES = [
   'other',
 ];
 const PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other', ''];
+const BUDGET_OUTCOMES = [
+  '',
+  'unassigned',
+  'unbudgeted',
+  'healthy',
+  'warning',
+  'exceeded',
+];
 
 function cleanText(value, max = 300) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -71,6 +79,52 @@ const AdminSnapshotSchema = new mongoose.Schema(
     displayName: { type: String, trim: true, default: '' },
     role: { type: String, trim: true, lowercase: true, default: '' },
     adminRole: { type: String, trim: true, lowercase: true, default: '' },
+  },
+  { _id: false }
+);
+
+const CostCenterSnapshotSchema = new mongoose.Schema(
+  {
+    code: { type: String, trim: true, uppercase: true, default: '' },
+    name: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const BudgetEvaluationSchema = new mongoose.Schema(
+  {
+    budget: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FinanceBudget',
+      default: null,
+    },
+    periodKey: { type: String, trim: true, default: '', maxlength: 7 },
+    limitAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    committedAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    spentAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    projectedAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    availableAmount: { type: Number, default: 0 },
+    percentUsed: { type: Number, min: 0, default: 0 },
+    outcome: { type: String, enum: BUDGET_OUTCOMES, default: '' },
+    evaluatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const BudgetOverrideSchema = new mongoose.Schema(
+  {
+    used: { type: Boolean, default: false },
+    reason: { type: String, trim: true, default: '', maxlength: 500 },
+    actor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+    actorSnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({ username: '', displayName: '', role: '', adminRole: '' }),
+    },
+    at: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -129,6 +183,21 @@ const WorkflowEventSchema = new mongoose.Schema(
     selfApprovalOverride: {
       type: Boolean,
       default: false,
+    },
+    budgetOutcome: {
+      type: String,
+      enum: BUDGET_OUTCOMES,
+      default: '',
+    },
+    budgetOverrideUsed: {
+      type: Boolean,
+      default: false,
+    },
+    budgetOverrideReason: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 500,
     },
   },
   { _id: true }
@@ -314,6 +383,28 @@ const FinanceExpenseSchema = new mongoose.Schema(
       default: () => ({ name: '', code: '', type: '' }),
     },
 
+    costCenter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FinanceCostCenter',
+      default: null,
+      index: true,
+    },
+
+    costCenterSnapshot: {
+      type: CostCenterSnapshotSchema,
+      default: () => ({ code: '', name: '' }),
+    },
+
+    budgetEvaluation: {
+      type: BudgetEvaluationSchema,
+      default: () => ({ outcome: '' }),
+    },
+
+    budgetOverride: {
+      type: BudgetOverrideSchema,
+      default: () => ({ used: false }),
+    },
+
     cashSession: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CashSession',
@@ -385,6 +476,10 @@ FinanceExpenseSchema.index({ deletedAt: 1, date: -1 });
 FinanceExpenseSchema.index({ branch: 1, status: 1, date: -1 });
 FinanceExpenseSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
 FinanceExpenseSchema.index(
+  { costCenter: 1, type: 1, date: -1, status: 1 },
+  { name: 'costCenter_1_type_1_date_-1_status_1' }
+);
+FinanceExpenseSchema.index(
   { requestKey: 1 },
   {
     unique: true,
@@ -417,6 +512,40 @@ FinanceExpenseSchema.pre('validate', function financeExpensePreValidate(next) {
       this.branchSnapshot.name = cleanText(this.branchSnapshot.name, 160);
       this.branchSnapshot.code = cleanText(this.branchSnapshot.code, 40).toUpperCase();
       this.branchSnapshot.type = cleanLower(this.branchSnapshot.type, 40);
+    }
+
+    if (this.costCenterSnapshot) {
+      this.costCenterSnapshot.code = cleanText(
+        this.costCenterSnapshot.code,
+        40
+      ).toUpperCase();
+      this.costCenterSnapshot.name = cleanText(
+        this.costCenterSnapshot.name,
+        120
+      );
+    }
+
+    if (this.budgetEvaluation) {
+      this.budgetEvaluation.periodKey = cleanText(
+        this.budgetEvaluation.periodKey,
+        7
+      );
+      this.budgetEvaluation.outcome = BUDGET_OUTCOMES.includes(
+        cleanLower(this.budgetEvaluation.outcome, 30)
+      )
+        ? cleanLower(this.budgetEvaluation.outcome, 30)
+        : '';
+      this.budgetEvaluation.availableAmount = Math.round(
+        Number(this.budgetEvaluation.availableAmount || 0)
+      );
+      this.budgetEvaluation.percentUsed = Math.max(
+        0,
+        Number(this.budgetEvaluation.percentUsed || 0)
+      );
+    }
+
+    if (this.budgetOverride) {
+      this.budgetOverride.reason = cleanText(this.budgetOverride.reason, 500);
     }
 
     if (this.deletedAt) {
