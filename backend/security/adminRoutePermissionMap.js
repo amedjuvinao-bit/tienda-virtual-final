@@ -921,6 +921,20 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/finance/treasury',
+    permission: 'finance:view',
+    description: 'Consultar cartera, cuentas por pagar y vencimientos dentro de las sedes autorizadas.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/finance/payables/:id/payments',
+    permission: 'finance:treasury:manage',
+    description: 'Registrar un abono auditable sobre una cuenta por pagar autorizada.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/admin/finance/summary',
     permission: 'finance:view',
     description: 'Consultar el resumen financiero dentro de las sedes autorizadas.',

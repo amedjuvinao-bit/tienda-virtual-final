@@ -8,6 +8,7 @@ const Branch = require('../models/Branch');
 const financeService = require('../services/adminFinanceService');
 const financeExpenseWorkflow = require('../services/adminFinanceExpenseWorkflowService');
 const financeBudgetService = require('../services/adminFinanceBudgetService');
+const financeTreasuryService = require('../services/adminFinanceTreasuryService');
 const {
   financeScopeQuery,
   resolveFinanceBranchAccess,
@@ -219,6 +220,39 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error calculando control presupuestal.');
+    }
+  }
+);
+
+router.get(
+  '/treasury',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const data = await financeTreasuryService.getTreasury(scopedQuery(req));
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error obteniendo cartera y vencimientos.');
+    }
+  }
+);
+
+router.post(
+  '/payables/:id/payments',
+  requirePermission('finance:treasury:manage'),
+  async (req, res) => {
+    try {
+      const resourceAccess = expenseResourceScope(req);
+      const data = await financeTreasuryService.registerPayablePayment(
+        req.params.id,
+        req.body || {},
+        getActor(req),
+        { branchIds: resourceAccess.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error registrando el abono.');
     }
   }
 );

@@ -32,6 +32,8 @@ vi.mock('./api/financeApi', () => ({
   getFinanceProfit: vi.fn(),
   getFinanceSales: vi.fn(),
   getFinanceSummary: vi.fn(),
+  getFinanceTreasury: vi.fn(),
+  registerFinancePayablePayment: vi.fn(),
   reviewFinanceExpense: vi.fn(),
   updateFinanceExpense: vi.fn(),
   updateFinanceBudget: vi.fn(),

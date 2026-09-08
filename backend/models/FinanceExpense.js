@@ -1,5 +1,8 @@
 // backend/models/FinanceExpense.js
 const mongoose = require('mongoose');
+const {
+  FINANCE_TREASURY_EXPENSE_INDEX_DEFINITIONS,
+} = require('./financeTreasuryIndexDefinitions');
 
 const EXPENSE_STATUSES = ['draft', 'pending', 'paid', 'rejected', 'cancelled'];
 const EXPENSE_WORKFLOW_ACTIONS = [
@@ -9,6 +12,7 @@ const EXPENSE_WORKFLOW_ACTIONS = [
   'approved',
   'rejected',
   'cancelled',
+  'payable_payment_registered',
 ];
 const EXPENSE_SOURCES = ['manual', 'cash_session', 'inventory', 'system'];
 const EXPENSE_TYPES = [
@@ -24,6 +28,8 @@ const EXPENSE_TYPES = [
   'other',
 ];
 const PAYMENT_METHODS = ['cash', 'transfer', 'card', 'mixed', 'other', ''];
+const PAYMENT_TERMS = ['immediate', 'credit'];
+const SETTLEMENT_STATUSES = ['not_required', 'pending', 'partial', 'paid'];
 const BUDGET_OUTCOMES = [
   '',
   'unassigned',
@@ -203,6 +209,61 @@ const WorkflowEventSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const PayablePaymentSchema = new mongoose.Schema(
+  {
+    requestKey: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      required: true,
+      minlength: 64,
+      maxlength: 64,
+    },
+    amount: { type: Number, required: true, min: 1, set: cleanMoney },
+    method: {
+      type: String,
+      enum: PAYMENT_METHODS.filter(Boolean),
+      required: true,
+    },
+    reference: { type: String, trim: true, default: '', maxlength: 160 },
+    notes: { type: String, trim: true, default: '', maxlength: 500 },
+    paidAt: { type: Date, required: true, default: Date.now },
+    actor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      required: true,
+    },
+    actorSnapshot: {
+      type: AdminSnapshotSchema,
+      default: () => ({ username: '', displayName: '', role: '', adminRole: '' }),
+    },
+    revision: { type: Number, min: 0, required: true },
+  },
+  { _id: true }
+);
+
+const PayableSettlementSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: SETTLEMENT_STATUSES,
+      default: 'not_required',
+    },
+    paidAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    balanceAmount: { type: Number, min: 0, set: cleanMoney, default: 0 },
+    lastPaymentAt: { type: Date, default: null },
+    payments: {
+      type: [PayablePaymentSchema],
+      default: [],
+      validate: [
+        (payments) => Array.isArray(payments) && payments.length <= 80,
+        'Máximo 80 abonos por cuenta por pagar.',
+      ],
+    },
+  },
+  { _id: false }
+);
+
 const FinanceExpenseSchema = new mongoose.Schema(
   {
     date: {
@@ -275,6 +336,27 @@ const FinanceExpenseSchema = new mongoose.Schema(
       enum: PAYMENT_METHODS,
       default: '',
       index: true,
+    },
+
+    paymentTerms: {
+      type: String,
+      enum: PAYMENT_TERMS,
+      default: 'immediate',
+    },
+
+    dueDate: {
+      type: Date,
+      default: null,
+    },
+
+    settlement: {
+      type: PayableSettlementSchema,
+      default: () => ({
+        status: 'not_required',
+        paidAmount: 0,
+        balanceAmount: 0,
+        payments: [],
+      }),
     },
 
     status: {
@@ -479,6 +561,9 @@ FinanceExpenseSchema.index(
   { costCenter: 1, type: 1, date: -1, status: 1 },
   { name: 'costCenter_1_type_1_date_-1_status_1' }
 );
+FINANCE_TREASURY_EXPENSE_INDEX_DEFINITIONS.forEach(({ key, options }) => {
+  FinanceExpenseSchema.index({ ...key }, { ...options });
+});
 FinanceExpenseSchema.index(
   { requestKey: 1 },
   {
@@ -499,6 +584,9 @@ FinanceExpenseSchema.pre('validate', function financeExpensePreValidate(next) {
     this.invoiceNumber = cleanText(this.invoiceNumber, 80).toUpperCase();
     this.reference = cleanText(this.reference, 120);
     this.paymentMethod = PAYMENT_METHODS.includes(cleanLower(this.paymentMethod)) ? cleanLower(this.paymentMethod) : '';
+    this.paymentTerms = PAYMENT_TERMS.includes(cleanLower(this.paymentTerms))
+      ? cleanLower(this.paymentTerms)
+      : 'immediate';
     this.status = EXPENSE_STATUSES.includes(cleanLower(this.status)) ? cleanLower(this.status) : 'paid';
     this.source = EXPENSE_SOURCES.includes(cleanLower(this.source)) ? cleanLower(this.source) : 'manual';
     this.requestKey = cleanLower(this.requestKey, 128) || undefined;
@@ -507,6 +595,55 @@ FinanceExpenseSchema.pre('validate', function financeExpensePreValidate(next) {
     this.cancellationReason = cleanText(this.cancellationReason, 500);
     this.tags = normalizeTags(this.tags);
     this.notes = cleanText(this.notes, 1000);
+
+    if (this.paymentTerms === 'credit') {
+      const dueDate = this.dueDate ? new Date(this.dueDate) : null;
+      if (!dueDate || Number.isNaN(dueDate.getTime())) {
+        this.invalidate(
+          'dueDate',
+          'La fecha de vencimiento es obligatoria para un gasto a crédito.'
+        );
+      } else {
+        this.dueDate = dueDate;
+        const expenseDate = this.date ? new Date(this.date) : new Date();
+        const expenseDay = Date.UTC(
+          expenseDate.getUTCFullYear(),
+          expenseDate.getUTCMonth(),
+          expenseDate.getUTCDate()
+        );
+        const dueDay = Date.UTC(
+          dueDate.getUTCFullYear(),
+          dueDate.getUTCMonth(),
+          dueDate.getUTCDate()
+        );
+        if (dueDay < expenseDay) {
+          this.invalidate(
+            'dueDate',
+            'El vencimiento no puede ser anterior a la fecha del gasto.'
+          );
+        }
+      }
+    } else {
+      this.dueDate = null;
+    }
+
+    if (this.settlement) {
+      this.settlement.paidAmount = cleanMoney(this.settlement.paidAmount);
+      this.settlement.balanceAmount = cleanMoney(this.settlement.balanceAmount);
+      this.settlement.status = SETTLEMENT_STATUSES.includes(
+        cleanLower(this.settlement.status)
+      )
+        ? cleanLower(this.settlement.status)
+        : 'not_required';
+      for (const payment of this.settlement.payments || []) {
+        payment.requestKey = cleanLower(payment.requestKey, 64);
+        payment.method = PAYMENT_METHODS.includes(cleanLower(payment.method))
+          ? cleanLower(payment.method)
+          : 'other';
+        payment.reference = cleanText(payment.reference, 160);
+        payment.notes = cleanText(payment.notes, 500);
+      }
+    }
 
     if (this.branchSnapshot) {
       this.branchSnapshot.name = cleanText(this.branchSnapshot.name, 160);
@@ -570,6 +707,10 @@ FinanceExpenseSchema.statics.getStatuses = function getStatuses() {
 
 FinanceExpenseSchema.statics.getTypes = function getTypes() {
   return [...EXPENSE_TYPES];
+};
+
+FinanceExpenseSchema.statics.getPaymentTerms = function getPaymentTerms() {
+  return [...PAYMENT_TERMS];
 };
 
 module.exports = mongoose.models.FinanceExpense || mongoose.model('FinanceExpense', FinanceExpenseSchema);

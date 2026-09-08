@@ -24,6 +24,7 @@ const EXPENSE_TYPES = new Set([
   'other',
 ]);
 const PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'mixed', 'other']);
+const PAYMENT_TERMS = new Set(['immediate', 'credit']);
 
 function cleanText(value, max = 500) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -202,8 +203,51 @@ function normalizeExpenseData(payload = {}, fallback = {}) {
     );
   }
 
+  const paymentTerms = cleanLower(
+    payload.paymentTerms ?? fallback.paymentTerms ?? 'immediate',
+    20
+  );
+  if (!PAYMENT_TERMS.has(paymentTerms)) {
+    throw createFinanceWorkflowError(
+      'La condición de pago seleccionada no es válida.',
+      'FINANCE_EXPENSE_PAYMENT_TERMS_INVALID',
+      400
+    );
+  }
+
+  const date = safeDate(payload.date ?? fallback.date) || new Date();
+  const dueDate = paymentTerms === 'credit'
+    ? safeDate(payload.dueDate ?? fallback.dueDate)
+    : null;
+  if (paymentTerms === 'credit' && !dueDate) {
+    throw createFinanceWorkflowError(
+      'Debes indicar la fecha de vencimiento del gasto a crédito.',
+      'FINANCE_EXPENSE_DUE_DATE_REQUIRED',
+      400
+    );
+  }
+  const expenseDay = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  );
+  const dueDay = dueDate
+    ? Date.UTC(
+        dueDate.getUTCFullYear(),
+        dueDate.getUTCMonth(),
+        dueDate.getUTCDate()
+      )
+    : null;
+  if (dueDay !== null && dueDay < expenseDay) {
+    throw createFinanceWorkflowError(
+      'El vencimiento no puede ser anterior a la fecha del gasto.',
+      'FINANCE_EXPENSE_DUE_DATE_INVALID',
+      400
+    );
+  }
+
   return {
-    date: safeDate(payload.date ?? fallback.date) || new Date(),
+    date,
     amount: Math.round(amount),
     type,
     category,
@@ -219,6 +263,8 @@ function normalizeExpenseData(payload = {}, fallback = {}) {
     ).toUpperCase(),
     reference: cleanText(payload.reference ?? fallback.reference, 120),
     paymentMethod,
+    paymentTerms,
+    dueDate,
     tags: payload.tags ?? fallback.tags ?? [],
     attachments: payload.attachments ?? fallback.attachments ?? [],
     notes: cleanText(payload.notes ?? fallback.notes, 1000),
@@ -535,6 +581,22 @@ async function reviewExpenseRequest(
       at: now,
     });
 
+    const settlement = expense.paymentTerms === 'credit'
+      ? {
+          status: 'pending',
+          paidAmount: 0,
+          balanceAmount: Number(expense.amount || 0),
+          lastPaymentAt: null,
+          payments: [],
+        }
+      : {
+          status: 'not_required',
+          paidAmount: 0,
+          balanceAmount: 0,
+          lastPaymentAt: null,
+          payments: [],
+        };
+
     const updated = await FinanceExpense.findOneAndUpdate(
       {
         ...buildResourceFilter(expenseId, scope),
@@ -551,7 +613,7 @@ async function reviewExpenseRequest(
           selfApprovalOverride: selfApproval,
           updatedBy: reviewer.id,
           ...(decision === 'approve'
-            ? { budgetEvaluation, budgetOverride }
+            ? { budgetEvaluation, budgetOverride, settlement }
             : {}),
         },
         $inc: { revision: 1 },
@@ -606,6 +668,17 @@ async function cancelExpenseRequest(
 
   const expense = await loadExpense(expenseId, scope);
   assertCurrentRevision(expense, revision);
+  if (
+    expense.paymentTerms === 'credit' &&
+    Number(expense.settlement?.paidAmount || 0) > 0
+  ) {
+    throw createFinanceWorkflowError(
+      'No puedes anular una cuenta por pagar que ya tiene abonos. Debes conciliar o reversar esos pagos primero.',
+      'FINANCE_PAYABLE_WITH_PAYMENTS_CANNOT_CANCEL',
+      409,
+      { paidAmount: Number(expense.settlement?.paidAmount || 0) }
+    );
+  }
   if (!CANCELLABLE_STATUSES.has(expense.status)) {
     throw createFinanceWorkflowError(
       'El gasto no se encuentra en un estado que permita anularlo.',
@@ -641,6 +714,13 @@ async function cancelExpenseRequest(
         cancelledBySnapshot: canceller.snapshot,
         cancellationReason: reason,
         updatedBy: canceller.id,
+        ...(expense.paymentTerms === 'credit'
+          ? {
+              'settlement.status': 'not_required',
+              'settlement.balanceAmount': 0,
+              'settlement.lastPaymentAt': null,
+            }
+          : {}),
       },
       $inc: { revision: 1 },
       $push: { workflow: event },

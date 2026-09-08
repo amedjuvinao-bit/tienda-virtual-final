@@ -4,6 +4,9 @@ const {
 const {
   ORDER_POST_COMMIT_INDEX_DEFINITIONS,
 } = require('./orderPostCommitIndexDefinitions');
+const {
+  FINANCE_TREASURY_ORDER_INDEX_DEFINITIONS,
+} = require('../financeTreasuryIndexDefinitions');
 
 function registerOrderIndexes(OrderSchema) {
   OrderSchema.index(
@@ -69,6 +72,9 @@ function registerOrderIndexes(OrderSchema) {
   OrderSchema.index({ 'pos.receiptNumber': 1 }, { sparse: true });
   OrderSchema.index({ 'pos.saleNumber': 1 }, { sparse: true });
   ORDER_POST_COMMIT_INDEX_DEFINITIONS.forEach(({ key, options }) => {
+    OrderSchema.index({ ...key }, { ...options });
+  });
+  FINANCE_TREASURY_ORDER_INDEX_DEFINITIONS.forEach(({ key, options }) => {
     OrderSchema.index({ ...key }, { ...options });
   });
 }

@@ -46,6 +46,7 @@ import {
 } from './api/financeApi';
 import useAdminPermissions from '../security/useAdminPermissions';
 import FinanceBudgetPanel from './FinanceBudgetPanel';
+import FinanceTreasuryPanel from './FinanceTreasuryPanel';
 
 const RANGE_OPTIONS = [
   { value: 'today', label: 'Hoy' },
@@ -101,6 +102,7 @@ const WORKFLOW_ACTION_LABELS = {
   approved: 'Gasto aprobado',
   rejected: 'Gasto rechazado',
   cancelled: 'Gasto anulado',
+  payable_payment_registered: 'Abono registrado',
 };
 
 const emptyExpenseForm = {
@@ -114,6 +116,8 @@ const emptyExpenseForm = {
   invoiceNumber: '',
   reference: '',
   paymentMethod: 'cash',
+  paymentTerms: 'immediate',
+  dueDate: '',
   branchId: '',
   costCenterId: '',
   notes: '',
@@ -156,6 +160,21 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  });
+}
+
+function formatDateOnly(value) {
+  if (!value) return '—';
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return formatDate(value);
+  return new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
+  ).toLocaleDateString('es-CO', {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
@@ -485,6 +504,21 @@ function ExpenseForm({ branches, costCenters, form, setForm, onSubmit, onCancel,
         </label>
 
         <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+          Condición de pago
+          <select value={form.paymentTerms} onChange={(event) => update('paymentTerms', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+            <option value="immediate">Contado</option>
+            <option value="credit">Crédito</option>
+          </select>
+        </label>
+
+        {form.paymentTerms === 'credit' ? (
+          <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+            Vencimiento
+            <input type="date" min={form.date || undefined} value={form.dueDate} onChange={(event) => update('dueDate', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} required />
+          </label>
+        ) : null}
+
+        <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
           Categoría
           <input value={form.category} onChange={(event) => update('category', event.target.value)} className="h-11 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} placeholder="Ej: Transporte, empaque, publicidad" required />
         </label>
@@ -790,6 +824,7 @@ export default function AdminFinancePage() {
   const canCancelExpenses = can('finance:expenses:cancel');
   const canManageBudgets = can('finance:budgets:manage');
   const canOverrideBudget = can('finance:budgets:override');
+  const canManageTreasury = can('finance:treasury:manage');
   const canExport = can('finance:export');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [expenseStatus, setExpenseStatus] = useState('all');
@@ -897,6 +932,8 @@ export default function AdminFinancePage() {
       invoiceNumber: expense?.invoiceNumber || '',
       reference: expense?.reference || '',
       paymentMethod: expense?.paymentMethod || 'cash',
+      paymentTerms: expense?.paymentTerms || 'immediate',
+      dueDate: expense?.dueDate ? String(expense.dueDate).slice(0, 10) : '',
       branchId: getExpenseBranchId(expense, filters.branchId || ''),
       costCenterId: getExpenseCostCenterId(expense),
       notes: expense?.notes || '',
@@ -915,6 +952,10 @@ export default function AdminFinancePage() {
     }
     if (!expenseForm.description.trim()) {
       toast.error('Debes explicar el concepto del gasto');
+      return;
+    }
+    if (expenseForm.paymentTerms === 'credit' && !expenseForm.dueDate) {
+      toast.error('Debes indicar el vencimiento del gasto a crédito');
       return;
     }
 
@@ -1080,7 +1121,7 @@ export default function AdminFinancePage() {
             <div className="max-w-3xl">
               <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>Centro financiero</p>
               <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>Finanzas</h1>
-              <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>Controla ingresos, costos, caja, gastos y utilidad con datos reales de órdenes, POS e inventario.</p>
+              <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>Controla ingresos, costos, caja, gastos, cartera y utilidad con datos reales de órdenes, POS e inventario.</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -1192,6 +1233,13 @@ export default function AdminFinancePage() {
               canManage={canManageBudgets}
               refreshKey={budgetRefreshKey}
               onDataChanged={refreshCostCenters}
+            />
+
+            <FinanceTreasuryPanel
+              selectedBranchId={filters.branchId}
+              canManage={canManageTreasury}
+              refreshKey={budgetRefreshKey}
+              onDataChanged={loadFinance}
             />
 
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -1330,7 +1378,7 @@ export default function AdminFinancePage() {
                         const privilegedEditor = ['owner', 'admin'].includes(String(role || adminUser?.adminRole || '').toLowerCase());
                         const editable = canManageExpenses && ['pending', 'rejected'].includes(expense.status) && (ownExpense || privilegedEditor || !creatorId);
                         const reviewable = canApproveExpenses && expense.status === 'pending' && (!ownExpense || isOwner);
-                        const cancellable = canCancelExpenses && ['pending', 'rejected', 'paid'].includes(expense.status);
+                        const cancellable = canCancelExpenses && ['pending', 'rejected', 'paid'].includes(expense.status) && Number(expense.settlement?.paidAmount || 0) === 0;
 
                         return (
                           <tr key={expense._id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
@@ -1343,6 +1391,7 @@ export default function AdminFinancePage() {
                               <p className="mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
                               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
                               {expense.costCenterSnapshot?.name ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-primary)' }}>{expense.costCenterSnapshot.name}</p> : null}
+                              {expense.paymentTerms === 'credit' ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-warning-text)' }}>Crédito · vence {formatDateOnly(expense.dueDate)}{expense.settlement?.status === 'partial' ? ` · saldo ${formatCurrency(expense.settlement?.balanceAmount)}` : ''}</p> : null}
                             </td>
                             <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
                             <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>

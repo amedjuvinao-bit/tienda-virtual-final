@@ -632,6 +632,17 @@ async function createExpense(payload = {}, actor = {}) {
   }
 
   const branchInfo = await resolveExpenseBranch(payload.branch || payload.branchId);
+  const status = cleanLower(payload.status || 'paid');
+  const paymentTerms = cleanLower(payload.paymentTerms || 'immediate');
+  const defaultSettlement = paymentTerms === 'credit' && status === 'paid'
+    ? {
+        status: 'pending',
+        paidAmount: 0,
+        balanceAmount: money(amount),
+        lastPaymentAt: null,
+        payments: [],
+      }
+    : undefined;
   const expense = new FinanceExpense({
     date: safeDate(payload.date) || new Date(),
     amount: payload.amount,
@@ -643,7 +654,10 @@ async function createExpense(payload = {}, actor = {}) {
     invoiceNumber: payload.invoiceNumber,
     reference: payload.reference,
     paymentMethod: payload.paymentMethod,
-    status: payload.status || 'paid',
+    paymentTerms,
+    dueDate: payload.dueDate,
+    settlement: payload.settlement || defaultSettlement,
+    status,
     source: 'manual',
     requestKey: payload.requestKey,
     revision: payload.revision,
@@ -701,6 +715,8 @@ async function updateExpense(expenseId, payload = {}, actor = {}, scope = {}) {
     'invoiceNumber',
     'reference',
     'paymentMethod',
+    'paymentTerms',
+    'dueDate',
     'tags',
     'attachments',
     'notes',
@@ -918,6 +934,10 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
       costCenterName: expense.costCenterSnapshot?.name || '',
       budgetOutcome: expense.budgetEvaluation?.outcome || '',
       budgetOverrideReason: expense.budgetOverride?.reason || '',
+      dueDate: expense.dueDate || '',
+      settlementStatus: expense.settlement?.status || 'not_required',
+      settlementPaidAmount: money(expense.settlement?.paidAmount),
+      settlementBalanceAmount: money(expense.settlement?.balanceAmount),
       requester:
         expense.createdBySnapshot?.displayName ||
         expense.createdBySnapshot?.username ||
@@ -934,6 +954,11 @@ async function buildFinanceCsv(type = 'sales', query = {}) {
       { key: 'category', label: 'Categoria' },
       { key: 'costCenterName', label: 'Centro de costo' },
       { key: 'paymentMethod', label: 'Metodo de pago' },
+      { key: 'paymentTerms', label: 'Condicion de pago' },
+      { key: 'dueDate', label: 'Vencimiento' },
+      { key: 'settlementStatus', label: 'Estado de pago' },
+      { key: 'settlementPaidAmount', label: 'Valor abonado' },
+      { key: 'settlementBalanceAmount', label: 'Saldo pendiente' },
       { key: 'status', label: 'Estado' },
       { key: 'description', label: 'Descripcion' },
       { key: 'reference', label: 'Referencia' },

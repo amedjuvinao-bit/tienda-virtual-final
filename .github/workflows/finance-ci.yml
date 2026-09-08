@@ -7,6 +7,7 @@ on:
       - feature/finanzas-nivel-plus-etapa-0
       - feature/finanzas-nivel-plus-etapa-1
       - feature/finanzas-nivel-plus-etapa-2
+      - feature/finanzas-nivel-plus-etapa-3
   pull_request:
     branches:
       - main
@@ -49,11 +50,17 @@ jobs:
       - name: Validar presupuestos y centros de costo de Etapa 2
         run: npm --prefix backend run test:finance-level-plus-stage2
 
+      - name: Validar cartera y tesorería de Etapa 3
+        run: npm --prefix backend run test:finance-level-plus-stage3
+
       - name: Revisar migración aditiva de gastos
         run: npm --prefix backend run migrate:finance-expense-indexes
 
       - name: Revisar migración aditiva de presupuestos
         run: npm --prefix backend run migrate:finance-budget-indexes
+
+      - name: Revisar migración aditiva de tesorería
+        run: npm --prefix backend run migrate:finance-treasury-indexes
 
       - name: Instalar frontend
         run: npm --prefix frontend ci
@@ -66,6 +73,9 @@ jobs:
 
       - name: Validar control presupuestal de Etapa 2
         run: npm --prefix frontend run test:finance-level-plus-stage2
+
+      - name: Validar cartera y abonos de Etapa 3
+        run: npm --prefix frontend run test:finance-level-plus-stage3
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -125,3 +135,13 @@ jobs:
         env:
           FINANCE_STAGE2_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage2_ci
         run: npm --prefix backend run test:finance-level-plus-stage2-integration
+
+      - name: Aplicar índices de tesorería en la base aislada
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/finance_stage3_ci
+        run: npm --prefix backend run migrate:finance-treasury-indexes -- --apply-finance-treasury-index-migration
+
+      - name: Validar cartera, abonos y concurrencia de tesorería
+        env:
+          FINANCE_STAGE3_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage3_ci
+        run: npm --prefix backend run test:finance-level-plus-stage3-integration

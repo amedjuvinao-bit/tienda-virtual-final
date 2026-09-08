@@ -108,6 +108,19 @@ export async function getFinanceBudgetControl(params = {}) {
   return unwrap(response);
 }
 
+export async function getFinanceTreasury(params = {}) {
+  const response = await api.get('/api/admin/finance/treasury', { params });
+  return unwrap(response);
+}
+
+export async function registerFinancePayablePayment(id, payload = {}) {
+  const response = await api.post(
+    `/api/admin/finance/payables/${id}/payments`,
+    payload
+  );
+  return unwrap(response);
+}
+
 export async function createFinanceBudget(payload = {}) {
   const response = await api.post('/api/admin/finance/budgets', payload);
   return unwrap(response);
@@ -135,6 +148,8 @@ export default {
   updateFinanceCostCenter,
   getFinanceBudgets,
   getFinanceBudgetControl,
+  getFinanceTreasury,
+  registerFinancePayablePayment,
   createFinanceBudget,
   updateFinanceBudget,
 };
