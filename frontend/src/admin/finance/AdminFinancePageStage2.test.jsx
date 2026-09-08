@@ -169,6 +169,8 @@ describe('Finanzas Nivel Plus · Etapa 2', () => {
     expect(budgetSummary).toHaveTextContent('Comprometido');
     expect(screen.getAllByText('Logística').length).toBeGreaterThan(0);
     expect(screen.getByText('$ 30.000 disponible')).toBeInTheDocument();
+    expect(screen.getByText('Utilización · 70%')).toBeInTheDocument();
+    expect(screen.queryByText('Disponible · 70%')).not.toBeInTheDocument();
   });
 
   it('asigna el centro de costo al registrar una solicitud', async () => {

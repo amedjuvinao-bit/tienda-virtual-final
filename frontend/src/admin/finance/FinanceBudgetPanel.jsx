@@ -58,7 +58,7 @@ function errorMessage(error, fallback) {
 function lineStatus(line) {
   if (line.level === 'exceeded') return { label: 'Excedido', tone: 'danger' };
   if (line.level === 'warning') return { label: 'En alerta', tone: 'warning' };
-  return { label: 'Disponible', tone: 'success' };
+  return { label: 'Utilización', tone: 'success' };
 }
 
 const emptyBudget = {
