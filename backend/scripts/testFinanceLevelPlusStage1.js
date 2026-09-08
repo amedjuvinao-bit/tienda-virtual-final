@@ -102,6 +102,7 @@ function validateAccountingAndInterface() {
   const service = read('backend/services/adminFinanceService.js');
   const workflow = read('backend/services/adminFinanceExpenseWorkflowService.js');
   const page = read('frontend/src/admin/finance/AdminFinancePage.jsx');
+  const layout = read('frontend/src/admin/finance/financeLayoutFix.css');
   const api = read('frontend/src/admin/finance/api/financeApi.js');
 
   ok('solo los gastos pagados afectan la utilidad', service.includes("buildExpenseFilter({ ...query, status: 'paid' })"));
@@ -116,6 +117,7 @@ function validateAccountingAndInterface() {
   ok('la interfaz no usa confirmaciones nativas del navegador', !page.includes('window.confirm'));
   ok('la interfaz separa permisos para solicitar, aprobar y anular', page.includes("can('finance:expenses')") && page.includes("can('finance:expenses:approve')") && page.includes("can('finance:expenses:cancel')"));
   ok('los controles visuales respetan las variables del tema', page.includes("background: 'var(--admin-button-bg)'") && page.includes("color: 'var(--admin-button-text)'"));
+  ok('la tabla de solicitudes reorganiza sus acciones sin desbordarse', page.includes('finance-expense-workflow') && page.includes('finance-expense-table') && layout.includes('@container finance-expense-workflow (max-width: 1040px)') && layout.includes('grid-column: 1 / -1'));
   ok('el cliente envía decisiones y anulaciones con cuerpo versionado', api.includes("/review`") && api.includes('data: payload'));
 }
 

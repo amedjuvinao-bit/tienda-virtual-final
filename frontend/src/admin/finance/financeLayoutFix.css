@@ -1,7 +1,127 @@
 /* frontend/src/admin/finance/financeLayoutFix.css
    Corrección puntual del módulo Finanzas.
    No toca el menú, no toca el layout general del panel y no cambia el tema.
-   Solo corrige la sección inferior de gastos. */
+   Solo corrige las secciones de gastos. */
+
+/* La tabla del flujo tiene seis columnas y varias acciones. Cuando el menú
+   administrativo reduce el espacio útil, se convierte en una fila de trabajo
+   de cuatro niveles en vez de exigir desplazamiento horizontal. */
+.finance-expense-workflow {
+  container-name: finance-expense-workflow;
+  container-type: inline-size;
+}
+
+.finance-expense-responsive-label {
+  display: none;
+}
+
+@container finance-expense-workflow (max-width: 1040px) {
+  .finance-expense-table-shell {
+    overflow-x: visible;
+  }
+
+  .finance-expense-table {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .finance-expense-table thead {
+    display: none;
+  }
+
+  .finance-expense-table tbody {
+    display: block;
+  }
+
+  .finance-expense-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 24px;
+    row-gap: 12px;
+    padding: 18px;
+  }
+
+  .finance-expense-table tbody td {
+    min-width: 0;
+    padding: 0 !important;
+    vertical-align: top;
+  }
+
+  .finance-expense-table tbody td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .finance-expense-table tbody td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .finance-expense-table tbody td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .finance-expense-table tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    text-align: right;
+  }
+
+  .finance-expense-table tbody td:nth-child(5) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: 2px !important;
+  }
+
+  .finance-expense-table tbody td:nth-child(6) {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    padding-top: 12px !important;
+    border-top: 1px solid var(--admin-card-border);
+  }
+
+  .finance-expense-responsive-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--admin-card-muted-text);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .finance-expense-table tbody td:last-child > div {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .finance-expense-table tbody td:last-child button {
+    min-height: 38px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+}
+
+@container finance-expense-workflow (max-width: 560px) {
+  .finance-expense-table tbody tr {
+    column-gap: 14px;
+    padding: 16px;
+  }
+
+  .finance-expense-table tbody td:last-child > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .finance-expense-table tbody td:last-child button {
+    width: 100%;
+  }
+}
 
 /* En Finanzas ya existe el botón principal "Nuevo gasto" en el encabezado.
    El bloque lateral "Control de gastos operativos" repetía la misma acción y quitaba espacio útil.

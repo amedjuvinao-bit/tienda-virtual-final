@@ -1157,7 +1157,7 @@ export default function AdminFinancePage() {
               </div>
             </div>
 
-            <div className="overflow-hidden" style={styles.card}>
+            <div className="finance-expense-workflow overflow-hidden" style={styles.card}>
               <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-4 md:px-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Control de gastos</p>
@@ -1199,8 +1199,8 @@ export default function AdminFinancePage() {
                   ) : null}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1040px] text-left text-sm">
+                <div className="finance-expense-table-shell overflow-x-auto">
+                  <table className="finance-expense-table w-full min-w-[1040px] text-left text-sm">
                     <thead>
                       <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                         <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fecha</th>
@@ -1235,10 +1235,12 @@ export default function AdminFinancePage() {
                             <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
                             <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
                             <td className="px-4 py-4">
+                              <p className="finance-expense-responsive-label">Responsables</p>
                               <p className="text-xs font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.createdBySnapshot?.displayName || expense.createdBySnapshot?.username || 'Registro anterior'}</p>
                               <p className="mt-1 text-xs font-semibold" style={styles.muted}>{expense.reviewedBySnapshot?.displayName || expense.reviewedBySnapshot?.username ? `Revisó ${expense.reviewedBySnapshot.displayName || expense.reviewedBySnapshot.username}` : 'Sin revisión'}</p>
                             </td>
                             <td className="px-4 py-4">
+                              <p className="finance-expense-responsive-label">Acciones disponibles</p>
                               <div className="flex flex-wrap gap-2">
                                 <button type="button" onClick={() => setHistoryExpense(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><History className="h-3.5 w-3.5" />Historial</button>
                                 {editable ? <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Corregir</button> : null}
