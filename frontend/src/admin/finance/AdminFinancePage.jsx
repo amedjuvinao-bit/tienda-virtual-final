@@ -430,18 +430,17 @@ const styles = {
 function FinanceWorkspaceNavigation({ activeSection, onChange }) {
   return (
     <nav className="finance-workspace-nav" aria-label="Recorrido financiero">
-      {FINANCE_WORKSPACE.map((item, index) => {
+      {FINANCE_WORKSPACE.map((item) => {
         const Icon = item.icon;
         const active = activeSection === item.key;
         return (
           <button
             type="button"
             key={item.key}
-            aria-current={active ? 'step' : undefined}
-            aria-label={`${index + 1}. ${item.label}: ${item.hint}`}
+            aria-current={active ? 'page' : undefined}
+            aria-label={`${item.label}: ${item.hint}`}
             onClick={() => onChange(item.key)}
           >
-            <span className="finance-workspace-nav__number">{index + 1}</span>
             <Icon aria-hidden="true" />
             <span className="finance-workspace-nav__copy">
               <strong>{item.label}</strong>
@@ -464,17 +463,16 @@ function FinanceWorkspaceGuide({ activeSection, onChange }) {
     <section className="finance-workspace-guide" aria-label={`Guía: ${item.label}`}>
       <div className="finance-workspace-guide__icon"><Icon aria-hidden="true" /></div>
       <div className="finance-workspace-guide__copy">
-        <small>PASO {index + 1} DE {FINANCE_WORKSPACE.length}</small>
         <h2>{item.title}</h2>
         <p>{item.description}</p>
       </div>
       {next ? (
         <button type="button" onClick={() => onChange(next.key)}>
-          <span><small>SIGUIENTE</small><strong>{item.nextLabel}</strong></span>
+          <span><small>SIGUIENTE SECCIÓN</small><strong>{item.nextLabel}</strong></span>
           <ArrowUpRight aria-hidden="true" />
         </button>
       ) : (
-        <div className="finance-workspace-guide__finish"><ShieldCheck /><span><small>ÚLTIMO PASO</small><strong>Certifica cuando todo esté claro</strong></span></div>
+        <div className="finance-workspace-guide__finish"><ShieldCheck /><span><strong>Certifica cuando todo esté claro</strong></span></div>
       )}
     </section>
   );
@@ -485,7 +483,7 @@ function FinanceMetricCard({ icon: Icon, label, value, sub, tone = 'primary' }) 
     <div className="p-4" style={styles.card}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.muted}>
+          <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.muted}>
             {label}
           </p>
           <p className="mt-2 truncate text-2xl font-black leading-none" style={{ color: 'var(--admin-card-text)' }}>
@@ -510,7 +508,7 @@ function BreakdownList({ title, rows = [], emptyText = 'Sin datos para este peri
     <div className="p-4" style={styles.card}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
+          <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>
             Distribución
           </p>
           <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>
@@ -550,7 +548,7 @@ function BreakdownList({ title, rows = [], emptyText = 'Sin datos para este peri
                     }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] font-semibold" style={styles.muted}>
+                <p className="mt-1 text-xs font-semibold" style={styles.muted}>
                   {formatPercent(percent)} del total · {formatNumber(row.orders || 0)} órdenes
                 </p>
               </div>
@@ -693,12 +691,12 @@ function ExpenseModal({ open, branches, costCenters, form, setForm, onSubmit, on
       <div className="w-full max-w-4xl overflow-hidden" style={{ ...styles.modalCard, maxHeight: 'calc(100vh - 5rem)' }}>
         <div className="flex items-start justify-between gap-4 px-5 py-4 md:px-6" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>{editing ? 'Editar gasto' : 'Nuevo gasto'}</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>{editing ? 'Editar gasto' : 'Nuevo gasto'}</p>
             <h3 className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>Registro financiero</h3>
             <p className="mt-1 text-sm font-semibold" style={styles.muted}>Registra egresos operativos para calcular utilidad neta real.</p>
           </div>
 
-          <button type="button" onClick={onCancel} className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Cerrar gasto">
+          <button type="button" onClick={onCancel} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Cerrar gasto">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -776,7 +774,7 @@ function ExpenseActionModal({
             <h3 className="text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{title}</h3>
             <p className="mt-1 text-sm font-semibold leading-relaxed" style={styles.muted}>{description}</p>
           </div>
-          <button type="button" onClick={onCancel} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={styles.softButton} aria-label="Cerrar decisión">
+          <button type="button" onClick={onCancel} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={styles.softButton} aria-label="Cerrar decisión">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -877,11 +875,11 @@ function ExpenseHistoryModal({ expense, onClose }) {
       <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden" style={styles.modalCard}>
         <div className="flex items-start justify-between gap-4 px-5 py-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={styles.eyebrow}>Trazabilidad financiera</p>
+            <p className="text-xs font-black uppercase tracking-[0.2em]" style={styles.eyebrow}>Trazabilidad financiera</p>
             <h3 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'Gasto'} · {formatCurrency(expense.amount)}</h3>
             <p className="mt-1 text-sm font-semibold" style={styles.muted}>Versión {Number(expense.revision || 0)} · {statusMeta.label}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={styles.softButton} aria-label="Cerrar trazabilidad">
+          <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={styles.softButton} aria-label="Cerrar trazabilidad">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -910,7 +908,7 @@ function ExpenseHistoryModal({ expense, onClose }) {
                           ? formatDateOnly(event.at)
                           : formatDateTime(event.at)}
                       </p>
-                      <p className="mt-1 text-[10px] font-black uppercase" style={styles.muted}>Versión {Number(event.revision || 0)}</p>
+                      <p className="mt-1 text-xs font-black uppercase" style={styles.muted}>Versión {Number(event.revision || 0)}</p>
                     </div>
                   </div>
                 );
@@ -945,7 +943,6 @@ export default function AdminFinancePage() {
   const [expenses, setExpenses] = useState(null);
   const [branches, setBranches] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
-  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState('');
@@ -1000,7 +997,6 @@ export default function AdminFinancePage() {
       setExpenses(expensesData || null);
       setBranches(Array.isArray(branchesData) ? branchesData : []);
       setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
-      setBudgetRefreshKey((value) => value + 1);
     } catch (err) {
       console.error('Error cargando finanzas admin:', err);
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudo cargar el módulo financiero.');
@@ -1229,7 +1225,7 @@ export default function AdminFinancePage() {
         <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
-              <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>Centro financiero</p>
+              <p className="text-xs font-black uppercase" style={styles.eyebrow}>Centro financiero</p>
               <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>Finanzas</h1>
               <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>Controla ingresos, costos, caja, gastos, cartera y utilidad con datos reales de órdenes, POS e inventario.</p>
             </div>
@@ -1288,7 +1284,7 @@ export default function AdminFinancePage() {
                 Actualizar
               </button>
               {(filters.dateFrom || filters.dateTo) && (
-                <button type="button" onClick={clearCustomDates} className="grid h-12 w-12 place-items-center rounded-full transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Limpiar fechas">
+                <button type="button" onClick={clearCustomDates} className="grid h-12 w-12 place-items-center rounded-xl transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Limpiar fechas">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -1343,36 +1339,39 @@ export default function AdminFinancePage() {
             </section>
 
             <section className="finance-workspace-view" hidden={activeSection !== 'budget'} aria-label="Control presupuestal">
-            <FinanceBudgetPanel
-              branches={branches}
-              selectedBranchId={filters.branchId}
-              costCenters={costCenters}
-              canManage={canManageBudgets}
-              refreshKey={budgetRefreshKey}
-              onDataChanged={refreshCostCenters}
-            />
+            {activeSection === 'budget' ? (
+              <FinanceBudgetPanel
+                branches={branches}
+                selectedBranchId={filters.branchId}
+                costCenters={costCenters}
+                canManage={canManageBudgets}
+                onDataChanged={refreshCostCenters}
+              />
+            ) : null}
             </section>
 
             <section className="finance-workspace-view" hidden={activeSection !== 'treasury'} aria-label="Tesorería operativa">
-            <FinanceTreasuryPanel
-              selectedBranchId={filters.branchId}
-              canManage={canManageTreasury}
-              refreshKey={budgetRefreshKey}
-              onDataChanged={loadFinance}
-            />
+            {activeSection === 'treasury' ? (
+              <FinanceTreasuryPanel
+                selectedBranchId={filters.branchId}
+                canManage={canManageTreasury}
+                onDataChanged={loadFinance}
+              />
+            ) : null}
             </section>
 
             <section className="finance-workspace-view" hidden={activeSection !== 'closing'} aria-label="Cierre financiero">
-            <FinanceClosingPanel
-              selectedBranchId={filters.branchId}
-              branches={branches}
-              canCertify={canCertifyPeriods}
-              canOverride={canOverridePeriods}
-              canExport={canExport}
-              refreshKey={budgetRefreshKey}
-              onNavigate={setActiveSection}
-              onDataChanged={loadFinance}
-            />
+            {activeSection === 'closing' ? (
+              <FinanceClosingPanel
+                selectedBranchId={filters.branchId}
+                branches={branches}
+                canCertify={canCertifyPeriods}
+                canOverride={canOverridePeriods}
+                canExport={canExport}
+                onNavigate={setActiveSection}
+                onDataChanged={loadFinance}
+              />
+            ) : null}
             </section>
 
             <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Análisis detallado">
@@ -1391,7 +1390,7 @@ export default function AdminFinancePage() {
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Rentabilidad</p>
+                    <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Rentabilidad</p>
                     <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Productos con mayor utilidad</h3>
                   </div>
                   <span className="rounded-full border px-3 py-1 text-xs font-black" style={toneStyle('success')}>Bruta {formatCurrency(kpis.grossProfit)}</span>
@@ -1420,7 +1419,7 @@ export default function AdminFinancePage() {
               <div className="p-4" style={styles.card}>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Caja POS</p>
+                    <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Caja POS</p>
                     <h3 className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>Resumen de caja</h3>
                   </div>
                   <span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}>
@@ -1436,7 +1435,7 @@ export default function AdminFinancePage() {
                     { label: 'Diferencia', value: formatCurrency(kpis.cashDifference), sub: 'Esperado vs contado' },
                   ].map((item) => (
                     <div key={item.label} className="p-3" style={styles.softCard}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>{item.label}</p>
+                      <p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>{item.label}</p>
                       <p className="mt-2 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>{item.value}</p>
                       <p className="mt-1 text-xs font-semibold" style={styles.muted}>{item.sub}</p>
                     </div>
@@ -1448,7 +1447,7 @@ export default function AdminFinancePage() {
                     .filter(([key]) => key !== 'total')
                     .map(([key, value]) => (
                       <div key={key} className="rounded-2xl border px-3 py-2" style={toneStyle('neutral')}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.12em]">{key}</p>
+                        <p className="text-xs font-black uppercase tracking-[0.12em]">{key}</p>
                         <p className="mt-1 text-sm font-black">{formatCurrency(value)}</p>
                       </div>
                     ))}
@@ -1463,7 +1462,7 @@ export default function AdminFinancePage() {
             <div className="finance-expense-workflow overflow-hidden" style={styles.card}>
               <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-4 md:px-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Control de gastos</p>
+                  <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.eyebrow}>Control de gastos</p>
                   <h3 className="mt-1 text-xl font-black" style={{ color: 'var(--admin-card-text)' }}>Solicitudes y aprobaciones</h3>
                   <p className="mt-1 text-sm font-semibold" style={styles.muted}>Solo los gastos aprobados se incluyen en la utilidad neta.</p>
                 </div>
@@ -1485,8 +1484,8 @@ export default function AdminFinancePage() {
                 ].map((item, index) => (
                   <div key={item.key} className="px-4 py-3 md:px-5" style={{ borderRight: index === 3 ? 'none' : '1px solid var(--admin-card-border)' }}>
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ background: toneStyle(item.tone).color }} />
-                      <p className="text-[10px] font-black uppercase tracking-[0.12em]" style={styles.muted}>{item.label}</p>
+                      <span className="h-1.5 w-4 rounded-sm" style={{ background: toneStyle(item.tone).color }} />
+                      <p className="text-xs font-black uppercase tracking-[0.12em]" style={styles.muted}>{item.label}</p>
                     </div>
                     <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatNumber(workflowSummary[item.key]?.count || 0)} · {formatCurrency(workflowSummary[item.key]?.amount || 0)}</p>
                   </div>
@@ -1506,12 +1505,12 @@ export default function AdminFinancePage() {
                   <table className="finance-expense-table w-full min-w-[1040px] text-left text-sm">
                     <thead>
                       <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Fecha</th>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Solicitud</th>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Estado</th>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Valor</th>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Responsables</th>
-                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Acciones</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Fecha</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Solicitud</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Estado</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Valor</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Responsables</th>
+                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.14em]">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1528,14 +1527,14 @@ export default function AdminFinancePage() {
                           <tr key={expense._id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
                             <td className="px-4 py-4 font-bold" style={{ color: 'var(--admin-card-text)' }}>
                               {formatDate(expense.date)}
-                              <p className="mt-1 text-[10px] font-bold" style={styles.muted}>v{Number(expense.revision || 0)}</p>
+                              <p className="mt-1 text-xs font-bold" style={styles.muted}>v{Number(expense.revision || 0)}</p>
                             </td>
                             <td className="px-4 py-4">
                               <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
                               <p className="mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
-                              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
-                              {expense.costCenterSnapshot?.name ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-primary)' }}>{expense.costCenterSnapshot.name}</p> : null}
-                              {expense.paymentTerms === 'credit' ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-warning-text)' }}>Crédito · vence {formatDateOnly(expense.dueDate)}{expense.settlement?.status === 'partial' ? ` · saldo ${formatCurrency(expense.settlement?.balanceAmount)}` : ''}</p> : null}
+                              <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
+                              {expense.costCenterSnapshot?.name ? <p className="mt-1 text-xs font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-primary)' }}>{expense.costCenterSnapshot.name}</p> : null}
+                              {expense.paymentTerms === 'credit' ? <p className="mt-1 text-xs font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-warning-text)' }}>Crédito · vence {formatDateOnly(expense.dueDate)}{expense.settlement?.status === 'partial' ? ` · saldo ${formatCurrency(expense.settlement?.balanceAmount)}` : ''}</p> : null}
                             </td>
                             <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
                             <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
@@ -1553,7 +1552,7 @@ export default function AdminFinancePage() {
                                 {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'reject')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><XCircle className="h-3.5 w-3.5" />Rechazar</button> : null}
                                 {cancellable ? <button type="button" onClick={() => openExpenseAction(expense, 'cancel')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button> : null}
                               </div>
-                              {canApproveExpenses && expense.status === 'pending' && ownExpense && !isOwner ? <p className="mt-2 max-w-[240px] text-[10px] font-bold" style={styles.muted}>Debe revisarlo otra persona autorizada.</p> : null}
+                              {canApproveExpenses && expense.status === 'pending' && ownExpense && !isOwner ? <p className="mt-2 max-w-[240px] text-xs font-bold" style={styles.muted}>Debe revisarlo otra persona autorizada.</p> : null}
                             </td>
                           </tr>
                         );
@@ -1568,13 +1567,13 @@ export default function AdminFinancePage() {
             <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Contexto del periodo">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><CalendarDays className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Rango técnico</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}</p></div></div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Rango técnico</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}</p></div></div>
               </div>
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('success')}><Banknote className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Ventas netas caja</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(cash?.netSales || summary?.cash?.netSales)}</p></div></div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('success')}><Banknote className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Ventas netas caja</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(cash?.netSales || summary?.cash?.netSales)}</p></div></div>
               </div>
               <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><Store className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Sede filtrada</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</p></div></div>
+                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><Store className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Sede filtrada</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</p></div></div>
               </div>
             </div>
             </section>

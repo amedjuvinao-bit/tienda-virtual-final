@@ -122,11 +122,13 @@ describe('Finanzas Nivel Plus · Etapa 0', () => {
     const budgetView = screen.getByLabelText('Control presupuestal', { selector: 'section' });
     expect(summaryView).not.toHaveAttribute('hidden');
     expect(budgetView).toHaveAttribute('hidden');
+    expect(getFinanceBudgetControl).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '2. Presupuesto: Límites y centros' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Presupuesto: Límites y centros' }));
     expect(screen.getByText('Define cuánto puede gastar cada operación')).toBeInTheDocument();
     expect(summaryView).toHaveAttribute('hidden');
     expect(budgetView).not.toHaveAttribute('hidden');
+    await waitFor(() => expect(getFinanceBudgetControl).toHaveBeenCalledTimes(1));
   });
 
   it('diferencia ingresos brutos, devoluciones e ingresos netos', async () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -63,10 +63,10 @@ const STATUS_META = {
 };
 
 const CLOSING_STEPS = [
-  { key: 'summary', number: 1, label: 'Resumen', hint: 'Situación del periodo' },
-  { key: 'checks', number: 2, label: 'Revisar', hint: 'Controles financieros' },
-  { key: 'resolve', number: 3, label: 'Resolver', hint: 'Alertas y diferencias' },
-  { key: 'certify', number: 4, label: 'Certificar', hint: 'Huella e informe' },
+  { key: 'summary', label: 'Resumen', hint: 'Situación del periodo' },
+  { key: 'checks', label: 'Revisar', hint: 'Controles financieros' },
+  { key: 'resolve', label: 'Resolver', hint: 'Alertas y diferencias' },
+  { key: 'certify', label: 'Certificar', hint: 'Huella e informe' },
 ];
 
 const CONTROL_ACTIONS = {
@@ -87,14 +87,49 @@ function displayVersion(revision) {
 function CertificationModal({ data, saving, onClose, onConfirm }) {
   const [notes, setNotes] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const blocked = Number(data?.readiness?.blockerCount || 0) > 0;
   const recertification = Boolean(data?.close);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
+    const returnFocus = document.activeElement;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+      if (returnFocus instanceof HTMLElement) returnFocus.focus();
+    };
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !saving) {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(modalRef.current?.querySelectorAll(
+        'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      ) || []);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, saving]);
 
   const submit = (event) => {
     event.preventDefault();
@@ -114,14 +149,14 @@ function CertificationModal({ data, saving, onClose, onConfirm }) {
 
   return createPortal(
     <div className="finance-closing-overlay" role="dialog" aria-modal="true" aria-label={recertification ? 'Actualizar certificación financiera' : 'Certificar cierre financiero'}>
-      <div className="finance-closing-modal">
+      <div className="finance-closing-modal" ref={modalRef}>
         <header>
           <div>
             <p>{recertification ? 'NUEVA VERSIÓN CERTIFICADA' : 'CERTIFICACIÓN FINANCIERA'}</p>
             <h3>{data.period?.label} · {data.period?.periodKey}</h3>
             <span>{data.branch?.name}{recertification ? ` · Versión actual ${displayVersion(data.close?.revision)}` : ''}</span>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Cerrar certificación"><X /></button>
+          <button ref={closeButtonRef} type="button" onClick={onClose} disabled={saving} aria-label="Cerrar certificación"><X /></button>
         </header>
 
         <form onSubmit={submit}>
@@ -303,10 +338,9 @@ export default function FinanceClosingPanel({
                 type="button"
                 key={step.key}
                 aria-current={activeStep === step.key ? 'step' : undefined}
-                aria-label={`${step.number}. ${step.label}: ${step.hint}`}
+                aria-label={`${step.label}: ${step.hint}`}
                 onClick={() => goToStep(step.key)}
               >
-                <span>{step.number}</span>
                 <div><strong>{step.label}</strong><small>{step.hint}</small></div>
               </button>
             ))}
@@ -316,7 +350,7 @@ export default function FinanceClosingPanel({
             {activeStep === 'summary' ? (
               <>
                 <div className="finance-closing-stage__intro">
-                  <div><small>PASO 1 DE 4</small><h3>Entiende el resultado del mes</h3><p>Estas cuatro cifras resumen lo que entró, lo disponible y lo que aún debe cobrarse o pagarse.</p></div>
+                  <div><h3>Entiende el resultado del mes</h3><p>Estas cuatro cifras resumen lo que entró, lo disponible y lo que aún debe cobrarse o pagarse.</p></div>
                   <button type="button" onClick={load}><RefreshCw />Actualizar cifras</button>
                 </div>
                 <div className="finance-closing-panel__metrics">
@@ -331,7 +365,7 @@ export default function FinanceClosingPanel({
             {activeStep === 'checks' ? (
               <>
                 <div className="finance-closing-stage__intro">
-                  <div><small>PASO 2 DE 4</small><h3>Revisa los controles automáticos</h3><p>Verde significa conciliado. Amarillo necesita seguimiento. Rojo debe resolverse o justificarse con autorización.</p></div>
+                  <div><h3>Revisa los controles automáticos</h3><p>Verde significa conciliado. Amarillo necesita seguimiento. Rojo debe resolverse o justificarse con autorización.</p></div>
                 </div>
                 <div className="finance-closing-panel__checks">
                   {(data.readiness?.checks || []).map((item) => {
@@ -345,7 +379,7 @@ export default function FinanceClosingPanel({
             {activeStep === 'resolve' ? (
               <>
                 <div className="finance-closing-stage__intro">
-                  <div><small>PASO 3 DE 4</small><h3>{unresolvedChecks.length ? 'Resuelve lo que requiere atención' : 'Todo está conciliado'}</h3><p>{unresolvedChecks.length ? 'Cada alerta indica dónde corregir el dato antes de certificar.' : 'No existen alertas ni diferencias pendientes para este periodo.'}</p></div>
+                  <div><h3>{unresolvedChecks.length ? 'Resuelve lo que requiere atención' : 'Todo está conciliado'}</h3><p>{unresolvedChecks.length ? 'Cada alerta indica dónde corregir el dato antes de certificar.' : 'No existen alertas ni diferencias pendientes para este periodo.'}</p></div>
                 </div>
                 {unresolvedChecks.length ? (
                   <div className="finance-closing-resolutions">
@@ -370,7 +404,7 @@ export default function FinanceClosingPanel({
             {activeStep === 'certify' ? (
               <>
                 <div className="finance-closing-stage__intro">
-                  <div><small>PASO 4 DE 4</small><h3>Genera la evidencia del cierre</h3><p>Descarga el informe y certifica una huella inalterable para este periodo y esta sede.</p></div>
+                  <div><h3>Genera la evidencia del cierre</h3><p>Descarga el informe y certifica una huella inalterable para este periodo y esta sede.</p></div>
                 </div>
                 <div className="finance-closing-certification">
                   <Fingerprint />

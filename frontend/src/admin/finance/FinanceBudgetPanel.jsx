@@ -213,7 +213,6 @@ function BudgetManagerModal({
         <div className="finance-budget-modal__body">
           <section className="finance-budget-manager-section">
             <div className="finance-budget-section-heading">
-              <span>1</span>
               <div><h4>Centros de costo</h4><p>Organiza dónde se consume el dinero.</p></div>
             </div>
             <form onSubmit={submitCenter} className="finance-budget-form">
@@ -242,7 +241,6 @@ function BudgetManagerModal({
 
           <section className="finance-budget-manager-section">
             <div className="finance-budget-section-heading">
-              <span>2</span>
               <div><h4>{editing ? 'Ajustar límite' : 'Asignar límite'}</h4><p>Define el monto mensual y su alerta.</p></div>
             </div>
             <form onSubmit={submitBudget} className="finance-budget-form">

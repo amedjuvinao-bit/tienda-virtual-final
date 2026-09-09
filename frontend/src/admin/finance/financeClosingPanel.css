@@ -22,18 +22,18 @@
 
 .finance-closing-panel__title { display: flex; align-items: center; gap: 14px; }
 .finance-closing-panel__title > svg { width: 42px; height: 42px; padding: 10px; border: 1px solid var(--admin-primary-soft-border); border-radius: calc(var(--admin-radius) * .65); background: var(--admin-primary-soft-bg); color: var(--admin-primary); }
-.finance-closing-panel__title p { color: var(--admin-primary); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
+.finance-closing-panel__title p { color: var(--admin-primary); font-size: 12px; font-weight: 900; letter-spacing: .16em; }
 .finance-closing-panel__title h2 { margin-top: 3px; font-size: 20px; font-weight: 900; }
 .finance-closing-panel__title span { display: block; margin-top: 3px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 600; }
-.finance-closing-panel__header > label { display: grid; gap: 5px; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 900; letter-spacing: .1em; }
-.finance-closing-panel__header input { min-height: 42px; border: 1px solid var(--admin-input-border); border-radius: 999px; padding: 0 14px; background: var(--admin-input-bg); color: var(--admin-input-text); font-size: 12px; font-weight: 900; }
+.finance-closing-panel__header > label { display: grid; gap: 5px; color: var(--admin-card-muted-text); font-size: 12px; font-weight: 900; letter-spacing: .1em; }
+.finance-closing-panel__header input { min-height: 42px; border: 1px solid var(--admin-input-border); border-radius: calc(var(--admin-radius) * .65); padding: 0 14px; background: var(--admin-input-bg); color: var(--admin-input-text); font-size: 14px; font-weight: 900; }
 
 .finance-closing-panel__select-branch,
 .finance-closing-panel__loading,
 .finance-closing-panel__error { display: flex; min-height: 110px; align-items: center; gap: 12px; padding: 24px; }
 .finance-closing-panel__select-branch { background: var(--admin-warning-soft-bg); color: var(--admin-warning-text); }
 .finance-closing-panel__select-branch strong, .finance-closing-panel__select-branch span { display: block; }
-.finance-closing-panel__select-branch span { margin-top: 4px; font-size: 12px; font-weight: 700; }
+.finance-closing-panel__select-branch span { margin-top: 4px; font-size: 13px; font-weight: 700; }
 .finance-closing-panel__loading { color: var(--admin-card-muted-text); font-size: 13px; font-weight: 800; }
 .finance-closing-panel__error { color: var(--admin-danger-text); background: var(--admin-danger-soft-bg); font-size: 13px; font-weight: 800; }
 .finance-closing-panel__error button { margin-left: auto; border: 0; background: transparent; color: var(--admin-primary); font-weight: 900; cursor: pointer; }
@@ -42,13 +42,13 @@
 .finance-closing-panel__status[data-status="ready"] { background: var(--admin-success-soft-bg); color: var(--admin-success-text); }
 .finance-closing-panel__status[data-status="attention"] { background: var(--admin-warning-soft-bg); color: var(--admin-warning-text); }
 .finance-closing-panel__status[data-status="blocked"] { background: var(--admin-danger-soft-bg); color: var(--admin-danger-text); }
-.finance-closing-panel__status p { color: var(--admin-card-muted-text); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.finance-closing-panel__status p { color: var(--admin-card-muted-text); font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .finance-closing-panel__status strong { display: block; margin-top: 3px; font-size: 16px; }
-.finance-closing-panel__status span { display: block; margin-top: 3px; color: var(--admin-card-muted-text); font-size: 11px; font-weight: 700; }
+.finance-closing-panel__status span { display: block; margin-top: 3px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 700; }
 .finance-closing-panel__version { text-align: right; }
 .finance-closing-panel__version small, .finance-closing-panel__version b { display: block; }
-.finance-closing-panel__version small { color: var(--admin-card-muted-text); font-size: 10px; font-weight: 900; text-transform: uppercase; }
-.finance-closing-panel__version b { margin-top: 4px; color: var(--admin-card-text); font-size: 11px; }
+.finance-closing-panel__version small { color: var(--admin-card-muted-text); font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.finance-closing-panel__version b { margin-top: 4px; color: var(--admin-card-text); font-size: 13px; }
 
 .finance-closing-steps {
   display: grid;
@@ -59,43 +59,24 @@
 }
 .finance-closing-steps button {
   position: relative;
-  display: flex;
+  display: block;
   min-width: 0;
-  align-items: center;
-  gap: 9px;
   border: 0;
   border-right: 1px solid var(--admin-card-border);
-  padding: 8px 14px;
+  border-bottom: 3px solid transparent;
+  padding: 11px 14px;
   background: transparent;
   color: var(--admin-card-muted-text);
   text-align: left;
   cursor: pointer;
 }
 .finance-closing-steps button:last-child { border-right: 0; }
-.finance-closing-steps button > span {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--admin-card-border);
-  border-radius: 50%;
-  background: var(--admin-card-bg);
-  color: var(--admin-card-muted-text);
-  font-size: 11px;
-  font-weight: 900;
-}
 .finance-closing-steps button strong,
 .finance-closing-steps button small { display: block; }
-.finance-closing-steps button strong { color: var(--admin-card-text); font-size: 12px; }
-.finance-closing-steps button small { margin-top: 2px; font-size: 9px; font-weight: 700; }
-.finance-closing-steps button[aria-current="step"] { color: var(--admin-primary); }
-.finance-closing-steps button[aria-current="step"] > span {
-  border-color: var(--admin-primary);
-  background: var(--admin-primary);
-  color: var(--admin-button-text);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--admin-primary) 24%, transparent);
-}
+.finance-closing-steps button strong { color: var(--admin-card-text); font-size: 14px; }
+.finance-closing-steps button small { margin-top: 3px; font-size: 12px; font-weight: 700; }
+.finance-closing-steps button[aria-current="step"] { border-bottom-color: var(--admin-primary); background: var(--admin-primary-soft-bg); color: var(--admin-primary); }
+.finance-closing-steps button:focus-visible { outline: 3px solid color-mix(in srgb, var(--admin-primary) 38%, transparent); outline-offset: -3px; }
 
 .finance-closing-stage { min-height: 270px; }
 .finance-closing-stage__intro {
@@ -105,9 +86,8 @@
   gap: 18px;
   padding: 18px 20px;
 }
-.finance-closing-stage__intro small { color: var(--admin-primary); font-size: 9px; font-weight: 900; letter-spacing: .16em; }
-.finance-closing-stage__intro h3 { margin-top: 4px; color: var(--admin-card-text); font-size: 17px; font-weight: 900; }
-.finance-closing-stage__intro p { margin-top: 4px; color: var(--admin-card-muted-text); font-size: 11px; font-weight: 650; }
+.finance-closing-stage__intro h3 { color: var(--admin-card-text); font-size: 19px; font-weight: 900; }
+.finance-closing-stage__intro p { margin-top: 5px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 650; line-height: 1.45; }
 .finance-closing-stage__intro button {
   display: inline-flex;
   min-height: 38px;
@@ -115,11 +95,11 @@
   align-items: center;
   gap: 7px;
   border: 1px solid var(--admin-button-soft-border);
-  border-radius: 999px;
+  border-radius: calc(var(--admin-radius) * .65);
   padding: 0 13px;
   background: var(--admin-button-soft-bg);
   color: var(--admin-card-text);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   cursor: pointer;
 }
@@ -127,7 +107,7 @@
 .finance-closing-panel__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--admin-card-border); }
 .finance-closing-panel__metrics > div { min-width: 0; padding: 15px 20px; border-right: 1px solid var(--admin-card-border); }
 .finance-closing-panel__metrics > div:last-child { border-right: 0; }
-.finance-closing-panel__metrics span, .finance-closing-panel__metrics small { display: block; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 800; }
+.finance-closing-panel__metrics span, .finance-closing-panel__metrics small { display: block; color: var(--admin-card-muted-text); font-size: 12px; font-weight: 800; }
 .finance-closing-panel__metrics span { letter-spacing: .09em; text-transform: uppercase; }
 .finance-closing-panel__metrics strong { display: block; margin: 6px 0 4px; font-size: 18px; }
 
@@ -138,8 +118,8 @@
 .finance-closing-panel__checks > div[data-status="warning"] > svg { color: var(--admin-warning-text); }
 .finance-closing-panel__checks > div[data-status="blocker"] > svg { color: var(--admin-danger-text); }
 .finance-closing-panel__checks strong, .finance-closing-panel__checks span { display: block; }
-.finance-closing-panel__checks strong { font-size: 11px; }
-.finance-closing-panel__checks span { margin-top: 3px; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 600; line-height: 1.35; }
+.finance-closing-panel__checks strong { font-size: 14px; }
+.finance-closing-panel__checks span { margin-top: 4px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 600; line-height: 1.4; }
 
 .finance-closing-resolutions { display: grid; gap: 10px; padding: 0 20px 20px; }
 .finance-closing-resolutions article {
@@ -159,8 +139,8 @@
 .finance-closing-resolutions article[data-status="blocker"] > svg { color: var(--admin-danger-text); }
 .finance-closing-resolutions strong,
 .finance-closing-resolutions span { display: block; }
-.finance-closing-resolutions strong { font-size: 12px; }
-.finance-closing-resolutions span { margin-top: 3px; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 650; }
+.finance-closing-resolutions strong { font-size: 14px; }
+.finance-closing-resolutions span { margin-top: 4px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 650; }
 .finance-closing-resolutions button,
 .finance-closing-resolutions a {
   display: inline-flex;
@@ -168,11 +148,11 @@
   align-items: center;
   gap: 6px;
   border: 1px solid var(--admin-button-soft-border);
-  border-radius: 999px;
+  border-radius: calc(var(--admin-radius) * .65);
   padding: 0 12px;
   background: var(--admin-button-soft-bg);
   color: var(--admin-card-text);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   text-decoration: none;
   cursor: pointer;
@@ -200,40 +180,40 @@
 .finance-closing-certification small,
 .finance-closing-certification strong,
 .finance-closing-certification span { display: block; }
-.finance-closing-certification small { color: var(--admin-primary); font-size: 9px; font-weight: 900; letter-spacing: .14em; }
-.finance-closing-certification strong { overflow-wrap: anywhere; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-.finance-closing-certification span { margin-top: 8px; color: var(--admin-card-muted-text); font-size: 11px; font-weight: 700; }
+.finance-closing-certification small { color: var(--admin-primary); font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.finance-closing-certification strong { overflow-wrap: anywhere; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.finance-closing-certification span { margin-top: 8px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 700; }
 
 .finance-closing-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; }
 .finance-closing-panel footer > div { display: flex; align-items: center; gap: 8px; }
-.finance-closing-panel footer > div:first-child { min-width: 0; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 800; }
-.finance-closing-panel footer button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--admin-button-soft-border); border-radius: 999px; padding: 0 14px; background: var(--admin-button-soft-bg); color: var(--admin-card-text); font-size: 11px; font-weight: 900; cursor: pointer; }
+.finance-closing-panel footer > div:first-child { min-width: 0; color: var(--admin-card-muted-text); font-size: 12px; font-weight: 800; }
+.finance-closing-panel footer button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--admin-button-soft-border); border-radius: calc(var(--admin-radius) * .65); padding: 0 14px; background: var(--admin-button-soft-bg); color: var(--admin-card-text); font-size: 13px; font-weight: 900; cursor: pointer; }
 .finance-closing-panel footer button.finance-closing-panel__certify { border-color: var(--admin-button-bg); background: var(--admin-button-bg); color: var(--admin-button-text); }
 .finance-closing-panel footer button:disabled { cursor: not-allowed; opacity: .55; }
-.finance-closing-panel__authority { padding: 0 20px 16px; color: var(--admin-danger-text); font-size: 11px; font-weight: 800; text-align: right; }
+.finance-closing-panel__authority { padding: 0 20px 16px; color: var(--admin-danger-text); font-size: 13px; font-weight: 800; text-align: right; }
 
 .finance-closing-overlay { position: fixed; inset: 0; z-index: 10040; display: grid; place-items: center; overflow-y: auto; padding: 24px; background: color-mix(in srgb, var(--admin-card-text) 58%, transparent); backdrop-filter: blur(10px); }
 .finance-closing-modal { width: min(660px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid var(--admin-card-border); border-radius: calc(var(--admin-radius) + 8px); background: var(--admin-card-bg); color: var(--admin-card-text); box-shadow: 0 30px 90px color-mix(in srgb, var(--admin-card-text) 30%, transparent); }
 .finance-closing-modal header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--admin-card-border); }
-.finance-closing-modal header p { color: var(--admin-primary); font-size: 10px; font-weight: 900; letter-spacing: .18em; }
+.finance-closing-modal header p { color: var(--admin-primary); font-size: 12px; font-weight: 900; letter-spacing: .16em; }
 .finance-closing-modal header h3 { margin-top: 4px; font-size: 20px; font-weight: 900; }
-.finance-closing-modal header span { display: block; margin-top: 3px; color: var(--admin-card-muted-text); font-size: 12px; font-weight: 700; }
-.finance-closing-modal header button { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--admin-button-soft-border); border-radius: 50%; background: var(--admin-button-soft-bg); color: var(--admin-card-text); cursor: pointer; }
+.finance-closing-modal header span { display: block; margin-top: 3px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 700; }
+.finance-closing-modal header button { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--admin-button-soft-border); border-radius: calc(var(--admin-radius) * .55); background: var(--admin-button-soft-bg); color: var(--admin-card-text); cursor: pointer; }
 .finance-closing-modal form { display: grid; gap: 15px; padding: 20px 24px 24px; }
 .finance-closing-modal__summary { display: flex; gap: 11px; padding: 14px; border: 1px solid var(--admin-card-border); border-radius: calc(var(--admin-radius) * .7); background: var(--admin-button-soft-bg); }
 .finance-closing-modal__summary strong, .finance-closing-modal__summary span { display: block; }
-.finance-closing-modal__summary span { margin-top: 4px; color: var(--admin-card-muted-text); font-size: 11px; font-weight: 700; }
-.finance-closing-modal label { display: grid; gap: 6px; color: var(--admin-card-muted-text); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-.finance-closing-modal textarea { min-height: 88px; resize: vertical; border: 1px solid var(--admin-input-border); border-radius: calc(var(--admin-radius) * .7); padding: 12px 14px; background: var(--admin-input-bg); color: var(--admin-input-text); font-size: 13px; font-weight: 700; letter-spacing: normal; outline: 0; text-transform: none; }
+.finance-closing-modal__summary span { margin-top: 4px; color: var(--admin-card-muted-text); font-size: 13px; font-weight: 700; }
+.finance-closing-modal label { display: grid; gap: 6px; color: var(--admin-card-muted-text); font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.finance-closing-modal textarea { min-height: 88px; resize: vertical; border: 1px solid var(--admin-input-border); border-radius: calc(var(--admin-radius) * .7); padding: 12px 14px; background: var(--admin-input-bg); color: var(--admin-input-text); font-size: 14px; font-weight: 700; letter-spacing: normal; outline: 0; text-transform: none; }
 .finance-closing-modal__override { padding: 14px; border: 1px solid var(--admin-warning); border-radius: calc(var(--admin-radius) * .7); background: var(--admin-warning-soft-bg); color: var(--admin-warning-text) !important; }
 .finance-closing-modal__actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 14px; border-top: 1px solid var(--admin-card-border); }
-.finance-closing-modal__actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--admin-button-soft-border); border-radius: 999px; padding: 0 17px; background: var(--admin-button-soft-bg); color: var(--admin-card-text); font-weight: 900; cursor: pointer; }
+.finance-closing-modal__actions button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--admin-button-soft-border); border-radius: calc(var(--admin-radius) * .65); padding: 0 17px; background: var(--admin-button-soft-bg); color: var(--admin-card-text); font-weight: 900; cursor: pointer; }
 .finance-closing-modal__actions button[type="submit"] { border-color: var(--admin-button-bg); background: var(--admin-button-bg); color: var(--admin-button-text); }
 
 @media (max-width: 900px) {
   .finance-closing-steps { grid-template-columns: 1fr 1fr; }
   .finance-closing-steps button:nth-child(2) { border-right: 0; }
-  .finance-closing-steps button:nth-child(-n+2) { border-bottom: 1px solid var(--admin-card-border); }
+  .finance-closing-steps button:nth-child(-n+2) { box-shadow: inset 0 -1px var(--admin-card-border); }
   .finance-closing-panel__metrics { grid-template-columns: 1fr 1fr; }
   .finance-closing-panel__metrics > div:nth-child(2) { border-right: 0; }
   .finance-closing-panel__metrics > div:nth-child(-n+2) { border-bottom: 1px solid var(--admin-card-border); }

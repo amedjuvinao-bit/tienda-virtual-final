@@ -66,7 +66,7 @@ describe('Cierre financiero mensual', () => {
     );
 
     expect(await screen.findByText('Listo para certificar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '2. Revisar: Controles financieros' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar: Controles financieros' }));
     expect(screen.getByText('Ecuación de utilidad')).toBeInTheDocument();
     expect(screen.getByText('Diferencia de caja')).toBeInTheDocument();
     expect(screen.getByText(/Huella: a{16}/)).toBeInTheDocument();
@@ -88,7 +88,7 @@ describe('Cierre financiero mensual', () => {
     );
 
     await screen.findByText('Listo para certificar');
-    fireEvent.click(screen.getByRole('button', { name: '4. Certificar: Huella e informe' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));
     fireEvent.click(screen.getByRole('button', { name: 'Certificar corte' }));
     const dialog = screen.getByRole('dialog', { name: 'Certificar cierre financiero' });
     fireEvent.change(screen.getByLabelText('Nota del responsable'), {
@@ -128,7 +128,7 @@ describe('Cierre financiero mensual', () => {
     );
 
     await screen.findByText('Con diferencias críticas');
-    fireEvent.click(screen.getByRole('button', { name: '4. Certificar: Huella e informe' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));
     const certifyButton = screen.getByRole('button', { name: 'Certificar corte' });
     expect(certifyButton).toBeDisabled();
     expect(screen.getByText(/requieren el permiso de autorización excepcional/i)).toBeInTheDocument();
@@ -160,7 +160,7 @@ describe('Cierre financiero mensual', () => {
 
     await screen.findByText('Con diferencias críticas');
     expect(screen.getByText('Versión 3')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '4. Certificar: Huella e informe' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar certificación' }));
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
     fireEvent.change(screen.getByLabelText('Justificación excepcional obligatoria'), {
@@ -191,7 +191,7 @@ describe('Cierre financiero mensual', () => {
     );
 
     expect(await screen.findByText('Versión 1')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '4. Certificar: Huella e informe' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));
     expect(screen.getByRole('button', { name: 'Certificación vigente' })).toBeDisabled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -201,5 +201,27 @@ describe('Cierre financiero mensual', () => {
 
     expect(screen.getByText('Selecciona una sede')).toBeInTheDocument();
     expect(getFinanceClosingControl).not.toHaveBeenCalled();
+  });
+
+  it('cierra la certificación con Escape y devuelve el foco al botón de origen', async () => {
+    render(
+      <FinanceClosingPanel
+        selectedBranchId="branch-1"
+        branches={[branch]}
+        canCertify
+      />
+    );
+
+    await screen.findByText('Listo para certificar');
+    fireEvent.click(screen.getByRole('button', { name: 'Certificar: Huella e informe' }));
+    const trigger = screen.getByRole('button', { name: 'Certificar corte' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('button', { name: 'Cerrar certificación' })).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 });
