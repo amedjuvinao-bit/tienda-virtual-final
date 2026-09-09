@@ -1,9 +1,10 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createFinanceExpense,
+  getFinanceExpenses,
   getFinanceTreasury,
   registerFinancePayablePayment,
 } from './api/financeApi';
@@ -149,6 +150,36 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
       paymentMethod: 'transfer',
       reference: 'TRX-9088',
     });
+  });
+
+  it('muestra el día elegido del abono sin desplazarlo por zona horaria', async () => {
+    getFinanceExpenses.mockResolvedValueOnce({
+      data: [{
+        _id: 'expense-credit-history',
+        date: '2026-09-08T05:00:00.000Z',
+        amount: 50000,
+        type: 'operating',
+        category: 'Servicios',
+        description: 'Servicio mensual a crédito',
+        status: 'paid',
+        revision: 2,
+        workflow: [{
+          action: 'payable_payment_registered',
+          at: '2026-09-08T00:00:00.000Z',
+          notes: 'Abono de 20000. Referencia TRX-9088.',
+          revision: 2,
+        }],
+      }],
+      workflow: {},
+    });
+
+    render(<AdminFinancePage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Historial' }));
+    const history = await screen.findByRole('dialog', { name: 'Trazabilidad del gasto' });
+    expect(within(history).getByText('Abono registrado')).toBeInTheDocument();
+    expect(within(history).getByText('08 de sept de 2026')).toBeInTheDocument();
+    expect(within(history).queryByText(/07 de sept de 2026/)).not.toBeInTheDocument();
   });
 
   it('mantiene la consulta visible sin exponer el abono a quien no tiene permiso', async () => {

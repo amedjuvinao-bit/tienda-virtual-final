@@ -9,6 +9,7 @@ const Order = require('../models/Order');
 const OPEN_ORDER_PAYMENT_STATUSES = ['pending_gateway', 'pending_manual'];
 const PAYMENT_METHODS = new Set(['cash', 'transfer', 'card', 'mixed', 'other']);
 const REFERENCE_REQUIRED_METHODS = new Set(['transfer', 'card', 'mixed', 'other']);
+const BOGOTA_UTC_OFFSET = '-05:00';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function cleanText(value, max = 500) {
@@ -465,6 +466,29 @@ function paymentRequestKey(value, actorId, expenseId) {
     .digest('hex');
 }
 
+function parsePaymentDate(value) {
+  if (!value) return new Date();
+  if (value instanceof Date) return new Date(value);
+
+  const text = cleanText(value, 64);
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!dateOnly) return new Date(text);
+
+  const year = Number(dateOnly[1]);
+  const month = Number(dateOnly[2]);
+  const day = Number(dateOnly[3]);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    return new Date(Number.NaN);
+  }
+
+  return new Date(`${text}T00:00:00.000${BOGOTA_UTC_OFFSET}`);
+}
+
 function paymentData(payload = {}) {
   const amount = money(payload.amount);
   if (amount <= 0) {
@@ -490,7 +514,7 @@ function paymentData(payload = {}) {
       400
     );
   }
-  const paidAt = payload.paidAt ? new Date(payload.paidAt) : new Date();
+  const paidAt = parsePaymentDate(payload.paidAt);
   if (Number.isNaN(paidAt.getTime()) || paidAt.getTime() > Date.now() + 5 * 60 * 1000) {
     throw createTreasuryError(
       'La fecha del pago no es válida.',

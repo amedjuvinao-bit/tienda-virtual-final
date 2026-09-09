@@ -29,6 +29,12 @@ const workflowService = require('../services/adminFinanceExpenseWorkflowService'
 const RUN_ID = Math.random().toString(36).slice(2, 9).toUpperCase();
 const PREFIX = `FIN3-${RUN_ID}`;
 const NOW = new Date();
+const PAYMENT_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Bogota',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(NOW);
 let controls = 0;
 
 function ok(message, condition = true) {
@@ -157,7 +163,7 @@ async function main() {
       amount: 40000,
       paymentMethod: 'transfer',
       reference: `${PREFIX}-TRX-1`,
-      paidAt: NOW,
+      paidAt: PAYMENT_DATE,
       notes: 'Primer abono conciliado.',
     };
     const partial = await treasuryService.registerPayablePayment(
@@ -168,6 +174,7 @@ async function main() {
     );
     ok('el primer abono deja la cuenta parcial y reduce el saldo', partial.settlement?.status === 'partial' && partial.settlement?.paidAmount === 40000 && partial.settlement?.balanceAmount === 60000 && partial.revision === 2);
     ok('el abono queda en el historial financiero', partial.workflow?.at(-1)?.action === 'payable_payment_registered' && partial.settlement?.payments?.length === 1);
+    ok('la fecha calendario del abono se conserva en horario de Bogotá', new Date(partial.settlement?.payments?.[0]?.paidAt).toISOString() === `${PAYMENT_DATE}T05:00:00.000Z`);
 
     const replay = await treasuryService.registerPayablePayment(
       requested._id,

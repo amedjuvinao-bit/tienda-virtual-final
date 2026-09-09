@@ -802,7 +802,11 @@ function ExpenseHistoryModal({ expense, onClose }) {
                       {event.budgetOverrideUsed ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-warning-text)' }}>Excepción presupuestal: {event.budgetOverrideReason || 'Justificación registrada'}</p> : null}
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-xs font-bold" style={styles.muted}>{formatDateTime(event.at)}</p>
+                      <p className="text-xs font-bold" style={styles.muted}>
+                        {event.action === 'payable_payment_registered'
+                          ? formatDateOnly(event.at)
+                          : formatDateTime(event.at)}
+                      </p>
                       <p className="mt-1 text-[10px] font-black uppercase" style={styles.muted}>Versión {Number(event.revision || 0)}</p>
                     </div>
                   </div>

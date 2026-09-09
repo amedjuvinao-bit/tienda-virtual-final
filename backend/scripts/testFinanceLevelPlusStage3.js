@@ -107,6 +107,17 @@ async function main() {
     paidAt: '2026-09-08',
   });
   ok('el abono normaliza valor, método y referencia', payment.amount === 25000 && payment.method === 'transfer' && payment.reference === 'TRX-100');
+  ok('la fecha del abono conserva el día operativo de Bogotá', payment.paidAt.toISOString() === '2026-09-08T05:00:00.000Z');
+  await expectError(
+    () => Promise.resolve(treasuryService.__test.paymentData({
+      amount: 25000,
+      paymentMethod: 'transfer',
+      reference: 'TRX-INVALID-DATE',
+      paidAt: '2026-02-31',
+    })),
+    'FINANCE_PAYABLE_PAYMENT_DATE_INVALID'
+  );
+  ok('el abono rechaza fechas calendario inexistentes');
   await expectError(
     () => Promise.resolve(treasuryService.__test.paymentData({
       amount: 25000,
