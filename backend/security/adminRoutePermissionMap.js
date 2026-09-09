@@ -935,6 +935,27 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
   },
   {
     method: 'GET',
+    path: '/api/admin/finance/closing-control',
+    permission: 'finance:view',
+    description: 'Consultar controles, diferencias y certificaciones del cierre financiero.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/finance/closing-export',
+    permission: 'finance:export',
+    description: 'Exportar el informe ejecutivo del cierre financiero.',
+    audit: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/finance/period-closes',
+    permission: 'finance:periods:certify',
+    description: 'Certificar un corte financiero mensual con versión y huella de integridad.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'GET',
     path: '/api/admin/finance/summary',
     permission: 'finance:view',
     description: 'Consultar el resumen financiero dentro de las sedes autorizadas.',

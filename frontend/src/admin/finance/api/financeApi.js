@@ -121,6 +121,26 @@ export async function registerFinancePayablePayment(id, payload = {}) {
   return unwrap(response);
 }
 
+export async function getFinanceClosingControl(params = {}) {
+  const response = await api.get('/api/admin/finance/closing-control', {
+    params,
+  });
+  return unwrap(response);
+}
+
+export async function certifyFinancePeriod(payload = {}) {
+  const response = await api.post('/api/admin/finance/period-closes', payload);
+  return unwrap(response);
+}
+
+export async function exportFinanceClosingCsv(params = {}) {
+  const response = await api.get('/api/admin/finance/closing-export', {
+    params,
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 export async function createFinanceBudget(payload = {}) {
   const response = await api.post('/api/admin/finance/budgets', payload);
   return unwrap(response);
@@ -150,6 +170,9 @@ export default {
   getFinanceBudgetControl,
   getFinanceTreasury,
   registerFinancePayablePayment,
+  getFinanceClosingControl,
+  certifyFinancePeriod,
+  exportFinanceClosingCsv,
   createFinanceBudget,
   updateFinanceBudget,
 };

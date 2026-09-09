@@ -174,6 +174,8 @@ const ADMIN_PERMISSION_MODULES = [
       permission('finance:budgets:manage', 'Gestionar presupuestos', 'Permite crear y ajustar centros de costo, límites mensuales y alertas presupuestales.', { audit: true, sensitive: true }),
       permission('finance:budgets:override', 'Autorizar exceso presupuestal', 'Permite aprobar gastos sin presupuesto o por encima del límite mediante justificación auditable.', { audit: true, sensitive: true, danger: true }),
       permission('finance:treasury:manage', 'Gestionar tesorería', 'Permite registrar abonos sobre cuentas por pagar aprobadas, con control de saldo, versión y trazabilidad.', { audit: true, sensitive: true, danger: true }),
+      permission('finance:periods:certify', 'Certificar cierres financieros', 'Permite guardar cortes mensuales versionados con huella de integridad y trazabilidad.', { audit: true, sensitive: true, danger: true }),
+      permission('finance:periods:override', 'Autorizar cierre con diferencias', 'Permite certificar excepcionalmente un periodo con controles bloqueantes mediante justificación obligatoria.', { audit: true, sensitive: true, danger: true }),
       permission('finance:export', 'Exportar finanzas', 'Permite descargar reportes financieros.', { audit: true, sensitive: true }),
     ],
   },

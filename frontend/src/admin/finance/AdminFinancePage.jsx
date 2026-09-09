@@ -47,6 +47,7 @@ import {
 import useAdminPermissions from '../security/useAdminPermissions';
 import FinanceBudgetPanel from './FinanceBudgetPanel';
 import FinanceTreasuryPanel from './FinanceTreasuryPanel';
+import FinanceClosingPanel from './FinanceClosingPanel';
 
 const RANGE_OPTIONS = [
   { value: 'today', label: 'Hoy' },
@@ -829,6 +830,8 @@ export default function AdminFinancePage() {
   const canManageBudgets = can('finance:budgets:manage');
   const canOverrideBudget = can('finance:budgets:override');
   const canManageTreasury = can('finance:treasury:manage');
+  const canCertifyPeriods = can('finance:periods:certify');
+  const canOverridePeriods = can('finance:periods:override');
   const canExport = can('finance:export');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [expenseStatus, setExpenseStatus] = useState('all');
@@ -1242,6 +1245,16 @@ export default function AdminFinancePage() {
             <FinanceTreasuryPanel
               selectedBranchId={filters.branchId}
               canManage={canManageTreasury}
+              refreshKey={budgetRefreshKey}
+              onDataChanged={loadFinance}
+            />
+
+            <FinanceClosingPanel
+              selectedBranchId={filters.branchId}
+              branches={branches}
+              canCertify={canCertifyPeriods}
+              canOverride={canOverridePeriods}
+              canExport={canExport}
               refreshKey={budgetRefreshKey}
               onDataChanged={loadFinance}
             />

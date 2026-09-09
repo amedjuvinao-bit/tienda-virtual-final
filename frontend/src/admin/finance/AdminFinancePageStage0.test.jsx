@@ -20,12 +20,15 @@ const permissionState = vi.hoisted(() => ({
 
 vi.mock('./api/financeApi', () => ({
   cancelFinanceExpense: vi.fn(),
+  certifyFinancePeriod: vi.fn(),
   createFinanceBudget: vi.fn(),
   createFinanceCostCenter: vi.fn(),
   createFinanceExpense: vi.fn(),
   exportFinanceCsv: vi.fn(),
+  exportFinanceClosingCsv: vi.fn(),
   getAdminBranches: vi.fn(),
   getFinanceCash: vi.fn(),
+  getFinanceClosingControl: vi.fn(),
   getFinanceBudgetControl: vi.fn(),
   getFinanceCostCenters: vi.fn(),
   getFinanceExpenses: vi.fn(),

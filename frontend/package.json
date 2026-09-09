@@ -41,6 +41,7 @@
     "test:finance-level-plus-stage1": "vitest run src/admin/finance/AdminFinancePageStage1.test.jsx src/admin/finance/api/financeApiStage1.test.js",
     "test:finance-level-plus-stage2": "vitest run src/admin/finance/AdminFinancePageStage2.test.jsx src/admin/finance/api/financeApiStage2.test.js",
     "test:finance-level-plus-stage3": "vitest run src/admin/finance/AdminFinancePageStage3.test.jsx src/admin/finance/api/financeApiStage3.test.js",
+    "test:finance-level-plus-stage4": "vitest run src/admin/finance/FinanceClosingPanel.test.jsx src/admin/finance/api/financeApiStage4.test.js",
     "test:orders-manual-payment": "vitest run src/admin/orders/components/orderDetail/manualPaymentConfirmationModel.test.js src/admin/orders/components/orderDetail/hooks/useOrderManualPaymentConfirmation.test.jsx src/admin/orders/components/orderDetail/OrderManualPaymentConfirmationCard.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",

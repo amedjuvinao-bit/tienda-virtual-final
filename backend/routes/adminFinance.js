@@ -9,6 +9,7 @@ const financeService = require('../services/adminFinanceService');
 const financeExpenseWorkflow = require('../services/adminFinanceExpenseWorkflowService');
 const financeBudgetService = require('../services/adminFinanceBudgetService');
 const financeTreasuryService = require('../services/adminFinanceTreasuryService');
+const financeClosingService = require('../services/adminFinanceClosingService');
 const {
   financeScopeQuery,
   resolveFinanceBranchAccess,
@@ -63,6 +64,16 @@ async function getBudgetAwareActor(req) {
     canOverrideBudget: await requirePermission.hasEffectivePermission(
       req,
       'finance:budgets:override'
+    ),
+  };
+}
+
+async function getClosingActor(req) {
+  return {
+    ...getActor(req),
+    canOverride: await requirePermission.hasEffectivePermission(
+      req,
+      'finance:periods:override'
     ),
   };
 }
@@ -253,6 +264,75 @@ router.post(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error registrando el abono.');
+    }
+  }
+);
+
+router.get(
+  '/closing-control',
+  requirePermission('finance:view'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const scoped = financeScopeQuery(req, req.query || {});
+      const data = await financeClosingService.getClosingControl(
+        scoped.query,
+        { branchIds: scoped.access.branchIds }
+      );
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error preparando el cierre financiero.');
+    }
+  }
+);
+
+router.get(
+  '/closing-export',
+  requirePermission('finance:export'),
+  async (req, res) => {
+    try {
+      noStore(res);
+      const scoped = financeScopeQuery(req, req.query || {});
+      const data = await financeClosingService.getClosingControl(
+        scoped.query,
+        { branchIds: scoped.access.branchIds }
+      );
+      const csv = financeClosingService.buildExecutiveCsv(data);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="finance-close-${data.period.periodKey}-${data.branch.code || 'branch'}.csv"`
+      );
+      res.status(200).send(csv);
+    } catch (error) {
+      sendError(res, error, 'Error exportando el cierre financiero.');
+    }
+  }
+);
+
+router.post(
+  '/period-closes',
+  requirePermission('finance:periods:certify'),
+  async (req, res) => {
+    try {
+      const writeAccess = resolveFinanceWriteBranch(
+        req,
+        req.body?.branchId ?? req.body?.branch ?? ''
+      );
+      if (!writeAccess.branchId) {
+        const error = new Error('Selecciona una sede específica para certificar el cierre.');
+        error.code = 'FINANCE_CLOSE_BRANCH_REQUIRED';
+        error.status = 400;
+        throw error;
+      }
+      const data = await financeClosingService.certifyPeriod(
+        { ...req.body, branchId: writeAccess.branchId },
+        await getClosingActor(req),
+        { branchIds: writeAccess.branchIds }
+      );
+      res.status(201).json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error certificando el cierre financiero.');
     }
   }
 );

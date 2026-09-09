@@ -16,14 +16,17 @@ const security = vi.hoisted(() => ({
 
 vi.mock('./api/financeApi', () => ({
   cancelFinanceExpense: vi.fn(),
+  certifyFinancePeriod: vi.fn(),
   createFinanceBudget: vi.fn(),
   createFinanceCostCenter: vi.fn(),
   createFinanceExpense: vi.fn(),
   exportFinanceCsv: vi.fn(),
+  exportFinanceClosingCsv: vi.fn(),
   getAdminBranches: vi.fn().mockResolvedValue([]),
   getFinanceBudgetControl: vi.fn().mockResolvedValue({ summary: {}, lines: [], unbudgeted: [] }),
   getFinanceBudgets: vi.fn().mockResolvedValue([]),
   getFinanceCash: vi.fn().mockResolvedValue({ paymentTotals: {}, movements: {} }),
+  getFinanceClosingControl: vi.fn(),
   getFinanceCostCenters: vi.fn().mockResolvedValue([]),
   getFinanceExpenses: vi.fn().mockResolvedValue({ data: [], workflow: {} }),
   getFinanceProfit: vi.fn().mockResolvedValue({ byProduct: [] }),

@@ -29,14 +29,17 @@ const security = vi.hoisted(() => ({
 
 vi.mock('./api/financeApi', () => ({
   cancelFinanceExpense: vi.fn(),
+  certifyFinancePeriod: vi.fn(),
   createFinanceBudget: vi.fn(),
   createFinanceCostCenter: vi.fn(),
   createFinanceExpense: vi.fn(),
   exportFinanceCsv: vi.fn(),
+  exportFinanceClosingCsv: vi.fn(),
   getAdminBranches: vi.fn(),
   getFinanceBudgetControl: vi.fn(),
   getFinanceBudgets: vi.fn(),
   getFinanceCash: vi.fn(),
+  getFinanceClosingControl: vi.fn(),
   getFinanceCostCenters: vi.fn(),
   getFinanceExpenses: vi.fn(),
   getFinanceProfit: vi.fn(),

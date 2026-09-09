@@ -8,6 +8,7 @@ on:
       - feature/finanzas-nivel-plus-etapa-1
       - feature/finanzas-nivel-plus-etapa-2
       - feature/finanzas-nivel-plus-etapa-3
+      - feature/finanzas-nivel-plus-etapa-4
   pull_request:
     branches:
       - main
@@ -53,6 +54,9 @@ jobs:
       - name: Validar cartera y tesorería de Etapa 3
         run: npm --prefix backend run test:finance-level-plus-stage3
 
+      - name: Validar conciliación y cierre de Etapa 4
+        run: npm --prefix backend run test:finance-level-plus-stage4
+
       - name: Revisar migración aditiva de gastos
         run: npm --prefix backend run migrate:finance-expense-indexes
 
@@ -61,6 +65,9 @@ jobs:
 
       - name: Revisar migración aditiva de tesorería
         run: npm --prefix backend run migrate:finance-treasury-indexes
+
+      - name: Revisar migración aditiva de cierres
+        run: npm --prefix backend run migrate:finance-period-close-indexes
 
       - name: Instalar frontend
         run: npm --prefix frontend ci
@@ -76,6 +83,9 @@ jobs:
 
       - name: Validar cartera y abonos de Etapa 3
         run: npm --prefix frontend run test:finance-level-plus-stage3
+
+      - name: Validar panel de conciliación y cierre de Etapa 4
+        run: npm --prefix frontend run test:finance-level-plus-stage4
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
@@ -145,3 +155,13 @@ jobs:
         env:
           FINANCE_STAGE3_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage3_ci
         run: npm --prefix backend run test:finance-level-plus-stage3-integration
+
+      - name: Aplicar índices de cierres en la base aislada
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/finance_stage4_ci
+        run: npm --prefix backend run migrate:finance-period-close-indexes -- --apply-finance-period-close-index-migration
+
+      - name: Validar cierres, huellas, idempotencia y concurrencia
+        env:
+          FINANCE_STAGE4_MONGO_URI: mongodb://127.0.0.1:27017/finance_stage4_ci
+        run: npm --prefix backend run test:finance-level-plus-stage4-integration
