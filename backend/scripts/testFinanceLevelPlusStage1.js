@@ -117,7 +117,15 @@ function validateAccountingAndInterface() {
   ok('la interfaz no usa confirmaciones nativas del navegador', !page.includes('window.confirm'));
   ok('la interfaz separa permisos para solicitar, aprobar y anular', page.includes("can('finance:expenses')") && page.includes("can('finance:expenses:approve')") && page.includes("can('finance:expenses:cancel')"));
   ok('los controles visuales respetan las variables del tema', page.includes("background: 'var(--admin-button-bg)'") && page.includes("color: 'var(--admin-button-text)'"));
-  ok('la tabla de solicitudes reorganiza sus acciones sin desbordarse', page.includes('finance-expense-workflow') && page.includes('finance-expense-table') && layout.includes('@container finance-expense-workflow (max-width: 1040px)') && layout.includes('grid-column: 1 / -1'));
+  ok(
+    'la tabla de solicitudes permanece compacta en escritorio y se adapta solo en pantallas pequeñas',
+    page.includes('finance-expense-workflow')
+      && page.includes('finance-expense-table')
+      && layout.includes('table-layout: fixed')
+      && layout.includes('min-width: 820px !important')
+      && layout.includes('@container finance-expense-workflow (max-width: 720px)')
+      && !layout.includes('@container finance-expense-workflow (max-width: 1040px)'),
+  );
   ok('el cliente envía decisiones y anulaciones con cuerpo versionado', api.includes("/review`") && api.includes('data: payload'));
 }
 
