@@ -110,6 +110,7 @@ afterEach(() => {
 describe('Finanzas Nivel Plus · Etapa 3', () => {
   it('muestra cartera, cuentas por pagar y flujo de 30 días', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '3. Tesorería: Cobros y pagos' }));
 
     expect(await screen.findByText('Cartera y vencimientos')).toBeInTheDocument();
     expect(await screen.findByText('ORD-1001')).toBeInTheDocument();
@@ -139,6 +140,7 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
 
   it('registra un abono versionado y con referencia', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '3. Tesorería: Cobros y pagos' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar abono' }));
     fireEvent.change(screen.getByLabelText('Valor del abono'), { target: { value: '25000' } });
@@ -177,6 +179,7 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
     });
 
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Historial' }));
     const history = await screen.findByRole('dialog', { name: 'Trazabilidad del gasto' });
@@ -188,6 +191,7 @@ describe('Finanzas Nivel Plus · Etapa 3', () => {
   it('mantiene la consulta visible sin exponer el abono a quien no tiene permiso', async () => {
     security.granted.delete('finance:treasury:manage');
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '3. Tesorería: Cobros y pagos' }));
 
     expect(await screen.findByText('Proveedor Empaques')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Registrar abono' })).not.toBeInTheDocument();

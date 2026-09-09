@@ -48,6 +48,7 @@ import useAdminPermissions from '../security/useAdminPermissions';
 import FinanceBudgetPanel from './FinanceBudgetPanel';
 import FinanceTreasuryPanel from './FinanceTreasuryPanel';
 import FinanceClosingPanel from './FinanceClosingPanel';
+import './financeWorkspace.css';
 
 const RANGE_OPTIONS = [
   { value: 'today', label: 'Hoy' },
@@ -105,6 +106,54 @@ const WORKFLOW_ACTION_LABELS = {
   cancelled: 'Gasto anulado',
   payable_payment_registered: 'Abono registrado',
 };
+
+const FINANCE_WORKSPACE = [
+  {
+    key: 'overview',
+    label: 'Resumen',
+    hint: 'Situación actual',
+    title: 'Entiende tus finanzas en pocos segundos',
+    description: 'Revisa ingresos, costos, gastos y utilidad antes de entrar al detalle operativo.',
+    nextLabel: 'Organizar presupuesto',
+    icon: CircleDollarSign,
+  },
+  {
+    key: 'budget',
+    label: 'Presupuesto',
+    hint: 'Límites y centros',
+    title: 'Define cuánto puede gastar cada operación',
+    description: 'Asigna límites mensuales y detecta excesos antes de aprobar nuevos gastos.',
+    nextLabel: 'Revisar tesorería',
+    icon: WalletCards,
+  },
+  {
+    key: 'treasury',
+    label: 'Tesorería',
+    hint: 'Cobros y pagos',
+    title: 'Controla el dinero que debe entrar y salir',
+    description: 'Consulta vencimientos, registra abonos y anticipa el flujo de los próximos 30 días.',
+    nextLabel: 'Gestionar gastos',
+    icon: Banknote,
+  },
+  {
+    key: 'expenses',
+    label: 'Gastos',
+    hint: 'Solicitudes y control',
+    title: 'Aprueba gastos con responsables y trazabilidad',
+    description: 'Cada solicitud conserva su historial y solo afecta la utilidad después de ser aprobada.',
+    nextLabel: 'Preparar el cierre',
+    icon: ReceiptText,
+  },
+  {
+    key: 'closing',
+    label: 'Cierre',
+    hint: 'Revisión y evidencia',
+    title: 'Comprueba todo antes de certificar el mes',
+    description: 'El cierre reúne resultados, presupuesto, caja y tesorería en una huella verificable.',
+    nextLabel: '',
+    icon: ShieldCheck,
+  },
+];
 
 const emptyExpenseForm = {
   date: '',
@@ -377,6 +426,59 @@ const styles = {
     boxShadow: '0 30px 90px rgba(0,0,0,0.30)',
   },
 };
+
+function FinanceWorkspaceNavigation({ activeSection, onChange }) {
+  return (
+    <nav className="finance-workspace-nav" aria-label="Recorrido financiero">
+      {FINANCE_WORKSPACE.map((item, index) => {
+        const Icon = item.icon;
+        const active = activeSection === item.key;
+        return (
+          <button
+            type="button"
+            key={item.key}
+            aria-current={active ? 'step' : undefined}
+            aria-label={`${index + 1}. ${item.label}: ${item.hint}`}
+            onClick={() => onChange(item.key)}
+          >
+            <span className="finance-workspace-nav__number">{index + 1}</span>
+            <Icon aria-hidden="true" />
+            <span className="finance-workspace-nav__copy">
+              <strong>{item.label}</strong>
+              <small>{item.hint}</small>
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function FinanceWorkspaceGuide({ activeSection, onChange }) {
+  const index = Math.max(0, FINANCE_WORKSPACE.findIndex((item) => item.key === activeSection));
+  const item = FINANCE_WORKSPACE[index];
+  const Icon = item.icon;
+  const next = FINANCE_WORKSPACE[index + 1];
+
+  return (
+    <section className="finance-workspace-guide" aria-label={`Guía: ${item.label}`}>
+      <div className="finance-workspace-guide__icon"><Icon aria-hidden="true" /></div>
+      <div className="finance-workspace-guide__copy">
+        <small>PASO {index + 1} DE {FINANCE_WORKSPACE.length}</small>
+        <h2>{item.title}</h2>
+        <p>{item.description}</p>
+      </div>
+      {next ? (
+        <button type="button" onClick={() => onChange(next.key)}>
+          <span><small>SIGUIENTE</small><strong>{item.nextLabel}</strong></span>
+          <ArrowUpRight aria-hidden="true" />
+        </button>
+      ) : (
+        <div className="finance-workspace-guide__finish"><ShieldCheck /><span><small>ÚLTIMO PASO</small><strong>Certifica cuando todo esté claro</strong></span></div>
+      )}
+    </section>
+  );
+}
 
 function FinanceMetricCard({ icon: Icon, label, value, sub, tone = 'primary' }) {
   return (
@@ -833,6 +935,7 @@ export default function AdminFinancePage() {
   const canCertifyPeriods = can('finance:periods:certify');
   const canOverridePeriods = can('finance:periods:override');
   const canExport = can('finance:export');
+  const [activeSection, setActiveSection] = useState('overview');
   const [filters, setFilters] = useState({ range: 'this_month', dateFrom: '', dateTo: '', branchId: '' });
   const [expenseStatus, setExpenseStatus] = useState('all');
   const [summary, setSummary] = useState(null);
@@ -1196,6 +1299,8 @@ export default function AdminFinancePage() {
             <Filter className="h-4 w-4" />
             Periodo activo: <span style={{ color: 'var(--admin-primary)' }}>{activePeriodLabel}</span>
           </div>
+
+          <FinanceWorkspaceNavigation activeSection={activeSection} onChange={setActiveSection} />
         </div>
 
         {error ? (
@@ -1214,6 +1319,9 @@ export default function AdminFinancePage() {
           </div>
         ) : (
           <div className="space-y-5 px-5 py-5 md:px-7 md:py-6">
+            <FinanceWorkspaceGuide activeSection={activeSection} onChange={setActiveSection} />
+
+            <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Resumen financiero">
             {(kpis.costQuality?.usesEstimatedCosts || kpis.costQuality?.hasMissingCosts) && (
               <div className="flex items-start gap-3 border-l-4 px-4 py-3 text-sm" style={{ ...styles.softCard, borderLeftColor: 'var(--admin-warning)' }} role="status">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-warning-text)' }} />
@@ -1232,7 +1340,9 @@ export default function AdminFinancePage() {
               <FinanceMetricCard icon={ArrowDownRight} label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} tone="warning" />
               <FinanceMetricCard icon={CircleDollarSign} label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
             </div>
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'budget'} aria-label="Control presupuestal">
             <FinanceBudgetPanel
               branches={branches}
               selectedBranchId={filters.branchId}
@@ -1241,14 +1351,18 @@ export default function AdminFinancePage() {
               refreshKey={budgetRefreshKey}
               onDataChanged={refreshCostCenters}
             />
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'treasury'} aria-label="Tesorería operativa">
             <FinanceTreasuryPanel
               selectedBranchId={filters.branchId}
               canManage={canManageTreasury}
               refreshKey={budgetRefreshKey}
               onDataChanged={loadFinance}
             />
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'closing'} aria-label="Cierre financiero">
             <FinanceClosingPanel
               selectedBranchId={filters.branchId}
               branches={branches}
@@ -1256,9 +1370,18 @@ export default function AdminFinancePage() {
               canOverride={canOverridePeriods}
               canExport={canExport}
               refreshKey={budgetRefreshKey}
+              onNavigate={setActiveSection}
               onDataChanged={loadFinance}
             />
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Análisis detallado">
+              <details className="finance-workspace-analysis">
+                <summary>
+                  <span><strong>Explorar análisis detallado</strong><small>Ventas, medios de pago, rentabilidad y caja POS</small></span>
+                  <ArrowDownRight aria-hidden="true" />
+                </summary>
+                <div className="finance-workspace-analysis__content">
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <BreakdownList title="Ventas POS vs Web" rows={sourceRows} />
               <BreakdownList title="Métodos de pago" rows={paymentRows} />
@@ -1332,7 +1455,11 @@ export default function AdminFinancePage() {
                 </div>
               </div>
             </div>
+                </div>
+              </details>
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'expenses'} aria-label="Gestión de gastos">
             <div className="finance-expense-workflow overflow-hidden" style={styles.card}>
               <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-4 md:px-5" style={{ borderBottom: '1px solid var(--admin-card-border)' }}>
                 <div>
@@ -1436,7 +1563,9 @@ export default function AdminFinancePage() {
                 </div>
               )}
             </div>
+            </section>
 
+            <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Contexto del periodo">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="p-4" style={styles.card}>
                 <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><CalendarDays className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Rango técnico</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}</p></div></div>
@@ -1448,6 +1577,7 @@ export default function AdminFinancePage() {
                 <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><Store className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Sede filtrada</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</p></div></div>
               </div>
             </div>
+            </section>
           </div>
         )}
       </div>

@@ -158,6 +158,7 @@ afterEach(() => {
 describe('Finanzas Nivel Plus · Etapa 1', () => {
   it('separa pendientes, aprobados, rechazados y anulados en un único control', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     expect(await screen.findByText('Solicitudes y aprobaciones')).toBeInTheDocument();
     expect(screen.getAllByText('Pendientes').length).toBeGreaterThan(0);
@@ -186,6 +187,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
 
   it('aprueba con la versión vigente y conserva la nota de revisión', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     fireEvent.change(screen.getByLabelText('Nota de aprobación'), {
@@ -206,6 +208,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
     security.user = { id: pendingExpense.createdBy, adminRole: 'owner' };
     security.role = 'owner';
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     expect(screen.getByText(/excepción de control/i)).toBeInTheDocument();
@@ -219,6 +222,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
   it('impide que un solicitante común revise su propia solicitud', async () => {
     security.user = { id: pendingExpense.createdBy, adminRole: 'manager' };
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     expect(await screen.findByText('Debe revisarlo otra persona autorizada.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
@@ -227,6 +231,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
 
   it('exige motivo para rechazar y conserva la versión enviada', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rechazar' }));
     expect(screen.getByRole('button', { name: 'Confirmar rechazo' })).toBeDisabled();
@@ -246,6 +251,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
 
   it('anula únicamente con motivo y versión vigente', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Anular' }));
     expect(screen.getByRole('button', { name: 'Confirmar anulación' })).toBeDisabled();
@@ -264,6 +270,7 @@ describe('Finanzas Nivel Plus · Etapa 1', () => {
 
   it('muestra la trazabilidad completa sin depender de confirmaciones del navegador', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Historial' }));
     expect(screen.getByRole('dialog', { name: 'Trazabilidad del gasto' })).toBeInTheDocument();

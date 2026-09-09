@@ -6,6 +6,8 @@ import {
   Download,
   FileCheck2,
   Fingerprint,
+  ArrowLeft,
+  ArrowRight,
   Loader2,
   RefreshCw,
   ShieldAlert,
@@ -60,6 +62,28 @@ const STATUS_META = {
   blocked: { label: 'Con diferencias críticas', icon: XCircle },
 };
 
+const CLOSING_STEPS = [
+  { key: 'summary', number: 1, label: 'Resumen', hint: 'Situación del periodo' },
+  { key: 'checks', number: 2, label: 'Revisar', hint: 'Controles financieros' },
+  { key: 'resolve', number: 3, label: 'Resolver', hint: 'Alertas y diferencias' },
+  { key: 'certify', number: 4, label: 'Certificar', hint: 'Huella e informe' },
+];
+
+const CONTROL_ACTIONS = {
+  open_cash_sessions: { label: 'Ir a Caja', href: '/admin/caja' },
+  cash_difference: { label: 'Revisar Caja', href: '/admin/caja' },
+  missing_product_costs: { label: 'Revisar inventario', href: '/admin/inventario' },
+  estimated_product_costs: { label: 'Revisar inventario', href: '/admin/inventario' },
+  pending_expenses: { label: 'Revisar gastos', section: 'expenses' },
+  budget_exceptions: { label: 'Revisar presupuesto', section: 'budget' },
+  unbudgeted_expenses: { label: 'Asignar presupuesto', section: 'budget' },
+  overdue_treasury: { label: 'Revisar tesorería', section: 'treasury' },
+};
+
+function displayVersion(revision) {
+  return Math.max(0, Number(revision || 0)) + 1;
+}
+
 function CertificationModal({ data, saving, onClose, onConfirm }) {
   const [notes, setNotes] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
@@ -89,13 +113,13 @@ function CertificationModal({ data, saving, onClose, onConfirm }) {
   };
 
   return createPortal(
-    <div className="finance-closing-overlay" role="dialog" aria-modal="true" aria-label="Certificar cierre financiero">
+    <div className="finance-closing-overlay" role="dialog" aria-modal="true" aria-label={recertification ? 'Actualizar certificación financiera' : 'Certificar cierre financiero'}>
       <div className="finance-closing-modal">
         <header>
           <div>
-            <p>CERTIFICACIÓN FINANCIERA</p>
+            <p>{recertification ? 'NUEVA VERSIÓN CERTIFICADA' : 'CERTIFICACIÓN FINANCIERA'}</p>
             <h3>{data.period?.label} · {data.period?.periodKey}</h3>
-            <span>{data.branch?.name}</span>
+            <span>{data.branch?.name}{recertification ? ` · Versión actual ${displayVersion(data.close?.revision)}` : ''}</span>
           </div>
           <button type="button" onClick={onClose} disabled={saving} aria-label="Cerrar certificación"><X /></button>
         </header>
@@ -125,7 +149,7 @@ function CertificationModal({ data, saving, onClose, onConfirm }) {
             <button type="button" onClick={onClose} disabled={saving}>Volver</button>
             <button type="submit" disabled={saving}>
               {saving ? <Loader2 className="animate-spin" /> : <FileCheck2 />}
-              Confirmar certificación
+              {recertification ? 'Confirmar nueva versión' : 'Confirmar certificación'}
             </button>
           </div>
         </form>
@@ -142,6 +166,7 @@ export default function FinanceClosingPanel({
   canOverride = false,
   canExport = false,
   refreshKey = 0,
+  onNavigate = () => {},
   onDataChanged = async () => {},
 }) {
   const [periodKey, setPeriodKey] = useState(currentPeriodKey);
@@ -151,6 +176,7 @@ export default function FinanceClosingPanel({
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [activeStep, setActiveStep] = useState('summary');
 
   const selectedBranch = useMemo(
     () => branches.find((branch) => String(branch._id) === String(selectedBranchId)),
@@ -176,6 +202,7 @@ export default function FinanceClosingPanel({
   }, [periodKey, selectedBranchId]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => { setActiveStep('summary'); }, [periodKey, selectedBranchId]);
 
   const certify = async ({ notes, overrideReason }) => {
     setSaving(true);
@@ -218,6 +245,13 @@ export default function FinanceClosingPanel({
   const budget = data?.budget?.summary || {};
   const treasury = data?.treasury?.summary || {};
   const blockedWithoutAuthority = data?.readiness?.blockerCount > 0 && !canOverride;
+  const certificationCurrent = Boolean(data?.close && !data?.drifted);
+  const unresolvedChecks = (data?.readiness?.checks || []).filter((item) => item.status !== 'ok');
+  const activeStepIndex = CLOSING_STEPS.findIndex((item) => item.key === activeStep);
+
+  const goToStep = (step) => {
+    setActiveStep(step);
+  };
 
   return (
     <section className="finance-closing-panel">
@@ -258,34 +292,114 @@ export default function FinanceClosingPanel({
               <span>{data.readiness?.okCount || 0} correctos · {data.readiness?.warningCount || 0} alertas · {data.readiness?.blockerCount || 0} diferencias críticas</span>
             </div>
             <div className="finance-closing-panel__version">
-              <small>{data.close ? `Versión ${Number(data.close.revision || 0)}` : 'Sin certificar'}</small>
+              <small>{data.close ? `Versión ${displayVersion(data.close.revision)}` : 'Sin certificar'}</small>
               <b>{data.drifted ? 'Hay cambios desde el último corte' : data.close ? 'Huella vigente' : data.period?.periodKey}</b>
             </div>
           </div>
 
-          <div className="finance-closing-panel__metrics">
-            <div><span>Ingresos netos</span><strong>{money(kpis.revenue)}</strong><small>Utilidad {money(kpis.netProfit)}</small></div>
-            <div><span>Presupuesto disponible</span><strong>{money(budget.availableAmount)}</strong><small>{budget.exceededCount || 0} línea(s) excedidas</small></div>
-            <div><span>Por cobrar / pagar</span><strong>{money(treasury.accountsReceivable)}</strong><small>Por pagar {money(treasury.accountsPayable)}</small></div>
-            <div><span>Flujo próximo 30 días</span><strong>{money(treasury.projectedNet30)}</strong><small>Cobros menos pagos</small></div>
-          </div>
+          <nav className="finance-closing-steps" aria-label="Proceso de cierre financiero">
+            {CLOSING_STEPS.map((step) => (
+              <button
+                type="button"
+                key={step.key}
+                aria-current={activeStep === step.key ? 'step' : undefined}
+                aria-label={`${step.number}. ${step.label}: ${step.hint}`}
+                onClick={() => goToStep(step.key)}
+              >
+                <span>{step.number}</span>
+                <div><strong>{step.label}</strong><small>{step.hint}</small></div>
+              </button>
+            ))}
+          </nav>
 
-          <div className="finance-closing-panel__checks">
-            {(data.readiness?.checks || []).map((item) => {
-              const Icon = item.status === 'ok' ? CheckCircle2 : item.status === 'warning' ? AlertTriangle : XCircle;
-              return <div key={item.code} data-status={item.status}><Icon /><div><strong>{item.label}</strong><span>{item.message}</span></div></div>;
-            })}
+          <div className="finance-closing-stage" aria-live="polite">
+            {activeStep === 'summary' ? (
+              <>
+                <div className="finance-closing-stage__intro">
+                  <div><small>PASO 1 DE 4</small><h3>Entiende el resultado del mes</h3><p>Estas cuatro cifras resumen lo que entró, lo disponible y lo que aún debe cobrarse o pagarse.</p></div>
+                  <button type="button" onClick={load}><RefreshCw />Actualizar cifras</button>
+                </div>
+                <div className="finance-closing-panel__metrics">
+                  <div><span>Ingresos netos</span><strong>{money(kpis.revenue)}</strong><small>Utilidad {money(kpis.netProfit)}</small></div>
+                  <div><span>Presupuesto disponible</span><strong>{money(budget.availableAmount)}</strong><small>{budget.exceededCount || 0} línea(s) excedidas</small></div>
+                  <div><span>Por cobrar / pagar</span><strong>{money(treasury.accountsReceivable)}</strong><small>Por pagar {money(treasury.accountsPayable)}</small></div>
+                  <div><span>Flujo próximo 30 días</span><strong>{money(treasury.projectedNet30)}</strong><small>Cobros menos pagos</small></div>
+                </div>
+              </>
+            ) : null}
+
+            {activeStep === 'checks' ? (
+              <>
+                <div className="finance-closing-stage__intro">
+                  <div><small>PASO 2 DE 4</small><h3>Revisa los controles automáticos</h3><p>Verde significa conciliado. Amarillo necesita seguimiento. Rojo debe resolverse o justificarse con autorización.</p></div>
+                </div>
+                <div className="finance-closing-panel__checks">
+                  {(data.readiness?.checks || []).map((item) => {
+                    const Icon = item.status === 'ok' ? CheckCircle2 : item.status === 'warning' ? AlertTriangle : XCircle;
+                    return <div key={item.code} data-status={item.status}><Icon /><div><strong>{item.label}</strong><span>{item.message}</span></div></div>;
+                  })}
+                </div>
+              </>
+            ) : null}
+
+            {activeStep === 'resolve' ? (
+              <>
+                <div className="finance-closing-stage__intro">
+                  <div><small>PASO 3 DE 4</small><h3>{unresolvedChecks.length ? 'Resuelve lo que requiere atención' : 'Todo está conciliado'}</h3><p>{unresolvedChecks.length ? 'Cada alerta indica dónde corregir el dato antes de certificar.' : 'No existen alertas ni diferencias pendientes para este periodo.'}</p></div>
+                </div>
+                {unresolvedChecks.length ? (
+                  <div className="finance-closing-resolutions">
+                    {unresolvedChecks.map((item) => {
+                      const action = CONTROL_ACTIONS[item.code];
+                      const Icon = item.status === 'warning' ? AlertTriangle : XCircle;
+                      return (
+                        <article key={item.code} data-status={item.status}>
+                          <Icon />
+                          <div><strong>{item.label}</strong><span>{item.message}</span></div>
+                          {action?.section ? <button type="button" onClick={() => onNavigate(action.section)}>{action.label}<ArrowRight /></button> : null}
+                          {action?.href ? <a href={action.href}>{action.label}<ArrowRight /></a> : null}
+                          {!action ? <button type="button" onClick={load}>Revisar nuevamente<RefreshCw /></button> : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : <div className="finance-closing-ready"><CheckCircle2 /><strong>El periodo está listo para certificar.</strong></div>}
+              </>
+            ) : null}
+
+            {activeStep === 'certify' ? (
+              <>
+                <div className="finance-closing-stage__intro">
+                  <div><small>PASO 4 DE 4</small><h3>Genera la evidencia del cierre</h3><p>Descarga el informe y certifica una huella inalterable para este periodo y esta sede.</p></div>
+                </div>
+                <div className="finance-closing-certification">
+                  <Fingerprint />
+                  <div>
+                    <small>HUELLA FINANCIERA SHA-256</small>
+                    <strong>{String(data.snapshotHash || '')}</strong>
+                    <span>{certificationCurrent ? `Certificación vigente · Versión ${displayVersion(data.close?.revision)}` : data.drifted ? 'Existen cambios que requieren una nueva certificación.' : 'Aún no se ha certificado este corte.'}</span>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
 
           <footer>
             <div><Fingerprint /><span>Huella: {String(data.snapshotHash || '').slice(0, 16)}…</span></div>
             <div>
-              <button type="button" onClick={load}><RefreshCw />Revisar nuevamente</button>
-              {canExport ? <button type="button" onClick={exportReport} disabled={exporting}>{exporting ? <Loader2 className="animate-spin" /> : <Download />}Informe ejecutivo</button> : null}
-              {canCertify ? <button type="button" className="finance-closing-panel__certify" onClick={() => setModalOpen(true)} disabled={blockedWithoutAuthority}><FileCheck2 />{data.close ? 'Actualizar certificación' : 'Certificar corte'}</button> : null}
+              {activeStepIndex > 0 ? <button type="button" onClick={() => goToStep(CLOSING_STEPS[activeStepIndex - 1].key)}><ArrowLeft />Anterior</button> : null}
+              {activeStepIndex < CLOSING_STEPS.length - 1 ? <button type="button" className="finance-closing-panel__certify" onClick={() => goToStep(CLOSING_STEPS[activeStepIndex + 1].key)}>Continuar<ArrowRight /></button> : null}
+              {activeStep === 'certify' ? <button type="button" onClick={load}><RefreshCw />Revisar nuevamente</button> : null}
+              {activeStep === 'certify' && canExport ? <button type="button" onClick={exportReport} disabled={exporting}>{exporting ? <Loader2 className="animate-spin" /> : <Download />}Informe ejecutivo</button> : null}
+              {activeStep === 'certify' && canCertify ? (
+                <button type="button" className="finance-closing-panel__certify" onClick={() => setModalOpen(true)} disabled={blockedWithoutAuthority || certificationCurrent}>
+                  <FileCheck2 />
+                  {certificationCurrent ? 'Certificación vigente' : data.close ? 'Actualizar certificación' : 'Certificar corte'}
+                </button>
+              ) : null}
             </div>
           </footer>
-          {blockedWithoutAuthority ? <p className="finance-closing-panel__authority">Las diferencias críticas requieren el permiso de autorización excepcional.</p> : null}
+          {activeStep === 'certify' && blockedWithoutAuthority ? <p className="finance-closing-panel__authority">Las diferencias críticas requieren el permiso de autorización excepcional.</p> : null}
         </>
       ) : null}
     </section>

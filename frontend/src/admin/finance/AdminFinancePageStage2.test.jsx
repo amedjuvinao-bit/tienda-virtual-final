@@ -166,6 +166,7 @@ afterEach(() => {
 describe('Finanzas Nivel Plus · Etapa 2', () => {
   it('muestra el control mensual con cifras derivadas del presupuesto', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '2. Presupuesto: Límites y centros' }));
 
     expect(await screen.findByText('Presupuesto mensual')).toBeInTheDocument();
     const budgetSummary = await screen.findByRole('group', { name: 'Resumen presupuestal' });
@@ -194,6 +195,7 @@ describe('Finanzas Nivel Plus · Etapa 2', () => {
 
   it('exige justificación para autorizar un exceso presupuestal', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     expect(screen.getByText('Esta aprobación supera el presupuesto')).toBeInTheDocument();
@@ -218,6 +220,7 @@ describe('Finanzas Nivel Plus · Etapa 2', () => {
   it('bloquea visualmente el exceso cuando falta el permiso de excepción', async () => {
     security.granted.delete('finance:budgets:override');
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '4. Gastos: Solicitudes y control' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     expect(screen.getByText('Necesitas el permiso para autorizar excepciones presupuestales.')).toBeInTheDocument();
@@ -227,6 +230,7 @@ describe('Finanzas Nivel Plus · Etapa 2', () => {
 
   it('configura centros y presupuestos en un modal centrado', async () => {
     render(<AdminFinancePage />);
+    fireEvent.click(screen.getByRole('button', { name: '2. Presupuesto: Límites y centros' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Configurar' }));
     expect(screen.getByRole('dialog', { name: 'Configurar presupuesto' })).toBeInTheDocument();

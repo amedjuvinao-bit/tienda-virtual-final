@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -114,6 +114,21 @@ afterEach(() => {
 });
 
 describe('Finanzas Nivel Plus · Etapa 0', () => {
+  it('divide el módulo en un recorrido guiado con una sola sección visible', async () => {
+    render(<AdminFinancePage />);
+
+    expect(await screen.findByText('Entiende tus finanzas en pocos segundos')).toBeInTheDocument();
+    const summaryView = screen.getByLabelText('Resumen financiero');
+    const budgetView = screen.getByLabelText('Control presupuestal', { selector: 'section' });
+    expect(summaryView).not.toHaveAttribute('hidden');
+    expect(budgetView).toHaveAttribute('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: '2. Presupuesto: Límites y centros' }));
+    expect(screen.getByText('Define cuánto puede gastar cada operación')).toBeInTheDocument();
+    expect(summaryView).toHaveAttribute('hidden');
+    expect(budgetView).not.toHaveAttribute('hidden');
+  });
+
   it('diferencia ingresos brutos, devoluciones e ingresos netos', async () => {
     render(<AdminFinancePage />);
 
