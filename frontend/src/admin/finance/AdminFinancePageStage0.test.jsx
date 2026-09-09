@@ -114,10 +114,10 @@ afterEach(() => {
 });
 
 describe('Finanzas Nivel Plus · Etapa 0', () => {
-  it('divide el módulo en un recorrido guiado con una sola sección visible', async () => {
+  it('organiza el módulo como un espacio de trabajo con una sola sección visible', async () => {
     render(<AdminFinancePage />);
 
-    expect(await screen.findByText('Entiende tus finanzas en pocos segundos')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Resumen financiero' })).toBeInTheDocument();
     const summaryView = screen.getByLabelText('Resumen financiero');
     const budgetView = screen.getByLabelText('Control presupuestal', { selector: 'section' });
     expect(summaryView).not.toHaveAttribute('hidden');
@@ -125,9 +125,9 @@ describe('Finanzas Nivel Plus · Etapa 0', () => {
     expect(getFinanceBudgetControl).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Presupuesto: Límites y centros' }));
-    expect(screen.getByText('Define cuánto puede gastar cada operación')).toBeInTheDocument();
     expect(summaryView).toHaveAttribute('hidden');
     expect(budgetView).not.toHaveAttribute('hidden');
+    expect(await screen.findByText('Presupuesto mensual')).toBeInTheDocument();
     await waitFor(() => expect(getFinanceBudgetControl).toHaveBeenCalledTimes(1));
   });
 

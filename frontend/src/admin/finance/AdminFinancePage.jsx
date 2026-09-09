@@ -5,11 +5,8 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowDownRight,
-  ArrowUpRight,
   Banknote,
-  CalendarDays,
   CheckCircle2,
-  CircleDollarSign,
   Clock3,
   Download,
   Edit3,
@@ -21,7 +18,6 @@ import {
   ReceiptText,
   RefreshCw,
   ShieldCheck,
-  Store,
   Trash2,
   UserCheck,
   WalletCards,
@@ -112,46 +108,26 @@ const FINANCE_WORKSPACE = [
     key: 'overview',
     label: 'Resumen',
     hint: 'Situación actual',
-    title: 'Entiende tus finanzas en pocos segundos',
-    description: 'Revisa ingresos, costos, gastos y utilidad antes de entrar al detalle operativo.',
-    nextLabel: 'Organizar presupuesto',
-    icon: CircleDollarSign,
   },
   {
     key: 'budget',
     label: 'Presupuesto',
     hint: 'Límites y centros',
-    title: 'Define cuánto puede gastar cada operación',
-    description: 'Asigna límites mensuales y detecta excesos antes de aprobar nuevos gastos.',
-    nextLabel: 'Revisar tesorería',
-    icon: WalletCards,
   },
   {
     key: 'treasury',
     label: 'Tesorería',
     hint: 'Cobros y pagos',
-    title: 'Controla el dinero que debe entrar y salir',
-    description: 'Consulta vencimientos, registra abonos y anticipa el flujo de los próximos 30 días.',
-    nextLabel: 'Gestionar gastos',
-    icon: Banknote,
   },
   {
     key: 'expenses',
     label: 'Gastos',
     hint: 'Solicitudes y control',
-    title: 'Aprueba gastos con responsables y trazabilidad',
-    description: 'Cada solicitud conserva su historial y solo afecta la utilidad después de ser aprobada.',
-    nextLabel: 'Preparar el cierre',
-    icon: ReceiptText,
   },
   {
     key: 'closing',
     label: 'Cierre',
     hint: 'Revisión y evidencia',
-    title: 'Comprueba todo antes de certificar el mes',
-    description: 'El cierre reúne resultados, presupuesto, caja y tesorería en una huella verificable.',
-    nextLabel: '',
-    icon: ShieldCheck,
   },
 ];
 
@@ -349,33 +325,28 @@ const styles = {
     color: 'var(--admin-card-text)',
   },
   shell: {
-    border: '1px solid var(--admin-card-border)',
-    borderRadius: 'calc(var(--admin-radius) + 8px)',
-    background: 'var(--admin-glass-bg)',
-    boxShadow: 'var(--admin-glass-shadow)',
+    border: 0,
+    borderTop: '4px solid var(--admin-primary)',
+    borderRadius: 16,
+    background: 'var(--admin-card-bg)',
+    boxShadow: '0 18px 46px rgba(15, 23, 42, 0.1)',
     overflow: 'hidden',
-  },
-  header: {
-    borderBottom: '1px solid var(--admin-card-border)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 88%, var(--admin-primary) 12%), var(--admin-card-bg))',
   },
   card: {
     border: '1px solid var(--admin-card-border)',
-    borderRadius: 'calc(var(--admin-radius) + 5px)',
-    background:
-      'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 96%, var(--admin-primary) 4%), var(--admin-card-bg))',
+    borderRadius: 16,
+    background: 'var(--admin-card-bg)',
     color: 'var(--admin-card-text)',
-    boxShadow: '0 14px 32px color-mix(in srgb, var(--admin-primary) 7%, transparent)',
+    boxShadow: 'none',
   },
   softCard: {
     border: '1px solid var(--admin-card-border)',
-    borderRadius: 'calc(var(--admin-radius) + 2px)',
-    background: 'color-mix(in srgb, var(--admin-card-bg) 90%, var(--admin-primary) 5%)',
+    borderRadius: 8,
+    background: 'var(--admin-card-bg)',
   },
   input: {
     border: '1px solid var(--admin-input-border)',
-    borderRadius: 999,
+    borderRadius: 8,
     background: 'var(--admin-input-bg)',
     color: 'var(--admin-input-text)',
     outline: 'none',
@@ -396,20 +367,20 @@ const styles = {
   },
   primaryButton: {
     border: '1px solid var(--admin-button-bg)',
-    borderRadius: 999,
+    borderRadius: 8,
     background: 'var(--admin-button-bg)',
     color: 'var(--admin-button-text)',
-    boxShadow: '0 12px 28px color-mix(in srgb, var(--admin-button-bg) 20%, transparent)',
+    boxShadow: 'none',
   },
   softButton: {
     border: '1px solid var(--admin-button-soft-border)',
-    borderRadius: 999,
+    borderRadius: 8,
     background: 'var(--admin-button-soft-bg)',
     color: 'var(--admin-card-text)',
   },
   dangerButton: {
     border: '1px solid var(--admin-danger)',
-    borderRadius: 999,
+    borderRadius: 8,
     background: 'var(--admin-danger)',
     color: 'var(--admin-danger-text-on-bg)',
   },
@@ -429,9 +400,8 @@ const styles = {
 
 function FinanceWorkspaceNavigation({ activeSection, onChange }) {
   return (
-    <nav className="finance-workspace-nav" aria-label="Recorrido financiero">
-      {FINANCE_WORKSPACE.map((item) => {
-        const Icon = item.icon;
+    <nav className="finance-workspace-nav" aria-label="Secciones de Finanzas">
+      {FINANCE_WORKSPACE.map((item, index) => {
         const active = activeSection === item.key;
         return (
           <button
@@ -441,9 +411,8 @@ function FinanceWorkspaceNavigation({ activeSection, onChange }) {
             aria-label={`${item.label}: ${item.hint}`}
             onClick={() => onChange(item.key)}
           >
-            <Icon aria-hidden="true" />
             <span className="finance-workspace-nav__copy">
-              <strong>{item.label}</strong>
+              <strong>{String(index + 1).padStart(2, '0')} · {item.label}</strong>
               <small>{item.hint}</small>
             </span>
           </button>
@@ -453,50 +422,12 @@ function FinanceWorkspaceNavigation({ activeSection, onChange }) {
   );
 }
 
-function FinanceWorkspaceGuide({ activeSection, onChange }) {
-  const index = Math.max(0, FINANCE_WORKSPACE.findIndex((item) => item.key === activeSection));
-  const item = FINANCE_WORKSPACE[index];
-  const Icon = item.icon;
-  const next = FINANCE_WORKSPACE[index + 1];
-
+function FinanceMetric({ label, value, sub, tone = 'neutral' }) {
   return (
-    <section className="finance-workspace-guide" aria-label={`Guía: ${item.label}`}>
-      <div className="finance-workspace-guide__icon"><Icon aria-hidden="true" /></div>
-      <div className="finance-workspace-guide__copy">
-        <h2>{item.title}</h2>
-        <p>{item.description}</p>
-      </div>
-      {next ? (
-        <button type="button" onClick={() => onChange(next.key)}>
-          <span><small>SIGUIENTE SECCIÓN</small><strong>{item.nextLabel}</strong></span>
-          <ArrowUpRight aria-hidden="true" />
-        </button>
-      ) : (
-        <div className="finance-workspace-guide__finish"><ShieldCheck /><span><strong>Certifica cuando todo esté claro</strong></span></div>
-      )}
-    </section>
-  );
-}
-
-function FinanceMetricCard({ icon: Icon, label, value, sub, tone = 'primary' }) {
-  return (
-    <div className="p-4" style={styles.card}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.18em]" style={styles.muted}>
-            {label}
-          </p>
-          <p className="mt-2 truncate text-2xl font-black leading-none" style={{ color: 'var(--admin-card-text)' }}>
-            {value}
-          </p>
-          <p className="mt-2 text-xs font-semibold" style={styles.muted}>
-            {sub}
-          </p>
-        </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border" style={toneStyle(tone)}>
-          <Icon className="h-5 w-5" />
-        </span>
-      </div>
+    <div className="finance-summary-stat" data-tone={tone}>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <small>{sub}</small>
     </div>
   );
 }
@@ -1221,30 +1152,30 @@ export default function AdminFinancePage() {
         onClose={() => setHistoryExpense(null)}
       />
 
-      <div style={styles.shell}>
-        <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <p className="text-xs font-black uppercase" style={styles.eyebrow}>Centro financiero</p>
-              <h1 className="mt-1 text-3xl font-black leading-tight" style={{ color: 'var(--admin-card-text)' }}>Finanzas</h1>
-              <p className="mt-2 text-sm leading-relaxed" style={styles.muted}>Controla ingresos, costos, caja, gastos, cartera y utilidad con datos reales de órdenes, POS e inventario.</p>
+      <div className="finance-workspace-shell" style={styles.shell}>
+        <header className="finance-workspace-header">
+          <div className="finance-workspace-hero">
+            <div className="finance-workspace-identity">
+              <p className="finance-eyebrow">Control financiero</p>
+              <h1>Finanzas</h1>
+              <p>Consulta el resultado del negocio y gestiona cada proceso desde un solo espacio.</p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="finance-workspace-actions">
               {canExport ? (
                 <>
-                  <button type="button" onClick={() => handleExport('sales')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
+                  <button type="button" onClick={() => handleExport('sales')} disabled={Boolean(exporting)} className="finance-header-action">
                     {exporting === 'sales' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     Ventas CSV
                   </button>
-                  <button type="button" onClick={() => handleExport('expenses')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition hover:-translate-y-0.5 disabled:opacity-60" style={styles.softButton}>
+                  <button type="button" onClick={() => handleExport('expenses')} disabled={Boolean(exporting)} className="finance-header-action">
                     {exporting === 'expenses' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                     Gastos CSV
                   </button>
                 </>
               ) : null}
               {canManageExpenses ? (
-                <button type="button" onClick={openCreateExpenseForm} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition hover:-translate-y-0.5" style={styles.primaryButton}>
+                <button type="button" onClick={openCreateExpenseForm} className="finance-header-action finance-header-action--primary">
                   <Plus className="h-4 w-4" />
                   Nuevo gasto
                 </button>
@@ -1252,52 +1183,54 @@ export default function AdminFinancePage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-[180px_160px_160px_1fr_auto]">
-            <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+          <div className="finance-workspace-filters">
+            <label className="finance-filter-field">
               Periodo
-              <select value={filters.range} onChange={(event) => updateFilter('range', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} disabled={Boolean(filters.dateFrom || filters.dateTo)}>
+              <select value={filters.range} onChange={(event) => updateFilter('range', event.target.value)} style={styles.input} disabled={Boolean(filters.dateFrom || filters.dateTo)}>
                 {RANGE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
 
-            <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+            <label className="finance-filter-field">
               Desde
-              <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} />
+              <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} style={styles.input} />
             </label>
 
-            <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+            <label className="finance-filter-field">
               Hasta
-              <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input} />
+              <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} style={styles.input} />
             </label>
 
-            <label className="space-y-1 text-xs font-black uppercase tracking-[0.08em]" style={styles.muted}>
+            <label className="finance-filter-field">
               Sede
-              <select value={filters.branchId} onChange={(event) => updateFilter('branchId', event.target.value)} className="h-12 w-full px-4 text-sm font-bold normal-case tracking-normal" style={styles.input}>
+              <select value={filters.branchId} onChange={(event) => updateFilter('branchId', event.target.value)} style={styles.input}>
                 <option value="">Todas las sedes</option>
                 {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name || branch.code || 'Sede'}</option>)}
               </select>
             </label>
 
-            <div className="flex items-end gap-2">
-              <button type="button" onClick={loadFinance} className="inline-flex h-12 items-center gap-2 px-4 text-sm font-black transition hover:-translate-y-0.5" style={styles.softButton}>
+            <div className="finance-filter-actions">
+              <button type="button" onClick={loadFinance} className="finance-filter-refresh">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </button>
               {(filters.dateFrom || filters.dateTo) && (
-                <button type="button" onClick={clearCustomDates} className="grid h-12 w-12 place-items-center rounded-xl transition hover:-translate-y-0.5" style={styles.softButton} aria-label="Limpiar fechas">
+                <button type="button" onClick={clearCustomDates} className="finance-filter-clear" aria-label="Limpiar fechas">
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold" style={styles.muted}>
+          <div className="finance-active-context">
             <Filter className="h-4 w-4" />
-            Periodo activo: <span style={{ color: 'var(--admin-primary)' }}>{activePeriodLabel}</span>
+            <span>{activePeriodLabel}</span>
+            <span aria-hidden="true">·</span>
+            <span>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</span>
           </div>
+        </header>
 
-          <FinanceWorkspaceNavigation activeSection={activeSection} onChange={setActiveSection} />
-        </div>
+        <FinanceWorkspaceNavigation activeSection={activeSection} onChange={setActiveSection} />
 
         {error ? (
           <div className="m-5 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-bold" style={toneStyle('danger')}>
@@ -1314,12 +1247,21 @@ export default function AdminFinancePage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-5 px-5 py-5 md:px-7 md:py-6">
-            <FinanceWorkspaceGuide activeSection={activeSection} onChange={setActiveSection} />
-
-            <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Resumen financiero">
+          <div className="finance-workspace-body">
+            <section className="finance-workspace-view finance-overview" hidden={activeSection !== 'overview'} aria-label="Resumen financiero">
+            <div className="finance-current-state">Periodo consolidado · {activePeriodLabel}</div>
+            <div className="finance-overview-heading">
+              <div>
+                <p className="finance-eyebrow">Resultado del periodo</p>
+                <h2>Resumen financiero</h2>
+                <p>Ingresos, costos, gastos y utilidad del periodo seleccionado.</p>
+              </div>
+              <span className="finance-profit-status" data-negative={Number(kpis.netProfit || 0) < 0}>
+                {Number(kpis.netProfit || 0) >= 0 ? 'Utilidad' : 'Pérdida'} · {formatCurrency(kpis.netProfit)}
+              </span>
+            </div>
             {(kpis.costQuality?.usesEstimatedCosts || kpis.costQuality?.hasMissingCosts) && (
-              <div className="flex items-start gap-3 border-l-4 px-4 py-3 text-sm" style={{ ...styles.softCard, borderLeftColor: 'var(--admin-warning)' }} role="status">
+              <div className="finance-cost-warning" role="status">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-warning-text)' }} />
                 <div>
                   <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>Costo histórico incompleto</p>
@@ -1330,11 +1272,11 @@ export default function AdminFinancePage() {
               </div>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FinanceMetricCard icon={ArrowUpRight} label="Ingresos netos" value={formatCurrency(kpis.revenue)} sub={`Bruto ${formatCurrency(kpis.grossRevenue)} · Devoluciones ${formatCurrency(kpis.refunds)}`} tone="success" />
-              <FinanceMetricCard icon={ReceiptText} label="Costos netos" value={formatCurrency(kpis.cogs)} sub={`Costo devuelto ${formatCurrency(kpis.returnedCogs)} · Margen ${formatPercent(kpis.grossMarginPercent)}`} tone="primary" />
-              <FinanceMetricCard icon={ArrowDownRight} label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} tone="warning" />
-              <FinanceMetricCard icon={CircleDollarSign} label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
+            <div className="finance-summary-grid" role="group" aria-label="Indicadores del periodo">
+              <FinanceMetric label="Ingresos netos" value={formatCurrency(kpis.revenue)} sub={`Bruto ${formatCurrency(kpis.grossRevenue)} · Devoluciones ${formatCurrency(kpis.refunds)}`} />
+              <FinanceMetric label="Costos netos" value={formatCurrency(kpis.cogs)} sub={`Costo devuelto ${formatCurrency(kpis.returnedCogs)} · Margen ${formatPercent(kpis.grossMarginPercent)}`} />
+              <FinanceMetric label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} />
+              <FinanceMetric label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
             </div>
             </section>
 
@@ -1564,19 +1506,6 @@ export default function AdminFinancePage() {
             </div>
             </section>
 
-            <section className="finance-workspace-view" hidden={activeSection !== 'overview'} aria-label="Contexto del periodo">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Rango técnico</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatDate(summary?.dateRange?.fromISO)} → {formatDate(summary?.dateRange?.toISO)}</p></div></div>
-              </div>
-              <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('success')}><Banknote className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Ventas netas caja</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(cash?.netSales || summary?.cash?.netSales)}</p></div></div>
-              </div>
-              <div className="p-4" style={styles.card}>
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl border" style={toneStyle('primary')}><Store className="h-5 w-5" /></span><div><p className="text-xs font-black uppercase tracking-[0.14em]" style={styles.muted}>Sede filtrada</p><p className="text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{filters.branchId ? branches.find((branch) => String(branch._id) === String(filters.branchId))?.name || 'Sede seleccionada' : 'Todas las sedes'}</p></div></div>
-              </div>
-            </div>
-            </section>
           </div>
         )}
       </div>
