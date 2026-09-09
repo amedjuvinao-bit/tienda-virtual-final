@@ -1,21 +1,80 @@
-/* frontend/src/admin/finance/financeLayoutFix.css
-   Corrección puntual del módulo Finanzas.
-   No toca el menú, no toca el layout general del panel y no cambia el tema.
-   Solo corrige las secciones de gastos. */
+/* Ajuste exclusivo de la tabla de gastos de Finanzas.
+   Mantiene una tabla compacta en escritorio y reserva el formato apilado
+   para pantallas realmente pequeñas. */
 
-/* La tabla del flujo tiene seis columnas y varias acciones. Cuando el menú
-   administrativo reduce el espacio útil, se convierte en una fila de trabajo
-   de cuatro niveles en vez de exigir desplazamiento horizontal. */
 .finance-expense-workflow {
   container-name: finance-expense-workflow;
   container-type: inline-size;
+}
+
+.finance-expense-table-shell {
+  overflow-x: auto;
+}
+
+.finance-expense-table {
+  width: 100%;
+  min-width: 820px !important;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.finance-expense-table thead {
+  background: color-mix(in srgb, var(--admin-card-bg) 96%, var(--admin-primary) 4%);
+}
+
+.finance-expense-table th,
+.finance-expense-table td {
+  min-width: 0;
+  vertical-align: top;
+}
+
+.finance-expense-table th:nth-child(1),
+.finance-expense-table td:nth-child(1) { width: 14%; }
+
+.finance-expense-table th:nth-child(2),
+.finance-expense-table td:nth-child(2) { width: 26%; }
+
+.finance-expense-table th:nth-child(3),
+.finance-expense-table td:nth-child(3) { width: 11%; }
+
+.finance-expense-table th:nth-child(4),
+.finance-expense-table td:nth-child(4) { width: 12%; }
+
+.finance-expense-table th:nth-child(5),
+.finance-expense-table td:nth-child(5) { width: 18%; }
+
+.finance-expense-table th:nth-child(6),
+.finance-expense-table td:nth-child(6) { width: 19%; }
+
+.finance-expense-table tbody tr {
+  background: var(--admin-card-bg);
+  transition: background 150ms ease;
+}
+
+.finance-expense-table tbody tr:hover {
+  background: color-mix(in srgb, var(--admin-card-bg) 96%, var(--admin-primary) 4%);
+}
+
+.finance-expense-table tbody td {
+  overflow-wrap: anywhere;
+}
+
+.finance-expense-table tbody td:last-child > div {
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.finance-expense-table tbody td:last-child button {
+  min-height: 34px;
+  padding: 7px 9px !important;
+  white-space: nowrap;
 }
 
 .finance-expense-responsive-label {
   display: none;
 }
 
-@container finance-expense-workflow (max-width: 1040px) {
+@container finance-expense-workflow (max-width: 720px) {
   .finance-expense-table-shell {
     overflow-x: visible;
   }
@@ -23,7 +82,6 @@
   .finance-expense-table {
     display: block;
     min-width: 0 !important;
-    width: 100%;
   }
 
   .finance-expense-table thead {
@@ -31,21 +89,19 @@
   }
 
   .finance-expense-table tbody {
-    display: block;
+    display: grid;
   }
 
   .finance-expense-table tbody tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 24px;
-    row-gap: 12px;
-    padding: 18px;
+    gap: 13px 20px;
+    padding: 16px;
   }
 
   .finance-expense-table tbody td {
-    min-width: 0;
+    width: auto !important;
     padding: 0 !important;
-    vertical-align: top;
   }
 
   .finance-expense-table tbody td:nth-child(1) {
@@ -72,45 +128,46 @@
   }
 
   .finance-expense-table tbody td:nth-child(5) {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 3;
-    padding-top: 2px !important;
   }
 
   .finance-expense-table tbody td:nth-child(6) {
-    grid-column: 1 / -1;
-    grid-row: 4;
-    padding-top: 12px !important;
-    border-top: 1px solid var(--admin-card-border);
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
   }
 
   .finance-expense-responsive-label {
     display: block;
     margin-bottom: 6px;
     color: var(--admin-card-muted-text);
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 900;
-    letter-spacing: 0.12em;
-    line-height: 1.2;
+    letter-spacing: .12em;
     text-transform: uppercase;
   }
 
   .finance-expense-table tbody td:last-child > div {
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .finance-expense-table tbody td:last-child button {
-    min-height: 38px;
-    justify-content: center;
-    white-space: nowrap;
+    justify-content: flex-end;
   }
 }
 
-@container finance-expense-workflow (max-width: 560px) {
+@container finance-expense-workflow (max-width: 500px) {
   .finance-expense-table tbody tr {
-    column-gap: 14px;
-    padding: 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .finance-expense-table tbody td:nth-child(n) {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+    text-align: left;
+  }
+
+  .finance-expense-table tbody td:last-child {
+    padding-top: 12px !important;
+    border-top: 1px solid var(--admin-card-border);
   }
 
   .finance-expense-table tbody td:last-child > div {
@@ -120,72 +177,6 @@
 
   .finance-expense-table tbody td:last-child button {
     width: 100%;
-  }
-}
-
-/* En Finanzas ya existe el botón principal "Nuevo gasto" en el encabezado.
-   El bloque lateral "Control de gastos operativos" repetía la misma acción y quitaba espacio útil.
-   Se oculta ese bloque y la tabla de gastos ocupa el ancho disponible. */
-.admin-area .grid:has(> div table.min-w-\[760px\]) {
-  grid-template-columns: 1fr !important;
-}
-
-.admin-area .grid:has(> div table.min-w-\[760px\]) > div:first-child {
-  display: none !important;
-}
-
-.admin-area .grid:has(> div table.min-w-\[760px\]) > div:last-child {
-  min-width: 0 !important;
-  width: 100% !important;
-}
-
-@media (min-width: 1024px) {
-  .admin-area table.min-w-\[760px\] {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    table-layout: fixed !important;
-  }
-
-  .admin-area table.min-w-\[760px\] th,
-  .admin-area table.min-w-\[760px\] td {
-    max-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-  }
-
-  .admin-area table.min-w-\[760px\] th:nth-child(1),
-  .admin-area table.min-w-\[760px\] td:nth-child(1) {
-    width: 20%;
-  }
-
-  .admin-area table.min-w-\[760px\] th:nth-child(2),
-  .admin-area table.min-w-\[760px\] td:nth-child(2) {
-    width: 22%;
-  }
-
-  .admin-area table.min-w-\[760px\] th:nth-child(3),
-  .admin-area table.min-w-\[760px\] td:nth-child(3) {
-    width: 16%;
-  }
-
-  .admin-area table.min-w-\[760px\] th:nth-child(4),
-  .admin-area table.min-w-\[760px\] td:nth-child(4) {
-    width: 16%;
-  }
-
-  .admin-area table.min-w-\[760px\] th:nth-child(5),
-  .admin-area table.min-w-\[760px\] td:nth-child(5) {
-    width: 26%;
-  }
-
-  .admin-area table.min-w-\[760px\] td:last-child > div {
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-  }
-
-  .admin-area table.min-w-\[760px\] td:last-child button {
-    white-space: nowrap;
+    justify-content: center;
   }
 }
