@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const Order = require('../models/Order');
 
 const EXPECTED_SCHEMA_FINGERPRINT =
-  '1385bd5dae9935f071ca5407505ca4e0f6943ebc5de8a4af7ed6176efd7ad86b';
+  '1349f946dfd5d95c32932ed04b7ba5da8c190159a9ff381be7c3555bc1b94b08';
 
 function normalizeValue(value) {
   if (value === undefined) return '__undefined__';
@@ -248,7 +248,7 @@ async function main() {
   assert.strictEqual(Object.keys(schema.nested).length, 8);
   assert.strictEqual(Object.keys(schema.singleNestedPaths).length, 345);
   assert(schema.path('payment.manualConfirmation.requestFingerprint'));
-  assert.strictEqual(schema.indexes().length, 44);
+  assert.strictEqual(schema.indexes().length, 45);
   assert.strictEqual(schema.s.hooks._pres.get('validate')?.length, 1);
   assert.strictEqual(schema.s.hooks._pres.get('save')?.length, 6);
   assert.strictEqual(buildSchemaFingerprint(schema), EXPECTED_SCHEMA_FINGERPRINT);
