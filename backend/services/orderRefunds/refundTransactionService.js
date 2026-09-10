@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const couponService = require('../couponService');
 
 const Order = require('../../models/Order');
 const OrderRefund = require('../../models/OrderRefund');
@@ -312,9 +313,23 @@ async function processOrderRefund(
       session,
     });
 
+    const cumulativeRefundAmount = toMoney(
+      previouslyRefunded + refundAmount
+    );
+    const couponRefund = cumulativeRefundAmount >= orderTotal
+      ? await couponService.transitionOrderCouponRedemption(
+          order,
+          {
+            to: 'refunded',
+            reason: 'La orden quedó reembolsada completamente.',
+            source: 'order_refund',
+          },
+          { session, now: refund.processedAt }
+        )
+      : { changed: false, skipped: true };
+
     if (OrderEventModel) {
-      await OrderEventModel.create(
-        [
+      const events = [
           {
             orderId: order._id,
             type: 'refund_created',
@@ -341,7 +356,21 @@ async function processOrderRefund(
               by: cleanText(adminLabel || 'admin'),
             },
           },
-        ],
+        ];
+      if (couponRefund.changed) {
+        events.push({
+          orderId: order._id,
+          type: 'coupon_refunded',
+          message: 'El uso del cupón fue liberado por reembolso total.',
+          meta: {
+            redemptionId: couponRefund.redemption?._id || null,
+            couponId: order.coupon?.coupon || null,
+            refundId: refund._id,
+          },
+        });
+      }
+      await OrderEventModel.create(
+        events,
         { session }
       );
     }

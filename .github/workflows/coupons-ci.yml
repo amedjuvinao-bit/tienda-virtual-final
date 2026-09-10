@@ -58,6 +58,9 @@ jobs:
       - name: Validar seguridad y exactitud de Etapa 0
         run: npm --prefix backend run test:coupons-level-plus-stage0
 
+      - name: Validar composición del ciclo de redenciones
+        run: npm --prefix backend run test:coupons-level-plus-stage1
+
       - name: Revisar migración aditiva de índices
         run: npm --prefix backend run migrate:coupon-indexes
 
@@ -113,3 +116,8 @@ jobs:
         env:
           COUPONS_STAGE0_MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
         run: npm --prefix backend run test:coupons-level-plus-stage0-integration
+
+      - name: Validar concurrencia e idempotencia de redenciones
+        env:
+          COUPONS_STAGE1_MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
+        run: npm --prefix backend run test:coupons-level-plus-stage1-integration

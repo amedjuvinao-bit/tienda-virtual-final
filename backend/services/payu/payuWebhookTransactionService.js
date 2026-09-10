@@ -1,5 +1,7 @@
 'use strict';
 
+const couponService = require('../couponService');
+
 const {
   ensurePaidOrderPostCommitState,
 } = require('../orderCreationPostCommitService');
@@ -295,6 +297,36 @@ async function processPayUWebhookTransaction({
               },
             },
           ],
+          { session }
+        );
+      }
+    }
+
+    if (['paid', 'failed', 'cancelled'].includes(mapped.paymentStatus)) {
+      const couponResult = await couponService.reconcileOrderCouponForStatus(
+        freshOrder,
+        mapped.paymentStatus,
+        {
+          session,
+          source: 'payu_webhook',
+          reason: `Estado de pago PayU: ${mapped.paymentStatus}.`,
+        }
+      );
+      if (couponResult.changed) {
+        await OrderEventModel.create(
+          [{
+            orderId: freshOrder._id,
+            type: `coupon_${couponResult.status}`,
+            message:
+              couponResult.status === 'applied'
+                ? 'Uso del cupón confirmado con el pago.'
+                : 'Uso reservado del cupón liberado.',
+            meta: {
+              provider: 'payu',
+              redemptionId: couponResult.redemption?._id || null,
+              status: couponResult.status,
+            },
+          }],
           { session }
         );
       }

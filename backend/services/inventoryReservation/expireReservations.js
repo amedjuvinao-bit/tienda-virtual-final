@@ -1,4 +1,5 @@
 const InventoryReservation = require('../../models/InventoryReservation');
+const couponService = require('../couponService');
 const {
   syncOrderInventoryAllocationsFromReservation,
 } = require('../orderInventoryAllocationService');
@@ -46,6 +47,17 @@ async function expireInventoryReservations({ limit = 50 } = {}, options = {}) {
           }
         );
       }
+
+      await couponService.reconcileOrderCouponForStatus(
+        { _id: reservation.order },
+        'failed',
+        {
+          session,
+          now,
+          source: 'inventory_reservation_expiration',
+          reason: 'La reserva de la orden venció antes de confirmar el pago.',
+        }
+      );
 
       expiredReservations.push(reservation);
     }

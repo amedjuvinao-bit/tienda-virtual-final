@@ -286,7 +286,7 @@ async function main() {
     coupons: couponCollection,
     couponredemptions: redemptionCollection,
   });
-  ok('la migración crea únicamente los índices faltantes', applied.mutations === 14 && couponCollection.created.length === 7 && redemptionCollection.created.length === 7);
+  ok('la migración crea únicamente los índices faltantes', applied.mutations === 16 && couponCollection.created.length === 7 && redemptionCollection.created.length === 9);
 
   const safeCouponCollection = fakeCollection();
   const conflictingRedemptions = fakeCollection([

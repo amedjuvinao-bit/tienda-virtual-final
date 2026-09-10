@@ -41,6 +41,14 @@ const COUPON_REDEMPTION_INDEX_DEFINITIONS = Object.freeze([
     options: Object.freeze({ name: 'coupon_1_order_1' }),
   }),
   Object.freeze({
+    key: Object.freeze({ coupon: 1, order: 1, code: 1 }),
+    options: Object.freeze({
+      name: 'coupon_1_order_1_code_1_unique',
+      unique: true,
+      partialFilterExpression: Object.freeze({ order: Object.freeze({ $type: 'objectId' }) }),
+    }),
+  }),
+  Object.freeze({
     key: Object.freeze({ order: 1 }),
     options: Object.freeze({ name: 'order_1' }),
   }),
@@ -63,6 +71,10 @@ const COUPON_REDEMPTION_INDEX_DEFINITIONS = Object.freeze([
   Object.freeze({
     key: Object.freeze({ status: 1, createdAt: -1 }),
     options: Object.freeze({ name: 'status_1_createdAt_-1' }),
+  }),
+  Object.freeze({
+    key: Object.freeze({ status: 1, reservedAt: 1 }),
+    options: Object.freeze({ name: 'status_1_reservedAt_1' }),
   }),
 ]);
 

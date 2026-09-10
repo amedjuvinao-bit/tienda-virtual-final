@@ -13,6 +13,7 @@ async function recordNewOrderCoupon({ order, cleaned, quote, pricing, session })
       code: order.coupon.code,
       orderId: order._id,
       orderNumber: order.orderNumber,
+      customerId: order.customer?.customerId || null,
       customerEmail: getOrderCustomerEmail(cleaned),
       sessionId: cleaned.sessionId,
       source: 'checkout',
@@ -26,7 +27,14 @@ async function recordNewOrderCoupon({ order, cleaned, quote, pricing, session })
         totalDiscountAmount: pricing.totalDiscount,
       },
     },
-    { session }
+    {
+      session,
+      initialStatus:
+        String(order.payment?.status || '').toLowerCase() === 'paid'
+          ? 'applied'
+          : 'reserved',
+      source: 'order_creation',
+    }
   );
 
   order.coupon.redemption = redemption?._id || null;
@@ -35,8 +43,14 @@ async function recordNewOrderCoupon({ order, cleaned, quote, pricing, session })
     [
       {
         orderId: order._id,
-        type: 'coupon_applied',
-        message: `Cupón aplicado: ${order.coupon.code}`,
+        type:
+          String(redemption?.status || '').toLowerCase() === 'applied'
+            ? 'coupon_applied'
+            : 'coupon_reserved',
+        message:
+          String(redemption?.status || '').toLowerCase() === 'applied'
+            ? `Cupón aplicado: ${order.coupon.code}`
+            : `Cupón reservado: ${order.coupon.code}`,
         meta: {
           coupon: order.coupon.toObject
             ? order.coupon.toObject()

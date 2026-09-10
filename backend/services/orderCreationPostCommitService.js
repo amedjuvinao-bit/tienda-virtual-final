@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const couponService = require('./couponService');
 const Order = require('../models/Order');
 const {
   executeElectronicInvoiceAfterPayment,
@@ -336,6 +337,29 @@ function createOrderCreationPostCommitService({
       paymentProvider,
       transaction,
     });
+    let coupon = { changed: false, skipped: true };
+    try {
+      const paidOrder = typeof OrderModel.findById === 'function'
+        ? await OrderModel.findById(orderId)
+        : null;
+      if (paidOrder) {
+        coupon = await couponService.reconcileOrderCouponForStatus(
+          paidOrder,
+          'paid',
+          {
+            source: `${provider}_payment`,
+            reason: `Pago confirmado por ${provider}.`,
+          }
+        );
+      }
+    } catch (error) {
+      logger.error('No fue posible confirmar el uso del cupón post pago.', {
+        orderId: String(orderId || ''),
+        provider,
+        code: error?.code || '',
+      });
+      coupon = { changed: false, failed: true, retryable: true, error };
+    }
     let fulfillment;
     try {
       fulfillment = await processFulfillmentOnce({
@@ -374,10 +398,13 @@ function createOrderCreationPostCommitService({
       processed: true,
       provider,
       transactionId,
+      coupon,
       fulfillment,
       invoice,
       retryable:
-        fulfillment?.retryable === true || invoice?.retryable === true,
+        coupon?.retryable === true ||
+        fulfillment?.retryable === true ||
+        invoice?.retryable === true,
     };
   }
 

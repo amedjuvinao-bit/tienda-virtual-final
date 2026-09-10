@@ -1,5 +1,7 @@
 'use strict';
 
+const couponService = require('../couponService');
+
 function createNonApprovedProcessor({
   OrderEventModel,
   OrderModel,
@@ -306,6 +308,36 @@ function createNonApprovedProcessor({
                   },
                 },
               ],
+              { session }
+            );
+          }
+        }
+
+        if (shouldRecoverFailedInventory) {
+          const couponResult = await couponService.reconcileOrderCouponForStatus(
+            order,
+            mapped.paymentStatus,
+            {
+              session,
+              source: 'wompi_webhook',
+              reason:
+                mapped.paymentStatus === 'cancelled'
+                  ? 'Pago cancelado por Wompi.'
+                  : 'Pago rechazado por Wompi.',
+            }
+          );
+          if (couponResult.changed) {
+            await OrderEventModel.create(
+              [{
+                orderId: order._id,
+                type: `coupon_${couponResult.status}`,
+                message: 'El uso reservado del cupón volvió a quedar disponible.',
+                meta: {
+                  provider: 'wompi',
+                  redemptionId: couponResult.redemption?._id || null,
+                  status: couponResult.status,
+                },
+              }],
               { session }
             );
           }

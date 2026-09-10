@@ -620,7 +620,8 @@ async function ensurePerCustomerLimit(
   const limit = Number(coupon.perCustomerLimit || 0);
   if (!Number.isFinite(limit) || limit <= 0) return { ok: true };
 
-  const filters = [{ coupon: coupon._id, status: 'applied' }];
+  const consumingStatuses = ['reserved', 'applied'];
+  const filters = [{ coupon: coupon._id, status: { $in: consumingStatuses } }];
   const customerObjectId = mongoose.Types.ObjectId.isValid(String(customerId || ''))
     ? new mongoose.Types.ObjectId(String(customerId))
     : null;
@@ -633,7 +634,7 @@ async function ensurePerCustomerLimit(
 
   const query = {
     $and: [
-      { coupon: coupon._id, status: 'applied' },
+      { coupon: coupon._id, status: { $in: consumingStatuses } },
       { $or: filters.slice(1) },
     ],
   };
@@ -921,6 +922,9 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
     : null;
 
   const discountData = discount && typeof discount === 'object' ? discount : {};
+  const initialStatus = trimSafe(options.initialStatus, 20).toLowerCase() === 'applied'
+    ? 'applied'
+    : 'reserved';
   const redemptionPayload = {
     coupon: couponObjectId,
     code: normalizeCode(code),
@@ -935,12 +939,52 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
     shippingDiscountAmount: moneySafe(discountData.shippingDiscountAmount, 0),
     totalDiscountAmount: moneySafe(discountData.totalDiscountAmount, 0),
     source: ['checkout', 'admin', 'pos', 'manual'].includes(source) ? source : 'checkout',
-    status: 'applied',
+    status: initialStatus,
     meta: discountData,
+    reservedAt: new Date(),
+    appliedAt: initialStatus === 'applied' ? new Date() : null,
+    lifecycle: [{
+      from: '',
+      to: initialStatus,
+      reason: initialStatus === 'applied'
+        ? 'Orden creada con pago confirmado.'
+        : 'Uso reservado durante la creación de la orden.',
+      source: trimSafe(options.source || source || 'checkout', 60),
+      at: new Date(),
+    }],
   };
 
   const session = options.session || null;
-  const redemption = await CouponRedemption.create([redemptionPayload], { session }).then((rows) => rows[0]);
+  if (orderObjectId) {
+    let existingQuery = CouponRedemption.findOne({
+      coupon: couponObjectId,
+      order: orderObjectId,
+    });
+    if (session && typeof existingQuery.session === 'function') {
+      existingQuery = existingQuery.session(session);
+    }
+    const existing = await existingQuery;
+    if (existing) return existing.toObject ? existing.toObject() : existing;
+  }
+
+  let redemption;
+  try {
+    redemption = await CouponRedemption.create([redemptionPayload], { session })
+      .then((rows) => rows[0]);
+  } catch (error) {
+    if (error?.code === 11000 && orderObjectId) {
+      let duplicateQuery = CouponRedemption.findOne({
+        coupon: couponObjectId,
+        order: orderObjectId,
+      });
+      if (session && typeof duplicateQuery.session === 'function') {
+        duplicateQuery = duplicateQuery.session(session);
+      }
+      const duplicate = await duplicateQuery;
+      if (duplicate) return duplicate.toObject ? duplicate.toObject() : duplicate;
+    }
+    throw error;
+  }
 
   const usageUpdate = await Coupon.updateOne(
     {
@@ -967,6 +1011,7 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
   );
 
   if (!usageUpdate.matchedCount) {
+    await CouponRedemption.deleteOne({ _id: redemption._id }, { session });
     throw createServiceError(
       'El cupón dejó de estar disponible antes de finalizar la orden.',
       409,
@@ -975,6 +1020,120 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
   }
 
   return redemption?.toObject ? redemption.toObject() : redemption;
+}
+
+function redemptionLookup(order = {}) {
+  const redemptionId = order?.coupon?.redemption;
+  if (mongoose.Types.ObjectId.isValid(String(redemptionId || ''))) {
+    return { _id: new mongoose.Types.ObjectId(String(redemptionId)) };
+  }
+  if (mongoose.Types.ObjectId.isValid(String(order?._id || ''))) {
+    return { order: new mongoose.Types.ObjectId(String(order._id)) };
+  }
+  return null;
+}
+
+async function transitionOrderCouponRedemption(
+  order,
+  { to, reason = '', source = 'system' } = {},
+  options = {}
+) {
+  const target = trimSafe(to, 20).toLowerCase();
+  const allowed = ['applied', 'released', 'cancelled', 'refunded'];
+  if (!allowed.includes(target)) {
+    throw createServiceError('Estado de redención inválido.', 400, 'COUPON_REDEMPTION_STATUS_INVALID');
+  }
+  const lookup = redemptionLookup(order);
+  if (!lookup) {
+    return { changed: false, skipped: true, reason: 'order_without_coupon' };
+  }
+
+  const fromStatuses = target === 'applied'
+    ? ['reserved']
+    : target === 'refunded'
+      ? ['applied']
+      : ['reserved'];
+  const now = options.now instanceof Date ? options.now : new Date();
+  const safeReason = trimSafe(reason, 500);
+  const safeSource = trimSafe(source, 60);
+  const timestampField = {
+    applied: 'appliedAt',
+    released: 'releasedAt',
+    cancelled: 'cancelledAt',
+    refunded: 'refundedAt',
+  }[target];
+  const reasonField = {
+    released: 'releaseReason',
+    cancelled: 'cancelledReason',
+    refunded: 'refundReason',
+  }[target];
+  const set = { status: target, [timestampField]: now };
+  if (reasonField) set[reasonField] = safeReason;
+  const lifecycleFrom = target === 'refunded' ? 'applied' : 'reserved';
+
+  const session = options.session || null;
+  const update = await CouponRedemption.findOneAndUpdate(
+    { ...lookup, status: { $in: fromStatuses } },
+    {
+      $set: set,
+      $push: {
+        lifecycle: {
+          from: lifecycleFrom,
+          to: target,
+          reason: safeReason,
+          source: safeSource,
+          at: now,
+        },
+      },
+    },
+    { new: true, session }
+  );
+  if (!update) {
+    let currentQuery = CouponRedemption.findOne(lookup);
+    if (session && typeof currentQuery.session === 'function') currentQuery = currentQuery.session(session);
+    const current = await currentQuery;
+    return {
+      changed: false,
+      duplicate: current?.status === target,
+      status: current?.status || '',
+      redemption: current || null,
+    };
+  }
+
+  if (['released', 'cancelled', 'refunded'].includes(target)) {
+    await Coupon.updateOne(
+      { _id: update.coupon, usageCount: { $gt: 0 } },
+      { $inc: { usageCount: -1 } },
+      { session }
+    );
+  }
+  return { changed: true, status: target, redemption: update };
+}
+
+async function reconcileOrderCouponForStatus(order, status, options = {}) {
+  const normalized = trimSafe(status, 30).toLowerCase();
+  if (normalized === 'paid') {
+    return transitionOrderCouponRedemption(order, {
+      to: 'applied',
+      reason: options.reason || 'Pago confirmado.',
+      source: options.source || 'payment',
+    }, options);
+  }
+  if (normalized === 'failed') {
+    return transitionOrderCouponRedemption(order, {
+      to: 'released',
+      reason: options.reason || 'Pago fallido; uso liberado.',
+      source: options.source || 'payment',
+    }, options);
+  }
+  if (['cancelled', 'canceled'].includes(normalized)) {
+    return transitionOrderCouponRedemption(order, {
+      to: 'cancelled',
+      reason: options.reason || 'Orden cancelada; uso liberado.',
+      source: options.source || 'order',
+    }, options);
+  }
+  return { changed: false, skipped: true, reason: 'status_without_coupon_effect' };
 }
 
 module.exports = {
@@ -994,6 +1153,8 @@ module.exports = {
   setCouponStatus,
   deleteCoupon,
   recordCouponRedemption,
+  transitionOrderCouponRedemption,
+  reconcileOrderCouponForStatus,
   __test: {
     cleanCouponPayload,
   },

@@ -38,12 +38,33 @@ const CouponRedemptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['applied', 'cancelled', 'refunded'],
-      default: 'applied',
+      enum: ['reserved', 'applied', 'released', 'cancelled', 'refunded'],
+      default: 'reserved',
     },
     meta: { type: Object, default: {} },
+    reservedAt: { type: Date, default: Date.now },
+    appliedAt: { type: Date, default: null },
+    releasedAt: { type: Date, default: null },
+    releaseReason: { type: String, trim: true, default: '' },
     cancelledAt: { type: Date, default: null },
     cancelledReason: { type: String, trim: true, default: '' },
+    refundedAt: { type: Date, default: null },
+    refundReason: { type: String, trim: true, default: '' },
+    lifecycle: {
+      type: [
+        new mongoose.Schema(
+          {
+            from: { type: String, trim: true, default: '' },
+            to: { type: String, trim: true, required: true },
+            reason: { type: String, trim: true, default: '' },
+            source: { type: String, trim: true, default: '' },
+            at: { type: Date, default: Date.now },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

@@ -5,6 +5,7 @@ const {
   advanceOrderInventoryAllocations,
   hydrateOrderInventoryAllocations,
 } = require('../orderInventoryAllocationService');
+const couponService = require('../couponService');
 const {
   cleanText,
   createTransitionError,
@@ -199,6 +200,28 @@ async function applyOperationalEffects(context, dependencies) {
   }
   const events = await applyInventoryEffects(context, dependencies);
   await applyPaymentAndFulfillmentEffects(context);
+  const couponResult = await couponService.reconcileOrderCouponForStatus(
+    context.order,
+    context.targetStatus,
+    {
+      session: context.session,
+      now: context.now,
+      source: context.actor?.source || 'admin_order_status',
+      reason: `Estado de orden actualizado a ${context.targetStatus}.`,
+    }
+  );
+  if (couponResult.changed) {
+    events.push({
+      orderId: context.order._id,
+      type: `coupon_${couponResult.status}`,
+      message: `Cupón ${context.order.coupon?.code || ''}: ${couponResult.status}.`,
+      meta: {
+        redemptionId: couponResult.redemption?._id || null,
+        couponId: context.order.coupon?.coupon || null,
+        status: couponResult.status,
+      },
+    });
+  }
   return events;
 }
 
