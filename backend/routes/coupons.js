@@ -6,21 +6,27 @@ const couponService = require('../services/couponService');
 
 const router = express.Router();
 
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  next();
+});
+
 function sendError(res, error, fallback = 'Error procesando cupón.') {
   const status = Number(error?.status || error?.statusCode || 500);
   return res.status(status).json({
     ok: false,
     error: error?.code || 'COUPON_ERROR',
-    message: error?.message || fallback,
+    message: status >= 500 ? fallback : error?.message || fallback,
   });
 }
 
 router.post('/validate', async (req, res) => {
   try {
     const data = await couponService.validateCoupon(req.body || {});
-    return res.status(data.valid ? 200 : 422).json({
-      ok: data.valid === true,
-      data,
+    const publicData = couponService.serializePublicValidation(data);
+    return res.status(publicData.valid ? 200 : 422).json({
+      ok: publicData.valid === true,
+      data: publicData,
     });
   } catch (error) {
     return sendError(res, error, 'No se pudo validar el cupón.');

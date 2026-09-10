@@ -39,6 +39,15 @@ const STATUS_OPTIONS = [
   { value: 'expired', label: 'Vencido' },
 ];
 
+const FILTER_STATUS_OPTIONS = [
+  { value: 'active', label: 'Activos' },
+  { value: 'scheduled', label: 'Programados' },
+  { value: 'exhausted', label: 'Agotados' },
+  { value: 'expired', label: 'Vencidos' },
+  { value: 'inactive', label: 'Inactivos' },
+  { value: 'draft', label: 'Borradores' },
+];
+
 const APPLIES_TO_OPTIONS = [
   { value: 'all', label: 'Todos los productos' },
   { value: 'categories', label: 'Categorías' },
@@ -434,7 +443,15 @@ function CouponFormModal({
             </Field>
             <Field label="Aplicar a">
               <select style={inputStyle} value={form.appliesTo} onChange={(e) => patchForm('appliesTo', e.target.value)}>
-                {APPLIES_TO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {APPLIES_TO_OPTIONS.map((option) => (
+                  <option
+                    key={option.value}
+                    value={option.value}
+                    disabled={option.value === 'products' && form.appliesTo !== 'products'}
+                  >
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Inicio">
@@ -530,7 +547,12 @@ export default function AdminCouponsPage() {
     try {
       setLoading(true);
       setError('');
-      const data = await fetchAdminCoupons({ q, type: typeFilter, status: statusFilter, limit: 80 });
+      const data = await fetchAdminCoupons({
+        q,
+        type: typeFilter,
+        effectiveStatus: statusFilter,
+        limit: 80,
+      });
       setRows(Array.isArray(data.rows) ? data.rows : []);
     } catch (err) {
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudieron cargar los cupones.');
@@ -595,6 +617,26 @@ export default function AdminCouponsPage() {
       return;
     }
 
+    if (payload.appliesTo === 'categories' && payload.categories.length === 0) {
+      setError('Selecciona al menos una categoría para aplicar este cupón.');
+      return;
+    }
+
+    if (payload.startsAt && payload.endsAt && new Date(payload.endsAt) <= new Date(payload.startsAt)) {
+      setError('La fecha final debe ser posterior a la fecha inicial.');
+      return;
+    }
+
+    for (const [value, label] of [
+      [payload.usageLimit, 'El límite total de usos'],
+      [payload.perCustomerLimit, 'El límite por cliente'],
+    ]) {
+      if (value !== null && (!Number.isInteger(value) || value < 1)) {
+        setError(`${label} debe ser un número entero mayor que cero.`);
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       setError('');
@@ -615,7 +657,7 @@ export default function AdminCouponsPage() {
   const handleToggleStatus = async (coupon) => {
     const id = coupon?._id || coupon?.id;
     if (!id) return;
-    const isActive = coupon?.active !== false && coupon?.effectiveStatus === 'active';
+    const isActive = coupon?.active !== false && coupon?.status === 'active';
     const accepted = await confirm({
       title: isActive ? 'Desactivar cupón' : 'Activar cupón',
       message: isActive
@@ -747,6 +789,7 @@ export default function AdminCouponsPage() {
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)' }}>
             <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />
             <input
+              aria-label="Buscar cupones"
               className="min-w-0 flex-1 bg-transparent text-sm font-bold outline-none"
               style={{ color: 'var(--admin-card-text)' }}
               value={q}
@@ -756,13 +799,13 @@ export default function AdminCouponsPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <select style={{ ...inputStyle, width: 170 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <select aria-label="Filtrar por tipo" style={{ ...inputStyle, width: 170 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="">Todos los tipos</option>
               {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-            <select style={{ ...inputStyle, width: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select aria-label="Filtrar por estado" style={{ ...inputStyle, width: 160 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Todos</option>
-              {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {FILTER_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <button
               type="button"
@@ -804,7 +847,15 @@ export default function AdminCouponsPage() {
               <tbody>
                 {rows.map((coupon) => {
                   const id = coupon._id || coupon.id;
-                  const isActive = coupon.active !== false && coupon.effectiveStatus === 'active';
+                  const isEnabled = coupon.active !== false && coupon.status === 'active';
+                  const requiresRuleEdit = ['expired', 'exhausted'].includes(coupon.effectiveStatus);
+                  const statusActionLabel = coupon.effectiveStatus === 'expired'
+                    ? 'Editar vigencia'
+                    : coupon.effectiveStatus === 'exhausted'
+                      ? 'Ajustar límite'
+                      : isEnabled
+                        ? 'Desactivar'
+                        : 'Activar';
                   const usageLimit = coupon.usageLimit == null ? 'Sin límite' : Number(coupon.usageLimit || 0).toLocaleString('es-CO');
                   return (
                     <tr key={id || coupon.code} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
@@ -870,12 +921,12 @@ export default function AdminCouponsPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus(coupon)}
+                            onClick={() => (requiresRuleEdit ? openEditForm(coupon) : handleToggleStatus(coupon))}
                             className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black"
                             style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
                           >
                             <Power className="h-3.5 w-3.5" />
-                            {isActive ? 'Desactivar' : 'Activar'}
+                            {statusActionLabel}
                           </button>
                           <button
                             type="button"

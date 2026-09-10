@@ -1,0 +1,115 @@
+name: Cupones CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/cupones-nivel-plus-etapa-0
+      - feature/cupones-nivel-plus-etapa-1
+      - feature/cupones-nivel-plus-etapa-2
+      - feature/cupones-nivel-plus-etapa-3
+      - feature/cupones-nivel-plus-etapa-4
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cupones-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coupons-integrity:
+    name: Seguridad e integridad de Cupones
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend y frontend
+        run: |
+          npm --prefix backend ci
+          npm --prefix frontend ci
+
+      - name: Auditar dependencias de producción
+        run: |
+          node .github/scripts/audit-production-dependencies.cjs backend
+          node .github/scripts/audit-production-dependencies.cjs frontend
+
+      - name: Validar contratos de Cupones existentes
+        run: |
+          npm --prefix backend run test:coupons-backend
+          npm --prefix backend run test:coupons-checkout
+          npm --prefix backend run test:coupons-admin
+
+      - name: Validar seguridad y exactitud de Etapa 0
+        run: npm --prefix backend run test:coupons-level-plus-stage0
+
+      - name: Revisar migración aditiva de índices
+        run: npm --prefix backend run migrate:coupon-indexes
+
+      - name: Validar compatibilidad con checkout, órdenes y facturación
+        run: |
+          npm --prefix backend run test:order-creation-composition
+          npm --prefix backend run test:billing-totals
+          npm --prefix frontend run test:checkout-architecture
+
+      - name: Validar administración de Cupones
+        run: npm --prefix frontend run test:coupons-level-plus-stage0
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build
+
+  coupons-mongodb:
+    name: Reglas e índices reales en MongoDB
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend
+        run: npm --prefix backend ci
+
+      - name: Aplicar índices en base aislada
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
+        run: npm --prefix backend run migrate:coupon-indexes -- --apply-coupon-index-migration
+
+      - name: Validar reglas, privacidad y estados en MongoDB aislado
+        env:
+          COUPONS_STAGE0_MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
+        run: npm --prefix backend run test:coupons-level-plus-stage0-integration

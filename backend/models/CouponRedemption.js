@@ -2,6 +2,9 @@
 
 // backend/models/CouponRedemption.js
 const mongoose = require('mongoose');
+const {
+  COUPON_REDEMPTION_INDEX_DEFINITIONS,
+} = require('./couponIndexDefinitions');
 
 const CouponRedemptionSchema = new mongoose.Schema(
   {
@@ -9,20 +12,18 @@ const CouponRedemptionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Coupon',
       required: true,
-      index: true,
     },
     code: {
       type: String,
       required: true,
       trim: true,
       uppercase: true,
-      index: true,
     },
-    order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null, index: true },
-    orderNumber: { type: String, trim: true, default: '', index: true },
-    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null, index: true },
-    customerEmail: { type: String, trim: true, lowercase: true, default: '', index: true },
-    sessionId: { type: String, trim: true, default: '', index: true },
+    order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+    orderNumber: { type: String, trim: true, default: '' },
+    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
+    customerEmail: { type: String, trim: true, lowercase: true, default: '' },
+    sessionId: { type: String, trim: true, default: '' },
 
     subtotal: { type: Number, min: 0, default: 0 },
     shippingAmount: { type: Number, min: 0, default: 0 },
@@ -34,13 +35,11 @@ const CouponRedemptionSchema = new mongoose.Schema(
       type: String,
       enum: ['checkout', 'admin', 'pos', 'manual'],
       default: 'checkout',
-      index: true,
     },
     status: {
       type: String,
       enum: ['applied', 'cancelled', 'refunded'],
       default: 'applied',
-      index: true,
     },
     meta: { type: Object, default: {} },
     cancelledAt: { type: Date, default: null },
@@ -52,9 +51,9 @@ const CouponRedemptionSchema = new mongoose.Schema(
   }
 );
 
-CouponRedemptionSchema.index({ coupon: 1, order: 1 });
-CouponRedemptionSchema.index({ code: 1, customer: 1, status: 1 });
-CouponRedemptionSchema.index({ code: 1, customerEmail: 1, status: 1 });
+COUPON_REDEMPTION_INDEX_DEFINITIONS.forEach(({ key, options }) => {
+  CouponRedemptionSchema.index({ ...key }, { ...options });
+});
 
 module.exports =
   mongoose.models.CouponRedemption ||

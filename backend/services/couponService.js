@@ -8,6 +8,14 @@ const CouponRedemption = require('../models/CouponRedemption');
 const COUPON_TYPES = Coupon.COUPON_TYPES || ['percentage', 'fixed', 'free_shipping'];
 const COUPON_STATUS = Coupon.COUPON_STATUS || ['draft', 'active', 'inactive', 'expired'];
 const COUPON_APPLIES_TO = Coupon.COUPON_APPLIES_TO || ['all', 'products', 'categories'];
+const COUPON_EFFECTIVE_STATUS = [
+  'active',
+  'scheduled',
+  'exhausted',
+  'expired',
+  'inactive',
+  'draft',
+];
 
 function createServiceError(message, status = 400, code = 'COUPON_ERROR') {
   const error = new Error(message);
@@ -43,15 +51,63 @@ function roundMoney(value, fallback = 0) {
   return Math.round(moneySafe(value, fallback) * 100) / 100;
 }
 
-function optionalMoney(value) {
-  if (value === '' || value === null || value === undefined) return null;
-  return moneySafe(value, 0);
+function strictNumber(
+  value,
+  {
+    field = 'valor',
+    code = 'COUPON_NUMBER_INVALID',
+    nullable = false,
+    integer = false,
+    min = 0,
+  } = {}
+) {
+  if (value === '' || value === null || value === undefined) {
+    return nullable ? null : min;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || (integer && !Number.isInteger(number))) {
+    const requirement = integer
+      ? `un número entero mayor o igual a ${min}`
+      : `un número mayor o igual a ${min}`;
+    throw createServiceError(
+      `${field} debe ser ${requirement}.`,
+      400,
+      code
+    );
+  }
+  return number;
 }
 
-function optionalDate(value) {
-  if (!value) return null;
+function optionalMoney(value, field, code) {
+  return strictNumber(value, { field, code, nullable: true, min: 0 });
+}
+
+function optionalPositiveMoney(value, field, code) {
+  const number = optionalMoney(value, field, code);
+  if (number === null) return null;
+  if (number <= 0) {
+    throw createServiceError(`${field} debe ser mayor que cero.`, 400, code);
+  }
+  return number;
+}
+
+function optionalPositiveInteger(value, field, code) {
+  return strictNumber(value, {
+    field,
+    code,
+    nullable: true,
+    integer: true,
+    min: 1,
+  });
+}
+
+function optionalDate(value, field, code) {
+  if (value === '' || value === null || value === undefined) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (Number.isNaN(date.getTime())) {
+    throw createServiceError(`${field} no contiene una fecha válida.`, 400, code);
+  }
+  return date;
 }
 
 function normalizeStringArray(values = []) {
@@ -71,15 +127,28 @@ function normalizeStringArray(values = []) {
   return result;
 }
 
-function normalizeObjectIdArray(values = []) {
-  if (!Array.isArray(values)) return [];
+function normalizeObjectIdArray(values = [], field = 'identificadores') {
+  if (values === null || values === undefined || values === '') return [];
+  if (!Array.isArray(values)) {
+    throw createServiceError(
+      `${field} debe enviarse como una lista.`,
+      400,
+      'COUPON_OBJECT_ID_LIST_INVALID'
+    );
+  }
   const seen = new Set();
   const result = [];
 
   values.forEach((value) => {
     const raw = typeof value === 'object' ? value?._id || value?.id : value;
     const text = trimSafe(raw, 80);
-    if (!mongoose.Types.ObjectId.isValid(text)) return;
+    if (!mongoose.Types.ObjectId.isValid(text)) {
+      throw createServiceError(
+        `${field} contiene un identificador inválido.`,
+        400,
+        'COUPON_OBJECT_ID_INVALID'
+      );
+    }
     const key = String(text);
     if (seen.has(key)) return;
     seen.add(key);
@@ -104,79 +173,135 @@ function normalizeActor(actor = {}) {
   };
 }
 
-function cleanCouponPayload(body = {}, { partial = false } = {}) {
+function arraysOverlap(left = [], right = [], normalizer = (value) => String(value)) {
+  const values = new Set(left.map(normalizer));
+  return right.some((value) => values.has(normalizer(value)));
+}
+
+function cleanCouponPayload(body = {}) {
   const source = body && typeof body === 'object' ? body : {};
   const payload = {};
 
-  if (!partial || source.code !== undefined) {
-    const code = normalizeCode(source.code);
-    if (!code) throw createServiceError('El código del cupón es obligatorio.', 400, 'COUPON_CODE_REQUIRED');
-    if (code.length < 3) throw createServiceError('El código del cupón debe tener mínimo 3 caracteres.', 400, 'COUPON_CODE_TOO_SHORT');
-    payload.code = code;
+  const code = normalizeCode(source.code);
+  if (!code) throw createServiceError('El código del cupón es obligatorio.', 400, 'COUPON_CODE_REQUIRED');
+  if (code.length < 3) throw createServiceError('El código del cupón debe tener mínimo 3 caracteres.', 400, 'COUPON_CODE_TOO_SHORT');
+  payload.code = code;
+  payload.name = trimSafe(source.name, 120);
+  payload.description = trimSafe(source.description, 500);
+
+  const type = trimSafe(source.type || 'percentage', 40).toLowerCase();
+  if (!COUPON_TYPES.includes(type)) {
+    throw createServiceError('Tipo de cupón inválido.', 400, 'COUPON_TYPE_INVALID');
+  }
+  payload.type = type;
+
+  const value = strictNumber(source.value, {
+    field: 'El valor del cupón',
+    code: 'COUPON_VALUE_INVALID',
+    min: 0,
+  });
+  if (type === 'percentage' && value > 100) {
+    throw createServiceError('El porcentaje del cupón no puede superar 100%.', 400, 'COUPON_PERCENTAGE_TOO_HIGH');
+  }
+  if (type !== 'free_shipping' && value <= 0) {
+    throw createServiceError('El valor del cupón debe ser mayor que cero.', 400, 'COUPON_VALUE_REQUIRED');
+  }
+  payload.value = type === 'free_shipping' ? 0 : value;
+  payload.maxDiscountAmount = type === 'percentage'
+    ? optionalPositiveMoney(
+        source.maxDiscountAmount,
+        'El tope de descuento',
+        'COUPON_MAX_DISCOUNT_INVALID'
+      )
+    : null;
+  payload.minSubtotal = strictNumber(source.minSubtotal, {
+    field: 'La compra mínima',
+    code: 'COUPON_MIN_SUBTOTAL_INVALID',
+    min: 0,
+  });
+
+  const status = trimSafe(source.status || 'active', 40).toLowerCase();
+  if (!COUPON_STATUS.includes(status)) {
+    throw createServiceError('Estado de cupón inválido.', 400, 'COUPON_STATUS_INVALID');
+  }
+  payload.status = status;
+  payload.active = status === 'active';
+  payload.startsAt = optionalDate(
+    source.startsAt,
+    'La fecha inicial',
+    'COUPON_START_DATE_INVALID'
+  );
+  payload.endsAt = optionalDate(
+    source.endsAt,
+    'La fecha final',
+    'COUPON_END_DATE_INVALID'
+  );
+
+  if (payload.startsAt && payload.endsAt && payload.endsAt <= payload.startsAt) {
+    throw createServiceError('La fecha final debe ser posterior a la fecha inicial.', 400, 'COUPON_DATE_RANGE_INVALID');
   }
 
-  if (!partial || source.name !== undefined) payload.name = trimSafe(source.name, 120);
-  if (!partial || source.description !== undefined) payload.description = trimSafe(source.description, 500);
+  payload.usageLimit = optionalPositiveInteger(
+    source.usageLimit,
+    'El límite total de usos',
+    'COUPON_USAGE_LIMIT_INVALID'
+  );
+  payload.perCustomerLimit = optionalPositiveInteger(
+    source.perCustomerLimit,
+    'El límite por cliente',
+    'COUPON_CUSTOMER_LIMIT_INVALID'
+  );
 
-  if (!partial || source.type !== undefined) {
-    const type = trimSafe(source.type || 'percentage', 40).toLowerCase();
-    if (!COUPON_TYPES.includes(type)) {
-      throw createServiceError('Tipo de cupón inválido.', 400, 'COUPON_TYPE_INVALID');
-    }
-    payload.type = type;
+  const appliesTo = trimSafe(source.appliesTo || 'all', 40).toLowerCase();
+  if (!COUPON_APPLIES_TO.includes(appliesTo)) {
+    throw createServiceError('Regla de aplicación inválida.', 400, 'COUPON_APPLIES_TO_INVALID');
+  }
+  payload.appliesTo = appliesTo;
+  payload.productIds = normalizeObjectIdArray(source.productIds, 'Los productos incluidos');
+  payload.excludedProductIds = normalizeObjectIdArray(source.excludedProductIds, 'Los productos excluidos');
+  payload.categories = normalizeStringArray(source.categories);
+  payload.excludedCategories = normalizeStringArray(source.excludedCategories);
+  payload.customerIds = normalizeObjectIdArray(source.customerIds, 'Los clientes permitidos');
+
+  if (appliesTo === 'products' && payload.productIds.length === 0) {
+    throw createServiceError(
+      'Debes seleccionar al menos un producto para este cupón.',
+      400,
+      'COUPON_PRODUCTS_REQUIRED'
+    );
+  }
+  if (appliesTo === 'categories' && payload.categories.length === 0) {
+    throw createServiceError(
+      'Debes seleccionar al menos una categoría para este cupón.',
+      400,
+      'COUPON_CATEGORIES_REQUIRED'
+    );
+  }
+  if (arraysOverlap(payload.productIds, payload.excludedProductIds, String)) {
+    throw createServiceError(
+      'Un producto no puede estar incluido y excluido al mismo tiempo.',
+      400,
+      'COUPON_PRODUCT_RULE_CONFLICT'
+    );
+  }
+  if (arraysOverlap(payload.categories, payload.excludedCategories, normalizeLower)) {
+    throw createServiceError(
+      'Una categoría no puede estar incluida y excluida al mismo tiempo.',
+      400,
+      'COUPON_CATEGORY_RULE_CONFLICT'
+    );
   }
 
-  if (!partial || source.value !== undefined) {
-    const typeForValue = payload.type || trimSafe(source.type || 'percentage', 40).toLowerCase();
-    const value = moneySafe(source.value, 0);
-    if (typeForValue === 'percentage' && value > 100) {
-      throw createServiceError('El porcentaje del cupón no puede superar 100%.', 400, 'COUPON_PERCENTAGE_TOO_HIGH');
-    }
-    if (typeForValue !== 'free_shipping' && value <= 0) {
-      throw createServiceError('El valor del cupón debe ser mayor que cero.', 400, 'COUPON_VALUE_REQUIRED');
-    }
-    payload.value = typeForValue === 'free_shipping' ? 0 : value;
+  payload.newCustomersOnly = source.newCustomersOnly === true;
+  if (payload.customerIds.length > 0 || payload.newCustomersOnly) {
+    throw createServiceError(
+      'Las reglas por cliente estarán disponibles cuando exista identificación autoritativa en checkout.',
+      409,
+      'COUPON_CUSTOMER_RULES_NOT_AVAILABLE'
+    );
   }
-
-  if (!partial || source.maxDiscountAmount !== undefined) payload.maxDiscountAmount = optionalMoney(source.maxDiscountAmount);
-  if (!partial || source.minSubtotal !== undefined) payload.minSubtotal = moneySafe(source.minSubtotal, 0);
-
-  if (!partial || source.status !== undefined) {
-    const status = trimSafe(source.status || 'active', 40).toLowerCase();
-    if (!COUPON_STATUS.includes(status)) {
-      throw createServiceError('Estado de cupón inválido.', 400, 'COUPON_STATUS_INVALID');
-    }
-    payload.status = status;
-  }
-
-  if (!partial || source.active !== undefined) payload.active = source.active !== false;
-  if (!partial || source.startsAt !== undefined) payload.startsAt = optionalDate(source.startsAt);
-  if (!partial || source.endsAt !== undefined) payload.endsAt = optionalDate(source.endsAt);
-
-  if (payload.startsAt && payload.endsAt && payload.endsAt < payload.startsAt) {
-    throw createServiceError('La fecha final no puede ser anterior a la fecha inicial.', 400, 'COUPON_DATE_RANGE_INVALID');
-  }
-
-  if (!partial || source.usageLimit !== undefined) payload.usageLimit = optionalMoney(source.usageLimit);
-  if (!partial || source.perCustomerLimit !== undefined) payload.perCustomerLimit = optionalMoney(source.perCustomerLimit);
-
-  if (!partial || source.appliesTo !== undefined) {
-    const appliesTo = trimSafe(source.appliesTo || 'all', 40).toLowerCase();
-    if (!COUPON_APPLIES_TO.includes(appliesTo)) {
-      throw createServiceError('Regla de aplicación inválida.', 400, 'COUPON_APPLIES_TO_INVALID');
-    }
-    payload.appliesTo = appliesTo;
-  }
-
-  if (!partial || source.productIds !== undefined) payload.productIds = normalizeObjectIdArray(source.productIds);
-  if (!partial || source.excludedProductIds !== undefined) payload.excludedProductIds = normalizeObjectIdArray(source.excludedProductIds);
-  if (!partial || source.categories !== undefined) payload.categories = normalizeStringArray(source.categories);
-  if (!partial || source.excludedCategories !== undefined) payload.excludedCategories = normalizeStringArray(source.excludedCategories);
-  if (!partial || source.customerIds !== undefined) payload.customerIds = normalizeObjectIdArray(source.customerIds);
-
-  if (!partial || source.newCustomersOnly !== undefined) payload.newCustomersOnly = source.newCustomersOnly === true;
-  if (!partial || source.tags !== undefined) payload.tags = normalizeStringArray(source.tags);
-  if (!partial || source.internalNotes !== undefined) payload.internalNotes = trimSafe(source.internalNotes, 1000);
+  payload.tags = normalizeStringArray(source.tags);
+  payload.internalNotes = trimSafe(source.internalNotes, 1000);
 
   return payload;
 }
@@ -191,10 +316,10 @@ function serializeCoupon(coupon) {
 
   const effectiveStatus = (() => {
     if (plain.deletedAt) return 'deleted';
-    if (plain.active === false || plain.status === 'inactive') return 'inactive';
     if (plain.status === 'draft') return 'draft';
+    if (plain.status === 'expired' || (endsAt && endsAt <= now)) return 'expired';
+    if (plain.active === false || plain.status === 'inactive') return 'inactive';
     if (startsAt && startsAt > now) return 'scheduled';
-    if (endsAt && endsAt < now) return 'expired';
     if (usageLimit !== null && usageLimit > 0 && usageCount >= usageLimit) return 'exhausted';
     return 'active';
   })();
@@ -207,6 +332,137 @@ function serializeCoupon(coupon) {
       usageLimit !== null && usageLimit > 0
         ? Math.max(0, usageLimit - usageCount)
         : null,
+  };
+}
+
+function serializePublicCoupon(coupon) {
+  const plain = serializeCoupon(coupon);
+  return {
+    code: plain.code || '',
+    name: plain.name || '',
+    type: plain.type || '',
+    value: Number(plain.value || 0),
+    minSubtotal: Number(plain.minSubtotal || 0),
+    maxDiscountAmount:
+      plain.maxDiscountAmount === null || plain.maxDiscountAmount === undefined
+        ? null
+        : Number(plain.maxDiscountAmount),
+    effectiveStatus: plain.effectiveStatus || '',
+    startsAt: plain.startsAt || null,
+    endsAt: plain.endsAt || null,
+  };
+}
+
+function serializePublicValidation(validation = {}) {
+  const source = validation && typeof validation === 'object' ? validation : {};
+  const safe = {
+    valid: source.valid === true,
+    code: trimSafe(source.code, 80),
+    message: trimSafe(source.message, 500),
+  };
+
+  if (source.coupon) safe.coupon = serializePublicCoupon(source.coupon);
+  if (source.discount && typeof source.discount === 'object') {
+    safe.discount = {
+      eligibleSubtotal: roundMoney(source.discount.eligibleSubtotal),
+      discountAmount: roundMoney(source.discount.discountAmount),
+      shippingDiscountAmount: roundMoney(source.discount.shippingDiscountAmount),
+      totalDiscountAmount: roundMoney(source.discount.totalDiscountAmount),
+      message: trimSafe(source.discount.message, 500),
+    };
+  }
+  if (source.totals && typeof source.totals === 'object') {
+    safe.totals = {
+      subtotal: roundMoney(source.totals.subtotal),
+      shippingAmount: roundMoney(source.totals.shippingAmount),
+      discountAmount: roundMoney(source.totals.discountAmount),
+      shippingDiscountAmount: roundMoney(source.totals.shippingDiscountAmount),
+      totalDiscountAmount: roundMoney(source.totals.totalDiscountAmount),
+      totalAfterDiscount: roundMoney(source.totals.totalAfterDiscount),
+    };
+  }
+  return safe;
+}
+
+function buildEffectiveStatusFilter(status, now = new Date()) {
+  const normalized = trimSafe(status, 40).toLowerCase();
+  if (!COUPON_EFFECTIVE_STATUS.includes(normalized)) return null;
+
+  const activeState = [
+    { active: { $ne: false } },
+    { status: { $in: ['active', null] } },
+  ];
+  const notExpired = {
+    $or: [
+      { endsAt: null },
+      { endsAt: { $exists: false } },
+      { endsAt: { $gt: now } },
+    ],
+  };
+  const alreadyStarted = {
+    $or: [
+      { startsAt: null },
+      { startsAt: { $exists: false } },
+      { startsAt: { $lte: now } },
+    ],
+  };
+  const hasRemainingUses = {
+    $or: [
+      { usageLimit: null },
+      { usageLimit: { $exists: false } },
+      { usageLimit: { $lte: 0 } },
+      {
+        $expr: {
+          $lt: [
+            { $ifNull: ['$usageCount', 0] },
+            { $ifNull: ['$usageLimit', 0] },
+          ],
+        },
+      },
+    ],
+  };
+
+  if (normalized === 'draft') return { status: 'draft' };
+  if (normalized === 'expired') {
+    return {
+      status: { $ne: 'draft' },
+      $or: [{ status: 'expired' }, { endsAt: { $lte: now } }],
+    };
+  }
+  if (normalized === 'inactive') {
+    return {
+      status: { $nin: ['draft', 'expired'] },
+      ...notExpired,
+      $and: [
+        { $or: [{ active: false }, { status: 'inactive' }] },
+      ],
+    };
+  }
+  if (normalized === 'scheduled') {
+    return {
+      $and: [...activeState, notExpired, { startsAt: { $gt: now } }],
+    };
+  }
+  if (normalized === 'exhausted') {
+    return {
+      $and: [
+        ...activeState,
+        notExpired,
+        alreadyStarted,
+        { usageLimit: { $gt: 0 } },
+        {
+          $expr: {
+            $gte: [
+              { $ifNull: ['$usageCount', 0] },
+              '$usageLimit',
+            ],
+          },
+        },
+      ],
+    };
+  }
+  return {
+    $and: [...activeState, notExpired, alreadyStarted, hasRemainingUses],
   };
 }
 
@@ -231,7 +487,7 @@ function validateCouponStatus(coupon, now = new Date()) {
     return { ok: false, code: 'COUPON_NOT_STARTED', message: 'El cupón todavía no está vigente.' };
   }
 
-  if (coupon.endsAt && new Date(coupon.endsAt) < now) {
+  if (coupon.endsAt && new Date(coupon.endsAt) <= now) {
     return { ok: false, code: 'COUPON_EXPIRED', message: 'El cupón ya venció.' };
   }
 
@@ -280,11 +536,11 @@ function isItemEligibleForCoupon(coupon = {}, item = {}) {
   if (categories.some((category) => excludedCategories.has(category))) return false;
 
   if (appliesTo === 'products') {
-    return allowedProductIds.size === 0 || Boolean(productId && allowedProductIds.has(productId));
+    return allowedProductIds.size > 0 && Boolean(productId && allowedProductIds.has(productId));
   }
 
   if (appliesTo === 'categories') {
-    return allowedCategories.size === 0 || categories.some((category) => allowedCategories.has(category));
+    return allowedCategories.size > 0 && categories.some((category) => allowedCategories.has(category));
   }
 
   return true;
@@ -293,10 +549,14 @@ function isItemEligibleForCoupon(coupon = {}, item = {}) {
 function calculateEligibleSubtotal(coupon, items = [], fallbackSubtotal = 0) {
   const appliesTo = coupon.appliesTo || 'all';
   const subtotal = moneySafe(fallbackSubtotal, 0);
+  const hasExclusions =
+    (coupon.excludedProductIds || []).length > 0 ||
+    (coupon.excludedCategories || []).length > 0;
 
-  if (!Array.isArray(items) || items.length === 0 || appliesTo === 'all') {
+  if (appliesTo === 'all' && !hasExclusions) {
     return subtotal;
   }
+  if (!Array.isArray(items) || items.length === 0) return 0;
 
   return items.reduce((sum, item) => {
     return isItemEligibleForCoupon(coupon, item) ? sum + getItemLineTotal(item) : sum;
@@ -308,7 +568,7 @@ function calculateDiscount(coupon, { subtotal = 0, shippingAmount = 0, items = [
   const safeSubtotal = moneySafe(subtotal, 0);
   const safeShipping = moneySafe(shippingAmount, 0);
 
-  if (coupon.type !== 'free_shipping' && eligibleSubtotal <= 0) {
+  if (eligibleSubtotal <= 0) {
     return {
       eligibleSubtotal,
       discountAmount: 0,
@@ -410,8 +670,17 @@ async function listCoupons(params = {}) {
   const type = trimSafe(params.type, 40).toLowerCase();
   if (COUPON_TYPES.includes(type)) filter.type = type;
 
-  const status = trimSafe(params.status, 40).toLowerCase();
-  if (COUPON_STATUS.includes(status)) filter.status = status;
+  const effectiveStatus = trimSafe(params.effectiveStatus, 40).toLowerCase();
+  const effectiveStatusFilter = buildEffectiveStatusFilter(effectiveStatus);
+  if (effectiveStatusFilter) {
+    filter.$and = [
+      ...(Array.isArray(filter.$and) ? filter.$and : []),
+      effectiveStatusFilter,
+    ];
+  } else {
+    const status = trimSafe(params.status, 40).toLowerCase();
+    if (COUPON_STATUS.includes(status)) filter.status = status;
+  }
 
   if (params.active === 'true') filter.active = true;
   if (params.active === 'false') filter.active = false;
@@ -441,7 +710,7 @@ async function getCouponById(id) {
 }
 
 async function createCoupon(body = {}, actor = {}) {
-  const payload = cleanCouponPayload(body, { partial: false });
+  const payload = cleanCouponPayload(body);
   payload.createdBy = normalizeActor(actor);
   payload.updatedBy = normalizeActor(actor);
 
@@ -461,7 +730,17 @@ async function updateCoupon(id, body = {}, actor = {}) {
     throw createServiceError('Cupón no encontrado.', 404, 'COUPON_NOT_FOUND');
   }
 
-  const payload = cleanCouponPayload(body, { partial: true });
+  const current = await Coupon.findOne({ _id: id, deletedAt: null });
+  if (!current) throw createServiceError('Cupón no encontrado.', 404, 'COUPON_NOT_FOUND');
+
+  const patch = body && typeof body === 'object' ? body : {};
+  const merged = { ...current.toObject(), ...patch };
+  for (const field of ['usageLimit', 'perCustomerLimit', 'maxDiscountAmount']) {
+    if (!Object.prototype.hasOwnProperty.call(patch, field) && Number(merged[field]) === 0) {
+      merged[field] = null;
+    }
+  }
+  const payload = cleanCouponPayload(merged);
   payload.updatedBy = normalizeActor(actor);
 
   try {
@@ -501,6 +780,29 @@ async function setCouponStatus(id, body = {}, actor = {}) {
 
   if (!Object.keys(patch).length) {
     throw createServiceError('No se envió ningún cambio de estado.', 400, 'COUPON_STATUS_PATCH_EMPTY');
+  }
+
+  if (patch.active === true || patch.status === 'active') {
+    if (!mongoose.Types.ObjectId.isValid(String(id || ''))) {
+      throw createServiceError('Cupón no encontrado.', 404, 'COUPON_NOT_FOUND');
+    }
+    const coupon = await Coupon.findOne({ _id: id, deletedAt: null }).lean();
+    if (!coupon) throw createServiceError('Cupón no encontrado.', 404, 'COUPON_NOT_FOUND');
+    if (coupon.endsAt && new Date(coupon.endsAt) <= new Date()) {
+      throw createServiceError(
+        'Actualiza primero la fecha de vencimiento para reactivar este cupón.',
+        409,
+        'COUPON_REACTIVATION_REQUIRES_END_DATE'
+      );
+    }
+    const usageLimit = Number(coupon.usageLimit || 0);
+    if (usageLimit > 0 && Number(coupon.usageCount || 0) >= usageLimit) {
+      throw createServiceError(
+        'Aumenta primero el límite de usos para reactivar este cupón.',
+        409,
+        'COUPON_REACTIVATION_REQUIRES_USAGE_LIMIT'
+      );
+    }
   }
 
   return updateCoupon(id, patch, actor);
@@ -566,21 +868,21 @@ async function validateCoupon(input = {}, options = {}) {
   }
 
   const discount = calculateDiscount(coupon, { subtotal, shippingAmount, items });
-  if (coupon.type !== 'free_shipping' && discount.discountAmount <= 0) {
-    return {
-      valid: false,
-      code: 'COUPON_NOT_APPLICABLE_TO_CART',
-      message: discount.message || 'El cupón no aplica para este carrito.',
-      coupon: serializeCoupon(coupon),
-      discount,
-    };
-  }
-
   if (coupon.type === 'free_shipping' && shippingAmount <= 0) {
     return {
       valid: false,
       code: 'COUPON_FREE_SHIPPING_WITHOUT_SHIPPING',
       message: 'El cupón es de envío gratis, pero el pedido no tiene valor de envío para descontar.',
+      coupon: serializeCoupon(coupon),
+      discount,
+    };
+  }
+
+  if (discount.totalDiscountAmount <= 0) {
+    return {
+      valid: false,
+      code: 'COUPON_NOT_APPLICABLE_TO_CART',
+      message: discount.message || 'El cupón no aplica para este carrito.',
       coupon: serializeCoupon(coupon),
       discount,
     };
@@ -678,6 +980,9 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
 module.exports = {
   normalizeCode,
   serializeCoupon,
+  serializePublicCoupon,
+  serializePublicValidation,
+  buildEffectiveStatusFilter,
   isItemEligibleForCoupon,
   calculateEligibleSubtotal,
   calculateDiscount,
@@ -689,4 +994,7 @@ module.exports = {
   setCouponStatus,
   deleteCoupon,
   recordCouponRedemption,
+  __test: {
+    cleanCouponPayload,
+  },
 };

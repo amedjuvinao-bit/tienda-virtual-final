@@ -14,7 +14,7 @@ function sendError(res, error, fallback = 'Error procesando cupones.') {
   return res.status(status).json({
     ok: false,
     error: error?.code || 'COUPON_ADMIN_ERROR',
-    message: error?.message || fallback,
+    message: status >= 500 ? fallback : error?.message || fallback,
   });
 }
 
@@ -31,6 +31,10 @@ function getActor(req) {
 }
 
 router.use(requireAdmin);
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  next();
+});
 
 router.get(
   '/',
