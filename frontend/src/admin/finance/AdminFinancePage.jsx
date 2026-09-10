@@ -1467,32 +1467,34 @@ export default function AdminFinancePage() {
 
                         return (
                           <tr key={expense._id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                            <td className="px-4 py-4 font-bold" style={{ color: 'var(--admin-card-text)' }}>
+                            <td className="finance-expense-date px-4 py-4 font-bold" style={{ color: 'var(--admin-card-text)' }}>
                               {formatDate(expense.date)}
-                              <p className="mt-1 text-xs font-bold" style={styles.muted}>v{Number(expense.revision || 0)}</p>
+                              <p className="finance-expense-revision mt-1 text-xs font-bold" style={styles.muted}>v{Number(expense.revision || 0)}</p>
                             </td>
-                            <td className="px-4 py-4">
+                            <td className="finance-expense-request px-4 py-4">
                               <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.category || 'General'}</p>
-                              <p className="mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted}>{expense.description || expense.vendor || 'Sin descripción'}</p>
-                              <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em]" style={styles.muted}>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</p>
-                              {expense.costCenterSnapshot?.name ? <p className="mt-1 text-xs font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-primary)' }}>{expense.costCenterSnapshot.name}</p> : null}
-                              {expense.paymentTerms === 'credit' ? <p className="mt-1 text-xs font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-warning-text)' }}>Crédito · vence {formatDateOnly(expense.dueDate)}{expense.settlement?.status === 'partial' ? ` · saldo ${formatCurrency(expense.settlement?.balanceAmount)}` : ''}</p> : null}
+                              <p className="finance-expense-request__description mt-1 max-w-[280px] truncate text-xs font-semibold" style={styles.muted} title={expense.description || expense.vendor || 'Sin descripción'}>{expense.description || expense.vendor || 'Sin descripción'}</p>
+                              <div className="finance-expense-request__meta">
+                                <span>{getLabel(EXPENSE_TYPES, expense.type, expense.type)}</span>
+                                {expense.costCenterSnapshot?.name ? <span data-accent="true">{expense.costCenterSnapshot.name}</span> : null}
+                              </div>
+                              {expense.paymentTerms === 'credit' ? <p className="finance-expense-request__credit mt-1 text-xs font-black uppercase tracking-[0.08em]" style={{ color: 'var(--admin-warning-text)' }}>Crédito · vence {formatDateOnly(expense.dueDate)}{expense.settlement?.status === 'partial' ? ` · saldo ${formatCurrency(expense.settlement?.balanceAmount)}` : ''}</p> : null}
                             </td>
-                            <td className="px-4 py-4"><span className="inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
-                            <td className="px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
-                            <td className="px-4 py-4">
+                            <td className="px-4 py-4"><span className="finance-expense-status inline-flex border px-3 py-1 text-xs font-black" style={{ ...toneStyle(statusMeta.tone), borderRadius: 'calc(var(--admin-radius) * 0.65)' }}>{statusMeta.label}</span></td>
+                            <td className="finance-expense-amount px-4 py-4 text-base font-black" style={{ color: 'var(--admin-primary)' }}>{formatCurrency(expense.amount)}</td>
+                            <td className="finance-expense-owners px-4 py-4">
                               <p className="finance-expense-responsive-label">Responsables</p>
                               <p className="text-xs font-black" style={{ color: 'var(--admin-card-text)' }}>{expense.createdBySnapshot?.displayName || expense.createdBySnapshot?.username || 'Registro anterior'}</p>
                               <p className="mt-1 text-xs font-semibold" style={styles.muted}>{expense.reviewedBySnapshot?.displayName || expense.reviewedBySnapshot?.username ? `Revisó ${expense.reviewedBySnapshot.displayName || expense.reviewedBySnapshot.username}` : 'Sin revisión'}</p>
                             </td>
-                            <td className="px-4 py-4">
+                            <td className="finance-expense-actions px-4 py-4">
                               <p className="finance-expense-responsive-label">Acciones disponibles</p>
                               <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => setHistoryExpense(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><History className="h-3.5 w-3.5" />Historial</button>
-                                {editable ? <button type="button" onClick={() => openEditExpenseForm(expense)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Corregir</button> : null}
-                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'approve')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.primaryButton}><CheckCircle2 className="h-3.5 w-3.5" />Aprobar</button> : null}
-                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'reject')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><XCircle className="h-3.5 w-3.5" />Rechazar</button> : null}
-                                {cancellable ? <button type="button" onClick={() => openExpenseAction(expense, 'cancel')} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button> : null}
+                                <button type="button" onClick={() => setHistoryExpense(expense)} className="finance-expense-action inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><History className="h-3.5 w-3.5" />Historial</button>
+                                {editable ? <button type="button" onClick={() => openEditExpenseForm(expense)} className="finance-expense-action inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><Edit3 className="h-3.5 w-3.5" />Corregir</button> : null}
+                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'approve')} className="finance-expense-action finance-expense-action--primary inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.primaryButton}><CheckCircle2 className="h-3.5 w-3.5" />Aprobar</button> : null}
+                                {reviewable ? <button type="button" onClick={() => openExpenseAction(expense, 'reject')} className="finance-expense-action inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.softButton}><XCircle className="h-3.5 w-3.5" />Rechazar</button> : null}
+                                {cancellable ? <button type="button" onClick={() => openExpenseAction(expense, 'cancel')} className="finance-expense-action finance-expense-action--danger inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black" style={styles.dangerButton}><Trash2 className="h-3.5 w-3.5" />Anular</button> : null}
                               </div>
                               {canApproveExpenses && expense.status === 'pending' && ownExpense && !isOwner ? <p className="mt-2 max-w-[240px] text-xs font-bold" style={styles.muted}>Debe revisarlo otra persona autorizada.</p> : null}
                             </td>
