@@ -37,7 +37,7 @@ function couponPayload(code, extra = {}) {
     startsAt: null,
     endsAt: null,
     usageLimit: 10,
-    perCustomerLimit: 2,
+    perCustomerLimit: null,
     appliesTo: 'all',
     productIds: [],
     excludedProductIds: [],
