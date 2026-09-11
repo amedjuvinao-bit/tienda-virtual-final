@@ -529,6 +529,77 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     danger: true,
   },
   /* =========================================================
+   * CUPONES / PROMOCIONES
+   * ======================================================= */
+  {
+    method: 'GET',
+    path: '/api/admin/coupons/summary',
+    permission: 'coupons:view',
+    description: 'Consultar métricas y alertas operativas de cupones.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/coupons/export',
+    permission: 'coupons:export',
+    additionalPermissions: ['coupons:view'],
+    description: 'Exportar redenciones de cupones con los filtros activos.',
+    audit: true,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/coupons/:id/operations',
+    permission: 'coupons:view',
+    description: 'Consultar trazabilidad y auditoría de un cupón.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/coupons/:id/redemptions',
+    permission: 'coupons:view',
+    description: 'Listar redenciones de un cupón.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/coupons/:id',
+    permission: 'coupons:view',
+    description: 'Consultar el detalle de un cupón.',
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/coupons',
+    permission: 'coupons:view',
+    description: 'Listar cupones con filtros y paginación.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/coupons',
+    permission: 'coupons:create',
+    description: 'Crear un cupón.',
+    audit: true,
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/coupons/:id',
+    permission: 'coupons:update',
+    description: 'Editar reglas y vigencia de un cupón.',
+    audit: true,
+  },
+  {
+    method: 'PATCH',
+    path: '/api/admin/coupons/:id/status',
+    permission: 'coupons:update',
+    description: 'Cambiar el estado de un cupón.',
+    audit: true,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/admin/coupons/:id',
+    permission: 'coupons:delete',
+    description: 'Eliminar lógicamente un cupón.',
+    audit: true,
+    danger: true,
+  },
+
+  /* =========================================================
    * CARRITOS
    * ======================================================= */
   {

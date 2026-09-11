@@ -17,6 +17,7 @@ const COUPON_EFFECTIVE_STATUS = [
   'expired',
   'inactive',
   'draft',
+  'deleted',
 ];
 
 function createServiceError(message, status = 400, code = 'COUPON_ERROR') {
@@ -445,6 +446,7 @@ function buildEffectiveStatusFilter(status, now = new Date()) {
     ],
   };
 
+  if (normalized === 'deleted') return { deletedAt: { $ne: null } };
   if (normalized === 'draft') return { status: 'draft' };
   if (normalized === 'expired') {
     return {
@@ -768,11 +770,11 @@ async function validateCommercialEligibility(coupon, input = {}, options = {}) {
   return { ok: true, channel, branchId, customerContext };
 }
 
-async function listCoupons(params = {}) {
-  const page = Math.max(1, numberSafe(params.page, 1));
-  const limit = Math.min(100, Math.max(1, numberSafe(params.limit, 20)));
-  const skip = (page - 1) * limit;
-  const filter = { deletedAt: null };
+function buildCouponListFilter(params = {}) {
+  const effectiveStatus = trimSafe(params.effectiveStatus, 40).toLowerCase();
+  const filter = effectiveStatus === 'deleted'
+    ? { deletedAt: { $ne: null } }
+    : { deletedAt: null };
 
   const q = trimSafe(params.q || params.search, 80);
   if (q) {
@@ -783,7 +785,6 @@ async function listCoupons(params = {}) {
   const type = trimSafe(params.type, 40).toLowerCase();
   if (COUPON_TYPES.includes(type)) filter.type = type;
 
-  const effectiveStatus = trimSafe(params.effectiveStatus, 40).toLowerCase();
   const effectiveStatusFilter = buildEffectiveStatusFilter(effectiveStatus);
   if (effectiveStatusFilter) {
     filter.$and = [
@@ -797,6 +798,15 @@ async function listCoupons(params = {}) {
 
   if (params.active === 'true') filter.active = true;
   if (params.active === 'false') filter.active = false;
+
+  return filter;
+}
+
+async function listCoupons(params = {}) {
+  const page = Math.max(1, numberSafe(params.page, 1));
+  const limit = Math.min(100, Math.max(1, numberSafe(params.limit, 20)));
+  const skip = (page - 1) * limit;
+  const filter = buildCouponListFilter(params);
 
   const [total, rows] = await Promise.all([
     Coupon.countDocuments(filter),
@@ -1030,7 +1040,7 @@ async function validateCoupon(input = {}, options = {}) {
   return validateCouponDefinition(coupon, input, options);
 }
 
-async function recordCouponRedemption({ couponId, code, orderId, orderNumber, customerId, customerEmail, customerDocument, sessionId, source, subtotal, shippingAmount, discount } = {}, options = {}) {
+async function recordCouponRedemption({ couponId, code, orderId, orderNumber, customerId, customerEmail, customerDocument, sessionId, branchId, source, subtotal, shippingAmount, discount } = {}, options = {}) {
   if (!mongoose.Types.ObjectId.isValid(String(couponId || ''))) {
     throw createServiceError('Cupón inválido para registrar uso.', 400, 'COUPON_ID_INVALID');
   }
@@ -1041,6 +1051,9 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
     : null;
   const orderObjectId = mongoose.Types.ObjectId.isValid(String(orderId || ''))
     ? new mongoose.Types.ObjectId(String(orderId))
+    : null;
+  const branchObjectId = mongoose.Types.ObjectId.isValid(String(branchId || ''))
+    ? new mongoose.Types.ObjectId(String(branchId))
     : null;
 
   const discountData = discount && typeof discount === 'object' ? discount : {};
@@ -1056,6 +1069,7 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
     customerEmail: normalizeLower(customerEmail),
     customerDocument: normalizeDocument(customerDocument),
     sessionId: trimSafe(sessionId, 120),
+    branch: branchObjectId,
     subtotal: moneySafe(subtotal, 0),
     shippingAmount: moneySafe(shippingAmount, 0),
     discountAmount: moneySafe(discountData.discountAmount, 0),
@@ -1264,6 +1278,7 @@ module.exports = {
   serializeCoupon,
   serializePublicCoupon,
   serializePublicValidation,
+  buildCouponListFilter,
   buildEffectiveStatusFilter,
   isItemEligibleForCoupon,
   calculateEligibleSubtotal,

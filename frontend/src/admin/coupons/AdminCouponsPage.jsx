@@ -7,6 +7,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Eye,
+  AlertTriangle,
   Loader2,
   Pencil,
   Plus,
@@ -19,15 +22,19 @@ import {
   X,
 } from 'lucide-react';
 import { useAppConfirm } from '../../components/AppConfirmProvider';
+import useAdminPermissions from '../security/useAdminPermissions';
 import {
   changeAdminCouponStatus,
   createAdminCoupon,
   deleteAdminCoupon,
+  exportCouponRedemptions,
   fetchAdminCoupons,
   fetchCouponCampaignMetadata,
+  fetchCouponDashboard,
   simulateAdminCoupon,
   updateAdminCoupon,
 } from './api/adminCouponsApi';
+import CouponOperationsModal from './CouponOperationsModal';
 
 const PUBLIC_CODE_PREFIX = 'CUP';
 const SAFE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -52,6 +59,7 @@ const FILTER_STATUS_OPTIONS = [
   { value: 'expired', label: 'Vencidos' },
   { value: 'inactive', label: 'Inactivos' },
   { value: 'draft', label: 'Borradores' },
+  { value: 'deleted', label: 'Eliminados' },
 ];
 
 const APPLIES_TO_OPTIONS = [
@@ -905,7 +913,14 @@ function CouponFormModal({
 
 export default function AdminCouponsPage() {
   const confirm = useAppConfirm();
+  const { can } = useAdminPermissions();
+  const canCreate = can('coupons:create');
+  const canUpdate = can('coupons:update');
+  const canDelete = can('coupons:delete');
+  const canExport = can('coupons:export');
   const [rows, setRows] = useState([]);
+  const [dashboard, setDashboard] = useState({ metrics: {}, alerts: [] });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [simulating, setSimulating] = useState(false);
@@ -917,27 +932,41 @@ export default function AdminCouponsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState('');
+  const [operationsCouponId, setOperationsCouponId] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
 
   const stats = useMemo(() => {
-    const active = rows.filter((coupon) => coupon.effectiveStatus === 'active').length;
-    const scheduled = rows.filter((coupon) => coupon.effectiveStatus === 'scheduled').length;
-    const exhausted = rows.filter((coupon) => coupon.effectiveStatus === 'exhausted').length;
-    const totalUses = rows.reduce((sum, coupon) => sum + Number(coupon.usageCount || 0), 0);
-    return { active, scheduled, exhausted, totalUses };
-  }, [rows]);
+    const metrics = dashboard?.metrics || {};
+    return {
+      active: Number(metrics.active || 0),
+      scheduled: Number(metrics.scheduled || 0),
+      exhausted: Number(metrics.exhausted || 0),
+      totalUses: Number(metrics.currentUses || 0),
+    };
+  }, [dashboard]);
 
-  const loadCoupons = async () => {
+  const loadCoupons = async (nextPage = pagination.page, refreshDashboard = true) => {
     try {
       setLoading(true);
       setError('');
-      const data = await fetchAdminCoupons({
-        q,
-        type: typeFilter,
-        effectiveStatus: statusFilter,
-        limit: 80,
-      });
+      const [data, summary] = await Promise.all([
+        fetchAdminCoupons({
+          q,
+          type: typeFilter,
+          effectiveStatus: statusFilter,
+          page: nextPage,
+          limit: 20,
+        }),
+        refreshDashboard ? fetchCouponDashboard().catch(() => dashboard) : Promise.resolve(dashboard),
+      ]);
       setRows(Array.isArray(data.rows) ? data.rows : []);
+      setPagination({
+        page: Number(data.page || 1),
+        limit: Number(data.limit || 20),
+        total: Number(data.total || 0),
+        pages: Number(data.pages || 1),
+      });
+      if (refreshDashboard) setDashboard(summary || { metrics: {}, alerts: [] });
     } catch (err) {
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudieron cargar los cupones.');
     } finally {
@@ -955,7 +984,7 @@ export default function AdminCouponsPage() {
   };
 
   useEffect(() => {
-    loadCoupons();
+    loadCoupons(1, true);
     loadMetadata();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1079,7 +1108,7 @@ export default function AdminCouponsPage() {
         await createAdminCoupon(payload);
       }
       closeForm();
-      await loadCoupons();
+      await loadCoupons(1, true);
     } catch (err) {
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudo guardar el cupón.');
     } finally {
@@ -1108,7 +1137,7 @@ export default function AdminCouponsPage() {
         active: !isActive,
         status: isActive ? 'inactive' : 'active',
       });
-      await loadCoupons();
+      await loadCoupons(pagination.page, true);
     } catch (err) {
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudo cambiar el estado del cupón.');
     }
@@ -1129,9 +1158,22 @@ export default function AdminCouponsPage() {
     try {
       setError('');
       await deleteAdminCoupon(id);
-      await loadCoupons();
+      await loadCoupons(1, true);
     } catch (err) {
       setError(err?.response?.data?.message || err?.userMessage || 'No se pudo eliminar el cupón.');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      setError('');
+      await exportCouponRedemptions({
+        q,
+        type: typeFilter,
+        effectiveStatus: statusFilter,
+      });
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.userMessage || 'No se pudo exportar el historial de cupones.');
     }
   };
 
@@ -1152,6 +1194,7 @@ export default function AdminCouponsPage() {
         simulation={simulation}
         handleSimulate={handleSimulate}
       />
+      <CouponOperationsModal couponId={operationsCouponId} onClose={() => setOperationsCouponId('')} />
 
       <div
         className="overflow-hidden rounded-[calc(var(--admin-radius)*0.9)] border"
@@ -1174,7 +1217,7 @@ export default function AdminCouponsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={loadCoupons}
+              onClick={() => loadCoupons(pagination.page, true)}
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition hover:scale-[1.01] disabled:opacity-60"
               style={{
@@ -1186,15 +1229,28 @@ export default function AdminCouponsPage() {
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Recargar
             </button>
-            <button
-              type="button"
-              onClick={openNewForm}
-              className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition hover:scale-[1.01]"
-              style={{ background: 'var(--admin-primary)' }}
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo cupón
-            </button>
+            {canExport ? (
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
+                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
+              >
+                <Download className="h-4 w-4" />
+                Exportar usos
+              </button>
+            ) : null}
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={openNewForm}
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition hover:scale-[1.01]"
+                style={{ background: 'var(--admin-primary)' }}
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo cupón
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -1205,6 +1261,20 @@ export default function AdminCouponsPage() {
           <StatCard label="Usos totales" value={stats.totalUses} helper="Redenciones registradas" />
         </div>
       </div>
+
+      {dashboard.alerts?.length ? (
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)' }}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+            <div>
+              <p className="font-black">Campañas que requieren atención</p>
+              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                {dashboard.alerts.map((alert) => `${alert.code}: ${alert.type === 'expiring' ? 'vence pronto' : alert.type === 'exhausted' ? 'cupón agotado' : `quedan ${alert.remainingUses} uso(s)`}`).join(' · ')}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <div
@@ -1232,7 +1302,7 @@ export default function AdminCouponsPage() {
               style={{ color: 'var(--admin-card-text)' }}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') loadCoupons(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') loadCoupons(1, false); }}
               placeholder="Buscar por código, nombre o descripción"
             />
           </div>
@@ -1247,7 +1317,7 @@ export default function AdminCouponsPage() {
             </select>
             <button
               type="button"
-              onClick={loadCoupons}
+              onClick={() => loadCoupons(1, false)}
               className="rounded-2xl px-4 py-2 text-sm font-black text-white"
               style={{ background: 'var(--admin-primary)' }}
             >
@@ -1285,6 +1355,7 @@ export default function AdminCouponsPage() {
               <tbody>
                 {rows.map((coupon) => {
                   const id = coupon._id || coupon.id;
+                  const isDeleted = coupon.effectiveStatus === 'deleted';
                   const isEnabled = coupon.active !== false && coupon.status === 'active';
                   const requiresRuleEdit = ['expired', 'exhausted'].includes(coupon.effectiveStatus);
                   const statusActionLabel = coupon.effectiveStatus === 'expired'
@@ -1350,31 +1421,32 @@ export default function AdminCouponsPage() {
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => openEditForm(coupon)}
+                            onClick={() => setOperationsCouponId(String(id || ''))}
                             className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black"
                             style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Editar
+                            <Eye className="h-3.5 w-3.5" />
+                            Actividad
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => (requiresRuleEdit ? openEditForm(coupon) : handleToggleStatus(coupon))}
-                            className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black"
-                            style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
-                          >
-                            <Power className="h-3.5 w-3.5" />
-                            {statusActionLabel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(coupon)}
-                            className="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black text-white"
-                            style={{ background: 'var(--admin-danger, #be123c)' }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Eliminar
-                          </button>
+                          {!isDeleted && (canUpdate || canDelete) ? (
+                            <>
+                              {canUpdate ? (
+                                <>
+                                  <button type="button" onClick={() => openEditForm(coupon)} className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+                                    <Pencil className="h-3.5 w-3.5" /> Editar
+                                  </button>
+                                  <button type="button" onClick={() => (requiresRuleEdit ? openEditForm(coupon) : handleToggleStatus(coupon))} className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+                                    <Power className="h-3.5 w-3.5" /> {statusActionLabel}
+                                  </button>
+                                </>
+                              ) : null}
+                              {canDelete ? (
+                                <button type="button" onClick={() => handleDelete(coupon)} className="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black text-white" style={{ background: 'var(--admin-danger, #be123c)' }}>
+                                  <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                                </button>
+                              ) : null}
+                            </>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -1384,6 +1456,33 @@ export default function AdminCouponsPage() {
             </table>
           </div>
         )}
+        {rows.length > 0 ? (
+          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <p className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+              {pagination.total.toLocaleString('es-CO')} cupón(es) · página {pagination.page} de {pagination.pages}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={loading || pagination.page <= 1}
+                onClick={() => loadCoupons(pagination.page - 1, false)}
+                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40"
+                style={{ borderColor: 'var(--admin-card-border)' }}
+              >
+                <ChevronLeft className="h-4 w-4" /> Anterior
+              </button>
+              <button
+                type="button"
+                disabled={loading || pagination.page >= pagination.pages}
+                onClick={() => loadCoupons(pagination.page + 1, false)}
+                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-black disabled:opacity-40"
+                style={{ borderColor: 'var(--admin-card-border)' }}
+              >
+                Siguiente <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

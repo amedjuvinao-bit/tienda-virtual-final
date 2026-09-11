@@ -64,6 +64,9 @@ jobs:
       - name: Validar reglas comerciales avanzadas
         run: npm --prefix backend run test:coupons-level-plus-stage2
 
+      - name: Validar operación, trazabilidad y exportación
+        run: npm --prefix backend run test:coupons-level-plus-stage3
+
       - name: Revisar migración aditiva de índices
         run: npm --prefix backend run migrate:coupon-indexes
 
@@ -77,6 +80,7 @@ jobs:
         run: |
           npm --prefix frontend run test:coupons-level-plus-stage0
           npm --prefix frontend run test:coupons-level-plus-stage2
+          npm --prefix frontend run test:coupons-level-plus-stage3
           npm --prefix frontend run test:pos-level-plus-stage2
 
       - name: Compilar frontend
@@ -132,3 +136,8 @@ jobs:
         env:
           COUPONS_STAGE2_MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
         run: npm --prefix backend run test:coupons-level-plus-stage2-integration
+
+      - name: Validar métricas, historial, exportación e índices operativos
+        env:
+          COUPONS_STAGE3_MONGO_URI: mongodb://127.0.0.1:27017/coupons_stage0_ci
+        run: npm --prefix backend run test:coupons-level-plus-stage3-integration

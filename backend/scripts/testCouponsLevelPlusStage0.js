@@ -283,7 +283,12 @@ async function main() {
     coupons: couponCollection,
     couponredemptions: redemptionCollection,
   });
-  ok('la migración crea únicamente los índices faltantes', applied.mutations === 20 && couponCollection.created.length === 10 && redemptionCollection.created.length === 10);
+  ok(
+    'la migración crea únicamente los índices faltantes',
+    applied.mutations === COUPON_INDEX_DEFINITIONS.length + COUPON_REDEMPTION_INDEX_DEFINITIONS.length &&
+      couponCollection.created.length === COUPON_INDEX_DEFINITIONS.length &&
+      redemptionCollection.created.length === COUPON_REDEMPTION_INDEX_DEFINITIONS.length
+  );
 
   const safeCouponCollection = fakeCollection();
   const conflictingRedemptions = fakeCollection([

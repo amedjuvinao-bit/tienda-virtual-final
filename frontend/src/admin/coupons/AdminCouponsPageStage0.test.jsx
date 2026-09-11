@@ -14,14 +14,22 @@ vi.mock('./api/adminCouponsApi', () => ({
   changeAdminCouponStatus: vi.fn(),
   createAdminCoupon: vi.fn(),
   deleteAdminCoupon: vi.fn(),
+  exportCouponRedemptions: vi.fn(),
   fetchAdminCoupons: vi.fn(),
+  fetchCouponDashboard: vi.fn().mockResolvedValue({ metrics: {}, alerts: [] }),
   fetchCouponCampaignMetadata: vi.fn().mockResolvedValue({ products: [], categories: [], customers: [], branches: [] }),
+  fetchCouponOperations: vi.fn(),
+  fetchCouponRedemptions: vi.fn(),
   simulateAdminCoupon: vi.fn(),
   updateAdminCoupon: vi.fn(),
 }));
 
 vi.mock('../../components/AppConfirmProvider', () => ({
   useAppConfirm: () => confirmAction,
+}));
+
+vi.mock('../security/useAdminPermissions', () => ({
+  default: () => ({ can: () => true }),
 }));
 
 const expiredCoupon = {

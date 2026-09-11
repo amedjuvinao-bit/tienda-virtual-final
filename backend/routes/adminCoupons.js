@@ -7,6 +7,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const couponService = require('../services/couponService');
 const couponCampaignService = require('../services/couponCampaignService');
+const couponOperationsService = require('../services/couponOperationsService');
 
 const router = express.Router();
 
@@ -51,6 +52,36 @@ router.get(
 );
 
 router.get(
+  '/summary',
+  requirePermission.any(['coupons:view', 'orders:view', 'finance:view']),
+  async (_req, res) => {
+    try {
+      const data = await couponOperationsService.getCouponDashboard();
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error cargando indicadores de cupones.');
+    }
+  }
+);
+
+router.get(
+  '/export',
+  requirePermission.all(['coupons:view', 'coupons:export']),
+  async (req, res) => {
+    try {
+      const data = await couponOperationsService.exportCouponRedemptions(req.query || {});
+      res.set('Content-Type', 'text/csv; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="${data.filename}"`);
+      res.set('X-Exported-Rows', String(data.rows));
+      res.set('X-Export-Truncated', data.truncated ? 'true' : 'false');
+      res.send(data.csv);
+    } catch (error) {
+      sendError(res, error, 'Error exportando las redenciones de cupones.');
+    }
+  }
+);
+
+router.get(
   '/metadata',
   requirePermission.any(['coupons:create', 'coupons:update']),
   async (_req, res) => {
@@ -81,6 +112,32 @@ router.post(
 );
 
 router.get(
+  '/:id/operations',
+  requirePermission.any(['coupons:view', 'orders:view', 'finance:view']),
+  async (req, res) => {
+    try {
+      const data = await couponOperationsService.getCouponOperationsDetail(req.params.id);
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error cargando la actividad del cupón.');
+    }
+  }
+);
+
+router.get(
+  '/:id/redemptions',
+  requirePermission.any(['coupons:view', 'orders:view', 'finance:view']),
+  async (req, res) => {
+    try {
+      const data = await couponOperationsService.listCouponRedemptions(req.params.id, req.query || {});
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error listando las redenciones del cupón.');
+    }
+  }
+);
+
+router.get(
   '/:id',
   requirePermission.any(['coupons:view', 'orders:view', 'finance:view']),
   async (req, res) => {
@@ -99,6 +156,7 @@ router.post(
   async (req, res) => {
     try {
       const data = await couponService.createCoupon(req.body || {}, getActor(req));
+      res.locals.adminAuditResourceId = String(data?._id || data?.id || '');
       res.status(201).json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error creando cupón.');

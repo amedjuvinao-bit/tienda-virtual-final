@@ -92,6 +92,14 @@ const COUPON_REDEMPTION_INDEX_DEFINITIONS = Object.freeze([
     key: Object.freeze({ status: 1, reservedAt: 1 }),
     options: Object.freeze({ name: 'status_1_reservedAt_1' }),
   }),
+  Object.freeze({
+    key: Object.freeze({ coupon: 1, status: 1, createdAt: -1, _id: -1 }),
+    options: Object.freeze({ name: 'coupon_1_status_1_createdAt_-1__id_-1' }),
+  }),
+  Object.freeze({
+    key: Object.freeze({ branch: 1, createdAt: -1 }),
+    options: Object.freeze({ name: 'branch_1_createdAt_-1' }),
+  }),
 ]);
 
 module.exports = {

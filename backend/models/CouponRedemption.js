@@ -25,6 +25,7 @@ const CouponRedemptionSchema = new mongoose.Schema(
     customerEmail: { type: String, trim: true, lowercase: true, default: '' },
     customerDocument: { type: String, trim: true, default: '' },
     sessionId: { type: String, trim: true, default: '' },
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
 
     subtotal: { type: Number, min: 0, default: 0 },
     shippingAmount: { type: Number, min: 0, default: 0 },

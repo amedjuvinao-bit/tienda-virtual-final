@@ -22,6 +22,42 @@ export async function fetchCouponCampaignMetadata() {
   return data?.data || { products: [], categories: [], customers: [], branches: [] };
 }
 
+export async function fetchCouponDashboard() {
+  const { data } = await api.get('/api/admin/coupons/summary');
+  return data?.data || { metrics: {}, alerts: [], generatedAt: null };
+}
+
+export async function fetchCouponOperations(id) {
+  const { data } = await api.get(`/api/admin/coupons/${id}/operations`);
+  return data?.data || { coupon: null, activity: {}, recentRedemptions: [], audit: [] };
+}
+
+export async function fetchCouponRedemptions(id, params = {}) {
+  const { data } = await api.get(`/api/admin/coupons/${id}/redemptions`, {
+    params: cleanParams(params),
+  });
+  return data?.data || { rows: [], total: 0, page: 1, limit: 20, pages: 1 };
+}
+
+export async function exportCouponRedemptions(params = {}) {
+  const response = await api.get('/api/admin/coupons/export', {
+    params: cleanParams(params),
+    responseType: 'blob',
+  });
+  const disposition = String(response.headers?.['content-disposition'] || '');
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = match?.[1] || `redenciones-cupones-${new Date().toISOString().slice(0, 10)}.csv`;
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  return { filename };
+}
+
 export async function simulateAdminCoupon(payload = {}) {
   try {
     const { data } = await api.post('/api/admin/coupons/simulate', payload);

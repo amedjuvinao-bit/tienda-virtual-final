@@ -219,6 +219,8 @@
     "test:coupons-level-plus-stage1": "node scripts/testCouponsLevelPlusStage1.js",
     "test:coupons-level-plus-stage2": "node scripts/testCouponsLevelPlusStage2.js",
     "test:coupons-level-plus-stage2-integration": "node scripts/testCouponsLevelPlusStage2Integration.js",
+    "test:coupons-level-plus-stage3": "node scripts/testCouponsLevelPlusStage3.js",
+    "test:coupons-level-plus-stage3-integration": "node scripts/testCouponsLevelPlusStage3Integration.js",
     "migrate:coupon-indexes": "node scripts/migrateCouponIndexes.js",
     "test:billing-admin-shell": "node scripts/testBillingAdminShellModule.js",
     "test:billing-electronic-invoice": "node scripts/testBillingElectronicInvoiceModule.js",

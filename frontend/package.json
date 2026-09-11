@@ -44,6 +44,7 @@
     "test:finance-level-plus-stage4": "vitest run src/admin/finance/FinanceClosingPanel.test.jsx src/admin/finance/api/financeApiStage4.test.js",
     "test:coupons-level-plus-stage0": "vitest run src/admin/coupons/AdminCouponsPageStage0.test.jsx",
     "test:coupons-level-plus-stage2": "vitest run src/admin/coupons/AdminCouponsPageStage2.test.jsx",
+    "test:coupons-level-plus-stage3": "vitest run src/admin/coupons/AdminCouponsPageStage3.test.jsx",
     "test:orders-manual-payment": "vitest run src/admin/orders/components/orderDetail/manualPaymentConfirmationModel.test.js src/admin/orders/components/orderDetail/hooks/useOrderManualPaymentConfirmation.test.jsx src/admin/orders/components/orderDetail/OrderManualPaymentConfirmationCard.test.jsx",
     "test:shipping-settings-ui": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",

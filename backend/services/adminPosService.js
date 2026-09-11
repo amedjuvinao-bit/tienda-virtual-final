@@ -1667,6 +1667,7 @@ async function createPosSale(payload = {}, options = {}) {
         customerEmail: order.customer?.email || order.customer?.emailOrPhone,
         customerDocument: order.customer?.id,
         sessionId: order.sessionId,
+        branchId: branch._id,
         source: 'pos',
         subtotal: normalizedPayload.subtotal,
         shippingAmount: 0,

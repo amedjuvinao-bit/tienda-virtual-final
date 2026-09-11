@@ -206,7 +206,7 @@ function buildAuditPayload(req, res, rule, startedAt, extra = {}) {
     path: requestPath,
     routePattern: rule.path,
 
-    resourceId: getResourceId(rule, req),
+    resourceId: String(res.locals.adminAuditResourceId || getResourceId(rule, req) || ''),
 
     adminUserId: req.adminUserId || null,
     adminUsername: req.adminUsername || req.adminUser || '',

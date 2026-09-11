@@ -21,6 +21,7 @@ async function recordNewOrderCoupon({ order, cleaned, quote, pricing, session })
         cleaned.customer?.id ||
         '',
       sessionId: cleaned.sessionId,
+      branchId: order.branch,
       source: 'checkout',
       subtotal: pricing.subtotal,
       shippingAmount: pricing.originalShipping,
