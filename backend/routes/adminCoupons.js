@@ -6,6 +6,7 @@ const express = require('express');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 const couponService = require('../services/couponService');
+const couponCampaignService = require('../services/couponCampaignService');
 
 const router = express.Router();
 
@@ -45,6 +46,36 @@ router.get(
       res.json({ ok: true, data });
     } catch (error) {
       sendError(res, error, 'Error listando cupones.');
+    }
+  }
+);
+
+router.get(
+  '/metadata',
+  requirePermission.any(['coupons:create', 'coupons:update']),
+  async (_req, res) => {
+    try {
+      const data = await couponCampaignService.getCouponCampaignMetadata();
+      res.json({ ok: true, data });
+    } catch (error) {
+      sendError(res, error, 'Error cargando opciones comerciales del cupón.');
+    }
+  }
+);
+
+router.post(
+  '/simulate',
+  requirePermission.any(['coupons:create', 'coupons:update']),
+  async (req, res) => {
+    try {
+      const data = await couponCampaignService.simulateCouponCampaign(req.body || {});
+      res.status(data.validation?.valid ? 200 : 422).json({
+        ok: data.validation?.valid === true,
+        data,
+      });
+    } catch (error) {
+      if (error?.name === 'ValidationError' && !error.status) error.status = 400;
+      sendError(res, error, 'Error simulando el cupón.');
     }
   }
 );

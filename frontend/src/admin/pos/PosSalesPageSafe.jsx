@@ -312,6 +312,7 @@ export default function PosSalesPageSafe() {
   const [cartItems, setCartItems] = useState([]);
   const [paymentDetails, setPaymentDetails] = useState(createInitialPaymentDetails);
   const [discount, setDiscount] = useState(createInitialDiscount);
+  const [couponCode, setCouponCode] = useState('');
   const [checkoutErrors, setCheckoutErrors] = useState({});
   const [reviewLoading, setReviewLoading] = useState(false);
   const [saleReview, setSaleReview] = useState(null);
@@ -375,6 +376,7 @@ export default function PosSalesPageSafe() {
     setCartItems([]);
     setPaymentDetails(createInitialPaymentDetails());
     setDiscount(createInitialDiscount());
+    setCouponCode('');
     setCheckoutErrors({});
     setSaleReview(null);
     setCurrentHeldSaleId('');
@@ -415,6 +417,7 @@ export default function PosSalesPageSafe() {
       ...createInitialDiscount(),
       ...(heldSale.discount || {}),
     });
+    setCouponCode(heldSale.couponCode || '');
     setCurrentHeldSaleId(heldSale.id || '');
     setCheckoutErrors({});
     setSaleReview(null);
@@ -501,6 +504,7 @@ export default function PosSalesPageSafe() {
     paymentMethod,
     paymentDetails,
     discount,
+    couponCode,
     total: checkoutValidation.summary.total,
     registerCode: REGISTER_CODE,
   });
@@ -594,7 +598,7 @@ export default function PosSalesPageSafe() {
   useEffect(() => {
     saleAttemptKeyRef.current = '';
     setSaleReview(null);
-  }, [branchId, cartItems, discount, paymentDetails, paymentMethod]);
+  }, [branchId, cartItems, couponCode, discount, paymentDetails, paymentMethod]);
 
   useEffect(() => {
     const resetAttempt = () => {
@@ -611,6 +615,7 @@ export default function PosSalesPageSafe() {
     setCartItems([]);
     setPaymentDetails(createInitialPaymentDetails());
     setDiscount(createInitialDiscount());
+    setCouponCode('');
     setCheckoutErrors({});
     setSaleReview(null);
     setSaleError('');
@@ -770,6 +775,21 @@ export default function PosSalesPageSafe() {
                     setDiscount(nextDiscount);
                   }}
                 />
+                <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-page-bg)' }}>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Cupón de campaña</label>
+                  <input
+                    value={couponCode}
+                    onChange={(event) => {
+                      clearMessages();
+                      setCouponCode(event.target.value.toUpperCase().replace(/\s+/g, ''));
+                    }}
+                    disabled={saleLoading || reviewLoading || cartItems.length === 0}
+                    placeholder="Ejemplo: CUP-7K9X-P2Q4"
+                    className="w-full rounded-xl border bg-transparent px-4 py-3 text-sm font-bold uppercase outline-none disabled:opacity-50"
+                    style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }}
+                  />
+                  <p className="mt-2 text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>Se valida con el cliente, la sede y los productos reales al revisar la venta.</p>
+                </div>
                 {saleError ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Revisa la venta</p><p className="mt-1">{saleError}</p></div></div> : null}
                 <div className="space-y-3 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
                   <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--admin-card-muted-text)' }}>Subtotal</span><strong style={{ color: 'var(--admin-card-text)' }}>{money(cartSummary.subtotal)}</strong></div>

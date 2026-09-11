@@ -17,6 +17,21 @@ export async function fetchAdminCoupons(params = {}) {
   return data?.data || { rows: [], total: 0, page: 1, limit: 20, pages: 1 };
 }
 
+export async function fetchCouponCampaignMetadata() {
+  const { data } = await api.get('/api/admin/coupons/metadata');
+  return data?.data || { products: [], categories: [], customers: [], branches: [] };
+}
+
+export async function simulateAdminCoupon(payload = {}) {
+  try {
+    const { data } = await api.post('/api/admin/coupons/simulate', payload);
+    return data?.data;
+  } catch (error) {
+    if (error?.response?.data?.data) return error.response.data.data;
+    throw error;
+  }
+}
+
 export async function createAdminCoupon(payload = {}) {
   const { data } = await api.post('/api/admin/coupons', payload);
   return data?.data;

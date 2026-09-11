@@ -20,10 +20,13 @@ function couponSnapshot(validation = null) {
 
 router.post('/quote', async (req, res) => {
   try {
-    const quote = await buildOrderQuote({
-      ...(req.body || {}),
-      items: req.body?.items || req.body?.cart || [],
-    });
+    const quote = await buildOrderQuote(
+      {
+        ...(req.body || {}),
+        items: req.body?.items || req.body?.cart || [],
+      },
+      { deferBranchValidation: true }
+    );
 
     if (quote.couponCode && !quote.couponValidation?.valid) {
       return res.status(422).json({

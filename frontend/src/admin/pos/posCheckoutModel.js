@@ -212,6 +212,7 @@ export function buildPosCommercialPayload({
   paymentMethod = 'cash',
   paymentDetails = {},
   discount = {},
+  couponCode = '',
   total = 0,
   registerCode = 'CAJA POS',
 } = {}) {
@@ -232,5 +233,6 @@ export function buildPosCommercialPayload({
     })),
     payment: buildPaymentPayload({ method: paymentMethod, total, details: paymentDetails }),
     discount: buildDiscountPayload(discount),
+    couponCode: cleanText(couponCode).toUpperCase().replace(/\s+/g, ''),
   };
 }

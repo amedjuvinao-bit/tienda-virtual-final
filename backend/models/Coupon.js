@@ -9,6 +9,7 @@ const {
 const COUPON_TYPES = ['percentage', 'fixed', 'free_shipping'];
 const COUPON_STATUS = ['draft', 'active', 'inactive', 'expired'];
 const COUPON_APPLIES_TO = ['all', 'products', 'categories'];
+const COUPON_CHANNELS = ['web', 'pos'];
 
 const AdminActorSchema = new mongoose.Schema(
   {
@@ -72,6 +73,14 @@ const CouponSchema = new mongoose.Schema(
 
     customerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }],
     newCustomersOnly: { type: Boolean, default: false },
+    allowedChannels: {
+      type: [{ type: String, enum: COUPON_CHANNELS }],
+      default: () => ['web', 'pos'],
+    },
+    branchIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+    allowWithStoreCredit: { type: Boolean, default: true },
+    allowWithManualDiscount: { type: Boolean, default: false },
+    allowWithAutomaticPromotions: { type: Boolean, default: false },
 
     tags: [{ type: String, trim: true }],
     internalNotes: { type: String, trim: true, maxlength: 1000, default: '' },
@@ -118,6 +127,9 @@ CouponSchema.pre('validate', function normalizeCoupon(next) {
     this.categories = cleanStringArray(this.categories);
     this.excludedCategories = cleanStringArray(this.excludedCategories);
     this.tags = cleanStringArray(this.tags);
+    this.allowedChannels = cleanStringArray(this.allowedChannels)
+      .map((value) => value.toLowerCase())
+      .filter((value) => COUPON_CHANNELS.includes(value));
     this.active = this.status === 'active';
 
     const value = Number(this.value);
@@ -167,6 +179,9 @@ CouponSchema.pre('validate', function normalizeCoupon(next) {
     if (this.appliesTo === 'categories' && this.categories.length === 0) {
       this.invalidate('categories', 'Debes seleccionar al menos una categoría.');
     }
+    if (this.allowedChannels.length === 0) {
+      this.invalidate('allowedChannels', 'Debes habilitar al menos un canal de venta.');
+    }
 
     next();
   } catch (error) {
@@ -178,3 +193,4 @@ module.exports = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema
 module.exports.COUPON_TYPES = COUPON_TYPES;
 module.exports.COUPON_STATUS = COUPON_STATUS;
 module.exports.COUPON_APPLIES_TO = COUPON_APPLIES_TO;
+module.exports.COUPON_CHANNELS = COUPON_CHANNELS;

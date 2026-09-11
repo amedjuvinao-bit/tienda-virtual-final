@@ -15,6 +15,11 @@ async function recordNewOrderCoupon({ order, cleaned, quote, pricing, session })
       orderNumber: order.orderNumber,
       customerId: order.customer?.customerId || null,
       customerEmail: getOrderCustomerEmail(cleaned),
+      customerDocument:
+        cleaned.billing?.documentNumber ||
+        cleaned.billing?.id ||
+        cleaned.customer?.id ||
+        '',
       sessionId: cleaned.sessionId,
       source: 'checkout',
       subtotal: pricing.subtotal,

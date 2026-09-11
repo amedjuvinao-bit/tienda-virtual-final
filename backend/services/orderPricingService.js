@@ -455,6 +455,13 @@ async function buildOrderQuote(input = {}, options = {}) {
         shippingAmount: originalShipping,
         items,
         customerId: input.customerId,
+        customerDocument:
+          input.customerDocument ||
+          input?.billing?.documentNumber ||
+          input?.billing?.id ||
+          customer.documentNumber ||
+          customer.id ||
+          '',
         customerEmail:
           input.customerEmail ||
           input?.billing?.email ||
@@ -462,8 +469,15 @@ async function buildOrderQuote(input = {}, options = {}) {
           customer.emailOrPhone ||
           '',
         sessionId: input.sessionId,
+        channel: input.channel || input.source || 'web',
+        branchId: input.branchId || input.branch || '',
+        storeCreditAmount:
+          input.storeCreditAmount ??
+          (input.storeCredit?.apply === true ? input.storeCredit?.amount : 0),
+        manualDiscountAmount: input.manualDiscountAmount ?? input.manualDiscount?.amount,
+        promotionDiscountAmount: input.promotionDiscountAmount ?? input.promotion?.amount,
       },
-      { session }
+      { session, deferBranchValidation: options.deferBranchValidation === true }
     );
   }
 

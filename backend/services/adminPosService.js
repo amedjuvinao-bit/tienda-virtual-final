@@ -10,6 +10,7 @@ const InventoryMovement = require('../models/InventoryMovement');
 const Order = require('../models/Order');
 const OrderEvent = require('../models/OrderEvent');
 const Customer = require('../models/Customer');
+const couponService = require('./couponService');
 const {
   applyCustomerStatsForOrder,
   findCustomerMatch,
@@ -1107,6 +1108,7 @@ function validateDiscountAuthorization({ normalizedPayload, admin = {}, maxPerce
   const discountAmount = toMoney(normalizedPayload.discount?.amount);
 
   if (!discountAmount || subtotal <= 0) return;
+  if (normalizedPayload.discount?.source === 'coupon') return;
 
   if (!admin.canApplyPosDiscount) {
     throw createPosError(
@@ -1244,6 +1246,23 @@ function buildPosOrderPayload({
     customer: normalizedPayload.customer,
     billing: normalizedPayload.billing,
     discount: recordedDiscount,
+    coupon: normalizedPayload.coupon || undefined,
+    pricing: normalizedPayload.coupon
+      ? {
+          version: 2,
+          currency: DEFAULT_CURRENCY,
+          subtotal: normalizedPayload.subtotal,
+          productDiscount: normalizedPayload.discount.amount,
+          subtotalAfterDiscount: Math.max(0, normalizedPayload.subtotal - normalizedPayload.discount.amount),
+          originalShipping: 0,
+          shippingDiscount: 0,
+          shipping: 0,
+          totalDiscount: normalizedPayload.discount.amount,
+          taxableBase: Math.max(0, normalizedPayload.subtotal - normalizedPayload.discount.amount),
+          taxAmount: normalizedPayload.taxes?.iva?.amount || 0,
+          total: normalizedPayload.total,
+        }
+      : undefined,
     payment: {
       active: true,
       provider: 'pos',
@@ -1478,7 +1497,7 @@ async function preparePosSalePreview(payload = {}, options = {}) {
   const normalizedPayload = normalizePosPayload(payload, { deferPaymentValidation: true });
   const branch = await validatePosBranch(normalizedPayload.branchId, { session });
   const validatedItems = await loadAndValidatePosItems(normalizedPayload.items, branch, { session });
-  const recalculated = calculateTotalsFromNormalizedItems({
+  let recalculated = calculateTotalsFromNormalizedItems({
     items: validatedItems,
     discount: payload.discount,
     taxes: payload.taxes,
@@ -1488,6 +1507,44 @@ async function preparePosSalePreview(payload = {}, options = {}) {
     normalizedPayload,
     { session, branch }
   );
+  const couponCode = couponService.normalizeCode(payload.couponCode || payload.coupon?.code || '');
+  let couponValidation = null;
+  if (couponCode) {
+    couponValidation = await couponService.validateCoupon({
+      code: couponCode,
+      subtotal: recalculated.subtotal,
+      shippingAmount: 0,
+      items: validatedItems,
+      customerId: customerResolution.customer?._id || normalizedPayload.customerId,
+      customerDocument: customerResolution.customerSnapshot?.id,
+      customerEmail: customerResolution.customerSnapshot?.email || customerResolution.customerSnapshot?.emailOrPhone,
+      channel: 'pos',
+      branchId: branch._id,
+      manualDiscountAmount: recalculated.discount?.amount || 0,
+    }, { session });
+    if (!couponValidation.valid) {
+      throw createPosError(
+        couponValidation.message || 'El cupón no es válido para esta venta.',
+        couponValidation.code || 'POS_COUPON_INVALID',
+        { couponCode },
+        422
+      );
+    }
+    recalculated = calculateTotalsFromNormalizedItems({
+      items: validatedItems,
+      discount: {
+        type: 'amount',
+        value: couponValidation.discount?.discountAmount || 0,
+        reason: `Cupón ${couponCode}`,
+      },
+      taxes: payload.taxes,
+    });
+    recalculated.discount = {
+      ...recalculated.discount,
+      source: 'coupon',
+      couponCode,
+    };
+  }
   const needsElectronicContact = validatedItems.some(
     (item) =>
       ['digital', 'service'].includes(item.product?.productType) ||
@@ -1520,7 +1577,12 @@ async function preparePosSalePreview(payload = {}, options = {}) {
   return {
     ...normalizedPayload,
     ...recalculated,
-    payment: normalizePaymentPayload(payload.payment || {}, recalculated.total),
+    payment: normalizePaymentPayload(
+      couponCode && String(payload.payment?.method || payload.payment?.methodType || '').toLowerCase() !== 'mixed'
+        ? { ...(payload.payment || {}), amount: recalculated.total }
+        : payload.payment || {},
+      recalculated.total
+    ),
     customerMode: customerResolution.customerMode,
     quickSale: customerResolution.quickSale,
     customer: customerResolution.customerSnapshot,
@@ -1534,6 +1596,25 @@ async function preparePosSalePreview(payload = {}, options = {}) {
       : null,
     branch,
     branchSnapshot: buildBranchSnapshot(branch),
+    couponValidation,
+    coupon: couponValidation?.valid
+      ? {
+          coupon: couponValidation.coupon?._id || null,
+          redemption: null,
+          code: couponCode,
+          type: couponValidation.coupon?.type || '',
+          value: Number(couponValidation.coupon?.value || 0),
+          name: couponValidation.coupon?.name || '',
+          discountAmount: Number(couponValidation.discount?.discountAmount || 0),
+          shippingDiscountAmount: 0,
+          totalDiscountAmount: Number(couponValidation.discount?.totalDiscountAmount || 0),
+          originalShippingAmount: 0,
+          finalShippingAmount: 0,
+          status: 'applied',
+          message: couponValidation.message || 'Cupón aplicado correctamente.',
+          appliedAt: new Date(),
+        }
+      : undefined,
   };
 }
 
@@ -1576,6 +1657,24 @@ async function createPosSale(payload = {}, options = {}) {
     }
     const createdOrders = await Order.create([orderPayload], { session });
     const order = createdOrders[0];
+    if (normalizedPayload.couponValidation?.valid && order.coupon?.coupon) {
+      const redemption = await couponService.recordCouponRedemption({
+        couponId: order.coupon.coupon,
+        code: order.coupon.code,
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        customerId: order.customer?.customerId || customerResolution.customer?._id,
+        customerEmail: order.customer?.email || order.customer?.emailOrPhone,
+        customerDocument: order.customer?.id,
+        sessionId: order.sessionId,
+        source: 'pos',
+        subtotal: normalizedPayload.subtotal,
+        shippingAmount: 0,
+        discount: normalizedPayload.couponValidation.discount,
+      }, { session, initialStatus: 'applied', source: 'pos_sale' });
+      order.coupon.redemption = redemption?._id || null;
+      await order.save({ session });
+    }
     await OrderEvent.create(
       [
         {

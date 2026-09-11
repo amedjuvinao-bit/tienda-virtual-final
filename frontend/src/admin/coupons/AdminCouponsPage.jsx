@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BadgePercent,
+  Calculator,
   Loader2,
   Pencil,
   Plus,
@@ -20,6 +21,8 @@ import {
   createAdminCoupon,
   deleteAdminCoupon,
   fetchAdminCoupons,
+  fetchCouponCampaignMetadata,
+  simulateAdminCoupon,
   updateAdminCoupon,
 } from './api/adminCouponsApi';
 
@@ -69,10 +72,27 @@ const EMPTY_FORM = {
   usageLimit: '',
   perCustomerLimit: '',
   appliesTo: 'all',
-  categoriesText: '',
-  excludedCategoriesText: '',
+  productIds: [],
+  excludedProductIds: [],
+  categories: [],
+  excludedCategories: [],
+  customerIds: [],
+  newCustomersOnly: false,
+  allowedChannels: ['web', 'pos'],
+  branchIds: [],
+  allowWithStoreCredit: true,
+  allowWithManualDiscount: false,
+  allowWithAutomaticPromotions: false,
   tagsText: '',
   internalNotes: '',
+  simulationProductId: '',
+  simulationQuantity: '1',
+  simulationShipping: '0',
+  simulationCustomerId: '',
+  simulationChannel: 'web',
+  simulationBranchId: '',
+  simulationStoreCredit: '0',
+  simulationManualDiscount: '0',
 };
 
 function formatMoney(value) {
@@ -190,10 +210,27 @@ function buildFormFromCoupon(coupon = {}) {
     usageLimit: coupon.usageLimit == null ? '' : String(coupon.usageLimit),
     perCustomerLimit: coupon.perCustomerLimit == null ? '' : String(coupon.perCustomerLimit),
     appliesTo: coupon.appliesTo || 'all',
-    categoriesText: joinTextList(coupon.categories),
-    excludedCategoriesText: joinTextList(coupon.excludedCategories),
+    productIds: (coupon.productIds || []).map(String),
+    excludedProductIds: (coupon.excludedProductIds || []).map(String),
+    categories: Array.isArray(coupon.categories) ? coupon.categories : [],
+    excludedCategories: Array.isArray(coupon.excludedCategories) ? coupon.excludedCategories : [],
+    customerIds: (coupon.customerIds || []).map(String),
+    newCustomersOnly: coupon.newCustomersOnly === true,
+    allowedChannels: Array.isArray(coupon.allowedChannels) && coupon.allowedChannels.length ? coupon.allowedChannels : ['web', 'pos'],
+    branchIds: (coupon.branchIds || []).map(String),
+    allowWithStoreCredit: coupon.allowWithStoreCredit !== false,
+    allowWithManualDiscount: coupon.allowWithManualDiscount === true,
+    allowWithAutomaticPromotions: coupon.allowWithAutomaticPromotions === true,
     tagsText: joinTextList(coupon.tags),
     internalNotes: coupon.internalNotes || '',
+    simulationProductId: '',
+    simulationQuantity: '1',
+    simulationShipping: '0',
+    simulationCustomerId: '',
+    simulationChannel: 'web',
+    simulationBranchId: '',
+    simulationStoreCredit: '0',
+    simulationManualDiscount: '0',
   };
 }
 
@@ -214,8 +251,17 @@ function buildPayloadFromForm(form) {
     usageLimit: nullableNumber(form.usageLimit),
     perCustomerLimit: nullableNumber(form.perCustomerLimit),
     appliesTo: form.appliesTo || 'all',
-    categories: splitTextList(form.categoriesText),
-    excludedCategories: splitTextList(form.excludedCategoriesText),
+    productIds: form.productIds || [],
+    excludedProductIds: form.excludedProductIds || [],
+    categories: form.categories || [],
+    excludedCategories: form.excludedCategories || [],
+    customerIds: form.customerIds || [],
+    newCustomersOnly: form.newCustomersOnly === true,
+    allowedChannels: form.allowedChannels || [],
+    branchIds: form.branchIds || [],
+    allowWithStoreCredit: form.allowWithStoreCredit !== false,
+    allowWithManualDiscount: form.allowWithManualDiscount === true,
+    allowWithAutomaticPromotions: form.allowWithAutomaticPromotions === true,
     tags: splitTextList(form.tagsText),
     internalNotes: String(form.internalNotes || '').trim(),
   };
@@ -271,6 +317,36 @@ const textAreaStyle = {
   resize: 'vertical',
 };
 
+function ChoiceChecklist({ options = [], values = [], onChange, empty = 'No hay opciones disponibles.' }) {
+  const selected = new Set((values || []).map(String));
+  const toggle = (value) => {
+    const key = String(value);
+    onChange(selected.has(key)
+      ? (values || []).filter((item) => String(item) !== key)
+      : [...(values || []), key]);
+  };
+
+  return (
+    <div className="max-h-44 space-y-2 overflow-y-auto rounded-2xl border p-3 admin-thin-scrollbar" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+      {options.length === 0 ? <p className="text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{empty}</p> : options.map((option) => (
+        <label key={option.value} className="flex cursor-pointer items-start gap-2 rounded-xl px-2 py-1.5 text-xs font-bold hover:bg-black/5">
+          <input type="checkbox" checked={selected.has(String(option.value))} onChange={() => toggle(option.value)} style={{ accentColor: 'var(--admin-primary)' }} />
+          <span className="min-w-0"><span className="block truncate">{option.label}</span>{option.helper ? <span className="block truncate text-[10px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{option.helper}</span> : null}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ToggleRule({ checked, onChange, label, helper }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} style={{ accentColor: 'var(--admin-primary)' }} />
+      <span><span className="block text-xs font-black">{label}</span><span className="mt-1 block text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{helper}</span></span>
+    </label>
+  );
+}
+
 function CouponFormModal({
   open,
   editingId,
@@ -280,6 +356,10 @@ function CouponFormModal({
   closeForm,
   handleSave,
   handleGenerateCode,
+  metadata,
+  simulating,
+  simulation,
+  handleSimulate,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -443,15 +523,7 @@ function CouponFormModal({
             </Field>
             <Field label="Aplicar a">
               <select style={inputStyle} value={form.appliesTo} onChange={(e) => patchForm('appliesTo', e.target.value)}>
-                {APPLIES_TO_OPTIONS.map((option) => (
-                  <option
-                    key={option.value}
-                    value={option.value}
-                    disabled={option.value === 'products' && form.appliesTo !== 'products'}
-                  >
-                    {option.label}
-                  </option>
-                ))}
+                {APPLIES_TO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </Field>
             <Field label="Inicio">
@@ -462,13 +534,86 @@ function CouponFormModal({
             </Field>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Field label="Categorías incluidas" helper="Separadas por coma. Útil si aplica a categorías.">
-              <input style={inputStyle} value={form.categoriesText} onChange={(e) => patchForm('categoriesText', e.target.value)} placeholder="Vestidos largos, Bebé" />
-            </Field>
-            <Field label="Categorías excluidas">
-              <input style={inputStyle} value={form.excludedCategoriesText} onChange={(e) => patchForm('excludedCategoriesText', e.target.value)} placeholder="Ofertas, Liquidación" />
-            </Field>
+          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
+            <h3 className="text-sm font-black">Alcance de productos y categorías</h3>
+            <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Las inclusiones definen dónde aplica; las exclusiones siempre tienen prioridad.</p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {form.appliesTo === 'products' ? (
+                <Field label="Productos incluidos" helper={`${form.productIds.length} seleccionado(s)`}>
+                  <ChoiceChecklist
+                    options={(metadata.products || []).map((product) => ({ value: product.id, label: product.title, helper: [product.sku, product.category].filter(Boolean).join(' · ') }))}
+                    values={form.productIds}
+                    onChange={(value) => patchForm('productIds', value)}
+                  />
+                </Field>
+              ) : null}
+              {form.appliesTo === 'categories' ? (
+                <Field label="Categorías incluidas" helper={`${form.categories.length} seleccionada(s)`}>
+                  <ChoiceChecklist options={(metadata.categories || []).map((category) => ({ value: category, label: category }))} values={form.categories} onChange={(value) => patchForm('categories', value)} />
+                </Field>
+              ) : null}
+              <Field label="Productos excluidos" helper={`${form.excludedProductIds.length} seleccionado(s)`}>
+                <ChoiceChecklist
+                  options={(metadata.products || []).map((product) => ({ value: product.id, label: product.title, helper: product.sku || product.category }))}
+                  values={form.excludedProductIds}
+                  onChange={(value) => patchForm('excludedProductIds', value)}
+                />
+              </Field>
+              <Field label="Categorías excluidas" helper={`${form.excludedCategories.length} seleccionada(s)`}>
+                <ChoiceChecklist options={(metadata.categories || []).map((category) => ({ value: category, label: category }))} values={form.excludedCategories} onChange={(value) => patchForm('excludedCategories', value)} />
+              </Field>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
+            <h3 className="text-sm font-black">Clientes, canales y sedes</h3>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <Field label="Clientes permitidos" helper="Vacío significa todos los clientes.">
+                <ChoiceChecklist
+                  options={(metadata.customers || []).map((customer) => ({ value: customer.id, label: customer.name, helper: [customer.customerCode, customer.documentNumber, `${customer.ordersCount} compra(s)`].filter(Boolean).join(' · ') }))}
+                  values={form.customerIds}
+                  onChange={(value) => patchForm('customerIds', value)}
+                />
+              </Field>
+              <Field label="Canales habilitados" helper="Selecciona al menos uno.">
+                <ChoiceChecklist
+                  options={[{ value: 'web', label: 'Tienda virtual / Checkout' }, { value: 'pos', label: 'POS / Venta física' }]}
+                  values={form.allowedChannels}
+                  onChange={(value) => patchForm('allowedChannels', value)}
+                />
+              </Field>
+              <Field label="Sedes permitidas" helper="Vacío significa todas las sedes.">
+                <ChoiceChecklist
+                  options={(metadata.branches || []).map((branch) => ({ value: branch.id, label: branch.name, helper: [branch.code, branch.type].filter(Boolean).join(' · ') }))}
+                  values={form.branchIds}
+                  onChange={(value) => patchForm('branchIds', value)}
+                />
+              </Field>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-4">
+              <ToggleRule checked={form.newCustomersOnly} onChange={(value) => patchForm('newCustomersOnly', value)} label="Solo primera compra" helper="Exige documento y bloquea clientes con compras confirmadas." />
+              <ToggleRule checked={form.allowWithStoreCredit} onChange={(value) => patchForm('allowWithStoreCredit', value)} label="Permitir saldo a favor" helper="El cliente puede usar cupón y saldo en la misma orden." />
+              <ToggleRule checked={form.allowWithManualDiscount} onChange={(value) => patchForm('allowWithManualDiscount', value)} label="Permitir descuento manual" helper="Útil en POS; desactivado evita duplicar descuentos." />
+              <ToggleRule checked={form.allowWithAutomaticPromotions} onChange={(value) => patchForm('allowWithAutomaticPromotions', value)} label="Permitir otras promociones" helper="Autoriza combinación con promociones automáticas futuras." />
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+            <div className="flex items-start gap-3"><Calculator className="mt-0.5 h-5 w-5" style={{ color: 'var(--admin-primary)' }} /><div><h3 className="text-sm font-black">Simulador antes de guardar</h3><p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Comprueba las reglas con precios reales sin crear ni modificar el cupón.</p></div></div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-4">
+              <Field label="Producto de prueba"><select style={inputStyle} value={form.simulationProductId} onChange={(e) => patchForm('simulationProductId', e.target.value)}><option value="">Selecciona producto</option>{(metadata.products || []).map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}</select></Field>
+              <Field label="Cantidad"><input style={inputStyle} type="number" min="1" value={form.simulationQuantity} onChange={(e) => patchForm('simulationQuantity', e.target.value)} /></Field>
+              <Field label="Canal"><select style={inputStyle} value={form.simulationChannel} onChange={(e) => patchForm('simulationChannel', e.target.value)}><option value="web">Tienda virtual</option><option value="pos">POS</option></select></Field>
+              <Field label="Sede"><select style={inputStyle} value={form.simulationBranchId} onChange={(e) => patchForm('simulationBranchId', e.target.value)}><option value="">Sin sede específica</option>{(metadata.branches || []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
+              <Field label="Cliente"><select style={inputStyle} value={form.simulationCustomerId} onChange={(e) => patchForm('simulationCustomerId', e.target.value)}><option value="">Cliente nuevo/no identificado</option>{(metadata.customers || []).map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.ordersCount} compra(s)</option>)}</select></Field>
+              <Field label="Envío"><input style={inputStyle} type="number" min="0" value={form.simulationShipping} onChange={(e) => patchForm('simulationShipping', e.target.value)} /></Field>
+              <Field label="Saldo a favor"><input style={inputStyle} type="number" min="0" value={form.simulationStoreCredit} onChange={(e) => patchForm('simulationStoreCredit', e.target.value)} /></Field>
+              <Field label="Descuento manual"><input style={inputStyle} type="number" min="0" value={form.simulationManualDiscount} onChange={(e) => patchForm('simulationManualDiscount', e.target.value)} /></Field>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button type="button" onClick={handleSimulate} disabled={simulating || !form.simulationProductId} className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-black text-white disabled:opacity-50" style={{ background: 'var(--admin-primary)' }}>{simulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{simulating ? 'Simulando...' : 'Probar reglas'}</button>
+              {simulation ? <div className="rounded-2xl border px-4 py-2 text-xs font-bold" style={{ borderColor: simulation.validation?.valid ? '#10b981' : 'var(--admin-danger, #be123c)', color: 'var(--admin-card-text)' }}>{simulation.validation?.valid ? `Aplicable · descuento ${formatMoney(simulation.validation?.discount?.totalDiscountAmount)}` : simulation.validation?.message || 'El cupón no aplica.'}</div> : null}
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -492,7 +637,7 @@ function CouponFormModal({
               onChange={(e) => patchForm('active', e.target.checked)}
               style={{ accentColor: 'var(--admin-primary)' }}
             />
-            Cupón activo para checkout
+            Cupón activo en los canales seleccionados
           </label>
 
           <div className="flex flex-wrap justify-end gap-3">
@@ -527,6 +672,9 @@ export default function AdminCouponsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [simulation, setSimulation] = useState(null);
+  const [metadata, setMetadata] = useState({ products: [], categories: [], customers: [], branches: [] });
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -561,8 +709,18 @@ export default function AdminCouponsPage() {
     }
   };
 
+  const loadMetadata = async () => {
+    try {
+      const data = await fetchCouponCampaignMetadata();
+      setMetadata(data || { products: [], categories: [], customers: [], branches: [] });
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.userMessage || 'No se pudieron cargar productos, clientes y sedes para las reglas.');
+    }
+  };
+
   useEffect(() => {
     loadCoupons();
+    loadMetadata();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -573,6 +731,7 @@ export default function AdminCouponsPage() {
       code: buildSecureCouponCode(rows),
     });
     setFormOpen(true);
+    setSimulation(null);
     setError('');
   };
 
@@ -580,6 +739,7 @@ export default function AdminCouponsPage() {
     setEditingId(String(coupon?._id || coupon?.id || ''));
     setForm(buildFormFromCoupon(coupon));
     setFormOpen(true);
+    setSimulation(null);
     setError('');
   };
 
@@ -587,6 +747,7 @@ export default function AdminCouponsPage() {
     setFormOpen(false);
     setEditingId('');
     setForm(EMPTY_FORM);
+    setSimulation(null);
   };
 
   const patchForm = (field, value) => {
@@ -601,6 +762,32 @@ export default function AdminCouponsPage() {
 
   const handleGenerateCode = () => {
     patchForm('code', buildSecureCouponCode(rows));
+  };
+
+  const handleSimulate = async () => {
+    if (!form.simulationProductId) return;
+    const selectedCustomer = (metadata.customers || []).find((customer) => customer.id === form.simulationCustomerId);
+    try {
+      setSimulating(true);
+      setSimulation(null);
+      const result = await simulateAdminCoupon({
+        coupon: buildPayloadFromForm(form),
+        items: [{ productId: form.simulationProductId, quantity: Math.max(1, Number(form.simulationQuantity || 1)) }],
+        shippingAmount: normalizeNumber(form.simulationShipping, 0),
+        customerId: form.simulationCustomerId,
+        customerDocument: selectedCustomer?.documentNumber || '',
+        customerEmail: selectedCustomer?.email || '',
+        channel: form.simulationChannel,
+        branchId: form.simulationBranchId,
+        storeCreditAmount: normalizeNumber(form.simulationStoreCredit, 0),
+        manualDiscountAmount: normalizeNumber(form.simulationManualDiscount, 0),
+      });
+      setSimulation(result);
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.userMessage || 'No se pudo simular el cupón.');
+    } finally {
+      setSimulating(false);
+    }
   };
 
   const handleSave = async (event) => {
@@ -619,6 +806,16 @@ export default function AdminCouponsPage() {
 
     if (payload.appliesTo === 'categories' && payload.categories.length === 0) {
       setError('Selecciona al menos una categoría para aplicar este cupón.');
+      return;
+    }
+
+    if (payload.appliesTo === 'products' && payload.productIds.length === 0) {
+      setError('Selecciona al menos un producto para aplicar este cupón.');
+      return;
+    }
+
+    if (payload.allowedChannels.length === 0) {
+      setError('Selecciona al menos un canal de venta.');
       return;
     }
 
@@ -713,6 +910,10 @@ export default function AdminCouponsPage() {
         closeForm={closeForm}
         handleSave={handleSave}
         handleGenerateCode={handleGenerateCode}
+        metadata={metadata}
+        simulating={simulating}
+        simulation={simulation}
+        handleSimulate={handleSimulate}
       />
 
       <div

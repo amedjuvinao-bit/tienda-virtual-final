@@ -180,11 +180,8 @@ async function validateStrictPayload() {
   );
   ok('una fecha inválida no se convierte silenciosamente en ausencia de fecha');
 
-  assertServiceError(
-    () => clean(validPayload({ customerIds: [objectId()] })),
-    'COUPON_CUSTOMER_RULES_NOT_AVAILABLE'
-  );
-  ok('las reglas de cliente incompletas fallan cerrado');
+  const segmented = clean(validPayload({ customerIds: [objectId()] }));
+  ok('las reglas de cliente se conservan con identidad autoritativa', segmented.customerIds.length === 1);
 
   const directModel = new Coupon(validPayload({ value: 150 }));
   await assert.rejects(
@@ -286,7 +283,7 @@ async function main() {
     coupons: couponCollection,
     couponredemptions: redemptionCollection,
   });
-  ok('la migración crea únicamente los índices faltantes', applied.mutations === 16 && couponCollection.created.length === 7 && redemptionCollection.created.length === 9);
+  ok('la migración crea únicamente los índices faltantes', applied.mutations === 19 && couponCollection.created.length === 9 && redemptionCollection.created.length === 10);
 
   const safeCouponCollection = fakeCollection();
   const conflictingRedemptions = fakeCollection([

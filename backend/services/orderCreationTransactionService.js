@@ -18,6 +18,7 @@ const {
   orderNeedsElectronicDelivery,
 } = require('../lib/orders/orderCreationPayload');
 const { buildOrderQuote } = require('./orderPricingService');
+const couponService = require('./couponService');
 const {
   createInventoryReservation,
   expandReservableItems,
@@ -312,10 +313,18 @@ async function createOrderInTransaction({
         customer: cleaned.customer,
         billing: cleaned.billing,
         couponCode: cleaned.couponCode,
+        customerDocument:
+          cleaned.billing?.documentNumber ||
+          cleaned.billing?.id ||
+          cleaned.customer?.id ||
+          '',
         customerEmail: getOrderCustomerEmail(cleaned),
         sessionId: cleaned.sessionId,
+        channel: 'web',
+        storeCreditAmount:
+          cleaned.storeCredit?.apply === true ? cleaned.storeCredit?.amount : 0,
       },
-      { session, settings }
+      { session, settings, deferBranchValidation: true }
     );
     assertValidQuote(quote, cleaned);
     assertOrderCartSnapshot(
@@ -337,6 +346,28 @@ async function createOrderInTransaction({
       rawBody?.source || cleaned.source,
       hasAdminUser
     );
+    if (quote.couponCode) {
+      quote.couponValidation = await couponService.validateCoupon(
+        {
+          code: quote.couponCode,
+          subtotal: quote.pricing.subtotal,
+          shippingAmount: quote.pricing.originalShipping,
+          items: quote.pricing.items,
+          customerDocument:
+            cleaned.billing?.documentNumber ||
+            cleaned.billing?.id ||
+            cleaned.customer?.id ||
+            '',
+          customerEmail: getOrderCustomerEmail(cleaned),
+          channel: orderSource === 'pos' ? 'pos' : 'web',
+          branchId: orderBranchData.branchId,
+          storeCreditAmount:
+            cleaned.storeCredit?.apply === true ? cleaned.storeCredit?.amount : 0,
+        },
+        { session }
+      );
+      assertValidQuote(quote, cleaned);
+    }
     const createdByAdminSnapshot = buildAdminSnapshot(requestContext);
     const adminUserId =
       hasAdminUser && requestContext.adminUserId

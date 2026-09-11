@@ -4,10 +4,12 @@
 const mongoose = require('mongoose');
 const Coupon = require('../models/Coupon');
 const CouponRedemption = require('../models/CouponRedemption');
+const Customer = require('../models/Customer');
 
 const COUPON_TYPES = Coupon.COUPON_TYPES || ['percentage', 'fixed', 'free_shipping'];
 const COUPON_STATUS = Coupon.COUPON_STATUS || ['draft', 'active', 'inactive', 'expired'];
 const COUPON_APPLIES_TO = Coupon.COUPON_APPLIES_TO || ['all', 'products', 'categories'];
+const COUPON_CHANNELS = Coupon.COUPON_CHANNELS || ['web', 'pos'];
 const COUPON_EFFECTIVE_STATUS = [
   'active',
   'scheduled',
@@ -158,6 +160,22 @@ function normalizeObjectIdArray(values = [], field = 'identificadores') {
   return result;
 }
 
+function normalizeChannel(value) {
+  const channel = trimSafe(value, 40).toLowerCase();
+  if (['pos', 'physical_store', 'tienda_fisica'].includes(channel)) return 'pos';
+  if (['web', 'online', 'checkout', 'ecommerce', 'tienda_online'].includes(channel)) return 'web';
+  return channel;
+}
+
+function normalizeChannels(values) {
+  const source = Array.isArray(values) ? values : values ? [values] : ['web', 'pos'];
+  return Array.from(new Set(source.map(normalizeChannel).filter((value) => COUPON_CHANNELS.includes(value))));
+}
+
+function normalizeDocument(value) {
+  return trimSafe(value, 80).replace(/\D/g, '');
+}
+
 function normalizeActor(actor = {}) {
   const source = actor && typeof actor === 'object' ? actor : {};
   const snapshot = source.snapshot && typeof source.snapshot === 'object' ? source.snapshot : {};
@@ -293,13 +311,18 @@ function cleanCouponPayload(body = {}) {
   }
 
   payload.newCustomersOnly = source.newCustomersOnly === true;
-  if (payload.customerIds.length > 0 || payload.newCustomersOnly) {
+  payload.allowedChannels = normalizeChannels(source.allowedChannels);
+  if (payload.allowedChannels.length === 0) {
     throw createServiceError(
-      'Las reglas por cliente estarán disponibles cuando exista identificación autoritativa en checkout.',
-      409,
-      'COUPON_CUSTOMER_RULES_NOT_AVAILABLE'
+      'Debes habilitar al menos un canal de venta.',
+      400,
+      'COUPON_CHANNEL_REQUIRED'
     );
   }
+  payload.branchIds = normalizeObjectIdArray(source.branchIds, 'Las sedes permitidas');
+  payload.allowWithStoreCredit = source.allowWithStoreCredit !== false;
+  payload.allowWithManualDiscount = source.allowWithManualDiscount === true;
+  payload.allowWithAutomaticPromotions = source.allowWithAutomaticPromotions === true;
   payload.tags = normalizeStringArray(source.tags);
   payload.internalNotes = trimSafe(source.internalNotes, 1000);
 
@@ -614,10 +637,11 @@ function calculateDiscount(coupon, { subtotal = 0, shippingAmount = 0, items = [
 
 async function ensurePerCustomerLimit(
   coupon,
-  { customerId = '', customerEmail = '' } = {},
+  { customerId = '', customerEmail = '', customerDocument = '' } = {},
   options = {}
 ) {
-  const limit = Number(coupon.perCustomerLimit || 0);
+  const configuredLimit = Number(coupon.perCustomerLimit || 0);
+  const limit = coupon.newCustomersOnly === true ? 1 : configuredLimit;
   if (!Number.isFinite(limit) || limit <= 0) return { ok: true };
 
   const consumingStatuses = ['reserved', 'applied'];
@@ -626,11 +650,19 @@ async function ensurePerCustomerLimit(
     ? new mongoose.Types.ObjectId(String(customerId))
     : null;
   const email = normalizeLower(customerEmail);
+  const document = normalizeDocument(customerDocument);
 
   if (customerObjectId) filters.push({ customer: customerObjectId });
   if (email) filters.push({ customerEmail: email });
+  if (document) filters.push({ customerDocument: document });
 
-  if (filters.length === 1) return { ok: true };
+  if (filters.length === 1) {
+    return {
+      ok: false,
+      code: 'COUPON_CUSTOMER_IDENTITY_REQUIRED',
+      message: 'Identifica al cliente para validar el límite de uso del cupón.',
+    };
+  }
 
   const query = {
     $and: [
@@ -639,7 +671,7 @@ async function ensurePerCustomerLimit(
     ],
   };
 
-  let countQuery = CouponRedemption.countDocuments(query);
+  let countQuery = (options.RedemptionModel || CouponRedemption).countDocuments(query);
   if (options.session && typeof countQuery.session === 'function') {
     countQuery = countQuery.session(options.session);
   }
@@ -654,6 +686,86 @@ async function ensurePerCustomerLimit(
   }
 
   return { ok: true };
+}
+
+async function resolveCustomerContext(input = {}, options = {}) {
+  const suppliedId = trimSafe(input.customerId || input.customer?._id || input.customer?.customerId, 80);
+  const email = normalizeLower(input.customerEmail || input.email || input.customer?.email || input.customer?.emailOrPhone);
+  const document = normalizeDocument(
+    input.customerDocument || input.documentNumber || input.customer?.documentNumber || input.customer?.id
+  );
+  const clauses = [];
+  if (mongoose.Types.ObjectId.isValid(suppliedId)) clauses.push({ _id: new mongoose.Types.ObjectId(suppliedId) });
+  if (document) clauses.push({ normalizedDocument: document });
+  if (email && email.includes('@')) clauses.push({ normalizedEmail: email });
+
+  let customer = null;
+  if (clauses.length) {
+    let query = (options.CustomerModel || Customer).findOne({
+      deletedAt: null,
+      $or: clauses,
+    }).select('_id customerCode normalizedEmail normalizedDocument stats status active');
+    if (options.session && typeof query.session === 'function') query = query.session(options.session);
+    customer = await query.lean();
+  }
+
+  return {
+    customer,
+    customerId: customer?._id || (mongoose.Types.ObjectId.isValid(suppliedId) ? suppliedId : ''),
+    customerEmail: customer?.normalizedEmail || email,
+    customerDocument: customer?.normalizedDocument || document,
+    identified: Boolean(customer || document || (email && email.includes('@'))),
+    purchaseCount: Number(customer?.stats?.ordersCount || 0),
+  };
+}
+
+async function validateCommercialEligibility(coupon, input = {}, options = {}) {
+  const channel = normalizeChannel(input.channel || input.source || 'web') || 'web';
+  const allowedChannels = normalizeChannels(coupon.allowedChannels);
+  if (!allowedChannels.includes(channel)) {
+    return { ok: false, code: 'COUPON_CHANNEL_NOT_ALLOWED', message: 'Este cupón no está disponible en este canal de venta.' };
+  }
+
+  const allowedBranches = (coupon.branchIds || []).map(String);
+  const branchId = trimSafe(input.branchId || input.branch || input.sede, 80);
+  if (
+    allowedBranches.length > 0 &&
+    ((!branchId && options.deferBranchValidation !== true) ||
+      (branchId && !allowedBranches.includes(String(branchId))))
+  ) {
+    return { ok: false, code: 'COUPON_BRANCH_NOT_ALLOWED', message: 'Este cupón no está disponible en la sede seleccionada.' };
+  }
+
+  const customerContext = await resolveCustomerContext(input, options);
+  const allowedCustomers = (coupon.customerIds || []).map(String);
+  if (allowedCustomers.length > 0) {
+    if (!customerContext.customer || !allowedCustomers.includes(String(customerContext.customer._id))) {
+      return { ok: false, code: 'COUPON_CUSTOMER_NOT_ALLOWED', message: 'Este cupón no está disponible para este cliente.' };
+    }
+  }
+  if (coupon.newCustomersOnly === true) {
+    if (!customerContext.customerDocument) {
+      return { ok: false, code: 'COUPON_CUSTOMER_IDENTITY_REQUIRED', message: 'Identifica al cliente con su documento para validar este cupón.' };
+    }
+    if (customerContext.purchaseCount > 0) {
+      return { ok: false, code: 'COUPON_FIRST_PURCHASE_ONLY', message: 'Este cupón es exclusivo para la primera compra.' };
+    }
+  }
+
+  const storeCreditAmount = moneySafe(input.storeCreditAmount ?? input.storeCredit?.amount, 0);
+  if (storeCreditAmount > 0 && coupon.allowWithStoreCredit === false) {
+    return { ok: false, code: 'COUPON_STORE_CREDIT_CONFLICT', message: 'Este cupón no se puede combinar con saldo a favor.' };
+  }
+  const manualDiscountAmount = moneySafe(input.manualDiscountAmount ?? input.discount?.amount, 0);
+  if (manualDiscountAmount > 0 && coupon.allowWithManualDiscount !== true) {
+    return { ok: false, code: 'COUPON_MANUAL_DISCOUNT_CONFLICT', message: 'Este cupón no se puede combinar con un descuento manual.' };
+  }
+  const promotionDiscountAmount = moneySafe(input.promotionDiscountAmount ?? input.promotion?.amount, 0);
+  if (promotionDiscountAmount > 0 && coupon.allowWithAutomaticPromotions !== true) {
+    return { ok: false, code: 'COUPON_PROMOTION_CONFLICT', message: 'Este cupón no se puede combinar con otra promoción.' };
+  }
+
+  return { ok: true, channel, branchId, customerContext };
 }
 
 async function listCoupons(params = {}) {
@@ -832,17 +944,7 @@ async function deleteCoupon(id, actor = {}) {
   return serializeCoupon(coupon);
 }
 
-async function validateCoupon(input = {}, options = {}) {
-  const code = normalizeCode(input.code);
-  if (!code) {
-    return { valid: false, code: 'COUPON_CODE_REQUIRED', message: 'Debes ingresar un cupón.' };
-  }
-
-  let couponQuery = Coupon.findOne({ code, deletedAt: null });
-  if (options.session && typeof couponQuery.session === 'function') {
-    couponQuery = couponQuery.session(options.session);
-  }
-  const coupon = await couponQuery;
+async function validateCouponDefinition(coupon, input = {}, options = {}) {
   const statusValidation = validateCouponStatus(coupon);
   if (!statusValidation.ok) return { valid: false, ...statusValidation };
 
@@ -859,9 +961,15 @@ async function validateCoupon(input = {}, options = {}) {
     };
   }
 
+  const commercialEligibility = await validateCommercialEligibility(coupon, input, options);
+  if (!commercialEligibility.ok) {
+    return { valid: false, ...commercialEligibility, coupon: serializeCoupon(coupon) };
+  }
+
   const customerLimit = await ensurePerCustomerLimit(coupon, {
-    customerId: input.customerId,
-    customerEmail: input.customerEmail || input.email,
+    customerId: commercialEligibility.customerContext.customerId,
+    customerEmail: commercialEligibility.customerContext.customerEmail,
+    customerDocument: commercialEligibility.customerContext.customerDocument,
   }, options);
 
   if (!customerLimit.ok) {
@@ -908,7 +1016,21 @@ async function validateCoupon(input = {}, options = {}) {
   };
 }
 
-async function recordCouponRedemption({ couponId, code, orderId, orderNumber, customerId, customerEmail, sessionId, source, subtotal, shippingAmount, discount } = {}, options = {}) {
+async function validateCoupon(input = {}, options = {}) {
+  const code = normalizeCode(input.code);
+  if (!code) {
+    return { valid: false, code: 'COUPON_CODE_REQUIRED', message: 'Debes ingresar un cupón.' };
+  }
+
+  let couponQuery = Coupon.findOne({ code, deletedAt: null });
+  if (options.session && typeof couponQuery.session === 'function') {
+    couponQuery = couponQuery.session(options.session);
+  }
+  const coupon = await couponQuery;
+  return validateCouponDefinition(coupon, input, options);
+}
+
+async function recordCouponRedemption({ couponId, code, orderId, orderNumber, customerId, customerEmail, customerDocument, sessionId, source, subtotal, shippingAmount, discount } = {}, options = {}) {
   if (!mongoose.Types.ObjectId.isValid(String(couponId || ''))) {
     throw createServiceError('Cupón inválido para registrar uso.', 400, 'COUPON_ID_INVALID');
   }
@@ -932,6 +1054,7 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
     orderNumber: trimSafe(orderNumber, 80),
     customer: customerObjectId,
     customerEmail: normalizeLower(customerEmail),
+    customerDocument: normalizeDocument(customerDocument),
     sessionId: trimSafe(sessionId, 120),
     subtotal: moneySafe(subtotal, 0),
     shippingAmount: moneySafe(shippingAmount, 0),
@@ -1145,6 +1268,8 @@ module.exports = {
   isItemEligibleForCoupon,
   calculateEligibleSubtotal,
   calculateDiscount,
+  validateCommercialEligibility,
+  validateCouponDefinition,
   validateCoupon,
   listCoupons,
   getCouponById,
@@ -1152,10 +1277,13 @@ module.exports = {
   updateCoupon,
   setCouponStatus,
   deleteCoupon,
+  cleanCouponPayload,
   recordCouponRedemption,
   transitionOrderCouponRedemption,
   reconcileOrderCouponForStatus,
   __test: {
     cleanCouponPayload,
+    normalizeChannel,
+    resolveCustomerContext,
   },
 };

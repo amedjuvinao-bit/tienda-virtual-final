@@ -33,6 +33,14 @@ const COUPON_INDEX_DEFINITIONS = Object.freeze([
     key: Object.freeze({ productIds: 1 }),
     options: Object.freeze({ name: 'productIds_1' }),
   }),
+  Object.freeze({
+    key: Object.freeze({ customerIds: 1 }),
+    options: Object.freeze({ name: 'customerIds_1' }),
+  }),
+  Object.freeze({
+    key: Object.freeze({ allowedChannels: 1, branchIds: 1 }),
+    options: Object.freeze({ name: 'allowedChannels_1_branchIds_1' }),
+  }),
 ]);
 
 const COUPON_REDEMPTION_INDEX_DEFINITIONS = Object.freeze([
@@ -63,6 +71,10 @@ const COUPON_REDEMPTION_INDEX_DEFINITIONS = Object.freeze([
   Object.freeze({
     key: Object.freeze({ coupon: 1, status: 1, customerEmail: 1 }),
     options: Object.freeze({ name: 'coupon_1_status_1_customerEmail_1' }),
+  }),
+  Object.freeze({
+    key: Object.freeze({ coupon: 1, status: 1, customerDocument: 1 }),
+    options: Object.freeze({ name: 'coupon_1_status_1_customerDocument_1' }),
   }),
   Object.freeze({
     key: Object.freeze({ coupon: 1, createdAt: -1 }),

@@ -15,6 +15,8 @@ vi.mock('./api/adminCouponsApi', () => ({
   createAdminCoupon: vi.fn(),
   deleteAdminCoupon: vi.fn(),
   fetchAdminCoupons: vi.fn(),
+  fetchCouponCampaignMetadata: vi.fn().mockResolvedValue({ products: [], categories: [], customers: [], branches: [] }),
+  simulateAdminCoupon: vi.fn(),
   updateAdminCoupon: vi.fn(),
 }));
 
@@ -116,11 +118,11 @@ describe('Cupones Nivel Plus · Etapa 0', () => {
     });
   });
 
-  it('no ofrece crear cupones por producto hasta disponer del selector autoritativo', async () => {
+  it('habilita cupones por producto porque la Etapa 2 ya dispone de selector autoritativo', async () => {
     render(<AdminCouponsPage />);
     expect(await screen.findByText('CUP-VENCIDO')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo cupón' }));
-    expect(screen.getByRole('option', { name: 'Productos específicos' })).toBeDisabled();
+    expect(screen.getByRole('option', { name: 'Productos específicos' })).toBeEnabled();
   });
 });

@@ -23,6 +23,7 @@ const CouponRedemptionSchema = new mongoose.Schema(
     orderNumber: { type: String, trim: true, default: '' },
     customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     customerEmail: { type: String, trim: true, lowercase: true, default: '' },
+    customerDocument: { type: String, trim: true, default: '' },
     sessionId: { type: String, trim: true, default: '' },
 
     subtotal: { type: Number, min: 0, default: 0 },

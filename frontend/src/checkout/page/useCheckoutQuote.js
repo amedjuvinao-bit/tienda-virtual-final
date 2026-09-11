@@ -28,6 +28,8 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
     setStoreCreditAmount,
     setStoreCreditPreview,
     setUseStoreCredit,
+    storeCreditAmount,
+    useStoreCredit,
   } = state;
   const { currentCart, selectedCountry, total } = derived;
 
@@ -78,8 +80,13 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
         ? String(customerEmailOrPhone || '').trim()
         : '',
       emailOrPhone: customerEmailOrPhone,
+      id: customerId,
+      documentNumber: customerId,
     },
+    customerDocument: customerId,
+    channel: 'web',
     couponCode,
+    storeCreditAmount: useStoreCredit ? Number(storeCreditAmount || 0) : 0,
   });
 
   const handleApplyCoupon = () => {
@@ -225,6 +232,8 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
     customerCity,
     customerEmailOrPhone,
     appliedCoupon?.code,
+    useStoreCredit,
+    storeCreditAmount,
   ]);
 
   return { handleApplyCoupon, handlePreviewStoreCredit };
