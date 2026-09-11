@@ -88,12 +88,13 @@ function validateSecureCodeGenerator() {
   [
     "PUBLIC_CODE_PREFIX = 'CUP'",
     'SAFE_CODE_ALPHABET',
+    'getCryptoNumber',
     'buildSecureCouponCode',
     'randomSafeChunk',
     'window.crypto.getRandomValues',
+    'existingCodes.has(candidate)',
+    'onClick={handleGenerateCode}',
     'CUP-7K9X-P2Q4',
-    'Código público seguro',
-    'Auto',
   ].forEach((needle) => assertIncludes(page, needle, `Página admin cupones no contiene generador seguro: ${needle}`));
 
   assertNotIncludes(page, "AUTO_CODE_PREFIX = 'ROSA'", 'No se debe usar ROSA como prefijo estándar del proyecto');

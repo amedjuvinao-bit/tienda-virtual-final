@@ -134,8 +134,15 @@ async function main() {
   ok('POS valida el código con cliente y sede autoritativos', pos.includes("channel: 'pos'") && pos.includes('customerResolution.customer') && pos.includes('branch._id'));
   ok('POS registra una redención aplicada dentro de la transacción', pos.includes('recordCouponRedemption') && pos.includes("initialStatus: 'applied'"));
   ok('la interfaz POS permite ingresar el cupón', posUi.includes('Cupón de campaña') && posUi.includes('couponCode'));
-  ok('el formulario ofrece selectores reales de productos, categorías, clientes y sedes', ['Productos incluidos', 'Categorías incluidas', 'Clientes permitidos', 'Sedes permitidas'].every((label) => admin.includes(label)));
-  ok('el formulario configura canales y combinaciones', admin.includes('Canales habilitados') && admin.includes('Permitir saldo a favor') && admin.includes('Permitir descuento manual'));
+  ok(
+    'el formulario ofrece selectores reales de productos, categorías, clientes y sedes',
+    ['productOptions', 'categoryOptions', 'customerOptions', 'branchOptions', 'ChoiceChecklist'].every((control) => admin.includes(control))
+      && ['Elige los productos incluidos', 'Elige las categorías incluidas', 'Elige los clientes autorizados', 'Limitar a sedes concretas'].every((label) => admin.includes(label))
+  );
+  ok(
+    'el formulario configura canales y combinaciones',
+    ["allowedChannels.includes('web')", "allowedChannels.includes('pos')", 'allowWithStoreCredit', 'allowWithManualDiscount'].every((control) => admin.includes(control))
+  );
   ok('el simulador usa precios reales sin guardar', routes.includes("'/simulate'") && source('backend/services/couponCampaignService.js').includes('resolveAuthoritativeItems'));
   ok('la respuesta pública sigue siendo lista permitida', service.includes('serializePublicCoupon') && !source('backend/routes/coupons.js').includes('serializeCoupon('));
 
