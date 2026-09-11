@@ -54,13 +54,18 @@ describe('Cupones Nivel Plus · Etapa 2', () => {
     await screen.findByText('No hay cupones registrados');
     await waitFor(() => expect(fetchCouponCampaignMetadata).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo cupón' }));
-    fireEvent.change(screen.getByLabelText('Aplicar a'), { target: { value: 'products' } });
+    fireEvent.change(screen.getByLabelText(/Nombre de la campaña/), { target: { value: 'Campaña dirigida' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: productos/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Productos concretos/ }));
 
     fireEvent.click(screen.getAllByRole('checkbox', { name: /Vestido Rosa/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: público/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Clientes concretos/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /María Prueba/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Limitar a sedes concretas/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Sede Principal/ }));
 
-    expect(screen.getAllByText('1 seleccionado(s)').length).toBeGreaterThan(0);
+    expect(screen.getByText('1 cliente(s) seleccionado(s)')).toBeInTheDocument();
     expect(screen.getByText('Clientes, canales y sedes')).toBeInTheDocument();
   });
 
@@ -69,14 +74,35 @@ describe('Cupones Nivel Plus · Etapa 2', () => {
     await screen.findByText('No hay cupones registrados');
     await waitFor(() => expect(fetchCouponCampaignMetadata).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo cupón' }));
+    fireEvent.change(screen.getByLabelText(/Nombre de la campaña/), { target: { value: 'Campaña simulada' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: productos/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: público/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: revisar/ }));
     fireEvent.change(screen.getByLabelText('Producto de prueba'), { target: { value: productId } });
-    fireEvent.click(screen.getByRole('button', { name: 'Probar reglas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar cupón' }));
 
     await waitFor(() => expect(simulateAdminCoupon).toHaveBeenCalledWith(expect.objectContaining({
       items: [{ productId, quantity: 1 }],
       channel: 'web',
     })));
-    expect(await screen.findByText(/Aplicable · descuento/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sí aplica · descuento/)).toBeInTheDocument();
     expect(createAdminCoupon).not.toHaveBeenCalled();
+  });
+
+  it('muestra un recorrido guiado y oculta las exclusiones hasta que se solicitan', async () => {
+    render(<AdminCouponsPage />);
+    await screen.findByText('No hay cupones registrados');
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo cupón' }));
+
+    expect(screen.getByText('¿Qué beneficio recibirá el cliente?')).toBeInTheDocument();
+    expect(screen.queryByText('Productos que nunca participan')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Nombre de la campaña/), { target: { value: 'Campaña clara' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: productos/ }));
+    expect(screen.getByText('¿En qué productos funcionará?')).toBeInTheDocument();
+    expect(screen.queryByText('Productos que nunca participan')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Necesito excluir/ }));
+    expect(screen.getByText('Productos que nunca participan')).toBeInTheDocument();
   });
 });

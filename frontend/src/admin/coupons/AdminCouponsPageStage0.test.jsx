@@ -123,6 +123,8 @@ describe('Cupones Nivel Plus · Etapa 0', () => {
     expect(await screen.findByText('CUP-VENCIDO')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo cupón' }));
-    expect(screen.getByRole('option', { name: 'Productos específicos' })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText(/Nombre de la campaña/), { target: { value: 'Cupón por producto' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente: productos/ }));
+    expect(screen.getByRole('radio', { name: /Productos concretos/ })).toBeEnabled();
   });
 });

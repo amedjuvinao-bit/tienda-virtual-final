@@ -4,6 +4,9 @@ import { createPortal } from 'react-dom';
 import {
   BadgePercent,
   Calculator,
+  Check,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   Pencil,
   Plus,
@@ -317,8 +320,20 @@ const textAreaStyle = {
   resize: 'vertical',
 };
 
-function ChoiceChecklist({ options = [], values = [], onChange, empty = 'No hay opciones disponibles.' }) {
+function ChoiceChecklist({
+  options = [],
+  values = [],
+  onChange,
+  empty = 'No hay opciones disponibles.',
+  searchLabel = 'Buscar en la lista',
+}) {
+  const [query, setQuery] = useState('');
   const selected = new Set((values || []).map(String));
+  const visibleOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase('es');
+    if (!normalizedQuery) return options;
+    return options.filter((option) => `${option.label || ''} ${option.helper || ''}`.toLocaleLowerCase('es').includes(normalizedQuery));
+  }, [options, query]);
   const toggle = (value) => {
     const key = String(value);
     onChange(selected.has(key)
@@ -327,13 +342,29 @@ function ChoiceChecklist({ options = [], values = [], onChange, empty = 'No hay 
   };
 
   return (
-    <div className="max-h-44 space-y-2 overflow-y-auto rounded-2xl border p-3 admin-thin-scrollbar" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-      {options.length === 0 ? <p className="text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{empty}</p> : options.map((option) => (
-        <label key={option.value} className="flex cursor-pointer items-start gap-2 rounded-xl px-2 py-1.5 text-xs font-bold hover:bg-black/5">
-          <input type="checkbox" checked={selected.has(String(option.value))} onChange={() => toggle(option.value)} style={{ accentColor: 'var(--admin-primary)' }} />
-          <span className="min-w-0"><span className="block truncate">{option.label}</span>{option.helper ? <span className="block truncate text-[10px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{option.helper}</span> : null}</span>
-        </label>
-      ))}
+    <div className="overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+      {options.length > 5 ? (
+        <div className="flex items-center gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />
+          <input
+            aria-label={searchLabel}
+            className="min-w-0 flex-1 bg-transparent text-xs font-bold outline-none"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={searchLabel}
+          />
+        </div>
+      ) : null}
+      <div className="max-h-52 space-y-1 overflow-y-auto p-2 admin-thin-scrollbar">
+        {options.length === 0 ? <p className="p-2 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{empty}</p> : null}
+        {options.length > 0 && visibleOptions.length === 0 ? <p className="p-2 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No hay coincidencias.</p> : null}
+        {visibleOptions.map((option) => (
+          <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl px-2.5 py-2 text-xs font-bold hover:bg-black/5">
+            <input type="checkbox" checked={selected.has(String(option.value))} onChange={() => toggle(option.value)} style={{ accentColor: 'var(--admin-primary)' }} />
+            <span className="min-w-0"><span className="block">{option.label}</span>{option.helper ? <span className="mt-0.5 block text-[10px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{option.helper}</span> : null}</span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -351,6 +382,7 @@ function CouponFormModal({
   open,
   editingId,
   form,
+  error,
   saving,
   patchForm,
   closeForm,
@@ -361,8 +393,27 @@ function CouponFormModal({
   simulation,
   handleSimulate,
 }) {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [showExclusions, setShowExclusions] = useState(false);
+  const [audienceMode, setAudienceMode] = useState('all');
+  const [limitBranches, setLimitBranches] = useState(false);
+  const [stepError, setStepError] = useState('');
+
+  const steps = [
+    { number: 1, label: 'Descuento', helper: 'Qué recibe' },
+    { number: 2, label: 'Productos', helper: 'Dónde aplica' },
+    { number: 3, label: 'Público', helper: 'Quién puede usarlo' },
+    { number: 4, label: 'Revisión', helper: 'Comprobar y guardar' },
+  ];
+
   useEffect(() => {
     if (!open) return undefined;
+
+    setCurrentStep(1);
+    setShowExclusions(Boolean(form.excludedProductIds?.length || form.excludedCategories?.length));
+    setAudienceMode(form.newCustomersOnly ? 'first_purchase' : form.customerIds?.length ? 'specific' : 'all');
+    setLimitBranches(Boolean(form.branchIds?.length));
+    setStepError('');
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -377,9 +428,99 @@ function CouponFormModal({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, closeForm]);
+  // El estado del asistente solo se reinicia al abrir otro formulario.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingId]);
 
   if (!open) return null;
+
+  const productOptions = (metadata.products || []).map((product) => ({
+    value: product.id,
+    label: product.title,
+    helper: [product.sku, product.category].filter(Boolean).join(' · '),
+  }));
+  const categoryOptions = (metadata.categories || []).map((category) => ({ value: category, label: category }));
+  const customerOptions = (metadata.customers || []).map((customer) => ({
+    value: customer.id,
+    label: customer.name,
+    helper: [customer.customerCode, customer.documentNumber, `${customer.ordersCount} compra(s)`].filter(Boolean).join(' · '),
+  }));
+  const branchOptions = (metadata.branches || []).map((branch) => ({
+    value: branch.id,
+    label: branch.name,
+    helper: [branch.code, branch.type].filter(Boolean).join(' · '),
+  }));
+
+  const benefitSummary = form.type === 'percentage'
+    ? `${form.value || 0}% de descuento`
+    : form.type === 'fixed'
+      ? `${formatMoney(form.value)} de descuento`
+      : 'Envío gratis';
+  const scopeSummary = form.appliesTo === 'products'
+    ? `${form.productIds.length} producto(s) elegido(s)`
+    : form.appliesTo === 'categories'
+      ? `${form.categories.length} categoría(s) elegida(s)`
+      : 'Todos los productos';
+  const audienceSummary = audienceMode === 'first_purchase'
+    ? 'Solo primera compra'
+    : audienceMode === 'specific'
+      ? `${form.customerIds.length} cliente(s) elegido(s)`
+      : 'Todos los clientes';
+  const channelSummary = [
+    form.allowedChannels.includes('web') ? 'Tienda virtual' : '',
+    form.allowedChannels.includes('pos') ? 'POS' : '',
+  ].filter(Boolean).join(' y ') || 'Sin canal';
+
+  const chooseAudience = (mode) => {
+    setAudienceMode(mode);
+    setStepError('');
+    if (mode === 'all') {
+      patchForm('newCustomersOnly', false);
+      patchForm('customerIds', []);
+    } else if (mode === 'first_purchase') {
+      patchForm('newCustomersOnly', true);
+      patchForm('customerIds', []);
+    } else {
+      patchForm('newCustomersOnly', false);
+    }
+  };
+
+  const validateCurrentStep = () => {
+    if (currentStep === 1) {
+      if (!String(form.code || '').trim()) return 'Genera o escribe el código que verá el cliente.';
+      if (!String(form.name || '').trim()) return 'Escribe un nombre interno para reconocer la campaña.';
+      if (form.type !== 'free_shipping' && normalizeNumber(form.value, 0) <= 0) return 'El descuento debe ser mayor que cero.';
+    }
+    if (currentStep === 2) {
+      if (form.appliesTo === 'products' && form.productIds.length === 0) return 'Elige al menos un producto incluido.';
+      if (form.appliesTo === 'categories' && form.categories.length === 0) return 'Elige al menos una categoría incluida.';
+    }
+    if (currentStep === 3) {
+      if (audienceMode === 'specific' && form.customerIds.length === 0) return 'Elige al menos un cliente o selecciona “Todos los clientes”.';
+      if (form.allowedChannels.length === 0) return 'Elige al menos un canal de venta.';
+      if (limitBranches && form.branchIds.length === 0) return 'Elige al menos una sede o desactiva la limitación por sede.';
+    }
+    return '';
+  };
+
+  const goToNextStep = () => {
+    const validationMessage = validateCurrentStep();
+    if (validationMessage) {
+      setStepError(validationMessage);
+      return;
+    }
+    setStepError('');
+    setCurrentStep((step) => Math.min(4, step + 1));
+  };
+
+  const handleWizardSubmit = (event) => {
+    if (currentStep < 4) {
+      event.preventDefault();
+      goToNextStep();
+      return;
+    }
+    handleSave(event);
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-[9990] flex min-h-screen items-center justify-center px-4 py-6">
@@ -391,8 +532,8 @@ function CouponFormModal({
       />
 
       <form
-        onSubmit={handleSave}
-        className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border shadow-2xl"
+        onSubmit={handleWizardSubmit}
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border shadow-2xl"
         style={{
           background: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%), var(--admin-card-bg))',
           borderColor: 'var(--admin-card-border)',
@@ -401,7 +542,7 @@ function CouponFormModal({
         }}
       >
         <div
-          className="flex items-start justify-between gap-4 border-b px-6 py-5"
+          className="flex items-start justify-between gap-4 border-b px-6 py-4"
           style={{ borderColor: 'var(--admin-card-border)' }}
         >
           <div>
@@ -412,7 +553,7 @@ function CouponFormModal({
               {editingId ? form.code || 'Cupón' : 'Crear promoción'}
             </h2>
             <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Configura descuento, vigencia y límites sin mover la página principal.
+              Sigue cuatro pasos sencillos. Al final podrás comprobar las reglas antes de guardar.
             </p>
           </div>
 
@@ -431,234 +572,329 @@ function CouponFormModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-6 py-5 admin-thin-scrollbar">
-          <div
-            className="mb-4 flex items-start gap-3 rounded-3xl border p-4"
-            style={{
-              borderColor: 'var(--admin-card-border)',
-              background: 'var(--admin-primary-soft-bg)',
-              color: 'var(--admin-card-text)',
-            }}
-          >
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
-            <div>
-              <p className="text-sm font-black">Código público seguro</p>
-              <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                El botón Auto genera un código aleatorio no consecutivo para evitar que clientes lo adivinen probando números.
-              </p>
-            </div>
-          </div>
+        <nav className="grid grid-cols-2 border-b md:grid-cols-4" aria-label="Pasos para crear el cupón" style={{ borderColor: 'var(--admin-card-border)' }}>
+          {steps.map((step) => {
+            const active = currentStep === step.number;
+            const complete = currentStep > step.number;
+            return (
+              <button
+                key={step.number}
+                type="button"
+                disabled={step.number > currentStep}
+                onClick={() => { setCurrentStep(step.number); setStepError(''); }}
+                className="flex items-center gap-3 border-r px-4 py-3 text-left transition disabled:cursor-default"
+                style={{
+                  borderColor: 'var(--admin-card-border)',
+                  background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)',
+                  color: active || complete ? 'var(--admin-card-text)' : 'var(--admin-card-muted-text)',
+                }}
+              >
+                <span className="text-xs font-black" style={{ color: active || complete ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+                  {complete ? <Check className="h-4 w-4" /> : `0${step.number}`}
+                </span>
+                <span><span className="block text-xs font-black">{step.label}</span><span className="hidden text-[10px] font-semibold md:block">{step.helper}</span></span>
+              </button>
+            );
+          })}
+        </nav>
 
-          <div className="grid gap-4 lg:grid-cols-4">
-            <Field
-              label="Código público"
-              helper={editingId ? 'Puedes conservar o ajustar el código actual.' : 'Aleatorio seguro. Ejemplo: CUP-7K9X-P2Q4.'}
-            >
-              <div className="flex gap-2">
-                <input
-                  style={inputStyle}
-                  value={form.code}
-                  onChange={(e) => patchForm('code', e.target.value.toUpperCase())}
-                  placeholder="CUP-7K9X-P2Q4"
-                />
-                {!editingId ? (
-                  <button
-                    type="button"
-                    onClick={handleGenerateCode}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-[calc(var(--admin-radius)*0.55)] border px-3 text-xs font-black transition hover:-translate-y-0.5"
-                    style={{
-                      borderColor: 'var(--admin-card-border)',
-                      background: 'var(--admin-primary-soft-bg)',
-                      color: 'var(--admin-primary)',
-                    }}
-                    title="Generar código público aleatorio"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Auto
-                  </button>
-                ) : null}
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_270px] lg:overflow-hidden admin-thin-scrollbar">
+          <div className="min-h-0 overflow-y-auto px-6 py-5 admin-thin-scrollbar">
+            {(stepError || error) ? (
+              <div className="mb-4 border-l-4 px-4 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-danger, #be123c)', background: 'color-mix(in srgb, var(--admin-danger, #be123c) 8%, var(--admin-card-bg))' }}>
+                {stepError || error}
               </div>
-            </Field>
-            <Field label="Nombre">
-              <input style={inputStyle} value={form.name} onChange={(e) => patchForm('name', e.target.value)} placeholder="10% lanzamiento" />
-            </Field>
-            <Field label="Tipo">
-              <select style={inputStyle} value={form.type} onChange={(e) => patchForm('type', e.target.value)}>
-                {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Valor" helper={form.type === 'percentage' ? 'Porcentaje 1 a 100' : form.type === 'fixed' ? 'Valor en pesos' : 'No aplica'}>
-              <input
-                style={inputStyle}
-                type="number"
-                min="0"
-                max={form.type === 'percentage' ? '100' : undefined}
-                value={form.type === 'free_shipping' ? '0' : form.value}
-                disabled={form.type === 'free_shipping'}
-                onChange={(e) => patchForm('value', e.target.value)}
-              />
-            </Field>
+            ) : null}
+
+            {currentStep === 1 ? (
+              <section aria-labelledby="coupon-step-benefit">
+                <h3 id="coupon-step-benefit" className="text-xl font-black">¿Qué beneficio recibirá el cliente?</h3>
+                <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Define el código, el descuento y los límites de la campaña.</p>
+
+                <div className="mt-5 border-b pb-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Nombre de la campaña" helper="Solo lo verá el equipo administrativo.">
+                      <input style={inputStyle} value={form.name} onChange={(e) => patchForm('name', e.target.value)} placeholder="Ejemplo: Lanzamiento de septiembre" autoFocus />
+                    </Field>
+                    <Field label="Código que escribirá el cliente" helper="Usamos un código aleatorio difícil de adivinar.">
+                      <div className="flex gap-2">
+                        <input style={inputStyle} value={form.code} onChange={(e) => patchForm('code', e.target.value.toUpperCase())} placeholder="CUP-7K9X-P2Q4" />
+                        {!editingId ? (
+                          <button type="button" onClick={handleGenerateCode} className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
+                            <RefreshCw className="h-3.5 w-3.5" /> Nuevo
+                          </button>
+                        ) : null}
+                      </div>
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="py-5">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Field label="Tipo de beneficio">
+                      <select style={inputStyle} value={form.type} onChange={(e) => patchForm('type', e.target.value)}>
+                        {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label={form.type === 'percentage' ? 'Porcentaje de descuento' : form.type === 'fixed' ? 'Valor del descuento' : 'Valor'} helper={form.type === 'percentage' ? 'Escribe un número entre 1 y 100.' : form.type === 'fixed' ? 'Valor expresado en pesos colombianos.' : 'El envío elegible quedará en $0.'}>
+                      <input style={inputStyle} type="number" min="0" max={form.type === 'percentage' ? '100' : undefined} value={form.type === 'free_shipping' ? '0' : form.value} disabled={form.type === 'free_shipping'} onChange={(e) => patchForm('value', e.target.value)} />
+                    </Field>
+                    <Field label="Compra mínima" helper="Déjalo en 0 si no hay mínimo.">
+                      <input style={inputStyle} type="number" min="0" value={form.minSubtotal} onChange={(e) => patchForm('minSubtotal', e.target.value)} />
+                    </Field>
+                    <Field label="Máximo descuento" helper="Opcional. Evita descuentos demasiado altos.">
+                      <input style={inputStyle} type="number" min="0" value={form.maxDiscountAmount} onChange={(e) => patchForm('maxDiscountAmount', e.target.value)} placeholder="Sin tope" />
+                    </Field>
+                    <Field label="Cantidad total disponible" helper="Cuántas veces podrá usarse en toda la tienda.">
+                      <input style={inputStyle} type="number" min="0" value={form.usageLimit} onChange={(e) => patchForm('usageLimit', e.target.value)} placeholder="Sin límite" />
+                    </Field>
+                    <Field label="Usos por cliente" helper="Opcional. Requiere identificar al cliente.">
+                      <input style={inputStyle} type="number" min="0" value={form.perCustomerLimit} onChange={(e) => patchForm('perCustomerLimit', e.target.value)} placeholder="Sin límite" />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 border-t pt-5 md:grid-cols-3" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <Field label="Estado inicial">
+                    <select style={inputStyle} value={form.status} onChange={(e) => patchForm('status', e.target.value)}>
+                      {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Comienza" helper="Vacío: disponible inmediatamente.">
+                    <input style={inputStyle} type="datetime-local" value={form.startsAt} onChange={(e) => patchForm('startsAt', e.target.value)} />
+                  </Field>
+                  <Field label="Termina" helper="Vacío: sin fecha de vencimiento.">
+                    <input style={inputStyle} type="datetime-local" value={form.endsAt} onChange={(e) => patchForm('endsAt', e.target.value)} />
+                  </Field>
+                </div>
+              </section>
+            ) : null}
+
+            {currentStep === 2 ? (
+              <section aria-labelledby="coupon-step-scope">
+                <h3 id="coupon-step-scope" className="text-xl font-black">¿En qué productos funcionará?</h3>
+                <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Primero elige una opción. Después aparecerá únicamente la lista que necesitas.</p>
+
+                <fieldset className="mt-5" aria-label="Aplicar a">
+                  <legend className="sr-only">Aplicar a</legend>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[
+                      { value: 'all', title: 'Toda la tienda', helper: 'El descuento aplica a cualquier producto elegible.' },
+                      { value: 'categories', title: 'Categorías concretas', helper: 'Ejemplo: vestidos, accesorios o belleza.' },
+                      { value: 'products', title: 'Productos concretos', helper: 'Elige artículos individuales de la tienda.' },
+                    ].map((option) => (
+                      <label key={option.value} className="cursor-pointer rounded-2xl border p-4 transition" style={{ borderColor: form.appliesTo === option.value ? 'var(--admin-primary)' : 'var(--admin-card-border)', background: form.appliesTo === option.value ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)' }}>
+                        <span className="flex items-start gap-3">
+                          <input type="radio" name="coupon-scope" value={option.value} checked={form.appliesTo === option.value} onChange={(event) => { patchForm('appliesTo', event.target.value); setStepError(''); }} style={{ accentColor: 'var(--admin-primary)' }} />
+                          <span><span className="block text-sm font-black">{option.title}</span><span className="mt-1 block text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{option.helper}</span></span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {form.appliesTo === 'all' ? (
+                  <div className="mt-5 border-l-4 px-4 py-3" style={{ borderColor: 'var(--admin-primary)', background: 'var(--admin-primary-soft-bg)' }}>
+                    <p className="text-sm font-black">Listo: aplicará a toda la tienda</p>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>No tienes que seleccionar productos uno por uno.</p>
+                  </div>
+                ) : null}
+
+                {form.appliesTo === 'products' ? (
+                  <div className="mt-5">
+                    <Field label="Elige los productos incluidos" helper={`${form.productIds.length} producto(s) seleccionado(s)`}>
+                      <ChoiceChecklist options={productOptions} values={form.productIds} onChange={(value) => patchForm('productIds', value)} searchLabel="Buscar producto por nombre, código o categoría" />
+                    </Field>
+                  </div>
+                ) : null}
+
+                {form.appliesTo === 'categories' ? (
+                  <div className="mt-5">
+                    <Field label="Elige las categorías incluidas" helper={`${form.categories.length} categoría(s) seleccionada(s)`}>
+                      <ChoiceChecklist options={categoryOptions} values={form.categories} onChange={(value) => patchForm('categories', value)} searchLabel="Buscar categoría" />
+                    </Field>
+                  </div>
+                ) : null}
+
+                <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <button type="button" onClick={() => setShowExclusions((value) => !value)} className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>
+                    {showExclusions ? 'Ocultar exclusiones opcionales' : 'Necesito excluir algunos productos o categorías'}
+                  </button>
+                  <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Úsalo solamente para excepciones. Lo excluido nunca recibirá el descuento.</p>
+                </div>
+
+                {showExclusions ? (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <Field label="Productos que nunca participan" helper={`${form.excludedProductIds.length} excluido(s)`}>
+                      <ChoiceChecklist options={productOptions} values={form.excludedProductIds} onChange={(value) => patchForm('excludedProductIds', value)} searchLabel="Buscar producto para excluir" />
+                    </Field>
+                    <Field label="Categorías que nunca participan" helper={`${form.excludedCategories.length} excluida(s)`}>
+                      <ChoiceChecklist options={categoryOptions} values={form.excludedCategories} onChange={(value) => patchForm('excludedCategories', value)} searchLabel="Buscar categoría para excluir" />
+                    </Field>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {currentStep === 3 ? (
+              <section aria-labelledby="coupon-step-audience">
+                <h3 id="coupon-step-audience" className="text-xl font-black">Clientes, canales y sedes</h3>
+                <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Decide quién puede usar el cupón y en cuáles puntos de venta será válido.</p>
+
+                <h4 className="mt-5 text-sm font-black">¿Quién puede usarlo?</h4>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  {[
+                    { value: 'all', title: 'Todos los clientes', helper: 'Cualquier comprador que cumpla las demás reglas.' },
+                    { value: 'first_purchase', title: 'Solo primera compra', helper: 'Se valida que el cliente no tenga compras confirmadas.' },
+                    { value: 'specific', title: 'Clientes concretos', helper: 'Selecciona personas autorizadas para esta campaña.' },
+                  ].map((option) => (
+                    <label key={option.value} className="cursor-pointer rounded-2xl border p-4" style={{ borderColor: audienceMode === option.value ? 'var(--admin-primary)' : 'var(--admin-card-border)', background: audienceMode === option.value ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)' }}>
+                      <span className="flex items-start gap-3">
+                        <input type="radio" name="coupon-audience" checked={audienceMode === option.value} onChange={() => chooseAudience(option.value)} style={{ accentColor: 'var(--admin-primary)' }} />
+                        <span><span className="block text-sm font-black">{option.title}</span><span className="mt-1 block text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{option.helper}</span></span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {audienceMode === 'specific' ? (
+                  <div className="mt-4">
+                    <Field label="Elige los clientes autorizados" helper={`${form.customerIds.length} cliente(s) seleccionado(s)`}>
+                      <ChoiceChecklist options={customerOptions} values={form.customerIds} onChange={(value) => patchForm('customerIds', value)} searchLabel="Buscar cliente por nombre o documento" />
+                    </Field>
+                  </div>
+                ) : null}
+
+                <div className="mt-5 grid gap-5 border-t pt-5 md:grid-cols-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <div>
+                    <h4 className="text-sm font-black">¿Dónde se acepta?</h4>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Puedes habilitar ambos canales o solo uno.</p>
+                    <div className="mt-3 space-y-2">
+                      <ToggleRule checked={form.allowedChannels.includes('web')} onChange={(checked) => patchForm('allowedChannels', checked ? [...new Set([...form.allowedChannels, 'web'])] : form.allowedChannels.filter((channel) => channel !== 'web'))} label="Tienda virtual" helper="El cliente lo escribe durante el checkout." />
+                      <ToggleRule checked={form.allowedChannels.includes('pos')} onChange={(checked) => patchForm('allowedChannels', checked ? [...new Set([...form.allowedChannels, 'pos'])] : form.allowedChannels.filter((channel) => channel !== 'pos'))} label="POS / Venta física" helper="El vendedor lo aplica desde la caja POS." />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black">Sedes permitidas</h4>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{limitBranches ? 'Funcionará únicamente en las sedes elegidas.' : 'Actualmente funciona en todas las sedes.'}</p>
+                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
+                      <input type="checkbox" checked={limitBranches} onChange={(event) => { setLimitBranches(event.target.checked); if (!event.target.checked) patchForm('branchIds', []); }} style={{ accentColor: 'var(--admin-primary)' }} />
+                      <span><span className="block text-xs font-black">Limitar a sedes concretas</span><span className="mt-1 block text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Actívalo solo si la campaña no aplica en toda la empresa.</span></span>
+                    </label>
+                    {limitBranches ? <div className="mt-3"><ChoiceChecklist options={branchOptions} values={form.branchIds} onChange={(value) => patchForm('branchIds', value)} searchLabel="Buscar sede" /></div> : null}
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+                  <h4 className="text-sm font-black">¿Puede combinarse con otros beneficios?</h4>
+                  <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Las opciones desactivadas evitan que se acumulen descuentos sin autorización.</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <ToggleRule checked={form.allowWithStoreCredit} onChange={(value) => patchForm('allowWithStoreCredit', value)} label="Saldo a favor" helper="Permite pagar parte de la orden con saldo disponible." />
+                    <ToggleRule checked={form.allowWithManualDiscount} onChange={(value) => patchForm('allowWithManualDiscount', value)} label="Descuento manual" helper="Permite combinarlo con descuentos agregados en POS." />
+                    <ToggleRule checked={form.allowWithAutomaticPromotions} onChange={(value) => patchForm('allowWithAutomaticPromotions', value)} label="Otras promociones" helper="Permite acumular promociones automáticas futuras." />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {currentStep === 4 ? (
+              <section aria-labelledby="coupon-step-review">
+                <h3 id="coupon-step-review" className="text-xl font-black">Comprueba el cupón antes de guardarlo</h3>
+                <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>El simulador usa precios reales y no crea órdenes ni consume el cupón.</p>
+
+                <div className="mt-5 border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
+                  <div className="flex items-start gap-3"><Calculator className="mt-0.5 h-5 w-5" style={{ color: 'var(--admin-primary)' }} /><div><h4 className="text-sm font-black">Simulación de una compra</h4><p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Selecciona un producto y pulsa “Comprobar cupón”.</p></div></div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <Field label="Producto de prueba"><select style={inputStyle} value={form.simulationProductId} onChange={(e) => patchForm('simulationProductId', e.target.value)}><option value="">Selecciona producto</option>{(metadata.products || []).map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}</select></Field>
+                    <Field label="Cantidad"><input style={inputStyle} type="number" min="1" value={form.simulationQuantity} onChange={(e) => patchForm('simulationQuantity', e.target.value)} /></Field>
+                    <Field label="Canal"><select style={inputStyle} value={form.simulationChannel} onChange={(e) => patchForm('simulationChannel', e.target.value)}><option value="web">Tienda virtual</option><option value="pos">POS</option></select></Field>
+                    <Field label="Sede"><select style={inputStyle} value={form.simulationBranchId} onChange={(e) => patchForm('simulationBranchId', e.target.value)}><option value="">Sin sede específica</option>{(metadata.branches || []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
+                    <Field label="Cliente"><select style={inputStyle} value={form.simulationCustomerId} onChange={(e) => patchForm('simulationCustomerId', e.target.value)}><option value="">Cliente nuevo/no identificado</option>{(metadata.customers || []).map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.ordersCount} compra(s)</option>)}</select></Field>
+                    <Field label="Costo del envío"><input style={inputStyle} type="number" min="0" value={form.simulationShipping} onChange={(e) => patchForm('simulationShipping', e.target.value)} /></Field>
+                  </div>
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs font-black" style={{ color: 'var(--admin-primary)' }}>Probar combinación con otros descuentos</summary>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <Field label="Saldo a favor"><input style={inputStyle} type="number" min="0" value={form.simulationStoreCredit} onChange={(e) => patchForm('simulationStoreCredit', e.target.value)} /></Field>
+                      <Field label="Descuento manual"><input style={inputStyle} type="number" min="0" value={form.simulationManualDiscount} onChange={(e) => patchForm('simulationManualDiscount', e.target.value)} /></Field>
+                    </div>
+                  </details>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button type="button" onClick={handleSimulate} disabled={simulating || !form.simulationProductId} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-white disabled:opacity-50" style={{ background: 'var(--admin-primary)' }}>{simulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{simulating ? 'Comprobando...' : 'Comprobar cupón'}</button>
+                    {simulation ? <div className="border-l-4 px-4 py-2 text-xs font-bold" style={{ borderColor: simulation.validation?.valid ? '#10b981' : 'var(--admin-danger, #be123c)', background: 'var(--admin-card-bg)' }}>{simulation.validation?.valid ? `Sí aplica · descuento ${formatMoney(simulation.validation?.discount?.totalDiscountAmount)}` : simulation.validation?.message || 'El cupón no aplica.'}</div> : null}
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <Field label="Descripción para identificar la campaña">
+                    <textarea style={textAreaStyle} value={form.description} onChange={(e) => patchForm('description', e.target.value)} placeholder="Ejemplo: promoción de lanzamiento válida en la tienda virtual" />
+                  </Field>
+                  <Field label="Notas privadas del equipo">
+                    <textarea style={textAreaStyle} value={form.internalNotes} onChange={(e) => patchForm('internalNotes', e.target.value)} placeholder="Estas notas nunca se muestran al cliente" />
+                  </Field>
+                </div>
+
+                <label className="mt-4 flex cursor-pointer items-start gap-3 border p-4" style={{ borderColor: 'var(--admin-card-border)', background: form.active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)' }}>
+                  <input type="checkbox" checked={form.active} onChange={(e) => patchForm('active', e.target.checked)} style={{ accentColor: 'var(--admin-primary)' }} />
+                  <span><span className="block text-sm font-black">Dejar el cupón habilitado</span><span className="mt-1 block text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Si tiene fecha futura aparecerá como programado; si no, podrá utilizarse inmediatamente.</span></span>
+                </label>
+              </section>
+            ) : null}
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-4">
-            <Field label="Compra mínima">
-              <input style={inputStyle} type="number" min="0" value={form.minSubtotal} onChange={(e) => patchForm('minSubtotal', e.target.value)} />
-            </Field>
-            <Field label="Tope descuento">
-              <input style={inputStyle} type="number" min="0" value={form.maxDiscountAmount} onChange={(e) => patchForm('maxDiscountAmount', e.target.value)} placeholder="Opcional" />
-            </Field>
-            <Field label="Límite total usos">
-              <input style={inputStyle} type="number" min="0" value={form.usageLimit} onChange={(e) => patchForm('usageLimit', e.target.value)} placeholder="Sin límite" />
-            </Field>
-            <Field label="Límite por cliente">
-              <input style={inputStyle} type="number" min="0" value={form.perCustomerLimit} onChange={(e) => patchForm('perCustomerLimit', e.target.value)} placeholder="Sin límite" />
-            </Field>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-4">
-            <Field label="Estado">
-              <select style={inputStyle} value={form.status} onChange={(e) => patchForm('status', e.target.value)}>
-                {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Aplicar a">
-              <select style={inputStyle} value={form.appliesTo} onChange={(e) => patchForm('appliesTo', e.target.value)}>
-                {APPLIES_TO_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Inicio">
-              <input style={inputStyle} type="datetime-local" value={form.startsAt} onChange={(e) => patchForm('startsAt', e.target.value)} />
-            </Field>
-            <Field label="Vence">
-              <input style={inputStyle} type="datetime-local" value={form.endsAt} onChange={(e) => patchForm('endsAt', e.target.value)} />
-            </Field>
-          </div>
-
-          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-primary-soft-bg)' }}>
-            <h3 className="text-sm font-black">Alcance de productos y categorías</h3>
-            <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Las inclusiones definen dónde aplica; las exclusiones siempre tienen prioridad.</p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {form.appliesTo === 'products' ? (
-                <Field label="Productos incluidos" helper={`${form.productIds.length} seleccionado(s)`}>
-                  <ChoiceChecklist
-                    options={(metadata.products || []).map((product) => ({ value: product.id, label: product.title, helper: [product.sku, product.category].filter(Boolean).join(' · ') }))}
-                    values={form.productIds}
-                    onChange={(value) => patchForm('productIds', value)}
-                  />
-                </Field>
-              ) : null}
-              {form.appliesTo === 'categories' ? (
-                <Field label="Categorías incluidas" helper={`${form.categories.length} seleccionada(s)`}>
-                  <ChoiceChecklist options={(metadata.categories || []).map((category) => ({ value: category, label: category }))} values={form.categories} onChange={(value) => patchForm('categories', value)} />
-                </Field>
-              ) : null}
-              <Field label="Productos excluidos" helper={`${form.excludedProductIds.length} seleccionado(s)`}>
-                <ChoiceChecklist
-                  options={(metadata.products || []).map((product) => ({ value: product.id, label: product.title, helper: product.sku || product.category }))}
-                  values={form.excludedProductIds}
-                  onChange={(value) => patchForm('excludedProductIds', value)}
-                />
-              </Field>
-              <Field label="Categorías excluidas" helper={`${form.excludedCategories.length} seleccionada(s)`}>
-                <ChoiceChecklist options={(metadata.categories || []).map((category) => ({ value: category, label: category }))} values={form.excludedCategories} onChange={(value) => patchForm('excludedCategories', value)} />
-              </Field>
+          <aside className="border-t px-5 py-5 lg:overflow-y-auto lg:border-l lg:border-t-0 admin-thin-scrollbar" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)' }}>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Resumen de la campaña</p>
+            <h3 className="mt-2 break-words text-lg font-black">{form.name || 'Cupón sin nombre'}</h3>
+            <p className="mt-1 break-all text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{form.code || 'Código pendiente'}</p>
+            <div className="mt-5 divide-y text-sm" style={{ borderColor: 'var(--admin-card-border)' }}>
+              {[
+                ['Beneficio', benefitSummary],
+                ['Productos', scopeSummary],
+                ['Clientes', audienceSummary],
+                ['Canales', channelSummary],
+                ['Sedes', limitBranches ? `${form.branchIds.length} sede(s)` : 'Todas las sedes'],
+                ['Vigencia', form.startsAt || form.endsAt ? `${form.startsAt ? 'Con inicio' : 'Desde ahora'} · ${form.endsAt ? 'con vencimiento' : 'sin vencimiento'}` : 'Sin fechas'],
+              ].map(([label, value]) => (
+                <div key={label} className="py-3 first:pt-0"><p className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>{label}</p><p className="mt-1 font-black">{value}</p></div>
+              ))}
             </div>
-          </div>
-
-          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)' }}>
-            <h3 className="text-sm font-black">Clientes, canales y sedes</h3>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <Field label="Clientes permitidos" helper="Vacío significa todos los clientes.">
-                <ChoiceChecklist
-                  options={(metadata.customers || []).map((customer) => ({ value: customer.id, label: customer.name, helper: [customer.customerCode, customer.documentNumber, `${customer.ordersCount} compra(s)`].filter(Boolean).join(' · ') }))}
-                  values={form.customerIds}
-                  onChange={(value) => patchForm('customerIds', value)}
-                />
-              </Field>
-              <Field label="Canales habilitados" helper="Selecciona al menos uno.">
-                <ChoiceChecklist
-                  options={[{ value: 'web', label: 'Tienda virtual / Checkout' }, { value: 'pos', label: 'POS / Venta física' }]}
-                  values={form.allowedChannels}
-                  onChange={(value) => patchForm('allowedChannels', value)}
-                />
-              </Field>
-              <Field label="Sedes permitidas" helper="Vacío significa todas las sedes.">
-                <ChoiceChecklist
-                  options={(metadata.branches || []).map((branch) => ({ value: branch.id, label: branch.name, helper: [branch.code, branch.type].filter(Boolean).join(' · ') }))}
-                  values={form.branchIds}
-                  onChange={(value) => patchForm('branchIds', value)}
-                />
-              </Field>
+            <div className="mt-4 flex items-start gap-2 border-t pt-4" style={{ borderColor: 'var(--admin-card-border)' }}>
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+              <p className="text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>El resumen se actualiza mientras configuras el cupón.</p>
             </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-4">
-              <ToggleRule checked={form.newCustomersOnly} onChange={(value) => patchForm('newCustomersOnly', value)} label="Solo primera compra" helper="Exige documento y bloquea clientes con compras confirmadas." />
-              <ToggleRule checked={form.allowWithStoreCredit} onChange={(value) => patchForm('allowWithStoreCredit', value)} label="Permitir saldo a favor" helper="El cliente puede usar cupón y saldo en la misma orden." />
-              <ToggleRule checked={form.allowWithManualDiscount} onChange={(value) => patchForm('allowWithManualDiscount', value)} label="Permitir descuento manual" helper="Útil en POS; desactivado evita duplicar descuentos." />
-              <ToggleRule checked={form.allowWithAutomaticPromotions} onChange={(value) => patchForm('allowWithAutomaticPromotions', value)} label="Permitir otras promociones" helper="Autoriza combinación con promociones automáticas futuras." />
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-3xl border p-4" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-            <div className="flex items-start gap-3"><Calculator className="mt-0.5 h-5 w-5" style={{ color: 'var(--admin-primary)' }} /><div><h3 className="text-sm font-black">Simulador antes de guardar</h3><p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>Comprueba las reglas con precios reales sin crear ni modificar el cupón.</p></div></div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-4">
-              <Field label="Producto de prueba"><select style={inputStyle} value={form.simulationProductId} onChange={(e) => patchForm('simulationProductId', e.target.value)}><option value="">Selecciona producto</option>{(metadata.products || []).map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}</select></Field>
-              <Field label="Cantidad"><input style={inputStyle} type="number" min="1" value={form.simulationQuantity} onChange={(e) => patchForm('simulationQuantity', e.target.value)} /></Field>
-              <Field label="Canal"><select style={inputStyle} value={form.simulationChannel} onChange={(e) => patchForm('simulationChannel', e.target.value)}><option value="web">Tienda virtual</option><option value="pos">POS</option></select></Field>
-              <Field label="Sede"><select style={inputStyle} value={form.simulationBranchId} onChange={(e) => patchForm('simulationBranchId', e.target.value)}><option value="">Sin sede específica</option>{(metadata.branches || []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></Field>
-              <Field label="Cliente"><select style={inputStyle} value={form.simulationCustomerId} onChange={(e) => patchForm('simulationCustomerId', e.target.value)}><option value="">Cliente nuevo/no identificado</option>{(metadata.customers || []).map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.ordersCount} compra(s)</option>)}</select></Field>
-              <Field label="Envío"><input style={inputStyle} type="number" min="0" value={form.simulationShipping} onChange={(e) => patchForm('simulationShipping', e.target.value)} /></Field>
-              <Field label="Saldo a favor"><input style={inputStyle} type="number" min="0" value={form.simulationStoreCredit} onChange={(e) => patchForm('simulationStoreCredit', e.target.value)} /></Field>
-              <Field label="Descuento manual"><input style={inputStyle} type="number" min="0" value={form.simulationManualDiscount} onChange={(e) => patchForm('simulationManualDiscount', e.target.value)} /></Field>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={handleSimulate} disabled={simulating || !form.simulationProductId} className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-black text-white disabled:opacity-50" style={{ background: 'var(--admin-primary)' }}>{simulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{simulating ? 'Simulando...' : 'Probar reglas'}</button>
-              {simulation ? <div className="rounded-2xl border px-4 py-2 text-xs font-bold" style={{ borderColor: simulation.validation?.valid ? '#10b981' : 'var(--admin-danger, #be123c)', color: 'var(--admin-card-text)' }}>{simulation.validation?.valid ? `Aplicable · descuento ${formatMoney(simulation.validation?.discount?.totalDiscountAmount)}` : simulation.validation?.message || 'El cupón no aplica.'}</div> : null}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Field label="Descripción">
-              <textarea style={textAreaStyle} value={form.description} onChange={(e) => patchForm('description', e.target.value)} placeholder="Texto visible o referencia interna del cupón" />
-            </Field>
-            <Field label="Notas internas">
-              <textarea style={textAreaStyle} value={form.internalNotes} onChange={(e) => patchForm('internalNotes', e.target.value)} placeholder="Observaciones para administración" />
-            </Field>
-          </div>
+          </aside>
         </div>
 
         <div
-          className="flex flex-col gap-3 border-t px-6 py-4 md:flex-row md:items-center md:justify-between"
+          className="flex items-center justify-between gap-3 border-t px-6 py-4"
           style={{ borderColor: 'var(--admin-card-border)' }}
         >
-          <label className="inline-flex items-center gap-3 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => patchForm('active', e.target.checked)}
-              style={{ accentColor: 'var(--admin-primary)' }}
-            />
-            Cupón activo en los canales seleccionados
-          </label>
-
-          <div className="flex flex-wrap justify-end gap-3">
+          <div>
+            {currentStep > 1 ? (
+              <button type="button" onClick={() => { setCurrentStep((step) => Math.max(1, step - 1)); setStepError(''); }} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+                <ChevronLeft className="h-4 w-4" /> Anterior
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={closeForm}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-black"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-black"
               style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
             >
-              <X className="h-4 w-4" />
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-60"
-              style={{ background: 'var(--admin-primary)' }}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Guardando...' : 'Guardar cupón'}
-            </button>
+            {currentStep < 4 ? (
+              <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black text-white" style={{ background: 'var(--admin-primary)' }}>
+                {currentStep === 1 ? 'Siguiente: productos' : currentStep === 2 ? 'Siguiente: público' : 'Siguiente: revisar'} <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black text-white disabled:opacity-60" style={{ background: 'var(--admin-primary)' }}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? 'Guardando...' : 'Guardar cupón'}
+              </button>
+            )}
           </div>
         </div>
       </form>
@@ -905,6 +1141,7 @@ export default function AdminCouponsPage() {
         open={formOpen}
         editingId={editingId}
         form={form}
+        error={error}
         saving={saving}
         patchForm={patchForm}
         closeForm={closeForm}
