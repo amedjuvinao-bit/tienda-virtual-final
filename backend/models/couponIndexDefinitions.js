@@ -38,8 +38,12 @@ const COUPON_INDEX_DEFINITIONS = Object.freeze([
     options: Object.freeze({ name: 'customerIds_1' }),
   }),
   Object.freeze({
-    key: Object.freeze({ allowedChannels: 1, branchIds: 1 }),
-    options: Object.freeze({ name: 'allowedChannels_1_branchIds_1' }),
+    key: Object.freeze({ allowedChannels: 1 }),
+    options: Object.freeze({ name: 'allowedChannels_1' }),
+  }),
+  Object.freeze({
+    key: Object.freeze({ branchIds: 1 }),
+    options: Object.freeze({ name: 'branchIds_1' }),
   }),
 ]);
 

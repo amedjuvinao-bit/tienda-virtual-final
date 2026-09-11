@@ -121,7 +121,7 @@ async function main() {
 
     const couponIndexes = await mongoose.connection.collection('coupons').indexes();
     const redemptionIndexes = await mongoose.connection.collection('couponredemptions').indexes();
-    ok('los índices físicos cubren segmentación comercial', couponIndexes.some((index) => index.name === 'allowedChannels_1_branchIds_1') && couponIndexes.some((index) => index.name === 'customerIds_1'));
+    ok('los índices físicos cubren segmentación comercial', couponIndexes.some((index) => index.name === 'allowedChannels_1') && couponIndexes.some((index) => index.name === 'branchIds_1') && couponIndexes.some((index) => index.name === 'customerIds_1'));
     ok('los índices físicos cubren límites por documento', redemptionIndexes.some((index) => index.name === 'coupon_1_status_1_customerDocument_1'));
 
     console.log(`\nCupones Nivel Plus Etapa 2 MongoDB: ${controls}/${controls} controles.`);
