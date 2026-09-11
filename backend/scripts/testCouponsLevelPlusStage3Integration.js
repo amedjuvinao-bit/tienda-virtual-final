@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 
 const Coupon = require('../models/Coupon');
 const CouponRedemption = require('../models/CouponRedemption');
+require('../models/Order');
 const Customer = require('../models/Customer');
 const Branch = require('../models/Branch');
 const AdminAuditLog = require('../models/AdminAuditLog');
