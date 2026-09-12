@@ -1340,8 +1340,8 @@ export default function AdminCouponsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+          <div className="coupon-admin-table-wrap">
+            <table className="coupon-admin-table w-full text-left text-sm">
               <thead>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cupón</th>
@@ -1417,12 +1417,13 @@ export default function AdminCouponsPage() {
                           Por cliente: {coupon.perCustomerLimit == null ? 'Sin límite' : coupon.perCustomerLimit}
                         </p>
                       </td>
-                      <td className="px-4 py-4 align-top">
-                        <div className="flex justify-end gap-2">
+                      <td className="coupon-admin-actions-cell px-4 py-4 align-top">
+                        <div className="coupon-admin-actions">
                           <button
                             type="button"
                             onClick={() => setOperationsCouponId(String(id || ''))}
-                            className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black"
+                            className="coupon-admin-action inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black"
+                            title="Ver actividad, usos y trazabilidad"
                             style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -1432,16 +1433,16 @@ export default function AdminCouponsPage() {
                             <>
                               {canUpdate ? (
                                 <>
-                                  <button type="button" onClick={() => openEditForm(coupon)} className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+                                  <button type="button" onClick={() => openEditForm(coupon)} className="coupon-admin-action inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" title="Editar reglas y vigencia" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
                                     <Pencil className="h-3.5 w-3.5" /> Editar
                                   </button>
-                                  <button type="button" onClick={() => (requiresRuleEdit ? openEditForm(coupon) : handleToggleStatus(coupon))} className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
+                                  <button type="button" onClick={() => (requiresRuleEdit ? openEditForm(coupon) : handleToggleStatus(coupon))} className="coupon-admin-action inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black" title={statusActionLabel} style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
                                     <Power className="h-3.5 w-3.5" /> {statusActionLabel}
                                   </button>
                                 </>
                               ) : null}
                               {canDelete ? (
-                                <button type="button" onClick={() => handleDelete(coupon)} className="inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black text-white" style={{ background: 'var(--admin-danger, #be123c)' }}>
+                                <button type="button" onClick={() => handleDelete(coupon)} className="coupon-admin-action inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black text-white" title="Eliminar cupón" style={{ background: 'var(--admin-danger, #be123c)' }}>
                                   <Trash2 className="h-3.5 w-3.5" /> Eliminar
                                 </button>
                               ) : null}

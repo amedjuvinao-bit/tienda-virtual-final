@@ -1,0 +1,87 @@
+/*
+ * Presentación aislada de Cupones.
+ * No reutiliza las reglas globales de tablas de Facturación: sus acciones
+ * necesitan poder envolver el contenido sin recortarse ni montarse.
+ */
+.coupon-admin-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--admin-primary-soft-border) transparent;
+}
+
+.coupon-admin-table {
+  min-width: 960px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.coupon-admin-table th,
+.coupon-admin-table td {
+  min-width: 0;
+  vertical-align: top;
+}
+
+.coupon-admin-table th:nth-child(1),
+.coupon-admin-table td:nth-child(1) { width: 18%; }
+
+.coupon-admin-table th:nth-child(2),
+.coupon-admin-table td:nth-child(2) { width: 11%; }
+
+.coupon-admin-table th:nth-child(3),
+.coupon-admin-table td:nth-child(3) { width: 17%; }
+
+.coupon-admin-table th:nth-child(4),
+.coupon-admin-table td:nth-child(4) { width: 15%; }
+
+.coupon-admin-table th:nth-child(5),
+.coupon-admin-table td:nth-child(5) { width: 11%; }
+
+.coupon-admin-table th:nth-child(6),
+.coupon-admin-table td:nth-child(6) { width: 28%; }
+
+.coupon-admin-table td p,
+.coupon-admin-table td span {
+  max-width: 100%;
+}
+
+.coupon-admin-actions-cell {
+  overflow: visible;
+}
+
+.coupon-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.coupon-admin-action {
+  min-height: 36px;
+  flex: 0 1 auto;
+  white-space: nowrap;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.coupon-admin-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--admin-primary) 12%, transparent);
+}
+
+@media (max-width: 1180px) {
+  .coupon-admin-table {
+    min-width: 960px;
+  }
+}
+
+@media (max-width: 700px) {
+  .coupon-admin-table {
+    min-width: 860px;
+  }
+
+  .coupon-admin-actions {
+    justify-content: flex-start;
+  }
+}
