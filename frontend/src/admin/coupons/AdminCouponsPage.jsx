@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import {
   BadgePercent,
   Calculator,
+  CalendarClock,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -278,20 +279,17 @@ function buildPayloadFromForm(form) {
   };
 }
 
-function StatCard({ label, value, helper }) {
+function StatCard({ label, value, helper, icon: Icon, tone = 'neutral' }) {
   return (
-    <div
-      className="rounded-3xl border p-4"
-      style={{
-        background: 'var(--admin-card-bg)',
-        borderColor: 'var(--admin-card-border)',
-      }}
-    >
-      <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>{value}</p>
-      {helper ? <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>{helper}</p> : null}
+    <div className="coupon-stat" data-tone={tone}>
+      <span className="coupon-stat__icon" aria-hidden="true">
+        {Icon ? <Icon className="h-5 w-5" /> : null}
+      </span>
+      <div className="coupon-stat__copy">
+        <p className="coupon-stat__label">{label}</p>
+        <p className="coupon-stat__value">{value}</p>
+        {helper ? <p className="coupon-stat__helper">{helper}</p> : null}
+      </div>
     </div>
   );
 }
@@ -531,7 +529,7 @@ function CouponFormModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9990] flex min-h-screen items-center justify-center px-4 py-6">
+    <div className="coupon-form-overlay fixed inset-0 z-[9990] flex min-h-screen items-center justify-center px-4 py-6">
       <button
         type="button"
         className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-[4px]"
@@ -541,7 +539,7 @@ function CouponFormModal({
 
       <form
         onSubmit={handleWizardSubmit}
-        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border shadow-2xl"
+        className="coupon-form-dialog relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden border shadow-2xl"
         style={{
           background: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%), var(--admin-card-bg))',
           borderColor: 'var(--admin-card-border)',
@@ -550,7 +548,7 @@ function CouponFormModal({
         }}
       >
         <div
-          className="flex items-start justify-between gap-4 border-b px-6 py-4"
+          className="coupon-form-header flex items-start justify-between gap-4 border-b px-6 py-4"
           style={{ borderColor: 'var(--admin-card-border)' }}
         >
           <div>
@@ -568,7 +566,7 @@ function CouponFormModal({
           <button
             type="button"
             onClick={closeForm}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border transition hover:-translate-y-0.5"
+            className="coupon-form-close grid h-11 w-11 shrink-0 place-items-center border transition hover:-translate-y-0.5"
             style={{
               borderColor: 'var(--admin-card-border)',
               background: 'var(--admin-primary-soft-bg)',
@@ -580,7 +578,11 @@ function CouponFormModal({
           </button>
         </div>
 
-        <nav className="grid grid-cols-2 border-b md:grid-cols-4" aria-label="Pasos para crear el cupón" style={{ borderColor: 'var(--admin-card-border)' }}>
+        <nav
+          className="coupon-form-steps grid grid-cols-2 border-b md:grid-cols-4"
+          aria-label="Pasos para crear el cupón"
+          style={{ borderColor: 'var(--admin-card-border)', '--coupon-step-progress': `${((currentStep - 1) / 3) * 100}%` }}
+        >
           {steps.map((step) => {
             const active = currentStep === step.number;
             const complete = currentStep > step.number;
@@ -590,7 +592,7 @@ function CouponFormModal({
                 type="button"
                 disabled={step.number > currentStep}
                 onClick={() => { setCurrentStep(step.number); setStepError(''); }}
-                className="flex items-center gap-3 border-r px-4 py-3 text-left transition disabled:cursor-default"
+                className={`coupon-form-step flex items-center gap-3 border-r px-4 py-3 text-left transition disabled:cursor-default ${active ? 'is-active' : ''} ${complete ? 'is-complete' : ''}`}
                 style={{
                   borderColor: 'var(--admin-card-border)',
                   background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)',
@@ -606,8 +608,8 @@ function CouponFormModal({
           })}
         </nav>
 
-        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_270px] lg:overflow-hidden admin-thin-scrollbar">
-          <div className="min-h-0 overflow-y-auto px-6 py-5 admin-thin-scrollbar">
+        <div className="coupon-form-content grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_290px] lg:overflow-hidden admin-thin-scrollbar">
+          <div className="coupon-form-main min-h-0 overflow-y-auto px-6 py-5 admin-thin-scrollbar">
             {(stepError || error) ? (
               <div className="mb-4 border-l-4 px-4 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-danger, #be123c)', background: 'color-mix(in srgb, var(--admin-danger, #be123c) 8%, var(--admin-card-bg))' }}>
                 {stepError || error}
@@ -850,7 +852,7 @@ function CouponFormModal({
             ) : null}
           </div>
 
-          <aside className="border-t px-5 py-5 lg:overflow-y-auto lg:border-l lg:border-t-0 admin-thin-scrollbar" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)' }}>
+          <aside className="coupon-form-summary border-t px-5 py-5 lg:overflow-y-auto lg:border-l lg:border-t-0 admin-thin-scrollbar" style={{ borderColor: 'var(--admin-card-border)', background: 'color-mix(in srgb, var(--admin-card-bg) 92%, var(--admin-primary) 8%)' }}>
             <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Resumen de la campaña</p>
             <h3 className="mt-2 break-words text-lg font-black">{form.name || 'Cupón sin nombre'}</h3>
             <p className="mt-1 break-all text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{form.code || 'Código pendiente'}</p>
@@ -874,7 +876,7 @@ function CouponFormModal({
         </div>
 
         <div
-          className="flex items-center justify-between gap-3 border-t px-6 py-4"
+          className="coupon-form-footer flex items-center justify-between gap-3 border-t px-6 py-4"
           style={{ borderColor: 'var(--admin-card-border)' }}
         >
           <div>
@@ -1177,8 +1179,10 @@ export default function AdminCouponsPage() {
     }
   };
 
+  const activeFilterLabel = FILTER_STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label || 'Todas las campañas';
+
   return (
-    <div className="space-y-5" style={{ color: 'var(--admin-card-text)' }}>
+    <div className="coupon-admin-page" style={{ color: 'var(--admin-card-text)' }}>
       <CouponFormModal
         open={formOpen}
         editingId={editingId}
@@ -1196,89 +1200,98 @@ export default function AdminCouponsPage() {
       />
       <CouponOperationsModal couponId={operationsCouponId} onClose={() => setOperationsCouponId('')} />
 
-      <div
-        className="overflow-hidden rounded-[calc(var(--admin-radius)*0.9)] border"
-        style={{
-          borderColor: 'var(--admin-card-border)',
-          background: 'linear-gradient(135deg, var(--admin-card-bg), color-mix(in srgb, var(--admin-card-bg) 82%, var(--admin-primary) 18%))',
-        }}
-      >
-        <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-primary)' }}>
-              promociones
-            </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">Cupones</h1>
-            <p className="mt-2 max-w-3xl text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Crea descuentos, envío gratis, límites de uso y vigencias para el checkout de la tienda.
-            </p>
+      <section className="coupon-admin-hero" aria-labelledby="coupon-page-title">
+        <div className="coupon-admin-hero__copy">
+          <div className="coupon-admin-eyebrow">
+            <BadgePercent className="h-4 w-4" />
+            Centro de promociones
           </div>
+          <h1 id="coupon-page-title">Cupones</h1>
+          <p className="coupon-admin-hero__lead">
+            Diseña campañas claras, controla quién recibe el beneficio y sigue cada uso desde un solo lugar.
+          </p>
+          <div className="coupon-admin-journey" aria-label="Recorrido para administrar promociones">
+            <span><strong>1</strong> Crea la oferta</span>
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <span><strong>2</strong> Define las reglas</span>
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <span><strong>3</strong> Mide el resultado</span>
+          </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2">
+        <div className="coupon-admin-hero__actions">
+          {canCreate ? (
+            <button type="button" onClick={openNewForm} className="coupon-button coupon-button--primary">
+              <Plus className="h-5 w-5" />
+              Nuevo cupón
+            </button>
+          ) : null}
+          <div className="coupon-admin-secondary-actions">
             <button
               type="button"
               onClick={() => loadCoupons(pagination.page, true)}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition hover:scale-[1.01] disabled:opacity-60"
-              style={{
-                borderColor: 'var(--admin-card-border)',
-                background: 'var(--admin-card-bg)',
-                color: 'var(--admin-card-text)',
-              }}
+              className="coupon-button coupon-button--secondary"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Recargar
+              Actualizar
             </button>
             {canExport ? (
-              <button
-                type="button"
-                onClick={handleExport}
-                className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
-                style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
-              >
+              <button type="button" onClick={handleExport} className="coupon-button coupon-button--secondary">
                 <Download className="h-4 w-4" />
                 Exportar usos
               </button>
             ) : null}
-            {canCreate ? (
-              <button
-                type="button"
-                onClick={openNewForm}
-                className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition hover:scale-[1.01]"
-                style={{ background: 'var(--admin-primary)' }}
-              >
-                <Plus className="h-4 w-4" />
-                Nuevo cupón
-              </button>
-            ) : null}
           </div>
         </div>
+      </section>
 
-        <div className="grid gap-3 border-t p-5 md:grid-cols-4" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <StatCard label="Activos" value={stats.active} helper="Disponibles en checkout" />
-          <StatCard label="Programados" value={stats.scheduled} helper="Con fecha futura" />
-          <StatCard label="Agotados" value={stats.exhausted} helper="Sin usos restantes" />
-          <StatCard label="Usos totales" value={stats.totalUses} helper="Redenciones registradas" />
+      <section className="coupon-admin-overview" aria-labelledby="coupon-overview-title">
+        <div className="coupon-admin-section-heading">
+          <div>
+            <p className="coupon-admin-section-kicker">Pulso comercial</p>
+            <h2 id="coupon-overview-title">Así están funcionando tus campañas</h2>
+          </div>
+          <p>Los indicadores se actualizan con la actividad real del checkout y del POS.</p>
         </div>
-      </div>
+        <div className="coupon-admin-stats">
+          <StatCard label="Activos" value={stats.active} helper="Compradores pueden usarlos ahora" icon={Check} tone="success" />
+          <StatCard label="Programados" value={stats.scheduled} helper="Listos para una fecha futura" icon={CalendarClock} tone="scheduled" />
+          <StatCard label="Agotados" value={stats.exhausted} helper="Necesitan más usos o revisión" icon={AlertTriangle} tone="warning" />
+          <StatCard label="Usos totales" value={stats.totalUses} helper="Beneficios confirmados" icon={BadgePercent} tone="primary" />
+        </div>
+      </section>
 
       {dashboard.alerts?.length ? (
-        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)' }}>
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+        <aside className="coupon-admin-alerts" aria-labelledby="coupon-alerts-title">
+          <div className="coupon-admin-alerts__intro">
+            <span className="coupon-admin-alerts__icon"><AlertTriangle className="h-5 w-5" /></span>
             <div>
-              <p className="font-black">Campañas que requieren atención</p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-                {dashboard.alerts.map((alert) => `${alert.code}: ${alert.type === 'expiring' ? 'vence pronto' : alert.type === 'exhausted' ? 'cupón agotado' : `quedan ${alert.remainingUses} uso(s)`}`).join(' · ')}
-              </p>
+              <p className="coupon-admin-section-kicker">Revisión recomendada</p>
+              <h2 id="coupon-alerts-title">Campañas que requieren atención</h2>
+              <p>Revisa estos cupones para evitar que una promoción se detenga sin darte cuenta.</p>
             </div>
           </div>
-        </div>
+          <div className="coupon-admin-alerts__list">
+            {dashboard.alerts.map((alert) => (
+              <div className="coupon-admin-alert-item" key={`${alert.couponId || alert.code}-${alert.type}`}>
+                <strong>Cupón {alert.code}</strong>
+                <span>
+                  {alert.type === 'expiring'
+                    ? 'Vence pronto'
+                    : alert.type === 'exhausted'
+                      ? 'Cupón agotado'
+                      : `quedan ${alert.remainingUses} uso(s)`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </aside>
       ) : null}
 
       {error ? (
         <div
-          className="rounded-2xl border px-4 py-3 text-sm font-bold"
+          className="coupon-admin-error border px-4 py-3 text-sm font-bold"
           style={{
             borderColor: 'color-mix(in srgb, var(--admin-danger, #dc2626) 45%, var(--admin-card-border))',
             background: 'color-mix(in srgb, var(--admin-danger, #dc2626) 9%, var(--admin-card-bg))',
@@ -1290,11 +1303,23 @@ export default function AdminCouponsPage() {
       ) : null}
 
       <div
-        className="rounded-[calc(var(--admin-radius)*0.9)] border"
+        className="coupon-admin-workspace border"
         style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)' }}
       >
-        <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border px-3 py-2" style={{ borderColor: 'var(--admin-card-border)' }}>
+        <div className="coupon-admin-workspace__heading">
+          <div>
+            <p className="coupon-admin-section-kicker">Gestión de campañas</p>
+            <h2>Encuentra y administra tus cupones</h2>
+            <p>{pagination.total.toLocaleString('es-CO')} campaña(s) encontrada(s) · {activeFilterLabel}</p>
+          </div>
+          <span className="coupon-admin-workspace__hint">
+            <Eye className="h-4 w-4" />
+            Usa “Actividad” para consultar compras, clientes y descuentos.
+          </span>
+        </div>
+
+        <div className="coupon-admin-filters" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <div className="coupon-admin-search">
             <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />
             <input
               aria-label="Buscar cupones"
@@ -1306,7 +1331,7 @@ export default function AdminCouponsPage() {
               placeholder="Buscar por código, nombre o descripción"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="coupon-admin-filter-controls">
             <select aria-label="Filtrar por tipo" style={{ ...inputStyle, width: 170 }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="">Todos los tipos</option>
               {TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -1318,8 +1343,7 @@ export default function AdminCouponsPage() {
             <button
               type="button"
               onClick={() => loadCoupons(1, false)}
-              className="rounded-2xl px-4 py-2 text-sm font-black text-white"
-              style={{ background: 'var(--admin-primary)' }}
+              className="coupon-button coupon-button--filter"
             >
               Filtrar
             </button>
@@ -1327,29 +1351,32 @@ export default function AdminCouponsPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <div className="coupon-admin-loading" style={{ color: 'var(--admin-card-muted-text)' }}>
             <Loader2 className="h-4 w-4 animate-spin" />
             Cargando cupones...
           </div>
         ) : rows.length === 0 ? (
-          <div className="py-16 text-center">
-            <BadgePercent className="mx-auto h-10 w-10" style={{ color: 'var(--admin-primary)' }} />
-            <p className="mt-3 text-lg font-black">No hay cupones registrados</p>
-            <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              Crea el primer cupón para usarlo en checkout.
-            </p>
+          <div className="coupon-admin-empty">
+            <span><BadgePercent className="h-8 w-8" /></span>
+            <h3>No hay cupones registrados</h3>
+            <p>Crea tu primera campaña; el asistente te guiará para definir el descuento, los productos y el público.</p>
+            {canCreate ? (
+              <button type="button" onClick={openNewForm} className="coupon-button coupon-button--primary">
+                <Plus className="h-4 w-4" /> Crear primer cupón
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="coupon-admin-table-wrap">
             <table className="coupon-admin-table w-full text-left text-sm">
               <thead>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Cupón</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Tipo</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Reglas</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Campaña</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Beneficio</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Condiciones</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Vigencia</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Usos</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-right">Acciones</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em]">Rendimiento</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-right">Administrar</th>
                 </tr>
               </thead>
               <tbody>
@@ -1366,54 +1393,65 @@ export default function AdminCouponsPage() {
                         ? 'Desactivar'
                         : 'Activar';
                   const usageLimit = coupon.usageLimit == null ? 'Sin límite' : Number(coupon.usageLimit || 0).toLocaleString('es-CO');
+                  const usagePercent = coupon.usageLimit == null
+                    ? 0
+                    : Math.min(100, Math.round((Number(coupon.usageCount || 0) / Math.max(1, Number(coupon.usageLimit || 1))) * 100));
                   return (
-                    <tr key={id || coupon.code} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
+                    <tr key={id || coupon.code} className="coupon-admin-row" data-status={coupon.effectiveStatus} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
                       <td className="px-4 py-4 align-top">
                         <div className="flex items-start gap-3">
-                          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
+                          <span className="coupon-admin-row__icon">
                             <BadgePercent className="h-4 w-4" />
                           </span>
                           <div className="min-w-0">
-                            <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>{coupon.code}</p>
-                            <p className="mt-0.5 truncate text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                            <p className="coupon-admin-row__code" style={{ color: 'var(--admin-card-text)' }}>{coupon.code}</p>
+                            <p className="coupon-admin-row__name" style={{ color: 'var(--admin-card-muted-text)' }}>
                               {coupon.name || coupon.description || 'Sin nombre'}
                             </p>
-                            <span className="mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em]" style={{ borderColor: 'var(--admin-primary-soft-border)', color: 'var(--admin-primary)', background: 'var(--admin-primary-soft-bg)' }}>
+                            <span className="coupon-admin-status">
                               {getStatusLabel(coupon.effectiveStatus)}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">{getTypeLabel(coupon.type)}</p>
-                        <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        <p className="coupon-admin-benefit">
                           {coupon.type === 'percentage'
                             ? `${Number(coupon.value || 0)}%`
                             : coupon.type === 'fixed'
                               ? formatMoney(coupon.value)
-                              : 'Descuenta el envío'}
+                              : 'Gratis'}
                         </p>
+                        <p className="coupon-admin-cell-helper">{getTypeLabel(coupon.type)}</p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-bold">Mínimo: {formatMoney(coupon.minSubtotal)}</p>
-                        <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        <p className="font-bold">Compra mínima: {formatMoney(coupon.minSubtotal)}</p>
+                        <p className="coupon-admin-cell-helper">
                           Aplica: {APPLIES_TO_OPTIONS.find((option) => option.value === coupon.appliesTo)?.label || coupon.appliesTo}
                         </p>
                         {coupon.maxDiscountAmount ? (
-                          <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                          <p className="coupon-admin-cell-helper">
                             Tope: {formatMoney(coupon.maxDiscountAmount)}
                           </p>
                         ) : null}
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-bold">Desde: {formatDate(coupon.startsAt)}</p>
-                        <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        <p className="font-bold">Desde {formatDate(coupon.startsAt)}</p>
+                        <p className="coupon-admin-cell-helper">
                           Hasta: {formatDate(coupon.endsAt)}
                         </p>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <p className="font-black">{Number(coupon.usageCount || 0).toLocaleString('es-CO')} / {usageLimit}</p>
-                        <p className="mt-1 text-xs font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        <div className="coupon-admin-usage-line">
+                          <strong>{Number(coupon.usageCount || 0).toLocaleString('es-CO')}</strong>
+                          <span>de {usageLimit}</span>
+                        </div>
+                        {coupon.usageLimit != null ? (
+                          <div className="coupon-admin-usage-track" aria-label={`${usagePercent}% del límite utilizado`}>
+                            <span style={{ width: `${usagePercent}%` }} />
+                          </div>
+                        ) : null}
+                        <p className="coupon-admin-cell-helper">
                           Por cliente: {coupon.perCustomerLimit == null ? 'Sin límite' : coupon.perCustomerLimit}
                         </p>
                       </td>
