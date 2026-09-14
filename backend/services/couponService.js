@@ -1160,6 +1160,10 @@ async function recordCouponRedemption({ couponId, code, orderId, orderNumber, cu
 }
 
 function redemptionLookup(order = {}) {
+  if (!order?.coupon || typeof order.coupon !== 'object') {
+    return null;
+  }
+
   const redemptionId = order?.coupon?.redemption;
   if (mongoose.Types.ObjectId.isValid(String(redemptionId || ''))) {
     return { _id: new mongoose.Types.ObjectId(String(redemptionId)) };
