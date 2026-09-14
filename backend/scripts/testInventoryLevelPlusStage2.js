@@ -99,6 +99,12 @@ async function main() {
   assert.match(approvalsSource, /Solo lectura/);
   ok('la interfaz oculta acciones a quien solo puede consultar');
 
+  const movementsSource = read('../frontend/src/admin/inventory/components/InventoryMovementsModal.jsx');
+  assert.match(movementsSource, /function movementAffectsStock/);
+  assert.match(movementsSource, /if \(!movementAffectsStock\(movement\)\) return;/);
+  assert.match(routeSource, /if \(!\['posted', 'reversed'\]\.includes\(status\)\)/);
+  ok('los resúmenes de movimientos y Kardex excluyen solicitudes pendientes o canceladas');
+
   const adjustmentSource = read('../frontend/src/admin/inventory/components/InventoryAdjustmentModal.jsx');
   const transferSource = read('../frontend/src/admin/inventory/components/InventoryTransferModal.jsx');
   assert.match(adjustmentSource, /Enviar a revisión/);
@@ -111,7 +117,7 @@ async function main() {
   assert.match(transferSource, /El stock todavía no cambió/);
   ok('la confirmación explica claramente que una solicitud no cambia existencias');
 
-  console.log(`\nInventario Nivel Plus Etapa 2: ${passed}/18 controles aprobados.`);
+  console.log(`\nInventario Nivel Plus Etapa 2: ${passed}/19 controles aprobados.`);
 }
 
 main().catch((error) => {

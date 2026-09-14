@@ -761,6 +761,16 @@ function getKardexProductSnapshot(productValue = {}, fallbackSnapshot = {}) {
 }
 
 function getKardexEffect(movement, branchObjectId) {
+  const status = cleanLower(movement?.status || '');
+
+  if (!['posted', 'reversed'].includes(status)) {
+    return {
+      entry: 0,
+      exit: 0,
+      effect: 'none',
+    };
+  }
+
   const quantity = Math.max(0, Number(movement?.quantity || 0));
   const direction = cleanLower(movement?.direction || '');
   const branchId = getDocumentIdValue(branchObjectId);

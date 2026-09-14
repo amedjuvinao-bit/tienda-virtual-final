@@ -382,6 +382,10 @@ function getSignedQuantity(movement) {
   return formatNumber(quantity);
 }
 
+function movementAffectsStock(movement) {
+  return ['posted', 'reversed'].includes(movement?.status);
+}
+
 function movementMatchesSelectedVariant(movement, selectedStockRow) {
   if (!selectedStockRow) return true;
 
@@ -551,6 +555,8 @@ export default function InventoryMovementsModal({
     let totalOut = 0;
 
     movements.forEach((movement) => {
+      if (!movementAffectsStock(movement)) return;
+
       const quantity = Number(movement?.quantity || 0);
 
       if (movement?.direction === 'in') totalIn += quantity;
