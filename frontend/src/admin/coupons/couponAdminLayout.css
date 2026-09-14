@@ -331,6 +331,7 @@
 .coupon-admin-workspace {
   border-radius: 20px;
   animation-delay: 0.12s;
+  container-type: inline-size;
 }
 
 .coupon-admin-workspace__heading { align-items: center; }
@@ -565,6 +566,113 @@
 .coupon-admin-action:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px color-mix(in srgb, var(--admin-primary) 12%, transparent);
+}
+
+/*
+ * Cuando el menú lateral reduce el espacio disponible, cada fila se presenta
+ * como una tarjeta completa. La decisión depende del ancho real del módulo y
+ * no del ancho de toda la ventana, evitando columnas o botones recortados.
+ */
+@container (max-width: 1000px) {
+  .coupon-admin-table-wrap {
+    overflow-x: visible;
+    padding: 14px;
+    background: color-mix(in srgb, var(--admin-card-bg) 96%, var(--admin-primary) 4%);
+  }
+
+  .coupon-admin-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .coupon-admin-table thead {
+    display: none;
+  }
+
+  .coupon-admin-table tbody {
+    display: grid;
+    gap: 14px;
+  }
+
+  .coupon-admin-row {
+    display: grid;
+    grid-template-columns: minmax(190px, 1.2fr) minmax(150px, 0.9fr) minmax(180px, 1fr);
+    border: 1px solid var(--admin-card-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--admin-card-text) 5%, transparent);
+  }
+
+  .coupon-admin-row:hover {
+    box-shadow: inset 4px 0 0 var(--admin-primary), 0 10px 28px color-mix(in srgb, var(--admin-card-text) 8%, transparent);
+  }
+
+  .coupon-admin-row > td {
+    width: auto !important;
+    padding: 16px;
+    border: 0;
+  }
+
+  .coupon-admin-row > td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    border-right: 1px solid var(--admin-card-border);
+  }
+
+  .coupon-admin-row > td:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .coupon-admin-row > td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+    border-top: 1px solid var(--admin-card-border);
+  }
+
+  .coupon-admin-row > td:nth-child(4) {
+    grid-column: 3;
+    grid-row: 2;
+    border-top: 1px solid var(--admin-card-border);
+    border-left: 1px solid var(--admin-card-border);
+  }
+
+  .coupon-admin-row > td:nth-child(5) {
+    grid-column: 3;
+    grid-row: 1;
+    border-left: 1px solid var(--admin-card-border);
+  }
+
+  .coupon-admin-row > td:nth-child(6) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    border-top: 1px solid var(--admin-card-border);
+    background: color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%);
+  }
+
+  .coupon-admin-actions {
+    justify-content: flex-end;
+  }
+}
+
+@container (max-width: 680px) {
+  .coupon-admin-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .coupon-admin-row > td:nth-child(1) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-card-border);
+  }
+
+  .coupon-admin-row > td:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .coupon-admin-row > td:nth-child(5) { grid-column: 2; grid-row: 2; }
+  .coupon-admin-row > td:nth-child(3) { grid-column: 1; grid-row: 3; }
+  .coupon-admin-row > td:nth-child(4) { grid-column: 2; grid-row: 3; }
+  .coupon-admin-row > td:nth-child(6) { grid-column: 1 / -1; grid-row: 4; }
+  .coupon-admin-actions { justify-content: flex-start; }
 }
 
 /* Asistente: conserva el flujo de cuatro pasos y mejora su lectura visual. */
