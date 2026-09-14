@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   ArrowRightLeft,
+  CheckCircle2,
+  Clock,
   Info,
   PackageSearch,
   RefreshCw,
@@ -26,6 +28,7 @@ const INITIAL_FORM = {
   reason: '',
   reference: '',
   notes: '',
+  postNow: true,
 };
 
 const MOVEMENT_TYPES = [
@@ -915,7 +918,7 @@ export default function InventoryAdjustmentModal({
       reason: String(form.reason || '').trim(),
       reference: String(form.reference || '').trim(),
       notes: String(form.notes || '').trim(),
-      postNow: true,
+      postNow: form.postNow,
     };
 
     try {
@@ -923,7 +926,11 @@ export default function InventoryAdjustmentModal({
 
       await api.post('/api/admin/inventory/movements', payload);
 
-      setSuccess('Movimiento de inventario creado correctamente.');
+      setSuccess(
+        form.postNow
+          ? 'Movimiento de inventario creado correctamente.'
+          : 'Solicitud enviada a revisión. El stock todavía no cambió.'
+      );
 
       if (typeof onSaved === 'function') {
         await onSaved();
@@ -1326,6 +1333,58 @@ export default function InventoryAdjustmentModal({
                     </div>
                   </div>
                 </PanelCard>
+
+                <PanelCard>
+                  <PanelTitle
+                    icon={<CheckCircle2 size={18} />}
+                    title="¿Cómo quieres procesarlo?"
+                    description="Puedes aplicarlo ahora o dejarlo pendiente para que otra persona lo revise."
+                  />
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => updateField('postNow', true)}
+                      disabled={saving}
+                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
+                      style={{
+                        ...styles.softCard,
+                        border: form.postNow
+                          ? '2px solid var(--admin-primary)'
+                          : styles.softCard.border,
+                      }}
+                    >
+                      <CheckCircle2 size={20} className="mt-0.5 shrink-0" />
+                      <span>
+                        <b className="block text-sm">Aplicar ahora</b>
+                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
+                          Modifica las existencias inmediatamente.
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateField('postNow', false)}
+                      disabled={saving}
+                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
+                      style={{
+                        ...styles.softCard,
+                        border: !form.postNow
+                          ? '2px solid var(--admin-primary)'
+                          : styles.softCard.border,
+                      }}
+                    >
+                      <Clock size={20} className="mt-0.5 shrink-0" />
+                      <span>
+                        <b className="block text-sm">Enviar a revisión</b>
+                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
+                          No cambia el stock hasta que sea aprobado.
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </PanelCard>
               </main>
 
               <aside className="min-w-0">
@@ -1340,7 +1399,9 @@ export default function InventoryAdjustmentModal({
                     </h3>
 
                     <p className="mt-3 text-sm leading-6 opacity-85">
-                      Revisa el resultado antes de guardar. El cambio se aplicará inmediatamente.
+                      {form.postNow
+                        ? 'Revisa el resultado antes de guardar. El cambio se aplicará inmediatamente.'
+                        : 'La solicitud quedará pendiente y no cambiará el stock hasta su aprobación.'}
                     </p>
 
                     <div className="mt-5 space-y-3">
@@ -1399,7 +1460,9 @@ export default function InventoryAdjustmentModal({
           <footer className="shrink-0 px-5 py-4 md:px-8" style={styles.footer}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm" style={styles.muted}>
-                Verifica producto, sede, talla, color y cantidad antes de guardar.
+                {form.postNow
+                  ? 'Verifica producto, sede, variante y cantidad antes de aplicar.'
+                  : 'Se enviará a revisión sin modificar las existencias.'}
               </p>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row">
@@ -1427,7 +1490,7 @@ export default function InventoryAdjustmentModal({
                   ) : (
                     <>
                       <Save size={16} />
-                      Guardar ajuste
+                      {form.postNow ? 'Aplicar ajuste' : 'Enviar a revisión'}
                     </>
                   )}
                 </button>

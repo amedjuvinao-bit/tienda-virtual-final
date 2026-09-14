@@ -183,6 +183,28 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Crear movimiento de entrada, salida o ajuste de inventario.',
     audit: true,
   },
+  {
+    method: 'GET',
+    path: '/api/admin/inventory/approvals',
+    permission: 'inventory:view',
+    description: 'Ver solicitudes pendientes de aprobación de inventario.',
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/inventory/movements/:id/approve',
+    permission: 'inventory:approve',
+    description: 'Aprobar y aplicar una solicitud de inventario.',
+    audit: true,
+    danger: true,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/inventory/movements/:id/reject',
+    permission: 'inventory:approve',
+    description: 'Rechazar una solicitud de inventario sin afectar existencias.',
+    audit: true,
+    danger: true,
+  },
 
   /* =========================================================
    * ÓRDENES

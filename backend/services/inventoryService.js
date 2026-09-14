@@ -468,6 +468,9 @@ async function createInventoryMovement(payload = {}, options = {}) {
       updatedBy: adminId,
       postedBy: postNow ? adminId : null,
       postedAt: postNow ? new Date() : null,
+      approvalRequired: !postNow,
+      requestedBy: !postNow ? adminId : null,
+      requestedAt: !postNow ? new Date() : null,
     });
 
     await movement.save({ session });
@@ -508,6 +511,165 @@ async function createInventoryMovement(payload = {}, options = {}) {
   }
 }
 
+async function approveInventoryMovement(
+  movementId,
+  { adminId = null, reviewNote = '' } = {}
+) {
+  const session = await mongoose.startSession();
+  let result = null;
+
+  try {
+    await session.withTransaction(async () => {
+      const movement = await InventoryMovement.findOne({
+        _id: getValidObjectId(movementId, 'El movimiento'),
+        deletedAt: null,
+      }).session(session);
+
+      if (!movement) {
+        const error = new Error('Solicitud de inventario no encontrada.');
+        error.code = 'INVENTORY_APPROVAL_NOT_FOUND';
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!movement.approvalRequired || movement.status !== 'draft') {
+        const error = new Error('Esta solicitud ya fue resuelta o no requiere aprobación.');
+        error.code = 'INVENTORY_APPROVAL_ALREADY_RESOLVED';
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const product = await getProductOrFail(movement.product, { session });
+      const variant = movement.variant?.toObject
+        ? movement.variant.toObject()
+        : movement.variant;
+      const quantity = getQuantity(movement.quantity);
+      const direction = movement.direction;
+      let branchFrom = null;
+      let branchTo = null;
+      let stockFromRow = null;
+      let stockToRow = null;
+      let stockFromImpact = { before: 0, quantity: 0, after: 0 };
+      let stockToImpact = { before: 0, quantity: 0, after: 0 };
+
+      if (direction === 'out' || direction === 'transfer') {
+        branchFrom = await getBranchOrFail(movement.branchFrom, {
+          session,
+          fieldName: 'La sede origen',
+        });
+        stockFromRow = await getOrCreateStock({
+          branch: branchFrom,
+          product,
+          variant,
+          adminId,
+          session,
+        });
+        stockFromImpact = applyOutStock(stockFromRow, quantity);
+      }
+
+      if (direction === 'in' || direction === 'transfer') {
+        branchTo = await getBranchOrFail(movement.branchTo, {
+          session,
+          fieldName: 'La sede destino',
+        });
+        stockToRow = await getOrCreateStock({
+          branch: branchTo,
+          product,
+          variant,
+          adminId,
+          session,
+        });
+        stockToImpact = applyInStock(stockToRow, quantity);
+      }
+
+      const now = new Date();
+      const rows = [stockFromRow, stockToRow].filter(Boolean);
+
+      for (const stockRow of rows) {
+        stockRow.lastMovement = movement._id;
+        stockRow.lastMovementAt = now;
+        stockRow.updatedBy = adminId;
+        await stockRow.save({ session });
+      }
+
+      movement.stockFrom = stockFromImpact;
+      movement.stockTo = stockToImpact;
+      movement.status = 'posted';
+      movement.postedBy = adminId;
+      movement.postedAt = now;
+      movement.reviewedBy = adminId;
+      movement.reviewedAt = now;
+      movement.reviewDecision = 'approved';
+      movement.reviewNote = cleanText(reviewNote);
+      movement.updatedBy = adminId;
+      await movement.save({ session });
+
+      await syncProductTotalStock(product._id, { session });
+      result = movement;
+    });
+
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+async function rejectInventoryMovement(
+  movementId,
+  { adminId = null, reviewNote = '' } = {}
+) {
+  const note = cleanText(reviewNote);
+
+  if (!note) {
+    const error = new Error('Escribe el motivo del rechazo.');
+    error.code = 'INVENTORY_REJECTION_NOTE_REQUIRED';
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const session = await mongoose.startSession();
+  let result = null;
+
+  try {
+    await session.withTransaction(async () => {
+      const movement = await InventoryMovement.findOne({
+        _id: getValidObjectId(movementId, 'El movimiento'),
+        deletedAt: null,
+      }).session(session);
+
+      if (!movement) {
+        const error = new Error('Solicitud de inventario no encontrada.');
+        error.code = 'INVENTORY_APPROVAL_NOT_FOUND';
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!movement.approvalRequired || movement.status !== 'draft') {
+        const error = new Error('Esta solicitud ya fue resuelta o no requiere aprobación.');
+        error.code = 'INVENTORY_APPROVAL_ALREADY_RESOLVED';
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const now = new Date();
+      movement.status = 'cancelled';
+      movement.cancelledBy = adminId;
+      movement.cancelledAt = now;
+      movement.reviewedBy = adminId;
+      movement.reviewedAt = now;
+      movement.reviewDecision = 'rejected';
+      movement.reviewNote = note;
+      movement.updatedBy = adminId;
+      await movement.save({ session });
+      result = movement;
+    });
+
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
 async function getBranchStockSummary(branchId, { session = null } = {}) {
   const branchObjectId = getValidObjectId(branchId, 'La sede');
 
@@ -544,7 +706,9 @@ async function getBranchStockSummary(branchId, { session = null } = {}) {
 }
 
 module.exports = {
+  approveInventoryMovement,
   createInventoryMovement,
   getBranchStockSummary,
+  rejectInventoryMovement,
   syncProductTotalStock,
 };

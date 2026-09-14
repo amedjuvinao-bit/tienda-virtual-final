@@ -9,7 +9,12 @@ const requirePermission = require('../middleware/requirePermission');
 const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const InventoryReservation = require('../models/InventoryReservation');
-const { createInventoryMovement, getBranchStockSummary } = require('../services/inventoryService');
+const {
+  approveInventoryMovement,
+  createInventoryMovement,
+  getBranchStockSummary,
+  rejectInventoryMovement,
+} = require('../services/inventoryService');
 const {
   assertInventoryMovementAccess,
   buildInventoryBranchAccess,
@@ -599,6 +604,8 @@ function populateMovementForResponse(query) {
     .populate('branchFrom', 'name code type status active')
     .populate('branchTo', 'name code type status active')
     .populate('createdBy', 'username displayName firstName lastName role')
+    .populate('requestedBy', 'username displayName firstName lastName role')
+    .populate('reviewedBy', 'username displayName firstName lastName role')
     .populate('reversedByMovement', 'movementNumber type status createdAt')
     .populate('reversalOfMovement', 'movementNumber type status createdAt');
 }
@@ -1701,6 +1708,8 @@ router.get('/movements', requirePermission('inventory:view'), async (req, res) =
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
         .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('requestedBy', 'username displayName firstName lastName role')
+        .populate('reviewedBy', 'username displayName firstName lastName role')
         .populate('reversedByMovement', 'movementNumber type status createdAt')
         .populate('reversalOfMovement', 'movementNumber type status createdAt')
         .lean({ virtuals: true }),
@@ -1728,15 +1737,6 @@ router.get('/movements', requirePermission('inventory:view'), async (req, res) =
 
 router.post('/movements', requireMovementPermission, async (req, res) => {
   try {
-    if (req.body?.postNow === false) {
-      return sendError(
-        res,
-        400,
-        'Los movimientos en borrador no están habilitados hasta contar con un flujo de aprobación.',
-        { error: 'INVENTORY_DRAFT_WORKFLOW_UNAVAILABLE' }
-      );
-    }
-
     const access = assertInventoryMovementAccess(req, req.body || {}, {
       requireManage: true,
     });
@@ -1749,7 +1749,10 @@ router.post('/movements', requireMovementPermission, async (req, res) => {
 
     return res.status(201).json({
       ok: true,
-      message: 'Movimiento de inventario creado correctamente.',
+      message:
+        req.body?.postNow === false
+          ? 'Solicitud de movimiento enviada a revisión.'
+          : 'Movimiento de inventario creado correctamente.',
       data:
         typeof movement.toSafeObject === 'function'
           ? movement.toSafeObject()
@@ -1769,6 +1772,115 @@ router.post('/movements', requireMovementPermission, async (req, res) => {
     );
   }
 });
+
+/* ============================
+ * SOLICITUDES PENDIENTES DE APROBACIÓN
+ * GET /api/admin/inventory/approvals
+ * ============================ */
+
+router.get('/approvals', requirePermission('inventory:view'), async (req, res) => {
+  try {
+    const scoped = buildScopedInventoryMovementFilter(
+      req,
+      {
+        approvalRequired: true,
+        status: 'draft',
+        deletedAt: null,
+      }
+    );
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
+    const { page, limit, skip } = parsePagination(req.query);
+    const [total, movements] = await Promise.all([
+      InventoryMovement.countDocuments(scoped.filter),
+      populateMovementForResponse(
+        InventoryMovement.find(scoped.filter)
+          .sort({ requestedAt: 1, createdAt: 1 })
+          .skip(skip)
+          .limit(limit)
+      ).lean({ virtuals: true }),
+    ]);
+
+    return res.json({
+      ok: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
+      data: movements,
+    });
+  } catch (error) {
+    console.error('❌ Error listando aprobaciones de inventario:', error.message);
+    return sendError(res, 500, 'Error listando aprobaciones de inventario.');
+  }
+});
+
+async function resolveInventoryApproval(req, res, decision) {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return sendError(res, 400, 'ID de movimiento inválido.');
+    }
+
+    const scoped = buildScopedInventoryMovementFilter(
+      req,
+      {
+        _id: toObjectId(id),
+        approvalRequired: true,
+        status: 'draft',
+        deletedAt: null,
+      },
+      { requireManage: true }
+    );
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
+    const visibleMovement = await InventoryMovement.exists(scoped.filter);
+    if (!visibleMovement) {
+      return sendError(res, 404, 'Solicitud de inventario no encontrada.');
+    }
+
+    const action = decision === 'approved'
+      ? approveInventoryMovement
+      : rejectInventoryMovement;
+    const movement = await action(id, {
+      adminId: getCurrentAdminId(req),
+      reviewNote: req.body?.reviewNote,
+    });
+    const populated = await populateMovementForResponse(
+      InventoryMovement.findById(movement._id)
+    ).lean({ virtuals: true });
+
+    return res.json({
+      ok: true,
+      message:
+        decision === 'approved'
+          ? 'Solicitud aprobada y existencias actualizadas.'
+          : 'Solicitud rechazada sin modificar existencias.',
+      data: populated,
+    });
+  } catch (error) {
+    console.error(`❌ Error resolviendo aprobación de inventario (${decision}):`, error.message);
+    return sendError(
+      res,
+      error.statusCode || 400,
+      error.message || 'No se pudo resolver la solicitud de inventario.',
+      error.code ? { error: error.code } : {}
+    );
+  }
+}
+
+router.post(
+  '/movements/:id/approve',
+  requirePermission('inventory:approve'),
+  (req, res) => resolveInventoryApproval(req, res, 'approved')
+);
+
+router.post(
+  '/movements/:id/reject',
+  requirePermission('inventory:approve'),
+  (req, res) => resolveInventoryApproval(req, res, 'rejected')
+);
 
 /* ============================
  * REVERSAR MOVIMIENTO
@@ -1912,6 +2024,8 @@ router.get(
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
         .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('requestedBy', 'username displayName firstName lastName role')
+        .populate('reviewedBy', 'username displayName firstName lastName role')
         .populate('reversedByMovement', 'movementNumber type status createdAt')
         .populate('reversalOfMovement', 'movementNumber type status createdAt')
         .lean({ virtuals: true });

@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   Boxes,
   CheckCircle2,
+  Clock,
   Info,
   MapPin,
   RefreshCw,
@@ -22,6 +23,7 @@ const INITIAL_FORM = {
   reason: '',
   reference: '',
   notes: '',
+  postNow: true,
 };
 
 const styles = {
@@ -586,7 +588,7 @@ export default function InventoryTransferModal({
       reason: cleanText(form.reason),
       reference: cleanText(form.reference),
       notes: cleanText(form.notes),
-      postNow: true,
+      postNow: form.postNow,
     };
 
     try {
@@ -594,7 +596,11 @@ export default function InventoryTransferModal({
 
       await api.post('/api/admin/inventory/movements', payload);
 
-      setSuccess('Traslado de inventario creado correctamente.');
+      setSuccess(
+        form.postNow
+          ? 'Traslado de inventario creado correctamente.'
+          : 'Solicitud de traslado enviada a revisión. El stock todavía no cambió.'
+      );
 
       if (typeof onSaved === 'function') {
         await onSaved();
@@ -946,6 +952,58 @@ export default function InventoryTransferModal({
                     </div>
                   </div>
                 </PanelCard>
+
+                <PanelCard>
+                  <PanelTitle
+                    icon={<CheckCircle2 size={18} />}
+                    title="¿Cómo quieres procesarlo?"
+                    description="Aplica el traslado ahora o envíalo a revisión sin mover existencias."
+                  />
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => updateField('postNow', true)}
+                      disabled={saving}
+                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
+                      style={{
+                        ...styles.softCard,
+                        border: form.postNow
+                          ? '2px solid var(--admin-primary)'
+                          : styles.softCard.border,
+                      }}
+                    >
+                      <CheckCircle2 size={20} className="mt-0.5 shrink-0" />
+                      <span>
+                        <b className="block text-sm">Trasladar ahora</b>
+                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
+                          Resta del origen y suma al destino inmediatamente.
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateField('postNow', false)}
+                      disabled={saving}
+                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
+                      style={{
+                        ...styles.softCard,
+                        border: !form.postNow
+                          ? '2px solid var(--admin-primary)'
+                          : styles.softCard.border,
+                      }}
+                    >
+                      <Clock size={20} className="mt-0.5 shrink-0" />
+                      <span>
+                        <b className="block text-sm">Enviar a revisión</b>
+                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
+                          Mantiene el stock intacto hasta su aprobación.
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </PanelCard>
               </main>
 
               <aside className="min-w-0">
@@ -960,7 +1018,9 @@ export default function InventoryTransferModal({
                     </h3>
 
                     <p className="mt-3 text-sm leading-6 opacity-85">
-                      El sistema restará del origen y sumará al destino en una sola operación.
+                      {form.postNow
+                        ? 'El sistema restará del origen y sumará al destino en una sola operación.'
+                        : 'La solicitud quedará pendiente y no moverá unidades hasta su aprobación.'}
                     </p>
 
                     <div className="mt-5 space-y-3">
@@ -1031,7 +1091,9 @@ export default function InventoryTransferModal({
           <footer className="shrink-0 px-5 py-4 md:px-8" style={styles.footer}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm" style={styles.muted}>
-                Verifica origen, destino y cantidad antes de guardar.
+                {form.postNow
+                  ? 'Verifica origen, destino y cantidad antes de trasladar.'
+                  : 'Se enviará a revisión sin mover existencias.'}
               </p>
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row">
@@ -1059,7 +1121,7 @@ export default function InventoryTransferModal({
                   ) : (
                     <>
                       <Save size={16} />
-                      Guardar traslado
+                      {form.postNow ? 'Trasladar ahora' : 'Enviar a revisión'}
                     </>
                   )}
                 </button>

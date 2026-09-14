@@ -52,6 +52,7 @@ const ADMIN_PERMISSION_MODULES = [
       permission('inventory:view', 'Ver inventario', 'Permite consultar stock general, stock por sede y stock por variante.'),
       permission('inventory:update', 'Editar inventario', 'Permite actualizar cantidades desde formularios administrativos.', { audit: true, sensitive: true }),
       permission('inventory:adjust', 'Ajustar inventario', 'Permite realizar ajustes manuales de inventario.', { audit: true, sensitive: true }),
+      permission('inventory:approve', 'Aprobar movimientos', 'Permite aprobar o rechazar solicitudes de ajustes y traslados de inventario.', { audit: true, sensitive: true, danger: true }),
       permission('inventory:transfer', 'Trasladar inventario', 'Permite mover inventario entre sedes.', { audit: true, sensitive: true }),
       permission('inventory:import', 'Importar inventario', 'Permite cargar inventario de forma masiva.', { audit: true, sensitive: true }),
       permission('inventory:export', 'Exportar inventario', 'Permite descargar reportes de inventario.', { audit: true }),

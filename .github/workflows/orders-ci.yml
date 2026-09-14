@@ -6,6 +6,7 @@ on:
       - main
       - feature/ordenes-admin-avanzado
       - feature/inventario-nivel-plus-etapa-1
+      - feature/inventario-nivel-plus-etapa-2
   pull_request:
     branches:
       - main
@@ -78,6 +79,7 @@ jobs:
           npm --prefix backend run test:inventory-reservation-composition
           npm --prefix backend run test:order-inventory-allocation-composition
           npm --prefix backend run test:inventory-level-plus-stage1
+          npm --prefix backend run test:inventory-level-plus-stage2
           npm --prefix backend run test:order-module-boundaries
           npm --prefix backend run test:backend-commonjs-acyclicity
           npm --prefix backend run test:order-activity-scalability

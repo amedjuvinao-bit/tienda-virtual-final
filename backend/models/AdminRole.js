@@ -345,6 +345,7 @@ AdminRoleSchema.statics.getDefaultRoles = function getDefaultRoles() {
         'inventory:update',
         'inventory:transfer',
         'inventory:adjust',
+        'inventory:approve',
         'inventory:export',
 
         'carts:view',

@@ -276,6 +276,48 @@ const InventoryMovementSchema = new mongoose.Schema(
       index: true,
     },
 
+    approvalRequired: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    requestedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+
+    reviewDecision: {
+      type: String,
+      enum: ['', 'approved', 'rejected'],
+      default: '',
+    },
+
+    reviewNote: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 600,
+    },
+
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
@@ -508,6 +550,7 @@ InventoryMovementSchema.index({ branchFrom: 1, createdAt: -1 });
 InventoryMovementSchema.index({ branchTo: 1, createdAt: -1 });
 InventoryMovementSchema.index({ type: 1, status: 1, createdAt: -1 });
 InventoryMovementSchema.index({ direction: 1, status: 1, createdAt: -1 });
+InventoryMovementSchema.index({ approvalRequired: 1, status: 1, requestedAt: -1 });
 InventoryMovementSchema.index({ order: 1, createdAt: -1 });
 InventoryMovementSchema.index({ createdBy: 1, createdAt: -1 });
 InventoryMovementSchema.index({ deletedAt: 1, createdAt: -1 });
@@ -526,6 +569,7 @@ InventoryMovementSchema.pre('validate', async function inventoryMovementPreValid
     this.reference = cleanUpper(this.reference);
     this.orderNumber = cleanUpper(this.orderNumber);
     this.sourceModel = cleanText(this.sourceModel);
+    this.reviewNote = cleanText(this.reviewNote);
 
     if (!this.movementNumber) {
       const counter = await Counter.findOneAndUpdate(
@@ -613,6 +657,10 @@ InventoryMovementSchema.pre('validate', async function inventoryMovementPreValid
 
     if (this.status === 'cancelled' && !this.cancelledAt) {
       this.cancelledAt = new Date();
+    }
+
+    if (this.approvalRequired && !this.requestedAt) {
+      this.requestedAt = this.createdAt || new Date();
     }
 
     next();

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import InventoryAdjustmentModal from './inventory/components/InventoryAdjustmentModal';
+import InventoryApprovalsPanel from './inventory/components/InventoryApprovalsPanel';
 import InventoryAlertsPanel from './inventory/components/InventoryAlertsPanel';
 import InventoryKardexModal from './inventory/components/InventoryKardexModal';
 import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
@@ -617,6 +618,7 @@ export default function InventoryAdmin() {
             </button>
 
             <InventoryReservationsPanel />
+            <InventoryApprovalsPanel onChanged={loadInventory} />
           </div>
         </div>
 

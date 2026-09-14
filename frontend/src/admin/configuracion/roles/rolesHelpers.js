@@ -63,6 +63,7 @@ export const PERMISSION_ACTION_LABELS = {
   discount: 'Aplicar descuento',
   transfer: 'Transferir',
   adjust: 'Ajustar',
+  approve: 'Aprobar',
   retry: 'Reintentar',
   'credit-note': 'Nota crédito',
   download: 'Descargar',

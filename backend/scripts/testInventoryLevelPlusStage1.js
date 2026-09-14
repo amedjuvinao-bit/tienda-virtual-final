@@ -197,8 +197,9 @@ function main() {
   ok('rutas administrativas aplican alcance y permiso específico de exportación');
 
   assert.match(routeSource, /ADMIN_INVENTORY_MOVEMENT_TYPE_FORBIDDEN/);
-  assert.match(routeSource, /INVENTORY_DRAFT_WORKFLOW_UNAVAILABLE/);
-  ok('la API bloquea tipos internos y borradores sin flujo de aprobación');
+  assert.doesNotMatch(routeSource, /INVENTORY_DRAFT_WORKFLOW_UNAVAILABLE/);
+  assert.match(routeSource, /postNow:\s*req\.body\?\.postNow !== false/);
+  ok('la API bloquea tipos internos y permite borradores solo mediante el flujo de aprobación');
 
   const inventoryServiceSource = fs.readFileSync(
     path.join(__dirname, '..', 'services', 'inventoryService.js'),
