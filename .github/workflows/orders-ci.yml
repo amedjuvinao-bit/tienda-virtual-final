@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/ordenes-admin-avanzado
+      - feature/inventario-nivel-plus-etapa-1
   pull_request:
     branches:
       - main
