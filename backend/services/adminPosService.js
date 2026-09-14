@@ -918,10 +918,7 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
               toNumber(componentStock.reservedStock, 0)
           )
         );
-        if (
-          componentAvailable < requiredQuantity &&
-          branch.settings?.allowNegativeStock !== true
-        ) {
+        if (componentAvailable < requiredQuantity) {
           throw createPosError(
             `No hay stock suficiente para el componente ${component.title || product.title}. Disponible: ${componentAvailable}.`,
             'POS_BUNDLE_COMPONENT_STOCK_NOT_AVAILABLE',
@@ -1014,10 +1011,7 @@ async function loadAndValidatePosItems(items = [], branch, { session = null } = 
         )
       );
 
-      if (
-        availableStock < item.quantity &&
-        branch.settings?.allowNegativeStock !== true
-      ) {
+      if (availableStock < item.quantity) {
         throw createPosError(
           `No hay stock suficiente para ${product.title}. Disponible: ${availableStock}.`,
           'POS_STOCK_NOT_AVAILABLE',
@@ -1348,23 +1342,19 @@ async function applyPosInventoryOut({ order, validatedItems = [], branch, admin 
         _id: item.stock._id,
         active: true,
         deletedAt: null,
-        ...(branch.settings?.allowNegativeStock === true
-          ? {}
-          : {
-              $expr: {
-                $gte: [
-                  {
-                    $subtract: [
-                      '$stock',
-                      {
-                        $ifNull: ['$reservedStock', 0],
-                      },
-                    ],
-                  },
-                  item.quantity,
-                ],
-              },
-            }),
+        $expr: {
+          $gte: [
+            {
+              $subtract: [
+                '$stock',
+                {
+                  $ifNull: ['$reservedStock', 0],
+                },
+              ],
+            },
+            item.quantity,
+          ],
+        },
       },
       [
         {

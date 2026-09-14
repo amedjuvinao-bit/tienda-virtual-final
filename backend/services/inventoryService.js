@@ -11,6 +11,7 @@ const {
   normalizeAttributes,
   resolveVariantIdentity,
 } = require('../lib/products/productVariantConfig');
+const { applyAvailableStockOut } = require('./inventoryStockPolicy');
 
 function cleanText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -47,6 +48,28 @@ function getQuantity(value) {
   }
 
   return quantity;
+}
+
+function getMovementType(value) {
+  const type = cleanLower(value);
+  const allowedTypes = new Set(InventoryMovement.getTypes());
+
+  if (!type || !allowedTypes.has(type)) {
+    const error = new Error('El tipo de movimiento de inventario no es válido.');
+    error.code = 'INVALID_INVENTORY_MOVEMENT_TYPE';
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const direction = InventoryMovement.resolveDirectionFromType(type);
+  if (!['in', 'out', 'transfer'].includes(direction)) {
+    const error = new Error('El tipo de movimiento no produce un cambio de inventario.');
+    error.code = 'INVENTORY_MOVEMENT_WITHOUT_STOCK_IMPACT';
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return type;
 }
 
 function getVariantFromPayload(payload = {}, product = null) {
@@ -263,26 +286,8 @@ function applyInStock(stockRow, quantity) {
   };
 }
 
-function applyOutStock(stockRow, quantity, { allowNegativeStock = false } = {}) {
-  const before = Number(stockRow.stock || 0);
-
-  if (!allowNegativeStock && before < quantity) {
-    throw new Error(
-      `Stock insuficiente. Disponible: ${before}. Solicitado: ${quantity}.`
-    );
-  }
-
-  const after = Math.max(0, before - quantity);
-
-  stockRow.stock = after;
-  stockRow.reservedStock = Math.min(Number(stockRow.reservedStock || 0), after);
-  stockRow.availableStock = Math.max(0, after - Number(stockRow.reservedStock || 0));
-
-  return {
-    before,
-    quantity,
-    after,
-  };
+function applyOutStock(stockRow, quantity) {
+  return applyAvailableStockOut(stockRow, quantity);
 }
 
 async function createInventoryMovement(payload = {}, options = {}) {
@@ -296,9 +301,7 @@ async function createInventoryMovement(payload = {}, options = {}) {
   const session = externalSession || (await mongoose.startSession());
 
   async function execute() {
-    const type = InventoryMovement.resolveDirectionFromType
-      ? cleanLower(payload.type || 'correction')
-      : cleanLower(payload.type || 'correction');
+    const type = getMovementType(payload.type);
 
     const direction = InventoryMovement.resolveDirectionFromType(type);
     const quantity = getQuantity(payload.quantity);
@@ -383,9 +386,7 @@ async function createInventoryMovement(payload = {}, options = {}) {
         session,
       });
 
-      stockFromImpact = applyOutStock(stockFromRow, quantity, {
-        allowNegativeStock: payload.allowNegativeStock === true,
-      });
+      stockFromImpact = applyOutStock(stockFromRow, quantity);
 
       stockFromRow.lastMovementAt = new Date();
       stockFromRow.updatedBy = adminId;
@@ -410,9 +411,7 @@ async function createInventoryMovement(payload = {}, options = {}) {
         session,
       });
 
-      stockFromImpact = applyOutStock(stockFromRow, quantity, {
-        allowNegativeStock: false,
-      });
+      stockFromImpact = applyOutStock(stockFromRow, quantity);
 
       stockToImpact = applyInStock(stockToRow, quantity);
 

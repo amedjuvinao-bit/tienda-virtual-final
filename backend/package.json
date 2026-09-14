@@ -39,6 +39,7 @@
     "migrate:cash-journey-close-indexes": "node scripts/migrateCashJourneyCloseIndexes.js",
     "migrate:pos-held-sale-indexes": "node scripts/migratePosHeldSaleIndexes.js",
     "test:inventory-admin": "node scripts/testInventoryAdminModule.js",
+    "test:inventory-level-plus-stage1": "node scripts/testInventoryLevelPlusStage1.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",
     "test:order-cart-version": "node scripts/testOrderCartVersionContract.js",

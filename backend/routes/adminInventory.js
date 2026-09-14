@@ -10,12 +10,30 @@ const InventoryStock = require('../models/InventoryStock');
 const InventoryMovement = require('../models/InventoryMovement');
 const InventoryReservation = require('../models/InventoryReservation');
 const { createInventoryMovement, getBranchStockSummary } = require('../services/inventoryService');
+const {
+  assertInventoryMovementAccess,
+  buildInventoryBranchAccess,
+  buildScopedInventoryMovementFilter,
+  buildScopedInventoryReservationFilter,
+  buildScopedInventoryStockFilter,
+} = require('../services/adminInventoryAccessService');
 
 const router = express.Router();
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+const ADMIN_MOVEMENT_TYPES = new Set([
+  'initial_stock',
+  'purchase_in',
+  'return_in',
+  'return_out',
+  'adjustment_in',
+  'adjustment_out',
+  'transfer',
+  'damage_out',
+  'loss_out',
+]);
 
 function cleanText(value, fallback = '') {
   const text = String(value || '').trim().replace(/\s+/g, ' ');
@@ -40,6 +58,12 @@ function sendError(res, status, message, extra = {}) {
     ok: false,
     message,
     ...extra,
+  });
+}
+
+function sendAccessError(res, access) {
+  return sendError(res, access.status || 403, access.message, {
+    error: access.error || 'INVENTORY_ACCESS_FORBIDDEN',
   });
 }
 
@@ -433,6 +457,15 @@ function buildReservationFilter(query = {}) {
 
 function requireMovementPermission(req, res, next) {
   const type = cleanLower(req.body?.type || '');
+
+  if (!ADMIN_MOVEMENT_TYPES.has(type)) {
+    return sendError(
+      res,
+      400,
+      'El tipo de movimiento no está permitido para operaciones administrativas.',
+      { error: 'ADMIN_INVENTORY_MOVEMENT_TYPE_FORBIDDEN' }
+    );
+  }
 
   const direction = InventoryMovement.resolveDirectionFromType(type);
 
@@ -1127,12 +1160,15 @@ router.get('/stock', requirePermission('inventory:view'), async (req, res) => {
       return sendError(res, parsedFilter.status, parsedFilter.message);
     }
 
+    const scoped = buildScopedInventoryStockFilter(req, parsedFilter.filter);
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
     const { page, limit, skip } = parsePagination(req.query);
 
     const [total, rows] = await Promise.all([
-      InventoryStock.countDocuments(parsedFilter.filter),
+      InventoryStock.countDocuments(scoped.filter),
 
-      InventoryStock.find(parsedFilter.filter)
+      InventoryStock.find(scoped.filter)
         .sort({
           'branchSnapshot.name': 1,
           'productSnapshot.title': 1,
@@ -1167,7 +1203,7 @@ router.get('/stock', requirePermission('inventory:view'), async (req, res) => {
  * GET /api/admin/inventory/export
  * ============================ */
 
-router.get('/export', requirePermission('inventory:view'), async (req, res) => {
+router.get('/export', requirePermission('inventory:export'), async (req, res) => {
   try {
     const parsedFilter = buildStockFilter(req.query);
 
@@ -1175,7 +1211,10 @@ router.get('/export', requirePermission('inventory:view'), async (req, res) => {
       return sendError(res, parsedFilter.status, parsedFilter.message);
     }
 
-    const rows = await InventoryStock.find(parsedFilter.filter)
+    const scoped = buildScopedInventoryStockFilter(req, parsedFilter.filter);
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
+    const rows = await InventoryStock.find(scoped.filter)
       .sort({
         'branchSnapshot.name': 1,
         'productSnapshot.title': 1,
@@ -1220,6 +1259,11 @@ router.get(
         return sendError(res, 400, 'ID de sede inválido.');
       }
 
+      const access = buildInventoryBranchAccess(req, {
+        requestedBranchId: branchId,
+      });
+      if (!access.ok) return sendAccessError(res, access);
+
       const summary = await getBranchStockSummary(branchId);
 
       return res.json({
@@ -1251,13 +1295,19 @@ router.get('/reservations', requirePermission('inventory:view'), async (req, res
       return sendError(res, parsedFilter.status, parsedFilter.message);
     }
 
+    const scoped = buildScopedInventoryReservationFilter(
+      req,
+      parsedFilter.filter
+    );
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
     const { page, limit, skip } = parsePagination(req.query);
     const sort = parseReservationSort(req.query);
 
     const [total, reservations, statusSummary] = await Promise.all([
-      InventoryReservation.countDocuments(parsedFilter.filter),
+      InventoryReservation.countDocuments(scoped.filter),
 
-      InventoryReservation.find(parsedFilter.filter)
+      InventoryReservation.find(scoped.filter)
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -1268,7 +1318,7 @@ router.get('/reservations', requirePermission('inventory:view'), async (req, res
 
       InventoryReservation.aggregate([
         {
-          $match: parsedFilter.filter,
+          $match: scoped.filter,
         },
         {
           $group: {
@@ -1328,11 +1378,16 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
   try {
     const limit = parseAlertsLimit(req.query);
     const now = new Date();
-
-    const stockRows = await InventoryStock.find({
+    const scopedStock = buildScopedInventoryStockFilter(req, {
       deletedAt: null,
       active: true,
-    })
+    });
+    const scopedReservations = buildScopedInventoryReservationFilter(req, {});
+
+    if (!scopedStock.ok) return sendAccessError(res, scopedStock);
+    if (!scopedReservations.ok) return sendAccessError(res, scopedReservations);
+
+    const stockRows = await InventoryStock.find(scopedStock.filter)
       .populate('product', 'title sku image price stock reorderPoint stockMin')
       .populate('branch', 'name code type status active')
       .sort({
@@ -1363,6 +1418,7 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
 
     const [expiredReservationsRaw, pendingReservationsRaw] = await Promise.all([
       InventoryReservation.find({
+        ...scopedReservations.filter,
         status: 'pending',
         expiresAt: {
           $lte: now,
@@ -1378,6 +1434,7 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
         .lean({ virtuals: true }),
 
       InventoryReservation.find({
+        ...scopedReservations.filter,
         status: 'pending',
         expiresAt: {
           $gt: now,
@@ -1470,6 +1527,11 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
     if (!parsedFilter.ok) {
       return sendError(res, parsedFilter.status, parsedFilter.message);
     }
+
+    const access = buildInventoryBranchAccess(req, {
+      requestedBranchId: parsedFilter.branchId,
+    });
+    if (!access.ok) return sendAccessError(res, access);
 
     const {
       productObjectId,
@@ -1619,13 +1681,19 @@ router.get('/movements', requirePermission('inventory:view'), async (req, res) =
       return sendError(res, parsedFilter.status, parsedFilter.message);
     }
 
+    const scoped = buildScopedInventoryMovementFilter(
+      req,
+      parsedFilter.filter
+    );
+    if (!scoped.ok) return sendAccessError(res, scoped);
+
     const { page, limit, skip } = parsePagination(req.query);
     const sort = parseSort(req.query);
 
     const [total, movements] = await Promise.all([
-      InventoryMovement.countDocuments(parsedFilter.filter),
+      InventoryMovement.countDocuments(scoped.filter),
 
-      InventoryMovement.find(parsedFilter.filter)
+      InventoryMovement.find(scoped.filter)
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -1660,6 +1728,20 @@ router.get('/movements', requirePermission('inventory:view'), async (req, res) =
 
 router.post('/movements', requireMovementPermission, async (req, res) => {
   try {
+    if (req.body?.postNow === false) {
+      return sendError(
+        res,
+        400,
+        'Los movimientos en borrador no están habilitados hasta contar con un flujo de aprobación.',
+        { error: 'INVENTORY_DRAFT_WORKFLOW_UNAVAILABLE' }
+      );
+    }
+
+    const access = assertInventoryMovementAccess(req, req.body || {}, {
+      requireManage: true,
+    });
+    if (!access.ok) return sendAccessError(res, access);
+
     const movement = await createInventoryMovement(req.body || {}, {
       adminId: getCurrentAdminId(req),
       postNow: req.body?.postNow !== false,
@@ -1678,8 +1760,12 @@ router.post('/movements', requireMovementPermission, async (req, res) => {
 
     return sendError(
       res,
-      400,
-      error.message || 'Error creando movimiento de inventario.'
+      error.statusCode || 400,
+      error.message || 'Error creando movimiento de inventario.',
+      {
+        ...(error.code ? { error: error.code } : {}),
+        ...(error.details ? { details: error.details } : {}),
+      }
     );
   }
 });
@@ -1706,12 +1792,24 @@ router.post(
       const adminId = getCurrentAdminId(req);
       const reason = cleanText(req.body?.reason || '');
       let responsePayload = null;
-
-      await session.withTransaction(async () => {
-        const movement = await InventoryMovement.findOne({
+      const scoped = buildScopedInventoryMovementFilter(
+        req,
+        {
           _id: toObjectId(id),
           deletedAt: null,
-        }).session(session);
+        },
+        {
+          requestedBranchId: '',
+          requireManage: true,
+        }
+      );
+
+      if (!scoped.ok) {
+        return sendAccessError(res, scoped);
+      }
+
+      await session.withTransaction(async () => {
+        const movement = await InventoryMovement.findOne(scoped.filter).session(session);
 
         if (!movement) {
           throw Object.assign(new Error('Movimiento de inventario no encontrado.'), {
@@ -1797,10 +1895,19 @@ router.get(
         return sendError(res, 400, 'ID de movimiento inválido.');
       }
 
-      const movement = await InventoryMovement.findOne({
-        _id: toObjectId(id),
-        deletedAt: null,
-      })
+      const scoped = buildScopedInventoryMovementFilter(
+        req,
+        {
+          _id: toObjectId(id),
+          deletedAt: null,
+        },
+        {
+          requestedBranchId: '',
+        }
+      );
+      if (!scoped.ok) return sendAccessError(res, scoped);
+
+      const movement = await InventoryMovement.findOne(scoped.filter)
         .populate('product', 'title sku image price stock')
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
