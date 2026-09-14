@@ -458,6 +458,14 @@ const fakeOrderFulfillmentService = {
   processOrderFulfillmentAfterPayment: async () => ({ ok: true }),
 };
 
+const fakeCouponService = {
+  reconcileOrderCouponForStatus: async () => ({
+    changed: false,
+    skipped: true,
+    reason: 'order_without_coupon',
+  }),
+};
+
 const fakePublicPaymentAccessService = {
   SAFE_PAYMENT_ACCESS_ERROR: 'PAYMENT_ACCESS_DENIED',
   buildPublicCheckoutResponse: () => ({}),
@@ -493,6 +501,8 @@ Module._load = function loadWithIntegrityDoubles(request, parent, isMain) {
       fakeOrderInventoryAllocationService,
     './electronicInvoiceIssuanceService': fakeElectronicInvoiceIssuanceService,
     './orderFulfillmentService': fakeOrderFulfillmentService,
+    './couponService': fakeCouponService,
+    '../couponService': fakeCouponService,
     '../services/publicPaymentAccessService': fakePublicPaymentAccessService,
     '../services/paymentAttemptService': fakePaymentAttemptModule,
     '../models/ElectronicInvoice': fakeElectronicInvoiceModel,
