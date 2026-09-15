@@ -189,6 +189,11 @@ function main() {
   assert.match(alertsSource, /Preparar traslado/);
   ok('el panel divide la operación en tres vistas comprensibles');
 
+  assert.match(alertsSource, /Aplicado directamente/);
+  assert.match(alertsSource, /item\?\.status === 'posted' && !reviewedAt/);
+  assert.doesNotMatch(alertsSource, /reviewedAt \|\| item\?\.postedAt/);
+  ok('un traslado directo no atribuye una revisión que nunca ocurrió');
+
   assert.match(adminSource, /onPrepareTransfer=\{openSuggestedTransfer\}/);
   assert.match(transferSource, /initialSuggestion/);
   assert.match(transferSource, /postNow:\s*hasSuggestion \? false/);
@@ -200,7 +205,7 @@ function main() {
   assert.match(kardexSource, /movement\.reviewedBy/);
   ok('el Kardex conserva responsables y decisión administrativa');
 
-  console.log(`\nInventario Nivel Plus Etapa 3: ${passed}/10 controles aprobados.`);
+  console.log(`\nInventario Nivel Plus Etapa 3: ${passed}/11 controles aprobados.`);
 }
 
 try {

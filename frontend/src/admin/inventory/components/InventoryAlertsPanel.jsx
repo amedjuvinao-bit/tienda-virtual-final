@@ -701,7 +701,9 @@ function getResponsibleActor(primary, fallback) {
 
 function TransferActivityCard({ item }) {
   const status = getTransferStatus(item?.status);
-  const reviewed = item?.reviewedAt || item?.postedAt;
+  const reviewedAt = item?.reviewedAt || null;
+  const appliedDirectly =
+    item?.status === 'posted' && !reviewedAt && Boolean(item?.postedAt);
 
   return (
     <article className="p-4 md:p-5" style={styles.card}>
@@ -744,9 +746,14 @@ function TransferActivityCard({ item }) {
             <UserCheck size={15} style={{ color: 'var(--admin-primary)' }} />
             Solicitó: {getActorLabel(getResponsibleActor(item?.requestedBy, item?.createdBy))}
           </p>
-          {reviewed && (
+          {reviewedAt && (
             <p className="mt-2 text-xs leading-5" style={styles.cardMuted}>
-              Revisó: {getActorLabel(item?.reviewedBy)} · {formatDate(reviewed)}
+              Revisó: {getActorLabel(item?.reviewedBy)} · {formatDate(reviewedAt)}
+            </p>
+          )}
+          {appliedDirectly && (
+            <p className="mt-2 text-xs leading-5" style={styles.cardMuted}>
+              Aplicado directamente · {formatDate(item?.postedAt)}
             </p>
           )}
           {item?.reviewNote && (
