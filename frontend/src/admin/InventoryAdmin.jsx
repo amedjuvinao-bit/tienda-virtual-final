@@ -441,6 +441,7 @@ export default function InventoryAdmin() {
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [initialTransferStockRow, setInitialTransferStockRow] = useState(null);
+  const [initialTransferSuggestion, setInitialTransferSuggestion] = useState(null);
   const [movementsModalRow, setMovementsModalRow] = useState(null);
   const [kardexModalRow, setKardexModalRow] = useState(null);
   const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
@@ -546,17 +547,44 @@ export default function InventoryAdmin() {
 
   const openGeneralTransferModal = () => {
     setInitialTransferStockRow(null);
+    setInitialTransferSuggestion(null);
     setTransferModalOpen(true);
   };
 
   const openTransferFromCard = (row) => {
     setInitialTransferStockRow(row);
+    setInitialTransferSuggestion(null);
+    setTransferModalOpen(true);
+  };
+
+  const openSuggestedTransfer = (suggestion) => {
+    const sourceStockRow = stockRows.find(
+      (row) => getObjectId(row) === String(suggestion?.sourceStockId || '')
+    );
+
+    if (!sourceStockRow) {
+      setError('No se encontró el inventario de origen sugerido. Actualiza la vista e inténtalo nuevamente.');
+      return;
+    }
+
+    setError('');
+    setInitialTransferStockRow(sourceStockRow);
+    setInitialTransferSuggestion({
+      sourceStockId: suggestion.sourceStockId,
+      destinationBranchId: suggestion?.destination?.id || '',
+      quantity: suggestion.quantity,
+      reason: suggestion.reason,
+      reference: `REPOSICION-${suggestion?.product?.sku || 'INVENTARIO'}`,
+      notes: 'Traslado preparado desde el centro de control de inventario.',
+    });
+    setAlertsPanelOpen(false);
     setTransferModalOpen(true);
   };
 
   const closeTransferModal = () => {
     setTransferModalOpen(false);
     setInitialTransferStockRow(null);
+    setInitialTransferSuggestion(null);
   };
 
   return (
@@ -614,7 +642,7 @@ export default function InventoryAdmin() {
               style={styles.softButton}
             >
               <BellRing size={16} />
-              Alertas
+              Centro de control
             </button>
 
             <InventoryReservationsPanel />
@@ -839,10 +867,10 @@ export default function InventoryAdmin() {
       </div>
 
       <InventoryAdjustmentModal open={adjustmentModalOpen} onClose={() => setAdjustmentModalOpen(false)} stockRows={stockRows} onSaved={loadInventory} />
-      <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} onSaved={loadInventory} />
+      <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} initialSuggestion={initialTransferSuggestion} onSaved={loadInventory} />
       <InventoryMovementsModal open={Boolean(movementsModalRow)} onClose={() => setMovementsModalRow(null)} stockRow={movementsModalRow} onChanged={loadInventory} />
       <InventoryKardexModal open={Boolean(kardexModalRow)} onClose={() => setKardexModalRow(null)} stockRow={kardexModalRow} />
-      <InventoryAlertsPanel open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} />
+      <InventoryAlertsPanel open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} onPrepareTransfer={openSuggestedTransfer} />
     </section>
   );
 }

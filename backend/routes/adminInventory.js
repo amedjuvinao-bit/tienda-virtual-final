@@ -22,6 +22,10 @@ const {
   buildScopedInventoryReservationFilter,
   buildScopedInventoryStockFilter,
 } = require('../services/adminInventoryAccessService');
+const {
+  buildStaleStockItems,
+  buildTransferRecommendations,
+} = require('../services/inventoryOperationalIntelligence');
 
 const router = express.Router();
 
@@ -976,6 +980,61 @@ function mapReservationAlertItem(reservation = {}, type = 'pendingReservation') 
   };
 }
 
+function mapInventoryAdminActor(admin = {}) {
+  return {
+    id: getDocumentIdValue(admin),
+    name: cleanText(
+      admin?.displayName ||
+        [admin?.firstName, admin?.lastName].filter(Boolean).join(' ') ||
+        admin?.username ||
+        ''
+    ),
+    username: cleanText(admin?.username || ''),
+    role: cleanText(admin?.role || ''),
+  };
+}
+
+function mapTransferActivityItem(movement = {}) {
+  return {
+    id: String(movement?._id || ''),
+    movementNumber: cleanText(movement?.movementNumber || ''),
+    status: cleanText(movement?.status || ''),
+    quantity: Number(movement?.quantity || 0),
+    product: getKardexProductSnapshot(
+      movement?.product,
+      movement?.productSnapshot
+    ),
+    variant: {
+      variantKey: cleanText(movement?.variantKey || ''),
+      label: cleanText(movement?.variant?.label || ''),
+      size: cleanText(movement?.variant?.size || ''),
+      color: cleanText(movement?.variant?.color || ''),
+      attributes: Array.isArray(movement?.variant?.attributes)
+        ? movement.variant.attributes
+        : [],
+    },
+    source: getKardexBranchSnapshot(
+      movement?.branchFrom,
+      movement?.branchFromSnapshot
+    ),
+    destination: getKardexBranchSnapshot(
+      movement?.branchTo,
+      movement?.branchToSnapshot
+    ),
+    reason: cleanText(movement?.reason || ''),
+    reference: cleanText(movement?.reference || ''),
+    reviewDecision: cleanText(movement?.reviewDecision || ''),
+    reviewNote: cleanText(movement?.reviewNote || ''),
+    requestedBy: mapInventoryAdminActor(movement?.requestedBy),
+    reviewedBy: mapInventoryAdminActor(movement?.reviewedBy),
+    createdBy: mapInventoryAdminActor(movement?.createdBy),
+    requestedAt: movement?.requestedAt || null,
+    reviewedAt: movement?.reviewedAt || null,
+    postedAt: movement?.postedAt || null,
+    createdAt: movement?.createdAt || null,
+  };
+}
+
 function parseAlertsLimit(query = {}) {
   const rawLimit = Number(query.limit || 20);
 
@@ -1400,9 +1459,14 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
       active: true,
     });
     const scopedReservations = buildScopedInventoryReservationFilter(req, {});
+    const scopedMovements = buildScopedInventoryMovementFilter(req, {
+      deletedAt: null,
+      type: 'transfer',
+    });
 
     if (!scopedStock.ok) return sendAccessError(res, scopedStock);
     if (!scopedReservations.ok) return sendAccessError(res, scopedReservations);
+    if (!scopedMovements.ok) return sendAccessError(res, scopedMovements);
 
     const stockRows = await InventoryStock.find(scopedStock.filter)
       .populate('product', 'title sku image price stock reorderPoint stockMin')
@@ -1433,7 +1497,7 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
       }
     });
 
-    const [expiredReservationsRaw, pendingReservationsRaw] = await Promise.all([
+    const [expiredReservationsRaw, pendingReservationsRaw, recentTransfersRaw] = await Promise.all([
       InventoryReservation.find({
         ...scopedReservations.filter,
         status: 'pending',
@@ -1465,6 +1529,17 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
         .populate('items.product', 'title sku image price stock')
         .populate('items.branch', 'name code type status active')
         .lean({ virtuals: true }),
+
+      InventoryMovement.find(scopedMovements.filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit)
+        .populate('product', 'title sku image price stock')
+        .populate('branchFrom', 'name code type status active')
+        .populate('branchTo', 'name code type status active')
+        .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('requestedBy', 'username displayName firstName lastName role')
+        .populate('reviewedBy', 'username displayName firstName lastName role')
+        .lean({ virtuals: true }),
     ]);
 
     const expiredReservations = expiredReservationsRaw.map((reservation) =>
@@ -1474,6 +1549,23 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
     const pendingReservations = pendingReservationsRaw.map((reservation) =>
       mapReservationAlertItem(reservation, 'pendingReservation')
     );
+    const transferRecommendations = buildTransferRecommendations(stockRows, {
+      limit,
+    });
+    const staleStockItems = buildStaleStockItems(stockRows, {
+      now,
+      limit,
+    });
+    const recentTransfers = recentTransfersRaw.map(mapTransferActivityItem);
+    const pendingTransfers = recentTransfersRaw.filter(
+      (movement) => movement?.status === 'draft'
+    ).length;
+    const appliedTransfers = recentTransfersRaw.filter(
+      (movement) => movement?.status === 'posted'
+    ).length;
+    const rejectedTransfers = recentTransfersRaw.filter(
+      (movement) => movement?.status === 'cancelled'
+    ).length;
 
     const sortedOutOfStockItems = outOfStockItems
       .sort((a, b) => {
@@ -1514,6 +1606,11 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
           outOfStock: outOfStockItems.length,
           expiredReservations: expiredReservations.length,
           pendingReservations: pendingReservations.length,
+          transferRecommendations: transferRecommendations.length,
+          staleStock: staleStockItems.length,
+          pendingTransfers,
+          appliedTransfers,
+          rejectedTransfers,
           total:
             criticalCount +
             warningCount +
@@ -1523,6 +1620,9 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
         outOfStockItems: sortedOutOfStockItems,
         expiredReservations,
         pendingReservations,
+        transferRecommendations,
+        staleStockItems,
+        recentTransfers,
       },
     });
   } catch (error) {
@@ -1583,6 +1683,8 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
         .populate('branchFrom', 'name code type status active')
         .populate('branchTo', 'name code type status active')
         .populate('createdBy', 'username displayName firstName lastName role')
+        .populate('requestedBy', 'username displayName firstName lastName role')
+        .populate('reviewedBy', 'username displayName firstName lastName role')
         .populate('reversedByMovement', 'movementNumber type status createdAt')
         .populate('reversalOfMovement', 'movementNumber type status createdAt')
         .lean({ virtuals: true }),
@@ -1638,6 +1740,14 @@ router.get('/kardex', requirePermission('inventory:view'), async (req, res) => {
         orderNumber: movement.orderNumber || '',
         createdAt: movement.createdAt || null,
         postedAt: movement.postedAt || null,
+        approvalRequired: movement.approvalRequired === true,
+        reviewDecision: movement.reviewDecision || '',
+        reviewNote: movement.reviewNote || '',
+        requestedBy: mapInventoryAdminActor(movement.requestedBy),
+        reviewedBy: mapInventoryAdminActor(movement.reviewedBy),
+        createdBy: mapInventoryAdminActor(movement.createdBy),
+        requestedAt: movement.requestedAt || null,
+        reviewedAt: movement.reviewedAt || null,
         reversedByMovement: movement.reversedByMovement || null,
         reversalOfMovement: movement.reversalOfMovement || null,
       };

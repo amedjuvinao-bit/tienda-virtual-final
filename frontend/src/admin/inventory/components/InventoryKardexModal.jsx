@@ -17,6 +17,7 @@ import {
   MapPin,
   PackageSearch,
   Scale,
+  UserCheck,
   X,
 } from 'lucide-react';
 import api from '../../../lib/api';
@@ -286,6 +287,15 @@ function getMovementTypeLabel(type) {
 
 function getStatusLabel(status) {
   return STATUS_LABELS[status] || status || '—';
+}
+
+function getActorLabel(actor) {
+  return actor?.name || actor?.username || 'Usuario no identificado';
+}
+
+function getResponsibleActor(primary, fallback) {
+  if (primary?.id || primary?.name || primary?.username) return primary;
+  return fallback;
 }
 
 function getDirectionIcon(effect, direction) {
@@ -720,6 +730,30 @@ export default function InventoryKardexModal({ open, onClose, stockRow }) {
                                 )}
                               </div>
                             </div>
+
+                            {(movement.approvalRequired || movement.requestedBy?.id || movement.reviewedBy?.id) && (
+                              <div className="mt-3 p-3" style={styles.infoBox}>
+                                <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide" style={styles.cardMuted}>
+                                  <UserCheck size={14} style={{ color: 'var(--admin-primary)' }} />
+                                  Trazabilidad administrativa
+                                </p>
+                                <p className="mt-2 text-xs leading-5" style={styles.cardMuted}>
+                                  Solicitó: <b style={styles.cardTitle}>{getActorLabel(getResponsibleActor(movement.requestedBy, movement.createdBy))}</b>
+                                  {' · '}{formatDate(movement.requestedAt || movement.date)}
+                                </p>
+                                {movement.reviewedAt && (
+                                  <p className="mt-1 text-xs leading-5" style={styles.cardMuted}>
+                                    Revisó: <b style={styles.cardTitle}>{getActorLabel(movement.reviewedBy)}</b>
+                                    {' · '}{formatDate(movement.reviewedAt)}
+                                  </p>
+                                )}
+                                {movement.reviewNote && (
+                                  <p className="mt-1 break-words text-xs leading-5" style={styles.cardMuted}>
+                                    Nota de revisión: {movement.reviewNote}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </article>

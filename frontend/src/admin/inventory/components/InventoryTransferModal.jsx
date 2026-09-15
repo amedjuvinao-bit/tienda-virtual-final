@@ -370,10 +370,24 @@ function findSourceStock(stockRows = [], sourceStockId = '') {
   );
 }
 
-function buildInitialForm(initialStockRow) {
+function buildInitialForm(initialStockRow, initialSuggestion) {
+  const hasSuggestion = Boolean(initialSuggestion?.sourceStockId);
+
   return {
     ...INITIAL_FORM,
-    sourceStockId: initialStockRow ? getStockRowId(initialStockRow) : '',
+    sourceStockId: hasSuggestion
+      ? String(initialSuggestion.sourceStockId)
+      : initialStockRow
+        ? getStockRowId(initialStockRow)
+        : '',
+    destinationBranchId: hasSuggestion
+      ? String(initialSuggestion.destinationBranchId || '')
+      : '',
+    quantity: hasSuggestion ? String(initialSuggestion.quantity || '') : '',
+    reason: hasSuggestion ? cleanText(initialSuggestion.reason) : '',
+    reference: hasSuggestion ? cleanText(initialSuggestion.reference) : '',
+    notes: hasSuggestion ? cleanText(initialSuggestion.notes) : '',
+    postNow: hasSuggestion ? false : INITIAL_FORM.postNow,
   };
 }
 
@@ -382,6 +396,7 @@ export default function InventoryTransferModal({
   onClose,
   stockRows = [],
   initialStockRow = null,
+  initialSuggestion = null,
   onSaved,
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
@@ -482,9 +497,9 @@ export default function InventoryTransferModal({
     setError('');
     setSuccess('');
     setReferenceError('');
-    setForm(buildInitialForm(initialStockRow));
+    setForm(buildInitialForm(initialStockRow, initialSuggestion));
     loadReferences();
-  }, [open, loadReferences, initialStockRow]);
+  }, [open, loadReferences, initialStockRow, initialSuggestion]);
 
   useEffect(() => {
     if (!open) return undefined;
