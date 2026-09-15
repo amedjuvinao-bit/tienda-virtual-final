@@ -2,18 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Activity,
   AlertCircle,
   ArrowRightLeft,
-  BellRing,
   BookOpen,
   Boxes,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
   Download,
+  Gauge,
+  Layers3,
   PackageSearch,
   Palette,
   Plus,
   RefreshCw,
   Ruler,
+  Search,
+  ShieldCheck,
+  Sparkles,
   Warehouse,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -24,10 +30,12 @@ import InventoryKardexModal from './inventory/components/InventoryKardexModal';
 import InventoryMovementsModal from './inventory/components/InventoryMovementsModal';
 import InventoryReservationsPanel from './inventory/components/InventoryReservationsPanel';
 import InventoryTransferModal from './inventory/components/InventoryTransferModal';
+import './inventory/inventoryPlus.css';
 
 const LOW_STOCK_LIMIT = 5;
 const PAGE_LIMIT = 100;
 const MAX_PAGES = 100;
+const ROWS_PER_PAGE = 8;
 
 const STOCK_FILTERS = [
   { value: 'all', label: 'Todos' },
@@ -387,6 +395,7 @@ export default function InventoryAdmin() {
   const [kardexModalRow, setKardexModalRow] = useState(null);
   const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadInventory = useCallback(async () => {
     try {
@@ -481,6 +490,20 @@ export default function InventoryAdmin() {
 
   const hasActiveFilters = searchTerm.trim() !== '' || branchFilter !== 'all' || stockFilter !== 'all';
 
+  const totalPages = Math.max(1, Math.ceil(filteredStockRows.length / ROWS_PER_PAGE));
+  const visibleStockRows = useMemo(() => {
+    const firstRow = (currentPage - 1) * ROWS_PER_PAGE;
+    return filteredStockRows.slice(firstRow, firstRow + ROWS_PER_PAGE);
+  }, [currentPage, filteredStockRows]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, branchFilter, stockFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const clearFilters = () => {
     setSearchTerm('');
     setBranchFilter('all');
@@ -560,92 +583,127 @@ export default function InventoryAdmin() {
   };
 
   return (
-    <section className="space-y-6" style={styles.pageText}>
-      <div className="p-6 backdrop-blur" style={styles.headerCard}>
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.22em]" style={styles.eyebrow}>
-              Inventario por sedes
+    <section className="inventory-plus space-y-5" style={styles.pageText}>
+      <header className="inventory-plus__hero">
+        <Boxes className="inventory-plus__watermark" strokeWidth={0.8} />
+        <div className="inventory-plus__hero-content">
+          <div className="min-w-0 self-center">
+            <p className="inventory-plus__eyebrow">
+              <Sparkles size={15} /> Control inteligente por sedes
             </p>
-            <h1 className="mt-2 text-2xl font-black md:text-3xl" style={styles.title}>
-              Inventario
+            <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl" style={styles.title}>
+              Inventario bajo control
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6" style={styles.muted}>
-              Controla el stock físico, reservado y disponible por sede, producto, talla, color y movimientos. Esta vista carga todas las páginas del backend para no trabajar con solo 20 registros.
+            <p className="mt-3 max-w-2xl text-sm leading-6" style={styles.muted}>
+              Consulta existencias, detecta riesgos y ejecuta movimientos desde un solo espacio. Cada unidad conserva su sede, variante e historial.
             </p>
+            <span className="inventory-plus__status">
+              <span className="inventory-plus__status-dot" />
+              {loading ? 'Sincronizando información' : `${formatNumber(stockRows.length)} registros sincronizados`}
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={loadInventory}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-70"
-              style={styles.softButton}
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {loading ? 'Actualizando...' : 'Actualizar'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAdjustmentModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
-              style={styles.primaryButton}
-            >
-              <Plus size={16} />
-              Nuevo ajuste
-            </button>
-
-            <button
-              type="button"
-              onClick={openGeneralTransferModal}
-              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
-              style={styles.softButton}
-            >
-              <ArrowRightLeft size={16} />
-              Trasladar
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAlertsPanelOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black transition"
-              style={styles.softButton}
-            >
-              <BellRing size={16} />
-              Centro de control
-            </button>
-
-            <InventoryReservationsPanel />
-            <InventoryApprovalsPanel onChanged={loadInventory} />
+          <div className="inventory-plus__actions">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.16em]" style={styles.muted}>
+              ¿Qué necesitas hacer?
+            </p>
+            <div className="inventory-plus__action-grid">
+              <button
+                type="button"
+                onClick={() => setAdjustmentModalOpen(true)}
+                className="inventory-plus__action-main inline-flex items-center gap-2 px-5 py-3 text-sm font-black"
+                style={styles.primaryButton}
+              >
+                <Plus size={18} />
+                Registrar movimiento
+              </button>
+              <button
+                type="button"
+                onClick={openGeneralTransferModal}
+                className="inventory-plus__action-soft inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black"
+                style={styles.softButton}
+              >
+                <ArrowRightLeft size={17} /> Mover entre sedes
+              </button>
+              <button
+                type="button"
+                onClick={() => setAlertsPanelOpen(true)}
+                className="inventory-plus__action-soft inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black"
+                style={styles.softButton}
+              >
+                <Gauge size={17} /> Centro de control
+              </button>
+            </div>
+            <div className="inventory-plus__utility-row">
+              <button
+                type="button"
+                onClick={loadInventory}
+                disabled={loading}
+                className="inventory-plus__utility-button inline-flex items-center gap-2 font-black disabled:cursor-not-allowed disabled:opacity-60"
+                style={styles.softButton}
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                Actualizar
+              </button>
+              <InventoryReservationsPanel />
+              <InventoryApprovalsPanel onChanged={loadInventory} />
+            </div>
           </div>
         </div>
 
         {error && (
-          <div className="mt-5 flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
+          <div className="relative z-[2] mx-5 mb-5 flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <p>{error}</p>
           </div>
         )}
-      </div>
+      </header>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard label="Productos con stock" value={summary.productsWithStock} description="Productos con existencia" icon={<PackageSearch size={20} />} />
-        <SummaryCard label="Stock físico" value={summary.totalStock} description="Todas las sedes" icon={<Boxes size={20} />} />
-        <SummaryCard label="Reservado" value={summary.totalReserved} description="Apartado por órdenes" icon={<Clock size={20} />} />
-        <SummaryCard label="Disponible" value={summary.totalAvailable} description="Listo para venta" icon={<PackageSearch size={20} />} />
-        <SummaryCard label="Bajo stock" value={summary.lowStock} description="Según punto mínimo" icon={<AlertCircle size={20} />} />
-        <SummaryCard label="Movimientos" value={summary.totalMovements} description="Entradas, salidas y traslados" icon={<ArrowRightLeft size={20} />} />
-      </div>
+      <section className="inventory-plus__overview" aria-label="Resumen del inventario">
+        <article className="inventory-overview-card inventory-overview-card--feature">
+          <PackageSearch className="inventory-overview-card__watermark" strokeWidth={0.9} />
+          <p className="inventory-overview-card__label"><ShieldCheck size={17} /> Disponible para vender</p>
+          <p className="inventory-overview-card__value">{formatNumber(summary.totalAvailable)}</p>
+          <p className="inventory-overview-card__caption">Unidades libres después de descontar reservas.</p>
+          <div className="inventory-overview-card__split">
+            <MiniMetric label="Stock físico" value={summary.totalStock} />
+            <MiniMetric label="Reservado" value={summary.totalReserved} />
+          </div>
+        </article>
 
-      <div className="p-6 backdrop-blur" style={styles.card}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-lg font-black" style={styles.title}>Stock por sede</h2>
-            <p className="mt-1 text-sm leading-6" style={styles.muted}>
-              Mostrando {formatNumber(filteredStockRows.length)} de {formatNumber(stockRows.length)} registros cargados.
-            </p>
+        <article className="inventory-overview-card">
+          <AlertCircle className="inventory-overview-card__watermark" strokeWidth={0.9} />
+          <p className="inventory-overview-card__label" style={styles.muted}><AlertCircle size={17} style={styles.eyebrow} /> Atención requerida</p>
+          <p className="inventory-overview-card__value" style={styles.title}>{formatNumber(summary.lowStock + summary.outOfStock)}</p>
+          <p className="inventory-overview-card__caption">Referencias que conviene revisar ahora.</p>
+          <div className="inventory-overview-card__split">
+            <MiniMetric label="Bajo stock" value={summary.lowStock} />
+            <MiniMetric label="Agotados" value={summary.outOfStock} />
+          </div>
+        </article>
+
+        <article className="inventory-overview-card">
+          <Activity className="inventory-overview-card__watermark" strokeWidth={0.9} />
+          <p className="inventory-overview-card__label" style={styles.muted}><Activity size={17} style={styles.eyebrow} /> Actividad operativa</p>
+          <p className="inventory-overview-card__value" style={styles.title}>{formatNumber(summary.totalMovements)}</p>
+          <p className="inventory-overview-card__caption">Movimientos registrados en el historial.</p>
+          <div className="inventory-overview-card__split">
+            <MiniMetric label="Productos con stock" value={summary.productsWithStock} />
+            <MiniMetric label="Sedes visibles" value={branchOptions.length} />
+          </div>
+        </article>
+      </section>
+
+      <section className="inventory-stock-workspace">
+        <div className="inventory-stock-workspace__header">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="inventory-stock-workspace__icon"><Layers3 size={21} /></span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-black" style={styles.title}>Existencias por sede</h2>
+              <p className="mt-1 text-sm" style={styles.muted}>
+                {formatNumber(filteredStockRows.length)} resultado(s) · página {formatNumber(currentPage)} de {formatNumber(totalPages)}
+              </p>
+            </div>
           </div>
 
           <button
@@ -656,26 +714,29 @@ export default function InventoryAdmin() {
             style={styles.primaryButton}
           >
             <Download size={16} />
-            {exporting ? 'Preparando archivo...' : 'Exportar vista actual'}
+            {exporting ? 'Preparando archivo...' : 'Exportar resultados'}
           </button>
         </div>
 
-        <div className="mt-5 p-4" style={styles.filterCard}>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_220px_auto] lg:items-end">
+        <div className="inventory-filter-bar">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_190px_auto] lg:items-end">
             <div>
-              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Buscar</label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Producto, SKU, sede, talla o color..."
-                className="mt-2 w-full px-4 py-3 text-sm transition"
-                style={styles.input}
-              />
+              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Buscar producto o variante</label>
+              <div className="relative mt-2">
+                <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={styles.muted} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Nombre, SKU, talla, color..."
+                  className="w-full py-3 pl-11 pr-4 text-sm transition"
+                  style={styles.input}
+                />
+              </div>
             </div>
 
             <div>
-              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Sede</label>
+              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Ubicación</label>
               <select
                 value={branchFilter}
                 onChange={(event) => setBranchFilter(event.target.value)}
@@ -684,15 +745,13 @@ export default function InventoryAdmin() {
               >
                 <option value="all">Todas las sedes</option>
                 {branchOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="text-xs font-black uppercase tracking-wide" style={styles.muted}>Estado</label>
+              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Disponibilidad</label>
               <select
                 value={stockFilter}
                 onChange={(event) => setStockFilter(event.target.value)}
@@ -712,12 +771,12 @@ export default function InventoryAdmin() {
               className="inline-flex items-center justify-center px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
               style={styles.softButton}
             >
-              Limpiar filtros
+              Limpiar
             </button>
           </div>
         </div>
 
-        <div className="mt-6 space-y-4">
+        <div className="inventory-row-list">
           {loading && (
             <div className="px-4 py-12 text-center text-sm font-semibold" style={styles.muted}>
               Cargando inventario completo...
@@ -730,7 +789,7 @@ export default function InventoryAdmin() {
             </div>
           )}
 
-          {!loading && filteredStockRows.map((row) => {
+          {!loading && visibleStockRows.map((row) => {
             const color = getVariantColor(row);
             const variantAttributes = getVariantAttributes(row);
             const stockStatus = getStockStatus(row);
@@ -739,7 +798,7 @@ export default function InventoryAdmin() {
             const canTransfer = available > 0;
 
             return (
-              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="p-4 md:p-5" style={styles.inventoryCard}>
+              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="inventory-row-card p-4 md:p-5" style={styles.inventoryCard}>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center" style={styles.productIconBox}>
@@ -754,7 +813,7 @@ export default function InventoryAdmin() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="inventory-row-card__actions">
                     <button
                       type="button"
                       onClick={() => openTransferFromCard(row)}
@@ -788,7 +847,7 @@ export default function InventoryAdmin() {
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_1.25fr]">
+                <div className="inventory-row-card__facts mt-5">
                   <InfoBlock icon={<Warehouse size={17} />} label="Ubicación" title={getBranchName(row)}>
                     <span className="inline-flex w-fit items-center px-3 py-1 text-xs font-black" style={styles.badge}>{getBranchType(row)}</span>
                   </InfoBlock>
@@ -826,7 +885,7 @@ export default function InventoryAdmin() {
                     </div>
                   </InfoBlock>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="inventory-stock-strip grid sm:grid-cols-3">
                     <StockValueBox label="Stock físico" value={row?.stock} style={styles.stockBox} />
                     <StockValueBox label="Reservado" value={reserved} style={styles.reservedBox} />
                     <StockValueBox label="Disponible" value={available} style={styles.availableBox} />
@@ -836,7 +895,24 @@ export default function InventoryAdmin() {
             );
           })}
         </div>
-      </div>
+
+        {!loading && filteredStockRows.length > 0 && (
+          <div className="inventory-pagination">
+            <p className="text-sm font-semibold" style={styles.muted}>
+              Mostrando {formatNumber((currentPage - 1) * ROWS_PER_PAGE + 1)}–{formatNumber(Math.min(currentPage * ROWS_PER_PAGE, filteredStockRows.length))} de {formatNumber(filteredStockRows.length)}
+            </p>
+            <div className="inventory-pagination__controls">
+              <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} title="Página anterior">
+                <ChevronLeft size={17} />
+              </button>
+              <span className="px-2 text-sm font-black" style={styles.title}>{currentPage} / {totalPages}</span>
+              <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} title="Página siguiente">
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
 
       <InventoryAdjustmentModal open={adjustmentModalOpen} onClose={() => setAdjustmentModalOpen(false)} stockRows={stockRows} onSaved={loadInventory} />
       <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} initialSuggestion={initialTransferSuggestion} onSaved={loadInventory} />
@@ -847,22 +923,18 @@ export default function InventoryAdmin() {
   );
 }
 
-function SummaryCard({ label, value, description, icon }) {
+function MiniMetric({ label, value }) {
   return (
-    <article className="p-5" style={styles.statCard}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-bold" style={styles.muted}>{label}</span>
-        <span style={styles.eyebrow}>{icon}</span>
-      </div>
-      <p className="mt-4 text-3xl font-black" style={styles.title}>{formatNumber(value)}</p>
-      <p className="mt-1 text-xs font-semibold" style={styles.muted}>{description}</p>
-    </article>
+    <div className="inventory-overview-mini">
+      <span>{label}</span>
+      <strong>{formatNumber(value)}</strong>
+    </div>
   );
 }
 
 function InfoBlock({ icon, label, title, children }) {
   return (
-    <div className="p-4" style={styles.filterCard}>
+    <div className="inventory-row-card__info p-4" style={styles.filterCard}>
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center" style={styles.productIconBox}>{icon}</div>
         <div className="min-w-0">

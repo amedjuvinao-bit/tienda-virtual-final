@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import api from '../../../lib/api';
+import '../inventoryPlus.css';
 
 const styles = {
   overlay: {
@@ -266,7 +267,7 @@ function getReservationVariant(item) {
 
 function EmptyState({ icon, title, description }) {
   return (
-    <div className="flex flex-col items-center justify-center px-5 py-8 text-center" style={styles.card}>
+    <div className="inventory-control-empty flex flex-col items-center justify-center px-5 py-8 text-center" style={styles.card}>
       <div
         className="flex h-12 w-12 items-center justify-center"
         style={{
@@ -301,7 +302,8 @@ function SummaryCard({ title, value, description, icon, variant = 'info' }) {
           : styles.infoBox;
 
   return (
-    <article className="p-5" style={cardStyle}>
+    <article className={`inventory-control-metric inventory-control-metric--${variant} p-5`} style={cardStyle}>
+      <span className="inventory-control-metric__watermark" aria-hidden="true">{icon}</span>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-black uppercase tracking-wide" style={styles.cardMuted}>
@@ -499,7 +501,7 @@ function MiniReservation({ label, value }) {
 
 function AlertSection({ title, description, icon, count, children }) {
   return (
-    <section className="p-5" style={styles.card}>
+    <section className="inventory-control-section p-5" style={styles.card}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-3">
           <div
@@ -535,12 +537,12 @@ function AlertSection({ title, description, icon, count, children }) {
   );
 }
 
-function ControlTab({ active, icon, label, count, onClick }) {
+function ControlTab({ active, icon, label, description, count, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[64px] items-center justify-between gap-3 px-4 py-3 text-left transition"
+      className={`inventory-control-tab ${active ? 'inventory-control-tab--active' : ''} flex min-h-[64px] items-center justify-between gap-3 px-4 py-3 text-left transition`}
       style={{
         borderRadius: 'var(--admin-radius)',
         border: active
@@ -557,7 +559,10 @@ function ControlTab({ active, icon, label, count, onClick }) {
         <span style={{ color: active ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
           {icon}
         </span>
-        <span className="truncate text-sm font-black">{label}</span>
+        <span className="inventory-control-tab__copy">
+          <span className="block truncate text-sm font-black">{label}</span>
+          <small>{description}</small>
+        </span>
       </span>
       <span className="px-2.5 py-1 text-xs font-black" style={styles.badge}>
         {formatNumber(count)}
@@ -1014,8 +1019,8 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
     >
       <div className="absolute inset-0 backdrop-blur-sm" style={styles.overlay} />
 
-      <div className="relative z-[100000]" style={styles.modal}>
-        <header className="shrink-0 px-6 py-5 md:px-8" style={styles.header}>
+      <div className="inventory-control-modal relative z-[100000]" style={styles.modal}>
+        <header className="inventory-control-header shrink-0 px-6 py-5 md:px-8" style={styles.header}>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.26em]" style={styles.eyebrow}>
@@ -1062,7 +1067,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5" style={styles.body}>
+          <div className="inventory-control-body min-h-0 flex-1 overflow-y-auto p-4 md:p-5" style={styles.body}>
             <div className="flex flex-col gap-4">
               {error && (
                 <div className="flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
@@ -1071,11 +1076,12 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                 </div>
               )}
 
-              <nav className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Vistas del centro de control">
+              <nav className="inventory-control-tabs" aria-label="Vistas del centro de control">
                 <ControlTab
                   active={activeTab === 'priorities'}
                   icon={<ShieldAlert size={19} />}
                   label="Prioridades"
+                  description="Qué requiere atención"
                   count={Number(summary.critical || 0) + Number(summary.warning || 0)}
                   onClick={() => setActiveTab('priorities')}
                 />
@@ -1083,6 +1089,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                   active={activeTab === 'replenishment'}
                   icon={<ArrowRightLeft size={19} />}
                   label="Reposición entre sedes"
+                  description="Cómo equilibrar existencias"
                   count={summary.transferRecommendations}
                   onClick={() => setActiveTab('replenishment')}
                 />
@@ -1090,6 +1097,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                   active={activeTab === 'traceability'}
                   icon={<Activity size={19} />}
                   label="Trazabilidad"
+                  description="Quién hizo cada movimiento"
                   count={recentTransfers.length}
                   onClick={() => setActiveTab('traceability')}
                 />
@@ -1097,6 +1105,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                   active={activeTab === 'intelligence'}
                   icon={<PackageSearch size={19} />}
                   label="Inteligencia"
+                  description="Cobertura y anomalías"
                   count={
                     Number(summary.coverageCritical || 0) +
                     Number(summary.coverageWarning || 0) +
@@ -1125,7 +1134,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
               )}
 
               {!loading && activeTab === 'priorities' && (
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <section className="inventory-control-metrics">
                   <SummaryCard
                     title="Críticas"
                     value={summary.critical}
@@ -1232,7 +1241,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
 
               {!loading && activeTab === 'replenishment' && (
                 <>
-                  <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <section className="inventory-control-metrics">
                     <SummaryCard
                       title="Traslados sugeridos"
                       value={summary.transferRecommendations}
@@ -1290,7 +1299,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
 
               {!loading && activeTab === 'intelligence' && (
                 <>
-                  <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <section className="inventory-control-metrics">
                     <SummaryCard
                       title="Cobertura crítica"
                       value={summary.coverageCritical}
@@ -1401,7 +1410,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
 
               {!loading && activeTab === 'traceability' && (
                 <>
-                  <section className="grid gap-4 md:grid-cols-3">
+                  <section className="inventory-control-metrics inventory-control-metrics--three">
                     <SummaryCard
                       title="Pendientes"
                       value={summary.pendingTransfers}
