@@ -196,12 +196,14 @@ const styles = {
   },
 
   summary: {
+    position: 'relative',
+    overflow: 'hidden',
     borderRadius: 'calc(var(--admin-radius) + 8px)',
     background:
-      'linear-gradient(145deg, var(--admin-primary), var(--admin-primary-hover))',
-    color: 'var(--admin-primary-text)',
-    border: '1px solid color-mix(in srgb, var(--admin-primary) 70%, white)',
-    boxShadow: 'var(--admin-glass-shadow)',
+      'linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 7%, var(--admin-card-bg)), var(--admin-card-bg) 52%, color-mix(in srgb, var(--admin-primary) 13%, var(--admin-card-bg)))',
+    color: 'var(--admin-card-text)',
+    border: '1px solid color-mix(in srgb, var(--admin-primary) 34%, var(--admin-card-border))',
+    boxShadow: '0 18px 42px color-mix(in srgb, var(--admin-primary) 12%, transparent)',
   },
 
   summaryRow: {
@@ -987,19 +989,19 @@ export default function InventoryAdjustmentModal({
 
       await api.post('/api/admin/inventory/movements', payload);
 
-      setSuccess(
-        form.postNow
-          ? 'Movimiento de inventario creado correctamente.'
-          : 'Solicitud enviada a revisión. El stock todavía no cambió.'
-      );
-
       if (typeof onSaved === 'function') {
-        await onSaved();
+        try {
+          await onSaved();
+        } catch (refreshError) {
+          console.error('❌ El movimiento se guardó, pero no se pudo refrescar la vista:', refreshError);
+        }
       }
 
-      window.setTimeout(() => {
-        onClose();
-      }, 650);
+      setSuccess(
+        form.postNow
+          ? 'Movimiento guardado. El inventario ya fue actualizado.'
+          : 'Solicitud enviada a revisión. El stock todavía no cambió.'
+      );
     } catch (err) {
       console.error('❌ Error creando movimiento de inventario:', err);
 
@@ -1018,7 +1020,7 @@ export default function InventoryAdjustmentModal({
     ? currentAvailableStock - numericQuantity
     : currentAvailableStock + numericQuantity;
 
-  const canSubmit = !saving && !referenceLoading;
+  const canSubmit = !saving && !referenceLoading && !success;
 
   const steps = [
     { number: 1, label: 'Ubicación', icon: MapPin },
@@ -1100,8 +1102,9 @@ export default function InventoryAdjustmentModal({
               )}
 
               {success && (
-                <div className="px-4 py-2.5 text-sm font-bold" style={styles.successBox} role="status">
-                  {success}
+                <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold" style={styles.successBox} role="status">
+                  <CheckCircle2 size={18} className="shrink-0" style={{ color: '#16a34a' }} />
+                  <span>{success} Revisa el resultado y cierra cuando estés listo.</span>
                 </div>
               )}
 
@@ -1281,18 +1284,43 @@ export default function InventoryAdjustmentModal({
                     </div>
 
                     <div className="flex flex-col justify-between p-5" style={styles.summary}>
-                      <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-80">Resultado</p>
-                        <p className="mt-2 text-sm font-bold opacity-90">{selectedType.action}</p>
+                      <PackageSearch
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-9 -right-8 h-36 w-36 -rotate-12"
+                        strokeWidth={0.8}
+                        style={{ color: 'var(--admin-primary)', opacity: 0.065, filter: 'blur(0.35px)' }}
+                      />
+
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={styles.eyebrow}>Resultado previsto</p>
+                            <p className="mt-1 text-sm font-black" style={styles.cardTitle}>{selectedType.action}</p>
+                          </div>
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={styles.iconBox}>
+                            <ArrowRightLeft size={17} />
+                          </span>
+                        </div>
+
+                        <div className="my-5 grid grid-cols-[1fr_40px_1fr] items-center gap-2">
+                          <div className="rounded-xl px-3 py-3" style={{ background: 'var(--admin-card-bg)', border: '1px solid var(--admin-card-border)' }}>
+                            <span className="block text-[10px] font-black uppercase tracking-wide" style={styles.cardMuted}>Antes</span>
+                            <strong className="mt-1 block text-2xl" style={styles.cardTitle}>{formatNumber(currentAvailableStock)}</strong>
+                          </div>
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: 'var(--admin-primary)', background: 'var(--admin-primary-soft-bg)' }}>
+                            <ArrowRight size={18} />
+                          </span>
+                          <div className="rounded-xl px-3 py-3 text-right" style={{ background: 'var(--admin-primary-soft-bg)', border: '1px solid var(--admin-primary-soft-border)' }}>
+                            <span className="block text-[10px] font-black uppercase tracking-wide" style={styles.eyebrow}>Después</span>
+                            <strong className="mt-1 block text-2xl" style={{ color: 'var(--admin-primary)' }}>{formatNumber(expectedStock)}</strong>
+                          </div>
+                        </div>
+
+                        <p className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-text)', background: 'color-mix(in srgb, var(--admin-primary) 8%, var(--admin-card-bg))', border: '1px solid var(--admin-primary-soft-border)' }}>
+                          <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+                          <span>{form.postNow ? 'Se aplicará inmediatamente.' : 'Se enviará a revisión sin cambiar el stock.'}</span>
+                        </p>
                       </div>
-                      <div className="my-5 flex items-end justify-between gap-3">
-                        <div><span className="block text-xs opacity-75">Antes</span><strong className="text-2xl">{formatNumber(currentAvailableStock)}</strong></div>
-                        <ArrowRight size={21} className="mb-1 opacity-75" />
-                        <div className="text-right"><span className="block text-xs opacity-75">Después</span><strong className="text-3xl">{formatNumber(expectedStock)}</strong></div>
-                      </div>
-                      <p className="rounded-xl bg-white/15 px-3 py-2 text-xs font-bold leading-5">
-                        {form.postNow ? 'Se aplicará inmediatamente.' : 'Se enviará a revisión sin cambiar el stock.'}
-                      </p>
                     </div>
                   </div>
                 </PanelCard>
@@ -1302,19 +1330,25 @@ export default function InventoryAdjustmentModal({
 
           <footer className="shrink-0 px-4 py-3 md:px-7" style={styles.footer}>
             <div className="flex items-center justify-between gap-3">
-              <button type="button" onClick={step === 1 ? onClose : goToPreviousStep} disabled={saving} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-black disabled:opacity-60" style={styles.softButton}>
-                {step === 1 ? <X size={16} /> : <ArrowLeft size={16} />}
-                {step === 1 ? 'Cancelar' : 'Anterior'}
-              </button>
+              {!success ? (
+                <button type="button" onClick={step === 1 ? onClose : goToPreviousStep} disabled={saving} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-black disabled:opacity-60" style={styles.softButton}>
+                  {step === 1 ? <X size={16} /> : <ArrowLeft size={16} />}
+                  {step === 1 ? 'Cancelar' : 'Anterior'}
+                </button>
+              ) : <span />}
 
               <p className="hidden text-center text-xs font-semibold md:block" style={styles.muted}>
                 {step === 1 && 'Primero ubicamos el inventario correcto.'}
                 {step === 2 && getImpactText(form.type, form.quantity)}
                 {step === 3 && 'El soporte permite auditar el movimiento después.'}
-                {step === 4 && (form.postNow ? 'El cambio será inmediato.' : 'El stock no cambiará hasta la aprobación.')}
+                {step === 4 && (success ? 'El movimiento quedó registrado correctamente.' : form.postNow ? 'El cambio será inmediato.' : 'El stock no cambiará hasta la aprobación.')}
               </p>
 
-              {step < 4 ? (
+              {success ? (
+                <button type="button" onClick={onClose} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-black" style={styles.primaryButton}>
+                  <CheckCircle2 size={16} /> Cerrar y volver
+                </button>
+              ) : step < 4 ? (
                 <button type="button" onClick={goToNextStep} disabled={saving || referenceLoading} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-black disabled:opacity-60" style={styles.primaryButton}>
                   Siguiente
                   <ArrowRight size={16} />
