@@ -1,0 +1,69 @@
+name: Carritos y Favoritos CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/carritos-*'
+      - 'feature/favoritos-*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carritos-favoritos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module-integrity:
+    name: Integridad de Carritos y Favoritos
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: Instalar backend y frontend
+        run: |
+          npm --prefix backend ci
+          npm --prefix frontend ci
+
+      - name: Auditar dependencias de producción
+        run: |
+          node .github/scripts/audit-production-dependencies.cjs backend
+          node .github/scripts/audit-production-dependencies.cjs frontend
+
+      - name: Validar concurrencia, acceso y datos canónicos de Carritos
+        run: |
+          npm --prefix backend run test:cart-write-concurrency
+          npm --prefix backend run test:cart-access
+          npm --prefix backend run test:cart-canonical-validation
+
+      - name: Validar operación y rutas administrativas de Carritos
+        run: |
+          npm --prefix backend run test:cart-admin-operations
+          npm --prefix backend run test:cart-admin-routes
+
+      - name: Validar integridad y seguridad de Favoritos
+        run: npm --prefix backend run test:favorites-module
+
+      - name: Validar interfaces de Carritos y Favoritos
+        run: |
+          npm --prefix frontend run test:cart-module
+          npm --prefix frontend run test:favorites-module
+
+      - name: Compilar frontend
+        run: npm --prefix frontend run build

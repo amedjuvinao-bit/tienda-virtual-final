@@ -12,6 +12,9 @@ const Cart = require('../models/Cart');
 const AdminUser = require('../models/AdminUser');
 const AdminRole = require('../models/AdminRole');
 
+const ALLOWED_ADMIN_ID = '64b000000000000000000098';
+const LIMITED_ADMIN_ID = '64b000000000000000000099';
+
 const originals = {
   cartAggregate: Cart.aggregate,
   adminUserFindOne: AdminUser.findOne,
@@ -57,19 +60,24 @@ async function request(baseUrl, path, token) {
 
 async function run() {
   Cart.aggregate = aggregateResult;
-  AdminUser.findOne = () => queryResult({
-    _id: '64b000000000000000000099',
-    username: 'limited-admin',
-    role: 'operator',
-    permissions: [],
-    active: true,
-    status: 'active',
-    deletedAt: null,
-    tokenVersion: 0,
-    roleRef: null,
-    isAccountLocked: () => false,
-    toObject() { return { ...this }; },
-  });
+  AdminUser.findOne = (filter = {}) => {
+    const adminId = String(filter?._id || '');
+    const hasCartPermission = adminId === ALLOWED_ADMIN_ID;
+
+    return queryResult({
+      _id: adminId,
+      username: hasCartPermission ? 'cart-admin' : 'limited-admin',
+      role: 'operator',
+      permissions: hasCartPermission ? ['carts:view'] : [],
+      active: true,
+      status: 'active',
+      deletedAt: null,
+      tokenVersion: 0,
+      roleRef: null,
+      isAccountLocked: () => false,
+      toObject() { return { ...this }; },
+    });
+  };
   AdminRole.findOne = () => queryResult(null);
 
   const app = express();
@@ -82,7 +90,17 @@ async function run() {
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const allowedToken = jwt.sign(
-    { role: 'admin', username: 'route-test', authType: 'legacy' },
+    {
+      role: 'admin',
+      authType: 'db',
+      adminUserId: ALLOWED_ADMIN_ID,
+      tokenVersion: 0,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '2m' }
+  );
+  const legacyToken = jwt.sign(
+    { role: 'admin', username: 'legacy-route-test', authType: 'legacy' },
     process.env.JWT_SECRET,
     { expiresIn: '2m' }
   );
@@ -90,7 +108,7 @@ async function run() {
     {
       role: 'admin',
       authType: 'db',
-      adminUserId: '64b000000000000000000099',
+      adminUserId: LIMITED_ADMIN_ID,
       tokenVersion: 0,
     },
     process.env.JWT_SECRET,
@@ -104,6 +122,8 @@ async function run() {
     const listWithoutSession = await request(baseUrl, '/api/cart/admin');
     const summaryWithoutPermission = await request(baseUrl, '/api/cart/admin/summary', limitedToken);
     const listWithoutPermission = await request(baseUrl, '/api/cart/admin', limitedToken);
+    const summaryWithLegacyToken = await request(baseUrl, '/api/cart/admin/summary', legacyToken);
+    const listWithLegacyToken = await request(baseUrl, '/api/cart/admin', legacyToken);
 
     check(summary.status === 200, 'GET /api/cart/admin/summary existe y responde 200');
     check(summary.body.cartsWithProducts === 21, 'el resumen usa el controlador administrativo real');
@@ -113,6 +133,14 @@ async function run() {
     check(listWithoutSession.status === 401, 'el listado sin sesion responde 401 y nunca 404');
     check(summaryWithoutPermission.status === 403, 'el resumen sin carts:view responde 403');
     check(listWithoutPermission.status === 403, 'el listado sin carts:view responde 403');
+    check(
+      summaryWithLegacyToken.status === 403 && summaryWithLegacyToken.body.error === 'LEGACY_ADMIN_DISABLED',
+      'el resumen rechaza la autenticacion administrativa heredada'
+    );
+    check(
+      listWithLegacyToken.status === 403 && listWithLegacyToken.body.error === 'LEGACY_ADMIN_DISABLED',
+      'el listado rechaza la autenticacion administrativa heredada'
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
     Cart.aggregate = originals.cartAggregate;
