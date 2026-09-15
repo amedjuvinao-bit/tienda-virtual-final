@@ -4,10 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
   ArrowRightLeft,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   Info,
+  MapPin,
   PackageSearch,
   RefreshCw,
   Save,
@@ -89,8 +93,9 @@ const styles = {
   },
 
   modal: {
-    width: 'min(1320px, calc(100vw - 34px))',
-    maxHeight: 'calc(100vh - 34px)',
+    width: 'min(1040px, calc(100vw - 28px))',
+    height: 'min(720px, calc(100vh - 28px))',
+    maxHeight: 'calc(100vh - 28px)',
     borderRadius: 'calc(var(--admin-radius) + 12px)',
     border: '1px solid var(--admin-card-border)',
     background: 'var(--admin-modal-bg)',
@@ -647,6 +652,7 @@ export default function InventoryAdjustmentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [step, setStep] = useState(1);
 
   const loadReferences = useCallback(async () => {
     try {
@@ -742,6 +748,7 @@ export default function InventoryAdjustmentModal({
     setError('');
     setSuccess('');
     setReferenceError('');
+    setStep(1);
     setForm(INITIAL_FORM);
     loadReferences();
   }, [open, loadReferences]);
@@ -861,6 +868,60 @@ export default function InventoryAdjustmentModal({
     }));
   };
 
+  const validateStep = (stepToValidate) => {
+    setError('');
+
+    if (stepToValidate === 1) {
+      if (!form.productId) {
+        setError('Selecciona el producto que vas a modificar.');
+        return false;
+      }
+
+      if (!form.branchId) {
+        setError('Selecciona la sede o bodega donde está el producto.');
+        return false;
+      }
+
+      if (!form.variantKey && !cleanText(form.size) && !cleanText(form.color)) {
+        setError('Selecciona la presentación o variante del producto.');
+        return false;
+      }
+    }
+
+    if (stepToValidate === 2) {
+      const quantity = Number(form.quantity);
+
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        setError('Escribe una cantidad mayor a cero para continuar.');
+        return false;
+      }
+
+      if (selectedType.direction === 'out' && quantity > currentAvailableStock) {
+        setError(
+          `No puedes retirar ${formatNumber(quantity)} unidades. Solo hay ${formatNumber(currentAvailableStock)} disponibles.`
+        );
+        return false;
+      }
+    }
+
+    if (stepToValidate === 3 && !String(form.reason || '').trim()) {
+      setError('Escribe un motivo breve para dejar claro por qué se hace el movimiento.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const goToNextStep = () => {
+    if (!validateStep(step)) return;
+    setStep((current) => Math.min(current + 1, 4));
+  };
+
+  const goToPreviousStep = () => {
+    setError('');
+    setStep((current) => Math.max(current - 1, 1));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -952,549 +1013,317 @@ export default function InventoryAdjustmentModal({
     }
   };
 
-  const canSubmit =
-    !saving &&
-    !referenceLoading &&
-    Boolean(form.productId) &&
-    Boolean(form.branchId) &&
-    Boolean(form.variantKey || form.size || form.color);
+  const numericQuantity = Number(form.quantity || 0);
+  const expectedStock = selectedType.direction === 'out'
+    ? currentAvailableStock - numericQuantity
+    : currentAvailableStock + numericQuantity;
+
+  const canSubmit = !saving && !referenceLoading;
+
+  const steps = [
+    { number: 1, label: 'Ubicación', icon: MapPin },
+    { number: 2, label: 'Movimiento', icon: ArrowRightLeft },
+    { number: 3, label: 'Soporte', icon: Info },
+    { number: 4, label: 'Confirmar', icon: ClipboardCheck },
+  ];
 
   return createPortal(
     <div
       className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center p-2 md:p-4"
       aria-modal="true"
       role="dialog"
+      aria-labelledby="inventory-adjustment-title"
       onClick={(event) => {
-        if (event.target === event.currentTarget && !saving) {
-          onClose();
-        }
+        if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
       <div className="absolute inset-0 backdrop-blur-sm" style={styles.overlay} />
 
       <div className="relative z-[100000]" style={styles.modal}>
-        <header className="shrink-0 px-6 py-5 md:px-8" style={styles.header}>
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <header className="shrink-0 px-5 py-4 md:px-7" style={styles.header}>
+          <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p
-                className="text-xs font-black uppercase tracking-[0.26em]"
-                style={styles.eyebrow}
-              >
-                Movimiento de inventario
+              <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={styles.eyebrow}>
+                Nuevo movimiento · Paso {step} de 4
               </p>
-
-              <h2
-                className="mt-2 text-2xl font-black tracking-tight md:text-3xl"
-                style={styles.title}
-              >
-                Nuevo ajuste de stock
+              <h2 id="inventory-adjustment-title" className="mt-1 truncate text-xl font-black tracking-tight md:text-2xl" style={styles.title}>
+                Ajustar inventario
               </h2>
-
-              <p className="mt-2 max-w-3xl text-sm leading-6" style={styles.muted}>
-                Selecciona producto, sede o bodega, talla, color y cantidad. También puedes cargar stock inicial en una sede sin inventario.
-              </p>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center transition disabled:cursor-not-allowed disabled:opacity-60"
-              style={styles.closeButton}
-              title="Cerrar"
-            >
-              <X size={21} />
+            <button type="button" onClick={onClose} disabled={saving} className="inline-flex h-10 w-10 shrink-0 items-center justify-center transition disabled:opacity-60" style={styles.closeButton} title="Cerrar">
+              <X size={20} />
             </button>
           </div>
+
+          <nav className="mt-4 grid grid-cols-4 gap-1.5" aria-label="Progreso del ajuste">
+            {steps.map((item) => {
+              const StepIcon = item.icon;
+              const active = step === item.number;
+              const completed = step > item.number;
+
+              return (
+                <div
+                  key={item.number}
+                  className="flex min-w-0 items-center gap-2 rounded-xl px-2 py-2 md:px-3"
+                  style={{
+                    border: active ? '1px solid var(--admin-primary)' : '1px solid var(--admin-card-border)',
+                    background: active ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)',
+                    color: active || completed ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)',
+                  }}
+                  aria-current={active ? 'step' : undefined}
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                    style={{
+                      background: completed ? 'var(--admin-primary)' : 'var(--admin-button-soft-bg)',
+                      color: completed ? 'var(--admin-primary-text)' : 'currentColor',
+                    }}
+                  >
+                    {completed ? <CheckCircle2 size={15} /> : <StepIcon size={14} />}
+                  </span>
+                  <span className="hidden truncate text-xs font-black sm:block">{item.label}</span>
+                </div>
+              );
+            })}
+          </nav>
         </header>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5" style={styles.body}>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <main className="flex min-w-0 flex-col gap-4">
-                {error && (
-                  <div
-                    className="flex items-start gap-3 px-4 py-3 text-sm font-semibold"
-                    style={styles.dangerBox}
-                  >
-                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                    <p>{error}</p>
-                  </div>
-                )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-5" style={styles.body}>
+            <main className="mx-auto flex h-full w-full max-w-[930px] flex-col gap-3">
+              {(error || referenceError) && (
+                <div className="flex items-start gap-3 px-4 py-2.5 text-sm font-semibold" style={styles.dangerBox} role="alert">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                  <p>{error || referenceError}</p>
+                </div>
+              )}
 
-                {referenceError && !error && (
-                  <div
-                    className="flex items-start gap-3 px-4 py-3 text-sm font-semibold"
-                    style={styles.dangerBox}
-                  >
-                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                    <p>{referenceError}</p>
-                  </div>
-                )}
+              {success && (
+                <div className="px-4 py-2.5 text-sm font-bold" style={styles.successBox} role="status">
+                  {success}
+                </div>
+              )}
 
-                {success && (
-                  <div className="px-4 py-3 text-sm font-bold" style={styles.successBox}>
-                    {success}
-                  </div>
-                )}
-
+              {step === 1 && (
                 <PanelCard>
                   <PanelTitle
                     icon={<PackageSearch size={18} />}
-                    title="Producto, sede y variante"
-                    description="El movimiento se aplica a una combinación exacta de producto, sede y atributos de variante."
+                    title="¿Qué producto vas a ajustar?"
+                    description="Elige la ubicación exacta. Así evitamos modificar otra sede o presentación por error."
                   />
 
-                  {referenceLoading && (
-                    <div className="mt-4 flex items-center gap-2 text-sm font-bold" style={styles.cardMuted}>
-                      <RefreshCw size={16} className="animate-spin" />
+                  {referenceLoading ? (
+                    <div className="mt-5 flex items-center justify-center gap-2 py-12 text-sm font-bold" style={styles.cardMuted}>
+                      <RefreshCw size={18} className="animate-spin" />
                       Cargando productos y sedes...
                     </div>
-                  )}
-
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label>Producto</Label>
-
-                      <select
-                        value={form.productId}
-                        onChange={(event) => updateProduct(event.target.value)}
-                        disabled={saving || referenceLoading || productOptions.length === 0}
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      >
-                        <option value="">Seleccionar producto</option>
-
-                        {productOptions.map((product) => (
-                          <option key={getProductId(product)} value={getProductId(product)}>
-                            {getProductTitle(product)} · SKU {getProductSku(product)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <HelpText>
-                        El producto puede tener inventario en otra sede. Desde aquí puedes cargarlo en una bodega nueva.
-                      </HelpText>
-                    </div>
-
-                    <div>
-                      <Label>Sede o bodega</Label>
-
-                      <select
-                        value={form.branchId}
-                        onChange={(event) => updateField('branchId', event.target.value)}
-                        disabled={saving || referenceLoading || branchOptions.length === 0}
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      >
-                        <option value="">Seleccionar sede o bodega</option>
-
-                        {branchOptions.map((branch) => (
-                          <option key={getBranchId(branch)} value={getBranchId(branch)}>
-                            {getBranchName(branch)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <HelpText>
-                        Aquí debe aparecer Bodega Principal aunque todavía no tenga stock.
-                      </HelpText>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label>Variante</Label>
-
-                      <select
-                        value={buildVariantValue({
-                          size: form.size,
-                          color: form.color,
-                          variantKey: form.variantKey,
-                        })}
-                        onChange={(event) => updateVariant(event.target.value)}
-                        disabled={saving || referenceLoading || variantOptions.length === 0}
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      >
-                        <option value="">Seleccionar variante</option>
-
-                        {variantOptions.map((variant) => (
-                          <option
-                            key={buildVariantValue(variant)}
-                            value={buildVariantValue(variant)}
-                          >
-                            {getVariantLabel(variant)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <HelpText>
-                        Selecciona la combinación exacta de atributos del producto.
-                      </HelpText>
-                    </div>
-
-                    <div>
-                      <Label>Estado actual</Label>
-
-                      <div className="mt-2 px-4 py-3 text-sm font-black" style={styles.input}>
-                        {existingStockRow
-                          ? `Ya existe inventario: ${formatNumber(currentAvailableStock)} disponible(s)`
-                          : 'Nuevo registro para esta sede'}
-                      </div>
-
-                      <HelpText>
-                        Si dice nuevo registro, al guardar se creará el stock inicial en esa sede.
-                      </HelpText>
-                    </div>
-                  </div>
-
-                  {selectedProduct && selectedBranch && (
-                    <div className="mt-4 p-4" style={styles.softCard}>
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  ) : (
+                    <>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <div>
-                          <p
-                            className="text-xs font-black uppercase tracking-[0.2em]"
-                            style={styles.eyebrow}
-                          >
-                            Selección actual
-                          </p>
-
-                          <h3 className="mt-1 text-lg font-black" style={styles.cardTitle}>
-                            {getProductTitle(selectedProduct)}
-                          </h3>
+                          <Label>1. Producto</Label>
+                          <select value={form.productId} onChange={(event) => updateProduct(event.target.value)} disabled={saving || productOptions.length === 0} className="mt-2 w-full px-4 py-3 text-sm font-bold disabled:opacity-70" style={styles.input}>
+                            <option value="">Seleccionar producto</option>
+                            {productOptions.map((product) => (
+                              <option key={getProductId(product)} value={getProductId(product)}>
+                                {getProductTitle(product)} · SKU {getProductSku(product)}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        <span
-                          className="w-fit px-4 py-2 text-xs font-black uppercase tracking-wide"
-                          style={{
-                            borderRadius: '999px',
-                            border: '1px solid var(--admin-button-soft-border)',
-                            background: 'var(--admin-button-soft-bg)',
-                            color: 'var(--admin-button-soft-text)',
-                          }}
-                        >
-                          SKU: {getProductSku(selectedProduct)}
-                        </span>
+                        <div>
+                          <Label>2. Sede o bodega</Label>
+                          <select value={form.branchId} onChange={(event) => updateField('branchId', event.target.value)} disabled={saving || branchOptions.length === 0} className="mt-2 w-full px-4 py-3 text-sm font-bold disabled:opacity-70" style={styles.input}>
+                            <option value="">Seleccionar sede o bodega</option>
+                            {branchOptions.map((branch) => (
+                              <option key={getBranchId(branch)} value={getBranchId(branch)}>{getBranchName(branch)}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <Label>3. Variante o presentación</Label>
+                          <select
+                            value={buildVariantValue({ size: form.size, color: form.color, variantKey: form.variantKey })}
+                            onChange={(event) => updateVariant(event.target.value)}
+                            disabled={saving || variantOptions.length === 0}
+                            className="mt-2 w-full px-4 py-3 text-sm font-bold disabled:opacity-70"
+                            style={styles.input}
+                          >
+                            <option value="">Seleccionar variante</option>
+                            {variantOptions.map((variant) => (
+                              <option key={buildVariantValue(variant)} value={buildVariantValue(variant)}>{getVariantLabel(variant)}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <Label>Inventario disponible</Label>
+                          <div className="mt-2 flex min-h-[46px] items-center justify-between gap-3 px-4 py-2.5" style={styles.softCard}>
+                            <span className="text-sm font-bold" style={styles.cardMuted}>
+                              {existingStockRow ? 'Existencia actual' : 'Se creará un registro nuevo'}
+                            </span>
+                            <strong className="text-xl" style={styles.cardTitle}>
+                              {existingStockRow ? formatNumber(currentAvailableStock) : 'Nuevo'}
+                            </strong>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <MiniInfo label="Sede" value={getBranchName(selectedBranch)} />
-                        <MiniInfo label="Variante" value={form.variantLabel || [form.size, form.color].filter(Boolean).join(' / ') || '—'} />
-                        <MiniInfo
-                          label="Disponible"
-                          value={
-                            existingStockRow
-                              ? formatNumber(currentAvailableStock)
-                              : 'Nuevo'
-                          }
-                        />
+                      <div className="mt-5 flex items-center gap-3 rounded-2xl px-4 py-3" style={styles.softCard}>
+                        <MapPin size={19} className="shrink-0" style={{ color: 'var(--admin-primary)' }} />
+                        <p className="min-w-0 truncate text-sm font-bold" style={styles.cardTitle}>
+                          {selectedProduct && selectedBranch
+                            ? `${getProductTitle(selectedProduct)} · ${getBranchName(selectedBranch)} · ${form.variantLabel || [form.size, form.color].filter(Boolean).join(' / ') || 'Sin variante'}`
+                            : 'Completa las tres selecciones para continuar.'}
+                        </p>
                       </div>
-                    </div>
+                      <HelpText>Las sedes sin existencias, incluida Bodega Principal, también pueden seleccionarse.</HelpText>
+                    </>
                   )}
                 </PanelCard>
+              )}
 
+              {step === 2 && (
                 <PanelCard>
                   <PanelTitle
                     icon={<ArrowRightLeft size={18} />}
-                    title="Movimiento"
-                    description="Define si el inventario debe aumentar o disminuir."
+                    title="¿Qué cambio necesitas hacer?"
+                    description="Selecciona la razón operativa y escribe solo las unidades que entran o salen."
                   />
 
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
                     <div>
                       <Label>Tipo de movimiento</Label>
-
-                      <select
-                        value={form.type}
-                        onChange={(event) => updateField('type', event.target.value)}
-                        disabled={saving}
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      >
+                      <select value={form.type} onChange={(event) => updateField('type', event.target.value)} disabled={saving} className="mt-2 w-full px-4 py-3 text-sm font-bold" style={styles.input}>
                         {MOVEMENT_TYPES.map((type) => (
-                          <option key={type.value} value={type.value}>
-                            {type.label}
-                          </option>
+                          <option key={type.value} value={type.value}>{type.label}</option>
                         ))}
                       </select>
 
-                      <HelpText>
-                        Para cargar por primera vez en una bodega, usa Stock inicial.
-                      </HelpText>
+                      <div className="mt-3 flex items-start gap-3 p-4" style={styles.softCard}>
+                        <Info size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--admin-primary)' }} />
+                        <div>
+                          <p className="text-sm font-black" style={styles.cardTitle}>{selectedType.action}</p>
+                          <p className="mt-1 text-xs leading-5" style={styles.cardMuted}>{selectedType.help}</p>
+                        </div>
+                      </div>
                     </div>
 
                     <div>
-                      <Label>Cantidad</Label>
+                      <Label>Cantidad de unidades</Label>
+                      <input type="number" min="1" step="1" value={form.quantity} onChange={(event) => updateField('quantity', event.target.value)} disabled={saving} placeholder="Ejemplo: 10" autoFocus className="mt-2 w-full px-4 py-3 text-lg font-black" style={styles.input} />
+                      <HelpText>No escribas el stock total; escribe únicamente cuánto entra o cuánto sale.</HelpText>
 
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={form.quantity}
-                        onChange={(event) => updateField('quantity', event.target.value)}
-                        disabled={saving}
-                        placeholder="Ej: 10"
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      />
-
-                      <HelpText>
-                        Escribe únicamente la cantidad que entra o sale. No escribas el stock total.
-                      </HelpText>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-4" style={styles.softCard}>
-                    <div className="flex items-start gap-3">
-                      <Info
-                        size={18}
-                        className="mt-0.5 shrink-0"
-                        style={{ color: 'var(--admin-primary)' }}
-                      />
-
-                      <div>
-                        <p className="text-sm font-black" style={styles.cardTitle}>
-                          {selectedType.label} · {selectedType.action}
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6" style={styles.cardMuted}>
-                          {selectedType.help}
-                        </p>
+                      <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl" style={{ border: '1px solid var(--admin-card-border)' }}>
+                        <StockFigure label="Ahora" value={formatNumber(currentAvailableStock)} />
+                        <StockFigure label={selectedType.direction === 'out' ? 'Sale' : 'Entra'} value={form.quantity ? `${selectedType.direction === 'out' ? '−' : '+'}${formatNumber(form.quantity)}` : '—'} accent />
+                        <StockFigure label="Quedaría" value={form.quantity && numericQuantity > 0 ? formatNumber(expectedStock) : '—'} />
                       </div>
                     </div>
                   </div>
                 </PanelCard>
+              )}
 
+              {step === 3 && (
                 <PanelCard>
                   <PanelTitle
                     icon={<Info size={18} />}
-                    title="Soporte administrativo"
-                    description="Esta información queda guardada en el historial del inventario."
+                    title="Deja el soporte del movimiento"
+                    description="El motivo será visible en el historial. Luego decide si se aplica ahora o pasa a aprobación."
                   />
 
-                  <div className="mt-4">
-                    <Label>Motivo</Label>
-
-                    <input
-                      type="text"
-                      value={form.reason}
-                      onChange={(event) => updateField('reason', event.target.value)}
-                      disabled={saving}
-                      placeholder="Ej: Stock inicial en Bodega Principal"
-                      className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                      style={styles.input}
-                    />
-
-                    <HelpText>
-                      Campo obligatorio. Explica por qué se modifica este inventario.
-                    </HelpText>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label>
-                        Referencia <span style={styles.cardMuted}>(opcional)</span>
-                      </Label>
-
-                      <input
-                        type="text"
-                        value={form.reference}
-                        onChange={(event) => updateField('reference', event.target.value)}
-                        disabled={saving}
-                        placeholder="Ej: STOCK-BODEGA-001"
-                        className="mt-2 w-full px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      />
-
-                      <HelpText>
-                        Puedes usar un número interno, acta, remisión o código de control.
-                      </HelpText>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <Label>Motivo obligatorio</Label>
+                      <input type="text" value={form.reason} onChange={(event) => updateField('reason', event.target.value)} disabled={saving} placeholder="Ej: Conteo físico encontró 3 unidades adicionales" autoFocus className="mt-2 w-full px-4 py-3 text-sm font-bold" style={styles.input} />
                     </div>
 
                     <div>
-                      <Label>
-                        Observación <span style={styles.cardMuted}>(opcional)</span>
-                      </Label>
+                      <Label>Referencia <span style={styles.cardMuted}>(opcional)</span></Label>
+                      <input type="text" value={form.reference} onChange={(event) => updateField('reference', event.target.value)} disabled={saving} placeholder="Acta, remisión o código" className="mt-2 w-full px-4 py-3 text-sm font-bold" style={styles.input} />
+                    </div>
 
-                      <textarea
-                        rows={3}
-                        value={form.notes}
-                        onChange={(event) => updateField('notes', event.target.value)}
-                        disabled={saving}
-                        placeholder="Ej: Carga inicial de inventario en bodega..."
-                        className="mt-2 w-full resize-none px-4 py-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-70"
-                        style={styles.input}
-                      />
-
-                      <HelpText>
-                        Agrega detalles adicionales si necesitas dejar soporte del movimiento.
-                      </HelpText>
+                    <div>
+                      <Label>Observación <span style={styles.cardMuted}>(opcional)</span></Label>
+                      <input type="text" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={saving} placeholder="Detalle adicional" className="mt-2 w-full px-4 py-3 text-sm font-bold" style={styles.input} />
                     </div>
                   </div>
+
+                  <fieldset className="mt-5">
+                    <legend className="text-sm font-black" style={styles.label}>¿Cuándo debe cambiar el stock?</legend>
+                    <div className="mt-2 grid gap-3 md:grid-cols-2">
+                      <ProcessChoice selected={form.postNow} onClick={() => updateField('postNow', true)} icon={<CheckCircle2 size={20} />} title="Aplicar ahora" description="El stock cambia al confirmar este ajuste." />
+                      <ProcessChoice selected={!form.postNow} onClick={() => updateField('postNow', false)} icon={<Clock size={20} />} title="Enviar a revisión" description="Queda pendiente hasta que otra persona lo apruebe." />
+                    </div>
+                  </fieldset>
                 </PanelCard>
+              )}
 
+              {step === 4 && (
                 <PanelCard>
                   <PanelTitle
-                    icon={<CheckCircle2 size={18} />}
-                    title="¿Cómo quieres procesarlo?"
-                    description="Puedes aplicarlo ahora o dejarlo pendiente para que otra persona lo revise."
+                    icon={<ClipboardCheck size={18} />}
+                    title="Revisa antes de confirmar"
+                    description="Esta es la operación exacta que quedará registrada. Si algo no coincide, vuelve al paso anterior."
                   />
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => updateField('postNow', true)}
-                      disabled={saving}
-                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
-                      style={{
-                        ...styles.softCard,
-                        border: form.postNow
-                          ? '2px solid var(--admin-primary)'
-                          : styles.softCard.border,
-                      }}
-                    >
-                      <CheckCircle2 size={20} className="mt-0.5 shrink-0" />
-                      <span>
-                        <b className="block text-sm">Aplicar ahora</b>
-                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
-                          Modifica las existencias inmediatamente.
-                        </span>
-                      </span>
-                    </button>
+                  <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <ReviewItem label="Producto" value={selectedProduct ? getProductTitle(selectedProduct) : '—'} />
+                      <ReviewItem label="Sede" value={selectedBranch ? getBranchName(selectedBranch) : '—'} />
+                      <ReviewItem label="Variante" value={form.variantLabel || [form.size, form.color].filter(Boolean).join(' / ') || '—'} />
+                      <ReviewItem label="Movimiento" value={selectedType.label} />
+                      <ReviewItem label="Motivo" value={form.reason || '—'} wide />
+                      {(form.reference || form.notes) && <ReviewItem label="Soporte adicional" value={[form.reference, form.notes].filter(Boolean).join(' · ')} wide />}
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => updateField('postNow', false)}
-                      disabled={saving}
-                      className="flex items-start gap-3 p-4 text-left transition disabled:opacity-60"
-                      style={{
-                        ...styles.softCard,
-                        border: !form.postNow
-                          ? '2px solid var(--admin-primary)'
-                          : styles.softCard.border,
-                      }}
-                    >
-                      <Clock size={20} className="mt-0.5 shrink-0" />
-                      <span>
-                        <b className="block text-sm">Enviar a revisión</b>
-                        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>
-                          No cambia el stock hasta que sea aprobado.
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-                </PanelCard>
-              </main>
-
-              <aside className="min-w-0">
-                <div className="sticky top-0 flex flex-col gap-4">
-                  <div className="p-5" style={styles.summary}>
-                    <p className="text-xs font-black uppercase tracking-[0.22em] opacity-80">
-                      Resumen
-                    </p>
-
-                    <h3 className="mt-2 text-2xl font-black">
-                      Impacto del ajuste
-                    </h3>
-
-                    <p className="mt-3 text-sm leading-6 opacity-85">
-                      {form.postNow
-                        ? 'Revisa el resultado antes de guardar. El cambio se aplicará inmediatamente.'
-                        : 'La solicitud quedará pendiente y no cambiará el stock hasta su aprobación.'}
-                    </p>
-
-                    <div className="mt-5 space-y-3">
-                      <SummaryRow label="Acción" value={selectedType.label} />
-                      <SummaryRow label="Efecto" value={selectedType.action} />
-                      <SummaryRow
-                        label="Cantidad"
-                        value={form.quantity ? formatNumber(form.quantity) : 'Sin definir'}
-                      />
-                      <SummaryRow
-                        label="Disponible actual"
-                        value={
-                          existingStockRow
-                            ? formatNumber(currentAvailableStock)
-                            : 'Nuevo registro'
-                        }
-                      />
+                    <div className="flex flex-col justify-between p-5" style={styles.summary}>
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-80">Resultado</p>
+                        <p className="mt-2 text-sm font-bold opacity-90">{selectedType.action}</p>
+                      </div>
+                      <div className="my-5 flex items-end justify-between gap-3">
+                        <div><span className="block text-xs opacity-75">Antes</span><strong className="text-2xl">{formatNumber(currentAvailableStock)}</strong></div>
+                        <ArrowRight size={21} className="mb-1 opacity-75" />
+                        <div className="text-right"><span className="block text-xs opacity-75">Después</span><strong className="text-3xl">{formatNumber(expectedStock)}</strong></div>
+                      </div>
+                      <p className="rounded-xl bg-white/15 px-3 py-2 text-xs font-bold leading-5">
+                        {form.postNow ? 'Se aplicará inmediatamente.' : 'Se enviará a revisión sin cambiar el stock.'}
+                      </p>
                     </div>
                   </div>
-
-                  <PanelCard>
-                    <p className="text-sm font-black" style={styles.cardTitle}>
-                      Resultado esperado
-                    </p>
-
-                    <p className="mt-2 text-sm leading-6" style={styles.cardMuted}>
-                      {getImpactText(form.type, form.quantity)}
-                    </p>
-                  </PanelCard>
-
-                  <div className="p-5" style={styles.warningBox}>
-                    <p className="text-sm font-black">
-                      Guía rápida
-                    </p>
-
-                    <ul className="mt-3 space-y-2 text-sm leading-6">
-                      <li>
-                        <b>Stock inicial:</b> crea inventario en una sede o bodega.
-                      </li>
-                      <li>
-                        <b>Ajuste positivo:</b> suma unidades por corrección.
-                      </li>
-                      <li>
-                        <b>Ajuste negativo:</b> resta unidades por corrección.
-                      </li>
-                      <li>
-                        <b>Entrada por compra:</b> registra mercancía nueva.
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </aside>
-            </div>
+                </PanelCard>
+              )}
+            </main>
           </div>
 
-          <footer className="shrink-0 px-5 py-4 md:px-8" style={styles.footer}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-sm" style={styles.muted}>
-                {form.postNow
-                  ? 'Verifica producto, sede, variante y cantidad antes de aplicar.'
-                  : 'Se enviará a revisión sin modificar las existencias.'}
+          <footer className="shrink-0 px-4 py-3 md:px-7" style={styles.footer}>
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={step === 1 ? onClose : goToPreviousStep} disabled={saving} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-black disabled:opacity-60" style={styles.softButton}>
+                {step === 1 ? <X size={16} /> : <ArrowLeft size={16} />}
+                {step === 1 ? 'Cancelar' : 'Anterior'}
+              </button>
+
+              <p className="hidden text-center text-xs font-semibold md:block" style={styles.muted}>
+                {step === 1 && 'Primero ubicamos el inventario correcto.'}
+                {step === 2 && getImpactText(form.type, form.quantity)}
+                {step === 3 && 'El soporte permite auditar el movimiento después.'}
+                {step === 4 && (form.postNow ? 'El cambio será inmediato.' : 'El stock no cambiará hasta la aprobación.')}
               </p>
 
-              <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={saving}
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={styles.softButton}
-                >
-                  Cancelar
+              {step < 4 ? (
+                <button type="button" onClick={goToNextStep} disabled={saving || referenceLoading} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-black disabled:opacity-60" style={styles.primaryButton}>
+                  Siguiente
+                  <ArrowRight size={16} />
                 </button>
-
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className="inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
-                  style={styles.primaryButton}
-                >
-                  {saving ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      {form.postNow ? 'Aplicar ajuste' : 'Enviar a revisión'}
-                    </>
-                  )}
+              ) : (
+                <button type="submit" disabled={!canSubmit} className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-black disabled:opacity-60" style={styles.primaryButton}>
+                  {saving ? <><RefreshCw size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> {form.postNow ? 'Confirmar ajuste' : 'Enviar a revisión'}</>}
                 </button>
-              </div>
+              )}
             </div>
           </footer>
         </form>
@@ -1569,6 +1398,64 @@ function MiniInfo({ label, value }) {
       <p className="mt-1 text-sm font-black" style={styles.cardTitle}>
         {value || '—'}
       </p>
+    </div>
+  );
+}
+
+function ProcessChoice({ selected, onClick, icon, title, description }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-w-0 items-start gap-3 p-4 text-left transition"
+      style={{
+        ...styles.softCard,
+        border: selected
+          ? '2px solid var(--admin-primary)'
+          : styles.softCard.border,
+        boxShadow: selected
+          ? '0 10px 28px color-mix(in srgb, var(--admin-primary) 18%, transparent)'
+          : 'none',
+      }}
+      aria-pressed={selected}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          background: selected ? 'var(--admin-primary)' : 'var(--admin-button-soft-bg)',
+          color: selected ? 'var(--admin-primary-text)' : 'var(--admin-primary)',
+        }}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <strong className="block text-sm" style={styles.cardTitle}>{title}</strong>
+        <span className="mt-1 block text-xs leading-5" style={styles.cardMuted}>{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function StockFigure({ label, value, accent = false }) {
+  return (
+    <div
+      className="min-w-0 px-2 py-3 text-center"
+      style={{
+        borderRight: label === 'Quedaría' ? 'none' : '1px solid var(--admin-card-border)',
+        background: accent ? 'var(--admin-primary-soft-bg)' : 'var(--admin-card-bg)',
+      }}
+    >
+      <span className="block truncate text-[10px] font-black uppercase tracking-wide" style={styles.cardMuted}>{label}</span>
+      <strong className="mt-1 block truncate text-xl" style={{ color: accent ? 'var(--admin-primary)' : 'var(--admin-card-text)' }}>{value}</strong>
+    </div>
+  );
+}
+
+function ReviewItem({ label, value, wide = false }) {
+  return (
+    <div className={`min-w-0 px-4 py-3 ${wide ? 'sm:col-span-2' : ''}`} style={styles.softCard}>
+      <span className="block text-[10px] font-black uppercase tracking-[0.14em]" style={styles.cardMuted}>{label}</span>
+      <strong className="mt-1 block break-words text-sm" style={styles.cardTitle}>{value || '—'}</strong>
     </div>
   );
 }
