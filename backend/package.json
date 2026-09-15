@@ -42,6 +42,7 @@
     "test:inventory-level-plus-stage1": "node scripts/testInventoryLevelPlusStage1.js",
     "test:inventory-level-plus-stage2": "node scripts/testInventoryLevelPlusStage2.js",
     "test:inventory-level-plus-stage3": "node scripts/testInventoryLevelPlusStage3.js",
+    "test:inventory-level-plus-stage4": "node scripts/testInventoryLevelPlusStage4.js",
     "test:orders-admin": "node scripts/testOrdersAdminModule.js",
     "test:order-creation-composition": "node scripts/testOrderCreationComposition.js",
     "test:order-cart-version": "node scripts/testOrderCartVersionContract.js",

@@ -363,70 +363,11 @@ function buildBranchOptions(branches = [], stockRows = []) {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }
 
-function escapeCsv(value) {
-  if (value === null || value === undefined) return '';
-  const text = String(value).replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
-  if (text.includes(',') || text.includes(';') || text.includes('"')) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
+function getExportFilename(headers = {}) {
+  const disposition = String(headers?.['content-disposition'] || '');
+  const match = disposition.match(/filename="?([^";]+)"?/i);
 
-function downloadVisibleInventoryCsv(rows = []) {
-  const headers = [
-    'Producto',
-    'SKU',
-    'Sede',
-    'Codigo sede',
-    'Tipo sede',
-    'Variante',
-    'Atributos',
-    'Talla',
-    'Color',
-    'Stock fisico',
-    'Reservado',
-    'Disponible',
-    'Punto minimo',
-    'Estado',
-  ];
-
-  const lines = [headers.map(escapeCsv).join(',')];
-
-  rows.forEach((row) => {
-    const status = getStockStatus(row).label;
-    lines.push(
-      [
-        getProductTitle(row),
-        getProductSku(row),
-        getBranchName(row),
-        getBranchCode(row),
-        getBranchType(row),
-        getVariantLabel(row),
-        getVariantAttributesText(row),
-        getVariantSize(row),
-        getVariantColor(row),
-        Number(row?.stock || 0),
-        getReservedStock(row),
-        getAvailableStock(row),
-        getLowStockLimit(row),
-        status,
-      ]
-        .map(escapeCsv)
-        .join(',')
-    );
-  });
-
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
-  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = `inventario_filtrado_${stamp}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
+  return match?.[1] || `inventario_por_sedes_${Date.now()}.csv`;
 }
 
 export default function InventoryAdmin() {
@@ -445,6 +386,7 @@ export default function InventoryAdmin() {
   const [movementsModalRow, setMovementsModalRow] = useState(null);
   const [kardexModalRow, setKardexModalRow] = useState(null);
   const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadInventory = useCallback(async () => {
     try {
@@ -543,6 +485,36 @@ export default function InventoryAdmin() {
     setSearchTerm('');
     setBranchFilter('all');
     setStockFilter('all');
+  };
+
+  const exportInventory = async () => {
+    try {
+      setExporting(true);
+      setError('');
+
+      const response = await api.get('/api/admin/inventory/export', {
+        params: {
+          ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
+          ...(branchFilter !== 'all' ? { branchId: branchFilter } : {}),
+          ...(stockFilter !== 'all' ? { stockStatus: stockFilter } : {}),
+        },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = getExportFilename(response.headers);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('❌ Error exportando inventario:', err);
+      setError('No se pudo exportar el inventario. Verifica que tu perfil tenga permiso de exportación.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const openGeneralTransferModal = () => {
@@ -678,13 +650,13 @@ export default function InventoryAdmin() {
 
           <button
             type="button"
-            onClick={() => downloadVisibleInventoryCsv(filteredStockRows)}
-            disabled={loading || filteredStockRows.length === 0}
+            onClick={exportInventory}
+            disabled={loading || exporting || filteredStockRows.length === 0}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
             style={styles.primaryButton}
           >
             <Download size={16} />
-            Exportar vista actual
+            {exporting ? 'Preparando archivo...' : 'Exportar vista actual'}
           </button>
         </div>
 

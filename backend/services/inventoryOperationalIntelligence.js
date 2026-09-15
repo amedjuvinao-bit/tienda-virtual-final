@@ -2,6 +2,8 @@
 
 const DEFAULT_LOW_STOCK_LIMIT = 5;
 const DEFAULT_STALE_DAYS = 90;
+const DEFAULT_COVERAGE_WINDOW_DAYS = 30;
+const DEFAULT_STUCK_RESERVATION_MINUTES = 30;
 const MAX_RECOMMENDATIONS = 50;
 
 function cleanText(value = '') {
@@ -68,6 +70,10 @@ function getStockIdentity(row = {}) {
   return `${getId(row?.product)}::${getVariantIdentity(row)}`;
 }
 
+function getStockLocationIdentity(row = {}, branchField = 'branch') {
+  return `${getId(row?.[branchField])}::${getStockIdentity(row)}`;
+}
+
 function getBranchSnapshot(row = {}) {
   return {
     id: getId(row?.branch),
@@ -89,12 +95,14 @@ function getProductSnapshot(row = {}) {
 function getVariantSnapshot(row = {}) {
   return {
     variantKey: cleanText(row?.variantKey),
-    label: cleanText(row?.variant?.label),
+    label: cleanText(row?.variant?.label || row?.variantLabel),
     size: cleanText(row?.variant?.size || row?.size),
     color: cleanText(row?.variant?.color || row?.color),
     attributes: Array.isArray(row?.variant?.attributes)
       ? row.variant.attributes
-      : [],
+      : Array.isArray(row?.variantAttributes)
+        ? row.variantAttributes
+        : [],
     sku: cleanText(row?.variant?.sku),
   };
 }
@@ -273,12 +281,309 @@ function buildStaleStockItems(stockRows = [], options = {}) {
     .slice(0, limit);
 }
 
+function buildCoverageEstimates(stockRows = [], movementRows = [], options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const windowDays = Math.max(
+    Number(options.windowDays || DEFAULT_COVERAGE_WINDOW_DAYS),
+    1
+  );
+  const limit = Math.min(
+    Math.max(Number(options.limit || MAX_RECOMMENDATIONS), 1),
+    MAX_RECOMMENDATIONS
+  );
+  const threshold = new Date(now.getTime() - windowDays * 86400000);
+  const quantityByStock = new Map();
+
+  movementRows
+    .filter((movement) => movement?.status === 'posted')
+    .filter((movement) => movement?.type === 'sale_out')
+    .filter((movement) => {
+      const value = movement?.postedAt || movement?.createdAt;
+      const date = value ? new Date(value) : null;
+      return date && !Number.isNaN(date.getTime()) && date >= threshold && date <= now;
+    })
+    .forEach((movement) => {
+      const identity = getStockLocationIdentity(movement, 'branchFrom');
+      const quantity = Math.max(0, Number(movement?.quantity || 0));
+      quantityByStock.set(identity, Number(quantityByStock.get(identity) || 0) + quantity);
+    });
+
+  return stockRows
+    .filter((row) => row && row.active !== false && !row.deletedAt)
+    .map((row) => {
+      const soldQuantity = Number(
+        quantityByStock.get(getStockLocationIdentity(row)) || 0
+      );
+
+      if (soldQuantity <= 0) return null;
+
+      const availableStock = getAvailableStock(row);
+      const dailyDemand = soldQuantity / windowDays;
+      const coverageDays = dailyDemand > 0
+        ? Math.round((availableStock / dailyDemand) * 10) / 10
+        : null;
+      const status = availableStock <= 0 || coverageDays < 7
+        ? 'critical'
+        : coverageDays < 14
+          ? 'warning'
+          : 'healthy';
+
+      return {
+        id: getId(row),
+        type: 'coverage',
+        severity: status,
+        product: getProductSnapshot(row),
+        branch: getBranchSnapshot(row),
+        variant: getVariantSnapshot(row),
+        availableStock,
+        soldQuantity,
+        windowDays,
+        dailyDemand: Math.round(dailyDemand * 100) / 100,
+        coverageDays,
+        message: coverageDays < 7
+          ? `La existencia cubre aproximadamente ${coverageDays} día(s) al ritmo reciente.`
+          : `Cobertura estimada de ${coverageDays} día(s) según las ventas recientes.`,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.coverageDays - b.coverageDays)
+    .slice(0, limit);
+}
+
+function buildStuckReservationItems(reservations = [], options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const thresholdMinutes = Math.max(
+    Number(
+      options.thresholdMinutes || DEFAULT_STUCK_RESERVATION_MINUTES
+    ),
+    1
+  );
+  const limit = Math.min(
+    Math.max(Number(options.limit || MAX_RECOMMENDATIONS), 1),
+    MAX_RECOMMENDATIONS
+  );
+
+  return reservations
+    .filter((reservation) => reservation?.status === 'pending')
+    .map((reservation) => {
+      const createdAt = reservation?.createdAt
+        ? new Date(reservation.createdAt)
+        : null;
+      const expiresAt = reservation?.expiresAt
+        ? new Date(reservation.expiresAt)
+        : null;
+
+      if (!createdAt || Number.isNaN(createdAt.getTime())) return null;
+
+      const ageMinutes = Math.max(
+        0,
+        Math.floor((now.getTime() - createdAt.getTime()) / 60000)
+      );
+      const overdue = Boolean(
+        expiresAt &&
+        !Number.isNaN(expiresAt.getTime()) &&
+        expiresAt <= now
+      );
+
+      if (!overdue && ageMinutes < thresholdMinutes) return null;
+
+      const firstItem = Array.isArray(reservation?.items)
+        ? reservation.items[0]
+        : null;
+
+      return {
+        id: getId(reservation),
+        type: 'stuckReservation',
+        severity: overdue ? 'critical' : 'warning',
+        reservationCode: cleanText(reservation?.reservationCode),
+        orderNumber: cleanText(reservation?.orderNumber),
+        totalQuantity: Number(reservation?.totalQuantity || 0),
+        createdAt,
+        expiresAt,
+        ageMinutes,
+        overdue,
+        product: getProductSnapshot(firstItem),
+        branch: getBranchSnapshot(firstItem),
+        variant: getVariantSnapshot(firstItem),
+        message: overdue
+          ? 'La reserva sigue pendiente después de su vencimiento.'
+          : `La reserva lleva ${ageMinutes} minutos pendiente.`,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+      return b.ageMinutes - a.ageMinutes;
+    })
+    .slice(0, limit);
+}
+
+function buildInventoryAnomalies(stockRows = [], movementRows = [], options = {}) {
+  const limit = Math.min(
+    Math.max(Number(options.limit || MAX_RECOMMENDATIONS), 1),
+    MAX_RECOMMENDATIONS
+  );
+  const anomalies = [];
+
+  stockRows
+    .filter((row) => row && row.active !== false && !row.deletedAt)
+    .forEach((row) => {
+      const physicalStock = Number(row?.stock || 0);
+      const reservedStock = Number(row?.reservedStock || 0);
+      const availableStock = Number(row?.availableStock || 0);
+      const expectedAvailable = Math.max(0, physicalStock - reservedStock);
+      const base = {
+        id: `stock-${getId(row)}`,
+        product: getProductSnapshot(row),
+        branch: getBranchSnapshot(row),
+        variant: getVariantSnapshot(row),
+      };
+
+      if (reservedStock > physicalStock) {
+        anomalies.push({
+          ...base,
+          code: 'RESERVED_EXCEEDS_PHYSICAL',
+          severity: 'critical',
+          message: 'El stock reservado supera el stock físico.',
+        });
+      } else if (Math.abs(availableStock - expectedAvailable) > 0.001) {
+        anomalies.push({
+          ...base,
+          code: 'AVAILABLE_MISMATCH',
+          severity: 'critical',
+          message: `El disponible registrado (${availableStock}) no coincide con el esperado (${expectedAvailable}).`,
+        });
+      }
+
+      if (!getId(row?.product) || !getBranchSnapshot(row).id) {
+        anomalies.push({
+          ...base,
+          code: 'ORPHAN_STOCK',
+          severity: 'warning',
+          message: 'La existencia no conserva una relación válida con producto o sede.',
+        });
+      }
+    });
+
+  movementRows
+    .filter((movement) => movement?.status === 'posted')
+    .forEach((movement) => {
+      const source = getBranchSnapshot({
+        branch: movement?.branchFrom,
+        branchSnapshot: movement?.branchFromSnapshot,
+      });
+      const destination = getBranchSnapshot({
+        branch: movement?.branchTo,
+        branchSnapshot: movement?.branchToSnapshot,
+      });
+      const movementId = getId(movement);
+
+      if (!movement?.postedAt) {
+        anomalies.push({
+          id: `movement-posted-${movementId}`,
+          code: 'POSTED_WITHOUT_DATE',
+          severity: 'warning',
+          movementNumber: cleanText(movement?.movementNumber),
+          product: getProductSnapshot(movement),
+          branch: source.id ? source : destination,
+          variant: getVariantSnapshot(movement),
+          message: 'El movimiento figura aplicado, pero no tiene fecha de aplicación.',
+        });
+      }
+
+      if (
+        movement?.type === 'transfer' &&
+        (!source.id || !destination.id || source.id === destination.id)
+      ) {
+        anomalies.push({
+          id: `movement-route-${movementId}`,
+          code: 'INVALID_TRANSFER_ROUTE',
+          severity: 'critical',
+          movementNumber: cleanText(movement?.movementNumber),
+          product: getProductSnapshot(movement),
+          branch: source.id ? source : destination,
+          variant: getVariantSnapshot(movement),
+          message: 'El traslado aplicado no conserva una ruta válida entre dos sedes.',
+        });
+      }
+    });
+
+  return Array.from(
+    new Map(anomalies.map((item) => [item.id, item])).values()
+  )
+    .sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1;
+      return a.code.localeCompare(b.code);
+    })
+    .slice(0, limit);
+}
+
+function buildBranchAlertSummaries({
+  stockAlerts = [],
+  stuckReservations = [],
+  coverageEstimates = [],
+  anomalies = [],
+} = {}) {
+  const summaries = new Map();
+
+  function add(item = {}, category = '') {
+    const branch = item?.branch || {};
+    const branchId = getId(branch);
+    if (!branchId) return;
+
+    const current = summaries.get(branchId) || {
+      id: branchId,
+      name: cleanText(branch?.name),
+      code: cleanText(branch?.code),
+      critical: 0,
+      warning: 0,
+      lowStock: 0,
+      outOfStock: 0,
+      stuckReservations: 0,
+      coverageRisk: 0,
+      anomalies: 0,
+      total: 0,
+    };
+
+    if (item?.severity === 'critical') current.critical += 1;
+    if (item?.severity === 'warning') current.warning += 1;
+    if (Object.prototype.hasOwnProperty.call(current, category)) {
+      current[category] += 1;
+    }
+    current.total += 1;
+    summaries.set(branchId, current);
+  }
+
+  stockAlerts.forEach((item) => add(
+    item,
+    item?.type === 'outOfStock' ? 'outOfStock' : 'lowStock'
+  ));
+  stuckReservations.forEach((item) => add(item, 'stuckReservations'));
+  coverageEstimates
+    .filter((item) => item?.severity !== 'healthy')
+    .forEach((item) => add(item, 'coverageRisk'));
+  anomalies.forEach((item) => add(item, 'anomalies'));
+
+  return Array.from(summaries.values()).sort((a, b) => {
+    if (a.critical !== b.critical) return b.critical - a.critical;
+    if (a.warning !== b.warning) return b.warning - a.warning;
+    return b.total - a.total;
+  });
+}
+
 module.exports = {
+  DEFAULT_COVERAGE_WINDOW_DAYS,
   DEFAULT_LOW_STOCK_LIMIT,
   DEFAULT_STALE_DAYS,
+  DEFAULT_STUCK_RESERVATION_MINUTES,
+  buildBranchAlertSummaries,
+  buildCoverageEstimates,
+  buildInventoryAnomalies,
   buildStaleStockItems,
+  buildStuckReservationItems,
   buildTransferRecommendations,
   getAvailableStock,
   getLowStockLimit,
+  getStockLocationIdentity,
   getStockIdentity,
 };

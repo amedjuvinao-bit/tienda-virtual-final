@@ -683,6 +683,135 @@ function StaleStockCard({ item }) {
   );
 }
 
+function CoverageCard({ item }) {
+  const riskStyle = item?.severity === 'critical'
+    ? styles.dangerBadge
+    : item?.severity === 'warning'
+      ? styles.warningBadge
+      : styles.badge;
+  const riskLabel = item?.severity === 'critical'
+    ? 'Cobertura crítica'
+    : item?.severity === 'warning'
+      ? 'Cobertura corta'
+      : 'Cobertura saludable';
+
+  return (
+    <article className="p-4" style={styles.card}>
+      <div className="grid gap-4 lg:grid-cols-[minmax(260px,1fr)_minmax(320px,auto)] lg:items-center">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-2 px-3 py-1 text-xs font-black" style={riskStyle}>
+            <Activity size={14} />
+            {riskLabel}
+          </span>
+          <p className="mt-3 text-sm font-black" style={styles.cardTitle}>
+            {item?.product?.title || 'Producto sin nombre'}
+          </p>
+          <p className="mt-1 text-sm" style={styles.cardMuted}>
+            {item?.branch?.name || 'Sede no definida'} · {getVariantLabel(item)}
+          </p>
+          <p className="mt-2 text-xs leading-5" style={styles.cardMuted}>
+            Estimación calculada con las salidas por venta de los últimos {formatNumber(item?.windowDays)} días.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <MiniStock label="Disponible" value={item?.availableStock} />
+          <MiniStock label="Vendido" value={item?.soldQuantity} />
+          <MiniStock label="Días cobertura" value={item?.coverageDays} highlight />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function StuckReservationCard({ item }) {
+  const statusStyle = item?.overdue ? styles.dangerBadge : styles.warningBadge;
+
+  return (
+    <article className="p-4" style={styles.card}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-2 px-3 py-1 text-xs font-black" style={statusStyle}>
+            <Clock size={14} />
+            {item?.overdue ? 'Vencida y sin liberar' : 'Demora inusual'}
+          </span>
+          <p className="mt-3 text-sm font-black" style={styles.cardTitle}>
+            {item?.reservationCode || item?.orderNumber || 'Reserva sin código'}
+          </p>
+          <p className="mt-1 text-sm" style={styles.cardMuted}>
+            {item?.product?.title || 'Producto sin nombre'} · {item?.branch?.name || 'Sede no definida'}
+          </p>
+          <p className="mt-2 text-xs leading-5" style={styles.cardMuted}>
+            {item?.message}
+          </p>
+        </div>
+
+        <div className="grid min-w-[310px] grid-cols-2 gap-2">
+          <MiniReservation label="Tiempo pendiente" value={`${formatNumber(item?.ageMinutes)} min`} />
+          <MiniReservation label="Vencimiento" value={formatDate(item?.expiresAt)} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AnomalyCard({ item }) {
+  const severityStyle = item?.severity === 'critical'
+    ? styles.dangerBadge
+    : styles.warningBadge;
+
+  return (
+    <article className="p-4" style={styles.card}>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-2 px-3 py-1 text-xs font-black" style={severityStyle}>
+            <AlertCircle size={14} />
+            {item?.severity === 'critical' ? 'Revisión urgente' : 'Revisar integridad'}
+          </span>
+          <p className="mt-3 text-sm font-black" style={styles.cardTitle}>
+            {item?.product?.title || item?.movementNumber || 'Registro de inventario'}
+          </p>
+          <p className="mt-1 text-sm" style={styles.cardMuted}>
+            {item?.branch?.name || 'Sede no definida'} · {item?.message}
+          </p>
+        </div>
+        <span className="w-fit px-3 py-1 text-xs font-black" style={styles.badge}>
+          {item?.code || 'ANOMALÍA'}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function BranchAlertCard({ item }) {
+  const variant = Number(item?.critical || 0) > 0
+    ? styles.criticalBox
+    : styles.warningBox;
+
+  return (
+    <article className="p-4" style={variant}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-black" style={styles.cardTitle}>
+            {item?.name || 'Sede no definida'}
+          </p>
+          <p className="mt-1 text-xs" style={styles.cardMuted}>
+            {item?.code || 'Sin código'}
+          </p>
+        </div>
+        <span className="px-2.5 py-1 text-xs font-black" style={styles.badge}>
+          {formatNumber(item?.total)}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold" style={styles.cardMuted}>
+        <span>{formatNumber(item?.critical)} críticas</span>
+        <span>·</span>
+        <span>{formatNumber(item?.warning)} advertencias</span>
+      </div>
+    </article>
+  );
+}
+
 function getTransferStatus(status) {
   if (status === 'posted') return { label: 'Aplicado', style: styles.badge };
   if (status === 'cancelled') return { label: 'Rechazado', style: styles.dangerBadge };
@@ -795,6 +924,18 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
   const recentTransfers = Array.isArray(alerts?.recentTransfers)
     ? alerts.recentTransfers
     : [];
+  const coverageEstimates = Array.isArray(alerts?.coverageEstimates)
+    ? alerts.coverageEstimates
+    : [];
+  const stuckReservations = Array.isArray(alerts?.stuckReservations)
+    ? alerts.stuckReservations
+    : [];
+  const inventoryAnomalies = Array.isArray(alerts?.inventoryAnomalies)
+    ? alerts.inventoryAnomalies
+    : [];
+  const branchAlerts = Array.isArray(alerts?.branchAlerts)
+    ? alerts.branchAlerts
+    : [];
 
   const hasAlerts =
     lowStockItems.length > 0 ||
@@ -886,7 +1027,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
               </h2>
 
               <p className="mt-2 max-w-3xl text-sm leading-6" style={styles.muted}>
-                Prioriza alertas, prepara reposiciones entre sedes y consulta quién solicitó o aprobó cada traslado.
+                Prioriza alertas, prepara reposiciones y anticipa riesgos con cobertura, reservas y anomalías reales.
               </p>
             </div>
 
@@ -930,7 +1071,7 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                 </div>
               )}
 
-              <nav className="grid gap-3 md:grid-cols-3" aria-label="Vistas del centro de control">
+              <nav className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Vistas del centro de control">
                 <ControlTab
                   active={activeTab === 'priorities'}
                   icon={<ShieldAlert size={19} />}
@@ -951,6 +1092,18 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                   label="Trazabilidad"
                   count={recentTransfers.length}
                   onClick={() => setActiveTab('traceability')}
+                />
+                <ControlTab
+                  active={activeTab === 'intelligence'}
+                  icon={<PackageSearch size={19} />}
+                  label="Inteligencia"
+                  count={
+                    Number(summary.coverageCritical || 0) +
+                    Number(summary.coverageWarning || 0) +
+                    Number(summary.stuckReservations || 0) +
+                    Number(summary.anomalies || 0)
+                  }
+                  onClick={() => setActiveTab('intelligence')}
                 />
               </nav>
 
@@ -1131,6 +1284,117 @@ export default function InventoryAlertsPanel({ open, onClose, onPrepareTransfer 
                         />
                       ))}
                     </AlertSection>
+                  )}
+                </>
+              )}
+
+              {!loading && activeTab === 'intelligence' && (
+                <>
+                  <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <SummaryCard
+                      title="Cobertura crítica"
+                      value={summary.coverageCritical}
+                      description="Menos de 7 días al ritmo de venta."
+                      icon={<Activity size={21} />}
+                      variant={Number(summary.coverageCritical || 0) > 0 ? 'critical' : 'success'}
+                    />
+                    <SummaryCard
+                      title="Cobertura corta"
+                      value={summary.coverageWarning}
+                      description="Entre 7 y 14 días estimados."
+                      icon={<AlertTriangle size={21} />}
+                      variant={Number(summary.coverageWarning || 0) > 0 ? 'warning' : 'success'}
+                    />
+                    <SummaryCard
+                      title="Reservas atascadas"
+                      value={summary.stuckReservations}
+                      description="Pendientes por más tiempo del esperado."
+                      icon={<Clock size={21} />}
+                      variant={Number(summary.stuckReservations || 0) > 0 ? 'warning' : 'success'}
+                    />
+                    <SummaryCard
+                      title="Anomalías"
+                      value={summary.anomalies}
+                      description="Inconsistencias que requieren revisión."
+                      icon={<ShieldAlert size={21} />}
+                      variant={Number(summary.anomalies || 0) > 0 ? 'critical' : 'success'}
+                    />
+                  </section>
+
+                  <AlertSection
+                    title="Cobertura estimada"
+                    description="Proyección transparente basada en ventas aplicadas de los últimos 30 días."
+                    icon={<Activity size={19} />}
+                    count={coverageEstimates.length}
+                  >
+                    {coverageEstimates.length === 0 ? (
+                      <EmptyState
+                        icon={<PackageCheck size={22} />}
+                        title="Aún no hay consumo suficiente"
+                        description="La cobertura aparecerá cuando existan salidas por venta recientes para estos productos."
+                      />
+                    ) : (
+                      coverageEstimates.map((item) => (
+                        <CoverageCard key={item.id} item={item} />
+                      ))
+                    )}
+                  </AlertSection>
+
+                  {branchAlerts.length > 0 && (
+                    <AlertSection
+                      title="Alertas por sede"
+                      description="Concentra los riesgos para decidir dónde actuar primero."
+                      icon={<MapPin size={19} />}
+                      count={branchAlerts.length}
+                    >
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {branchAlerts.map((item) => (
+                          <BranchAlertCard key={item.id} item={item} />
+                        ))}
+                      </div>
+                    </AlertSection>
+                  )}
+
+                  {stuckReservations.length > 0 && (
+                    <AlertSection
+                      title="Reservas atascadas"
+                      description="Reservas pendientes por 30 minutos o que ya superaron su vencimiento."
+                      icon={<Clock size={19} />}
+                      count={stuckReservations.length}
+                    >
+                      {stuckReservations.map((item) => (
+                        <StuckReservationCard key={item.id} item={item} />
+                      ))}
+                    </AlertSection>
+                  )}
+
+                  {inventoryAnomalies.length > 0 && (
+                    <AlertSection
+                      title="Anomalías operativas"
+                      description="Validaciones automáticas de existencias y movimientos aplicados."
+                      icon={<ShieldAlert size={19} />}
+                      count={inventoryAnomalies.length}
+                    >
+                      {inventoryAnomalies.map((item) => (
+                        <AnomalyCard key={item.id} item={item} />
+                      ))}
+                    </AlertSection>
+                  )}
+
+                  {stuckReservations.length === 0 && inventoryAnomalies.length === 0 && (
+                    <section className="p-5" style={styles.successBox}>
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 size={19} className="mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-black" style={styles.cardTitle}>
+                            Operación consistente
+                          </p>
+                          <p className="mt-1 text-sm leading-6" style={styles.cardMuted}>
+                            No se detectaron reservas atascadas ni anomalías de integridad.
+                          </p>
+                        </div>
+                      </div>
+                    </section>
                   )}
                 </>
               )}

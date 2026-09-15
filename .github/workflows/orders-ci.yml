@@ -8,6 +8,7 @@ on:
       - feature/inventario-nivel-plus-etapa-1
       - feature/inventario-nivel-plus-etapa-2
       - feature/inventario-nivel-plus-etapa-3
+      - feature/inventario-nivel-plus-etapa-4
   pull_request:
     branches:
       - main
@@ -82,6 +83,7 @@ jobs:
           npm --prefix backend run test:inventory-level-plus-stage1
           npm --prefix backend run test:inventory-level-plus-stage2
           npm --prefix backend run test:inventory-level-plus-stage3
+          npm --prefix backend run test:inventory-level-plus-stage4
           npm --prefix backend run test:order-module-boundaries
           npm --prefix backend run test:backend-commonjs-acyclicity
           npm --prefix backend run test:order-activity-scalability

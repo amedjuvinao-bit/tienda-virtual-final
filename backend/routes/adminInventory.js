@@ -23,7 +23,11 @@ const {
   buildScopedInventoryStockFilter,
 } = require('../services/adminInventoryAccessService');
 const {
+  buildBranchAlertSummaries,
+  buildCoverageEstimates,
+  buildInventoryAnomalies,
   buildStaleStockItems,
+  buildStuckReservationItems,
   buildTransferRecommendations,
 } = require('../services/inventoryOperationalIntelligence');
 
@@ -1046,10 +1050,14 @@ function parseAlertsLimit(query = {}) {
 function escapeCsvValue(value) {
   if (value === null || value === undefined) return '';
 
-  const stringValue = String(value)
+  let stringValue = String(value)
     .replace(/\r?\n|\r/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  if (/^[=+\-@]/.test(stringValue)) {
+    stringValue = `'${stringValue}`;
+  }
 
   if (
     stringValue.includes(',') ||
@@ -1301,7 +1309,19 @@ router.get('/export', requirePermission('inventory:export'), async (req, res) =>
       .populate('product', 'title sku image price stock reorderPoint stockMin')
       .lean({ virtuals: true });
 
-    const exportRows = getInventoryExportRows(rows);
+    const stockStatus = cleanLower(req.query.stockStatus || 'all');
+    const filteredRows = rows.filter((row) => {
+      const available = getAvailableStockForAlert(row);
+
+      if (stockStatus === 'withstock') return available > 0;
+      if (stockStatus === 'withoutstock') return available <= 0;
+      if (stockStatus === 'lowstock') {
+        return available > 0 && available <= getLowStockLimitForAlert(row);
+      }
+
+      return true;
+    });
+    const exportRows = getInventoryExportRows(filteredRows);
     const csv = buildInventoryCsv(exportRows);
     const fileName = getExportFileName('inventario_por_sedes');
 
@@ -1463,10 +1483,20 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
       deletedAt: null,
       type: 'transfer',
     });
+    const intelligenceThreshold = new Date(now.getTime() - 30 * 86400000);
+    const scopedIntelligenceMovements = buildScopedInventoryMovementFilter(req, {
+      deletedAt: null,
+      status: 'posted',
+      type: { $in: ['sale_out', 'transfer'] },
+      createdAt: { $gte: intelligenceThreshold },
+    });
 
     if (!scopedStock.ok) return sendAccessError(res, scopedStock);
     if (!scopedReservations.ok) return sendAccessError(res, scopedReservations);
     if (!scopedMovements.ok) return sendAccessError(res, scopedMovements);
+    if (!scopedIntelligenceMovements.ok) {
+      return sendAccessError(res, scopedIntelligenceMovements);
+    }
 
     const stockRows = await InventoryStock.find(scopedStock.filter)
       .populate('product', 'title sku image price stock reorderPoint stockMin')
@@ -1497,7 +1527,12 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
       }
     });
 
-    const [expiredReservationsRaw, pendingReservationsRaw, recentTransfersRaw] = await Promise.all([
+    const [
+      expiredReservationsRaw,
+      pendingReservationsRaw,
+      recentTransfersRaw,
+      intelligenceMovementsRaw,
+    ] = await Promise.all([
       InventoryReservation.find({
         ...scopedReservations.filter,
         status: 'pending',
@@ -1540,6 +1575,14 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
         .populate('requestedBy', 'username displayName firstName lastName role')
         .populate('reviewedBy', 'username displayName firstName lastName role')
         .lean({ virtuals: true }),
+
+      InventoryMovement.find(scopedIntelligenceMovements.filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(10000)
+        .populate('product', 'title sku image price stock')
+        .populate('branchFrom', 'name code type status active')
+        .populate('branchTo', 'name code type status active')
+        .lean({ virtuals: true }),
     ]);
 
     const expiredReservations = expiredReservationsRaw.map((reservation) =>
@@ -1555,6 +1598,26 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
     const staleStockItems = buildStaleStockItems(stockRows, {
       now,
       limit,
+    });
+    const coverageEstimates = buildCoverageEstimates(
+      stockRows,
+      intelligenceMovementsRaw,
+      { now, limit }
+    );
+    const stuckReservations = buildStuckReservationItems(
+      [...expiredReservationsRaw, ...pendingReservationsRaw],
+      { now, limit }
+    );
+    const inventoryAnomalies = buildInventoryAnomalies(
+      stockRows,
+      [...recentTransfersRaw, ...intelligenceMovementsRaw],
+      { limit }
+    );
+    const branchAlerts = buildBranchAlertSummaries({
+      stockAlerts: [...outOfStockItems, ...lowStockItems],
+      stuckReservations,
+      coverageEstimates,
+      anomalies: inventoryAnomalies,
     });
     const recentTransfers = recentTransfersRaw.map(mapTransferActivityItem);
     const pendingTransfers = recentTransfersRaw.filter(
@@ -1608,6 +1671,15 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
           pendingReservations: pendingReservations.length,
           transferRecommendations: transferRecommendations.length,
           staleStock: staleStockItems.length,
+          coverageCritical: coverageEstimates.filter(
+            (item) => item.severity === 'critical'
+          ).length,
+          coverageWarning: coverageEstimates.filter(
+            (item) => item.severity === 'warning'
+          ).length,
+          stuckReservations: stuckReservations.length,
+          anomalies: inventoryAnomalies.length,
+          branchesWithAlerts: branchAlerts.length,
           pendingTransfers,
           appliedTransfers,
           rejectedTransfers,
@@ -1623,6 +1695,10 @@ router.get('/alerts', requirePermission('inventory:view'), async (req, res) => {
         transferRecommendations,
         staleStockItems,
         recentTransfers,
+        coverageEstimates,
+        stuckReservations,
+        inventoryAnomalies,
+        branchAlerts,
       },
     });
   } catch (error) {
