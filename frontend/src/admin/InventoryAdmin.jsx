@@ -7,11 +7,13 @@ import {
   ArrowRightLeft,
   BookOpen,
   Boxes,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
   Gauge,
   Layers3,
+  MoreHorizontal,
   PackageSearch,
   Plus,
   RefreshCw,
@@ -40,6 +42,27 @@ const STOCK_FILTERS = [
   { value: 'withStock', label: 'Con stock' },
   { value: 'withoutStock', label: 'Sin stock' },
   { value: 'lowStock', label: 'Bajo stock' },
+];
+
+const MOVEMENT_TYPE_LABELS = {
+  initial_stock: 'Stock inicial',
+  purchase_in: 'Entrada por compra',
+  sale_out: 'Salida por venta',
+  return_in: 'Entrada por devolución',
+  return_out: 'Salida por devolución',
+  adjustment_in: 'Ajuste positivo',
+  adjustment_out: 'Ajuste negativo',
+  transfer: 'Traslado',
+  damage_out: 'Salida por daño',
+  loss_out: 'Salida por pérdida',
+  correction: 'Corrección',
+};
+
+const INVENTORY_VIEWS = [
+  { id: 'summary', label: 'Resumen', icon: Gauge },
+  { id: 'stock', label: 'Existencias', icon: Boxes },
+  { id: 'movements', label: 'Movimientos', icon: Activity },
+  { id: 'alerts', label: 'Alertas', icon: AlertCircle },
 ];
 
 const styles = {
@@ -372,7 +395,47 @@ function getExportFilename(headers = {}) {
   return match?.[1] || `inventario_por_sedes_${Date.now()}.csv`;
 }
 
+function formatDate(value) {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function getMovementProductTitle(movement) {
+  return movement?.product?.title || movement?.productSnapshot?.title || 'Producto sin nombre';
+}
+
+function getMovementBranchName(movement) {
+  const from = movement?.branchFrom?.name || movement?.branchFromSnapshot?.name;
+  const to = movement?.branchTo?.name || movement?.branchToSnapshot?.name;
+  if (movement?.direction === 'transfer') return `${from || 'Origen'} → ${to || 'Destino'}`;
+  return movement?.direction === 'out' ? from || 'Sede origen' : to || from || 'Sede destino';
+}
+
+function getMovementTypeLabel(type) {
+  return MOVEMENT_TYPE_LABELS[type] || type || 'Movimiento';
+}
+
+function getMovementStatusLabel(status) {
+  if (status === 'posted') return 'Aplicado';
+  if (status === 'draft') return 'Pendiente';
+  if (status === 'cancelled') return 'Cancelado';
+  if (status === 'reversed') return 'Reversado';
+  return status || 'Sin estado';
+}
+
+function getMovementQuantity(movement) {
+  const quantity = formatNumber(movement?.quantity);
+  if (movement?.direction === 'out') return `-${quantity}`;
+  if (movement?.direction === 'in') return `+${quantity}`;
+  return quantity;
+}
+
 export default function InventoryAdmin() {
+  const [activeView, setActiveView] = useState('summary');
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [openRowMenuId, setOpenRowMenuId] = useState('');
   const [stockRows, setStockRows] = useState([]);
   const [movements, setMovements] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -386,6 +449,7 @@ export default function InventoryAdmin() {
   const [initialTransferStockRow, setInitialTransferStockRow] = useState(null);
   const [initialTransferSuggestion, setInitialTransferSuggestion] = useState(null);
   const [movementsModalRow, setMovementsModalRow] = useState(null);
+  const [movementsModalOpen, setMovementsModalOpen] = useState(false);
   const [kardexModalRow, setKardexModalRow] = useState(null);
   const [alertsPanelOpen, setAlertsPanelOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -482,6 +546,21 @@ export default function InventoryAdmin() {
     };
   }, [stockRows, movements]);
 
+  const priorityRows = useMemo(
+    () => stockRows
+      .filter((row) => getAvailableStock(row) <= getLowStockLimit(row))
+      .sort((a, b) => getAvailableStock(a) - getAvailableStock(b))
+      .slice(0, 5),
+    [stockRows]
+  );
+
+  const recentMovements = useMemo(
+    () => [...movements]
+      .sort((a, b) => new Date(b?.postedAt || b?.createdAt || 0) - new Date(a?.postedAt || a?.createdAt || 0))
+      .slice(0, 8),
+    [movements]
+  );
+
   const hasActiveFilters = searchTerm.trim() !== '' || branchFilter !== 'all' || stockFilter !== 'all';
 
   const totalPages = Math.max(1, Math.ceil(filteredStockRows.length / ROWS_PER_PAGE));
@@ -576,303 +655,276 @@ export default function InventoryAdmin() {
     setInitialTransferSuggestion(null);
   };
 
+  const showStockView = (filter = 'all') => {
+    setStockFilter(filter);
+    setActiveView('stock');
+  };
+
+  const openMovements = (row = null) => {
+    setMovementsModalRow(row);
+    setMovementsModalOpen(true);
+    setOpenRowMenuId('');
+  };
+
+  const closeMovements = () => {
+    setMovementsModalOpen(false);
+    setMovementsModalRow(null);
+  };
+
   return (
     <section className="inventory-plus" style={styles.pageText}>
-      <header className="inventory-plus__hero">
-        <Boxes className="inventory-plus__watermark" strokeWidth={0.8} />
-        <div className="inventory-plus__hero-content">
-          <div className="inventory-plus__identity">
-            <span className="inventory-plus__identity-icon"><Boxes size={23} /></span>
-            <div className="min-w-0">
-              <div className="inventory-plus__title-line">
-                <h1 style={styles.title}>Inventario</h1>
-                <span className="inventory-plus__status">
-                  <span className="inventory-plus__status-dot" />
-                  {loading ? 'Actualizando' : 'Datos al día'}
-                </span>
+      <header className="inventory-shell">
+        <Boxes className="inventory-shell__watermark" strokeWidth={0.75} />
+        <div className="inventory-shell__top">
+          <div className="inventory-shell__identity">
+            <span className="inventory-shell__logo"><Boxes size={23} /></span>
+            <div>
+              <div className="inventory-shell__title-line">
+                <h1>Inventario</h1>
+                <span className="inventory-shell__live"><i /> {loading ? 'Actualizando' : 'Datos al día'}</span>
               </div>
-              <p style={styles.muted}>Existencias, riesgos y movimientos de todas tus sedes.</p>
+              <p>Controla lo disponible, detecta riesgos y registra cada cambio.</p>
             </div>
           </div>
 
-          <div className="inventory-plus__main-actions" aria-label="Acciones principales de inventario">
-            <button
-              type="button"
-              onClick={() => setAdjustmentModalOpen(true)}
-              className="inventory-plus__action-main"
-              style={styles.primaryButton}
-            >
-              <Plus size={18} /> Nuevo movimiento
+          <div className="inventory-shell__actions">
+            <button type="button" onClick={() => setAdjustmentModalOpen(true)} className="inventory-button inventory-button--primary">
+              <Plus size={17} /> Nuevo movimiento
             </button>
-            <button type="button" onClick={openGeneralTransferModal} className="inventory-plus__action-soft" style={styles.softButton}>
-              <ArrowRightLeft size={17} /> Trasladar
-            </button>
-            <button type="button" onClick={() => setAlertsPanelOpen(true)} className="inventory-plus__action-soft" style={styles.softButton}>
-              <Gauge size={17} /> Centro de control
-            </button>
-            <button
-              type="button"
-              onClick={loadInventory}
-              disabled={loading}
-              className="inventory-plus__refresh disabled:cursor-not-allowed disabled:opacity-60"
-              style={styles.softButton}
-              title="Actualizar inventario"
-              aria-label="Actualizar inventario"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
+            <div className="inventory-actions-menu">
+              <button type="button" onClick={() => setActionsMenuOpen((open) => !open)} className="inventory-button inventory-button--soft" aria-expanded={actionsMenuOpen}>
+                Acciones <ChevronDown size={16} />
+              </button>
+              {actionsMenuOpen && (
+                <div className="inventory-actions-menu__panel">
+                  <button type="button" onClick={() => { setActionsMenuOpen(false); openGeneralTransferModal(); }}><ArrowRightLeft size={16} /> Trasladar entre sedes</button>
+                  <button type="button" onClick={() => { setActionsMenuOpen(false); setAlertsPanelOpen(true); }}><Gauge size={16} /> Abrir centro de control</button>
+                  <button type="button" onClick={() => { setActionsMenuOpen(false); loadInventory(); }}><RefreshCw size={16} /> Actualizar información</button>
+                  <button type="button" onClick={() => { setActionsMenuOpen(false); exportInventory(); }} disabled={exporting}><Download size={16} /> {exporting ? 'Preparando archivo...' : 'Exportar inventario'}</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="inventory-plus__secondary-actions">
-          <div className="inventory-plus__sync-copy">
-            <ShieldCheck size={15} />
-            <strong>{formatNumber(stockRows.length)} registros</strong>
-            <span>verificados por sede y variante</span>
-          </div>
-          <div className="inventory-plus__utility-row">
+        <div className="inventory-shell__navigation">
+          <nav className="inventory-view-tabs" aria-label="Secciones de inventario">
+            {INVENTORY_VIEWS.map(({ id, label, icon: Icon }) => {
+              const count = id === 'stock' ? stockRows.length : id === 'movements' ? movements.length : id === 'alerts' ? summary.lowStock + summary.outOfStock : null;
+              return (
+                <button key={id} type="button" onClick={() => setActiveView(id)} className={activeView === id ? 'is-active' : ''}>
+                  <Icon size={16} /> <span>{label}</span>
+                  {count !== null && <strong>{formatNumber(count)}</strong>}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="inventory-shell__service-actions">
             <InventoryReservationsPanel />
             <InventoryApprovalsPanel onChanged={loadInventory} />
           </div>
         </div>
-
-        {error && (
-          <div className="inventory-plus__error flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
       </header>
 
-      <section className="inventory-plus__overview" aria-label="Estado general del inventario">
-        <SummaryMetric icon={<PackageSearch size={19} />} label="Disponible" value={summary.totalAvailable} hint="listo para vender" tone="primary" />
-        <SummaryMetric icon={<Boxes size={19} />} label="Stock físico" value={summary.totalStock} hint="en todas las sedes" />
-        <SummaryMetric icon={<ShieldCheck size={19} />} label="Reservado" value={summary.totalReserved} hint="apartado por pedidos" />
-        <SummaryMetric icon={<AlertCircle size={19} />} label="Bajo stock" value={summary.lowStock} hint="requiere atención" tone={summary.lowStock > 0 ? 'warning' : 'success'} />
-        <SummaryMetric icon={<PackageSearch size={19} />} label="Agotados" value={summary.outOfStock} hint="sin unidades" tone={summary.outOfStock > 0 ? 'danger' : 'success'} />
-        <SummaryMetric icon={<Activity size={19} />} label="Movimientos" value={summary.totalMovements} hint="en el historial" />
-      </section>
+      {error && (
+        <div className="inventory-inline-error" style={styles.errorBox}>
+          <AlertCircle size={18} /> <p>{error}</p>
+        </div>
+      )}
 
-      <section className="inventory-stock-workspace">
-        <div className="inventory-stock-workspace__header">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="inventory-stock-workspace__icon"><Layers3 size={21} /></span>
-            <div className="min-w-0">
-              <h2 className="text-lg font-black" style={styles.title}>Existencias</h2>
-              <p className="text-xs" style={styles.muted}>
-                {formatNumber(filteredStockRows.length)} resultados · página {formatNumber(currentPage)} de {formatNumber(totalPages)}
-              </p>
+      {activeView === 'summary' && (
+        <section className="inventory-view inventory-dashboard-view">
+          <div className="inventory-dashboard__lead">
+            <div className="inventory-dashboard__lead-copy">
+              <span className="inventory-dashboard__kicker"><ShieldCheck size={16} /> Estado general</span>
+              <p className="inventory-dashboard__big-number">{formatNumber(summary.totalAvailable)}</p>
+              <h2>unidades listas para vender</h2>
+              <p>Es el stock realmente disponible después de descontar las reservas.</p>
+              <button type="button" onClick={() => showStockView('withStock')}>Consultar existencias <ChevronRight size={16} /></button>
+            </div>
+            <PackageSearch className="inventory-dashboard__mark" strokeWidth={0.7} />
+          </div>
+
+          <div className="inventory-dashboard__priorities">
+            <div className="inventory-view__heading">
+              <div>
+                <span className="inventory-view__eyebrow">Decisiones rápidas</span>
+                <h2>¿Qué necesita atención?</h2>
+              </div>
+              <button type="button" onClick={() => setActiveView('alerts')} className="inventory-text-button">Ver alertas <ChevronRight size={16} /></button>
+            </div>
+            <button type="button" className="inventory-priority-line inventory-priority-line--warning" onClick={() => showStockView('lowStock')}>
+              <span><AlertCircle size={18} /></span><div><strong>{formatNumber(summary.lowStock)} con bajo stock</strong><small>Conviene reponerlos pronto</small></div><ChevronRight size={17} />
+            </button>
+            <button type="button" className="inventory-priority-line inventory-priority-line--danger" onClick={() => showStockView('withoutStock')}>
+              <span><PackageSearch size={18} /></span><div><strong>{formatNumber(summary.outOfStock)} agotados</strong><small>No están disponibles para vender</small></div><ChevronRight size={17} />
+            </button>
+            <div className="inventory-priority-line inventory-priority-line--neutral">
+              <span><ShieldCheck size={18} /></span><div><strong>{formatNumber(summary.totalReserved)} unidades reservadas</strong><small>Separadas para pedidos en proceso</small></div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={exportInventory}
-            disabled={loading || exporting || filteredStockRows.length === 0}
-            className="inventory-export-button inline-flex items-center justify-center gap-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
-            style={styles.softButton}
-          >
-            <Download size={16} />
-            {exporting ? 'Preparando archivo...' : 'Exportar CSV'}
-          </button>
-        </div>
+          <div className="inventory-dashboard__facts">
+            <DashboardFact label="Stock físico" value={summary.totalStock} help="Unidades registradas" />
+            <DashboardFact label="Productos con stock" value={summary.productsWithStock} help="Referencias disponibles" />
+            <DashboardFact label="Sedes activas" value={branchOptions.length} help="Ubicaciones visibles" />
+            <DashboardFact label="Movimientos" value={summary.totalMovements} help="Registros históricos" />
+          </div>
 
-        <div className="inventory-filter-bar">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_190px_auto] lg:items-end">
+          <div className="inventory-dashboard__guide">
+            <span className="inventory-dashboard__guide-icon"><Gauge size={19} /></span>
+            <div><strong>Empieza por las alertas</strong><p>Revisa los productos críticos y decide si debes ajustar existencias o mover unidades desde otra sede.</p></div>
+            <button type="button" onClick={() => setAlertsPanelOpen(true)}>Abrir control operativo</button>
+          </div>
+        </section>
+      )}
+
+      {activeView === 'stock' && (
+        <section className="inventory-view inventory-stock-view">
+          <div className="inventory-view__heading inventory-view__heading--padded">
             <div>
-              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Buscar producto o variante</label>
-              <div className="relative mt-2">
-                <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={styles.muted} />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Nombre, SKU, talla, color..."
-                  className="w-full py-3 pl-11 pr-4 text-sm transition"
-                  style={styles.input}
-                />
-              </div>
+              <span className="inventory-view__eyebrow">Inventario por sede</span>
+              <h2>Existencias</h2>
+              <p>{formatNumber(filteredStockRows.length)} resultados · página {currentPage} de {totalPages}</p>
             </div>
-
-            <div>
-              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Ubicación</label>
-              <select
-                value={branchFilter}
-                onChange={(event) => setBranchFilter(event.target.value)}
-                className="mt-2 w-full px-4 py-3 text-sm font-semibold transition"
-                style={styles.input}
-              >
-                <option value="all">Todas las sedes</option>
-                {branchOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-black uppercase tracking-wide" style={styles.muted}>Disponibilidad</label>
-              <select
-                value={stockFilter}
-                onChange={(event) => setStockFilter(event.target.value)}
-                className="mt-2 w-full px-4 py-3 text-sm font-semibold transition"
-                style={styles.input}
-              >
-                {STOCK_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>{filter.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={clearFilters}
-              disabled={!hasActiveFilters}
-              className="inline-flex items-center justify-center px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
-              style={styles.softButton}
-            >
-              Limpiar
+            <button type="button" onClick={exportInventory} disabled={exporting || filteredStockRows.length === 0} className="inventory-button inventory-button--soft">
+              <Download size={16} /> {exporting ? 'Preparando archivo...' : 'Exportar CSV'}
             </button>
           </div>
-        </div>
 
-        <div className="inventory-row-list">
-          {loading && (
-            <div className="px-4 py-12 text-center text-sm font-semibold" style={styles.muted}>
-              Cargando inventario completo...
+          <div className="inventory-filter-bar">
+            <div className="inventory-search-field">
+              <Search size={17} />
+              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por producto, SKU, talla o color" style={styles.input} />
             </div>
-          )}
+            <select value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)} style={styles.input} aria-label="Filtrar por sede">
+              <option value="all">Todas las sedes</option>
+              {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+            <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)} style={styles.input} aria-label="Filtrar por disponibilidad">
+              {STOCK_FILTERS.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}
+            </select>
+            <button type="button" onClick={clearFilters} disabled={!hasActiveFilters} className="inventory-filter-clear">Limpiar</button>
+          </div>
 
-          {!loading && filteredStockRows.length === 0 && (
-            <div className="px-4 py-12 text-center text-sm font-semibold" style={styles.muted}>
-              No hay registros de inventario para mostrar.
+          <div className="inventory-table" role="table" aria-label="Existencias de inventario">
+            <div className="inventory-table__header" role="row">
+              <span>Producto</span><span>Ubicación</span><span>Variante</span><span>Físico</span><span>Reservado</span><span>Disponible</span><span />
             </div>
-          )}
-
-          {!loading && visibleStockRows.map((row) => {
-            const stockStatus = getStockStatus(row);
-            const available = getAvailableStock(row);
-            const reserved = getReservedStock(row);
-            const canTransfer = available > 0;
-
-            return (
-              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="inventory-row-card" style={styles.inventoryCard}>
-                <div className="inventory-row-card__product">
-                  <div className="inventory-row-card__icon" style={styles.productIconBox}><Boxes size={20} /></div>
-                  <div className="min-w-0">
-                    <div className="inventory-row-card__name-line">
-                      <p className="inventory-row-card__name" style={styles.title}>{getProductTitle(row)}</p>
-                      <span className="inventory-row-card__status" style={stockStatus.style}>{stockStatus.label}</span>
-                    </div>
-                    <p className="inventory-row-card__sku" style={styles.muted}>SKU {getProductSku(row)}</p>
+            {loading && <div className="inventory-empty-state">Cargando inventario completo...</div>}
+            {!loading && filteredStockRows.length === 0 && <div className="inventory-empty-state">No encontramos existencias con estos filtros.</div>}
+            {!loading && visibleStockRows.map((row) => {
+              const rowId = String(row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`);
+              const status = getStockStatus(row);
+              const available = getAvailableStock(row);
+              return (
+                <div key={rowId} className="inventory-table__row" role="row">
+                  <div className="inventory-table__product" role="cell">
+                    <span className="inventory-table__product-icon"><Boxes size={18} /></span>
+                    <div><strong>{getProductTitle(row)}</strong><small>SKU {getProductSku(row)}</small></div>
+                    <em style={status.style}>{status.label}</em>
+                  </div>
+                  <div className="inventory-table__detail" role="cell"><Warehouse size={15} /><span><small>Ubicación</small>{getBranchName(row)}</span></div>
+                  <div className="inventory-table__detail" role="cell"><Ruler size={15} /><span><small>Variante</small>{getVariantLabel(row)}</span></div>
+                  <InventoryAmount mobileLabel="Físico" value={row?.stock} />
+                  <InventoryAmount mobileLabel="Reservado" value={getReservedStock(row)} />
+                  <InventoryAmount mobileLabel="Disponible" value={available} tone="success" />
+                  <div className="inventory-row-menu" role="cell">
+                    <button type="button" onClick={() => setOpenRowMenuId((id) => id === rowId ? '' : rowId)} aria-label={`Gestionar ${getProductTitle(row)}`}><MoreHorizontal size={19} /></button>
+                    {openRowMenuId === rowId && (
+                      <div className="inventory-row-menu__panel">
+                        <button type="button" onClick={() => { setOpenRowMenuId(''); openTransferFromCard(row); }} disabled={available <= 0}><ArrowRightLeft size={15} /> Trasladar</button>
+                        <button type="button" onClick={() => openMovements(row)}><Activity size={15} /> Movimientos</button>
+                        <button type="button" onClick={() => { setOpenRowMenuId(''); setKardexModalRow(row); }}><BookOpen size={15} /> Kardex</button>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <div className="inventory-row-card__details">
-                  <RowFact icon={<Warehouse size={15} />} label="Ubicación" value={getBranchName(row)} />
-                  <RowFact icon={<Ruler size={15} />} label="Variante" value={getVariantLabel(row)} />
-                </div>
-
-                <div className="inventory-stock-strip">
-                  <StockValueBox label="Físico" value={row?.stock} style={styles.stockBox} />
-                  <StockValueBox label="Reservado" value={reserved} style={styles.reservedBox} />
-                  <StockValueBox label="Disponible" value={available} style={styles.availableBox} />
-                </div>
-
-                <div className="inventory-row-card__actions">
-                    <button
-                      type="button"
-                      onClick={() => openTransferFromCard(row)}
-                      disabled={!canTransfer}
-                      className="inventory-row-action inventory-row-action--soft disabled:cursor-not-allowed disabled:opacity-60"
-                      style={styles.softButton}
-                      title="Trasladar entre sedes"
-                    >
-                      <ArrowRightLeft size={15} />
-                      Trasladar
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setMovementsModalRow(row)}
-                      className="inventory-row-action inventory-row-action--soft"
-                      style={styles.softButton}
-                    >
-                      <Activity size={15} />
-                      Movimientos
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setKardexModalRow(row)}
-                      className="inventory-row-action inventory-row-action--primary"
-                      style={styles.primaryButton}
-                    >
-                      <BookOpen size={15} />
-                      Kardex
-                    </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {!loading && filteredStockRows.length > 0 && (
-          <div className="inventory-pagination">
-            <p className="text-sm font-semibold" style={styles.muted}>
-              Mostrando {formatNumber((currentPage - 1) * ROWS_PER_PAGE + 1)}–{formatNumber(Math.min(currentPage * ROWS_PER_PAGE, filteredStockRows.length))} de {formatNumber(filteredStockRows.length)}
-            </p>
-            <div className="inventory-pagination__controls">
-              <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} title="Página anterior">
-                <ChevronLeft size={17} />
-              </button>
-              <span className="px-2 text-sm font-black" style={styles.title}>{currentPage} / {totalPages}</span>
-              <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} title="Página siguiente">
-                <ChevronRight size={17} />
-              </button>
-            </div>
+              );
+            })}
           </div>
-        )}
-      </section>
+
+          {!loading && filteredStockRows.length > 0 && (
+            <div className="inventory-pagination">
+              <p>Mostrando {formatNumber((currentPage - 1) * ROWS_PER_PAGE + 1)}–{formatNumber(Math.min(currentPage * ROWS_PER_PAGE, filteredStockRows.length))} de {formatNumber(filteredStockRows.length)}</p>
+              <div className="inventory-pagination__controls">
+                <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}><ChevronLeft size={17} /></button>
+                <strong>{currentPage} / {totalPages}</strong>
+                <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}><ChevronRight size={17} /></button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeView === 'movements' && (
+        <section className="inventory-view inventory-movements-view">
+          <div className="inventory-view__heading inventory-view__heading--padded">
+            <div><span className="inventory-view__eyebrow">Trazabilidad</span><h2>Movimientos recientes</h2><p>Entradas, salidas, ajustes y traslados registrados.</p></div>
+            <button type="button" onClick={loadInventory} disabled={loading} className="inventory-button inventory-button--soft"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualizar</button>
+          </div>
+          <div className="inventory-movement-list">
+            {recentMovements.length === 0 && <div className="inventory-empty-state">Todavía no hay movimientos para mostrar.</div>}
+            {recentMovements.map((movement) => (
+              <div key={movement?._id || movement?.movementNumber} className="inventory-movement-row">
+                <span className={`inventory-movement-row__direction inventory-movement-row__direction--${movement?.direction || 'neutral'}`}><ArrowRightLeft size={16} /></span>
+                <div className="inventory-movement-row__main"><strong>{getMovementProductTitle(movement)}</strong><small>{movement?.movementNumber || 'Sin número'} · {getMovementBranchName(movement)}</small></div>
+                <span className="inventory-movement-row__type">{getMovementTypeLabel(movement?.type)}</span>
+                <strong className={`inventory-movement-row__quantity inventory-movement-row__quantity--${movement?.direction || 'neutral'}`}>{getMovementQuantity(movement)}</strong>
+                <span className="inventory-movement-row__status">{getMovementStatusLabel(movement?.status)}</span>
+                <time>{formatDate(movement?.postedAt || movement?.createdAt)}</time>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeView === 'alerts' && (
+        <section className="inventory-view inventory-alerts-view">
+          <div className="inventory-view__heading inventory-view__heading--padded">
+            <div><span className="inventory-view__eyebrow">Prioridad operativa</span><h2>Alertas de inventario</h2><p>Empieza por los productos con menos disponibilidad.</p></div>
+            <button type="button" onClick={() => setAlertsPanelOpen(true)} className="inventory-button inventory-button--primary"><Gauge size={16} /> Centro de control</button>
+          </div>
+          <div className="inventory-alert-summary">
+            <AlertMetric label="Bajo stock" value={summary.lowStock} tone="warning" help="Cerca del punto mínimo" />
+            <AlertMetric label="Agotados" value={summary.outOfStock} tone="danger" help="Sin unidades disponibles" />
+            <AlertMetric label="Reservado" value={summary.totalReserved} tone="neutral" help="Apartado por pedidos" />
+          </div>
+          <div className="inventory-alert-list">
+            {priorityRows.length === 0 && <div className="inventory-empty-state inventory-empty-state--success"><ShieldCheck size={22} /> No hay productos críticos en este momento.</div>}
+            {priorityRows.map((row) => {
+              const available = getAvailableStock(row);
+              return (
+                <button key={row?._id || `${getProductId(row)}-${getBranchId(row)}`} type="button" className="inventory-alert-row" onClick={() => { setSearchTerm(getProductSku(row)); showStockView('all'); }}>
+                  <span className={available <= 0 ? 'is-danger' : 'is-warning'}><AlertCircle size={18} /></span>
+                  <div><strong>{getProductTitle(row)}</strong><small>{getBranchName(row)} · {getVariantLabel(row)}</small></div>
+                  <p><small>Disponible</small><strong>{formatNumber(available)}</strong></p>
+                  <p><small>Punto mínimo</small><strong>{formatNumber(getLowStockLimit(row))}</strong></p>
+                  <ChevronRight size={18} />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <InventoryAdjustmentModal open={adjustmentModalOpen} onClose={() => setAdjustmentModalOpen(false)} stockRows={stockRows} onSaved={loadInventory} />
       <InventoryTransferModal open={transferModalOpen} onClose={closeTransferModal} stockRows={stockRows} initialStockRow={initialTransferStockRow} initialSuggestion={initialTransferSuggestion} onSaved={loadInventory} />
-      <InventoryMovementsModal open={Boolean(movementsModalRow)} onClose={() => setMovementsModalRow(null)} stockRow={movementsModalRow} onChanged={loadInventory} />
+      <InventoryMovementsModal open={movementsModalOpen} onClose={closeMovements} stockRow={movementsModalRow} onChanged={loadInventory} />
       <InventoryKardexModal open={Boolean(kardexModalRow)} onClose={() => setKardexModalRow(null)} stockRow={kardexModalRow} />
       <InventoryAlertsPanel open={alertsPanelOpen} onClose={() => setAlertsPanelOpen(false)} onPrepareTransfer={openSuggestedTransfer} />
     </section>
   );
 }
 
-function SummaryMetric({ icon, label, value, hint, tone = 'neutral' }) {
-  return (
-    <article className={`inventory-summary-metric inventory-summary-metric--${tone}`}>
-      <span className="inventory-summary-metric__icon">{icon}</span>
-      <div>
-        <p className="inventory-summary-metric__label">{label}</p>
-        <p className="inventory-summary-metric__value">{formatNumber(value)}</p>
-        <p className="inventory-summary-metric__hint">{hint}</p>
-      </div>
-    </article>
-  );
+function DashboardFact({ label, value, help }) {
+  return <div className="inventory-dashboard-fact"><span>{label}</span><strong>{formatNumber(value)}</strong><small>{help}</small></div>;
 }
 
-function RowFact({ icon, label, value }) {
-  return (
-    <div className="inventory-row-fact">
-      <span className="inventory-row-fact__icon">{icon}</span>
-      <div className="min-w-0">
-        <p className="inventory-row-fact__label">{label}</p>
-        <p className="inventory-row-fact__value">{value}</p>
-      </div>
-    </div>
-  );
+function InventoryAmount({ mobileLabel, value, tone = 'neutral' }) {
+  return <div className={`inventory-table__amount inventory-table__amount--${tone}`} role="cell"><small>{mobileLabel}</small><strong>{formatNumber(value)}</strong></div>;
 }
 
-function StockValueBox({ label, value, style }) {
-  return (
-    <div className="inventory-stock-value" style={style}>
-      <p>{label}</p>
-      <strong>{formatNumber(value)}</strong>
-    </div>
-  );
+function AlertMetric({ label, value, tone, help }) {
+  return <div className={`inventory-alert-metric inventory-alert-metric--${tone}`}><span>{label}</span><strong>{formatNumber(value)}</strong><small>{help}</small></div>;
 }
