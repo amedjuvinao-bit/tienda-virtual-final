@@ -10,6 +10,10 @@ const {
   buildPublicSiteSettings,
   stripProtectedWriteFields,
 } = require("../lib/siteSettingsSecurity");
+const {
+  getUnsupportedSiteSettingsKeys,
+  resolveSiteSettingsWritePermissions,
+} = require("../security/siteSettingsWritePermissions");
 
 /**
  * 🔎 Ping de diagnóstico
@@ -241,6 +245,13 @@ function flattenForSet(obj, prefix = "", out = {}) {
   return out;
 }
 
+function isInvalidSettingsSection(value) {
+  return (
+    value !== undefined &&
+    (!value || typeof value !== "object" || Array.isArray(value))
+  );
+}
+
 /**
  * ✅ autocorrige documentos viejos para que tengan theme.sections
  */
@@ -391,16 +402,7 @@ async function loadSettingsDocument() {
 }
 
 function requireSensitiveSettingsPermissions(req, res, next) {
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const requiredPermissions = [];
-
-  if (body.billing && typeof body.billing === "object") {
-    requiredPermissions.push("billing:settings");
-  }
-
-  if (body?.theme?.global?.payments) {
-    requiredPermissions.push("settings:payments");
-  }
+  const requiredPermissions = resolveSiteSettingsWritePermissions(req.body);
 
   if (!requiredPermissions.length) return next();
 
@@ -438,29 +440,47 @@ router.get("/", async (_req, res, next) => {
 router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
     const { theme, menus, admin, loginAdmin, billing, store } = req.body || {};
+    const unsupportedKeys = getUnsupportedSiteSettingsKeys(req.body);
 
-    if (theme && typeof theme !== "object") {
+    if (unsupportedKeys.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "UNSUPPORTED_SETTINGS_FIELDS",
+        message: "La solicitud contiene secciones de configuración no admitidas.",
+        fields: unsupportedKeys,
+      });
+    }
+
+    if (!resolveSiteSettingsWritePermissions(req.body).length) {
+      return res.status(400).json({
+        ok: false,
+        error: "EMPTY_SETTINGS_UPDATE",
+        message: "Debes enviar al menos una sección de configuración válida.",
+      });
+    }
+
+    if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }
-    if (menus && typeof menus !== "object") {
+    if (isInvalidSettingsSection(menus)) {
       return res.status(400).json({ error: "menus debe ser un objeto" });
     }
-    if (admin && typeof admin !== "object") {
+    if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
     }
-    if (loginAdmin && typeof loginAdmin !== "object") {
+    if (isInvalidSettingsSection(loginAdmin)) {
       return res.status(400).json({ error: "loginAdmin debe ser un objeto" });
     }
-    if (billing && typeof billing !== "object") {
+    if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });
     }
-    if (store && typeof store !== "object") {
+    if (isInvalidSettingsSection(store)) {
       return res.status(400).json({ error: "store debe ser un objeto" });
     }
 
     const updatedBy =
-      (req.user && (req.user.email || req.user.name || req.user.id)) ||
-      req.body?.updatedBy ||
+      req.adminUsername ||
+      req.adminUserId ||
       "admin";
 
     const id = await ensureSingletonId();

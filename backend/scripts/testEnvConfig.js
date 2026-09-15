@@ -35,6 +35,12 @@ try {
     ok('FRONTEND_URL configurado');
   }
 
+  if (!summary.backendUrlConfigured) {
+    warn('BACKEND_URL no esta configurado. En produccion debe ser la URL HTTPS permanente del backend.');
+  } else {
+    ok('BACKEND_URL configurado');
+  }
+
   if (!summary.jwtConfigured) {
     warn('JWT_SECRET no esta configurado. Revisa autenticacion si el proyecto lo requiere en produccion.');
   } else {
@@ -51,6 +57,13 @@ try {
     warn('INTEGRATIONS_ENCRYPTION_KEY no esta configurado. El panel de envios no podra guardar tokens o secretos hasta definir una llave de al menos 32 caracteres.');
   } else {
     ok(`Cifrado de integraciones configurado desde ${summary.integrationsEncryptionKeySource}`);
+  }
+
+
+  if (!summary.mailEncryptionConfigured) {
+    warn('MAIL_ENCRYPTION_KEY no esta configurado. No se podran guardar credenciales SMTP de forma segura.');
+  } else {
+    ok('Cifrado de credenciales de correo configurado');
   }
 
   if (!summary.cloudinary.backendConfigured) {

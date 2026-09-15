@@ -22,6 +22,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const { buildCorsOptions } = require('./config/corsOptions');
 const {
   applyMongooseIndexPolicy,
 } = require('./config/mongooseIndexPolicy');
@@ -63,7 +64,7 @@ function requireCritical(relPath) {
   return mod;
 }
 
-app.use(cors());
+app.use(cors(buildCorsOptions(env)));
 const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
 if (shippingWebhookRoutes) {
   app.use(
@@ -147,6 +148,7 @@ const adminDashboardRoutes = tryRequire('./routes/adminDashboard');
 const adminDashboardSalesRoutes = tryRequire('./routes/adminDashboardSales');
 const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
+const adminAuditLogsRoutes = tryRequire('./routes/adminAuditLogs');
 const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
@@ -192,6 +194,7 @@ if (adminDashboardRoutes) app.use('/api/admin/dashboard', adminDashboardRoutes);
 if (adminDashboardSalesRoutes) app.use('/api/admin/dashboard-sales', adminDashboardSalesRoutes);
 if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboardGoalRoutes);
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
+if (adminAuditLogsRoutes) app.use('/api/admin/audit-logs', adminAuditLogsRoutes);
 if (adminShippingSettingsRoutes) {
   app.use('/api/admin/shipping-settings', adminShippingSettingsRoutes);
 }

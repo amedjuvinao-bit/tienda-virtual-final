@@ -10,6 +10,9 @@ const {
   canonicalPermission,
   isKnownPermission,
 } = require('./adminPermissionCatalog');
+const {
+  resolveSiteSettingsWritePermissions,
+} = require('./siteSettingsWritePermissions');
 
 const ADMIN_ROUTE_PERMISSION_RULES = [
   /* =========================================================
@@ -1281,17 +1284,8 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
       'Ruta global de configuración. El middleware avanzado validará permisos específicos según el payload.',
     audit: true,
     dynamic: true,
+    resolvePermissions: (req) => resolveSiteSettingsWritePermissions(req?.body),
   },
-  {
-    method: 'PATCH',
-    path: '/api/site-settings',
-    permission: 'settings:view',
-    description:
-      'Ruta global de configuración parcial. El middleware avanzado validará permisos específicos según el payload.',
-    audit: true,
-    dynamic: true,
-  },
-
   /* =========================================================
    * CORREO ADMINISTRATIVO
    * ======================================================= */

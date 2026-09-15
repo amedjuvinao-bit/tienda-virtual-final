@@ -14,6 +14,7 @@ const {
 const {
   canonicalPermission,
   getPermissionMeta,
+  isKnownPermission,
 } = require('../security/adminPermissionCatalog');
 
 const SENSITIVE_BODY_KEYS = [
@@ -272,6 +273,22 @@ function rejectUnknownPermission(req, res, rule) {
   });
 }
 
+function resolveRulePermissions(rule, req) {
+  if (!rule?.dynamic || typeof rule.resolvePermissions !== 'function') {
+    return rule.requiredPermissions || [rule.permission];
+  }
+
+  const dynamicPermissions = rule.resolvePermissions(req);
+
+  if (!Array.isArray(dynamicPermissions) || !dynamicPermissions.length) {
+    return rule.requiredPermissions || [rule.permission];
+  }
+
+  return Array.from(
+    new Set(dynamicPermissions.map(canonicalPermission).filter(Boolean))
+  );
+}
+
 function adminAccessGate(req, res, next) {
   if (req.method === 'OPTIONS') {
     return next();
@@ -287,18 +304,26 @@ function adminAccessGate(req, res, next) {
     return next();
   }
 
-  if (!rule.knownPermission) {
-    return rejectUnknownPermission(req, res, rule);
+  const requiredPermissions = resolveRulePermissions(rule, req);
+  const resolvedRule = {
+    ...rule,
+    permission: requiredPermissions[0] || rule.permission,
+    requiredPermissions,
+    knownPermission:
+      rule.knownPermission && requiredPermissions.every(isKnownPermission),
+  };
+
+  if (!resolvedRule.knownPermission) {
+    return rejectUnknownPermission(req, res, resolvedRule);
   }
 
-  attachAuditLogger(req, res, rule);
+  attachAuditLogger(req, res, resolvedRule);
 
   return requireAdmin(req, res, () => {
-    return requirePermission(
-      rule.requiredPermissions || [rule.permission]
-    )(req, res, next);
+    return requirePermission(requiredPermissions)(req, res, next);
   });
 }
 
 module.exports = adminAccessGate;
 module.exports.sanitizeValue = sanitizeValue;
+module.exports.resolveRulePermissions = resolveRulePermissions;

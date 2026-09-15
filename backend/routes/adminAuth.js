@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
+const requireAdmin = require('../middleware/requireAdmin');
+const requirePermission = require('../middleware/requirePermission');
 const { sendMail } = require('../lib/mail/mailer');
 const {
   isLegacyAdminAuthEnabled,
@@ -1238,26 +1240,8 @@ router.get('/verify', async (req, res) => {
   });
 });
 
-router.get('/logs', async (req, res) => {
+router.get('/logs', requireAdmin, requirePermission('logs:view'), async (req, res) => {
   try {
-    const authResult = await verifyAdminToken(req);
-
-    if (!authResult.ok) {
-      return res.status(authResult.status || 401).json({
-        ok: false,
-        message: authResult.message,
-      });
-    }
-
-    const adminRole = authResult.user?.adminRole || authResult.user?.actualRole || 'admin';
-
-    if (!['owner', 'admin'].includes(adminRole)) {
-      return res.status(403).json({
-        ok: false,
-        message: 'No tienes permisos para consultar logs administrativos.',
-      });
-    }
-
     const logs = await AdminLoginAudit.find()
       .sort({ createdAt: -1 })
       .limit(100)

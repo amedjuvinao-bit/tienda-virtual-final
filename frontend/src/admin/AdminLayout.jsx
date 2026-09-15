@@ -25,7 +25,6 @@ import {
   Search,
   Store,
   Building2,
-  ReceiptText,
   CreditCard,
   Truck,
   Mail,
@@ -49,7 +48,6 @@ const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
 
 const CONFIG_SUBLINKS = [
   { to: '/admin/configuracion/empresa', label: 'Tienda', icon: Store },
-  { to: '/admin/configuracion/facturacion', label: 'Facturación', icon: ReceiptText },
   { to: '/admin/configuracion/pagos', label: 'Pagos', icon: CreditCard },
   { to: '/admin/configuracion/envios', label: 'Envíos', icon: Truck },
   { to: '/admin/configuracion/correo', label: 'Correo', icon: Mail },

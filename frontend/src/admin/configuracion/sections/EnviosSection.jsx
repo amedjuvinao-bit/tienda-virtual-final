@@ -420,11 +420,8 @@ export default function EnviosSection() {
       };
 
       const updated = {
-        ...data,
         theme: {
-          ...data.theme,
           global: {
-            ...data.theme?.global,
             envios: payloadEnvios,
           },
         },

@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Store,
-  Receipt,
   CreditCard,
   Truck,
   Mail,
@@ -18,7 +17,6 @@ import {
 
 // 🔹 IMPORTS MODULARES
 import EmpresaSection from './configuracion/sections/EmpresaSection';
-import FacturacionSection from './configuracion/sections/FacturacionSection';
 import PagosSection from './configuracion/sections/PagosSection';
 import EnviosSection from './configuracion/sections/EnviosSection';
 import CorreoSection from './configuracion/sections/CorreoSection';
@@ -42,12 +40,6 @@ const TABS = [
     label: 'Sedes',
     icon: Building2,
     description: 'Gestión de sedes, bodegas, puntos de venta y puntos de recogida.',
-  },
-  {
-    id: 'facturacion',
-    label: 'Facturación',
-    icon: Receipt,
-    description: 'Información legal y tributaria para documentos y cobros.',
   },
   {
     id: 'pagos',
@@ -95,7 +87,7 @@ const TABS = [
     id: 'logs',
     label: 'Logs',
     icon: FileSearch,
-    description: 'Registro de accesos e intentos de ingreso al panel administrativo.',
+    description: 'Registro de accesos y operaciones protegidas del panel administrativo.',
   },
 ];
 
@@ -118,8 +110,6 @@ export default function ConfiguracionPage() {
         return <EmpresaSection />;
       case 'sedes':
         return <SedesSection />;
-      case 'facturacion':
-        return <FacturacionSection />;
       case 'pagos':
         return <PagosSection />;
       case 'envios':

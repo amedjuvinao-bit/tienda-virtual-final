@@ -89,7 +89,7 @@ describe('EnviosSection', () => {
     expect(screen.getByText('Si una ciudad no está en la lista')).toBeInTheDocument();
   });
 
-  it('guarda las tarifas sin borrar las demás opciones globales', async () => {
+  it('guarda únicamente su sección para no sobrescribir otras opciones globales', async () => {
     const user = userEvent.setup();
     render(<EnviosSection />);
 
@@ -97,8 +97,11 @@ describe('EnviosSection', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar tarifas' }));
 
     await waitFor(() => expect(saveSiteSettings).toHaveBeenCalledTimes(1));
-    expect(saveSiteSettings.mock.calls[0][0].theme.global.siteName).toBe('Rosa Boutique');
-    expect(saveSiteSettings.mock.calls[0][0].theme.global.envios).toMatchObject({
+    const payload = saveSiteSettings.mock.calls[0][0];
+    expect(Object.keys(payload)).toEqual(['theme']);
+    expect(Object.keys(payload.theme)).toEqual(['global']);
+    expect(Object.keys(payload.theme.global)).toEqual(['envios']);
+    expect(payload.theme.global.envios).toMatchObject({
       active: true,
       mode: 'fixed',
       fixedPrice: 12000,

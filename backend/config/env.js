@@ -47,6 +47,28 @@ function isValidMongoUri(value) {
   return /^mongodb(\+srv)?:\/\//i.test(clean(value));
 }
 
+function isValidAbsoluteUrl(value) {
+  try {
+    const url = new URL(clean(value));
+    return ['http:', 'https:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isSecureProductionUrl(value) {
+  if (!isValidAbsoluteUrl(value)) return false;
+  const url = new URL(clean(value));
+  const hostname = url.hostname.toLowerCase();
+  const temporaryOrLocalHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname.endsWith('.trycloudflare.com');
+
+  return url.protocol === 'https:' && !temporaryOrLocalHost;
+}
+
 function maskValue(value = '') {
   const text = clean(value);
   if (!text) return '';
@@ -67,7 +89,6 @@ const cloudinaryUploadPreset = firstEnv(['CLOUDINARY_UPLOAD_PRESET', 'VITE_CLOUD
 const enviaMode = clean(process.env.ENVIA_MODE).toLowerCase();
 const integrationsEncryption = firstEnv([
   'INTEGRATIONS_ENCRYPTION_KEY',
-  'BILLING_ENCRYPTION_KEY',
 ]);
 
 const env = {
@@ -85,6 +106,7 @@ const env = {
   cartAccessSecret: clean(process.env.CART_ACCESS_SECRET),
   orderPaymentAccessSecret: clean(process.env.ORDER_PAYMENT_ACCESS_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
+  mailEncryptionKey: clean(process.env.MAIL_ENCRYPTION_KEY),
   integrationsEncryptionKey: integrationsEncryption.value,
   integrationsEncryptionKeySource: integrationsEncryption.value
     ? integrationsEncryption.name
@@ -127,6 +149,7 @@ const env = {
   shipping: {
     defaultProvider: clean(process.env.SHIPPING_PROVIDER).toLowerCase() || 'manual',
     envia: {
+      requestedMode: enviaMode,
       mode: enviaMode === 'production'
         ? 'production'
         : 'sandbox',
@@ -141,70 +164,112 @@ const env = {
   },
 };
 
-function assertEnv() {
+function assertEnv(config = env) {
   const errors = [];
 
-  if (!env.mongoUri) {
+  if (!config.mongoUri) {
     errors.push('Falta MONGO_URI en backend/.env. También se aceptan MONGODB_URI, MONGO_URL o DATABASE_URL como alias de compatibilidad.');
-  } else if (!isValidMongoUri(env.mongoUri)) {
-    errors.push(`La variable ${env.mongoUriSource} no parece una cadena MongoDB válida. Debe iniciar por mongodb:// o mongodb+srv://.`);
+  } else if (!isValidMongoUri(config.mongoUri)) {
+    errors.push(`La variable ${config.mongoUriSource} no parece una cadena MongoDB válida. Debe iniciar por mongodb:// o mongodb+srv://.`);
   }
 
-  if (env.billingEncryptionKey && env.billingEncryptionKey.length < 32) {
+  if (config.billingEncryptionKey && config.billingEncryptionKey.length < 32) {
     errors.push('BILLING_ENCRYPTION_KEY debe tener al menos 32 caracteres. No uses contraseñas cortas para cifrar credenciales fiscales.');
   }
 
   if (
-    env.integrationsEncryptionKey &&
-    env.integrationsEncryptionKey.length < 32
+    config.integrationsEncryptionKey &&
+    config.integrationsEncryptionKey.length < 32
   ) {
     errors.push('INTEGRATIONS_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
   }
 
-  if (env.cartAccessSecret && env.cartAccessSecret.length < 32) {
+  if (config.mailEncryptionKey && config.mailEncryptionKey.length < 32) {
+    errors.push('MAIL_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
+  }
+
+  if (config.jwtSecret && config.jwtSecret.length < 32) {
+    errors.push('JWT_SECRET debe tener al menos 32 caracteres.');
+  }
+
+  if (config.cartAccessSecret && config.cartAccessSecret.length < 32) {
     errors.push('CART_ACCESS_SECRET debe tener al menos 32 caracteres.');
   }
 
   if (
-    env.orderPaymentAccessSecret &&
-    env.orderPaymentAccessSecret.length < 32
+    config.orderPaymentAccessSecret &&
+    config.orderPaymentAccessSecret.length < 32
   ) {
     errors.push('ORDER_PAYMENT_ACCESS_SECRET debe tener al menos 32 caracteres.');
   }
 
-  if (
-    env.nodeEnv === 'production' &&
-    !env.cartAccessSecret
+  if (config.nodeEnv === 'production' && !config.jwtSecret) {
+    errors.push('Producción requiere JWT_SECRET con al menos 32 caracteres.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.frontendUrl) {
+    errors.push('Producción requiere FRONTEND_URL con la URL HTTPS permanente del frontend.');
+  } else if (
+    config.nodeEnv === 'production' &&
+    !isSecureProductionUrl(config.frontendUrl)
   ) {
+    errors.push('FRONTEND_URL debe ser una URL HTTPS válida en producción.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.backendUrl) {
+    errors.push('Producción requiere BACKEND_URL con la URL HTTPS permanente del backend.');
+  } else if (
+    config.nodeEnv === 'production' &&
+    !isSecureProductionUrl(config.backendUrl)
+  ) {
+    errors.push('BACKEND_URL debe ser una URL HTTPS válida en producción.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.billingEncryptionKey) {
+    errors.push('Producción requiere BILLING_ENCRYPTION_KEY con al menos 32 caracteres.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.integrationsEncryptionKey) {
+    errors.push('Producción requiere INTEGRATIONS_ENCRYPTION_KEY con al menos 32 caracteres.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.mailEncryptionKey) {
+    errors.push('Producción requiere MAIL_ENCRYPTION_KEY con al menos 32 caracteres.');
+  }
+
+  if (config.nodeEnv === 'production' && !config.cartAccessSecret) {
     errors.push('Producción requiere CART_ACCESS_SECRET independiente con al menos 32 caracteres.');
   }
 
   if (
-    env.nodeEnv === 'production' &&
-    !env.orderPaymentAccessSecret
+    config.nodeEnv === 'production' &&
+    !config.orderPaymentAccessSecret
   ) {
     errors.push('Producción requiere ORDER_PAYMENT_ACCESS_SECRET independiente con al menos 32 caracteres.');
   }
 
-  if (!['manual', 'envia'].includes(env.shipping.defaultProvider)) {
+  if (!['manual', 'envia'].includes(config.shipping.defaultProvider)) {
     errors.push('SHIPPING_PROVIDER debe ser manual o envia.');
   }
 
-  if (enviaMode && !['sandbox', 'production'].includes(enviaMode)) {
+  if (
+    config.shipping.envia.requestedMode &&
+    !['sandbox', 'production'].includes(config.shipping.envia.requestedMode)
+  ) {
     errors.push('ENVIA_MODE debe ser sandbox o production.');
   }
 
   if (
-    env.shipping.defaultProvider === 'envia' &&
-    !env.shipping.envia.token
+    config.shipping.defaultProvider === 'envia' &&
+    !config.shipping.envia.token
   ) {
     errors.push('SHIPPING_PROVIDER=envia requiere ENVIA_TOKEN. Usa manual durante el desarrollo sin cuenta externa.');
   }
 
   if (
-    env.nodeEnv === 'production' &&
-    env.shipping.defaultProvider === 'envia' &&
-    env.shipping.envia.mode !== 'production'
+    config.nodeEnv === 'production' &&
+    config.shipping.defaultProvider === 'envia' &&
+    config.shipping.envia.mode !== 'production'
   ) {
     errors.push('Producción no puede usar SHIPPING_PROVIDER=envia con ENVIA_MODE=sandbox.');
   }
@@ -244,6 +309,9 @@ function getSafeEnvSummary() {
     billingEncryptionConfigured: Boolean(
       env.billingEncryptionKey && env.billingEncryptionKey.length >= 32
     ),
+    mailEncryptionConfigured: Boolean(
+      env.mailEncryptionKey && env.mailEncryptionKey.length >= 32
+    ),
     integrationsEncryptionConfigured: Boolean(
       env.integrationsEncryptionKey &&
       env.integrationsEncryptionKey.length >= 32
@@ -281,4 +349,6 @@ module.exports = {
   assertEnv,
   getSafeEnvSummary,
   EnvConfigError,
+  isSecureProductionUrl,
+  isValidAbsoluteUrl,
 };
