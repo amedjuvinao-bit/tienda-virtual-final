@@ -1,0 +1,128 @@
+import React from 'react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import EmpresaSection from './EmpresaSection';
+import { fetchStoreSettings, saveStoreSettings } from '../api/storeSettingsApi';
+
+vi.mock('../api/storeSettingsApi', () => ({
+  fetchStoreSettings: vi.fn(),
+  saveStoreSettings: vi.fn(),
+}));
+
+const INITIAL_STORE = {
+  name: 'Rosa Boutique',
+  businessName: 'Rosa Boutique S.A.S.',
+  email: 'contacto@rosa.example',
+  phone: '+573001234567',
+  whatsapp: '+573017654321',
+  supportEmail: 'soporte@rosa.example',
+  website: 'https://rosa.example',
+  address: 'Calle 20 # 4-15',
+  city: 'Santa Marta',
+  department: 'Magdalena',
+  country: 'CO',
+  timezone: 'America/Bogota',
+  locale: 'es-CO',
+  customerServiceHours: 'Lunes a sábado, 8:00 a. m. a 6:00 p. m.',
+};
+
+function settings(overrides = {}) {
+  return {
+    ok: true,
+    store: { ...INITIAL_STORE, ...overrides },
+    revision: 7,
+    updatedAt: '2026-09-15T12:00:00.000Z',
+    updatedBy: 'owner',
+  };
+}
+
+describe('EmpresaSection', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchStoreSettings.mockResolvedValue(settings());
+    saveStoreSettings.mockResolvedValue({
+      ...settings({ name: 'Rosa Boutique Premium' }),
+      revision: 8,
+    });
+  });
+
+  it('organiza Tienda en tres secciones compactas sin mezclar datos fiscales', async () => {
+    const user = userEvent.setup();
+    render(<EmpresaSection />);
+
+    expect(await screen.findByText('Identidad de la tienda')).toBeInTheDocument();
+    expect(screen.queryByText('Canales de contacto')).not.toBeInTheDocument();
+    expect(screen.getByText(/datos fiscales continúan exclusivamente en Facturación/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Contacto/i }));
+    expect(screen.getByText('Canales de contacto')).toBeInTheDocument();
+    expect(screen.queryByText('Identidad de la tienda')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Operación/i }));
+    expect(screen.getByText('Operación principal')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Zona horaria/i)).toHaveValue('America/Bogota');
+  });
+
+  it('guarda sólo el contrato de Tienda con la revisión vigente', async () => {
+    const user = userEvent.setup();
+    render(<EmpresaSection />);
+
+    const name = await screen.findByLabelText(/Nombre comercial/i);
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+
+    await user.clear(name);
+    await user.type(name, 'Rosa Boutique Premium');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(saveStoreSettings).toHaveBeenCalledTimes(1));
+    expect(saveStoreSettings).toHaveBeenCalledWith({
+      store: { ...INITIAL_STORE, name: 'Rosa Boutique Premium' },
+      revision: 7,
+    });
+    expect(await screen.findByText(/quedaron guardados y sincronizados/i)).toBeInTheDocument();
+    expect(screen.getByText('Versión 8')).toBeInTheDocument();
+  });
+
+  it('bloquea datos inválidos y lleva al administrador al campo pendiente', async () => {
+    const user = userEvent.setup();
+    render(<EmpresaSection />);
+
+    await screen.findByText('Identidad de la tienda');
+    await user.click(screen.getByRole('button', { name: /Contacto/i }));
+    const phone = screen.getByLabelText(/Teléfono principal/i);
+    await user.clear(phone);
+    await user.type(phone, 'teléfono inválido');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(saveStoreSettings).not.toHaveBeenCalled();
+    expect(screen.getByText('Escribe un teléfono principal válido.')).toBeInTheDocument();
+    expect(phone).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/Hay datos pendientes/i)).toBeInTheDocument();
+  });
+
+  it('informa conflictos y permite recargar la versión más reciente', async () => {
+    const user = userEvent.setup();
+    saveStoreSettings.mockRejectedValue({
+      response: {
+        data: {
+          error: 'STORE_SETTINGS_CONFLICT',
+          message: 'Otra persona actualizó los datos de la tienda.',
+        },
+      },
+    });
+    render(<EmpresaSection />);
+
+    const name = await screen.findByLabelText(/Nombre comercial/i);
+    await user.clear(name);
+    await user.type(name, 'Cambio local');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(await screen.findByText(/Otra persona actualizó/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Recargar versión actual' }));
+    await waitFor(() => expect(fetchStoreSettings).toHaveBeenCalledTimes(2));
+  });
+});

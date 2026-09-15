@@ -119,7 +119,16 @@ const StoreSchema = new Schema(
     businessName: { type: String, default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
+    whatsapp: { type: String, default: "" },
+    supportEmail: { type: String, default: "" },
+    website: { type: String, default: "" },
     address: { type: String, default: "" },
+    city: { type: String, default: "" },
+    department: { type: String, default: "" },
+    country: { type: String, default: "CO" },
+    timezone: { type: String, default: "America/Bogota" },
+    locale: { type: String, default: "es-CO" },
+    customerServiceHours: { type: String, default: "" },
   },
   { _id: false, strict: false }
 );
@@ -495,6 +504,7 @@ const SiteSettingsSchema = new Schema(
       type: StoreSchema,
       default: () => ({}),
     },
+    storeRevision: { type: Number, min: 0, default: 0 },
 
     theme: ThemeSchema,
 

@@ -31,7 +31,16 @@ function buildDefaultSettings() {
       businessName: "",
       email: "",
       phone: "",
+      whatsapp: "",
+      supportEmail: "",
+      website: "",
       address: "",
+      city: "",
+      department: "",
+      country: "CO",
+      timezone: "America/Bogota",
+      locale: "es-CO",
+      customerServiceHours: "",
     },
 
     theme: {
@@ -434,12 +443,13 @@ router.get("/", async (_req, res, next) => {
 
 /**
  * PUT /api/site-settings
- * Guarda cambios de theme, menus, admin, loginAdmin, billing y/o store (solo admin)
- * body: { theme?, menus?, admin?, loginAdmin?, billing?, store?, updatedBy? }
+ * Guarda cambios globales de theme, menus, admin, loginAdmin y/o billing.
+ * Tienda se actualiza exclusivamente mediante /api/admin/store-settings.
+ * body: { theme?, menus?, admin?, loginAdmin?, billing? }
  */
 router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
-    const { theme, menus, admin, loginAdmin, billing, store } = req.body || {};
+    const { theme, menus, admin, loginAdmin, billing } = req.body || {};
     const unsupportedKeys = getUnsupportedSiteSettingsKeys(req.body);
 
     if (unsupportedKeys.length) {
@@ -459,6 +469,14 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       });
     }
 
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "store")) {
+      return res.status(409).json({
+        ok: false,
+        error: "STORE_DEDICATED_ENDPOINT_REQUIRED",
+        message: "Los datos de Tienda deben guardarse desde su módulo protegido.",
+      });
+    }
+
     if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }
@@ -474,10 +492,6 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });
     }
-    if (isInvalidSettingsSection(store)) {
-      return res.status(400).json({ error: "store debe ser un objeto" });
-    }
-
     const updatedBy =
       req.adminUsername ||
       req.adminUserId ||
@@ -515,11 +529,6 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (billing) {
       const flatBilling = flattenForSet(billing, "billing");
       Object.assign($set, stripProtectedWriteFields(flatBilling));
-    }
-
-    if (store) {
-      const flatStore = flattenForSet(store, "store");
-      Object.assign($set, flatStore);
     }
 
     const protectedSet = stripProtectedWriteFields($set);

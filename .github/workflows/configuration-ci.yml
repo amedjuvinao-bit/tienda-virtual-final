@@ -45,8 +45,10 @@ jobs:
           node .github/scripts/audit-production-dependencies.cjs backend
           node .github/scripts/audit-production-dependencies.cjs frontend
 
-      - name: Validar permisos, Logs, entorno y CORS
-        run: npm --prefix backend run test:configuration-level-plus-stage0
+      - name: Validar permisos, Logs, entorno, CORS y Tienda
+        run: |
+          npm --prefix backend run test:configuration-level-plus-stage0
+          npm --prefix backend run test:configuration-level-plus-stage1
 
       - name: Validar configuracion de pagos y envios
         run: |
@@ -58,6 +60,7 @@ jobs:
       - name: Validar interfaz de Configuracion
         run: |
           npm --prefix frontend run test:configuration-level-plus-stage0
+          npm --prefix frontend run test:configuration-level-plus-stage1
           npm --prefix frontend run test:shipping-settings-ui
 
       - name: Compilar frontend

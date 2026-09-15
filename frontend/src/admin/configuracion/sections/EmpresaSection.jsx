@@ -1,158 +1,407 @@
-// src/admin/configuracion/sections/EmpresaSection.jsx
-import React, { useEffect, useState } from 'react';
-import InfoCard from '../components/InfoCard';
-import EmptyHint from '../components/EmptyHint';
-import api from '../../../lib/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  BadgeCheck,
+  Building2,
+  CheckCircle2,
+  Clock3,
+  ContactRound,
+  Globe2,
+  Loader2,
+  MapPin,
+  RotateCcw,
+  Save,
+  Store,
+} from 'lucide-react';
 
-export default function EmpresaSection() {
-  const [store, setStore] = useState({
-    name: '',
-    businessName: '',
-    email: '',
-    phone: '',
-    address: '',
+import {
+  fetchStoreSettings,
+  saveStoreSettings,
+} from '../api/storeSettingsApi';
+import './EmpresaSection.css';
+
+const EMPTY_STORE = Object.freeze({
+  name: '',
+  businessName: '',
+  email: '',
+  phone: '',
+  whatsapp: '',
+  supportEmail: '',
+  website: '',
+  address: '',
+  city: '',
+  department: '',
+  country: 'CO',
+  timezone: 'America/Bogota',
+  locale: 'es-CO',
+  customerServiceHours: '',
+});
+
+const STEPS = [
+  {
+    id: 'identity',
+    label: 'Identidad',
+    description: 'Cómo se reconoce tu tienda',
+    icon: Building2,
+    fields: ['name', 'businessName', 'website'],
+  },
+  {
+    id: 'contact',
+    label: 'Contacto',
+    description: 'Canales para tus clientes',
+    icon: ContactRound,
+    fields: ['email', 'phone', 'whatsapp', 'supportEmail'],
+  },
+  {
+    id: 'operation',
+    label: 'Operación',
+    description: 'Ubicación y horario',
+    icon: MapPin,
+    fields: [
+      'address',
+      'city',
+      'department',
+      'country',
+      'timezone',
+      'locale',
+      'customerServiceHours',
+    ],
+  },
+];
+
+const REQUIRED_FIELDS = [
+  'name',
+  'email',
+  'phone',
+  'address',
+  'city',
+  'department',
+];
+
+function normalizeStore(raw = {}) {
+  return Object.fromEntries(
+    Object.entries(EMPTY_STORE).map(([key, fallback]) => [
+      key,
+      raw?.[key] ?? fallback,
+    ])
+  );
+}
+
+function validateStore(store) {
+  const errors = {};
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phonePattern = /^\+?[\d\s().-]{7,24}$/;
+
+  if (String(store.name || '').trim().length < 2) {
+    errors.name = 'Escribe el nombre comercial de la tienda.';
+  }
+  if (!emailPattern.test(String(store.email || '').trim())) {
+    errors.email = 'Escribe un correo principal válido.';
+  }
+  if (!phonePattern.test(String(store.phone || '').trim())) {
+    errors.phone = 'Escribe un teléfono principal válido.';
+  }
+  if (store.whatsapp && !phonePattern.test(String(store.whatsapp).trim())) {
+    errors.whatsapp = 'Escribe un número de WhatsApp válido.';
+  }
+  if (store.supportEmail && !emailPattern.test(String(store.supportEmail).trim())) {
+    errors.supportEmail = 'Escribe un correo de atención válido.';
+  }
+  if (store.website) {
+    try {
+      const url = new URL(store.website);
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('protocol');
+    } catch {
+      errors.website = 'Usa una dirección completa, por ejemplo https://mitienda.com.';
+    }
+  }
+  if (String(store.address || '').trim().length < 5) {
+    errors.address = 'Escribe la dirección principal.';
+  }
+  if (String(store.city || '').trim().length < 2) {
+    errors.city = 'Escribe la ciudad principal.';
+  }
+  if (String(store.department || '').trim().length < 2) {
+    errors.department = 'Escribe el departamento o región.';
+  }
+
+  return errors;
+}
+
+function stepForField(field) {
+  return STEPS.find((step) => step.fields.includes(field))?.id || 'identity';
+}
+
+function formatUpdatedAt(value) {
+  if (!value) return 'Sin actualizaciones registradas';
+  return `Última actualización: ${new Date(value).toLocaleString('es-CO')}`;
+}
+
+function Field({ label, required = false, help, error, children }) {
+  const controlId = React.useId();
+  const feedbackId = `${controlId}-feedback`;
+  const control = React.cloneElement(children, {
+    id: children.props.id || controlId,
+    'aria-invalid': error ? 'true' : 'false',
+    'aria-describedby': error || help ? feedbackId : undefined,
   });
 
+  return (
+    <div className="store-field">
+      <label className="store-field__label" htmlFor={children.props.id || controlId}>
+        {label}
+        {required ? <b aria-hidden="true">*</b> : null}
+      </label>
+      {control}
+      {error ? (
+        <span id={feedbackId} className="store-field__error" role="alert">{error}</span>
+      ) : help ? (
+        <span id={feedbackId} className="store-field__help">{help}</span>
+      ) : null}
+    </div>
+  );
+}
+
+export default function EmpresaSection() {
+  const [store, setStore] = useState(EMPTY_STORE);
+  const [snapshot, setSnapshot] = useState(EMPTY_STORE);
+  const [revision, setRevision] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [updatedBy, setUpdatedBy] = useState('');
+  const [activeStep, setActiveStep] = useState('identity');
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
-  // 🔹 CARGAR DESDE BACKEND
+  const dirty = useMemo(
+    () => JSON.stringify(store) !== JSON.stringify(snapshot),
+    [store, snapshot]
+  );
+  const completedRequired = REQUIRED_FIELDS.filter((field) =>
+    String(store[field] || '').trim()
+  ).length;
+  const completion = Math.round((completedRequired / REQUIRED_FIELDS.length) * 100);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      setFeedback(null);
+      setErrors({});
+      const response = await fetchStoreSettings();
+      const nextStore = normalizeStore(response?.store);
+      setStore(nextStore);
+      setSnapshot(nextStore);
+      setRevision(Number(response?.revision || 0));
+      setUpdatedAt(response?.updatedAt || null);
+      setUpdatedBy(response?.updatedBy || '');
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error?.userMessage || 'No pudimos cargar los datos de la tienda.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const { data } = await api.get('/api/site-settings');
-
-        if (data?.store) {
-          setStore({
-            name: data.store.name || '',
-            businessName: data.store.businessName || '',
-            email: data.store.email || '',
-            phone: data.store.phone || '',
-            address: data.store.address || '',
-          });
-        }
-      } catch (error) {
-        console.error('Error cargando empresa:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSettings();
+    loadSettings();
   }, []);
 
-  // 🔹 GUARDAR EN BACKEND
+  useEffect(() => {
+    const warnUnsavedChanges = (event) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnUnsavedChanges);
+    return () => window.removeEventListener('beforeunload', warnUnsavedChanges);
+  }, [dirty]);
+
+  const updateField = (field, value) => {
+    setStore((current) => ({ ...current, [field]: value }));
+    setErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    if (feedback?.type === 'success') setFeedback(null);
+  };
+
+  const handleReset = () => {
+    setStore(snapshot);
+    setErrors({});
+    setFeedback(null);
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateStore(store);
+    if (Object.keys(validationErrors).length) {
+      const firstField = Object.keys(validationErrors)[0];
+      setErrors(validationErrors);
+      setActiveStep(stepForField(firstField));
+      setFeedback({
+        type: 'error',
+        message: 'Hay datos pendientes. Revisa los campos señalados.',
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-
-      await api.put('/api/site-settings', {
-        store,
+      setFeedback(null);
+      setErrors({});
+      const response = await saveStoreSettings({ store, revision });
+      const nextStore = normalizeStore(response?.store);
+      setStore(nextStore);
+      setSnapshot(nextStore);
+      setRevision(Number(response?.revision || revision + 1));
+      setUpdatedAt(response?.updatedAt || new Date().toISOString());
+      setUpdatedBy(response?.updatedBy || updatedBy);
+      setFeedback({
+        type: 'success',
+        message: 'Los datos de la tienda quedaron guardados y sincronizados.',
       });
-
-      alert('Datos de la tienda guardados correctamente');
     } catch (error) {
-      console.error('Error guardando empresa:', error);
-      alert('Error al guardar los datos de la tienda');
+      const details = Array.isArray(error?.response?.data?.details)
+        ? error.response.data.details
+        : [];
+      const serverErrors = Object.fromEntries(
+        details
+          .filter((item) => item?.field && item?.message)
+          .map((item) => [item.field, item.message])
+      );
+      if (Object.keys(serverErrors).length) {
+        setErrors(serverErrors);
+        setActiveStep(stepForField(Object.keys(serverErrors)[0]));
+      }
+      const conflict = error?.response?.data?.error === 'STORE_SETTINGS_CONFLICT';
+      setFeedback({
+        type: conflict ? 'conflict' : 'error',
+        message:
+          error?.response?.data?.message ||
+          error?.userMessage ||
+          'No fue posible guardar los datos de la tienda.',
+      });
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="text-sm text-gray-500">Cargando...</div>;
+    return (
+      <div className="store-loading" aria-live="polite">
+        <Loader2 className="animate-spin" size={24} />
+        <span>Preparando los datos de tu tienda…</span>
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-4">
-      <InfoCard
-        title="Datos generales de la tienda"
-        description="Aquí irán los datos principales del negocio para identificar la tienda dentro del sistema."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
-              Nombre comercial
-            </span>
-            <input
-              value={store.name}
-              onChange={(e) =>
-                setStore({ ...store, name: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
-              Razón social
-            </span>
-            <input
-              value={store.businessName}
-              onChange={(e) =>
-                setStore({ ...store, businessName: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
-              Correo principal
-            </span>
-            <input
-              type="email"
-              value={store.email}
-              onChange={(e) =>
-                setStore({ ...store, email: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
-              Teléfono principal
-            </span>
-            <input
-              value={store.phone}
-              onChange={(e) =>
-                setStore({ ...store, phone: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          </label>
-
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
-              Dirección principal
-            </span>
-            <input
-              value={store.address}
-              onChange={(e) =>
-                setStore({ ...store, address: e.target.value })
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          </label>
+    <div className="store-settings">
+      <section className="store-hero">
+        <div className="store-hero__identity">
+          <div className="store-hero__icon"><Store size={26} /></div>
+          <div>
+            <span className="store-eyebrow">Centro de identidad comercial</span>
+            <h2>{store.name || 'Configura tu tienda'}</h2>
+            <p>Centraliza la información que verán tus clientes y usarán los procesos internos.</p>
+          </div>
         </div>
-
-        {/* 🔥 BOTÓN GUARDAR */}
-        <div className="pt-4">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-pink-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-600 disabled:opacity-50"
-          >
-            {saving ? 'Guardando...' : 'Guardar datos'}
-          </button>
+        <div className="store-readiness" aria-label={`${completion}% de datos esenciales completos`}>
+          <div className="store-readiness__label"><span>Datos esenciales</span><strong>{completion}%</strong></div>
+          <div className="store-readiness__track"><span style={{ width: `${completion}%` }} /></div>
+          <small>{formatUpdatedAt(updatedAt)}{updatedBy ? ` · ${updatedBy}` : ''}</small>
         </div>
-      </InfoCard>
+      </section>
 
-      <EmptyHint
-        title="Siguiente mejora"
-        text="Ahora estos datos ya se guardan en base de datos y podrán ser usados en el sistema (facturación, DIAN, PDF, etc)."
-      />
+      {feedback ? (
+        <div className={`store-feedback store-feedback--${feedback.type}`} role="status">
+          {feedback.type === 'success' ? <CheckCircle2 size={19} /> : <AlertTriangle size={19} />}
+          <span>{feedback.message}</span>
+          {feedback.type === 'conflict' ? <button type="button" onClick={loadSettings}>Recargar versión actual</button> : null}
+        </div>
+      ) : null}
+
+      <nav className="store-steps" aria-label="Secciones de datos de la tienda">
+        {STEPS.map((step) => {
+          const Icon = step.icon;
+          const hasErrors = step.fields.some((field) => errors[field]);
+          return (
+            <button key={step.id} type="button" className="store-step" data-active={activeStep === step.id} data-error={hasErrors} aria-current={activeStep === step.id ? 'step' : undefined} onClick={() => setActiveStep(step.id)}>
+              <Icon size={19} />
+              <span><strong>{step.label}</strong><small>{step.description}</small></span>
+              {hasErrors ? <b className="store-step__alert">Revisar</b> : null}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="store-workspace">
+        <section className="store-form-card">
+          {activeStep === 'identity' ? (
+            <div className="store-panel" data-testid="store-step-identity">
+              <header><BadgeCheck size={22} /><div><h3>Identidad de la tienda</h3><p>Información comercial; los datos fiscales continúan exclusivamente en Facturación.</p></div></header>
+              <div className="store-form-grid">
+                <Field label="Nombre comercial" required error={errors.name} help="El nombre que reconocerán tus clientes."><input value={store.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Ej. Rosa Boutique" /></Field>
+                <Field label="Razón social" error={errors.businessName} help="Opcional. No reemplaza la configuración fiscal."><input value={store.businessName} onChange={(event) => updateField('businessName', event.target.value)} placeholder="Nombre legal registrado" /></Field>
+                <Field label="Página web" error={errors.website} help="Usa la URL completa con https://."><input type="url" value={store.website} onChange={(event) => updateField('website', event.target.value)} placeholder="https://mitienda.com" /></Field>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStep === 'contact' ? (
+            <div className="store-panel" data-testid="store-step-contact">
+              <header><ContactRound size={22} /><div><h3>Canales de contacto</h3><p>Define cómo podrán comunicarse los clientes con la tienda.</p></div></header>
+              <div className="store-form-grid">
+                <Field label="Correo principal" required error={errors.email}><input type="email" value={store.email} onChange={(event) => updateField('email', event.target.value)} placeholder="contacto@mitienda.com" /></Field>
+                <Field label="Teléfono principal" required error={errors.phone} help="Incluye indicativo cuando corresponda."><input value={store.phone} onChange={(event) => updateField('phone', event.target.value)} placeholder="+57 300 000 0000" /></Field>
+                <Field label="WhatsApp comercial" error={errors.whatsapp} help="Opcional. Puede ser diferente al teléfono principal."><input value={store.whatsapp} onChange={(event) => updateField('whatsapp', event.target.value)} placeholder="+57 300 000 0000" /></Field>
+                <Field label="Correo de atención" error={errors.supportEmail} help="Opcional, para soporte y novedades de pedidos."><input type="email" value={store.supportEmail} onChange={(event) => updateField('supportEmail', event.target.value)} placeholder="soporte@mitienda.com" /></Field>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStep === 'operation' ? (
+            <div className="store-panel" data-testid="store-step-operation">
+              <header><Clock3 size={22} /><div><h3>Operación principal</h3><p>Ubicación, zona horaria e idioma usados por la administración.</p></div></header>
+              <div className="store-form-grid">
+                <Field label="Dirección principal" required error={errors.address}><input value={store.address} onChange={(event) => updateField('address', event.target.value)} placeholder="Calle, número y referencia" /></Field>
+                <Field label="Ciudad" required error={errors.city}><input value={store.city} onChange={(event) => updateField('city', event.target.value)} placeholder="Santa Marta" /></Field>
+                <Field label="Departamento o región" required error={errors.department}><input value={store.department} onChange={(event) => updateField('department', event.target.value)} placeholder="Magdalena" /></Field>
+                <Field label="País" required error={errors.country}><select value={store.country} onChange={(event) => updateField('country', event.target.value)}><option value="CO">Colombia</option><option value="EC">Ecuador</option><option value="MX">México</option><option value="PE">Perú</option><option value="US">Estados Unidos</option></select></Field>
+                <Field label="Zona horaria" required error={errors.timezone}><select value={store.timezone} onChange={(event) => updateField('timezone', event.target.value)}><option value="America/Bogota">Bogotá (UTC-5)</option><option value="America/Guayaquil">Guayaquil (UTC-5)</option><option value="America/Lima">Lima (UTC-5)</option><option value="America/Mexico_City">Ciudad de México</option><option value="America/New_York">Nueva York</option></select></Field>
+                <Field label="Idioma regional" required error={errors.locale}><select value={store.locale} onChange={(event) => updateField('locale', event.target.value)}><option value="es-CO">Español (Colombia)</option><option value="en-US">English (United States)</option></select></Field>
+                <Field label="Horario de atención" error={errors.customerServiceHours} help="Opcional. Escríbelo como quieres comunicarlo al cliente."><input value={store.customerServiceHours} onChange={(event) => updateField('customerServiceHours', event.target.value)} placeholder="Lunes a sábado, 8:00 a. m. – 6:00 p. m." /></Field>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <aside className="store-preview" aria-label="Resumen de la tienda">
+          <span className="store-eyebrow">Vista resumida</span>
+          <div className="store-preview__brand"><Store size={24} /><div><strong>{store.name || 'Tu tienda'}</strong><small>{store.businessName || 'Identidad comercial'}</small></div></div>
+          <dl>
+            <div><dt><MapPin size={15} /> Ubicación</dt><dd>{[store.city, store.department].filter(Boolean).join(', ') || 'Pendiente'}</dd></div>
+            <div><dt><ContactRound size={15} /> Contacto</dt><dd>{store.email || store.phone || 'Pendiente'}</dd></div>
+            <div><dt><Clock3 size={15} /> Atención</dt><dd>{store.customerServiceHours || 'Sin horario publicado'}</dd></div>
+            <div><dt><Globe2 size={15} /> Región</dt><dd>{store.locale} · {store.timezone}</dd></div>
+          </dl>
+          <p><BadgeCheck size={16} /> La información fiscal se administra separadamente en Facturación.</p>
+        </aside>
+      </div>
+
+      <footer className="store-actions">
+        <div><strong>{dirty ? 'Tienes cambios sin guardar' : 'Información sincronizada'}</strong><span>Versión {revision}</span></div>
+        <div className="store-actions__buttons">
+          <button type="button" className="store-button store-button--secondary" onClick={handleReset} disabled={!dirty || saving}><RotateCcw size={17} /> Descartar</button>
+          <button type="button" className="store-button store-button--primary" onClick={handleSave} disabled={!dirty || saving}>{saving ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}{saving ? 'Guardando…' : 'Guardar cambios'}</button>
+        </div>
+      </footer>
     </div>
   );
 }
+
+export { EMPTY_STORE, normalizeStore, validateStore };

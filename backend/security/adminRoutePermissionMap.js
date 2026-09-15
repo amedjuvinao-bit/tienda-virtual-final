@@ -1277,6 +1277,19 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     description: 'Consultar configuración administrativa sin exponer secretos.',
   },
   {
+    method: 'GET',
+    path: '/api/admin/store-settings',
+    permission: 'settings:store',
+    description: 'Consultar los datos operativos del módulo Tienda.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/store-settings',
+    permission: 'settings:store',
+    description: 'Actualizar los datos operativos del módulo Tienda.',
+    audit: true,
+  },
+  {
     method: 'PUT',
     path: '/api/site-settings',
     permission: 'settings:view',

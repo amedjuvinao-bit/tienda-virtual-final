@@ -33,7 +33,7 @@ const TABS = [
     id: 'empresa',
     label: 'Tienda',
     icon: Store,
-    description: 'Datos generales de la tienda y contacto principal.',
+    description: 'Identidad comercial, contacto y operación principal de la tienda.',
   },
   {
     id: 'sedes',
