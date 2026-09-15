@@ -13,13 +13,11 @@ import {
   Gauge,
   Layers3,
   PackageSearch,
-  Palette,
   Plus,
   RefreshCw,
   Ruler,
   Search,
   ShieldCheck,
-  Sparkles,
   Warehouse,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -307,10 +305,6 @@ function matchesStockFilter(row, stockFilter) {
   return true;
 }
 
-function isHexColor(value) {
-  return /^#([0-9A-F]{3}){1,2}$/i.test(String(value || '').trim());
-}
-
 function getRowsFromResponse(response) {
   const data = response?.data;
   if (Array.isArray(data)) return data;
@@ -583,115 +577,80 @@ export default function InventoryAdmin() {
   };
 
   return (
-    <section className="inventory-plus space-y-5" style={styles.pageText}>
+    <section className="inventory-plus" style={styles.pageText}>
       <header className="inventory-plus__hero">
         <Boxes className="inventory-plus__watermark" strokeWidth={0.8} />
         <div className="inventory-plus__hero-content">
-          <div className="min-w-0 self-center">
-            <p className="inventory-plus__eyebrow">
-              <Sparkles size={15} /> Control inteligente por sedes
-            </p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl" style={styles.title}>
-              Inventario bajo control
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6" style={styles.muted}>
-              Consulta existencias, detecta riesgos y ejecuta movimientos desde un solo espacio. Cada unidad conserva su sede, variante e historial.
-            </p>
-            <span className="inventory-plus__status">
-              <span className="inventory-plus__status-dot" />
-              {loading ? 'Sincronizando información' : `${formatNumber(stockRows.length)} registros sincronizados`}
-            </span>
+          <div className="inventory-plus__identity">
+            <span className="inventory-plus__identity-icon"><Boxes size={23} /></span>
+            <div className="min-w-0">
+              <div className="inventory-plus__title-line">
+                <h1 style={styles.title}>Inventario</h1>
+                <span className="inventory-plus__status">
+                  <span className="inventory-plus__status-dot" />
+                  {loading ? 'Actualizando' : 'Datos al día'}
+                </span>
+              </div>
+              <p style={styles.muted}>Existencias, riesgos y movimientos de todas tus sedes.</p>
+            </div>
           </div>
 
-          <div className="inventory-plus__actions">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.16em]" style={styles.muted}>
-              ¿Qué necesitas hacer?
-            </p>
-            <div className="inventory-plus__action-grid">
-              <button
-                type="button"
-                onClick={() => setAdjustmentModalOpen(true)}
-                className="inventory-plus__action-main inline-flex items-center gap-2 px-5 py-3 text-sm font-black"
-                style={styles.primaryButton}
-              >
-                <Plus size={18} />
-                Registrar movimiento
-              </button>
-              <button
-                type="button"
-                onClick={openGeneralTransferModal}
-                className="inventory-plus__action-soft inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black"
-                style={styles.softButton}
-              >
-                <ArrowRightLeft size={17} /> Mover entre sedes
-              </button>
-              <button
-                type="button"
-                onClick={() => setAlertsPanelOpen(true)}
-                className="inventory-plus__action-soft inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black"
-                style={styles.softButton}
-              >
-                <Gauge size={17} /> Centro de control
-              </button>
-            </div>
-            <div className="inventory-plus__utility-row">
-              <button
-                type="button"
-                onClick={loadInventory}
-                disabled={loading}
-                className="inventory-plus__utility-button inline-flex items-center gap-2 font-black disabled:cursor-not-allowed disabled:opacity-60"
-                style={styles.softButton}
-              >
-                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-                Actualizar
-              </button>
-              <InventoryReservationsPanel />
-              <InventoryApprovalsPanel onChanged={loadInventory} />
-            </div>
+          <div className="inventory-plus__main-actions" aria-label="Acciones principales de inventario">
+            <button
+              type="button"
+              onClick={() => setAdjustmentModalOpen(true)}
+              className="inventory-plus__action-main"
+              style={styles.primaryButton}
+            >
+              <Plus size={18} /> Nuevo movimiento
+            </button>
+            <button type="button" onClick={openGeneralTransferModal} className="inventory-plus__action-soft" style={styles.softButton}>
+              <ArrowRightLeft size={17} /> Trasladar
+            </button>
+            <button type="button" onClick={() => setAlertsPanelOpen(true)} className="inventory-plus__action-soft" style={styles.softButton}>
+              <Gauge size={17} /> Centro de control
+            </button>
+            <button
+              type="button"
+              onClick={loadInventory}
+              disabled={loading}
+              className="inventory-plus__refresh disabled:cursor-not-allowed disabled:opacity-60"
+              style={styles.softButton}
+              title="Actualizar inventario"
+              aria-label="Actualizar inventario"
+            >
+              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        <div className="inventory-plus__secondary-actions">
+          <div className="inventory-plus__sync-copy">
+            <ShieldCheck size={15} />
+            <strong>{formatNumber(stockRows.length)} registros</strong>
+            <span>verificados por sede y variante</span>
+          </div>
+          <div className="inventory-plus__utility-row">
+            <InventoryReservationsPanel />
+            <InventoryApprovalsPanel onChanged={loadInventory} />
           </div>
         </div>
 
         {error && (
-          <div className="relative z-[2] mx-5 mb-5 flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
+          <div className="inventory-plus__error flex items-start gap-3 px-4 py-3 text-sm font-semibold" style={styles.errorBox}>
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <p>{error}</p>
           </div>
         )}
       </header>
 
-      <section className="inventory-plus__overview" aria-label="Resumen del inventario">
-        <article className="inventory-overview-card inventory-overview-card--feature">
-          <PackageSearch className="inventory-overview-card__watermark" strokeWidth={0.9} />
-          <p className="inventory-overview-card__label"><ShieldCheck size={17} /> Disponible para vender</p>
-          <p className="inventory-overview-card__value">{formatNumber(summary.totalAvailable)}</p>
-          <p className="inventory-overview-card__caption">Unidades libres después de descontar reservas.</p>
-          <div className="inventory-overview-card__split">
-            <MiniMetric label="Stock físico" value={summary.totalStock} />
-            <MiniMetric label="Reservado" value={summary.totalReserved} />
-          </div>
-        </article>
-
-        <article className="inventory-overview-card">
-          <AlertCircle className="inventory-overview-card__watermark" strokeWidth={0.9} />
-          <p className="inventory-overview-card__label" style={styles.muted}><AlertCircle size={17} style={styles.eyebrow} /> Atención requerida</p>
-          <p className="inventory-overview-card__value" style={styles.title}>{formatNumber(summary.lowStock + summary.outOfStock)}</p>
-          <p className="inventory-overview-card__caption">Referencias que conviene revisar ahora.</p>
-          <div className="inventory-overview-card__split">
-            <MiniMetric label="Bajo stock" value={summary.lowStock} />
-            <MiniMetric label="Agotados" value={summary.outOfStock} />
-          </div>
-        </article>
-
-        <article className="inventory-overview-card">
-          <Activity className="inventory-overview-card__watermark" strokeWidth={0.9} />
-          <p className="inventory-overview-card__label" style={styles.muted}><Activity size={17} style={styles.eyebrow} /> Actividad operativa</p>
-          <p className="inventory-overview-card__value" style={styles.title}>{formatNumber(summary.totalMovements)}</p>
-          <p className="inventory-overview-card__caption">Movimientos registrados en el historial.</p>
-          <div className="inventory-overview-card__split">
-            <MiniMetric label="Productos con stock" value={summary.productsWithStock} />
-            <MiniMetric label="Sedes visibles" value={branchOptions.length} />
-          </div>
-        </article>
+      <section className="inventory-plus__overview" aria-label="Estado general del inventario">
+        <SummaryMetric icon={<PackageSearch size={19} />} label="Disponible" value={summary.totalAvailable} hint="listo para vender" tone="primary" />
+        <SummaryMetric icon={<Boxes size={19} />} label="Stock físico" value={summary.totalStock} hint="en todas las sedes" />
+        <SummaryMetric icon={<ShieldCheck size={19} />} label="Reservado" value={summary.totalReserved} hint="apartado por pedidos" />
+        <SummaryMetric icon={<AlertCircle size={19} />} label="Bajo stock" value={summary.lowStock} hint="requiere atención" tone={summary.lowStock > 0 ? 'warning' : 'success'} />
+        <SummaryMetric icon={<PackageSearch size={19} />} label="Agotados" value={summary.outOfStock} hint="sin unidades" tone={summary.outOfStock > 0 ? 'danger' : 'success'} />
+        <SummaryMetric icon={<Activity size={19} />} label="Movimientos" value={summary.totalMovements} hint="en el historial" />
       </section>
 
       <section className="inventory-stock-workspace">
@@ -699,9 +658,9 @@ export default function InventoryAdmin() {
           <div className="flex min-w-0 items-center gap-3">
             <span className="inventory-stock-workspace__icon"><Layers3 size={21} /></span>
             <div className="min-w-0">
-              <h2 className="text-xl font-black" style={styles.title}>Existencias por sede</h2>
-              <p className="mt-1 text-sm" style={styles.muted}>
-                {formatNumber(filteredStockRows.length)} resultado(s) · página {formatNumber(currentPage)} de {formatNumber(totalPages)}
+              <h2 className="text-lg font-black" style={styles.title}>Existencias</h2>
+              <p className="text-xs" style={styles.muted}>
+                {formatNumber(filteredStockRows.length)} resultados · página {formatNumber(currentPage)} de {formatNumber(totalPages)}
               </p>
             </div>
           </div>
@@ -710,11 +669,11 @@ export default function InventoryAdmin() {
             type="button"
             onClick={exportInventory}
             disabled={loading || exporting || filteredStockRows.length === 0}
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
-            style={styles.primaryButton}
+            className="inventory-export-button inline-flex items-center justify-center gap-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+            style={styles.softButton}
           >
             <Download size={16} />
-            {exporting ? 'Preparando archivo...' : 'Exportar resultados'}
+            {exporting ? 'Preparando archivo...' : 'Exportar CSV'}
           </button>
         </div>
 
@@ -790,36 +749,43 @@ export default function InventoryAdmin() {
           )}
 
           {!loading && visibleStockRows.map((row) => {
-            const color = getVariantColor(row);
-            const variantAttributes = getVariantAttributes(row);
             const stockStatus = getStockStatus(row);
             const available = getAvailableStock(row);
             const reserved = getReservedStock(row);
             const canTransfer = available > 0;
 
             return (
-              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="inventory-row-card p-4 md:p-5" style={styles.inventoryCard}>
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center" style={styles.productIconBox}>
-                      <Boxes size={22} />
+              <article key={row?._id || `${getProductId(row)}-${getBranchId(row)}-${row?.variantKey || getVariantLabel(row)}`} className="inventory-row-card" style={styles.inventoryCard}>
+                <div className="inventory-row-card__product">
+                  <div className="inventory-row-card__icon" style={styles.productIconBox}><Boxes size={20} /></div>
+                  <div className="min-w-0">
+                    <div className="inventory-row-card__name-line">
+                      <p className="inventory-row-card__name" style={styles.title}>{getProductTitle(row)}</p>
+                      <span className="inventory-row-card__status" style={stockStatus.style}>{stockStatus.label}</span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-lg font-black leading-6" style={styles.title}>{getProductTitle(row)}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center px-3 py-1 text-xs font-black" style={styles.badge}>SKU: {getProductSku(row)}</span>
-                        <span className="inline-flex items-center px-3 py-1 text-xs font-black" style={stockStatus.style}>{stockStatus.label}</span>
-                      </div>
-                    </div>
+                    <p className="inventory-row-card__sku" style={styles.muted}>SKU {getProductSku(row)}</p>
                   </div>
+                </div>
 
-                  <div className="inventory-row-card__actions">
+                <div className="inventory-row-card__details">
+                  <RowFact icon={<Warehouse size={15} />} label="Ubicación" value={getBranchName(row)} />
+                  <RowFact icon={<Ruler size={15} />} label="Variante" value={getVariantLabel(row)} />
+                </div>
+
+                <div className="inventory-stock-strip">
+                  <StockValueBox label="Físico" value={row?.stock} style={styles.stockBox} />
+                  <StockValueBox label="Reservado" value={reserved} style={styles.reservedBox} />
+                  <StockValueBox label="Disponible" value={available} style={styles.availableBox} />
+                </div>
+
+                <div className="inventory-row-card__actions">
                     <button
                       type="button"
                       onClick={() => openTransferFromCard(row)}
                       disabled={!canTransfer}
-                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inventory-row-action inventory-row-action--soft disabled:cursor-not-allowed disabled:opacity-60"
                       style={styles.softButton}
+                      title="Trasladar entre sedes"
                     >
                       <ArrowRightLeft size={15} />
                       Trasladar
@@ -828,68 +794,22 @@ export default function InventoryAdmin() {
                     <button
                       type="button"
                       onClick={() => setMovementsModalRow(row)}
-                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition"
-                      style={styles.primaryButton}
+                      className="inventory-row-action inventory-row-action--soft"
+                      style={styles.softButton}
                     >
-                      <ArrowRightLeft size={15} />
+                      <Activity size={15} />
                       Movimientos
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setKardexModalRow(row)}
-                      className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black transition"
+                      className="inventory-row-action inventory-row-action--primary"
                       style={styles.primaryButton}
                     >
                       <BookOpen size={15} />
                       Kardex
                     </button>
-                  </div>
-                </div>
-
-                <div className="inventory-row-card__facts mt-5">
-                  <InfoBlock icon={<Warehouse size={17} />} label="Ubicación" title={getBranchName(row)}>
-                    <span className="inline-flex w-fit items-center px-3 py-1 text-xs font-black" style={styles.badge}>{getBranchType(row)}</span>
-                  </InfoBlock>
-
-                  <InfoBlock icon={<Ruler size={17} />} label="Variante" title={getVariantLabel(row)}>
-                    <div className="flex flex-wrap gap-2">
-                      {variantAttributes.length > 0 ? (
-                        variantAttributes.map((attribute) => (
-                          <span key={`${row?._id || row?.variantKey}-${attribute.key}`} className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
-                            {attribute.key === 'color' && isHexColor(attribute.value) ? (
-                              <span className="h-4 w-4 rounded-full" style={{ backgroundColor: attribute.value, border: '1px solid var(--admin-table-border)' }} />
-                            ) : attribute.key === 'color' ? (
-                              <Palette size={13} />
-                            ) : (
-                              <Ruler size={13} />
-                            )}
-                            {attribute.label}: {attribute.value}
-                          </span>
-                        ))
-                      ) : (
-                        <>
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
-                            <Ruler size={13} /> Talla {getVariantSize(row)}
-                          </span>
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-black" style={styles.badge}>
-                            {isHexColor(color) ? (
-                              <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color, border: '1px solid var(--admin-table-border)' }} />
-                            ) : (
-                              <Palette size={13} />
-                            )}
-                            {color}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </InfoBlock>
-
-                  <div className="inventory-stock-strip grid sm:grid-cols-3">
-                    <StockValueBox label="Stock físico" value={row?.stock} style={styles.stockBox} />
-                    <StockValueBox label="Reservado" value={reserved} style={styles.reservedBox} />
-                    <StockValueBox label="Disponible" value={available} style={styles.availableBox} />
-                  </div>
                 </div>
               </article>
             );
@@ -923,25 +843,26 @@ export default function InventoryAdmin() {
   );
 }
 
-function MiniMetric({ label, value }) {
+function SummaryMetric({ icon, label, value, hint, tone = 'neutral' }) {
   return (
-    <div className="inventory-overview-mini">
-      <span>{label}</span>
-      <strong>{formatNumber(value)}</strong>
-    </div>
+    <article className={`inventory-summary-metric inventory-summary-metric--${tone}`}>
+      <span className="inventory-summary-metric__icon">{icon}</span>
+      <div>
+        <p className="inventory-summary-metric__label">{label}</p>
+        <p className="inventory-summary-metric__value">{formatNumber(value)}</p>
+        <p className="inventory-summary-metric__hint">{hint}</p>
+      </div>
+    </article>
   );
 }
 
-function InfoBlock({ icon, label, title, children }) {
+function RowFact({ icon, label, value }) {
   return (
-    <div className="inventory-row-card__info p-4" style={styles.filterCard}>
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center" style={styles.productIconBox}>{icon}</div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>{label}</p>
-          <p className="mt-1 text-sm font-black leading-5" style={styles.title}>{title}</p>
-          {children && <div className="mt-3">{children}</div>}
-        </div>
+    <div className="inventory-row-fact">
+      <span className="inventory-row-fact__icon">{icon}</span>
+      <div className="min-w-0">
+        <p className="inventory-row-fact__label">{label}</p>
+        <p className="inventory-row-fact__value">{value}</p>
       </div>
     </div>
   );
@@ -949,9 +870,9 @@ function InfoBlock({ icon, label, title, children }) {
 
 function StockValueBox({ label, value, style }) {
   return (
-    <div className="px-4 py-4" style={style}>
-      <p className="text-[10px] font-black uppercase tracking-wide" style={styles.muted}>{label}</p>
-      <p className="mt-1 text-2xl font-black" style={styles.title}>{formatNumber(value)}</p>
+    <div className="inventory-stock-value" style={style}>
+      <p>{label}</p>
+      <strong>{formatNumber(value)}</strong>
     </div>
   );
 }
