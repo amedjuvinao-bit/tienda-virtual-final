@@ -55,15 +55,17 @@ jobs:
         run: |
           npm --prefix backend run test:payment-configuration-authority
           npm --prefix backend run test:payment-route-composition
+          npm --prefix backend run test:configuration-level-plus-stage3
           npm --prefix backend run test:shipping-providers
           npm --prefix backend run test:shipping-settings
+          npm --prefix backend run test:order-shipping-composition
 
       - name: Validar interfaz de Configuracion
         run: |
           npm --prefix frontend run test:configuration-level-plus-stage0
           npm --prefix frontend run test:configuration-level-plus-stage1
           npm --prefix frontend run test:configuration-level-plus-stage2
-          npm --prefix frontend run test:shipping-settings-ui
+          npm --prefix frontend run test:configuration-level-plus-stage3
 
       - name: Compilar frontend
         run: npm --prefix frontend run build
