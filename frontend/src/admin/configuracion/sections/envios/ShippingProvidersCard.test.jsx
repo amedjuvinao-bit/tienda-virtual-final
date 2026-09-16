@@ -35,7 +35,7 @@ function response(overrides = {}) {
       ...overrides.settings,
     },
     meta: {
-      encryptionConfigured: true,
+      encryptionConfigured: overrides.encryptionConfigured ?? true,
       webhookUrl: 'https://api.tienda.test/api/shipping/webhooks/envia',
       webhookDashboardUrl: 'https://shipping-test.envia.com/settings/developers',
       readiness: {
@@ -152,6 +152,51 @@ describe('ShippingProvidersCard', () => {
         sandboxWebhookToken: 'CREDENCIAL-PORTAL-A968',
       })
     );
+  });
+
+  it('mantiene la entrega manual disponible sin exponer configuración técnica del servidor', async () => {
+    getAdminShippingSettings.mockResolvedValue(
+      response({ encryptionConfigured: false })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(
+      await screen.findByText(
+        'La entrega automática está pendiente de habilitación por soporte técnico.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Operación manual activa')).toBeInTheDocument();
+    expect(screen.getByText('Entrega disponible')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Token de Envia')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Activar Sandbox' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/INTEGRATIONS_ENCRYPTION_KEY|reiniciar el backend/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('convierte un error técnico del servidor en una orientación comprensible', async () => {
+    const user = userEvent.setup();
+    updateAdminShippingSettings.mockRejectedValue({
+      userMessage:
+        'Falta configurar INTEGRATIONS_ENCRYPTION_KEY con al menos 32 caracteres y reiniciar el backend.',
+    });
+
+    render(<ShippingProvidersCard />);
+
+    await user.type(await screen.findByLabelText('Token de Envia'), 'NUEVO-TOKEN');
+    await user.click(screen.getByRole('button', { name: 'Guardar configuración' }));
+
+    expect(
+      await screen.findByText(
+        'La conexión segura con transportadoras aún no está habilitada. La tienda continuará trabajando con entrega manual mientras soporte técnico completa la preparación.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/INTEGRATIONS_ENCRYPTION_KEY|reiniciar el backend/i)
+    ).not.toBeInTheDocument();
   });
 
   it('registra la URL y deja claro que aún falta recibir la prueba real de Envia', async () => {
@@ -316,7 +361,7 @@ describe('ShippingProvidersCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('bloquea Producción cuando BACKEND_URL pertenece a trycloudflare', async () => {
+  it('explica en lenguaje simple cuando la dirección de Producción es temporal', async () => {
     getAdminShippingSettings.mockResolvedValue(
       response({
         settings: {
@@ -341,7 +386,9 @@ describe('ShippingProvidersCard', () => {
     render(<ShippingProvidersCard />);
 
     expect(
-      await screen.findByText(/trycloudflare\.com es temporal/i)
+      await screen.findByText(
+        /La dirección actual es temporal y no puede utilizarse para operaciones reales/i
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Activar Producción' })

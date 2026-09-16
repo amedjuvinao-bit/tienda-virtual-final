@@ -57,6 +57,20 @@ function formatDate(value) {
   });
 }
 
+function friendlyShippingError(error) {
+  const message = String(error?.userMessage || error?.message || '').trim();
+
+  if (/INTEGRATIONS_ENCRYPTION_KEY|encryption key|reiniciar el backend/i.test(message)) {
+    return 'La conexión segura con transportadoras aún no está habilitada. La tienda continuará trabajando con entrega manual mientras soporte técnico completa la preparación.';
+  }
+
+  if (/BACKEND_URL|trycloudflare|URL HTTPS permanente/i.test(message)) {
+    return 'La dirección segura para recibir actualizaciones de la transportadora aún no está disponible. Contacta al soporte técnico.';
+  }
+
+  return message || 'No fue posible completar la operación. Intenta nuevamente.';
+}
+
 export default function ShippingProvidersCard({ onStatusChange }) {
   const [data, setData] = useState(null);
   const [mode, setMode] = useState('sandbox');
@@ -95,7 +109,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
       applyResponse(await getAdminShippingSettings());
       setFeedback(null);
     } catch (error) {
-      setFeedback({ type: 'error', text: error.userMessage });
+      setFeedback({ type: 'error', text: friendlyShippingError(error) });
     } finally {
       setLoading(false);
     }
@@ -108,6 +122,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const settings = data?.settings || {};
   const meta = data?.meta || {};
   const ready = meta.readiness || {};
+  const secureSetupUnavailable = meta.encryptionConfigured === false;
   const selectedEnvia = settings.defaultProvider === 'envia';
   const savedProductionMode = settings.enviaMode === 'production';
   const activeEnvia = Boolean(
@@ -122,7 +137,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const secretsChanged = Boolean(
     writesSecret || clearToken || clearSandboxWebhookToken || clearWebhookSecret
   );
-  const saveBlocked = writesSecret && !meta.encryptionConfigured;
+  const saveBlocked = secureSetupUnavailable || (writesSecret && !meta.encryptionConfigured);
   const savedMode = mode === settings.enviaMode;
   const waitingWebhookProof = Boolean(
     savedMode && ready.webhookRegistered && !ready.webhookVerified
@@ -191,7 +206,9 @@ export default function ShippingProvidersCard({ onStatusChange }) {
       ready.hasToken &&
       (production ? ready.hasWebhookSecret : ready.hasSandboxWebhookToken)
   );
-  const nextStep = !savedMode
+  const nextStep = secureSetupUnavailable
+    ? 'La entrega automática está pendiente de habilitación por soporte técnico.'
+    : !savedMode
     ? 'Guarda el ambiente seleccionado para continuar.'
     : !credentialsReady
       ? 'Completa y guarda las credenciales de esta conexión.'
@@ -213,7 +230,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
       applyResponse(response);
       setFeedback({ type: 'success', text: response?.message || 'Operación completada.' });
     } catch (error) {
-      setFeedback({ type: 'error', text: error.userMessage || error.message });
+      setFeedback({ type: 'error', text: friendlyShippingError(error) });
     } finally {
       setBusyAction('');
     }
@@ -318,34 +335,39 @@ export default function ShippingProvidersCard({ onStatusChange }) {
         <div className="shipping-soft-surface mb-5 rounded-2xl border p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">Haz esto ahora</p>
+              <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">
+                {secureSetupUnavailable ? 'Estado de la entrega' : 'Haz esto ahora'}
+              </p>
               <p className="mt-1 text-base font-black">{nextStep}</p>
+              {secureSetupUnavailable && (
+                <p className="shipping-muted mt-1 text-sm leading-5">
+                  No necesitas configurar ni reiniciar nada. La tienda continuará procesando los envíos manualmente sin afectar las ventas.
+                </p>
+              )}
             </div>
-            <div className="min-w-[190px]">
-              <div className="shipping-muted flex items-center justify-between text-xs font-bold">
-                <span>Preparación de Envia</span>
-                <span>{completedSteps}/{checklist.length}</span>
+            {secureSetupUnavailable ? (
+              <StatusPill tone="green">Operación manual activa</StatusPill>
+            ) : (
+              <div className="min-w-[190px]">
+                <div className="shipping-muted flex items-center justify-between text-xs font-bold">
+                  <span>Preparación de Envia</span>
+                  <span>{completedSteps}/{checklist.length}</span>
+                </div>
+                <div className="shipping-progress-track mt-2 h-2 overflow-hidden rounded-full">
+                  <div
+                    className="shipping-progress-value h-full rounded-full transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
-              <div className="shipping-progress-track mt-2 h-2 overflow-hidden rounded-full">
-                <div
-                  className="shipping-progress-value h-full rounded-full transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
+            )}
           </div>
         </div>
-
-        {!meta.encryptionConfigured && (
-          <div className="shipping-alert-warning mb-4 rounded-xl border p-3 text-sm leading-6">
-            Antes de guardar credenciales, el responsable del servidor debe definir una sola vez <code>INTEGRATIONS_ENCRYPTION_KEY</code> con 32 caracteres o más y reiniciar el backend.
-          </div>
-        )}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="grid content-start gap-3">
             <details
-              open={!credentialsReady || secretsChanged}
+              open={!secureSetupUnavailable && (!credentialsReady || secretsChanged)}
               className="shipping-details group overflow-hidden rounded-2xl border"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
@@ -353,7 +375,11 @@ export default function ShippingProvidersCard({ onStatusChange }) {
                   <span data-active={!credentialsReady} className="shipping-step-number rounded-lg px-2 py-1 text-xs font-black">01</span>
                   <span>
                     <span className="block text-sm font-black">Cuenta y credenciales</span>
-                    <span className="shipping-muted block text-xs">Ambiente, token y autorización segura</span>
+                    <span className="shipping-muted block text-xs">
+                      {secureSetupUnavailable
+                        ? 'Pendiente de habilitación por soporte técnico'
+                        : 'Ambiente, token y autorización segura'}
+                    </span>
                   </span>
                 </span>
                 <span className="shipping-muted text-xs font-bold group-open:hidden">Abrir</span>
@@ -361,7 +387,16 @@ export default function ShippingProvidersCard({ onStatusChange }) {
               </summary>
 
               <div className="shipping-details-body border-t p-4">
-                <div className="grid gap-4 md:grid-cols-2">
+                {secureSetupUnavailable ? (
+                  <div className="shipping-alert-success rounded-xl border p-4">
+                    <p className="text-sm font-black">La tienda puede continuar operando</p>
+                    <p className="mt-1 text-sm leading-6">
+                      La entrega manual permanece activa. Cuando soporte técnico habilite la conexión segura, este formulario se activará automáticamente.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
                     <span className="mb-1 block text-sm font-bold text-gray-700">Ambiente</span>
                     <select
@@ -470,20 +505,22 @@ export default function ShippingProvidersCard({ onStatusChange }) {
                     </select>
                     <span className="mt-1 block text-xs text-gray-500">Solo se usa cuando el origen y el destino están en países distintos.</span>
                   </label>
-                </div>
+                    </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <ActionButton tone="pink" busy={busyAction === 'save'} disabled={saveBlocked} onClick={save}>Guardar configuración</ActionButton>
-                  <ActionButton
-                    tone="light"
-                    busy={busyAction === 'test'}
-                    disabled={!ready.canTest || secretsChanged || mode !== settings.enviaMode}
-                    onClick={() => runAction('test', testAdminShippingConnection)}
-                  >
-                    Probar conexión
-                  </ActionButton>
-                </div>
-                {secretsChanged && <p className="mt-2 text-xs text-gray-500">Guarda los cambios antes de probar o activar.</p>}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <ActionButton tone="pink" busy={busyAction === 'save'} disabled={saveBlocked} onClick={save}>Guardar configuración</ActionButton>
+                      <ActionButton
+                        tone="light"
+                        busy={busyAction === 'test'}
+                        disabled={!ready.canTest || secretsChanged || mode !== settings.enviaMode}
+                        onClick={() => runAction('test', testAdminShippingConnection)}
+                      >
+                        Probar conexión
+                      </ActionButton>
+                    </div>
+                    {secretsChanged && <p className="mt-2 text-xs text-gray-500">Guarda los cambios antes de probar o activar.</p>}
+                  </>
+                )}
               </div>
             </details>
 
@@ -506,7 +543,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
               <div className="shipping-details-body border-t p-4">
                 <div className="shipping-surface rounded-xl border p-3">
                   <p className="shipping-muted text-xs font-bold uppercase tracking-wide">URL para registrar en Envia</p>
-                  <code className="shipping-code mt-2 block break-all rounded-lg px-3 py-2 text-xs">{meta.webhookUrl || 'BACKEND_URL no configurada'}</code>
+                  <code className="shipping-code mt-2 block break-all rounded-lg px-3 py-2 text-xs">{meta.webhookUrl || 'Dirección pública pendiente de habilitación'}</code>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <ActionButton tone="light" disabled={!meta.webhookUrl} onClick={copyWebhookUrl}>Copiar URL</ActionButton>
                     {meta.webhookDashboardUrl && (
@@ -544,10 +581,10 @@ export default function ShippingProvidersCard({ onStatusChange }) {
                     Webhook comprobado por Envia{settings.webhookVerifiedAt ? ` · ${formatDate(settings.webhookVerifiedAt)}` : ''}
                   </div>
                 )}
-                {!ready.webhookUrlReady && <p className="shipping-warning-text mt-2 text-xs">Para producción, BACKEND_URL debe ser pública y usar HTTPS.</p>}
+                {!ready.webhookUrlReady && <p className="shipping-warning-text mt-2 text-xs">La dirección segura para recibir actualizaciones aún está pendiente. Contacta al soporte técnico.</p>}
                 {production && ready.temporaryWebhookUrl && (
                   <p className="shipping-danger-text mt-2 text-xs font-semibold">
-                    Producción bloqueada: trycloudflare.com es temporal. Publica el backend en una dirección HTTPS permanente.
+                    La dirección actual es temporal y no puede utilizarse para operaciones reales. Solicita a soporte técnico una dirección permanente y segura.
                   </p>
                 )}
               </div>
@@ -575,52 +612,63 @@ export default function ShippingProvidersCard({ onStatusChange }) {
           </div>
 
           <aside className="grid content-start gap-3 lg:sticky lg:top-4">
-            <div className="shipping-surface rounded-2xl border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black">Estado de la conexión</p>
-                <span className="shipping-muted text-xs font-bold">{progressPercent}%</span>
+            {secureSetupUnavailable ? (
+              <div className="shipping-alert-success rounded-2xl border p-4">
+                <p className="text-sm font-black">Entrega disponible</p>
+                <p className="mt-1 text-xs leading-5">
+                  Operación manual activa. Podrás registrar la transportadora y la guía directamente desde cada orden.
+                </p>
               </div>
-              <div className="mt-3 grid gap-2">
-                {checklist.map((item) => (
-                  <div key={item.label} data-complete={item.done} className="shipping-check-item flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-semibold">
-                    <span>{item.label}</span>
-                    <span aria-hidden="true">{item.done ? 'Listo' : 'Pendiente'}</span>
-                  </div>
-                ))}
+            ) : (
+              <div className="shipping-surface rounded-2xl border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black">Estado de la conexión</p>
+                  <span className="shipping-muted text-xs font-bold">{progressPercent}%</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {checklist.map((item) => (
+                    <div key={item.label} data-complete={item.done} className="shipping-check-item flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-semibold">
+                      <span>{item.label}</span>
+                      <span aria-hidden="true">{item.done ? 'Listo' : 'Pendiente'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {ready.tested && (
               <div className="shipping-alert-success rounded-2xl border p-4">
                 <p className="text-sm font-black">Conexión aprobada</p>
                 {settings.lastTestMessage && (
                   <p className={`mt-1 text-xs leading-5 ${settings.lastTestStatus === 'success' ? 'shipping-success-text' : 'shipping-danger-text'}`}>
-                    {settings.lastTestMessage}{settings.lastTestAt ? ` · ${formatDate(settings.lastTestAt)}` : ''}
+                    {friendlyShippingError({ userMessage: settings.lastTestMessage })}{settings.lastTestAt ? ` · ${formatDate(settings.lastTestAt)}` : ''}
                   </p>
                 )}
               </div>
             )}
 
-            {production && (
+            {production && !secureSetupUnavailable && (
               <label className="shipping-alert-danger flex items-start gap-3 rounded-2xl border p-4 text-xs leading-5">
                 <input type="checkbox" checked={confirmProduction} onChange={(event) => setConfirmProduction(event.target.checked)} className="mt-0.5 h-4 w-4" />
                 Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
               </label>
             )}
 
-            <ActionButton
-              tone="dark"
-              busy={busyAction === 'activate'}
-              disabled={
-                activeEnvia ||
-                secretsChanged ||
-                mode !== settings.enviaMode ||
-                (production ? !ready.canActivateProduction || !confirmProduction : !ready.canActivateSandbox)
-              }
-              onClick={() => runAction('activate', () => activateAdminShippingProvider(production && confirmProduction))}
-            >
-              Activar {production ? 'Producción' : 'Sandbox'}
-            </ActionButton>
+            {!secureSetupUnavailable && (
+              <ActionButton
+                tone="dark"
+                busy={busyAction === 'activate'}
+                disabled={
+                  activeEnvia ||
+                  secretsChanged ||
+                  mode !== settings.enviaMode ||
+                  (production ? !ready.canActivateProduction || !confirmProduction : !ready.canActivateSandbox)
+                }
+                onClick={() => runAction('activate', () => activateAdminShippingProvider(production && confirmProduction))}
+              >
+                Activar {production ? 'Producción' : 'Sandbox'}
+              </ActionButton>
+            )}
 
             <div className={`rounded-2xl border p-4 ${!activeEnvia ? 'shipping-alert-success' : 'shipping-page-surface'}`}>
               <div className="flex items-center justify-between gap-3">
