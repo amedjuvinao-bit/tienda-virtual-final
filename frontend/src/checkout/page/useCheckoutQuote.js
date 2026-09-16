@@ -11,6 +11,7 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
   const {
     appliedCoupon,
     customerCity,
+    customerCityCode,
     customerCountry,
     customerEmailOrPhone,
     customerId,
@@ -76,6 +77,8 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
       department: selectedRegion,
       departmentCode: selectedRegion,
       city: customerCity,
+      cityCode: customerCityCode,
+      municipalityCode: customerCityCode,
       email: String(customerEmailOrPhone || '').includes('@')
         ? String(customerEmailOrPhone || '').trim()
         : '',
@@ -230,6 +233,7 @@ export default function useCheckoutQuote({ state, derived, ensureCartReady }) {
     selectedCountry?.code,
     selectedRegion,
     customerCity,
+    customerCityCode,
     customerEmailOrPhone,
     appliedCoupon?.code,
     useStoreCredit,

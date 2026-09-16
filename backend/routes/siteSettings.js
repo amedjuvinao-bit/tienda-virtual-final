@@ -491,6 +491,17 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       });
     }
 
+    if (
+      req.body?.theme?.global &&
+      Object.prototype.hasOwnProperty.call(req.body.theme.global, "envios")
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error: "SHIPPING_RATES_DEDICATED_ENDPOINT_REQUIRED",
+        message: "Las tarifas de Envíos deben guardarse desde su módulo protegido.",
+      });
+    }
+
     if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }

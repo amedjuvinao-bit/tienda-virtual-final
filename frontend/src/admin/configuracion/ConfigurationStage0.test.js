@@ -29,10 +29,12 @@ describe('Configuración Nivel Plus Etapa 0', () => {
     expect(logsSection).not.toContain('/api/admin/auth/logs');
   });
 
-  it('envía desde Envíos únicamente la sección que le pertenece', () => {
+  it('envía tarifas desde el endpoint protegido que le pertenece', () => {
     const shippingSection = source('./sections/EnviosSection.jsx');
+    const shippingApi = source('./api/shippingRatesApi.js');
 
-    expect(shippingSection).toContain('envios: payloadEnvios');
-    expect(shippingSection).not.toContain('...data,\n        theme:');
+    expect(shippingSection).toContain('saveShippingRates({ settings: buildPayload(), revision })');
+    expect(shippingApi).toContain("api.put('/api/admin/shipping-rates', payload)");
+    expect(shippingSection).not.toContain('saveSiteSettings');
   });
 });

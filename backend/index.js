@@ -152,6 +152,7 @@ const adminAuditLogsRoutes = tryRequire('./routes/adminAuditLogs');
 const adminStoreSettingsRoutes = tryRequire('./routes/adminStoreSettings');
 const adminPaymentSettingsRoutes = tryRequire('./routes/adminPaymentSettings');
 const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
+const adminShippingRatesRoutes = tryRequire('./routes/adminShippingRates');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
 const pageRoutes = tryRequire('./routes/pages');
@@ -203,6 +204,9 @@ if (adminPaymentSettingsRoutes) {
 }
 if (adminShippingSettingsRoutes) {
   app.use('/api/admin/shipping-settings', adminShippingSettingsRoutes);
+}
+if (adminShippingRatesRoutes) {
+  app.use('/api/admin/shipping-rates', adminShippingRatesRoutes);
 }
 if (billingSettingsProtectionRoutes) app.use('/api/site-settings', billingSettingsProtectionRoutes);
 if (siteSettingsRoutes) app.use('/api/site-settings', siteSettingsRoutes);

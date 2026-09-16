@@ -4,8 +4,12 @@ import {
   getItemLineTotal,
   getItemQuantity,
   getPaymentProviderMeta,
-  normalizeText,
 } from './checkoutPageModel';
+import {
+  DEFAULT_SHIPPING_PRICE,
+  findShippingZone,
+  resolveShippingRate,
+} from '../../lib/shippingRateRules';
 
 export default function useCheckoutDerived({ state, cart }) {
   const {
@@ -120,54 +124,37 @@ export default function useCheckoutDerived({ state, cart }) {
     [countries, customerCountry]
   );
   const matchedZone = useMemo(() => {
-    const zones = Array.isArray(shippingConfig?.zones) ? shippingConfig.zones : [];
-    const countryNorm = normalizeText(customerCountry);
-    const departmentNorm = normalizeText(
-      selectedCountry?.code === 'CO' ? selectedRegion : ''
-    );
-    const cityNorm = normalizeText(customerCity);
-    if (!countryNorm || !cityNorm) return null;
-    return (
-      zones.find((zone) => {
-        const zoneCountry = normalizeText(zone?.country);
-        const zoneDepartment = normalizeText(zone?.department);
-        const zoneCity = normalizeText(zone?.city);
-        if (zoneCountry && zoneCountry !== countryNorm) return false;
-        if (zoneDepartment && zoneDepartment !== departmentNorm) return false;
-        if (!zoneCity || zoneCity !== cityNorm) return false;
-        return true;
-      }) || null
-    );
+    return findShippingZone(shippingConfig, {
+      country: customerCountry,
+      countryCode: selectedCountry?.code,
+      departmentCode: selectedRegion,
+      city: customerCity,
+      cityCode: customerCityCode,
+    });
   }, [
     shippingConfig,
     customerCountry,
     selectedCountry?.code,
     selectedRegion,
     customerCity,
+    customerCityCode,
   ]);
 
   const shipping = useMemo(() => {
-    if (!cartRequiresShipping || deliveryType === 'retiro') return 0;
-    const envios = shippingConfig;
-    if (!envios || shippingConfigLoading) return 20000;
-    if (envios.active === false) return 0;
-    const freeEnabled = envios?.freeShipping?.enabled === true;
-    const freeMinimum = Number(envios?.freeShipping?.minimum || 0);
-    if (freeEnabled && Number.isFinite(freeMinimum) && subtotal >= freeMinimum) {
-      return 0;
-    }
-    const mode = String(envios.mode || '').toLowerCase();
-    if (mode === 'fixed') {
-      const fixedPrice = Number(envios.fixedPrice);
-      return Number.isFinite(fixedPrice) ? fixedPrice : 0;
-    }
-    if (mode === 'zones') {
-      const zonePrice = Number(matchedZone?.price);
-      if (Number.isFinite(zonePrice)) return zonePrice;
-      const fallbackPrice = Number(envios?.fallback?.price);
-      return Number.isFinite(fallbackPrice) ? fallbackPrice : 0;
-    }
-    return 20000;
+    if (shippingConfigLoading) return DEFAULT_SHIPPING_PRICE;
+    return resolveShippingRate({
+      config: shippingConfig,
+      customer: {
+        country: customerCountry,
+        countryCode: selectedCountry?.code,
+        departmentCode: selectedRegion,
+        city: customerCity,
+        cityCode: customerCityCode,
+      },
+      subtotal,
+      requiresShipping: cartRequiresShipping,
+      deliveryType,
+    });
   }, [
     cartRequiresShipping,
     deliveryType,
@@ -175,6 +162,11 @@ export default function useCheckoutDerived({ state, cart }) {
     shippingConfigLoading,
     matchedZone,
     subtotal,
+    customerCountry,
+    selectedCountry?.code,
+    selectedRegion,
+    customerCity,
+    customerCityCode,
   ]);
 
   const quotePricing = checkoutQuote?.pricing || null;

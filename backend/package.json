@@ -10,6 +10,7 @@
     "test:configuration-level-plus-stage0": "node scripts/testConfigurationLevelPlusStage0.js",
     "test:configuration-level-plus-stage1": "node scripts/testConfigurationLevelPlusStage1.js",
     "test:configuration-level-plus-stage2": "node scripts/testConfigurationLevelPlusStage2.js",
+    "test:configuration-level-plus-stage3": "node scripts/testConfigurationLevelPlusStage3.js",
     "test:date-range": "node scripts/testDateRangeUtil.js",
     "test:customers": "node scripts/testCustomersModule.js",
     "test:customers-stage1": "node scripts/testCustomersStage1Integrity.js",

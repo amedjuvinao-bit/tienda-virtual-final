@@ -57,7 +57,7 @@ function formatDate(value) {
   });
 }
 
-export default function ShippingProvidersCard() {
+export default function ShippingProvidersCard({ onStatusChange }) {
   const [data, setData] = useState(null);
   const [mode, setMode] = useState('sandbox');
   const [token, setToken] = useState('');
@@ -75,6 +75,7 @@ export default function ShippingProvidersCard() {
 
   const applyResponse = useCallback((response) => {
     setData(response);
+    onStatusChange?.(response);
     setMode(response?.settings?.enviaMode || 'sandbox');
     setToken('');
     setSandboxWebhookToken('');
@@ -86,7 +87,7 @@ export default function ShippingProvidersCard() {
     setClearSandboxWebhookToken(false);
     setClearWebhookSecret(false);
     setConfirmProduction(false);
-  }, []);
+  }, [onStatusChange]);
 
   const load = useCallback(async () => {
     try {

@@ -96,6 +96,7 @@ function buildPublicSiteSettings(rawSettings) {
   delete safe.billing;
   delete safe.storeRevision;
   delete safe.paymentSettingsRevision;
+  delete safe.shippingRatesRevision;
   delete safe.updatedBy;
   delete safe.__v;
 

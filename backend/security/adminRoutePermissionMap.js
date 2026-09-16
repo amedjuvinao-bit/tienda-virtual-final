@@ -1305,6 +1305,19 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     danger: true,
   },
   {
+    method: 'GET',
+    path: '/api/admin/shipping-rates',
+    permission: 'settings:shipping',
+    description: 'Consultar las tarifas de envío y su preparación operativa.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/shipping-rates',
+    permission: 'settings:shipping',
+    description: 'Actualizar tarifas de checkout con control de versión.',
+    audit: true,
+  },
+  {
     method: 'PUT',
     path: '/api/site-settings',
     permission: 'settings:view',

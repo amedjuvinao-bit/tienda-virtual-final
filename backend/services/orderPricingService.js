@@ -19,6 +19,9 @@ const {
 const {
   normalizeProductCustoms,
 } = require('../lib/products/productCustomsConfig');
+const {
+  resolveShippingRate,
+} = require('../lib/shipping/shippingRateRules');
 
 const MONEY_FACTOR = 100;
 
@@ -43,14 +46,6 @@ function money(value, fallback = 0) {
 
 function clean(value, max = 300) {
   return String(value || '').trim().slice(0, max);
-}
-
-function normalizeText(value) {
-  return clean(value, 180)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
 }
 
 function readProductId(item = {}) {
@@ -247,40 +242,11 @@ function resolveShippingAmount({
   const deliveryType = clean(customer.deliveryType || 'envio', 30).toLowerCase();
   if (deliveryType === 'retiro') return 0;
 
-  const shippingConfig = settings?.theme?.global?.envios;
-  if (!shippingConfig || typeof shippingConfig !== 'object') return 20000;
-  if (shippingConfig.active === false) return 0;
-
-  const freeShipping = shippingConfig.freeShipping || {};
-  const freeMinimum = money(freeShipping.minimum, 0);
-  if (freeShipping.enabled === true && money(subtotal) >= freeMinimum) {
-    return 0;
-  }
-
-  const mode = clean(shippingConfig.mode, 30).toLowerCase();
-  if (mode === 'fixed') return money(shippingConfig.fixedPrice, 0);
-
-  if (mode === 'zones') {
-    const country = normalizeText(customer.country);
-    const department = normalizeText(customer.departmentCode || customer.department);
-    const city = normalizeText(customer.city);
-    const zones = Array.isArray(shippingConfig.zones) ? shippingConfig.zones : [];
-
-    const zone = zones.find((candidate) => {
-      const zoneCountry = normalizeText(candidate?.country);
-      const zoneDepartment = normalizeText(candidate?.department);
-      const zoneCity = normalizeText(candidate?.city);
-
-      if (zoneCountry && country && zoneCountry !== country) return false;
-      if (zoneDepartment && department && zoneDepartment !== department) return false;
-      return Boolean(zoneCity && city && zoneCity === city);
-    });
-
-    if (zone) return money(zone.price, 0);
-    return money(shippingConfig?.fallback?.price, 0);
-  }
-
-  return 20000;
+  return money(resolveShippingRate({
+    config: settings?.theme?.global?.envios,
+    customer,
+    subtotal,
+  }));
 }
 
 function allocateDiscount(lines, targetDiscount, coupon = null) {

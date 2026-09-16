@@ -51,6 +51,7 @@
     "test:configuration-level-plus-stage0": "vitest run src/admin/configuracion/ConfigurationStage0.test.js",
     "test:configuration-level-plus-stage1": "vitest run src/admin/configuracion/sections/EmpresaSection.test.jsx src/admin/configuracion/api/storeSettingsApi.test.js",
     "test:configuration-level-plus-stage2": "vitest run src/admin/configuracion/sections/PagosSection.test.jsx src/admin/configuracion/api/paymentSettingsApi.test.js",
+    "test:configuration-level-plus-stage3": "vitest run src/admin/configuracion/sections/EnviosSection.test.jsx src/admin/configuracion/sections/envios/ShippingProvidersCard.test.jsx src/admin/configuracion/api/shippingRatesApi.test.js src/lib/shippingRateRules.test.js",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },
