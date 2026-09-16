@@ -60,7 +60,7 @@ function formatDate(value) {
 function friendlyShippingError(error) {
   const message = String(error?.userMessage || error?.message || '').trim();
 
-  if (/INTEGRATIONS_ENCRYPTION_KEY|encryption key|reiniciar el backend/i.test(message)) {
+  if (/INTEGRATIONS_ENCRYPTION_KEY|encryption key|llave compatible|llave maestra|reiniciar el backend/i.test(message)) {
     return 'La conexión segura con transportadoras aún no está habilitada. La tienda continuará trabajando con entrega manual mientras soporte técnico completa la preparación.';
   }
 
@@ -122,7 +122,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const settings = data?.settings || {};
   const meta = data?.meta || {};
   const ready = meta.readiness || {};
-  const secureSetupUnavailable = meta.encryptionConfigured === false;
+  const credentialStorageUnavailable = meta.encryptionConfigured === false;
   const selectedEnvia = settings.defaultProvider === 'envia';
   const savedProductionMode = settings.enviaMode === 'production';
   const activeEnvia = Boolean(
@@ -137,7 +137,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const secretsChanged = Boolean(
     writesSecret || clearToken || clearSandboxWebhookToken || clearWebhookSecret
   );
-  const saveBlocked = secureSetupUnavailable || (writesSecret && !meta.encryptionConfigured);
+  const saveBlocked = writesSecret && credentialStorageUnavailable;
   const savedMode = mode === settings.enviaMode;
   const waitingWebhookProof = Boolean(
     savedMode && ready.webhookRegistered && !ready.webhookVerified
@@ -206,12 +206,23 @@ export default function ShippingProvidersCard({ onStatusChange }) {
       ready.hasToken &&
       (production ? ready.hasWebhookSecret : ready.hasSandboxWebhookToken)
   );
-  const nextStep = secureSetupUnavailable
+  const existingCredentialsDetected = Boolean(
+    ready.hasToken || ready.hasSandboxWebhookToken || ready.hasWebhookSecret
+  );
+  const existingCredentialsReadOnly = Boolean(
+    credentialStorageUnavailable && existingCredentialsDetected
+  );
+  const noExistingConnection = Boolean(
+    credentialStorageUnavailable && !existingCredentialsDetected
+  );
+  const nextStep = noExistingConnection
     ? 'La entrega automática está pendiente de habilitación por soporte técnico.'
     : !savedMode
     ? 'Guarda el ambiente seleccionado para continuar.'
     : !credentialsReady
-      ? 'Completa y guarda las credenciales de esta conexión.'
+      ? existingCredentialsReadOnly
+        ? 'La conexión existente fue detectada, pero falta completar la autorización de avisos automáticos.'
+        : 'Completa y guarda las credenciales de esta conexión.'
       : !ready.tested
         ? 'Pulsa “Probar conexión” para validar el token con Envia.'
         : !ready.webhookRegistered
@@ -336,16 +347,16 @@ export default function ShippingProvidersCard({ onStatusChange }) {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="shipping-accent text-xs font-bold uppercase tracking-[0.16em]">
-                {secureSetupUnavailable ? 'Estado de la entrega' : 'Haz esto ahora'}
+                {noExistingConnection ? 'Estado de la entrega' : 'Haz esto ahora'}
               </p>
               <p className="mt-1 text-base font-black">{nextStep}</p>
-              {secureSetupUnavailable && (
+              {noExistingConnection && (
                 <p className="shipping-muted mt-1 text-sm leading-5">
                   No necesitas configurar ni reiniciar nada. La tienda continuará procesando los envíos manualmente sin afectar las ventas.
                 </p>
               )}
             </div>
-            {secureSetupUnavailable ? (
+            {noExistingConnection ? (
               <StatusPill tone="green">Operación manual activa</StatusPill>
             ) : (
               <div className="min-w-[190px]">
@@ -367,7 +378,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="grid content-start gap-3">
             <details
-              open={!secureSetupUnavailable && (!credentialsReady || secretsChanged)}
+              open={!noExistingConnection && (!credentialsReady || secretsChanged || !ready.tested)}
               className="shipping-details group overflow-hidden rounded-2xl border"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 marker:hidden">
@@ -376,8 +387,10 @@ export default function ShippingProvidersCard({ onStatusChange }) {
                   <span>
                     <span className="block text-sm font-black">Cuenta y credenciales</span>
                     <span className="shipping-muted block text-xs">
-                      {secureSetupUnavailable
+                      {noExistingConnection
                         ? 'Pendiente de habilitación por soporte técnico'
+                        : existingCredentialsReadOnly
+                          ? 'Credenciales existentes detectadas'
                         : 'Ambiente, token y autorización segura'}
                     </span>
                   </span>
@@ -387,12 +400,50 @@ export default function ShippingProvidersCard({ onStatusChange }) {
               </summary>
 
               <div className="shipping-details-body border-t p-4">
-                {secureSetupUnavailable ? (
+                {noExistingConnection ? (
                   <div className="shipping-alert-success rounded-xl border p-4">
                     <p className="text-sm font-black">La tienda puede continuar operando</p>
                     <p className="mt-1 text-sm leading-6">
                       La entrega manual permanece activa. Cuando soporte técnico habilite la conexión segura, este formulario se activará automáticamente.
                     </p>
+                  </div>
+                ) : existingCredentialsReadOnly ? (
+                  <div className="grid gap-4">
+                    <div className="shipping-alert-success rounded-xl border p-4">
+                      <p className="text-sm font-black">Conexión existente detectada</p>
+                      <p className="mt-1 text-sm leading-6">
+                        El panel utilizará las credenciales que ya estaban configuradas. No necesitas pegarlas nuevamente.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="shipping-check-item rounded-xl border px-3 py-2 text-xs font-semibold" data-complete={Boolean(ready.hasToken)}>
+                        <span className="flex items-center justify-between gap-3">
+                          <span>Token de Envia</span>
+                          <span>{ready.hasToken ? 'Listo' : 'Pendiente'}</span>
+                        </span>
+                      </div>
+                      <div
+                        className="shipping-check-item rounded-xl border px-3 py-2 text-xs font-semibold"
+                        data-complete={Boolean(production ? ready.hasWebhookSecret : ready.hasSandboxWebhookToken)}
+                      >
+                        <span className="flex items-center justify-between gap-3">
+                          <span>{production ? 'Autorización de Producción' : 'Autorización Sandbox'}</span>
+                          <span>{production ? ready.hasWebhookSecret ? 'Lista' : 'Pendiente' : ready.hasSandboxWebhookToken ? 'Lista' : 'Pendiente'}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton
+                        tone="light"
+                        busy={busyAction === 'test'}
+                        disabled={!ready.canTest || mode !== settings.enviaMode}
+                        onClick={() => runAction('test', testAdminShippingConnection)}
+                      >
+                        Probar conexión existente
+                      </ActionButton>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -612,7 +663,7 @@ export default function ShippingProvidersCard({ onStatusChange }) {
           </div>
 
           <aside className="grid content-start gap-3 lg:sticky lg:top-4">
-            {secureSetupUnavailable ? (
+            {noExistingConnection ? (
               <div className="shipping-alert-success rounded-2xl border p-4">
                 <p className="text-sm font-black">Entrega disponible</p>
                 <p className="mt-1 text-xs leading-5">
@@ -647,14 +698,14 @@ export default function ShippingProvidersCard({ onStatusChange }) {
               </div>
             )}
 
-            {production && !secureSetupUnavailable && (
+            {production && !noExistingConnection && (
               <label className="shipping-alert-danger flex items-start gap-3 rounded-2xl border p-4 text-xs leading-5">
                 <input type="checkbox" checked={confirmProduction} onChange={(event) => setConfirmProduction(event.target.checked)} className="mt-0.5 h-4 w-4" />
                 Confirmo que este ambiente realizará cotizaciones y guías reales y que Envia comprobó el webhook.
               </label>
             )}
 
-            {!secureSetupUnavailable && (
+            {!noExistingConnection && (
               <ActionButton
                 tone="dark"
                 busy={busyAction === 'activate'}

@@ -17,6 +17,7 @@ const {
   isEncryptedShippingSecret,
   secretHint,
 } = require('../lib/shipping/shippingConfigurationSecurity');
+const { env } = require('../config/env');
 const {
   findAdminRoutePermission,
 } = require('../security/adminRoutePermissionMap');
@@ -56,6 +57,37 @@ async function main() {
   );
   assert.strictEqual(secretHint(token), '••••1234');
   ok('las credenciales usan AES-256-GCM aleatorio, detectan alteraciones y solo exponen pista');
+
+  const originalIntegrationsKey = env.integrationsEncryptionKey;
+  const originalBillingKey = env.billingEncryptionKey;
+  const legacyBillingKey = 'legacy-billing-key-for-shipping-32-chars';
+  let legacyEncrypted;
+  try {
+    env.integrationsEncryptionKey = legacyBillingKey;
+    env.billingEncryptionKey = legacyBillingKey;
+    legacyEncrypted = encryptShippingSecret('token-envia-existente');
+
+    env.integrationsEncryptionKey = '';
+    assert.strictEqual(encryptionConfigured(), false);
+    assert.strictEqual(
+      decryptShippingSecret(legacyEncrypted),
+      'token-envia-existente'
+    );
+    assert.throws(
+      () => encryptShippingSecret('token-nuevo'),
+      (error) => error.code === 'SHIPPING_ENCRYPTION_KEY_REQUIRED'
+    );
+
+    env.integrationsEncryptionKey = 'new-integrations-key-for-shipping-32-chars';
+    assert.strictEqual(
+      decryptShippingSecret(legacyEncrypted),
+      'token-envia-existente'
+    );
+  } finally {
+    env.integrationsEncryptionKey = originalIntegrationsKey;
+    env.billingEncryptionKey = originalBillingKey;
+  }
+  ok('las credenciales históricas de Envia siguen legibles sin permitir nuevos secretos con la llave antigua');
 
   const model = read('backend/models/ShippingSettings.js');
   assert.match(model, /enviaTokenEncrypted[\s\S]*?select:\s*false/);
@@ -444,7 +476,10 @@ async function main() {
   assert.match(frontend, /Ya registré la URL/);
   assert.match(frontend, /Enviar prueba oficial desde Envia/);
   assert.match(frontend, /Prueba recibida desde Envia/);
-  assert.match(frontend, /trycloudflare\.com es temporal/);
+  assert.match(
+    frontend,
+    /La dirección actual es temporal y no puede utilizarse para operaciones reales/
+  );
   assert.match(frontend, /confirmProduction/);
   assert.match(frontend, /¿Qué queda automático\?/);
   assert.match(frontend, /El webhook es el aviso/);

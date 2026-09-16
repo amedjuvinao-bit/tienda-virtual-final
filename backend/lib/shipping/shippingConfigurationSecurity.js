@@ -22,6 +22,13 @@ function encryptionConfigured() {
   );
 }
 
+function deriveEncryptionKey(secret) {
+  return crypto
+    .createHash('sha256')
+    .update(`shipping:${secret}`)
+    .digest();
+}
+
 function encryptionKey() {
   if (!encryptionConfigured()) {
     throw new ShippingConfigurationSecurityError(
@@ -29,10 +36,20 @@ function encryptionKey() {
       'SHIPPING_ENCRYPTION_KEY_REQUIRED'
     );
   }
-  return crypto
-    .createHash('sha256')
-    .update(`shipping:${env.integrationsEncryptionKey}`)
-    .digest();
+  return deriveEncryptionKey(env.integrationsEncryptionKey);
+}
+
+function decryptionKeys() {
+  const candidates = [
+    env.integrationsEncryptionKey,
+    // Compatibilidad: las primeras credenciales de Envia se cifraban con
+    // BILLING_ENCRYPTION_KEY antes de separar las llaves por integración.
+    env.billingEncryptionKey,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter((value) => value.length >= 32);
+
+  return [...new Set(candidates)].map(deriveEncryptionKey);
 }
 
 function isEncryptedShippingSecret(value) {
@@ -86,24 +103,35 @@ function decryptShippingSecret(value) {
     );
   }
 
-  try {
-    const decipher = crypto.createDecipheriv(
-      'aes-256-gcm',
-      encryptionKey(),
-      Buffer.from(parts[2], 'base64')
-    );
-    decipher.setAuthTag(Buffer.from(parts[3], 'base64'));
-    return Buffer.concat([
-      decipher.update(Buffer.from(parts[4], 'base64')),
-      decipher.final(),
-    ]).toString('utf8');
-  } catch (error) {
-    if (error instanceof ShippingConfigurationSecurityError) throw error;
+  const keys = decryptionKeys();
+  if (!keys.length) {
     throw new ShippingConfigurationSecurityError(
-      'No fue posible descifrar la credencial de transportadora. Verifica la llave maestra.',
-      'SHIPPING_SECRET_DECRYPTION_FAILED'
+      'No hay una llave compatible disponible para leer las credenciales de transportadora.',
+      'SHIPPING_ENCRYPTION_KEY_REQUIRED'
     );
   }
+
+  for (const key of keys) {
+    try {
+      const decipher = crypto.createDecipheriv(
+        'aes-256-gcm',
+        key,
+        Buffer.from(parts[2], 'base64')
+      );
+      decipher.setAuthTag(Buffer.from(parts[3], 'base64'));
+      return Buffer.concat([
+        decipher.update(Buffer.from(parts[4], 'base64')),
+        decipher.final(),
+      ]).toString('utf8');
+    } catch {
+      // Prueba la llave histórica antes de declarar la credencial ilegible.
+    }
+  }
+
+  throw new ShippingConfigurationSecurityError(
+    'No fue posible descifrar la credencial de transportadora. Verifica la llave maestra.',
+    'SHIPPING_SECRET_DECRYPTION_FAILED'
+  );
 }
 
 function secretHint(value) {

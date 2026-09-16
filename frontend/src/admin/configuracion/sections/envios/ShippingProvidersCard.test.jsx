@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ShippingProvidersCard from './ShippingProvidersCard';
 import {
+  activateAdminShippingProvider,
   confirmAdminShippingWebhook,
   getAdminShippingSettings,
+  testAdminShippingConnection,
   testAdminShippingWebhook,
   updateAdminShippingSettings,
 } from '../../../api/adminShippingSettingsApi';
@@ -36,6 +38,9 @@ function response(overrides = {}) {
     },
     meta: {
       encryptionConfigured: overrides.encryptionConfigured ?? true,
+      credentialSource: overrides.credentialSource || 'none',
+      sandboxWebhookTokenSource: overrides.sandboxWebhookTokenSource || 'none',
+      webhookSecretSource: overrides.webhookSecretSource || 'none',
       webhookUrl: 'https://api.tienda.test/api/shipping/webhooks/envia',
       webhookDashboardUrl: 'https://shipping-test.envia.com/settings/developers',
       readiness: {
@@ -154,7 +159,7 @@ describe('ShippingProvidersCard', () => {
     );
   });
 
-  it('mantiene la entrega manual disponible sin exponer configuración técnica del servidor', async () => {
+  it('mantiene la entrega manual disponible cuando realmente no existe una conexión previa', async () => {
     getAdminShippingSettings.mockResolvedValue(
       response({ encryptionConfigured: false })
     );
@@ -175,6 +180,77 @@ describe('ShippingProvidersCard', () => {
     expect(
       screen.queryByText(/INTEGRATIONS_ENCRYPTION_KEY|reiniciar el backend/i)
     ).not.toBeInTheDocument();
+  });
+
+  it('reconoce y conserva activa la conexión existente aunque no permita reemplazar credenciales', async () => {
+    const user = userEvent.setup();
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        encryptionConfigured: false,
+        credentialSource: 'environment',
+        sandboxWebhookTokenSource: 'environment',
+        settings: {
+          defaultProvider: 'envia',
+          hasEnviaToken: true,
+          hasSandboxWebhookToken: true,
+          enviaTokenHint: 'Configurado en el despliegue',
+          sandboxWebhookTokenHint: 'Configurado en el despliegue',
+        },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: true,
+          canTest: true,
+          canActivateSandbox: true,
+        },
+      })
+    );
+    testAdminShippingConnection.mockResolvedValue(
+      response({
+        encryptionConfigured: false,
+        credentialSource: 'environment',
+        sandboxWebhookTokenSource: 'environment',
+        settings: {
+          defaultProvider: 'envia',
+          hasEnviaToken: true,
+          hasSandboxWebhookToken: true,
+        },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: true,
+          canTest: true,
+          canActivateSandbox: true,
+        },
+      })
+    );
+
+    render(<ShippingProvidersCard />);
+
+    expect(await screen.findByText('Activo: Envia Sandbox')).toBeInTheDocument();
+    expect(screen.getByText('Credenciales existentes detectadas')).toBeInTheDocument();
+    expect(screen.getByText('Conexión existente detectada')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Token de Envia')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('La entrega automática está pendiente de habilitación por soporte técnico.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/INTEGRATIONS_ENCRYPTION_KEY|reiniciar el backend/i)
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Cuenta y credenciales'));
+    await user.click(
+      screen.getByRole('button', { name: 'Probar conexión existente' })
+    );
+    await waitFor(() => expect(testAdminShippingConnection).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByRole('button', { name: 'Desactivar API y volver a manual' })
+    ).toBeInTheDocument();
+    expect(activateAdminShippingProvider).not.toHaveBeenCalled();
   });
 
   it('convierte un error técnico del servidor en una orientación comprensible', async () => {
