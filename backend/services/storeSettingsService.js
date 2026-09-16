@@ -12,14 +12,26 @@ const STORE_DEFAULTS = Object.freeze({
   website: '',
   address: '',
   city: '',
+  cityCode: '',
   department: '',
+  departmentCode: '',
   country: 'CO',
   timezone: 'America/Bogota',
   locale: 'es-CO',
   customerServiceHours: '',
+  weeklySchedule: null,
 });
 
 const SUPPORTED_LOCALES = new Set(['es-CO', 'en-US']);
+const WEEK_DAYS = Object.freeze([
+  ['monday', 'Lunes'],
+  ['tuesday', 'Martes'],
+  ['wednesday', 'Miércoles'],
+  ['thursday', 'Jueves'],
+  ['friday', 'Viernes'],
+  ['saturday', 'Sábado'],
+  ['sunday', 'Domingo'],
+]);
 
 class StoreSettingsError extends Error {
   constructor(message, code, status = 400, details = []) {
@@ -96,10 +108,121 @@ function isValidTimezone(value) {
   }
 }
 
+function normalizeTime(value) {
+  const time = cleanText(value, 5);
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : '';
+}
+
+function normalizeWeeklySchedule(value) {
+  if (!value || typeof value !== 'object' || !Array.isArray(value.days)) return null;
+
+  const sourceDays = new Map(
+    value.days
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => [cleanText(entry.day, 12).toLowerCase(), entry])
+  );
+
+  return {
+    version: 1,
+    days: WEEK_DAYS.map(([day]) => {
+      const source = sourceDays.get(day) || {};
+      const enabled = source.enabled === true;
+      const intervals = enabled && Array.isArray(source.intervals)
+        ? source.intervals.slice(0, 2).map((interval) => ({
+            open: normalizeTime(interval?.open),
+            close: normalizeTime(interval?.close),
+          }))
+        : [];
+      return { day, enabled, intervals };
+    }),
+  };
+}
+
+function timeLabel(value) {
+  const [hours, minutes] = String(value || '').split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return '';
+  const suffix = hours >= 12 ? 'p. m.' : 'a. m.';
+  const hour = hours % 12 || 12;
+  return `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function scheduleSummary(schedule) {
+  if (!schedule) return '';
+  const openDays = schedule.days.filter((entry) => entry.enabled && entry.intervals.length);
+  if (!openDays.length) return 'Cerrado todos los días';
+
+  const groups = [];
+  const intervalKey = (entry) => entry.intervals
+    .map(({ open, close }) => `${open}-${close}`)
+    .join('|');
+  openDays.forEach((entry) => {
+    const previous = groups[groups.length - 1];
+    const previousDay = previous?.[previous.length - 1]?.day;
+    const previousIndex = WEEK_DAYS.findIndex(([day]) => day === previousDay);
+    const currentIndex = WEEK_DAYS.findIndex(([day]) => day === entry.day);
+    if (
+      previous &&
+      previousIndex + 1 === currentIndex &&
+      intervalKey(previous[0]) === intervalKey(entry)
+    ) {
+      previous.push(entry);
+    } else {
+      groups.push([entry]);
+    }
+  });
+
+  return groups.map((group) => {
+    const firstLabel = WEEK_DAYS.find(([day]) => day === group[0].day)?.[1] || group[0].day;
+    const lastEntry = group[group.length - 1];
+    const lastLabel = WEEK_DAYS.find(([day]) => day === lastEntry.day)?.[1] || lastEntry.day;
+    const dayLabel = group.length === 1 ? firstLabel : `${firstLabel} a ${lastLabel.toLowerCase()}`;
+    const intervals = group[0].intervals
+      .map(({ open, close }) => `${timeLabel(open)} – ${timeLabel(close)}`)
+      .join(' y ');
+    return `${dayLabel}: ${intervals}`;
+  }).join('; ');
+}
+
+function validateWeeklySchedule(schedule, details) {
+  if (!schedule) return;
+
+  schedule.days.forEach((entry) => {
+    if (!entry.enabled) return;
+    if (!entry.intervals.length) {
+      details.push({
+        field: 'weeklySchedule',
+        message: 'Cada día activo debe tener al menos un horario.',
+      });
+      return;
+    }
+
+    entry.intervals.forEach((interval) => {
+      if (!interval.open || !interval.close || interval.open >= interval.close) {
+        details.push({
+          field: 'weeklySchedule',
+          message: 'La hora de cierre debe ser posterior a la hora de apertura.',
+        });
+      }
+    });
+
+    if (
+      entry.intervals.length === 2 &&
+      entry.intervals[0].close > entry.intervals[1].open
+    ) {
+      details.push({
+        field: 'weeklySchedule',
+        message: 'Los turnos de un mismo día no pueden superponerse.',
+      });
+    }
+  });
+}
+
 function normalizeStoreSettings(input = {}) {
   const source = input && typeof input === 'object' && !Array.isArray(input)
     ? input
     : {};
+
+  const weeklySchedule = normalizeWeeklySchedule(source.weeklySchedule);
 
   return {
     name: cleanText(source.name, 120),
@@ -111,11 +234,16 @@ function normalizeStoreSettings(input = {}) {
     website: normalizeWebsite(source.website),
     address: cleanText(source.address, 220),
     city: cleanText(source.city, 100),
+    cityCode: cleanText(source.cityCode, 20),
     department: cleanText(source.department, 100),
+    departmentCode: cleanText(source.departmentCode, 20),
     country: cleanText(source.country || STORE_DEFAULTS.country, 2).toUpperCase(),
     timezone: cleanText(source.timezone || STORE_DEFAULTS.timezone, 80),
     locale: cleanText(source.locale || STORE_DEFAULTS.locale, 12),
-    customerServiceHours: cleanText(source.customerServiceHours, 160),
+    customerServiceHours: weeklySchedule
+      ? cleanText(scheduleSummary(weeklySchedule), 1000)
+      : cleanText(source.customerServiceHours, 1000),
+    weeklySchedule,
   };
 }
 
@@ -153,6 +281,12 @@ function validateStoreSettings(input = {}) {
   if (store.department.length < 2) {
     details.push({ field: 'department', message: 'Escribe el departamento o región.' });
   }
+  if (store.country === 'CO' && !/^\d{2}$/.test(store.departmentCode)) {
+    details.push({ field: 'departmentCode', message: 'Selecciona un departamento del catálogo.' });
+  }
+  if (store.country === 'CO' && !/^\d{5}$/.test(store.cityCode)) {
+    details.push({ field: 'cityCode', message: 'Selecciona un municipio del catálogo.' });
+  }
   if (!/^[A-Z]{2}$/.test(store.country)) {
     details.push({ field: 'country', message: 'Selecciona un país válido.' });
   }
@@ -162,6 +296,7 @@ function validateStoreSettings(input = {}) {
   if (!SUPPORTED_LOCALES.has(store.locale)) {
     details.push({ field: 'locale', message: 'Selecciona un idioma regional válido.' });
   }
+  validateWeeklySchedule(store.weeklySchedule, details);
 
   if (details.length) {
     throw new StoreSettingsError(
@@ -278,6 +413,8 @@ module.exports = {
   buildStoreSettingsResponse,
   getStoreSettings,
   normalizeStoreSettings,
+  normalizeWeeklySchedule,
+  scheduleSummary,
   updateStoreSettings,
   validateStoreSettings,
 };

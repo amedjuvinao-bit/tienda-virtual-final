@@ -15,9 +15,17 @@ import {
 } from 'lucide-react';
 
 import {
+  fetchStoreCities,
+  fetchStoreRegions,
   fetchStoreSettings,
   saveStoreSettings,
 } from '../api/storeSettingsApi';
+import StoreHoursEditor from './StoreHoursEditor';
+import {
+  formatWeeklySchedule,
+  normalizeWeeklySchedule,
+  validateWeeklySchedule,
+} from './storeHours';
 import './EmpresaSection.css';
 
 const EMPTY_STORE = Object.freeze({
@@ -30,11 +38,14 @@ const EMPTY_STORE = Object.freeze({
   website: '',
   address: '',
   city: '',
+  cityCode: '',
   department: '',
+  departmentCode: '',
   country: 'CO',
   timezone: 'America/Bogota',
   locale: 'es-CO',
   customerServiceHours: '',
+  weeklySchedule: null,
 });
 
 const STEPS = [
@@ -60,11 +71,14 @@ const STEPS = [
     fields: [
       'address',
       'city',
+      'cityCode',
       'department',
+      'departmentCode',
       'country',
       'timezone',
       'locale',
       'customerServiceHours',
+      'weeklySchedule',
     ],
   },
 ];
@@ -79,12 +93,22 @@ const REQUIRED_FIELDS = [
 ];
 
 function normalizeStore(raw = {}) {
-  return Object.fromEntries(
+  const normalized = Object.fromEntries(
     Object.entries(EMPTY_STORE).map(([key, fallback]) => [
       key,
       raw?.[key] ?? fallback,
     ])
   );
+  normalized.weeklySchedule = normalizeWeeklySchedule(raw?.weeklySchedule);
+  return normalized;
+}
+
+function normalizeGeoText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 }
 
 function validateStore(store) {
@@ -124,6 +148,14 @@ function validateStore(store) {
   if (String(store.department || '').trim().length < 2) {
     errors.department = 'Escribe el departamento o región.';
   }
+  if (store.country === 'CO' && !/^\d{2}$/.test(String(store.departmentCode || ''))) {
+    errors.departmentCode = 'Selecciona un departamento del catálogo.';
+  }
+  if (store.country === 'CO' && !/^\d{5}$/.test(String(store.cityCode || ''))) {
+    errors.cityCode = 'Selecciona un municipio del catálogo.';
+  }
+  const scheduleError = validateWeeklySchedule(store.weeklySchedule);
+  if (scheduleError) errors.weeklySchedule = scheduleError;
 
   return errors;
 }
@@ -173,6 +205,11 @@ export default function EmpresaSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [regions, setRegions] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [geoError, setGeoError] = useState('');
 
   const dirty = useMemo(
     () => JSON.stringify(store) !== JSON.stringify(snapshot),
@@ -210,6 +247,88 @@ export default function EmpresaSection() {
   }, []);
 
   useEffect(() => {
+    if (!store.country) {
+      setRegions([]);
+      setCities([]);
+      return undefined;
+    }
+    let active = true;
+    setRegionsLoading(true);
+    setGeoError('');
+    fetchStoreRegions(store.country)
+      .then((data) => {
+        if (!active) return;
+        setRegions(data);
+        if (!data.length) setGeoError('No hay departamentos disponibles para el país seleccionado.');
+      })
+      .catch(() => {
+        if (!active) return;
+        setRegions([]);
+        setCities([]);
+        setGeoError('No fue posible cargar los departamentos. Intenta nuevamente.');
+      })
+      .finally(() => {
+        if (active) setRegionsLoading(false);
+      });
+    return () => { active = false; };
+  }, [store.country]);
+
+  useEffect(() => {
+    if (!regions.length || store.departmentCode || !store.department) return;
+    const match = regions.find(
+      (region) => normalizeGeoText(region.name) === normalizeGeoText(store.department)
+    );
+    if (!match) return;
+    const code = String(match.code || match.isoCode || '');
+    setStore((current) => ({ ...current, department: match.name, departmentCode: code }));
+    setSnapshot((current) =>
+      !current.departmentCode && normalizeGeoText(current.department) === normalizeGeoText(match.name)
+        ? { ...current, department: match.name, departmentCode: code }
+        : current
+    );
+  }, [regions, store.department, store.departmentCode]);
+
+  useEffect(() => {
+    if (!store.country || !store.departmentCode) {
+      setCities([]);
+      return undefined;
+    }
+    let active = true;
+    setCitiesLoading(true);
+    setGeoError('');
+    fetchStoreCities(store.country, store.departmentCode)
+      .then((data) => {
+        if (!active) return;
+        setCities(data);
+        if (!data.length) setGeoError('No hay municipios disponibles para el departamento seleccionado.');
+      })
+      .catch(() => {
+        if (!active) return;
+        setCities([]);
+        setGeoError('No fue posible cargar los municipios. Intenta nuevamente.');
+      })
+      .finally(() => {
+        if (active) setCitiesLoading(false);
+      });
+    return () => { active = false; };
+  }, [store.country, store.departmentCode]);
+
+  useEffect(() => {
+    if (!cities.length || store.cityCode || !store.city) return;
+    const match = cities.find(
+      (city) => normalizeGeoText(city.name) === normalizeGeoText(store.city)
+    );
+    if (!match) return;
+    const code = String(match.code || '');
+    setStore((current) => ({ ...current, city: match.name, cityCode: code }));
+    setSnapshot((current) =>
+      !current.cityCode && normalizeGeoText(current.city) === normalizeGeoText(match.name)
+        ? { ...current, city: match.name, cityCode: code }
+        : current
+    );
+  }, [cities, store.city, store.cityCode]);
+
+  useEffect(() => {
     const warnUnsavedChanges = (event) => {
       if (!dirty) return;
       event.preventDefault();
@@ -228,6 +347,25 @@ export default function EmpresaSection() {
       return next;
     });
     if (feedback?.type === 'success') setFeedback(null);
+  };
+
+  const updateLocation = (changes) => {
+    setStore((current) => ({ ...current, ...changes }));
+    const changedFields = Object.keys(changes);
+    setErrors((current) => {
+      if (!changedFields.some((field) => current[field])) return current;
+      const next = { ...current };
+      changedFields.forEach((field) => delete next[field]);
+      return next;
+    });
+    if (feedback?.type === 'success') setFeedback(null);
+  };
+
+  const updateSchedule = (weeklySchedule) => {
+    updateLocation({
+      weeklySchedule,
+      customerServiceHours: formatWeeklySchedule(weeklySchedule),
+    });
   };
 
   const handleReset = () => {
@@ -369,12 +507,40 @@ export default function EmpresaSection() {
               <header><Clock3 size={22} /><div><h3>Operación principal</h3><p>Ubicación, zona horaria e idioma usados por la administración.</p></div></header>
               <div className="store-form-grid">
                 <Field label="Dirección principal" required error={errors.address}><input value={store.address} onChange={(event) => updateField('address', event.target.value)} placeholder="Calle, número y referencia" /></Field>
-                <Field label="Ciudad" required error={errors.city}><input value={store.city} onChange={(event) => updateField('city', event.target.value)} placeholder="Santa Marta" /></Field>
-                <Field label="Departamento o región" required error={errors.department}><input value={store.department} onChange={(event) => updateField('department', event.target.value)} placeholder="Magdalena" /></Field>
-                <Field label="País" required error={errors.country}><select value={store.country} onChange={(event) => updateField('country', event.target.value)}><option value="CO">Colombia</option><option value="EC">Ecuador</option><option value="MX">México</option><option value="PE">Perú</option><option value="US">Estados Unidos</option></select></Field>
+                <Field label="País" required error={errors.country}><select value={store.country} onChange={(event) => updateLocation({ country: event.target.value, department: '', departmentCode: '', city: '', cityCode: '' })}><option value="CO">Colombia</option><option value="EC">Ecuador</option><option value="MX">México</option><option value="PE">Perú</option><option value="US">Estados Unidos</option></select></Field>
+                <Field label={store.country === 'CO' ? 'Departamento' : 'Estado o región'} required error={errors.departmentCode || errors.department} help={regionsLoading ? 'Cargando catálogo…' : 'Selecciona una opción registrada en la base de datos.'}>
+                  <select
+                    value={store.departmentCode}
+                    disabled={regionsLoading || !regions.length}
+                    onChange={(event) => {
+                      const region = regions.find((item) => String(item.code || item.isoCode) === event.target.value);
+                      updateLocation({ department: region?.name || '', departmentCode: event.target.value, city: '', cityCode: '' });
+                    }}
+                  >
+                    <option value="">{regionsLoading ? 'Cargando departamentos…' : 'Selecciona un departamento'}</option>
+                    {regions.map((region) => {
+                      const code = String(region.code || region.isoCode || '');
+                      return <option key={code} value={code}>{region.name}</option>;
+                    })}
+                  </select>
+                </Field>
+                <Field label={store.country === 'CO' ? 'Municipio' : 'Ciudad'} required error={errors.cityCode || errors.city} help={citiesLoading ? 'Cargando catálogo…' : !store.departmentCode ? 'Primero selecciona el departamento.' : 'La lista depende del departamento seleccionado.'}>
+                  <select
+                    value={store.cityCode}
+                    disabled={citiesLoading || !store.departmentCode || !cities.length}
+                    onChange={(event) => {
+                      const city = cities.find((item) => String(item.code) === event.target.value);
+                      updateLocation({ city: city?.name || '', cityCode: event.target.value });
+                    }}
+                  >
+                    <option value="">{citiesLoading ? 'Cargando municipios…' : 'Selecciona un municipio'}</option>
+                    {cities.map((city) => <option key={city.code} value={String(city.code)}>{city.name}</option>)}
+                  </select>
+                </Field>
+                {geoError ? <div className="store-geo-error" role="alert"><AlertTriangle size={15} /> {geoError}</div> : null}
                 <Field label="Zona horaria" required error={errors.timezone}><select value={store.timezone} onChange={(event) => updateField('timezone', event.target.value)}><option value="America/Bogota">Bogotá (UTC-5)</option><option value="America/Guayaquil">Guayaquil (UTC-5)</option><option value="America/Lima">Lima (UTC-5)</option><option value="America/Mexico_City">Ciudad de México</option><option value="America/New_York">Nueva York</option></select></Field>
                 <Field label="Idioma regional" required error={errors.locale}><select value={store.locale} onChange={(event) => updateField('locale', event.target.value)}><option value="es-CO">Español (Colombia)</option><option value="en-US">English (United States)</option></select></Field>
-                <Field label="Horario de atención" error={errors.customerServiceHours} help="Opcional. Escríbelo como quieres comunicarlo al cliente."><input value={store.customerServiceHours} onChange={(event) => updateField('customerServiceHours', event.target.value)} placeholder="Lunes a sábado, 8:00 a. m. – 6:00 p. m." /></Field>
+                <StoreHoursEditor value={store.weeklySchedule} legacySummary={store.customerServiceHours} error={errors.weeklySchedule} onChange={updateSchedule} />
               </div>
             </div>
           ) : null}

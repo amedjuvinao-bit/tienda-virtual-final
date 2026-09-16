@@ -25,11 +25,25 @@ const VALID_STORE = Object.freeze({
   website: 'https://rosa.example/',
   address: 'Calle 20 # 4-15',
   city: 'Santa Marta',
+  cityCode: '47001',
   department: 'Magdalena',
+  departmentCode: '47',
   country: 'co',
   timezone: 'America/Bogota',
   locale: 'es-CO',
   customerServiceHours: 'Lunes a sábado, 8:00 a. m. a 6:00 p. m.',
+  weeklySchedule: {
+    version: 1,
+    days: [
+      { day: 'monday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'tuesday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'wednesday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'thursday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'friday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'saturday', enabled: true, intervals: [{ open: '08:00', close: '18:00' }] },
+      { day: 'sunday', enabled: false, intervals: [] },
+    ],
+  },
 });
 
 function queryResult(value) {
@@ -50,6 +64,12 @@ async function run() {
   assert.strictEqual(normalized.whatsapp, '+573017654321');
   assert.strictEqual(normalized.website, 'https://rosa.example');
   assert.strictEqual(normalized.country, 'CO');
+  assert.strictEqual(normalized.departmentCode, '47');
+  assert.strictEqual(normalized.cityCode, '47001');
+  assert.strictEqual(
+    normalized.customerServiceHours,
+    'Lunes a sábado: 8:00 a. m. – 6:00 p. m.'
+  );
   assert.deepStrictEqual(validateStoreSettings(VALID_STORE), normalized);
 
   assert.throws(
@@ -58,6 +78,28 @@ async function run() {
       error instanceof StoreSettingsError &&
       error.status === 422 &&
       error.details.some(({ field }) => field === 'phone')
+  );
+  assert.throws(
+    () => validateStoreSettings({ ...VALID_STORE, cityCode: '' }),
+    (error) =>
+      error instanceof StoreSettingsError &&
+      error.details.some(({ field }) => field === 'cityCode')
+  );
+  assert.throws(
+    () => validateStoreSettings({
+      ...VALID_STORE,
+      weeklySchedule: {
+        version: 1,
+        days: [{
+          day: 'monday',
+          enabled: true,
+          intervals: [{ open: '18:00', close: '08:00' }],
+        }],
+      },
+    }),
+    (error) =>
+      error instanceof StoreSettingsError &&
+      error.details.some(({ field }) => field === 'weeklySchedule')
   );
   assert.throws(
     () => validateStoreSettings({ ...VALID_STORE, website: 'rosa.example' }),
@@ -107,6 +149,9 @@ async function run() {
   assert(SiteSettings.schema.path('storeRevision'), 'Falta la revisión de Tienda.');
   assert(SiteSettings.schema.path('store.website'), 'Falta el sitio web de Tienda.');
   assert(SiteSettings.schema.path('store.timezone'), 'Falta la zona horaria de Tienda.');
+  assert(SiteSettings.schema.path('store.departmentCode'), 'Falta el código de departamento.');
+  assert(SiteSettings.schema.path('store.cityCode'), 'Falta el código de municipio.');
+  assert(SiteSettings.schema.path('store.weeklySchedule'), 'Falta el horario semanal estructurado.');
 
   const originalFindOne = SiteSettings.findOne;
   const originalFindOneAndUpdate = SiteSettings.findOneAndUpdate;

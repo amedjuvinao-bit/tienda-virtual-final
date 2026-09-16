@@ -4,11 +4,18 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import EmpresaSection from './EmpresaSection';
-import { fetchStoreSettings, saveStoreSettings } from '../api/storeSettingsApi';
+import {
+  fetchStoreCities,
+  fetchStoreRegions,
+  fetchStoreSettings,
+  saveStoreSettings,
+} from '../api/storeSettingsApi';
 
 vi.mock('../api/storeSettingsApi', () => ({
   fetchStoreSettings: vi.fn(),
   saveStoreSettings: vi.fn(),
+  fetchStoreRegions: vi.fn(),
+  fetchStoreCities: vi.fn(),
 }));
 
 const INITIAL_STORE = {
@@ -21,11 +28,14 @@ const INITIAL_STORE = {
   website: 'https://rosa.example',
   address: 'Calle 20 # 4-15',
   city: 'Santa Marta',
+  cityCode: '47001',
   department: 'Magdalena',
+  departmentCode: '47',
   country: 'CO',
   timezone: 'America/Bogota',
   locale: 'es-CO',
   customerServiceHours: 'Lunes a sábado, 8:00 a. m. a 6:00 p. m.',
+  weeklySchedule: null,
 };
 
 function settings(overrides = {}) {
@@ -44,6 +54,11 @@ describe('EmpresaSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fetchStoreSettings.mockResolvedValue(settings());
+    fetchStoreRegions.mockResolvedValue([{ code: '47', name: 'Magdalena' }]);
+    fetchStoreCities.mockResolvedValue([
+      { code: '47001', name: 'Santa Marta' },
+      { code: '47189', name: 'Ciénaga' },
+    ]);
     saveStoreSettings.mockResolvedValue({
       ...settings({ name: 'Rosa Boutique Premium' }),
       revision: 8,
@@ -124,5 +139,39 @@ describe('EmpresaSection', () => {
     expect(await screen.findByText(/Otra persona actualizó/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Recargar versión actual' }));
     await waitFor(() => expect(fetchStoreSettings).toHaveBeenCalledTimes(2));
+  });
+
+  it('recupera códigos históricos y ofrece municipio dependiente del departamento', async () => {
+    const user = userEvent.setup();
+    fetchStoreSettings.mockResolvedValue(settings({ departmentCode: '', cityCode: '' }));
+    render(<EmpresaSection />);
+
+    await screen.findByText('Identidad de la tienda');
+    await user.click(screen.getByRole('button', { name: /Operación/i }));
+
+    const department = await screen.findByLabelText(/^Departamento/i);
+    await waitFor(() => expect(department).toHaveValue('47'));
+    expect(fetchStoreRegions).toHaveBeenCalledWith('CO');
+    await waitFor(() => expect(fetchStoreCities).toHaveBeenCalledWith('CO', '47'));
+    await waitFor(() => expect(screen.getByLabelText(/^Municipio/i)).toHaveValue('47001'));
+
+    await user.selectOptions(screen.getByLabelText(/^Municipio/i), '47189');
+    expect(screen.getByLabelText(/^Municipio/i)).toHaveValue('47189');
+  });
+
+  it('configura un horario semanal rápido y permite jornada dividida', async () => {
+    const user = userEvent.setup();
+    render(<EmpresaSection />);
+
+    await screen.findByText('Identidad de la tienda');
+    await user.click(screen.getByRole('button', { name: /Operación/i }));
+    await user.click(screen.getByRole('button', { name: 'Lun–Sáb' }));
+
+    expect(screen.getByLabelText(/Hora de apertura del lunes, turno 1/i)).toHaveValue('08:00');
+    expect(screen.getAllByText(/Lunes a sábado: 8:00 a. m. – 6:00 p. m./i)).toHaveLength(2);
+
+    await user.click(screen.getAllByRole('button', { name: 'Segundo turno' })[0]);
+    expect(screen.getByLabelText(/Hora de cierre del lunes, turno 1/i)).toHaveValue('12:00');
+    expect(screen.getByLabelText(/Hora de apertura del lunes, turno 2/i)).toHaveValue('14:00');
   });
 });

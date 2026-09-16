@@ -36,11 +36,14 @@ function buildDefaultSettings() {
       website: "",
       address: "",
       city: "",
+      cityCode: "",
       department: "",
+      departmentCode: "",
       country: "CO",
       timezone: "America/Bogota",
       locale: "es-CO",
       customerServiceHours: "",
+      weeklySchedule: null,
     },
 
     theme: {

@@ -113,6 +113,43 @@ const BannerSchema = new Schema(
 );
 
 /* ========== Store / Empresa ========== */
+const StoreHoursIntervalSchema = new Schema(
+  {
+    open: { type: String, default: "08:00" },
+    close: { type: String, default: "18:00" },
+  },
+  { _id: false }
+);
+
+const StoreHoursDaySchema = new Schema(
+  {
+    day: {
+      type: String,
+      enum: [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
+      required: true,
+    },
+    enabled: { type: Boolean, default: false },
+    intervals: { type: [StoreHoursIntervalSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const StoreWeeklyScheduleSchema = new Schema(
+  {
+    version: { type: Number, default: 1 },
+    days: { type: [StoreHoursDaySchema], default: [] },
+  },
+  { _id: false }
+);
+
 const StoreSchema = new Schema(
   {
     name: { type: String, default: "" },
@@ -124,11 +161,14 @@ const StoreSchema = new Schema(
     website: { type: String, default: "" },
     address: { type: String, default: "" },
     city: { type: String, default: "" },
+    cityCode: { type: String, default: "" },
     department: { type: String, default: "" },
+    departmentCode: { type: String, default: "" },
     country: { type: String, default: "CO" },
     timezone: { type: String, default: "America/Bogota" },
     locale: { type: String, default: "es-CO" },
     customerServiceHours: { type: String, default: "" },
+    weeklySchedule: { type: StoreWeeklyScheduleSchema, default: undefined },
   },
   { _id: false, strict: false }
 );
