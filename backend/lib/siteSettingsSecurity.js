@@ -20,6 +20,8 @@ const SENSITIVE_KEYS = new Set([
   'lastconnectionfingerprint',
   'numberingrangesfingerprint',
   'activationfingerprint',
+  'accountnumber',
+  'signaturesecret',
 ]);
 
 function clone(value) {
@@ -93,6 +95,7 @@ function buildPublicSiteSettings(rawSettings) {
   delete safe._credentialStatus;
   delete safe.billing;
   delete safe.storeRevision;
+  delete safe.paymentSettingsRevision;
   delete safe.updatedBy;
   delete safe.__v;
 

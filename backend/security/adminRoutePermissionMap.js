@@ -1290,6 +1290,21 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     audit: true,
   },
   {
+    method: 'GET',
+    path: '/api/admin/payment-settings',
+    permission: 'settings:payments',
+    description: 'Consultar la configuración protegida de proveedores de pago.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/payment-settings',
+    permission: 'settings:payments',
+    description: 'Actualizar la configuración protegida de proveedores de pago.',
+    audit: true,
+    sensitive: true,
+    danger: true,
+  },
+  {
     method: 'PUT',
     path: '/api/site-settings',
     permission: 'settings:view',

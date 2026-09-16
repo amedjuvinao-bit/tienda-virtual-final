@@ -480,6 +480,17 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
       });
     }
 
+    if (
+      req.body?.theme?.global &&
+      Object.prototype.hasOwnProperty.call(req.body.theme.global, "payments")
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error: "PAYMENTS_DEDICATED_ENDPOINT_REQUIRED",
+        message: "La configuración de Pagos debe guardarse desde su módulo protegido.",
+      });
+    }
+
     if (isInvalidSettingsSection(theme)) {
       return res.status(400).json({ error: "theme debe ser un objeto" });
     }

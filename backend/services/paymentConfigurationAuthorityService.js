@@ -36,6 +36,10 @@ function normalizePaymentsConfig(raw, env = process.env) {
     credentials.payu && typeof credentials.payu === 'object'
       ? credentials.payu
       : {};
+  const manual =
+    credentials.manual && typeof credentials.manual === 'object'
+      ? credentials.manual
+      : {};
 
   return {
     active: cfg.active === true,
@@ -70,6 +74,13 @@ function normalizePaymentsConfig(raw, env = process.env) {
           200
         ),
       },
+      manual: {
+        accountHolder: cleanText(manual.accountHolder, 180),
+        bankName: cleanText(manual.bankName, 120),
+        accountType: cleanText(manual.accountType, 80),
+        accountNumber: cleanText(manual.accountNumber, 120),
+        paymentInstructions: cleanText(manual.paymentInstructions, 1000),
+      },
     },
   };
 }
@@ -96,6 +107,13 @@ function missingProviderConfiguration(config, provider) {
     const payu = config.credentials.payu;
     return ['merchantId', 'accountId', 'apiLogin', 'apiKey'].filter(
       (field) => !payu[field]
+    );
+  }
+
+  if (provider === 'manual') {
+    const manual = config.credentials.manual;
+    return ['accountHolder', 'bankName', 'accountNumber', 'paymentInstructions'].filter(
+      (field) => !manual[field]
     );
   }
 

@@ -150,6 +150,7 @@ const adminDashboardGoalRoutes = tryRequire('./routes/adminDashboardGoal');
 const adminMailSettingsRoutes = tryRequire('./routes/adminMailSettings');
 const adminAuditLogsRoutes = tryRequire('./routes/adminAuditLogs');
 const adminStoreSettingsRoutes = tryRequire('./routes/adminStoreSettings');
+const adminPaymentSettingsRoutes = tryRequire('./routes/adminPaymentSettings');
 const adminShippingSettingsRoutes = tryRequire('./routes/adminShippingSettings');
 const billingSettingsProtectionRoutes = tryRequire('./routes/billingSettingsProtection');
 const siteSettingsRoutes = tryRequire('./routes/siteSettings');
@@ -197,6 +198,9 @@ if (adminDashboardGoalRoutes) app.use('/api/admin/dashboard-goal', adminDashboar
 if (adminMailSettingsRoutes) app.use('/api/admin/mail-settings', adminMailSettingsRoutes);
 if (adminAuditLogsRoutes) app.use('/api/admin/audit-logs', adminAuditLogsRoutes);
 if (adminStoreSettingsRoutes) app.use('/api/admin/store-settings', adminStoreSettingsRoutes);
+if (adminPaymentSettingsRoutes) {
+  app.use('/api/admin/payment-settings', adminPaymentSettingsRoutes);
+}
 if (adminShippingSettingsRoutes) {
   app.use('/api/admin/shipping-settings', adminShippingSettingsRoutes);
 }
