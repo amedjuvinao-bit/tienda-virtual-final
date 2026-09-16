@@ -87,16 +87,22 @@ function validateMenuAndPermissions() {
   ok('Menú y permisos de facturación unificada están configurados');
 }
 
-function validateConfigurationPreserved() {
-  const billingSection = readProjectFile('frontend/src/admin/ConfiguracionPage.jsx');
+function validateBillingAuthorityPreserved() {
+  const configurationPage = readProjectFile('frontend/src/admin/ConfiguracionPage.jsx');
   const settingsRoutes = readProjectFile('backend/routes/siteSettings.js');
 
-  assertIncludes(billingSection, "import FacturacionSection", 'ConfiguracionPage perdió FacturacionSection');
-  assertIncludes(billingSection, "case 'facturacion'", 'ConfiguracionPage perdió el caso facturacion');
+  assert(
+    !configurationPage.includes('import FacturacionSection'),
+    'ConfiguracionPage volvió a duplicar el módulo principal de Facturación'
+  );
+  assert(
+    !configurationPage.includes("case 'facturacion'"),
+    'ConfiguracionPage volvió a exponer el caso retirado de Facturación'
+  );
   assertIncludes(settingsRoutes, 'billing:', 'siteSettings no conserva billing');
   assertIncludes(settingsRoutes, 'ensureBillingExists', 'siteSettings no conserva autocorrección billing');
 
-  ok('Configuración de facturación existente se conserva sin borrarla');
+  ok('Facturación conserva sus datos y autoridad sin duplicarse dentro de Configuración');
 }
 
 function validatePackageScript() {
@@ -112,7 +118,7 @@ function main() {
     validateUnifiedBillingPage,
     validateRoutes,
     validateMenuAndPermissions,
-    validateConfigurationPreserved,
+    validateBillingAuthorityPreserved,
     validatePackageScript,
   ].forEach((step) => {
     try {
