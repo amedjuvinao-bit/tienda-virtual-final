@@ -294,3 +294,39 @@
 .shipping-center input[type='checkbox'] {
   accent-color: var(--admin-primary);
 }
+
+.shipping-center .shipping-zone-header,
+.shipping-center .shipping-zone-row {
+  grid-template-columns: minmax(150px, 1.35fr) minmax(90px, 0.65fr) minmax(130px, 1fr) auto;
+}
+
+.shipping-center .shipping-zone-row {
+  background: var(--admin-card-bg);
+}
+
+.shipping-center .shipping-zone-row:hover {
+  background: color-mix(in srgb, var(--admin-card-bg) 95%, var(--admin-primary) 5%);
+}
+
+.shipping-modal-backdrop {
+  background: color-mix(in srgb, #111827 52%, transparent);
+  backdrop-filter: blur(5px);
+}
+
+@media (max-width: 767px) {
+  .shipping-center .shipping-zone-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .shipping-center .shipping-zone-row > :nth-child(2),
+  .shipping-center .shipping-zone-row > :nth-child(3) {
+    grid-column: 1;
+  }
+
+  .shipping-center .shipping-zone-row > :last-child {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    flex-direction: column;
+  }
+}

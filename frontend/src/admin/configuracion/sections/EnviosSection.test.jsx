@@ -86,7 +86,7 @@ describe('EnviosSection', () => {
     expect(screen.getByText('¿Cuánto cobrará la tienda?')).toBeInTheDocument();
   });
 
-  it('permite configurar ciudades dentro de un panel compacto', async () => {
+  it('resume las ciudades en filas y abre solo un editor de destino', async () => {
     const user = userEvent.setup();
     render(<EnviosSection />);
 
@@ -94,9 +94,11 @@ describe('EnviosSection', () => {
     await user.click(screen.getByRole('button', { name: /Precio por ciudad/i }));
     await user.click(screen.getByRole('button', { name: '+ Agregar ciudad' }));
 
-    expect(screen.getByText('Destino 1')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Destino 1' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Destino 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Usar este destino' })).toBeInTheDocument();
     expect(screen.getByText('1 regla creada')).toBeInTheDocument();
-    expect(screen.getByText('Si una ciudad no está en la lista')).toBeInTheDocument();
+    expect(screen.getByText(/Si una ciudad no está en la lista/)).toBeInTheDocument();
   });
 
   it('guarda mediante el endpoint protegido con control de versión', async () => {
@@ -119,7 +121,7 @@ describe('EnviosSection', () => {
       estimatedTime: '2 a 5 días hábiles',
     });
     expect(await screen.findByText('Tarifas guardadas.')).toBeInTheDocument();
-    expect(screen.getAllByText('Versión 5')).toHaveLength(2);
+    expect(screen.getByText('Versión 5')).toBeInTheDocument();
   });
 
   it('bloquea el envío gratis accidental cuando no hay compra mínima', async () => {
