@@ -9,11 +9,16 @@ import {
   savePaymentSettings,
   testWompiMerchant,
 } from '../api/paymentSettingsApi';
+import { fetchStoreSettings } from '../api/storeSettingsApi';
 
 vi.mock('../api/paymentSettingsApi', () => ({
   fetchPaymentSettings: vi.fn(),
   savePaymentSettings: vi.fn(),
   testWompiMerchant: vi.fn(),
+}));
+
+vi.mock('../api/storeSettingsApi', () => ({
+  fetchStoreSettings: vi.fn(),
 }));
 
 const SETTINGS = {
@@ -59,6 +64,10 @@ describe('PagosSection', () => {
     fetchPaymentSettings.mockResolvedValue(response());
     savePaymentSettings.mockResolvedValue(response({ checkoutLabel: 'Pago seguro' }));
     testWompiMerchant.mockResolvedValue({ ok: true, merchant: { name: 'Rosa Boutique' } });
+    fetchStoreSettings.mockResolvedValue({
+      ok: true,
+      store: { name: 'Rosa Boutique', businessName: 'Rosa Boutique S.A.S.' },
+    });
   });
 
   it('muestra únicamente proveedores respaldados por el checkout', async () => {
@@ -69,6 +78,7 @@ describe('PagosSection', () => {
     expect(screen.getByRole('button', { name: /Pago manual/i })).toBeInTheDocument();
     expect(screen.queryByText('Bold')).not.toBeInTheDocument();
     expect(screen.queryByText('Mercado Pago')).not.toBeInTheDocument();
+    expect(screen.getByText(/Configura cómo/i)).toHaveTextContent('Rosa Boutique');
   });
 
   it('reconoce secretos guardados sin exponer sus valores', async () => {
@@ -112,6 +122,22 @@ describe('PagosSection', () => {
       mode: 'sandbox',
       publicKey: 'pub_test_value',
     }));
-    expect(await screen.findByText(/Conexión aprobada con Rosa Boutique/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Conexión aprobada por Wompi/i)).toBeInTheDocument();
+    expect(screen.getByText('Identidad coherente')).toBeInTheDocument();
+    expect(screen.getByText('Tienda configurada').closest('div')).toHaveTextContent('Rosa Boutique');
+    expect(screen.getByText('Comercio conectado en Wompi').closest('div')).toHaveTextContent('Rosa Boutique');
+  });
+
+  it('advierte cuando la identidad de Wompi no coincide con la tienda configurada', async () => {
+    const user = userEvent.setup();
+    testWompiMerchant.mockResolvedValue({ ok: true, merchant: { name: 'Otro Comercio' } });
+    render(<PagosSection />);
+    await screen.findByText('Proveedor y ambiente');
+    await user.click(screen.getByRole('button', { name: 'Abrir Credenciales' }));
+    await user.click(screen.getByRole('button', { name: /Probar conexión/i }));
+
+    expect(await screen.findByText('Revisa la identidad')).toBeInTheDocument();
+    expect(screen.getByText('Otro Comercio')).toBeInTheDocument();
+    expect(screen.getByText(/tienen nombres diferentes/i)).toBeInTheDocument();
   });
 });

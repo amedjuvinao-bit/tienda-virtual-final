@@ -22,6 +22,7 @@ import {
   savePaymentSettings,
   testWompiMerchant,
 } from '../api/paymentSettingsApi';
+import { fetchStoreSettings } from '../api/storeSettingsApi';
 import { API_BASE_URL } from '../../../config/apiBaseUrl';
 import './PagosSection.css';
 
@@ -118,6 +119,27 @@ function paymentErrorMessage(error) {
   return error?.response?.data?.message || error?.userMessage || 'No fue posible completar la operación.';
 }
 
+function normalizeIdentityName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(s\.?\s*a\.?\s*s\.?|s\.?\s*a\.?|ltda\.?|limitada|e\.?\s*u\.?)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function merchantMatchesStore(merchantName, storeIdentity) {
+  const merchant = normalizeIdentityName(merchantName);
+  if (!merchant) return null;
+  const storeNames = [storeIdentity?.name, storeIdentity?.businessName]
+    .map(normalizeIdentityName)
+    .filter(Boolean);
+  if (!storeNames.length) return null;
+  return storeNames.includes(merchant);
+}
+
 function Field({ label, error, help, children }) {
   const controlId = React.useId();
   const feedbackId = `${controlId}-feedback`;
@@ -163,11 +185,17 @@ export default function PagosSection() {
   const [testResult, setTestResult] = useState(null);
   const [confirmProduction, setConfirmProduction] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [storeIdentity, setStoreIdentity] = useState({ name: '', businessName: '' });
+  const [storeIdentityAvailable, setStoreIdentityAvailable] = useState(true);
 
   const currentProvider = useMemo(() => providerMeta(settings.provider), [settings.provider]);
   const dirty = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(snapshot),
     [settings, snapshot]
+  );
+  const storeDisplayName = useMemo(
+    () => storeIdentity.name || storeIdentity.businessName || 'Tienda sin identificar',
+    [storeIdentity]
   );
 
   const localReadiness = useMemo(() => {
@@ -193,7 +221,10 @@ export default function PagosSection() {
       setLoading(true);
       setFeedback(null);
       setErrors({});
-      const response = await fetchPaymentSettings();
+      const [response, storeResponse] = await Promise.all([
+        fetchPaymentSettings(),
+        fetchStoreSettings().catch(() => null),
+      ]);
       const next = normalizeSettings(response?.settings);
       setSettings(next);
       setSnapshot(next);
@@ -204,6 +235,11 @@ export default function PagosSection() {
       setUpdatedBy(response?.updatedBy || '');
       setConfirmProduction(false);
       setTestResult(null);
+      setStoreIdentity({
+        name: String(storeResponse?.store?.name || '').trim(),
+        businessName: String(storeResponse?.store?.businessName || '').trim(),
+      });
+      setStoreIdentityAvailable(Boolean(storeResponse?.store));
     } catch (error) {
       setFeedback({ type: 'error', message: paymentErrorMessage(error) });
     } finally {
@@ -310,11 +346,12 @@ export default function PagosSection() {
         mode: settings.mode,
         publicKey: settings.credentials.wompi.publicKey,
       });
+      const merchantName = String(response?.merchant?.name || '').trim();
       setTestResult({
         ok: true,
-        message: response?.merchant?.name
-          ? `Conexión aprobada con ${response.merchant.name}.`
-          : 'Conexión aprobada por Wompi.',
+        message: 'Conexión aprobada por Wompi.',
+        merchantName,
+        identityMatches: merchantMatchesStore(merchantName, storeIdentity),
       });
     } catch (error) {
       setTestResult({ ok: false, message: paymentErrorMessage(error) });
@@ -353,7 +390,7 @@ export default function PagosSection() {
           <div>
             <span className="payments-eyebrow">Centro seguro de cobros</span>
             <h2>{currentProvider?.label || 'Configura tus pagos'}</h2>
-            <p>Define el único proveedor que usará el checkout y protege sus credenciales.</p>
+            <p>Configura cómo <strong>{storeDisplayName}</strong> recibirá pagos y protege sus credenciales.</p>
           </div>
         </div>
         <div className="payments-readiness">
@@ -460,6 +497,24 @@ export default function PagosSection() {
                   <div><strong>Validación de comercio Wompi</strong><small>Consulta el comercio usando la llave pública y el ambiente seleccionados.</small></div>
                   <button type="button" onClick={handleTest} disabled={testing || !settings.credentials.wompi.publicKey}>{testing ? <Loader2 className="animate-spin" size={16} /> : <BadgeCheck size={16} />} Probar conexión</button>
                   {testResult ? <p data-ok={testResult.ok}>{testResult.message}</p> : null}
+                  <div className="payments-identity-comparison">
+                    <div>
+                      <span>Tienda configurada</span>
+                      <strong>{storeDisplayName}</strong>
+                      <small>{storeIdentityAvailable ? 'Nombre obtenido de Configuración → Tienda.' : 'No fue posible consultar la identidad guardada.'}</small>
+                    </div>
+                    <div>
+                      <span>Comercio conectado en Wompi</span>
+                      <strong>{testResult?.merchantName || 'Pendiente de validar'}</strong>
+                      <small>{testResult?.merchantName ? 'Nombre informado directamente por Wompi.' : 'Pulsa Probar conexión para consultarlo.'}</small>
+                    </div>
+                    {testResult?.ok && testResult.identityMatches === true ? (
+                      <div className="payments-identity-status" data-match="true"><CheckCircle2 size={17} /><span><strong>Identidad coherente</strong><small>El comercio conectado coincide con la tienda configurada.</small></span></div>
+                    ) : null}
+                    {testResult?.ok && testResult.identityMatches === false ? (
+                      <div className="payments-identity-status" data-match="false"><AlertTriangle size={17} /><span><strong>Revisa la identidad</strong><small>La tienda configurada y el comercio conectado en Wompi tienen nombres diferentes.</small></span></div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>

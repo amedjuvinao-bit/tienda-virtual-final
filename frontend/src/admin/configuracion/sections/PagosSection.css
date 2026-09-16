@@ -121,6 +121,15 @@
 .payments-test-box button:disabled { opacity: .5; cursor: not-allowed; }
 .payments-test-box p { grid-column: 1 / -1; margin: 0; color: var(--admin-danger, #b91c1c); font-size: 11px; font-weight: 700; }
 .payments-test-box p[data-ok="true"] { color: #16803d; }
+.payments-identity-comparison { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px !important; }
+.payments-identity-comparison > div:not(.payments-identity-status) { display: grid; min-width: 0; gap: 3px; padding: 11px; border: 1px solid var(--payments-border); border-radius: 12px; background: color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 2%); }
+.payments-identity-comparison span { color: var(--payments-muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.payments-identity-comparison strong { overflow-wrap: anywhere; color: var(--payments-text); font-size: 12px; }
+.payments-identity-comparison small { color: var(--payments-muted); font-size: 9px; line-height: 1.4; }
+.payments-identity-status { grid-column: 1 / -1; display: flex !important; align-items: flex-start; gap: 8px !important; padding: 10px 11px; border: 1px solid color-mix(in srgb, #16a34a 28%, transparent); border-radius: 12px; background: color-mix(in srgb, #16a34a 8%, var(--admin-card-bg)); color: #16803d; }
+.payments-identity-status[data-match="false"] { border-color: color-mix(in srgb, #f59e0b 34%, transparent); background: color-mix(in srgb, #f59e0b 9%, var(--admin-card-bg)); color: #9a6700; }
+.payments-identity-status > span { display: grid; gap: 2px; color: inherit; letter-spacing: 0; text-transform: none; }
+.payments-identity-status strong, .payments-identity-status small { color: inherit; }
 
 .payments-webhook { margin-top: 18px; padding: 14px; border: 1px solid var(--payments-border); border-radius: 16px; background: color-mix(in srgb, var(--admin-card-bg) 95%, var(--admin-primary) 2%); }
 .payments-webhook__heading { display: flex; align-items: center; gap: 9px; color: var(--admin-primary, #db2777); }
@@ -164,6 +173,7 @@
 @media (max-width: 680px) {
   .payments-steps { grid-template-columns: 1fr; }
   .payments-provider-grid, .payments-form-grid { grid-template-columns: 1fr; }
+  .payments-identity-comparison { grid-template-columns: 1fr; }
   .payments-card { padding: 15px; }
   .payments-actions { position: static; grid-template-columns: 1fr 1fr; }
   .payments-actions > div { grid-column: 1 / -1; }
