@@ -109,12 +109,14 @@ async function main() {
           async json() {
             return {
               success: true,
-              data: [{
-                tracking_number: 'ACCOUNT-TEST-001',
-                carrier: 'fedex',
-                status: 'Created',
-                created_at: '2026-08-28T12:00:00.000Z',
-              }],
+              data: {
+                guides: [{
+                  tracking_number: 'ACCOUNT-TEST-001',
+                  carrier: 'fedex',
+                  status: 'Created',
+                  created_at: '2026-08-28T12:00:00.000Z',
+                }],
+              },
             };
           },
         };

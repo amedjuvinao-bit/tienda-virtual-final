@@ -7,6 +7,7 @@ import {
   activateAdminShippingProvider,
   confirmAdminShippingWebhook,
   getAdminShippingSettings,
+  getAdminShippingWebhookCandidates,
   testAdminShippingConnection,
   testAdminShippingWebhook,
   updateAdminShippingSettings,
@@ -17,6 +18,7 @@ vi.mock('../../../api/adminShippingSettingsApi', () => ({
   confirmAdminShippingWebhook: vi.fn(),
   disableAdminShippingProvider: vi.fn(),
   getAdminShippingSettings: vi.fn(),
+  getAdminShippingWebhookCandidates: vi.fn(),
   testAdminShippingConnection: vi.fn(),
   testAdminShippingWebhook: vi.fn(),
   updateAdminShippingSettings: vi.fn(),
@@ -70,6 +72,7 @@ describe('ShippingProvidersCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getAdminShippingSettings.mockResolvedValue(response());
+    getAdminShippingWebhookCandidates.mockResolvedValue({ candidates: [] });
   });
 
   it('mantiene manual activo y nunca renderiza un secreto recibido', async () => {
@@ -323,6 +326,15 @@ describe('ShippingProvidersCard', () => {
 
   it('solicita a Envia el POST oficial después de registrar la URL', async () => {
     const user = userEvent.setup();
+    getAdminShippingWebhookCandidates.mockResolvedValue({
+      candidates: [
+        {
+          carrier: 'dhl',
+          trackingNumber: '9402306292',
+          createdAt: '2026-09-15T12:00:00.000Z',
+        },
+      ],
+    });
     getAdminShippingSettings.mockResolvedValue(
       response({
         settings: { hasEnviaToken: true, hasSandboxWebhookToken: true },
@@ -351,10 +363,53 @@ describe('ShippingProvidersCard', () => {
 
     render(<ShippingProvidersCard />);
     await user.click(
-      await screen.findByRole('button', { name: 'Enviar prueba oficial desde Envia' })
+      await screen.findByRole('button', { name: 'Enviar prueba con esta guía' })
     );
 
-    await waitFor(() => expect(testAdminShippingWebhook).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(testAdminShippingWebhook).toHaveBeenCalledWith({
+        carrier: 'dhl',
+        trackingNumber: '9402306292',
+      })
+    );
+  });
+
+  it('permite escribir una guía existente cuando Envia no devuelve el listado', async () => {
+    const user = userEvent.setup();
+    getAdminShippingSettings.mockResolvedValue(
+      response({
+        settings: { hasEnviaToken: true, hasSandboxWebhookToken: true },
+        readiness: {
+          hasToken: true,
+          hasSandboxWebhookToken: true,
+          tested: true,
+          webhookRegistered: true,
+          webhookVerified: false,
+        },
+      })
+    );
+    testAdminShippingWebhook.mockResolvedValue({
+      ...response(),
+      message: 'Prueba oficial solicitada a Envia.',
+    });
+
+    render(<ShippingProvidersCard />);
+    await user.click(
+      await screen.findByText('¿La guía no aparece? Escribir una existente')
+    );
+    await user.type(screen.getByLabelText('Transportadora de la guía'), 'DHL');
+    await user.type(
+      screen.getByLabelText('Número de guía para la prueba'),
+      '9402306292'
+    );
+    await user.click(screen.getByRole('button', { name: 'Probar guía' }));
+
+    await waitFor(() =>
+      expect(testAdminShippingWebhook).toHaveBeenCalledWith({
+        carrier: 'DHL',
+        trackingNumber: '9402306292',
+      })
+    );
   });
 
   it('muestra la confirmación únicamente cuando Envia ya comprobó el webhook', async () => {

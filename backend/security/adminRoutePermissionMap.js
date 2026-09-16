@@ -1385,6 +1385,12 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     danger: true,
   },
   {
+    method: 'GET',
+    path: '/api/admin/shipping-settings/webhook/candidates',
+    permission: 'settings:shipping',
+    description: 'Consultar guías Sandbox disponibles para probar el webhook.',
+  },
+  {
     method: 'POST',
     path: '/api/admin/shipping-settings/webhook/test',
     permission: 'settings:shipping',

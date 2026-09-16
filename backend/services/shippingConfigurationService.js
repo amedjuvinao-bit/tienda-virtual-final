@@ -117,6 +117,44 @@ function shipmentIdentity(shipment = {}) {
   };
 }
 
+async function listRecentSandboxShipments(provider, now = new Date()) {
+  if (typeof provider?.listShipmentsByMonth !== 'function') {
+    throw new ShippingSettingsError(
+      'La integración de Envia no puede consultar las guías de la cuenta.',
+      'SHIPPING_SHIPMENT_LOOKUP_UNAVAILABLE',
+      500
+    );
+  }
+
+  const candidates = [];
+  const seen = new Set();
+  for (const period of recentShipmentPeriods(now)) {
+    let shipments = [];
+    try {
+      shipments = await provider.listShipmentsByMonth(period);
+    } catch (error) {
+      const providerStatus = Number(error?.details?.providerStatus);
+      if (
+        error?.code === 'SHIPPING_PROVIDER_HTTP_ERROR' &&
+        [404, 422].includes(providerStatus)
+      ) {
+        continue;
+      }
+      throw error;
+    }
+    (Array.isArray(shipments) ? shipments : []).forEach((shipment) => {
+      const candidate = shipmentIdentity(shipment);
+      if (!candidate.carrier || !candidate.trackingNumber) return;
+      const key = `${candidate.carrier}:${candidate.trackingNumber}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push(candidate);
+    });
+    if (candidates.length) break;
+  }
+  return candidates.sort((left, right) => right.createdAt - left.createdAt);
+}
+
 async function findRecentSandboxReturnShipment(
   { OrderReturnModel = OrderReturn } = {}
 ) {
@@ -160,6 +198,24 @@ async function resolveSandboxWebhookTestShipment(
   now = new Date(),
   { findReturnShipment = findRecentSandboxReturnShipment } = {}
 ) {
+  const requestedTrackingNumber = clean(input.trackingNumber, 180);
+  const requestedCarrier = clean(input.carrier, 80).toLowerCase();
+  if (requestedTrackingNumber || requestedCarrier) {
+    if (!requestedTrackingNumber || !requestedCarrier) {
+      throw new ShippingSettingsError(
+        'Selecciona la transportadora y la guía que Envia usará en la prueba.',
+        'SHIPPING_WEBHOOK_TEST_DATA_REQUIRED',
+        400
+      );
+    }
+    return {
+      carrier: requestedCarrier,
+      trackingNumber: requestedTrackingNumber,
+      createdAt: 0,
+      source: 'selected_by_admin',
+    };
+  }
+
   if (typeof provider?.listShipmentsByMonth !== 'function') {
     throw new ShippingSettingsError(
       'La integración de Envia no puede consultar las guías de la cuenta.',
@@ -167,27 +223,10 @@ async function resolveSandboxWebhookTestShipment(
       500
     );
   }
-  const requestedTrackingNumber = clean(input.trackingNumber, 180);
-  const requestedCarrier = clean(input.carrier, 80).toLowerCase();
-  const candidates = [];
-  for (const period of recentShipmentPeriods(now)) {
-    const shipments = await provider.listShipmentsByMonth(period);
-    (Array.isArray(shipments) ? shipments : []).forEach((shipment) => {
-      const candidate = shipmentIdentity(shipment);
-      if (!candidate.carrier || !candidate.trackingNumber) return;
-      if (
-        requestedTrackingNumber &&
-        candidate.trackingNumber !== requestedTrackingNumber
-      ) return;
-      if (requestedCarrier && candidate.carrier !== requestedCarrier) return;
-      candidates.push(candidate);
-    });
-    if (candidates.length) break;
-  }
-  candidates.sort((left, right) => right.createdAt - left.createdAt);
+  const candidates = await listRecentSandboxShipments(provider, now);
   if (candidates[0]) return candidates[0];
 
-  if (!requestedTrackingNumber && typeof findReturnShipment === 'function') {
+  if (typeof findReturnShipment === 'function') {
     const returnShipment = await findReturnShipment();
     if (returnShipment?.carrier && returnShipment?.trackingNumber) {
       return returnShipment;
@@ -195,13 +234,54 @@ async function resolveSandboxWebhookTestShipment(
   }
 
   throw new ShippingSettingsError(
-    requestedTrackingNumber
-      ? 'La guía indicada no pertenece a las guías recientes de esta cuenta Envia Sandbox.'
-      : 'La cuenta Envia Sandbox no tiene una guía reciente para realizar la prueba oficial. Primero debe existir una guía de prueba en esa misma cuenta.',
+    'Envia no devolvió guías recientes. Puedes escribir en el panel cualquier guía existente de esta misma cuenta Sandbox.',
     'SHIPPING_WEBHOOK_TEST_SHIPMENT_REQUIRED',
     409,
     { provider: 'envia', mode: 'sandbox' }
   );
+}
+
+async function listShippingWebhookProofCandidates(
+  {
+    SettingsModel = ShippingSettings,
+    provider = null,
+    fetchImpl,
+    now = new Date(),
+    findReturnShipment = findRecentSandboxReturnShipment,
+  } = {}
+) {
+  const runtime = await getRuntimeShippingConfiguration({ SettingsModel });
+  const state = readiness(runtime.settings, runtime);
+  if (runtime.envia.mode !== 'sandbox') {
+    return { candidates: [] };
+  }
+  if (!state.hasToken || !state.tested) {
+    throw new ShippingSettingsError(
+      'Prueba primero la conexión con Envia para consultar las guías Sandbox.',
+      'SHIPPING_SHIPMENT_LOOKUP_NOT_READY',
+      409,
+      state
+    );
+  }
+
+  const envia = provider || createEnviaProvider({
+    config: runtime.envia,
+    fetchImpl,
+  });
+  const candidates = await listRecentSandboxShipments(envia, now);
+  if (!candidates.length && typeof findReturnShipment === 'function') {
+    const fallback = await findReturnShipment();
+    if (fallback?.carrier && fallback?.trackingNumber) candidates.push(fallback);
+  }
+  return {
+    candidates: candidates.slice(0, 20).map((candidate) => ({
+      carrier: candidate.carrier,
+      trackingNumber: candidate.trackingNumber,
+      createdAt: candidate.createdAt
+        ? new Date(candidate.createdAt).toISOString()
+        : null,
+    })),
+  };
 }
 
 function publicHttpsUrl(value) {
@@ -766,6 +846,7 @@ module.exports = {
   findRecentSandboxReturnShipment,
   getRuntimeShippingConfiguration,
   getShippingSettingsView,
+  listShippingWebhookProofCandidates,
   markShippingWebhookVerified,
   permanentPublicHttpsUrl,
   publicHttpsUrl,

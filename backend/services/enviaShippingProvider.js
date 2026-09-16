@@ -59,6 +59,39 @@ function carrierActionRows(payload = {}) {
   return [];
 }
 
+function shipmentRows(payload = {}) {
+  const candidates = [
+    payload,
+    payload?.data,
+    payload?.data?.data,
+    payload?.data?.shipments,
+    payload?.data?.guides,
+    payload?.data?.records,
+    payload?.data?.items,
+    payload?.shipments,
+    payload?.guides,
+    payload?.records,
+    payload?.items,
+    payload?.results,
+  ];
+  const rows = candidates.find(Array.isArray);
+  if (rows) return rows;
+
+  const keyedRows = payload?.data && typeof payload.data === 'object'
+    ? Object.values(payload.data).filter(
+        (item) => item && typeof item === 'object' && !Array.isArray(item)
+      )
+    : [];
+  return keyedRows.some((item) =>
+    item.tracking_number ||
+    item.trackingNumber ||
+    item.guide_number ||
+    item.guideNumber
+  )
+    ? keyedRows
+    : [];
+}
+
 function carrierActionNames(rows = []) {
   return [...new Set((Array.isArray(rows) ? rows : [])
     .map((item) => clean(item?.action_name || item?.action || item?.name).toLowerCase())
@@ -545,7 +578,7 @@ function createEnviaProvider({
         'list_shipments',
         { accountQueryApi: true, method: 'GET', normalize: false }
       );
-      return Array.isArray(payload?.data) ? payload.data : [];
+      return shipmentRows(payload);
     },
     async schedulePickup(payload) {
       return request('/ship/pickup/', payload, 'schedule_pickup');

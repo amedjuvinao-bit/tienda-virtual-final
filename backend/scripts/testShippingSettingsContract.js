@@ -23,6 +23,7 @@ const {
 } = require('../security/adminRoutePermissionMap');
 const {
   findRecentSandboxReturnShipment,
+  listShippingWebhookProofCandidates,
   markShippingWebhookVerified,
   permanentPublicHttpsUrl,
   readiness,
@@ -106,6 +107,7 @@ async function main() {
     ['PUT', '/api/admin/shipping-settings'],
     ['POST', '/api/admin/shipping-settings/test'],
     ['POST', '/api/admin/shipping-settings/webhook/confirm'],
+    ['GET', '/api/admin/shipping-settings/webhook/candidates'],
     ['POST', '/api/admin/shipping-settings/webhook/test'],
     ['POST', '/api/admin/shipping-settings/activate'],
     ['POST', '/api/admin/shipping-settings/disable'],
@@ -118,7 +120,7 @@ async function main() {
   const routeSource = read('backend/routes/adminShippingSettings.js');
   assert.match(routeSource, /requireAdmin/);
   assert.match(routeSource, /requirePermission\('settings:shipping'\)/);
-  ok('las siete operaciones administrativas exigen sesión y permiso de envíos');
+  ok('las ocho operaciones administrativas exigen sesión y permiso de envíos');
 
   const webhookRouteSource = read('backend/routes/shippingWebhookRoutes.js');
   assert.match(webhookRouteSource, /router\.get\('\/'[\s\S]*?ready: true/);
@@ -221,6 +223,38 @@ async function main() {
       };
     },
   };
+  const listedCandidates = await listShippingWebhookProofCandidates({
+    SettingsModel: { getSingleton: async () => proofSettings },
+    provider: {
+      async listShipmentsByMonth(period) {
+        if (period.month === '08') {
+          return [
+            {
+              tracking_number: '9402306292',
+              carrier: 'DHL',
+              created_at: '2026-08-27T15:00:00.000Z',
+            },
+            {
+              tracking_number: '9402306292',
+              carrier: 'DHL',
+              created_at: '2026-08-26T15:00:00.000Z',
+            },
+          ];
+        }
+        return [];
+      },
+    },
+    now: new Date('2026-08-28T12:00:00.000Z'),
+  });
+  assert.deepStrictEqual(listedCandidates.candidates, [
+    {
+      carrier: 'dhl',
+      trackingNumber: '9402306292',
+      createdAt: '2026-08-27T15:00:00.000Z',
+    },
+  ]);
+  ok('el panel lista guías Sandbox reales sin duplicarlas ni exponer credenciales');
+
   let proofRequest = null;
   const queriedPeriods = [];
   await requestShippingWebhookProof(
@@ -252,6 +286,30 @@ async function main() {
     status: 'Shipped',
   });
   ok('el panel usa una guía real de la cuenta y el contrato oficial carrier/trackingNumber/status');
+
+  proofRequest = null;
+  await requestShippingWebhookProof(
+    { carrier: 'DHL', trackingNumber: '9402306292' },
+    '64b000000000000000000001',
+    {
+      SettingsModel: { getSingleton: async () => proofSettings },
+      provider: {
+        async listShipmentsByMonth() {
+          throw new Error('No debe buscar otra guía cuando el administrador ya eligió una');
+        },
+        async testWebhook(input) {
+          proofRequest = input;
+          return { success: true };
+        },
+      },
+    }
+  );
+  assert.deepStrictEqual(proofRequest, {
+    carrier: 'dhl',
+    trackingNumber: '9402306292',
+    status: 'Shipped',
+  });
+  ok('la guía elegida por el administrador se prueba directamente sin sustituirla por otra');
 
   let returnLookupFilter = null;
   let returnLookupSort = null;
@@ -474,7 +532,9 @@ async function main() {
   assert.match(frontend, /Probar conexión/);
   assert.match(frontend, /Abrir portal de Envia/);
   assert.match(frontend, /Ya registré la URL/);
-  assert.match(frontend, /Enviar prueba oficial desde Envia/);
+  assert.match(frontend, /Enviar prueba con esta guía/);
+  assert.match(frontend, /Guía para la prueba del webhook/);
+  assert.match(frontend, /¿La guía no aparece\? Escribir una existente/);
   assert.match(frontend, /Prueba recibida desde Envia/);
   assert.match(
     frontend,

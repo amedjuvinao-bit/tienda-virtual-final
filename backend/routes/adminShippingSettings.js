@@ -9,6 +9,7 @@ const {
   confirmShippingWebhook,
   disableShippingProvider,
   getShippingSettingsView,
+  listShippingWebhookProofCandidates,
   requestShippingWebhookProof,
   testShippingConnection,
   updateShippingSettings,
@@ -74,6 +75,17 @@ router.post('/webhook/confirm', async (req, res) => {
       ok: true,
       message: 'Registro anotado. Solicita ahora la prueba oficial de Envia desde este panel.',
       ...result,
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+router.get('/webhook/candidates', async (_req, res) => {
+  try {
+    return res.json({
+      ok: true,
+      ...(await listShippingWebhookProofCandidates()),
     });
   } catch (error) {
     return sendError(res, error);

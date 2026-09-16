@@ -4,6 +4,7 @@ import {
   confirmAdminShippingWebhook,
   disableAdminShippingProvider,
   getAdminShippingSettings,
+  getAdminShippingWebhookCandidates,
   testAdminShippingConnection,
   testAdminShippingWebhook,
   updateAdminShippingSettings,
@@ -86,6 +87,11 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
   const [feedback, setFeedback] = useState(null);
+  const [webhookCandidates, setWebhookCandidates] = useState([]);
+  const [selectedWebhookCandidate, setSelectedWebhookCandidate] = useState('');
+  const [loadingWebhookCandidates, setLoadingWebhookCandidates] = useState(false);
+  const [manualCarrier, setManualCarrier] = useState('');
+  const [manualTrackingNumber, setManualTrackingNumber] = useState('');
 
   const applyResponse = useCallback((response) => {
     setData(response);
@@ -142,6 +148,48 @@ export default function ShippingProvidersCard({ onStatusChange }) {
   const waitingWebhookProof = Boolean(
     savedMode && ready.webhookRegistered && !ready.webhookVerified
   );
+
+  const loadWebhookCandidates = useCallback(async ({ announce = false } = {}) => {
+    try {
+      setLoadingWebhookCandidates(true);
+      const response = await getAdminShippingWebhookCandidates();
+      const candidates = Array.isArray(response?.candidates)
+        ? response.candidates
+        : [];
+      setWebhookCandidates(candidates);
+      setSelectedWebhookCandidate((current) => {
+        const stillExists = candidates.some(
+          (candidate) =>
+            `${candidate.carrier}:${candidate.trackingNumber}` === current
+        );
+        return stillExists
+          ? current
+          : candidates[0]
+            ? `${candidates[0].carrier}:${candidates[0].trackingNumber}`
+            : '';
+      });
+      if (announce) {
+        setFeedback({
+          type: candidates.length ? 'success' : 'error',
+          text: candidates.length
+            ? `Se encontraron ${candidates.length} guías disponibles en Envia Sandbox.`
+            : 'Envia no devolvió guías recientes. Puedes escribir abajo una guía existente de esta cuenta.',
+        });
+      }
+    } catch (error) {
+      setWebhookCandidates([]);
+      if (announce) {
+        setFeedback({ type: 'error', text: friendlyShippingError(error) });
+      }
+    } finally {
+      setLoadingWebhookCandidates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!waitingWebhookProof || production) return;
+    loadWebhookCandidates();
+  }, [loadWebhookCandidates, production, waitingWebhookProof]);
 
   useEffect(() => {
     if (!waitingWebhookProof) return undefined;
@@ -245,6 +293,27 @@ export default function ShippingProvidersCard({ onStatusChange }) {
     } finally {
       setBusyAction('');
     }
+  };
+
+  const selectedGuide = webhookCandidates.find(
+    (candidate) =>
+      `${candidate.carrier}:${candidate.trackingNumber}` === selectedWebhookCandidate
+  );
+  const requestWebhookTest = (guide = selectedGuide) => {
+    const carrier = String(guide?.carrier || manualCarrier).trim();
+    const trackingNumber = String(
+      guide?.trackingNumber || manualTrackingNumber
+    ).trim();
+    if (!carrier || !trackingNumber) {
+      setFeedback({
+        type: 'error',
+        text: 'Selecciona una guía o escribe la transportadora y el número de guía existente.',
+      });
+      return;
+    }
+    runAction('webhook-test', () =>
+      testAdminShippingWebhook({ carrier, trackingNumber })
+    );
   };
 
   const save = () => {
@@ -610,16 +679,95 @@ export default function ShippingProvidersCard({ onStatusChange }) {
                     >
                       Ya registré la URL
                     </ActionButton>
-                    {ready.webhookRegistered && !ready.webhookVerified && !production && (
-                      <ActionButton
-                        tone="pink"
-                        busy={busyAction === 'webhook-test'}
-                        onClick={() => runAction('webhook-test', testAdminShippingWebhook)}
-                      >
-                        Enviar prueba oficial desde Envia
-                      </ActionButton>
-                    )}
                   </div>
+
+                  {ready.webhookRegistered && !ready.webhookVerified && !production && (
+                    <div className="shipping-soft-surface mt-3 rounded-xl border p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <label className="min-w-0 flex-1">
+                          <span className="mb-1 block text-xs font-bold uppercase tracking-wide">
+                            Guía para la prueba
+                          </span>
+                          <select
+                            aria-label="Guía para la prueba del webhook"
+                            className={fieldClass}
+                            value={selectedWebhookCandidate}
+                            disabled={loadingWebhookCandidates || !webhookCandidates.length}
+                            onChange={(event) => setSelectedWebhookCandidate(event.target.value)}
+                          >
+                            {!webhookCandidates.length && (
+                              <option value="">
+                                {loadingWebhookCandidates
+                                  ? 'Consultando guías de Envia…'
+                                  : 'No se encontraron guías recientes'}
+                              </option>
+                            )}
+                            {webhookCandidates.map((candidate) => {
+                              const value = `${candidate.carrier}:${candidate.trackingNumber}`;
+                              return (
+                                <option key={value} value={value}>
+                                  {candidate.carrier.toUpperCase()} · {candidate.trackingNumber}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <ActionButton
+                            tone="light"
+                            busy={loadingWebhookCandidates}
+                            onClick={() => loadWebhookCandidates({ announce: true })}
+                          >
+                            Actualizar guías
+                          </ActionButton>
+                          <ActionButton
+                            tone="pink"
+                            busy={busyAction === 'webhook-test'}
+                            disabled={!selectedGuide}
+                            onClick={() => requestWebhookTest(selectedGuide)}
+                          >
+                            Enviar prueba con esta guía
+                          </ActionButton>
+                        </div>
+                      </div>
+
+                      <details className="mt-3">
+                        <summary className="shipping-muted cursor-pointer text-xs font-semibold">
+                          ¿La guía no aparece? Escribir una existente
+                        </summary>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end">
+                          <label>
+                            <span className="mb-1 block text-xs font-bold">Transportadora</span>
+                            <input
+                              aria-label="Transportadora de la guía"
+                              className={fieldClass}
+                              value={manualCarrier}
+                              onChange={(event) => setManualCarrier(event.target.value)}
+                              placeholder="Ej. DHL"
+                            />
+                          </label>
+                          <label>
+                            <span className="mb-1 block text-xs font-bold">Número de guía</span>
+                            <input
+                              aria-label="Número de guía para la prueba"
+                              className={fieldClass}
+                              value={manualTrackingNumber}
+                              onChange={(event) => setManualTrackingNumber(event.target.value)}
+                              placeholder="Guía existente en esta cuenta Sandbox"
+                            />
+                          </label>
+                          <ActionButton
+                            tone="pink"
+                            busy={busyAction === 'webhook-test'}
+                            disabled={!manualCarrier.trim() || !manualTrackingNumber.trim()}
+                            onClick={() => requestWebhookTest(null)}
+                          >
+                            Probar guía
+                          </ActionButton>
+                        </div>
+                      </details>
+                    </div>
+                  )}
                 </div>
 
                 {ready.webhookRegistered && !ready.webhookVerified && (

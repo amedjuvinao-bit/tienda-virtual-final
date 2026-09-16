@@ -50,9 +50,16 @@ export function confirmAdminShippingWebhook() {
   );
 }
 
-export function testAdminShippingWebhook() {
+export function getAdminShippingWebhookCandidates() {
   return request(
-    () => api.post(`${BASE_URL}/webhook/test`),
+    () => api.get(`${BASE_URL}/webhook/candidates`),
+    'No se pudieron consultar las guías disponibles en Envia.'
+  );
+}
+
+export function testAdminShippingWebhook(payload = {}) {
+  return request(
+    () => api.post(`${BASE_URL}/webhook/test`, payload),
     'No se pudo solicitar la prueba oficial del webhook a Envia.'
   );
 }
