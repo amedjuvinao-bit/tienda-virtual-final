@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import galleryImmersiveDefault from "../assets/login/gallery-immersive-default.webp";
 import {
   Lock,
   User,
@@ -1119,6 +1120,7 @@ export default function Login() {
     || DEFAULT_LOGIN_SETTINGS.customizations[activeTheme.id]
     || DEFAULT_LOGIN_SETTINGS.customizations.liquidGlass;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
+  const galleryBackground = hasCustomImageBg ? loginBg.image : galleryImmersiveDefault;
 
   const loginPageBackground =
     loginBg.mode === "color" ? loginBg.color : activeTheme.pageBg;
@@ -1423,11 +1425,19 @@ export default function Login() {
   </section>;
 
   const renderImmersiveGallery = () => <section className="rb-gallery-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    {hasCustomImageBg ? <div className="rb-gallery-media" style={{ backgroundImage: `url("${loginBg.image}")`, opacity: loginBg.imageOpacity }} /> : null}
-    <div className="rb-gallery-overlay" style={{ opacity: hasCustomImageBg ? loginBg.overlay : undefined }} />
-    <div className="rb-gallery-lens" aria-hidden="true" />
-    <div className="rb-gallery-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-gallery-copy" /></div>
-    <div className="rb-gallery-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-gallery" /></div>
+    <div className="rb-gallery-media" style={{ backgroundImage: `url("${galleryBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
+    <div className="rb-gallery-overlay" style={{ "--gallery-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.18 }} />
+    <div className="rb-gallery-ambient" aria-hidden="true"><i /><i /></div>
+    <div className="rb-gallery-story">
+      <CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} />
+      <StoryCopy className="rb-theme-copy rb-gallery-copy" />
+      <span className="rb-gallery-caption">IDENTIDAD · GESTIÓN · CRECIMIENTO</span>
+    </div>
+    <div className="rb-gallery-access">
+      <span className="rb-gallery-access-kicker">ACCESO PRIVADO</span>
+      <CuratedCredentialsForm {...curatedFormProps} inputId="rb-gallery" />
+      <span className="rb-gallery-security"><i /> Sesión protegida</span>
+    </div>
   </section>;
 
   const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>

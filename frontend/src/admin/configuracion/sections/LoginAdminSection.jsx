@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import galleryImmersiveDefault from '../../../assets/login/gallery-immersive-default.webp';
 import {
   Check,
   ExternalLink,
@@ -90,6 +91,9 @@ function LoginPreview({ settings, store }) {
   const customization = settings.customizations?.[theme.id] || getLoginThemeCustomization(theme.id);
   const previewImage = safeLoginImageUrl(background.image);
   const imageMode = background.mode === 'image' && previewImage;
+  const resolvedPreviewImage = imageMode
+    ? previewImage
+    : theme.id === 'immersiveGallery' ? galleryImmersiveDefault : '';
   const pageBackground = background.mode === 'color' ? background.color : theme.pageBg;
 
   return (
@@ -115,15 +119,15 @@ function LoginPreview({ settings, store }) {
           '--login-surface': customization.surface,
         }}
       >
-        {imageMode ? (
+        {resolvedPreviewImage ? (
           <>
             <div
               className="login-settings-preview-image"
-              style={{ backgroundImage: `url("${previewImage}")`, opacity: background.imageOpacity }}
+              style={{ backgroundImage: `url("${resolvedPreviewImage}")`, opacity: imageMode ? background.imageOpacity : 1 }}
             />
             <div
               className="login-settings-preview-overlay"
-              style={{ background: `rgba(0,0,0,${background.overlay})` }}
+              style={{ background: `rgba(0,0,0,${imageMode ? background.overlay : 0.18})` }}
             />
           </>
         ) : null}
@@ -142,7 +146,7 @@ function LoginPreview({ settings, store }) {
             </div>
           </div>
           <div className="login-settings-curated-access">
-            <StoreLogo store={store} className="access" />
+            {theme.id !== 'immersiveGallery' ? <StoreLogo store={store} className="access" /> : null}
             <strong>{customization.welcomeTitle}</strong>
             <small>{customization.welcomeSubtitle}</small>
             <i /><i />
