@@ -1438,7 +1438,6 @@ export default function Login() {
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
       <span className="rb-editorial-kicker">ACCESO</span>
       <CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" />
-      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
     </div>
   </section>;
 
@@ -1455,7 +1454,6 @@ export default function Login() {
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
       <span className="rb-editorial-kicker">ACCESO</span>
       <CuratedCredentialsForm {...curatedFormProps} inputId="rb-gallery" />
-      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
     </div>
   </section>;
 
@@ -1468,7 +1466,6 @@ export default function Login() {
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
       <span className="rb-editorial-kicker">ACCESO</span>
       <CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" />
-      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
     </div>
   </section>;
 

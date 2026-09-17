@@ -157,7 +157,6 @@ function LoginPreview({ settings, store }) {
             <small>{customization.welcomeSubtitle}</small>
             <i /><i />
             <button type="button"><span>{customization.buttonText}</span><b>→</b></button>
-            <span className="login-settings-editorial-security">SESIÓN SEGURA</span>
           </div>
         </div>
       </div>
