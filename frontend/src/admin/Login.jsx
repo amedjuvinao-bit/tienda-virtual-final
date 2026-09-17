@@ -10,6 +10,7 @@ import {
   Crown,
   Fingerprint,
   ArrowRight,
+  Store,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { setAdminToken } from "../lib/api";
@@ -117,6 +118,50 @@ function isGoldTheme(theme) {
   return theme?.id === "goldBoutiqueLight" || theme?.id === "goldLuxury";
 }
 
+function StoreIdentity({ theme, storeName, storeLogo, compact = false }) {
+  return (
+    <div
+      className={`flex items-center ${compact ? "gap-2.5 px-3 py-2" : "gap-3 px-4 py-3"}`}
+      style={{
+        border: `1px solid ${theme.brandPanelBorder || theme.cardBorder}`,
+        borderRadius: compact ? 18 : 22,
+        background: theme.brandPanelBg || theme.cardBg,
+        boxShadow: `0 16px 45px ${theme.glowSoft}`,
+        backdropFilter: "blur(18px)",
+      }}
+    >
+      <span
+        className={`grid shrink-0 place-items-center overflow-hidden ${compact ? "h-9 w-9 rounded-xl" : "h-11 w-11 rounded-2xl"}`}
+        style={{
+          background: theme.brandBadgeBg,
+          color: theme.brandBadgeColor,
+          border: `1px solid ${theme.cardInnerBorder || theme.cardBorder}`,
+        }}
+      >
+        {storeLogo ? (
+          <img className="h-full w-full object-contain p-1" src={storeLogo} alt="" />
+        ) : (
+          <Store size={compact ? 18 : 21} />
+        )}
+      </span>
+      <span className="grid min-w-0 gap-0.5">
+        <small
+          className="truncate text-[9px] font-black uppercase tracking-[0.2em]"
+          style={{ color: theme.brandBadgeColor }}
+        >
+          {theme.premiumLabel || "ACCESO PRIVADO"}
+        </small>
+        <strong
+          className={`${compact ? "max-w-[180px] text-sm" : "max-w-[260px] text-base"} truncate`}
+          style={{ color: theme.titleColor, fontFamily: theme.displayFont }}
+        >
+          {storeName}
+        </strong>
+      </span>
+    </div>
+  );
+}
+
 function extractAdminToken(response) {
   return response?.token || response?.adminToken || response?.accessToken || "";
 }
@@ -153,6 +198,13 @@ function AnimatedBorderBox({
           ...innerStyle,
         }}
       >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: theme.cardSheen || "transparent",
+            boxShadow: `inset 0 0 0 1px ${theme.cardInnerBorder || "transparent"}`,
+          }}
+        />
         {children}
       </div>
     </div>
@@ -219,7 +271,7 @@ function InputField({
             color: theme.inputText,
             boxShadow: isLine
               ? "none"
-              : `0 10px 30px ${theme.glowSoft || "rgba(0,0,0,0.06)"}`,
+              : theme.inputShadow || `0 10px 30px ${theme.glowSoft || "rgba(0,0,0,0.06)"}`,
           }}
         />
       </div>
@@ -290,9 +342,11 @@ function LoginForm({
   showBadge = true,
   title = "Iniciar sesión",
   subtitle = "Accede al panel de administración de forma segura",
+  storeLogo = "",
 }) {
   const dark = isDarkTheme(theme);
   const inputVariant = variant === "luxury" ? "line" : variant;
+  const ThemeIcon = theme.icon || Lock;
 
   return (
     <>
@@ -306,14 +360,26 @@ function LoginForm({
               boxShadow: `0 0 30px ${theme.glowSoft || "rgba(0,0,0,0.12)"}`,
             }}
           >
-            <Lock size={26} />
+            {storeLogo ? (
+              <img className="h-full w-full object-contain p-2" src={storeLogo} alt="" />
+            ) : (
+              <ThemeIcon size={26} />
+            )}
           </div>
         )}
+
+        <span
+          className="mb-2 inline-block text-[9px] font-black uppercase tracking-[0.24em]"
+          style={{ color: theme.brandBadgeColor }}
+        >
+          {theme.premiumLabel || "ACCESO ADMINISTRATIVO"}
+        </span>
 
         <h2
           className={`${compact ? "text-xl" : "text-3xl sm:text-4xl"} font-black tracking-tight`}
           style={{
             color: theme.titleColor,
+            fontFamily: theme.displayFont,
             textShadow: dark ? `0 0 18px ${theme.glowSoft}` : "none",
           }}
         >
@@ -460,16 +526,40 @@ function CircleLoginForm({
   handleSubmit,
   onForgotPassword,
   subtitle = "Panel administrativo privado",
+  storeLogo = "",
 }) {
   const dark = isDarkTheme(theme);
+  const ThemeIcon = theme.icon || Lock;
 
   return (
     <div className="w-full max-w-[300px]">
       <div className="mb-7 text-center">
+        <div
+          className="mx-auto mb-3 grid h-12 w-12 place-items-center overflow-hidden rounded-2xl"
+          style={{
+            background: theme.brandBadgeBg,
+            color: theme.brandBadgeColor,
+            border: `1px solid ${theme.cardInnerBorder || theme.cardBorder}`,
+            boxShadow: `0 0 24px ${theme.glowSoft}`,
+          }}
+        >
+          {storeLogo ? (
+            <img className="h-full w-full object-contain p-1.5" src={storeLogo} alt="" />
+          ) : (
+            <ThemeIcon size={21} />
+          )}
+        </div>
+        <span
+          className="mb-2 inline-block text-[8px] font-black uppercase tracking-[0.22em]"
+          style={{ color: theme.brandBadgeColor }}
+        >
+          {theme.premiumLabel || "ACCESO PRIVADO"}
+        </span>
         <h2
           className="text-2xl font-semibold uppercase tracking-wide"
           style={{
             color: theme.titleColor,
+            fontFamily: theme.displayFont,
             textShadow: dark ? `0 0 18px ${theme.glowSoft}` : "none",
           }}
         >
@@ -591,6 +681,7 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(rememberedLogin.remember);
   const [loginBg, setLoginBg] = useState(DEFAULT_LOGIN_SETTINGS.background);
   const [storeName, setStoreName] = useState('tu tienda');
+  const [storeLogo, setStoreLogo] = useState('');
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
   const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
@@ -615,12 +706,22 @@ export default function Login() {
       setActiveLayoutId(normalized.layout);
       setLoginBg(normalized.background);
       if (identity?.name) setStoreName(String(identity.name).trim());
+      if (identity?.logo) setStoreLogo(String(identity.logo).trim());
     };
 
     const loadSettings = async () => {
       try {
         const response = await fetchSiteSettings();
-        if (active) applySettings(response?.loginAdmin, response?.store);
+        if (active) {
+          applySettings(response?.loginAdmin, {
+            ...response?.store,
+            logo:
+              response?.theme?.header?.logoLight ||
+              response?.theme?.logo?.light ||
+              response?.theme?.header?.logoDark ||
+              '',
+          });
+        }
       } catch {
         // El acceso continúa disponible con el diseño seguro predeterminado.
       }
@@ -805,13 +906,14 @@ export default function Login() {
     handleSubmit,
     onForgotPassword: handleForgotPassword,
     subtitle: `Accede al panel de ${storeName}`,
+    storeLogo,
   };
 
   const cardStyle = {
     background: activeTheme.cardBg,
     borderColor: activeTheme.cardBorder,
     boxShadow: activeTheme.cardShadow,
-    backdropFilter: "blur(18px)",
+    backdropFilter: "blur(24px) saturate(1.12)",
   };
 
   const renderCenteredCard = () => (
@@ -835,7 +937,7 @@ export default function Login() {
       >
         <div
           className="pointer-events-none absolute inset-x-10 top-0 h-[3px]"
-          style={{ background: activeTheme.buttonBg }}
+          style={{ background: activeTheme.accentLine || activeTheme.buttonBg }}
         />
         <LoginForm {...formProps} />
       </AnimatedBorderBox>
@@ -907,7 +1009,7 @@ export default function Login() {
 
           <h2
             className="max-w-md text-5xl font-black leading-tight tracking-tight"
-            style={{ color: activeTheme.titleColor }}
+            style={{ color: activeTheme.titleColor, fontFamily: activeTheme.displayFont }}
           >
             Administra {storeName} con seguridad y estilo
           </h2>
@@ -918,6 +1020,15 @@ export default function Login() {
           >
             Controla productos, órdenes, apariencia, usuarios, logs y configuración desde un acceso privado.
           </p>
+        </div>
+
+        <div className="relative z-10 w-fit">
+          <StoreIdentity
+            theme={activeTheme}
+            storeName={storeName}
+            storeLogo={storeLogo}
+            compact
+          />
         </div>
       </div>
 
@@ -1036,6 +1147,7 @@ export default function Login() {
 
   return (
     <div
+      data-login-theme={activeTheme.id}
       className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8"
       style={{ background: loginPageBackground }}
     >
@@ -1045,6 +1157,10 @@ export default function Login() {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
+          }
+          @keyframes rbLoginAuraFloat {
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+            50% { transform: translate3d(0, -12px, 0) scale(1.04); }
           }
         `}
       </style>
@@ -1069,12 +1185,30 @@ export default function Login() {
       )}
 
       <div
+        className="pointer-events-none absolute inset-0 z-[1] opacity-70"
+        style={{
+          backgroundImage: activeTheme.pagePattern,
+          backgroundSize: activeTheme.patternSize,
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.28))",
+        }}
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0 z-[1]"
+        style={{
+          background: dark
+            ? "radial-gradient(circle at center, transparent 28%, rgba(0,0,0,.44) 100%)"
+            : "radial-gradient(circle at center, transparent 30%, rgba(255,255,255,.36) 100%)",
+        }}
+      />
+
+      <div
         className="pointer-events-none absolute -left-20 top-8 z-[1] h-72 w-72 rounded-full blur-3xl"
-        style={{ background: activeTheme.deco1 }}
+        style={{ background: activeTheme.deco1, animation: "rbLoginAuraFloat 9s ease-in-out infinite" }}
       />
       <div
         className="pointer-events-none absolute -right-16 bottom-6 z-[1] h-80 w-80 rounded-full blur-3xl"
-        style={{ background: activeTheme.deco2 }}
+        style={{ background: activeTheme.deco2, animation: "rbLoginAuraFloat 11s ease-in-out infinite reverse" }}
       />
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[580px] w-[580px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 blur-3xl"
@@ -1094,6 +1228,15 @@ export default function Login() {
           />
         </div>
       )}
+
+      <div className="absolute left-5 top-5 z-[4] hidden lg:block">
+        <StoreIdentity
+          theme={activeTheme}
+          storeName={storeName}
+          storeLogo={storeLogo}
+          compact
+        />
+      </div>
 
       <div className="relative z-[2] mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl items-center justify-center">
         {renderLayout()}

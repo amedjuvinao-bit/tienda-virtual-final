@@ -3,14 +3,14 @@
 const SiteSettings = require('../models/SiteSettings');
 
 const LOGIN_THEMES = Object.freeze([
-  { value: 'roseLuxuryLight', label: 'Rosa luxury claro', description: 'Claro, elegante y boutique.' },
-  { value: 'goldBoutiqueLight', label: 'Dorado boutique claro', description: 'Crema y dorado con lujo suave.' },
-  { value: 'glassPastel', label: 'Glass pastel', description: 'Cristal moderno y delicado.' },
-  { value: 'pearlFuture', label: 'Perla futurista', description: 'Blanco perla con brillo azul.' },
-  { value: 'neonRoseLight', label: 'Rosa neón claro', description: 'Fucsia luminoso y moderno.' },
-  { value: 'minimalPro', label: 'Minimal profesional', description: 'Limpio, serio y corporativo.' },
-  { value: 'electricNeon', label: 'Neón eléctrico', description: 'Oscuro tecnológico con brillo azul.' },
-  { value: 'darkCyber', label: 'Oscuro cyber', description: 'Profundo, elegante y tecnológico.' },
+  { value: 'roseLuxuryLight', label: 'Rose Atelier', description: 'Alta boutique, seda rosa y champagne.' },
+  { value: 'goldBoutiqueLight', label: 'Maison Gold', description: 'Marfil y oro con acabado editorial.' },
+  { value: 'glassPastel', label: 'Aurora Glass', description: 'Cristal esmerilado y luz pastel.' },
+  { value: 'pearlFuture', label: 'Pearl Signature', description: 'Perla luminosa y precisión contemporánea.' },
+  { value: 'neonRoseLight', label: 'Magenta Pulse', description: 'Moda digital con brillo editorial.' },
+  { value: 'minimalPro', label: 'Executive', description: 'Orden y presencia institucional.' },
+  { value: 'electricNeon', label: 'Nexus', description: 'Energía digital de alto contraste.' },
+  { value: 'darkCyber', label: 'Obsidian', description: 'Tecnología sobria y profundidad ejecutiva.' },
 ]);
 
 const LOGIN_LAYOUTS = Object.freeze([

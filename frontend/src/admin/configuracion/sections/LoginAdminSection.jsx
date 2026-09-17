@@ -43,6 +43,7 @@ function LoginPreview({ settings, store }) {
   const previewImage = safeLoginImageUrl(background.image);
   const imageMode = background.mode === 'image' && previewImage;
   const pageBackground = background.mode === 'color' ? background.color : theme.pageBg;
+  const ThemeIcon = theme.icon || ShieldCheck;
 
   return (
     <div className="login-settings-preview-wrap">
@@ -56,7 +57,24 @@ function LoginPreview({ settings, store }) {
         </a>
       </div>
 
-      <div className={`login-settings-preview layout-${settings.layout}`} style={{ background: pageBackground }}>
+      <div
+        className={`login-settings-preview layout-${settings.layout}`}
+        data-preview-theme={theme.id}
+        style={{
+          background: pageBackground,
+          '--preview-glow': theme.glowSoft,
+          '--preview-strong': theme.glowStrong,
+          '--preview-accent': theme.glowColor,
+          '--preview-inner': theme.cardInnerBorder,
+          '--preview-font': theme.displayFont,
+        }}
+      >
+        <div className="login-settings-preview-aura aura-one" style={{ background: theme.deco1 }} />
+        <div className="login-settings-preview-aura aura-two" style={{ background: theme.deco2 }} />
+        <div
+          className="login-settings-preview-pattern"
+          style={{ backgroundImage: theme.pagePattern, backgroundSize: theme.patternSize }}
+        />
         {imageMode ? (
           <>
             <div
@@ -71,11 +89,18 @@ function LoginPreview({ settings, store }) {
         ) : null}
 
         <div className="login-settings-preview-brand" style={{ color: theme.titleColor }}>
-          <span style={{ background: theme.brandBadgeBg, color: theme.brandBadgeColor }}>
+          <span
+            style={{
+              background: theme.brandBadgeBg,
+              color: theme.brandBadgeColor,
+              borderColor: theme.cardInnerBorder,
+              boxShadow: `0 10px 28px ${theme.glowSoft}`,
+            }}
+          >
             {store?.logo ? <img src={store.logo} alt="" /> : <Store size={22} />}
           </span>
           <div>
-            <small>ACCESO ADMINISTRATIVO</small>
+            <small>{theme.premiumLabel || 'ACCESO ADMINISTRATIVO'}</small>
             <b>{store?.name || 'Tu tienda'}</b>
           </div>
         </div>
@@ -89,12 +114,17 @@ function LoginPreview({ settings, store }) {
             color: theme.textColor,
           }}
         >
-          <ShieldCheck style={{ color: theme.brandBadgeColor }} />
+          <span className="login-settings-preview-card-sheen" style={{ background: theme.cardSheen }} />
+          <span className="login-settings-preview-card-accent" style={{ background: theme.accentLine }} />
+          <div className="login-settings-preview-kicker" style={{ color: theme.brandBadgeColor }}>
+            <ThemeIcon size={13} /> {theme.premiumLabel || 'ACCESO PRIVADO'}
+          </div>
+          <ThemeIcon className="login-settings-preview-emblem" style={{ color: theme.brandBadgeColor }} />
           <strong style={{ color: theme.titleColor }}>Iniciar sesión</strong>
-          <small style={{ color: theme.mutedColor }}>Accede al panel de {store?.name || 'tu tienda'}</small>
-          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder }} />
-          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder }} />
-          <button type="button" style={{ background: theme.buttonBg, color: theme.buttonText }}>
+          <small style={{ color: theme.mutedColor }}>{theme.signature}</small>
+          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
+          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
+          <button type="button" style={{ background: theme.buttonBg, color: theme.buttonText, boxShadow: theme.buttonShadow }}>
             Ingresar
           </button>
         </div>

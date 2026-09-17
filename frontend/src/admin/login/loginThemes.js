@@ -13,8 +13,8 @@ import {
 export const LOGIN_THEMES = {
   electricNeon: {
     id: "electricNeon",
-    name: "Neón eléctrico",
-    description: "Oscuro cyber azul, inspirado en aro luminoso.",
+    name: "Nexus",
+    description: "Energía digital de alto contraste.",
     icon: Zap,
     pageBg: "radial-gradient(circle at center, #07111f 0%, #030712 48%, #000000 100%)",
     deco1: "rgba(34,211,238,0.36)",
@@ -47,8 +47,8 @@ export const LOGIN_THEMES = {
 
   darkCyber: {
     id: "darkCyber",
-    name: "Oscuro cyber",
-    description: "Oscuro elegante, profundo y tecnológico.",
+    name: "Obsidian",
+    description: "Tecnología sobria y profundidad ejecutiva.",
     icon: MoonStar,
     pageBg: "radial-gradient(circle at center, #111827 0%, #030712 50%, #000000 100%)",
     deco1: "rgba(99,102,241,0.26)",
@@ -81,8 +81,8 @@ export const LOGIN_THEMES = {
 
   roseLuxuryLight: {
     id: "roseLuxuryLight",
-    name: "Rosa luxury claro",
-    description: "Claro, femenino, elegante y boutique.",
+    name: "Rose Atelier",
+    description: "Alta boutique, seda rosa y champagne.",
     icon: Flower2,
     pageBg: "linear-gradient(135deg, #fff7fb 0%, #ffe4f1 38%, #fff8ed 100%)",
     deco1: "rgba(236,72,153,0.18)",
@@ -115,8 +115,8 @@ export const LOGIN_THEMES = {
 
   goldBoutiqueLight: {
     id: "goldBoutiqueLight",
-    name: "Dorado boutique claro",
-    description: "Crema, dorado y lujo suave.",
+    name: "Maison Gold",
+    description: "Marfil y oro con acabado editorial.",
     icon: Crown,
     pageBg: "linear-gradient(135deg, #fffdf5 0%, #f9efd3 45%, #fff8ec 100%)",
     deco1: "rgba(212,175,55,0.22)",
@@ -149,8 +149,8 @@ export const LOGIN_THEMES = {
 
   glassPastel: {
     id: "glassPastel",
-    name: "Glass pastel",
-    description: "Cristal claro, moderno y delicado.",
+    name: "Aurora Glass",
+    description: "Cristal esmerilado y luz pastel.",
     icon: Gem,
     pageBg: "linear-gradient(135deg, #e0f2fe 0%, #fdf2f8 45%, #fff7ed 100%)",
     deco1: "rgba(14,165,233,0.18)",
@@ -183,8 +183,8 @@ export const LOGIN_THEMES = {
 
   pearlFuture: {
     id: "pearlFuture",
-    name: "Perla futurista",
-    description: "Blanco perla con glow azul suave.",
+    name: "Pearl Signature",
+    description: "Perla luminosa y precisión contemporánea.",
     icon: Diamond,
     pageBg: "radial-gradient(circle at center, #ffffff 0%, #eef7ff 48%, #dbeafe 100%)",
     deco1: "rgba(59,130,246,0.16)",
@@ -217,8 +217,8 @@ export const LOGIN_THEMES = {
 
   neonRoseLight: {
     id: "neonRoseLight",
-    name: "Rosa neón claro",
-    description: "Claro con acentos fucsia y brillo moderno.",
+    name: "Magenta Pulse",
+    description: "Moda digital con brillo editorial.",
     icon: Sparkles,
     pageBg: "linear-gradient(135deg, #fff1f8 0%, #fdf4ff 46%, #eff6ff 100%)",
     deco1: "rgba(244,114,182,0.22)",
@@ -251,8 +251,8 @@ export const LOGIN_THEMES = {
 
   minimalPro: {
     id: "minimalPro",
-    name: "Minimal pro claro",
-    description: "Limpio, serio y corporativo.",
+    name: "Executive",
+    description: "Orden y presencia institucional.",
     icon: SunMedium,
     pageBg: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 48%, #ffffff 100%)",
     deco1: "rgba(15,23,42,0.08)",
@@ -283,6 +283,125 @@ export const LOGIN_THEMES = {
     animatedBorder: "linear-gradient(120deg, #cbd5e1, #ffffff, #64748b, #e2e8f0, #cbd5e1)",
   },
 };
+
+const PREMIUM_THEME_FINISHES = {
+  electricNeon: {
+    premiumLabel: "NEXUS EDITION",
+    signature: "Energía digital de alto contraste",
+    displayFont: '"Space Grotesk", "Segoe UI", sans-serif',
+    pagePattern:
+      "linear-gradient(rgba(34,211,238,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.055) 1px, transparent 1px)",
+    patternSize: "38px 38px",
+    cardSheen: "linear-gradient(145deg, rgba(103,232,249,.14), transparent 34%, rgba(37,99,235,.09) 70%, transparent)",
+    cardInnerBorder: "rgba(103,232,249,.18)",
+    brandPanelBg: "rgba(3,7,18,.68)",
+    brandPanelBorder: "rgba(103,232,249,.26)",
+    accentLine: "linear-gradient(90deg, transparent, #67e8f9, #2563eb, transparent)",
+    inputShadow: "0 14px 35px rgba(2,132,199,.16), inset 0 1px 0 rgba(255,255,255,.04)",
+  },
+  darkCyber: {
+    premiumLabel: "OBSIDIAN EDITION",
+    signature: "Tecnología sobria y profundidad ejecutiva",
+    displayFont: '"Space Grotesk", "Segoe UI", sans-serif',
+    pagePattern:
+      "radial-gradient(circle at 1px 1px, rgba(165,180,252,.12) 1px, transparent 0)",
+    patternSize: "30px 30px",
+    cardSheen: "linear-gradient(150deg, rgba(129,140,248,.14), transparent 32%, rgba(34,211,238,.06) 74%, transparent)",
+    cardInnerBorder: "rgba(199,210,254,.12)",
+    brandPanelBg: "rgba(15,23,42,.72)",
+    brandPanelBorder: "rgba(165,180,252,.2)",
+    accentLine: "linear-gradient(90deg, transparent, #818cf8, #22d3ee, transparent)",
+    inputShadow: "0 14px 34px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.04)",
+  },
+  roseLuxuryLight: {
+    premiumLabel: "ROSE ATELIER",
+    signature: "Alta boutique, seda rosa y destellos champagne",
+    displayFont: 'Georgia, "Times New Roman", serif',
+    pagePattern:
+      "radial-gradient(circle at 20% 20%, rgba(236,72,153,.08) 0 1px, transparent 1.5px), radial-gradient(circle at 80% 70%, rgba(180,83,9,.08) 0 1px, transparent 1.5px)",
+    patternSize: "32px 32px, 44px 44px",
+    cardSheen: "linear-gradient(145deg, rgba(255,255,255,.78), transparent 38%, rgba(251,191,36,.08) 74%, rgba(236,72,153,.08))",
+    cardInnerBorder: "rgba(255,255,255,.82)",
+    brandPanelBg: "rgba(255,255,255,.7)",
+    brandPanelBorder: "rgba(190,24,93,.16)",
+    accentLine: "linear-gradient(90deg, transparent, #ec4899, #f5c16c, transparent)",
+    inputShadow: "0 14px 32px rgba(190,24,93,.08), inset 0 1px 0 rgba(255,255,255,.9)",
+  },
+  goldBoutiqueLight: {
+    premiumLabel: "MAISON GOLD",
+    signature: "Marfil, oro cepillado y elegancia editorial",
+    displayFont: 'Georgia, "Times New Roman", serif',
+    pagePattern:
+      "linear-gradient(135deg, transparent 47%, rgba(180,134,11,.07) 48%, rgba(180,134,11,.07) 52%, transparent 53%)",
+    patternSize: "42px 42px",
+    cardSheen: "linear-gradient(145deg, rgba(255,255,255,.86), transparent 35%, rgba(212,175,55,.12) 76%, transparent)",
+    cardInnerBorder: "rgba(255,255,255,.9)",
+    brandPanelBg: "rgba(255,253,245,.78)",
+    brandPanelBorder: "rgba(154,101,7,.19)",
+    accentLine: "linear-gradient(90deg, transparent, #b8860b, #f5d77a, #b8860b, transparent)",
+    inputShadow: "0 14px 34px rgba(154,101,7,.09), inset 0 1px 0 rgba(255,255,255,.95)",
+  },
+  glassPastel: {
+    premiumLabel: "AURORA GLASS",
+    signature: "Cristal esmerilado y luz pastel envolvente",
+    displayFont: '"Segoe UI", Inter, sans-serif',
+    pagePattern:
+      "radial-gradient(circle at 30% 30%, rgba(14,165,233,.12), transparent 32%), radial-gradient(circle at 75% 65%, rgba(236,72,153,.11), transparent 34%)",
+    patternSize: "100% 100%",
+    cardSheen: "linear-gradient(135deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 45%, rgba(14,165,233,.08))",
+    cardInnerBorder: "rgba(255,255,255,.92)",
+    brandPanelBg: "rgba(255,255,255,.46)",
+    brandPanelBorder: "rgba(255,255,255,.8)",
+    accentLine: "linear-gradient(90deg, transparent, #38bdf8, #f9a8d4, transparent)",
+    inputShadow: "0 16px 38px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.9)",
+  },
+  pearlFuture: {
+    premiumLabel: "PEARL SIGNATURE",
+    signature: "Perla luminosa y precisión contemporánea",
+    displayFont: '"Segoe UI", Inter, sans-serif',
+    pagePattern:
+      "linear-gradient(120deg, rgba(59,130,246,.055) 1px, transparent 1px), linear-gradient(30deg, rgba(125,211,252,.05) 1px, transparent 1px)",
+    patternSize: "46px 46px",
+    cardSheen: "linear-gradient(145deg, rgba(255,255,255,.92), transparent 42%, rgba(56,189,248,.09))",
+    cardInnerBorder: "rgba(255,255,255,.96)",
+    brandPanelBg: "rgba(255,255,255,.76)",
+    brandPanelBorder: "rgba(37,99,235,.14)",
+    accentLine: "linear-gradient(90deg, transparent, #2563eb, #7dd3fc, transparent)",
+    inputShadow: "0 15px 36px rgba(37,99,235,.09), inset 0 1px 0 rgba(255,255,255,1)",
+  },
+  neonRoseLight: {
+    premiumLabel: "MAGENTA PULSE",
+    signature: "Moda digital con brillo editorial",
+    displayFont: '"Space Grotesk", "Segoe UI", sans-serif',
+    pagePattern:
+      "radial-gradient(circle at 1px 1px, rgba(217,70,239,.11) 1px, transparent 0)",
+    patternSize: "28px 28px",
+    cardSheen: "linear-gradient(145deg, rgba(255,255,255,.82), transparent 38%, rgba(217,70,239,.09) 72%, rgba(59,130,246,.06))",
+    cardInnerBorder: "rgba(255,255,255,.92)",
+    brandPanelBg: "rgba(255,255,255,.72)",
+    brandPanelBorder: "rgba(217,70,239,.17)",
+    accentLine: "linear-gradient(90deg, transparent, #ec4899, #a855f7, #38bdf8, transparent)",
+    inputShadow: "0 15px 36px rgba(192,38,211,.1), inset 0 1px 0 rgba(255,255,255,.95)",
+  },
+  minimalPro: {
+    premiumLabel: "EXECUTIVE EDITION",
+    signature: "Claridad, orden y presencia institucional",
+    displayFont: '"Segoe UI", Inter, sans-serif',
+    pagePattern:
+      "linear-gradient(rgba(15,23,42,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,.035) 1px, transparent 1px)",
+    patternSize: "52px 52px",
+    cardSheen: "linear-gradient(145deg, rgba(255,255,255,.98), transparent 50%, rgba(15,23,42,.035))",
+    cardInnerBorder: "rgba(255,255,255,1)",
+    brandPanelBg: "rgba(255,255,255,.82)",
+    brandPanelBorder: "rgba(15,23,42,.1)",
+    accentLine: "linear-gradient(90deg, transparent, #0f172a, #94a3b8, transparent)",
+    inputShadow: "0 14px 30px rgba(15,23,42,.065), inset 0 1px 0 rgba(255,255,255,1)",
+  },
+};
+
+Object.values(LOGIN_THEMES).forEach((theme) => {
+  Object.assign(theme, PREMIUM_THEME_FINISHES[theme.id] || {});
+});
 
 export const LOGIN_LAYOUTS = {
   electricCircle: {
