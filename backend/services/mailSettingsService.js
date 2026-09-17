@@ -80,6 +80,11 @@ function revisionNumber(value) {
   return Number.isInteger(revision) && revision >= 0 ? revision : 0;
 }
 
+function normalizeActorId(value) {
+  const actorId = String(value || '').trim();
+  return /^[a-f\d]{24}$/i.test(actorId) ? actorId : null;
+}
+
 function buildMeta() {
   return {
     providers: Object.entries(PROVIDERS).map(([value, provider]) => ({
@@ -354,7 +359,7 @@ async function updateMailSettings(input = {}, options = {}) {
   }
 
   settings.revision = revisionNumber(settings.revision) + 1;
-  settings.updatedBy = options.actor || null;
+  settings.updatedBy = normalizeActorId(options.actor);
   await saveSettings(settings);
 
   const response = buildMailSettingsResponse(settings, store);
@@ -406,7 +411,7 @@ async function testMailSettings(input = {}, options = {}) {
     settings.lastTestAt = new Date();
     settings.lastTestFingerprint = '';
     settings.revision = revisionNumber(settings.revision) + 1;
-    settings.updatedBy = options.actor || null;
+    settings.updatedBy = normalizeActorId(options.actor);
     await saveSettings(settings);
     throw new MailSettingsError(
       friendlyDeliveryError(),
@@ -422,7 +427,7 @@ async function testMailSettings(input = {}, options = {}) {
   settings.lastTestAt = new Date();
   settings.lastTestFingerprint = configurationFingerprint(settings);
   settings.revision = revisionNumber(settings.revision) + 1;
-  settings.updatedBy = options.actor || null;
+  settings.updatedBy = normalizeActorId(options.actor);
   await saveSettings(settings);
   const response = buildMailSettingsResponse(settings, store);
   response.message = settings.lastTestMessage;

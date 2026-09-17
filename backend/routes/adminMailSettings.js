@@ -14,7 +14,7 @@ const {
 const router = express.Router();
 
 function actorFromRequest(req) {
-  return req.adminUsername || req.adminUserId || 'admin';
+  return req.adminUserId || null;
 }
 
 function sendMailSettingsError(res, error) {

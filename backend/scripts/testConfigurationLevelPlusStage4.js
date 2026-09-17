@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const MailSettings = require('../models/MailSettings');
+const { actorFromRequest } = require('../routes/adminMailSettings');
 const { findAdminRoutePermission } = require('../security/adminRoutePermissionMap');
 const {
   MailSettingsError,
@@ -146,6 +147,10 @@ async function run() {
   assert.equal(saved.settings.fromName, 'Rosa Boutique');
 
   const pendingTest = mailDocument();
+  pendingTest.save = async function save() {
+    assert.equal(this.updatedBy, null);
+    return this;
+  };
   let delivered = null;
   const tested = await testMailSettings({ revision: 3, testEmail: 'owner@rosa.com' }, {
     MailSettingsModel: mailModel(pendingTest),
@@ -157,6 +162,10 @@ async function run() {
   assert.equal(tested.readiness.tested, true);
   assert.equal(tested.settings.lastTestStatus, 'success');
   assert.equal(tested.revision, 4);
+
+  const adminUserId = '507f1f77bcf86cd799439011';
+  assert.equal(actorFromRequest({ adminUsername: 'owner', adminUserId: null }), null);
+  assert.equal(actorFromRequest({ adminUsername: 'owner', adminUserId }), adminUserId);
 
   assert(MailSettings.schema.path('revision'));
   assert(MailSettings.schema.path('lastTestFingerprint'));
