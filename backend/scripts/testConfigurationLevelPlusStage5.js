@@ -73,6 +73,17 @@ async function run() {
   assert.equal(normalized.background.overlay, 0);
   assert.equal(normalized.background.color, '#abcdef');
 
+  const galleryTone = normalizeLoginSettings({
+    ...DEFAULT_LOGIN_SETTINGS,
+    customizations: {
+      immersiveGallery: {
+        ...DEFAULT_LOGIN_SETTINGS.customizations.immersiveGallery,
+        imageTone: 'lightBlue',
+      },
+    },
+  });
+  assert.equal(galleryTone.customizations.immersiveGallery.imageTone, 'lightBlue');
+
   assert.equal(safeImageUrl('javascript:alert(1)'), '');
   assert.equal(safeImageUrl('data:image/png;base64,abc'), '');
   assert.equal(safeImageUrl('//malicioso.example/fondo.png'), '');
@@ -99,6 +110,17 @@ async function run() {
     },
   });
   assert.equal(invalidCustomization[0]?.field, 'customizations.liquidGlass.accent');
+
+  const invalidGalleryTone = validateLoginSettings({
+    ...DEFAULT_LOGIN_SETTINGS,
+    customizations: {
+      immersiveGallery: {
+        ...DEFAULT_LOGIN_SETTINGS.customizations.immersiveGallery,
+        imageTone: 'inventado',
+      },
+    },
+  });
+  assert.equal(invalidGalleryTone[0]?.field, 'customizations.immersiveGallery.imageTone');
 
   const current = document();
   const response = await getLoginSettings({ SiteSettingsModel: modelFor(current) });

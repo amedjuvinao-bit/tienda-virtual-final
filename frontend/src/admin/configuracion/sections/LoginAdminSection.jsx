@@ -30,7 +30,9 @@ import {
 } from '../../login/loginSettings';
 import {
   CURATED_LOGIN_THEME_IDS,
+  getLoginGalleryImageTone,
   getLoginThemeCustomization,
+  LOGIN_GALLERY_IMAGE_TONES,
   LOGIN_THEMES,
 } from '../../login/loginThemes';
 import './LoginAdminSection.css';
@@ -90,6 +92,7 @@ function LoginPreview({ settings, store }) {
   const theme = LOGIN_THEMES[settings.theme] || LOGIN_THEMES[DEFAULT_LOGIN_SETTINGS.theme];
   const background = settings.background;
   const customization = settings.customizations?.[theme.id] || getLoginThemeCustomization(theme.id);
+  const galleryTone = getLoginGalleryImageTone(customization.imageTone);
   const previewImage = safeLoginImageUrl(background.image);
   const imageMode = background.mode === 'image' && previewImage;
   const defaultThemeImages = {
@@ -117,6 +120,7 @@ function LoginPreview({ settings, store }) {
       <div
         className="login-settings-preview curated-preview"
         data-preview-theme={theme.id}
+        data-gallery-tone={theme.id === 'immersiveGallery' ? galleryTone.id : undefined}
         style={{
           background: pageBackground,
           '--login-primary': customization.primary,
@@ -133,7 +137,11 @@ function LoginPreview({ settings, store }) {
             />
             <div
               className="login-settings-preview-overlay"
-              style={{ background: `${lightTheme ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})` }}
+              style={{
+                background: theme.id === 'immersiveGallery'
+                  ? `${galleryTone.overlay},rgba(0,0,0,${imageMode ? background.overlay : defaultOverlay})`
+                  : `${lightTheme ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})`,
+              }}
             />
           </>
         ) : null}
@@ -355,6 +363,24 @@ export default function LoginAdminSection() {
               <div><SlidersHorizontal /><span><b>Personaliza {LOGIN_THEMES[form.theme]?.name}</b><small>Los cambios aparecen inmediatamente en la vista previa.</small></span></div>
               <button type="button" onClick={resetCurrentTheme}><RotateCcw size={14} /> Restaurar este tema</button>
             </div>
+
+            {form.theme === 'immersiveGallery' ? <div className="login-gallery-tone-picker">
+              <div className="login-theme-preset-heading"><b>Tonalidad de la imagen</b><small>La misma imagen cambia de ambiente sin reemplazarse.</small></div>
+              <div className="login-gallery-tone-options">
+                {LOGIN_GALLERY_IMAGE_TONES.map((tone) => <button
+                  type="button"
+                  key={tone.id}
+                  className={currentCustomization.imageTone === tone.id ? 'selected' : ''}
+                  aria-label={`Usar tonalidad ${tone.name}`}
+                  aria-pressed={currentCustomization.imageTone === tone.id}
+                  onClick={() => setCustomization('imageTone', tone.id)}
+                >
+                  <i style={{ background: tone.swatch }} aria-hidden="true" />
+                  <span>{tone.name}</span>
+                  {currentCustomization.imageTone === tone.id ? <Check size={14} aria-hidden="true" /> : null}
+                </button>)}
+              </div>
+            </div> : null}
 
             <div className="login-theme-preset-heading"><b>Paletas listas</b><small>Escoge una combinación o crea la tuya debajo.</small></div>
             <div className="login-theme-presets">

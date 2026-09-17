@@ -3,6 +3,7 @@ import {
   DEFAULT_LOGIN_LAYOUT_ID,
   DEFAULT_LOGIN_THEME_ID,
   getLoginThemeCustomization,
+  LOGIN_GALLERY_IMAGE_TONES,
   LOGIN_LAYOUTS,
 } from './loginThemes';
 
@@ -88,6 +89,12 @@ function normalizeThemeCustomization(themeId, input = {}) {
   Object.entries(LOGIN_TEXT_LIMITS).forEach(([field, maxLength]) => {
     normalized[field] = String(input[field] || '').trim().slice(0, maxLength) || defaults[field];
   });
+
+  if (themeId === 'immersiveGallery') {
+    normalized.imageTone = LOGIN_GALLERY_IMAGE_TONES.some(({ id }) => id === input.imageTone)
+      ? input.imageTone
+      : defaults.imageTone;
+  }
 
   return normalized;
 }

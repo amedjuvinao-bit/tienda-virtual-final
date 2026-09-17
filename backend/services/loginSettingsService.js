@@ -16,7 +16,7 @@ const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
     welcomeTitle: 'Hola de nuevo', welcomeSubtitle: 'Tu espacio de trabajo está listo.', buttonText: 'Continuar',
   }),
   immersiveGallery: Object.freeze({
-    primary: '#111827', secondary: '#44546a', accent: '#e7d7bd', surface: '#f8fafc',
+    primary: '#111827', secondary: '#44546a', accent: '#e7d7bd', surface: '#f8fafc', imageTone: 'black',
     eyebrow: 'TU NEGOCIO, EN PRIMER PLANO', headline: 'Una entrada visual.', highlight: 'Tu identidad primero.',
     description: 'Presenta la esencia de tu tienda con una imagen propia y un acceso limpio.',
     welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa para gestionar tu tienda.', buttonText: 'Ingresar',
@@ -39,6 +39,7 @@ const LOGIN_THEME_MIGRATIONS = Object.freeze({
 });
 
 const LOGIN_COLOR_FIELDS = Object.freeze(['primary', 'secondary', 'accent', 'surface']);
+const LOGIN_GALLERY_IMAGE_TONES = Object.freeze(['black', 'roseGold', 'lightBlue']);
 const LOGIN_TEXT_LIMITS = Object.freeze({
   eyebrow: 48,
   headline: 48,
@@ -129,6 +130,12 @@ function normalizeThemeCustomization(themeId, input = {}) {
   Object.entries(LOGIN_TEXT_LIMITS).forEach(([field, maxLength]) => {
     normalized[field] = cleanText(input[field], maxLength) || defaults[field];
   });
+
+  if (themeId === 'immersiveGallery') {
+    normalized.imageTone = LOGIN_GALLERY_IMAGE_TONES.includes(input.imageTone)
+      ? input.imageTone
+      : defaults.imageTone;
+  }
 
   return normalized;
 }
@@ -221,6 +228,17 @@ function validateLoginSettings(input = {}) {
           message: `Usa máximo ${maxLength} caracteres.`,
         });
       }
+    }
+
+    if (
+      themeId === 'immersiveGallery'
+      && customization.imageTone !== undefined
+      && !LOGIN_GALLERY_IMAGE_TONES.includes(customization.imageTone)
+    ) {
+      details.push({
+        field: 'customizations.immersiveGallery.imageTone',
+        message: 'Selecciona una tonalidad disponible.',
+      });
     }
   }
 

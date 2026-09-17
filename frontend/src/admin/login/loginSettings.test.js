@@ -54,6 +54,30 @@ describe('loginSettings', () => {
     expect(normalized.customizations.liquidGlass.headline).toBe('Control total');
   });
 
+  it('conserva una tonalidad válida de Galería Inmersiva y descarta valores inventados', () => {
+    const roseGold = normalizeLoginSettings({
+      ...DEFAULT_LOGIN_SETTINGS,
+      customizations: {
+        immersiveGallery: {
+          ...DEFAULT_LOGIN_SETTINGS.customizations.immersiveGallery,
+          imageTone: 'roseGold',
+        },
+      },
+    });
+    const invalid = normalizeLoginSettings({
+      ...DEFAULT_LOGIN_SETTINGS,
+      customizations: {
+        immersiveGallery: {
+          ...DEFAULT_LOGIN_SETTINGS.customizations.immersiveGallery,
+          imageTone: 'inventado',
+        },
+      },
+    });
+
+    expect(roseGold.customizations.immersiveGallery.imageTone).toBe('roseGold');
+    expect(invalid.customizations.immersiveGallery.imageTone).toBe('black');
+  });
+
   it('rechaza fondos con protocolos inseguros o URLs relativas a otro host', () => {
     expect(safeLoginImageUrl('javascript:alert(1)')).toBe('');
     expect(safeLoginImageUrl('//malicioso.example/fondo.png')).toBe('');

@@ -27,6 +27,7 @@ import {
   LOGIN_LAYOUTS,
   DEFAULT_LOGIN_THEME_ID,
   DEFAULT_LOGIN_LAYOUT_ID,
+  getLoginGalleryImageTone,
 } from "./login/loginThemes";
 import {
   DEFAULT_LOGIN_SETTINGS,
@@ -1130,6 +1131,7 @@ export default function Login() {
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
   const liquidBackground = hasCustomImageBg ? loginBg.image : liquidGlassDefault;
   const galleryBackground = hasCustomImageBg ? loginBg.image : galleryImmersiveDefault;
+  const galleryImageTone = getLoginGalleryImageTone(activeCustomization.imageTone);
   const smokeBackground = hasCustomImageBg ? loginBg.image : "";
 
   const loginPageBackground =
@@ -1440,9 +1442,9 @@ export default function Login() {
     </div>
   </section>;
 
-  const renderImmersiveGallery = () => <section className="rb-gallery-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+  const renderImmersiveGallery = () => <section className="rb-gallery-stage" data-gallery-tone={galleryImageTone.id} aria-label={`Acceso administrativo de ${storeName}`}>
     <div className="rb-gallery-media" style={{ backgroundImage: `url("${galleryBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
-    <div className="rb-gallery-overlay" style={{ "--gallery-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.18 }} />
+    <div className="rb-gallery-overlay" style={{ background: `${galleryImageTone.overlay},rgba(0,0,0,${hasCustomImageBg ? loginBg.overlay : 0.18})` }} />
     <div className="rb-gallery-ambient" aria-hidden="true"><i /><i /></div>
     <div className="rb-gallery-story">
       <CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} />
