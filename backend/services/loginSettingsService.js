@@ -3,36 +3,43 @@
 const SiteSettings = require('../models/SiteSettings');
 
 const LOGIN_THEMES = Object.freeze([
-  { value: 'roseLuxuryLight', label: 'Rosa Signature', description: 'Tema insignia de alta costura creado para la marca.' },
-  { value: 'noirGallery', label: 'Noir Gallery', description: 'Galería nocturna, luz escultórica y lujo silencioso.' },
-  { value: 'auroraMotion', label: 'Aurora Motion', description: 'Interfaz cinética, órbitas de luz y precisión tecnológica.' },
-  { value: 'paperStudio', label: 'Paper Studio', description: 'Editorial audaz, geometría gráfica y movimiento creativo.' },
+  { value: 'orbit3d', label: 'Órbita 3D', description: 'Esferas en profundidad y movimiento espacial elegante.' },
+  { value: 'liquidGlass', label: 'Cristal Líquido', description: 'Volúmenes translúcidos, reflejos suaves y profundidad fluida.' },
+  { value: 'neonPortal', label: 'Portal Neón', description: 'Umbral de luz, energía digital y acceso inmersivo.' },
+  { value: 'editorialMotion', label: 'Editorial Motion', description: 'Tipografía protagonista, ritmo gráfico y movimiento expresivo.' },
+  { value: 'architectMono', label: 'Arquitectura Mono', description: 'Planos, bloques flotantes y precisión minimalista.' },
 ]);
 
 const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
-  roseLuxuryLight: Object.freeze({
-    primary: '#5c1733', secondary: '#8f3154', accent: '#f0d69f', surface: '#fffaf5',
-    eyebrow: 'ADMINISTRACIÓN PRIVADA', headline: 'Tu universo,', highlight: 'bajo control.',
-    description: 'Una entrada creada para dirigir cada detalle de la tienda con precisión, carácter y absoluta confianza.',
-    welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa al espacio privado de la tienda.', buttonText: 'Entrar al panel',
+  orbit3d: Object.freeze({
+    primary: '#07132f', secondary: '#183b73', accent: '#64f5d2', surface: '#f2fbff',
+    eyebrow: 'CENTRO DE OPERACIONES', headline: 'Todo tu negocio.', highlight: 'En una sola órbita.',
+    description: 'Controla la operación de tu tienda desde un espacio visual, seguro y conectado.',
+    welcomeTitle: 'Acceso administrativo', welcomeSubtitle: 'Ingresa para continuar gestionando tu comercio.', buttonText: 'Entrar al panel',
   }),
-  noirGallery: Object.freeze({
-    primary: '#0a0a0c', secondary: '#1b1b21', accent: '#f0c87c', surface: '#f3eee4',
-    eyebrow: 'DIRECCIÓN CREATIVA', headline: 'El negocio,', highlight: 'en primer plano.',
-    description: 'Una sala privada para observar la operación completa y decidir con absoluta claridad.',
-    welcomeTitle: 'Sala privada', welcomeSubtitle: 'Identifícate para abrir la galería de control.', buttonText: 'Abrir la galería',
+  liquidGlass: Object.freeze({
+    primary: '#16324a', secondary: '#876fd4', accent: '#ff8f70', surface: '#f8fdff',
+    eyebrow: 'ESPACIO DE GESTIÓN', headline: 'Claridad que fluye.', highlight: 'Control sin esfuerzo.',
+    description: 'Una experiencia ligera y luminosa para administrar cualquier tipo de tienda.',
+    welcomeTitle: 'Hola de nuevo', welcomeSubtitle: 'Tu espacio de trabajo está listo.', buttonText: 'Continuar',
   }),
-  auroraMotion: Object.freeze({
-    primary: '#041724', secondary: '#0b3850', accent: '#64f0d1', surface: '#eafcff',
-    eyebrow: 'CENTRO DE MANDO', headline: 'Decide hoy.', highlight: 'Avanza primero.',
-    description: 'Toda la energía de la tienda converge en un espacio ágil, seguro y preparado para actuar.',
-    welcomeTitle: 'Sincroniza tu acceso', welcomeSubtitle: 'Conecta con el centro operativo de la tienda.', buttonText: 'Iniciar conexión',
+  neonPortal: Object.freeze({
+    primary: '#06091c', secondary: '#30236b', accent: '#56e7ff', surface: '#f5f3ff',
+    eyebrow: 'PORTAL SEGURO', headline: 'Cruza al centro.', highlight: 'Activa el control.',
+    description: 'Una entrada inmersiva diseñada para operaciones rápidas y decisiones precisas.',
+    welcomeTitle: 'Validar identidad', welcomeSubtitle: 'Acceso exclusivo para el equipo autorizado.', buttonText: 'Abrir portal',
   }),
-  paperStudio: Object.freeze({
-    primary: '#1226aa', secondary: '#f04d2f', accent: '#f4dd52', surface: '#f7f0de',
-    eyebrow: 'ESTUDIO DE OPERACIONES', headline: 'Ideas claras.', highlight: 'Decisiones rápidas.',
-    description: 'Una entrada gráfica para administrar la tienda sin ruido, con ritmo y una visión completamente clara.',
-    welcomeTitle: 'Entra al estudio', welcomeSubtitle: 'Tu mesa de trabajo está preparada.', buttonText: 'Comenzar ahora',
+  editorialMotion: Object.freeze({
+    primary: '#111111', secondary: '#d7432f', accent: '#f4d84c', surface: '#f3eddf',
+    eyebrow: 'ADMINISTRACIÓN EN MOVIMIENTO', headline: 'Haz que ocurra.', highlight: 'Dirige con intención.',
+    description: 'Un acceso gráfico, directo y memorable para equipos que trabajan con ritmo.',
+    welcomeTitle: 'Entra al estudio', welcomeSubtitle: 'Continúa construyendo tu próxima gran venta.', buttonText: 'Comenzar ahora',
+  }),
+  architectMono: Object.freeze({
+    primary: '#181a18', secondary: '#5c625d', accent: '#b6ff45', surface: '#f5f5ef',
+    eyebrow: 'SISTEMA DE CONTROL', headline: 'Orden visible.', highlight: 'Decisiones simples.',
+    description: 'Una estructura limpia y precisa que pone la operación por encima del ruido.',
+    welcomeTitle: 'Acceso al sistema', welcomeSubtitle: 'Identifícate para abrir tu espacio de gestión.', buttonText: 'Ingresar',
   }),
 });
 
@@ -57,12 +64,12 @@ const LOGIN_LAYOUTS = Object.freeze([
 ]);
 
 const DEFAULT_LOGIN_SETTINGS = Object.freeze({
-  theme: 'roseLuxuryLight',
+  theme: 'orbit3d',
   layout: 'centeredCard',
   customizations: LOGIN_THEME_CUSTOMIZATIONS,
   background: Object.freeze({
     mode: 'theme',
-    color: '#fff7fb',
+    color: '#07132f',
     image: '',
     imageOpacity: 0.35,
     overlay: 0.35,
@@ -103,7 +110,7 @@ function validHex(value) {
 }
 
 function normalizeThemeCustomization(themeId, input = {}) {
-  const defaults = LOGIN_THEME_CUSTOMIZATIONS[themeId] || LOGIN_THEME_CUSTOMIZATIONS.roseLuxuryLight;
+  const defaults = LOGIN_THEME_CUSTOMIZATIONS[themeId] || LOGIN_THEME_CUSTOMIZATIONS.orbit3d;
   const normalized = {};
 
   LOGIN_COLOR_FIELDS.forEach((field) => {

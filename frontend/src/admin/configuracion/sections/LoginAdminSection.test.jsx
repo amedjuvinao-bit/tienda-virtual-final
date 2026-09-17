@@ -20,7 +20,7 @@ function response(overrides = {}) {
   return {
     ok: true,
     settings: {
-      theme: 'roseLuxuryLight',
+      theme: 'orbit3d',
       layout: 'centeredCard',
       background: { mode: 'theme', color: '#fff7fb', image: '', imageOpacity: 0.35, overlay: 0.35 },
       ...overrides.settings,
@@ -29,10 +29,7 @@ function response(overrides = {}) {
     store: { name: 'Rosa Boutique', logo: '' },
     meta: {
       themes: [
-        { value: 'roseLuxuryLight', label: 'Rosa Signature', description: 'Alta costura.' },
-        { value: 'noirGallery', label: 'Noir Gallery', description: 'Galería nocturna.' },
-        { value: 'auroraMotion', label: 'Aurora Motion', description: 'Interfaz cinética.' },
-        { value: 'paperStudio', label: 'Paper Studio', description: 'Editorial audaz.' },
+        { value: 'orbit3d', label: 'Órbita 3D', description: 'Movimiento espacial.' },
       ],
       layouts: [
         { value: 'centeredCard', label: 'Tarjeta centrada', description: 'Acceso directo.' },
@@ -44,7 +41,7 @@ function response(overrides = {}) {
         { value: 'image', label: 'Imagen personalizada' },
       ],
       defaults: {
-        theme: 'roseLuxuryLight',
+        theme: 'orbit3d',
         layout: 'centeredCard',
         background: { mode: 'theme', color: '#fff7fb', image: '', imageOpacity: 0.35, overlay: 0.35 },
       },
@@ -61,7 +58,7 @@ describe('LoginAdminSection', () => {
     getAdminLoginSettings.mockResolvedValue(response());
     updateAdminLoginSettings.mockResolvedValue(response({
       revision: 3,
-      settings: { theme: 'noirGallery' },
+      settings: { theme: 'neonPortal' },
       message: 'Diseño guardado.',
     }));
     uploadAdminLoginBackground.mockResolvedValue('https://cdn.example.com/login.webp');
@@ -72,9 +69,9 @@ describe('LoginAdminSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Login de Rosa Boutique' })).toBeInTheDocument();
     expect(screen.getByText('Sincronizado')).toBeInTheDocument();
-    expect(screen.getByText('Rosa Signature · composición exclusiva')).toBeInTheDocument();
-    expect(screen.getByText('Composición exclusiva incluida')).toBeInTheDocument();
-    expect(screen.getByText('Tu universo,')).toBeInTheDocument();
+    expect(screen.getByText('Órbita 3D · composición exclusiva')).toBeInTheDocument();
+    expect(screen.getByText('Escoge el diseño')).toBeInTheDocument();
+    expect(screen.getByText('Todo tu negocio.')).toBeInTheDocument();
     expect(screen.getByText('Versión 2 · se aplicará al login real después de guardar.')).toBeInTheDocument();
     expect(getAdminLoginSettings).toHaveBeenCalledTimes(1);
   });
@@ -84,7 +81,8 @@ describe('LoginAdminSection', () => {
     render(<LoginAdminSection />);
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
-    await user.click(screen.getByRole('radio', { name: /Noir Gallery/ }));
+    await user.selectOptions(screen.getByLabelText('Tema visual'), 'neonPortal');
+    await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     await user.click(screen.getByText('Cambiar textos del diseño'));
     await user.clear(screen.getByLabelText('Título principal'));
     await user.type(screen.getByLabelText('Título principal'), 'Mi negocio,');
@@ -95,9 +93,9 @@ describe('LoginAdminSection', () => {
     expect(updateAdminLoginSettings).toHaveBeenCalledWith(expect.objectContaining({
       revision: 2,
       settings: expect.objectContaining({
-        theme: 'noirGallery',
+        theme: 'neonPortal',
         customizations: expect.objectContaining({
-          noirGallery: expect.objectContaining({ headline: 'Mi negocio,' }),
+          neonPortal: expect.objectContaining({ headline: 'Mi negocio,' }),
         }),
       }),
     }));
@@ -110,6 +108,7 @@ describe('LoginAdminSection', () => {
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
     expect(screen.queryByText('Imagen publicada')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     await user.click(screen.getByRole('button', { name: 'Imagen personalizada' }));
     expect(screen.getByText('Imagen publicada')).toBeInTheDocument();
     expect(screen.getByText('Subir imagen')).toBeInTheDocument();

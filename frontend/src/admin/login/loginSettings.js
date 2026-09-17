@@ -29,7 +29,7 @@ export const DEFAULT_LOGIN_SETTINGS = Object.freeze({
   customizations: Object.freeze(defaultCustomizations()),
   background: Object.freeze({
     mode: 'theme',
-    color: '#fff7fb',
+    color: '#07132f',
     image: '',
     imageOpacity: 0.35,
     overlay: 0.35,

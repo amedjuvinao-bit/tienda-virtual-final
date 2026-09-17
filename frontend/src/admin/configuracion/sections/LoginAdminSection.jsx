@@ -32,11 +32,12 @@ import {
   LOGIN_THEMES,
 } from '../../login/loginThemes';
 import {
-  AuroraOrbitMark,
-  NoirGalleryMark,
-  PaperStudioMark,
+  ArchitectMark,
+  EditorialMotionMark,
+  LiquidGlassMark,
+  NeonPortalMark,
+  OrbitCommerceMark,
 } from '../../login/LoginThemeMarks';
-import RosaCoutureMark from '../../login/RosaCoutureMark';
 import './LoginAdminSection.css';
 
 function clone(value) {
@@ -54,6 +55,15 @@ const COLOR_CONTROLS = [
   { field: 'surface', label: 'Fondo y superficie' },
 ];
 
+const PALETTE_PRESETS = [
+  { name: 'Océano', primary: '#07132f', secondary: '#183b73', accent: '#64f5d2', surface: '#f2fbff' },
+  { name: 'Violeta', primary: '#160b2d', secondary: '#5b3bbd', accent: '#ff82c8', surface: '#fff7fd' },
+  { name: 'Tierra', primary: '#2c1d16', secondary: '#9a5d38', accent: '#efc56a', surface: '#fff8ea' },
+  { name: 'Esmeralda', primary: '#06271f', secondary: '#14735b', accent: '#b7f34a', surface: '#f3fff8' },
+  { name: 'Grafito', primary: '#151719', secondary: '#555b61', accent: '#e8ff45', surface: '#f5f5f0' },
+  { name: 'Coral', primary: '#351824', secondary: '#bb4162', accent: '#ffbd68', surface: '#fff6f1' },
+];
+
 const STORY_TEXT_CONTROLS = [
   { field: 'eyebrow', label: 'Texto pequeño', maxLength: 48 },
   { field: 'headline', label: 'Título principal', maxLength: 48 },
@@ -68,10 +78,11 @@ const ACCESS_TEXT_CONTROLS = [
 ];
 
 function ThemeMark({ themeId, size = 30 }) {
-  if (themeId === 'noirGallery') return <NoirGalleryMark size={size} />;
-  if (themeId === 'auroraMotion') return <AuroraOrbitMark size={size} />;
-  if (themeId === 'paperStudio') return <PaperStudioMark size={size} />;
-  return <RosaCoutureMark size={size} />;
+  if (themeId === 'liquidGlass') return <LiquidGlassMark size={size} />;
+  if (themeId === 'neonPortal') return <NeonPortalMark size={size} />;
+  if (themeId === 'editorialMotion') return <EditorialMotionMark size={size} />;
+  if (themeId === 'architectMono') return <ArchitectMark size={size} />;
+  return <OrbitCommerceMark size={size} />;
 }
 
 function LoginPreview({ settings, store }) {
@@ -165,11 +176,10 @@ export default function LoginAdminSection() {
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [customizerOpen, setCustomizerOpen] = useState(false);
 
   const dirty = useMemo(() => !loginSettingsEqual(form, saved), [form, saved]);
-  const themeOptions = meta.themes.length
-    ? meta.themes
-    : CURATED_LOGIN_THEME_IDS.map((themeId) => LOGIN_THEMES[themeId]).map((item) => ({ value: item.id, label: item.name, description: item.description }));
+  const themeOptions = CURATED_LOGIN_THEME_IDS.map((themeId) => LOGIN_THEMES[themeId]).map((item) => ({ value: item.id, label: item.name, description: item.description }));
   const currentCustomization = form.customizations?.[form.theme] || getLoginThemeCustomization(form.theme);
 
   function applyResponse(response) {
@@ -234,6 +244,22 @@ export default function LoginAdminSection() {
       customizations: {
         ...current.customizations,
         [current.theme]: getLoginThemeCustomization(current.theme),
+      },
+    }));
+  }
+
+  function setPalette(palette) {
+    setForm((current) => ({
+      ...current,
+      customizations: {
+        ...current.customizations,
+        [current.theme]: {
+          ...(current.customizations?.[current.theme] || getLoginThemeCustomization(current.theme)),
+          primary: palette.primary,
+          secondary: palette.secondary,
+          accent: palette.accent,
+          surface: palette.surface,
+        },
       },
     }));
   }
@@ -306,47 +332,36 @@ export default function LoginAdminSection() {
             <button type="button" onClick={load} disabled={Boolean(busy)} title="Recargar"><RefreshCw size={17} /></button>
           </div>
 
-          <div className="login-theme-picker" role="radiogroup" aria-label="Tema visual">
-            {themeOptions.map((option) => {
-              const selected = option.value === form.theme;
-              const palette = form.customizations?.[option.value] || getLoginThemeCustomization(option.value);
-              return (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  key={option.value}
-                  className={selected ? 'selected' : ''}
-                  onClick={() => setRoot('theme', option.value)}
-                >
-                  <span className="login-theme-card-mark" style={{ '--card-accent': palette.accent }}>
-                    <ThemeMark themeId={option.value} size={32} />
-                  </span>
-                  <span className="login-theme-card-copy">
-                    <b>{option.label}</b>
-                    <small>{option.description}</small>
-                  </span>
-                  <span className="login-theme-card-palette" aria-hidden="true">
-                    {['primary', 'secondary', 'accent', 'surface'].map((color) => (
-                      <i key={color} style={{ background: palette[color] }} />
-                    ))}
-                  </span>
-                  {selected ? <Check className="login-theme-card-check" size={16} /> : null}
-                </button>
-              );
-            })}
-          </div>
+          <section className="login-theme-selector">
+            <div className="login-theme-selector-step"><span>1</span><div><b>Escoge el diseño</b><small>Cada opción cambia por completo la estructura y el movimiento.</small></div></div>
+            <div className="login-theme-selector-current">
+              <span className="login-theme-selector-mark" style={{ '--card-accent': currentCustomization.accent }}><ThemeMark themeId={form.theme} size={46} /></span>
+              <span className="login-theme-selector-copy"><b>{LOGIN_THEMES[form.theme]?.name}</b><small>{LOGIN_THEMES[form.theme]?.description}</small></span>
+              <span className="login-theme-selector-palette" aria-hidden="true">{['primary', 'secondary', 'accent', 'surface'].map((color) => <i key={color} style={{ background: currentCustomization[color] }} />)}</span>
+            </div>
+            <label className="login-theme-select-field">
+              <span>Diseño del login</span>
+              <select aria-label="Tema visual" value={form.theme} onChange={(event) => { setRoot('theme', event.target.value); setCustomizerOpen(false); }}>
+                {themeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <button type="button" className="login-theme-customize-button" onClick={() => setCustomizerOpen((open) => !open)}>
+              <SlidersHorizontal size={17} /> {customizerOpen ? 'Cerrar personalización' : 'Personalizar este tema'}
+            </button>
+          </section>
           {fieldErrors.theme ? <em>{fieldErrors.theme}</em> : null}
 
-          <div className="login-settings-exclusive">
-            <ThemeMark themeId={form.theme} size={34} />
-            <span><b>Composición exclusiva incluida</b><small>Cada tema cambia estructura, emblema y animación; no es solo otro color.</small></span>
-          </div>
-
-          <section className="login-theme-customizer">
+          {customizerOpen ? <section className="login-theme-customizer">
             <div className="login-theme-customizer-head">
               <div><SlidersHorizontal /><span><b>Personaliza {LOGIN_THEMES[form.theme]?.name}</b><small>Los cambios aparecen inmediatamente en la vista previa.</small></span></div>
               <button type="button" onClick={resetCurrentTheme}><RotateCcw size={14} /> Restaurar este tema</button>
+            </div>
+
+            <div className="login-theme-preset-heading"><b>Paletas listas</b><small>Escoge una combinación o crea la tuya debajo.</small></div>
+            <div className="login-theme-presets">
+              {PALETTE_PRESETS.map((palette) => <button type="button" key={palette.name} onClick={() => setPalette(palette)} aria-label={`Usar paleta ${palette.name}`} title={palette.name}>
+                <span>{[palette.primary, palette.secondary, palette.accent, palette.surface].map((color) => <i key={color} style={{ background: color }} />)}</span><b>{palette.name}</b>
+              </button>)}
             </div>
 
             <div className="login-theme-colors">
@@ -394,9 +409,9 @@ export default function LoginAdminSection() {
                 </fieldset>
               </div>
             </details>
-          </section>
+          </section> : null}
 
-          <div className="login-settings-background">
+          {customizerOpen ? <div className="login-settings-background">
             <div className="login-settings-subtitle"><ImageIcon /><span><b>Fondo</b><small>Escoge una sola opción</small></span></div>
             <div className="login-settings-segments">
               {(meta.backgroundModes || []).map((mode) => (
@@ -438,11 +453,11 @@ export default function LoginAdminSection() {
                 </div>
               </div>
             ) : null}
-          </div>
+          </div> : null}
 
-          <button type="button" className="login-settings-default" onClick={() => setForm(normalizeLoginSettings(meta.defaults || DEFAULT_LOGIN_SETTINGS))}>
+          {customizerOpen ? <button type="button" className="login-settings-default" onClick={() => setForm(normalizeLoginSettings(meta.defaults || DEFAULT_LOGIN_SETTINGS))}>
             <RotateCcw size={16} /> Recuperar diseño recomendado
-          </button>
+          </button> : null}
         </div>
 
         <LoginPreview settings={form} store={store} />

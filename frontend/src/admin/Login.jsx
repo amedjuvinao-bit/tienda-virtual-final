@@ -19,9 +19,11 @@ import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
 import {
-  AuroraOrbitMark,
-  NoirGalleryMark,
-  PaperStudioMark,
+  ArchitectMark,
+  EditorialMotionMark,
+  LiquidGlassMark,
+  NeonPortalMark,
+  OrbitCommerceMark,
 } from "./login/LoginThemeMarks";
 import "./login/LoginFlagship.css";
 import "./login/LoginCuratedThemes.css";
@@ -1100,14 +1102,15 @@ export default function Login() {
   const isLocked = lockRemaining > 0;
   const dark = isDarkTheme(activeTheme);
   const gold = isGoldTheme(activeTheme);
-  const isRosaCouture = activeTheme.id === "roseLuxuryLight";
-  const isNoirGallery = activeTheme.id === "noirGallery";
-  const isAuroraMotion = activeTheme.id === "auroraMotion";
-  const isPaperStudio = activeTheme.id === "paperStudio";
-  const isCuratedTheme = isRosaCouture || isNoirGallery || isAuroraMotion || isPaperStudio;
+  const isOrbit3d = activeTheme.id === "orbit3d";
+  const isLiquidGlass = activeTheme.id === "liquidGlass";
+  const isNeonPortal = activeTheme.id === "neonPortal";
+  const isEditorialMotion = activeTheme.id === "editorialMotion";
+  const isArchitectMono = activeTheme.id === "architectMono";
+  const isCuratedTheme = isOrbit3d || isLiquidGlass || isNeonPortal || isEditorialMotion || isArchitectMono;
   const activeCustomization = loginCustomizations[activeTheme.id]
     || DEFAULT_LOGIN_SETTINGS.customizations[activeTheme.id]
-    || DEFAULT_LOGIN_SETTINGS.customizations.roseLuxuryLight;
+    || DEFAULT_LOGIN_SETTINGS.customizations.orbit3d;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
 
   const loginPageBackground =
@@ -1400,69 +1403,48 @@ export default function Login() {
     customization: activeCustomization,
   };
 
-  const renderNoirGallery = () => (
-    <section className="rb-noir-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-      <div className="rb-noir-gallery">
-        <div className="rb-noir-brand">
-          <strong>{storeName}</strong>
-          <span>Galería privada · acceso protegido</span>
-        </div>
-        <div className="rb-noir-art" aria-hidden="true"><NoirGalleryMark /></div>
-        <div className="rb-noir-copy">
-          <small>{activeCustomization.eyebrow}</small>
-          <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
-          <p>{activeCustomization.description}</p>
-        </div>
-      </div>
-      <div className="rb-noir-access">
-        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-noir" />
-      </div>
-    </section>
-  );
+  const StoryCopy = ({ className }) => <div className={className}>
+    <small>{activeCustomization.eyebrow}</small>
+    <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
+    <p>{activeCustomization.description}</p>
+  </div>;
 
-  const renderAuroraMotion = () => (
-    <section className="rb-aurora-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-      <div className="rb-aurora-access">
-        <div className="rb-aurora-brand"><i /> {storeName}</div>
-        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-aurora" />
-      </div>
-      <div className="rb-aurora-visual">
-        <div className="rb-aurora-orbit" aria-hidden="true"><AuroraOrbitMark /></div>
-        <div className="rb-aurora-copy">
-          <small>{activeCustomization.eyebrow}</small>
-          <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
-          <p>{activeCustomization.description}</p>
-        </div>
-      </div>
-    </section>
-  );
+  const renderOrbit3d = () => <section className="rb-orbit-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-orbit-access"><div className="rb-theme-brand"><i />{storeName}</div><CuratedCredentialsForm {...curatedFormProps} inputId="rb-orbit" /></div>
+    <div className="rb-orbit-world"><div className="rb-orbit-object"><OrbitCommerceMark /></div><StoryCopy className="rb-theme-copy rb-orbit-copy" /></div>
+  </section>;
 
-  const renderPaperStudio = () => (
-    <section className="rb-paper-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-      <div className="rb-paper-grid" aria-hidden="true" />
-      <div className="rb-paper-marquee" aria-hidden="true">
-        <span>{activeCustomization.eyebrow} · {storeName} · {activeCustomization.eyebrow} · {storeName} · {activeCustomization.eyebrow} · {storeName} · </span>
-      </div>
-      <div className="rb-paper-copy">
-        <small>{activeCustomization.eyebrow}</small>
-        <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
-        <p>{activeCustomization.description}</p>
-      </div>
-      <div className="rb-paper-mark">
-        <PaperStudioMark />
-        <span><strong>{storeName}</strong><small>Estudio privado de operaciones</small></span>
-      </div>
-      <div className="rb-paper-access">
-        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-paper" />
-      </div>
-    </section>
-  );
+  const renderLiquidGlass = () => <section className="rb-liquid-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-liquid-blob one" /><div className="rb-liquid-blob two" /><LiquidGlassMark className="rb-liquid-mark" />
+    <StoryCopy className="rb-theme-copy rb-liquid-copy" />
+    <div className="rb-liquid-access"><div className="rb-theme-brand"><i />{storeName}</div><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
+  </section>;
+
+  const renderNeonPortal = () => <section className="rb-portal-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-portal-brand">{storeName}<span>ACCESO CIFRADO</span></div>
+    <div className="rb-portal-rings" aria-hidden="true"><NeonPortalMark /></div>
+    <StoryCopy className="rb-theme-copy rb-portal-copy" />
+    <div className="rb-portal-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-portal" /></div>
+  </section>;
+
+  const renderEditorialMotion = () => <section className="rb-editorial-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-editorial-grid" /><div className="rb-editorial-ticker"><span>{storeName} · OPERACIÓN · CONTROL · CRECIMIENTO · {storeName} · OPERACIÓN · CONTROL · CRECIMIENTO · </span></div>
+    <StoryCopy className="rb-theme-copy rb-editorial-copy" />
+    <div className="rb-editorial-mark"><EditorialMotionMark /><strong>{storeName}</strong></div>
+    <div className="rb-editorial-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-editorial" /></div>
+  </section>;
+
+  const renderArchitectMono = () => <section className="rb-architect-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-architect-plan"><div className="rb-architect-brand">{storeName}</div><ArchitectMark /><StoryCopy className="rb-theme-copy rb-architect-copy" /></div>
+    <div className="rb-architect-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-architect" /></div>
+  </section>;
 
   const renderLayout = () => {
-    if (isRosaCouture) return renderRosaCouture();
-    if (isNoirGallery) return renderNoirGallery();
-    if (isAuroraMotion) return renderAuroraMotion();
-    if (isPaperStudio) return renderPaperStudio();
+    if (isOrbit3d) return renderOrbit3d();
+    if (isLiquidGlass) return renderLiquidGlass();
+    if (isNeonPortal) return renderNeonPortal();
+    if (isEditorialMotion) return renderEditorialMotion();
+    if (isArchitectMono) return renderArchitectMono();
 
     switch (activeLayout.id) {
       case "electricCircle":
@@ -1484,7 +1466,7 @@ export default function Login() {
   return (
     <div
       data-login-theme={activeTheme.id}
-      className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 ${isRosaCouture ? "is-rosa-couture" : ""} ${isNoirGallery ? "is-noir-gallery" : ""} ${isAuroraMotion ? "is-aurora-motion" : ""} ${isPaperStudio ? "is-paper-studio" : ""}`}
+      className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 theme-${activeTheme.id}`}
       style={{
         background: loginPageBackground,
         "--login-primary": activeCustomization.primary,
