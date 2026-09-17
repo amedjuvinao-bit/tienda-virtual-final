@@ -18,7 +18,13 @@ import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
+import {
+  AuroraOrbitMark,
+  NoirGalleryMark,
+  PaperStudioMark,
+} from "./login/LoginThemeMarks";
 import "./login/LoginFlagship.css";
+import "./login/LoginCuratedThemes.css";
 import {
   LOGIN_THEMES,
   LOGIN_LAYOUTS,
@@ -684,6 +690,7 @@ function RosaCoutureLoginForm({
   handleSubmit,
   onForgotPassword,
   storeName,
+  customization,
 }) {
   return (
     <div className="rb-couture-form">
@@ -691,8 +698,8 @@ function RosaCoutureLoginForm({
         <div className="rb-couture-mini-mark">
           <RosaCoutureMark size={44} />
         </div>
-        <h2>Bienvenido</h2>
-        <p>Ingresa al espacio privado de {storeName}.</p>
+        <h2>{customization.welcomeTitle}</h2>
+        <p>{customization.welcomeSubtitle.replace("la tienda", storeName)}</p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -754,7 +761,7 @@ function RosaCoutureLoginForm({
               ? "Validando acceso"
               : isLocked
                 ? `Acceso pausado · ${lockSeconds}s`
-                : "Entrar al panel"}
+                : customization.buttonText}
           </span>
           <span className="rb-couture-submit-mark" aria-hidden="true">→</span>
         </button>
@@ -780,6 +787,97 @@ function RosaCoutureLoginForm({
   );
 }
 
+function CuratedCredentialsForm({
+  username,
+  password,
+  error,
+  isLocked,
+  isSubmitting,
+  lockSeconds,
+  setUsername,
+  setPassword,
+  rememberMe,
+  setRememberMe,
+  handleSubmit,
+  onForgotPassword,
+  customization,
+  inputId,
+}) {
+  return (
+    <div className="rb-curated-auth">
+      <div className="rb-curated-auth__head">
+        <h2>{customization.welcomeTitle}</h2>
+        <p>{customization.welcomeSubtitle}</p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        {error ? (
+          <div className="rb-curated-auth__error">
+            {error}
+            {isLocked ? <span> Intenta nuevamente en {lockSeconds} segundos.</span> : null}
+          </div>
+        ) : null}
+
+        <div className="rb-curated-auth__field">
+          <label htmlFor={`${inputId}-username`}>Usuario</label>
+          <input
+            id={`${inputId}-username`}
+            name="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="Nombre de usuario"
+            autoComplete="username"
+            required
+            disabled={isSubmitting || isLocked}
+          />
+        </div>
+
+        <div className="rb-curated-auth__field">
+          <label htmlFor={`${inputId}-password`}>Contraseña</label>
+          <input
+            id={`${inputId}-password`}
+            type="password"
+            name="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Escribe tu contraseña"
+            autoComplete="current-password"
+            required
+            disabled={isSubmitting || isLocked}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="rb-curated-auth__submit"
+          disabled={isSubmitting || isLocked}
+        >
+          <span>
+            {isSubmitting
+              ? "Validando acceso"
+              : isLocked
+                ? `Acceso pausado · ${lockSeconds}s`
+                : customization.buttonText}
+          </span>
+          <b aria-hidden="true">→</b>
+        </button>
+      </form>
+
+      <div className="rb-curated-auth__options">
+        <button
+          type="button"
+          className="rb-curated-auth__remember"
+          onClick={() => setRememberMe(!rememberMe)}
+        >
+          <span className={`rb-curated-auth__check ${rememberMe ? "active" : ""}`} aria-hidden="true" />
+          Recordar usuario
+        </button>
+        <button type="button" onClick={onForgotPassword}>Recuperar acceso</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   const rememberedLogin = useMemo(() => getRememberedLogin(), []);
 
@@ -792,6 +890,9 @@ export default function Login() {
   const [lockRemaining, setLockRemaining] = useState(0);
   const [rememberMe, setRememberMe] = useState(rememberedLogin.remember);
   const [loginBg, setLoginBg] = useState(DEFAULT_LOGIN_SETTINGS.background);
+  const [loginCustomizations, setLoginCustomizations] = useState(
+    DEFAULT_LOGIN_SETTINGS.customizations
+  );
   const [storeName, setStoreName] = useState('tu tienda');
   const [storeLogo, setStoreLogo] = useState('');
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
@@ -817,6 +918,7 @@ export default function Login() {
       setActiveThemeId(normalized.theme);
       setActiveLayoutId(normalized.layout);
       setLoginBg(normalized.background);
+      setLoginCustomizations(normalized.customizations);
       if (identity?.name) setStoreName(String(identity.name).trim());
       if (identity?.logo) setStoreLogo(String(identity.logo).trim());
     };
@@ -999,6 +1101,13 @@ export default function Login() {
   const dark = isDarkTheme(activeTheme);
   const gold = isGoldTheme(activeTheme);
   const isRosaCouture = activeTheme.id === "roseLuxuryLight";
+  const isNoirGallery = activeTheme.id === "noirGallery";
+  const isAuroraMotion = activeTheme.id === "auroraMotion";
+  const isPaperStudio = activeTheme.id === "paperStudio";
+  const isCuratedTheme = isRosaCouture || isNoirGallery || isAuroraMotion || isPaperStudio;
+  const activeCustomization = loginCustomizations[activeTheme.id]
+    || DEFAULT_LOGIN_SETTINGS.customizations[activeTheme.id]
+    || DEFAULT_LOGIN_SETTINGS.customizations.roseLuxuryLight;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
 
   const loginPageBackground =
@@ -1258,15 +1367,12 @@ export default function Login() {
         </div>
 
         <div className="rb-couture-hero">
-          <span className="rb-couture-kicker">Administración privada</span>
+          <span className="rb-couture-kicker">{activeCustomization.eyebrow}</span>
           <h1>
-            Tu universo,
-            <em>bajo control.</em>
+            {activeCustomization.headline}
+            <em>{activeCustomization.highlight}</em>
           </h1>
-          <p>
-            Una entrada creada para dirigir cada detalle de la tienda con precisión,
-            carácter y absoluta confianza.
-          </p>
+          <p>{activeCustomization.description}</p>
         </div>
 
         <div className="rb-couture-seal" aria-hidden="true">
@@ -1283,13 +1389,80 @@ export default function Login() {
         <RosaCoutureLoginForm
           {...formProps}
           storeName={storeName}
+          customization={activeCustomization}
         />
+      </div>
+    </section>
+  );
+
+  const curatedFormProps = {
+    ...formProps,
+    customization: activeCustomization,
+  };
+
+  const renderNoirGallery = () => (
+    <section className="rb-noir-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+      <div className="rb-noir-gallery">
+        <div className="rb-noir-brand">
+          <strong>{storeName}</strong>
+          <span>Galería privada · acceso protegido</span>
+        </div>
+        <div className="rb-noir-art" aria-hidden="true"><NoirGalleryMark /></div>
+        <div className="rb-noir-copy">
+          <small>{activeCustomization.eyebrow}</small>
+          <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
+          <p>{activeCustomization.description}</p>
+        </div>
+      </div>
+      <div className="rb-noir-access">
+        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-noir" />
+      </div>
+    </section>
+  );
+
+  const renderAuroraMotion = () => (
+    <section className="rb-aurora-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+      <div className="rb-aurora-access">
+        <div className="rb-aurora-brand"><i /> {storeName}</div>
+        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-aurora" />
+      </div>
+      <div className="rb-aurora-visual">
+        <div className="rb-aurora-orbit" aria-hidden="true"><AuroraOrbitMark /></div>
+        <div className="rb-aurora-copy">
+          <small>{activeCustomization.eyebrow}</small>
+          <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
+          <p>{activeCustomization.description}</p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderPaperStudio = () => (
+    <section className="rb-paper-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+      <div className="rb-paper-grid" aria-hidden="true" />
+      <div className="rb-paper-marquee" aria-hidden="true">
+        <span>{activeCustomization.eyebrow} · {storeName} · {activeCustomization.eyebrow} · {storeName} · {activeCustomization.eyebrow} · {storeName} · </span>
+      </div>
+      <div className="rb-paper-copy">
+        <small>{activeCustomization.eyebrow}</small>
+        <h1>{activeCustomization.headline}<em>{activeCustomization.highlight}</em></h1>
+        <p>{activeCustomization.description}</p>
+      </div>
+      <div className="rb-paper-mark">
+        <PaperStudioMark />
+        <span><strong>{storeName}</strong><small>Estudio privado de operaciones</small></span>
+      </div>
+      <div className="rb-paper-access">
+        <CuratedCredentialsForm {...curatedFormProps} inputId="rb-paper" />
       </div>
     </section>
   );
 
   const renderLayout = () => {
     if (isRosaCouture) return renderRosaCouture();
+    if (isNoirGallery) return renderNoirGallery();
+    if (isAuroraMotion) return renderAuroraMotion();
+    if (isPaperStudio) return renderPaperStudio();
 
     switch (activeLayout.id) {
       case "electricCircle":
@@ -1311,8 +1484,14 @@ export default function Login() {
   return (
     <div
       data-login-theme={activeTheme.id}
-      className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 ${isRosaCouture ? "is-rosa-couture" : ""}`}
-      style={{ background: loginPageBackground }}
+      className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 ${isRosaCouture ? "is-rosa-couture" : ""} ${isNoirGallery ? "is-noir-gallery" : ""} ${isAuroraMotion ? "is-aurora-motion" : ""} ${isPaperStudio ? "is-paper-studio" : ""}`}
+      style={{
+        background: loginPageBackground,
+        "--login-primary": activeCustomization.primary,
+        "--login-secondary": activeCustomization.secondary,
+        "--login-accent": activeCustomization.accent,
+        "--login-surface": activeCustomization.surface,
+      }}
     >
       <style>
         {`
@@ -1347,7 +1526,7 @@ export default function Login() {
         </>
       )}
 
-      {!isRosaCouture ? (
+      {!isCuratedTheme ? (
         <>
           <div
             className="pointer-events-none absolute inset-0 z-[1] opacity-70"
@@ -1409,7 +1588,7 @@ export default function Login() {
         {renderLayout()}
       </div>
 
-      {!isRosaCouture ? (
+      {!isCuratedTheme ? (
         <div
           className="pointer-events-none fixed bottom-5 left-1/2 z-[3] hidden -translate-x-1/2 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold md:flex"
           style={{

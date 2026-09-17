@@ -4,14 +4,48 @@ const SiteSettings = require('../models/SiteSettings');
 
 const LOGIN_THEMES = Object.freeze([
   { value: 'roseLuxuryLight', label: 'Rosa Signature', description: 'Tema insignia de alta costura creado para la marca.' },
-  { value: 'goldBoutiqueLight', label: 'Maison Gold', description: 'Marfil y oro con acabado editorial.' },
-  { value: 'glassPastel', label: 'Aurora Glass', description: 'Cristal esmerilado y luz pastel.' },
-  { value: 'pearlFuture', label: 'Pearl Signature', description: 'Perla luminosa y precisión contemporánea.' },
-  { value: 'neonRoseLight', label: 'Magenta Pulse', description: 'Moda digital con brillo editorial.' },
-  { value: 'minimalPro', label: 'Executive', description: 'Orden y presencia institucional.' },
-  { value: 'electricNeon', label: 'Nexus', description: 'Energía digital de alto contraste.' },
-  { value: 'darkCyber', label: 'Obsidian', description: 'Tecnología sobria y profundidad ejecutiva.' },
+  { value: 'noirGallery', label: 'Noir Gallery', description: 'Galería nocturna, luz escultórica y lujo silencioso.' },
+  { value: 'auroraMotion', label: 'Aurora Motion', description: 'Interfaz cinética, órbitas de luz y precisión tecnológica.' },
+  { value: 'paperStudio', label: 'Paper Studio', description: 'Editorial audaz, geometría gráfica y movimiento creativo.' },
 ]);
+
+const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
+  roseLuxuryLight: Object.freeze({
+    primary: '#5c1733', secondary: '#8f3154', accent: '#f0d69f', surface: '#fffaf5',
+    eyebrow: 'ADMINISTRACIÓN PRIVADA', headline: 'Tu universo,', highlight: 'bajo control.',
+    description: 'Una entrada creada para dirigir cada detalle de la tienda con precisión, carácter y absoluta confianza.',
+    welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa al espacio privado de la tienda.', buttonText: 'Entrar al panel',
+  }),
+  noirGallery: Object.freeze({
+    primary: '#0a0a0c', secondary: '#1b1b21', accent: '#f0c87c', surface: '#f3eee4',
+    eyebrow: 'DIRECCIÓN CREATIVA', headline: 'El negocio,', highlight: 'en primer plano.',
+    description: 'Una sala privada para observar la operación completa y decidir con absoluta claridad.',
+    welcomeTitle: 'Sala privada', welcomeSubtitle: 'Identifícate para abrir la galería de control.', buttonText: 'Abrir la galería',
+  }),
+  auroraMotion: Object.freeze({
+    primary: '#041724', secondary: '#0b3850', accent: '#64f0d1', surface: '#eafcff',
+    eyebrow: 'CENTRO DE MANDO', headline: 'Decide hoy.', highlight: 'Avanza primero.',
+    description: 'Toda la energía de la tienda converge en un espacio ágil, seguro y preparado para actuar.',
+    welcomeTitle: 'Sincroniza tu acceso', welcomeSubtitle: 'Conecta con el centro operativo de la tienda.', buttonText: 'Iniciar conexión',
+  }),
+  paperStudio: Object.freeze({
+    primary: '#1226aa', secondary: '#f04d2f', accent: '#f4dd52', surface: '#f7f0de',
+    eyebrow: 'ESTUDIO DE OPERACIONES', headline: 'Ideas claras.', highlight: 'Decisiones rápidas.',
+    description: 'Una entrada gráfica para administrar la tienda sin ruido, con ritmo y una visión completamente clara.',
+    welcomeTitle: 'Entra al estudio', welcomeSubtitle: 'Tu mesa de trabajo está preparada.', buttonText: 'Comenzar ahora',
+  }),
+});
+
+const LOGIN_COLOR_FIELDS = Object.freeze(['primary', 'secondary', 'accent', 'surface']);
+const LOGIN_TEXT_LIMITS = Object.freeze({
+  eyebrow: 48,
+  headline: 48,
+  highlight: 48,
+  description: 180,
+  welcomeTitle: 48,
+  welcomeSubtitle: 100,
+  buttonText: 32,
+});
 
 const LOGIN_LAYOUTS = Object.freeze([
   { value: 'centeredCard', label: 'Tarjeta centrada', description: 'Acceso directo y equilibrado.' },
@@ -25,6 +59,7 @@ const LOGIN_LAYOUTS = Object.freeze([
 const DEFAULT_LOGIN_SETTINGS = Object.freeze({
   theme: 'roseLuxuryLight',
   layout: 'centeredCard',
+  customizations: LOGIN_THEME_CUSTOMIZATIONS,
   background: Object.freeze({
     mode: 'theme',
     color: '#fff7fb',
@@ -63,6 +98,36 @@ function optionExists(options, value) {
   return options.some((option) => option.value === value);
 }
 
+function validHex(value) {
+  return /^#[0-9a-f]{6}$/i.test(cleanText(value, 20));
+}
+
+function normalizeThemeCustomization(themeId, input = {}) {
+  const defaults = LOGIN_THEME_CUSTOMIZATIONS[themeId] || LOGIN_THEME_CUSTOMIZATIONS.roseLuxuryLight;
+  const normalized = {};
+
+  LOGIN_COLOR_FIELDS.forEach((field) => {
+    normalized[field] = validHex(input[field])
+      ? cleanText(input[field], 20).toLowerCase()
+      : defaults[field];
+  });
+
+  Object.entries(LOGIN_TEXT_LIMITS).forEach(([field, maxLength]) => {
+    normalized[field] = cleanText(input[field], maxLength) || defaults[field];
+  });
+
+  return normalized;
+}
+
+function normalizeCustomizations(input = {}) {
+  return Object.fromEntries(
+    LOGIN_THEMES.map(({ value }) => [
+      value,
+      normalizeThemeCustomization(value, input?.[value] || {}),
+    ])
+  );
+}
+
 function safeImageUrl(value) {
   const image = cleanText(value);
   if (!image) return '';
@@ -84,6 +149,7 @@ function normalizeLoginSettings(input = {}) {
   return {
     theme: optionExists(LOGIN_THEMES, theme) ? theme : DEFAULT_LOGIN_SETTINGS.theme,
     layout: optionExists(LOGIN_LAYOUTS, layout) ? layout : DEFAULT_LOGIN_SETTINGS.layout,
+    customizations: normalizeCustomizations(input.customizations),
     background: {
       mode: ['theme', 'color', 'image'].includes(mode)
         ? mode
@@ -119,6 +185,29 @@ function validateLoginSettings(input = {}) {
   }
   if (mode === 'image' && !safeImageUrl(background.image)) {
     details.push({ field: 'background.image', message: 'Sube una imagen o escribe una URL válida.' });
+  }
+
+  for (const { value: themeId } of LOGIN_THEMES) {
+    const customization = input?.customizations?.[themeId];
+    if (!customization) continue;
+
+    for (const field of LOGIN_COLOR_FIELDS) {
+      if (customization[field] !== undefined && !validHex(customization[field])) {
+        details.push({
+          field: `customizations.${themeId}.${field}`,
+          message: 'Selecciona un color válido.',
+        });
+      }
+    }
+
+    for (const [field, maxLength] of Object.entries(LOGIN_TEXT_LIMITS)) {
+      if (String(customization[field] || '').trim().length > maxLength) {
+        details.push({
+          field: `customizations.${themeId}.${field}`,
+          message: `Usa máximo ${maxLength} caracteres.`,
+        });
+      }
+    }
   }
 
   return details;
@@ -240,6 +329,7 @@ module.exports = {
   DEFAULT_LOGIN_SETTINGS,
   LOGIN_LAYOUTS,
   LOGIN_THEMES,
+  LOGIN_THEME_CUSTOMIZATIONS,
   LoginSettingsError,
   buildResponse,
   getLoginSettings,

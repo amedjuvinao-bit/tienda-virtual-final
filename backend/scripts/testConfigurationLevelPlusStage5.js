@@ -48,8 +48,15 @@ function modelFor(current, options = {}) {
 
 async function run() {
   const normalized = normalizeLoginSettings({
-    theme: 'darkCyber',
+    theme: 'auroraMotion',
     layout: 'splitPanel',
+    customizations: {
+      auroraMotion: {
+        ...DEFAULT_LOGIN_SETTINGS.customizations.auroraMotion,
+        accent: '#12abef',
+        headline: 'Control total',
+      },
+    },
     background: {
       mode: 'image',
       image: 'https://cdn.example.com/login.webp',
@@ -58,7 +65,9 @@ async function run() {
       color: '#ABCDEF',
     },
   });
-  assert.equal(normalized.theme, 'darkCyber');
+  assert.equal(normalized.theme, 'auroraMotion');
+  assert.equal(normalized.customizations.auroraMotion.accent, '#12abef');
+  assert.equal(normalized.customizations.auroraMotion.headline, 'Control total');
   assert.equal(normalized.layout, 'splitPanel');
   assert.equal(normalized.background.imageOpacity, 1);
   assert.equal(normalized.background.overlay, 0);
@@ -80,6 +89,17 @@ async function run() {
     'background.image',
   ]);
 
+  const invalidCustomization = validateLoginSettings({
+    ...DEFAULT_LOGIN_SETTINGS,
+    customizations: {
+      auroraMotion: {
+        ...DEFAULT_LOGIN_SETTINGS.customizations.auroraMotion,
+        accent: 'azul',
+      },
+    },
+  });
+  assert.equal(invalidCustomization[0]?.field, 'customizations.auroraMotion.accent');
+
   const current = document();
   const response = await getLoginSettings({ SiteSettingsModel: modelFor(current) });
   assert.equal(response.store.name, 'Rosa Boutique');
@@ -97,8 +117,9 @@ async function run() {
   const updated = await updateLoginSettings({
     revision: 4,
     settings: {
-      theme: 'minimalPro',
+      theme: 'noirGallery',
       layout: 'centeredCard',
+      customizations: DEFAULT_LOGIN_SETTINGS.customizations,
       background: { mode: 'color', color: '#ffffff', image: '', imageOpacity: 0.5, overlay: 0.2 },
     },
   }, {
@@ -110,7 +131,7 @@ async function run() {
   assert.equal(captured.query.loginAdminRevision, 4);
   assert.equal(captured.update.$inc.loginAdminRevision, 1);
   assert.equal(captured.update.$set.updatedBy, 'owner');
-  assert.equal(updated.settings.theme, 'minimalPro');
+  assert.equal(updated.settings.theme, 'noirGallery');
   assert.equal(updated.revision, 5);
 
   await assert.rejects(

@@ -10,7 +10,8 @@ import {
   RotateCcw,
   Save,
   ShieldCheck,
-  Store,
+  SlidersHorizontal,
+  Type,
   Upload,
 } from 'lucide-react';
 
@@ -25,7 +26,16 @@ import {
   normalizeLoginSettings,
   safeLoginImageUrl,
 } from '../../login/loginSettings';
-import { LOGIN_LAYOUTS, LOGIN_THEMES } from '../../login/loginThemes';
+import {
+  CURATED_LOGIN_THEME_IDS,
+  getLoginThemeCustomization,
+  LOGIN_THEMES,
+} from '../../login/loginThemes';
+import {
+  AuroraOrbitMark,
+  NoirGalleryMark,
+  PaperStudioMark,
+} from '../../login/LoginThemeMarks';
 import RosaCoutureMark from '../../login/RosaCoutureMark';
 import './LoginAdminSection.css';
 
@@ -37,22 +47,47 @@ function apiMessage(error, fallback) {
   return error?.response?.data?.message || error?.userMessage || fallback;
 }
 
+const COLOR_CONTROLS = [
+  { field: 'primary', label: 'Color principal' },
+  { field: 'secondary', label: 'Color complementario' },
+  { field: 'accent', label: 'Color de acento' },
+  { field: 'surface', label: 'Fondo y superficie' },
+];
+
+const STORY_TEXT_CONTROLS = [
+  { field: 'eyebrow', label: 'Texto pequeño', maxLength: 48 },
+  { field: 'headline', label: 'Título principal', maxLength: 48 },
+  { field: 'highlight', label: 'Título destacado', maxLength: 48 },
+  { field: 'description', label: 'Descripción', maxLength: 180, multiline: true },
+];
+
+const ACCESS_TEXT_CONTROLS = [
+  { field: 'welcomeTitle', label: 'Título del acceso', maxLength: 48 },
+  { field: 'welcomeSubtitle', label: 'Texto de bienvenida', maxLength: 100 },
+  { field: 'buttonText', label: 'Texto del botón', maxLength: 32 },
+];
+
+function ThemeMark({ themeId, size = 30 }) {
+  if (themeId === 'noirGallery') return <NoirGalleryMark size={size} />;
+  if (themeId === 'auroraMotion') return <AuroraOrbitMark size={size} />;
+  if (themeId === 'paperStudio') return <PaperStudioMark size={size} />;
+  return <RosaCoutureMark size={size} />;
+}
+
 function LoginPreview({ settings, store }) {
   const theme = LOGIN_THEMES[settings.theme] || LOGIN_THEMES[DEFAULT_LOGIN_SETTINGS.theme];
-  const layout = LOGIN_LAYOUTS[settings.layout] || LOGIN_LAYOUTS[DEFAULT_LOGIN_SETTINGS.layout];
   const background = settings.background;
+  const customization = settings.customizations?.[theme.id] || getLoginThemeCustomization(theme.id);
   const previewImage = safeLoginImageUrl(background.image);
   const imageMode = background.mode === 'image' && previewImage;
   const pageBackground = background.mode === 'color' ? background.color : theme.pageBg;
-  const ThemeIcon = theme.icon || ShieldCheck;
-  const isRosaCouture = theme.id === 'roseLuxuryLight';
 
   return (
     <div className="login-settings-preview-wrap">
       <div className="login-settings-preview-title">
         <div>
           <span>VISTA PREVIA</span>
-          <strong>{isRosaCouture ? 'Composición Rosa Signature' : layout.name}</strong>
+          <strong>{theme.name} · composición exclusiva</strong>
         </div>
         <a href="/admin/login" target="_blank" rel="noreferrer">
           Ver login real <ExternalLink size={15} />
@@ -60,7 +95,7 @@ function LoginPreview({ settings, store }) {
       </div>
 
       <div
-        className={`login-settings-preview layout-${settings.layout}`}
+        className="login-settings-preview curated-preview"
         data-preview-theme={theme.id}
         style={{
           background: pageBackground,
@@ -69,6 +104,10 @@ function LoginPreview({ settings, store }) {
           '--preview-accent': theme.glowColor,
           '--preview-inner': theme.cardInnerBorder,
           '--preview-font': theme.displayFont,
+          '--login-primary': customization.primary,
+          '--login-secondary': customization.secondary,
+          '--login-accent': customization.accent,
+          '--login-surface': customization.surface,
         }}
       >
         <div className="login-settings-preview-aura aura-one" style={{ background: theme.deco1 }} />
@@ -90,75 +129,27 @@ function LoginPreview({ settings, store }) {
           </>
         ) : null}
 
-        {isRosaCouture ? (
-          <div className="login-settings-couture-preview">
-            <div className="login-settings-couture-story">
-              <div className="login-settings-couture-brand">
-                <span>
-                  {store?.logo ? <img src={store.logo} alt="" /> : <RosaCoutureMark size={29} />}
-                </span>
-                <b>{store?.name || 'Tu tienda'}</b>
-              </div>
-              <div className="login-settings-couture-copy">
-                <small>ADMINISTRACIÓN PRIVADA</small>
-                <strong>Tu universo,<em>bajo control.</em></strong>
-              </div>
-              <RosaCoutureMark className="login-settings-couture-seal" size={150} title="" />
-              <i>ROSA SIGNATURE · PRIVATE EDITION</i>
+        <div className="login-settings-curated-scene">
+          <div className="login-settings-curated-story">
+            <div className="login-settings-curated-brand">
+              <ThemeMark themeId={theme.id} size={32} />
+              <b>{store?.name || 'Tu tienda'}</b>
             </div>
-            <div className="login-settings-couture-form">
-              <RosaCoutureMark size={32} />
-              <strong>Bienvenido</strong>
-              <small>Ingresa al espacio privado de la tienda.</small>
-              <i /><i />
-              <button type="button"><span>ENTRAR AL PANEL</span><b>→</b></button>
-              <em>SESIÓN CIFRADA · ACCESO EXCLUSIVO</em>
+            <div className="login-settings-curated-copy">
+              <small>{customization.eyebrow}</small>
+              <strong>{customization.headline}<em>{customization.highlight}</em></strong>
+              <p>{customization.description}</p>
             </div>
+            <ThemeMark themeId={theme.id} size={150} />
           </div>
-        ) : (
-          <>
-            <div className="login-settings-preview-brand" style={{ color: theme.titleColor }}>
-              <span
-                style={{
-                  background: theme.brandBadgeBg,
-                  color: theme.brandBadgeColor,
-                  borderColor: theme.cardInnerBorder,
-                  boxShadow: `0 10px 28px ${theme.glowSoft}`,
-                }}
-              >
-                {store?.logo ? <img src={store.logo} alt="" /> : <Store size={22} />}
-              </span>
-              <div>
-                <small>{theme.premiumLabel || 'ACCESO ADMINISTRATIVO'}</small>
-                <b>{store?.name || 'Tu tienda'}</b>
-              </div>
-            </div>
-
-            <div
-              className="login-settings-preview-card"
-              style={{
-                background: theme.cardBg,
-                borderColor: theme.cardBorder,
-                boxShadow: theme.cardShadow,
-                color: theme.textColor,
-              }}
-            >
-              <span className="login-settings-preview-card-sheen" style={{ background: theme.cardSheen }} />
-              <span className="login-settings-preview-card-accent" style={{ background: theme.accentLine }} />
-              <div className="login-settings-preview-kicker" style={{ color: theme.brandBadgeColor }}>
-                <ThemeIcon size={13} /> {theme.premiumLabel || 'ACCESO PRIVADO'}
-              </div>
-              <ThemeIcon className="login-settings-preview-emblem" style={{ color: theme.brandBadgeColor }} />
-              <strong style={{ color: theme.titleColor }}>Iniciar sesión</strong>
-              <small style={{ color: theme.mutedColor }}>{theme.signature}</small>
-              <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
-              <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
-              <button type="button" style={{ background: theme.buttonBg, color: theme.buttonText, boxShadow: theme.buttonShadow }}>
-                Ingresar
-              </button>
-            </div>
-          </>
-        )}
+          <div className="login-settings-curated-access">
+            <ThemeMark themeId={theme.id} size={31} />
+            <strong>{customization.welcomeTitle}</strong>
+            <small>{customization.welcomeSubtitle}</small>
+            <i /><i />
+            <button type="button"><span>{customization.buttonText}</span><b>→</b></button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -178,11 +169,8 @@ export default function LoginAdminSection() {
   const dirty = useMemo(() => !loginSettingsEqual(form, saved), [form, saved]);
   const themeOptions = meta.themes.length
     ? meta.themes
-    : Object.values(LOGIN_THEMES).map((item) => ({ value: item.id, label: item.name, description: item.description }));
-  const layoutOptions = meta.layouts.length
-    ? meta.layouts
-    : Object.values(LOGIN_LAYOUTS).map((item) => ({ value: item.id, label: item.name, description: item.description }));
-  const flagshipSelected = form.theme === 'roseLuxuryLight';
+    : CURATED_LOGIN_THEME_IDS.map((themeId) => LOGIN_THEMES[themeId]).map((item) => ({ value: item.id, label: item.name, description: item.description }));
+  const currentCustomization = form.customizations?.[form.theme] || getLoginThemeCustomization(form.theme);
 
   function applyResponse(response) {
     const next = normalizeLoginSettings(response?.settings || DEFAULT_LOGIN_SETTINGS);
@@ -221,6 +209,33 @@ export default function LoginAdminSection() {
       background: { ...current.background, [key]: value },
     }));
     setFieldErrors((current) => ({ ...current, [`background.${key}`]: '' }));
+  }
+
+  function setCustomization(key, value) {
+    setForm((current) => ({
+      ...current,
+      customizations: {
+        ...current.customizations,
+        [current.theme]: {
+          ...(current.customizations?.[current.theme] || getLoginThemeCustomization(current.theme)),
+          [key]: value,
+        },
+      },
+    }));
+    setFieldErrors((current) => ({
+      ...current,
+      [`customizations.${form.theme}.${key}`]: '',
+    }));
+  }
+
+  function resetCurrentTheme() {
+    setForm((current) => ({
+      ...current,
+      customizations: {
+        ...current.customizations,
+        [current.theme]: getLoginThemeCustomization(current.theme),
+      },
+    }));
   }
 
   async function uploadImage(event) {
@@ -291,34 +306,95 @@ export default function LoginAdminSection() {
             <button type="button" onClick={load} disabled={Boolean(busy)} title="Recargar"><RefreshCw size={17} /></button>
           </div>
 
-          <div className="login-settings-grid-two">
-            <label>
-              <span>Tema visual</span>
-              <select aria-label="Tema visual" value={form.theme} onChange={(event) => setRoot('theme', event.target.value)}>
-                {themeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-              <small>{themeOptions.find((item) => item.value === form.theme)?.description}</small>
-              {fieldErrors.theme ? <em>{fieldErrors.theme}</em> : null}
-            </label>
-
-            <label>
-              <span>{flagshipSelected ? 'Composición exclusiva' : 'Estructura'}</span>
-              {flagshipSelected ? (
-                <div className="login-settings-signature-layout">
-                  <RosaCoutureMark size={32} />
-                  <span><b>Editorial asimétrica</b><small>Incluida en Rosa Signature</small></span>
-                </div>
-              ) : (
-                <>
-                  <select aria-label="Estructura" value={form.layout} onChange={(event) => setRoot('layout', event.target.value)}>
-                    {layoutOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                  <small>{layoutOptions.find((item) => item.value === form.layout)?.description}</small>
-                </>
-              )}
-              {fieldErrors.layout ? <em>{fieldErrors.layout}</em> : null}
-            </label>
+          <div className="login-theme-picker" role="radiogroup" aria-label="Tema visual">
+            {themeOptions.map((option) => {
+              const selected = option.value === form.theme;
+              const palette = form.customizations?.[option.value] || getLoginThemeCustomization(option.value);
+              return (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  key={option.value}
+                  className={selected ? 'selected' : ''}
+                  onClick={() => setRoot('theme', option.value)}
+                >
+                  <span className="login-theme-card-mark" style={{ '--card-accent': palette.accent }}>
+                    <ThemeMark themeId={option.value} size={32} />
+                  </span>
+                  <span className="login-theme-card-copy">
+                    <b>{option.label}</b>
+                    <small>{option.description}</small>
+                  </span>
+                  <span className="login-theme-card-palette" aria-hidden="true">
+                    {['primary', 'secondary', 'accent', 'surface'].map((color) => (
+                      <i key={color} style={{ background: palette[color] }} />
+                    ))}
+                  </span>
+                  {selected ? <Check className="login-theme-card-check" size={16} /> : null}
+                </button>
+              );
+            })}
           </div>
+          {fieldErrors.theme ? <em>{fieldErrors.theme}</em> : null}
+
+          <div className="login-settings-exclusive">
+            <ThemeMark themeId={form.theme} size={34} />
+            <span><b>Composición exclusiva incluida</b><small>Cada tema cambia estructura, emblema y animación; no es solo otro color.</small></span>
+          </div>
+
+          <section className="login-theme-customizer">
+            <div className="login-theme-customizer-head">
+              <div><SlidersHorizontal /><span><b>Personaliza {LOGIN_THEMES[form.theme]?.name}</b><small>Los cambios aparecen inmediatamente en la vista previa.</small></span></div>
+              <button type="button" onClick={resetCurrentTheme}><RotateCcw size={14} /> Restaurar este tema</button>
+            </div>
+
+            <div className="login-theme-colors">
+              {COLOR_CONTROLS.map((control) => (
+                <label key={control.field}>
+                  <span>{control.label}</span>
+                  <div>
+                    <input
+                      type="color"
+                      aria-label={control.label}
+                      value={currentCustomization[control.field]}
+                      onChange={(event) => setCustomization(control.field, event.target.value)}
+                    />
+                    <code>{currentCustomization[control.field]}</code>
+                  </div>
+                  {fieldErrors[`customizations.${form.theme}.${control.field}`] ? <em>{fieldErrors[`customizations.${form.theme}.${control.field}`]}</em> : null}
+                </label>
+              ))}
+            </div>
+
+            <details className="login-theme-copy-editor">
+              <summary><Type size={17} /><span><b>Cambiar textos del diseño</b><small>Títulos, mensaje y botón</small></span><span>Editar</span></summary>
+              <div className="login-theme-copy-groups">
+                <fieldset>
+                  <legend>Presentación de la marca</legend>
+                  {STORY_TEXT_CONTROLS.map((control) => (
+                    <label key={control.field}>
+                      <span>{control.label}</span>
+                      {control.multiline ? (
+                        <textarea maxLength={control.maxLength} value={currentCustomization[control.field]} onChange={(event) => setCustomization(control.field, event.target.value)} />
+                      ) : (
+                        <input maxLength={control.maxLength} value={currentCustomization[control.field]} onChange={(event) => setCustomization(control.field, event.target.value)} />
+                      )}
+                    </label>
+                  ))}
+                </fieldset>
+                <fieldset>
+                  <legend>Formulario de acceso</legend>
+                  {ACCESS_TEXT_CONTROLS.map((control) => (
+                    <label key={control.field}>
+                      <span>{control.label}</span>
+                      <input maxLength={control.maxLength} value={currentCustomization[control.field]} onChange={(event) => setCustomization(control.field, event.target.value)} />
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+            </details>
+          </section>
 
           <div className="login-settings-background">
             <div className="login-settings-subtitle"><ImageIcon /><span><b>Fondo</b><small>Escoge una sola opción</small></span></div>

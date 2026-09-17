@@ -29,8 +29,10 @@ function response(overrides = {}) {
     store: { name: 'Rosa Boutique', logo: '' },
     meta: {
       themes: [
-        { value: 'roseLuxuryLight', label: 'Rosa luxury claro', description: 'Claro y boutique.' },
-        { value: 'minimalPro', label: 'Minimal profesional', description: 'Limpio y corporativo.' },
+        { value: 'roseLuxuryLight', label: 'Rosa Signature', description: 'Alta costura.' },
+        { value: 'noirGallery', label: 'Noir Gallery', description: 'Galería nocturna.' },
+        { value: 'auroraMotion', label: 'Aurora Motion', description: 'Interfaz cinética.' },
+        { value: 'paperStudio', label: 'Paper Studio', description: 'Editorial audaz.' },
       ],
       layouts: [
         { value: 'centeredCard', label: 'Tarjeta centrada', description: 'Acceso directo.' },
@@ -59,7 +61,7 @@ describe('LoginAdminSection', () => {
     getAdminLoginSettings.mockResolvedValue(response());
     updateAdminLoginSettings.mockResolvedValue(response({
       revision: 3,
-      settings: { theme: 'minimalPro' },
+      settings: { theme: 'noirGallery' },
       message: 'Diseño guardado.',
     }));
     uploadAdminLoginBackground.mockResolvedValue('https://cdn.example.com/login.webp');
@@ -70,8 +72,8 @@ describe('LoginAdminSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Login de Rosa Boutique' })).toBeInTheDocument();
     expect(screen.getByText('Sincronizado')).toBeInTheDocument();
-    expect(screen.getByText('Composición Rosa Signature')).toBeInTheDocument();
-    expect(screen.getByText('Editorial asimétrica')).toBeInTheDocument();
+    expect(screen.getByText('Rosa Signature · composición exclusiva')).toBeInTheDocument();
+    expect(screen.getByText('Composición exclusiva incluida')).toBeInTheDocument();
     expect(screen.getByText('Tu universo,')).toBeInTheDocument();
     expect(screen.getByText('Versión 2 · se aplicará al login real después de guardar.')).toBeInTheDocument();
     expect(getAdminLoginSettings).toHaveBeenCalledTimes(1);
@@ -82,14 +84,22 @@ describe('LoginAdminSection', () => {
     render(<LoginAdminSection />);
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
-    await user.selectOptions(screen.getByLabelText('Tema visual'), 'minimalPro');
+    await user.click(screen.getByRole('radio', { name: /Noir Gallery/ }));
+    await user.click(screen.getByText('Cambiar textos del diseño'));
+    await user.clear(screen.getByLabelText('Título principal'));
+    await user.type(screen.getByLabelText('Título principal'), 'Mi negocio,');
     expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
 
     await waitFor(() => expect(updateAdminLoginSettings).toHaveBeenCalledTimes(1));
     expect(updateAdminLoginSettings).toHaveBeenCalledWith(expect.objectContaining({
       revision: 2,
-      settings: expect.objectContaining({ theme: 'minimalPro' }),
+      settings: expect.objectContaining({
+        theme: 'noirGallery',
+        customizations: expect.objectContaining({
+          noirGallery: expect.objectContaining({ headline: 'Mi negocio,' }),
+        }),
+      }),
     }));
     expect(await screen.findByText('Diseño guardado.')).toBeInTheDocument();
   });
