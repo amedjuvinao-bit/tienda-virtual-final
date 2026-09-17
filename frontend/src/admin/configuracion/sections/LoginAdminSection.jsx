@@ -26,6 +26,7 @@ import {
   safeLoginImageUrl,
 } from '../../login/loginSettings';
 import { LOGIN_LAYOUTS, LOGIN_THEMES } from '../../login/loginThemes';
+import RosaCoutureMark from '../../login/RosaCoutureMark';
 import './LoginAdminSection.css';
 
 function clone(value) {
@@ -44,13 +45,14 @@ function LoginPreview({ settings, store }) {
   const imageMode = background.mode === 'image' && previewImage;
   const pageBackground = background.mode === 'color' ? background.color : theme.pageBg;
   const ThemeIcon = theme.icon || ShieldCheck;
+  const isRosaCouture = theme.id === 'roseLuxuryLight';
 
   return (
     <div className="login-settings-preview-wrap">
       <div className="login-settings-preview-title">
         <div>
           <span>VISTA PREVIA</span>
-          <strong>{layout.name}</strong>
+          <strong>{isRosaCouture ? 'Composición Rosa Signature' : layout.name}</strong>
         </div>
         <a href="/admin/login" target="_blank" rel="noreferrer">
           Ver login real <ExternalLink size={15} />
@@ -88,46 +90,75 @@ function LoginPreview({ settings, store }) {
           </>
         ) : null}
 
-        <div className="login-settings-preview-brand" style={{ color: theme.titleColor }}>
-          <span
-            style={{
-              background: theme.brandBadgeBg,
-              color: theme.brandBadgeColor,
-              borderColor: theme.cardInnerBorder,
-              boxShadow: `0 10px 28px ${theme.glowSoft}`,
-            }}
-          >
-            {store?.logo ? <img src={store.logo} alt="" /> : <Store size={22} />}
-          </span>
-          <div>
-            <small>{theme.premiumLabel || 'ACCESO ADMINISTRATIVO'}</small>
-            <b>{store?.name || 'Tu tienda'}</b>
+        {isRosaCouture ? (
+          <div className="login-settings-couture-preview">
+            <div className="login-settings-couture-story">
+              <div className="login-settings-couture-brand">
+                <span>
+                  {store?.logo ? <img src={store.logo} alt="" /> : <RosaCoutureMark size={29} />}
+                </span>
+                <b>{store?.name || 'Tu tienda'}</b>
+              </div>
+              <div className="login-settings-couture-copy">
+                <small>ADMINISTRACIÓN PRIVADA</small>
+                <strong>Tu universo,<em>bajo control.</em></strong>
+              </div>
+              <RosaCoutureMark className="login-settings-couture-seal" size={150} title="" />
+              <i>ROSA SIGNATURE · PRIVATE EDITION</i>
+            </div>
+            <div className="login-settings-couture-form">
+              <RosaCoutureMark size={32} />
+              <strong>Bienvenido</strong>
+              <small>Ingresa al espacio privado de la tienda.</small>
+              <i /><i />
+              <button type="button"><span>ENTRAR AL PANEL</span><b>→</b></button>
+              <em>SESIÓN CIFRADA · ACCESO EXCLUSIVO</em>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="login-settings-preview-brand" style={{ color: theme.titleColor }}>
+              <span
+                style={{
+                  background: theme.brandBadgeBg,
+                  color: theme.brandBadgeColor,
+                  borderColor: theme.cardInnerBorder,
+                  boxShadow: `0 10px 28px ${theme.glowSoft}`,
+                }}
+              >
+                {store?.logo ? <img src={store.logo} alt="" /> : <Store size={22} />}
+              </span>
+              <div>
+                <small>{theme.premiumLabel || 'ACCESO ADMINISTRATIVO'}</small>
+                <b>{store?.name || 'Tu tienda'}</b>
+              </div>
+            </div>
 
-        <div
-          className="login-settings-preview-card"
-          style={{
-            background: theme.cardBg,
-            borderColor: theme.cardBorder,
-            boxShadow: theme.cardShadow,
-            color: theme.textColor,
-          }}
-        >
-          <span className="login-settings-preview-card-sheen" style={{ background: theme.cardSheen }} />
-          <span className="login-settings-preview-card-accent" style={{ background: theme.accentLine }} />
-          <div className="login-settings-preview-kicker" style={{ color: theme.brandBadgeColor }}>
-            <ThemeIcon size={13} /> {theme.premiumLabel || 'ACCESO PRIVADO'}
-          </div>
-          <ThemeIcon className="login-settings-preview-emblem" style={{ color: theme.brandBadgeColor }} />
-          <strong style={{ color: theme.titleColor }}>Iniciar sesión</strong>
-          <small style={{ color: theme.mutedColor }}>{theme.signature}</small>
-          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
-          <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
-          <button type="button" style={{ background: theme.buttonBg, color: theme.buttonText, boxShadow: theme.buttonShadow }}>
-            Ingresar
-          </button>
-        </div>
+            <div
+              className="login-settings-preview-card"
+              style={{
+                background: theme.cardBg,
+                borderColor: theme.cardBorder,
+                boxShadow: theme.cardShadow,
+                color: theme.textColor,
+              }}
+            >
+              <span className="login-settings-preview-card-sheen" style={{ background: theme.cardSheen }} />
+              <span className="login-settings-preview-card-accent" style={{ background: theme.accentLine }} />
+              <div className="login-settings-preview-kicker" style={{ color: theme.brandBadgeColor }}>
+                <ThemeIcon size={13} /> {theme.premiumLabel || 'ACCESO PRIVADO'}
+              </div>
+              <ThemeIcon className="login-settings-preview-emblem" style={{ color: theme.brandBadgeColor }} />
+              <strong style={{ color: theme.titleColor }}>Iniciar sesión</strong>
+              <small style={{ color: theme.mutedColor }}>{theme.signature}</small>
+              <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
+              <i style={{ background: theme.inputBg, borderColor: theme.inputBorder, boxShadow: theme.inputShadow }} />
+              <button type="button" style={{ background: theme.buttonBg, color: theme.buttonText, boxShadow: theme.buttonShadow }}>
+                Ingresar
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -151,6 +182,7 @@ export default function LoginAdminSection() {
   const layoutOptions = meta.layouts.length
     ? meta.layouts
     : Object.values(LOGIN_LAYOUTS).map((item) => ({ value: item.id, label: item.name, description: item.description }));
+  const flagshipSelected = form.theme === 'roseLuxuryLight';
 
   function applyResponse(response) {
     const next = normalizeLoginSettings(response?.settings || DEFAULT_LOGIN_SETTINGS);
@@ -270,11 +302,20 @@ export default function LoginAdminSection() {
             </label>
 
             <label>
-              <span>Estructura</span>
-              <select aria-label="Estructura" value={form.layout} onChange={(event) => setRoot('layout', event.target.value)}>
-                {layoutOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-              <small>{layoutOptions.find((item) => item.value === form.layout)?.description}</small>
+              <span>{flagshipSelected ? 'Composición exclusiva' : 'Estructura'}</span>
+              {flagshipSelected ? (
+                <div className="login-settings-signature-layout">
+                  <RosaCoutureMark size={32} />
+                  <span><b>Editorial asimétrica</b><small>Incluida en Rosa Signature</small></span>
+                </div>
+              ) : (
+                <>
+                  <select aria-label="Estructura" value={form.layout} onChange={(event) => setRoot('layout', event.target.value)}>
+                    {layoutOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  <small>{layoutOptions.find((item) => item.value === form.layout)?.description}</small>
+                </>
+              )}
               {fieldErrors.layout ? <em>{fieldErrors.layout}</em> : null}
             </label>
           </div>

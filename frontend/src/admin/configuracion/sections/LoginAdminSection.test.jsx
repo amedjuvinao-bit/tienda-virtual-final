@@ -70,6 +70,9 @@ describe('LoginAdminSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Login de Rosa Boutique' })).toBeInTheDocument();
     expect(screen.getByText('Sincronizado')).toBeInTheDocument();
+    expect(screen.getByText('Composición Rosa Signature')).toBeInTheDocument();
+    expect(screen.getByText('Editorial asimétrica')).toBeInTheDocument();
+    expect(screen.getByText('Tu universo,')).toBeInTheDocument();
     expect(screen.getByText('Versión 2 · se aplicará al login real después de guardar.')).toBeInTheDocument();
     expect(getAdminLoginSettings).toHaveBeenCalledTimes(1);
   });

@@ -81,8 +81,8 @@ export const LOGIN_THEMES = {
 
   roseLuxuryLight: {
     id: "roseLuxuryLight",
-    name: "Rose Atelier",
-    description: "Alta boutique, seda rosa y champagne.",
+    name: "Rosa Signature",
+    description: "Tema insignia de alta costura creado para la marca.",
     icon: Flower2,
     pageBg: "linear-gradient(135deg, #fff7fb 0%, #ffe4f1 38%, #fff8ed 100%)",
     deco1: "rgba(236,72,153,0.18)",
@@ -314,9 +314,9 @@ const PREMIUM_THEME_FINISHES = {
     inputShadow: "0 14px 34px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.04)",
   },
   roseLuxuryLight: {
-    premiumLabel: "ROSE ATELIER",
-    signature: "Alta boutique, seda rosa y destellos champagne",
-    displayFont: 'Georgia, "Times New Roman", serif',
+    premiumLabel: "ROSA SIGNATURE",
+    signature: "Alta costura digital creada exclusivamente para la marca",
+    displayFont: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
     pagePattern:
       "radial-gradient(circle at 20% 20%, rgba(236,72,153,.08) 0 1px, transparent 1.5px), radial-gradient(circle at 80% 70%, rgba(180,83,9,.08) 0 1px, transparent 1.5px)",
     patternSize: "32px 32px, 44px 44px",

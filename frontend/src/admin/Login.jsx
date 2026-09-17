@@ -17,6 +17,8 @@ import { setAdminToken } from "../lib/api";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
+import RosaCoutureMark from "./login/RosaCoutureMark";
+import "./login/LoginFlagship.css";
 import {
   LOGIN_THEMES,
   LOGIN_LAYOUTS,
@@ -668,6 +670,116 @@ function CircleLoginForm({
   );
 }
 
+function RosaCoutureLoginForm({
+  username,
+  password,
+  error,
+  isLocked,
+  isSubmitting,
+  lockSeconds,
+  setUsername,
+  setPassword,
+  rememberMe,
+  setRememberMe,
+  handleSubmit,
+  onForgotPassword,
+  storeName,
+}) {
+  return (
+    <div className="rb-couture-form">
+      <div className="rb-couture-form-head">
+        <div className="rb-couture-mini-mark">
+          <RosaCoutureMark size={44} />
+        </div>
+        <h2>Bienvenido</h2>
+        <p>Ingresa al espacio privado de {storeName}.</p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        {error ? (
+          <div className="rb-couture-error">
+            {error}
+            {isLocked ? <span>Intenta nuevamente en {lockSeconds} segundos.</span> : null}
+          </div>
+        ) : null}
+
+        <div className="rb-couture-field">
+          <div className="rb-couture-field-head">
+            <label htmlFor="rb-couture-username">Usuario</label>
+            <small>Identidad</small>
+          </div>
+          <div className="rb-couture-input">
+            <input
+              id="rb-couture-username"
+              name="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Nombre de usuario"
+              autoComplete="username"
+              required
+              disabled={isSubmitting || isLocked}
+            />
+            <span className="rb-field-glyph" aria-hidden="true" />
+          </div>
+        </div>
+
+        <div className="rb-couture-field">
+          <div className="rb-couture-field-head">
+            <label htmlFor="rb-couture-password">Contraseña</label>
+            <small>Clave privada</small>
+          </div>
+          <div className="rb-couture-input">
+            <input
+              id="rb-couture-password"
+              type="password"
+              name="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Escribe tu contraseña"
+              autoComplete="current-password"
+              required
+              disabled={isSubmitting || isLocked}
+            />
+            <span className="rb-field-glyph" aria-hidden="true" />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="rb-couture-submit"
+          disabled={isSubmitting || isLocked}
+        >
+          <span>
+            {isSubmitting
+              ? "Validando acceso"
+              : isLocked
+                ? `Acceso pausado · ${lockSeconds}s`
+                : "Entrar al panel"}
+          </span>
+          <span className="rb-couture-submit-mark" aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <div className="rb-couture-options">
+        <button
+          type="button"
+          className="rb-couture-remember"
+          onClick={() => setRememberMe(!rememberMe)}
+        >
+          <span className={`rb-couture-check ${rememberMe ? "active" : ""}`} aria-hidden="true" />
+          Recordar mi usuario
+        </button>
+        <button type="button" onClick={onForgotPassword}>Recuperar acceso</button>
+      </div>
+
+      <div className="rb-couture-security">
+        <span className="rb-couture-security-mark" aria-hidden="true" />
+        Sesión cifrada · acceso exclusivo
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   const rememberedLogin = useMemo(() => getRememberedLogin(), []);
 
@@ -886,6 +998,7 @@ export default function Login() {
   const isLocked = lockRemaining > 0;
   const dark = isDarkTheme(activeTheme);
   const gold = isGoldTheme(activeTheme);
+  const isRosaCouture = activeTheme.id === "roseLuxuryLight";
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
 
   const loginPageBackground =
@@ -1127,7 +1240,57 @@ export default function Login() {
     </AnimatedBorderBox>
   );
 
+  const renderRosaCouture = () => (
+    <section className="rb-couture-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+      <div className="rb-couture-story">
+        <div className="rb-couture-brand">
+          <div className="rb-couture-brand-logo">
+            {storeLogo ? (
+              <img src={storeLogo} alt={`Logo de ${storeName}`} />
+            ) : (
+              <RosaCoutureMark size={54} />
+            )}
+          </div>
+          <div className="rb-couture-brand-copy">
+            <small>Private management house</small>
+            <strong>{storeName}</strong>
+          </div>
+        </div>
+
+        <div className="rb-couture-hero">
+          <span className="rb-couture-kicker">Administración privada</span>
+          <h1>
+            Tu universo,
+            <em>bajo control.</em>
+          </h1>
+          <p>
+            Una entrada creada para dirigir cada detalle de la tienda con precisión,
+            carácter y absoluta confianza.
+          </p>
+        </div>
+
+        <div className="rb-couture-seal" aria-hidden="true">
+          <RosaCoutureMark size={330} title="" />
+        </div>
+
+        <div className="rb-couture-foot">
+          <span>Rosa Signature · Private Edition</span>
+          <span><i /> Entorno protegido</span>
+        </div>
+      </div>
+
+      <div className="rb-couture-access">
+        <RosaCoutureLoginForm
+          {...formProps}
+          storeName={storeName}
+        />
+      </div>
+    </section>
+  );
+
   const renderLayout = () => {
+    if (isRosaCouture) return renderRosaCouture();
+
     switch (activeLayout.id) {
       case "electricCircle":
         return renderElectricCircle();
@@ -1148,7 +1311,7 @@ export default function Login() {
   return (
     <div
       data-login-theme={activeTheme.id}
-      className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8"
+      className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 ${isRosaCouture ? "is-rosa-couture" : ""}`}
       style={{ background: loginPageBackground }}
     >
       <style>
@@ -1184,76 +1347,82 @@ export default function Login() {
         </>
       )}
 
-      <div
-        className="pointer-events-none absolute inset-0 z-[1] opacity-70"
-        style={{
-          backgroundImage: activeTheme.pagePattern,
-          backgroundSize: activeTheme.patternSize,
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.28))",
-        }}
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0 z-[1]"
-        style={{
-          background: dark
-            ? "radial-gradient(circle at center, transparent 28%, rgba(0,0,0,.44) 100%)"
-            : "radial-gradient(circle at center, transparent 30%, rgba(255,255,255,.36) 100%)",
-        }}
-      />
-
-      <div
-        className="pointer-events-none absolute -left-20 top-8 z-[1] h-72 w-72 rounded-full blur-3xl"
-        style={{ background: activeTheme.deco1, animation: "rbLoginAuraFloat 9s ease-in-out infinite" }}
-      />
-      <div
-        className="pointer-events-none absolute -right-16 bottom-6 z-[1] h-80 w-80 rounded-full blur-3xl"
-        style={{ background: activeTheme.deco2, animation: "rbLoginAuraFloat 11s ease-in-out infinite reverse" }}
-      />
-      <div
-        className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[580px] w-[580px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 blur-3xl"
-        style={{ background: activeTheme.glowSoft }}
-      />
-
-      {!hasCustomImageBg && (
-        <div className="pointer-events-none absolute inset-0 z-[1] opacity-[0.05]">
+      {!isRosaCouture ? (
+        <>
           <div
-            className="h-full w-full"
+            className="pointer-events-none absolute inset-0 z-[1] opacity-70"
             style={{
-              backgroundImage:
-                "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
-              backgroundSize: "42px 42px",
-              color: activeTheme.glowColor,
+              backgroundImage: activeTheme.pagePattern,
+              backgroundSize: activeTheme.patternSize,
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.28))",
             }}
           />
-        </div>
-      )}
 
-      <div className="absolute left-5 top-5 z-[4] hidden lg:block">
-        <StoreIdentity
-          theme={activeTheme}
-          storeName={storeName}
-          storeLogo={storeLogo}
-          compact
-        />
-      </div>
+          <div
+            className="pointer-events-none absolute inset-0 z-[1]"
+            style={{
+              background: dark
+                ? "radial-gradient(circle at center, transparent 28%, rgba(0,0,0,.44) 100%)"
+                : "radial-gradient(circle at center, transparent 30%, rgba(255,255,255,.36) 100%)",
+            }}
+          />
+
+          <div
+            className="pointer-events-none absolute -left-20 top-8 z-[1] h-72 w-72 rounded-full blur-3xl"
+            style={{ background: activeTheme.deco1, animation: "rbLoginAuraFloat 9s ease-in-out infinite" }}
+          />
+          <div
+            className="pointer-events-none absolute -right-16 bottom-6 z-[1] h-80 w-80 rounded-full blur-3xl"
+            style={{ background: activeTheme.deco2, animation: "rbLoginAuraFloat 11s ease-in-out infinite reverse" }}
+          />
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[1] h-[580px] w-[580px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-40 blur-3xl"
+            style={{ background: activeTheme.glowSoft }}
+          />
+
+          {!hasCustomImageBg ? (
+            <div className="pointer-events-none absolute inset-0 z-[1] opacity-[0.05]">
+              <div
+                className="h-full w-full"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+                  backgroundSize: "42px 42px",
+                  color: activeTheme.glowColor,
+                }}
+              />
+            </div>
+          ) : null}
+
+          <div className="absolute left-5 top-5 z-[4] hidden lg:block">
+            <StoreIdentity
+              theme={activeTheme}
+              storeName={storeName}
+              storeLogo={storeLogo}
+              compact
+            />
+          </div>
+        </>
+      ) : null}
 
       <div className="relative z-[2] mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl items-center justify-center">
         {renderLayout()}
       </div>
 
-      <div
-        className="pointer-events-none fixed bottom-5 left-1/2 z-[3] hidden -translate-x-1/2 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold md:flex"
-        style={{
-          color: activeTheme.mutedColor,
-          borderColor: activeTheme.cardBorder,
-          background: dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.50)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <Fingerprint size={14} />
-        Sistema protegido con autenticación segura
-      </div>
+      {!isRosaCouture ? (
+        <div
+          className="pointer-events-none fixed bottom-5 left-1/2 z-[3] hidden -translate-x-1/2 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold md:flex"
+          style={{
+            color: activeTheme.mutedColor,
+            borderColor: activeTheme.cardBorder,
+            background: dark ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.50)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <Fingerprint size={14} />
+          Sistema protegido con autenticación segura
+        </div>
+      ) : null}
 
       <RequiredPasswordChangeModal
         open={showRequiredPasswordChange}

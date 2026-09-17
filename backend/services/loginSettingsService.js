@@ -3,7 +3,7 @@
 const SiteSettings = require('../models/SiteSettings');
 
 const LOGIN_THEMES = Object.freeze([
-  { value: 'roseLuxuryLight', label: 'Rose Atelier', description: 'Alta boutique, seda rosa y champagne.' },
+  { value: 'roseLuxuryLight', label: 'Rosa Signature', description: 'Tema insignia de alta costura creado para la marca.' },
   { value: 'goldBoutiqueLight', label: 'Maison Gold', description: 'Marfil y oro con acabado editorial.' },
   { value: 'glassPastel', label: 'Aurora Glass', description: 'Cristal esmerilado y luz pastel.' },
   { value: 'pearlFuture', label: 'Pearl Signature', description: 'Perla luminosa y precisión contemporánea.' },
