@@ -128,7 +128,8 @@
 .rb-editorial-access .rb-curated-auth{max-width:none}
 .rb-editorial-access .rb-curated-auth__head h2{text-shadow:none!important}
 .rb-liquid-access.rb-editorial-access{justify-self:center;margin:38px auto;--glass-fill:linear-gradient(145deg,rgba(255,255,255,.38),rgba(244,251,255,.16) 48%,rgba(211,227,237,.2));--glass-edge:rgba(255,255,255,.82);--glass-inner:rgba(255,255,255,.62);--mirror-shadow:rgba(37,67,86,.2)}
-.rb-gallery-access.rb-editorial-access{left:auto!important;right:clamp(36px,5.5%,70px)!important;top:50%!important;bottom:auto!important;width:min(470px,39%);min-height:610px;transform:translateY(-50%)!important;--glass-fill:linear-gradient(145deg,rgba(13,18,25,.38),rgba(17,24,32,.16) 52%,rgba(255,255,255,.06));--glass-edge:rgba(255,255,255,.3);--glass-inner:rgba(255,255,255,.28);--mirror-shadow:rgba(0,0,0,.58)}
+.rb-gallery-stage{display:flex;align-items:center;justify-content:flex-end;box-sizing:border-box;padding:48px clamp(36px,5.5%,70px)}
+.rb-gallery-access.rb-editorial-access{position:relative!important;inset:auto!important;flex:0 0 min(470px,42%);width:min(470px,42%);min-height:610px;margin:0;transform:none!important;--glass-fill:linear-gradient(145deg,rgba(13,18,25,.38),rgba(17,24,32,.16) 52%,rgba(255,255,255,.06));--glass-edge:rgba(255,255,255,.3);--glass-inner:rgba(255,255,255,.28);--mirror-shadow:rgba(0,0,0,.58)}
 
 /* Cristal Perla reemplaza al antiguo tema oscuro y centra el acceso. */
 .theme-smokeGlass{background:var(--login-page-background)!important;color:var(--login-primary)}
@@ -162,12 +163,13 @@
 
 @media(max-width:940px){
   .rb-liquid-access.rb-editorial-access,.rb-smoke-access.rb-editorial-access{width:min(500px,calc(100% - 48px));margin:30px auto}
-  .rb-gallery-access.rb-editorial-access{left:7%!important;right:7%!important;top:auto!important;bottom:5%!important;width:auto;min-height:560px;transform:none!important}
+  .rb-gallery-stage{display:block;padding:0}
+  .rb-gallery-access.rb-editorial-access{position:absolute!important;left:7%!important;right:7%!important;top:auto!important;bottom:5%!important;width:auto;min-height:560px;transform:none!important}
 }
 @media(max-width:600px){
   .rb-editorial-access,.rb-liquid-access.rb-editorial-access,.rb-smoke-access.rb-editorial-access{width:calc(100% - 32px);min-height:0;margin:16px auto;padding:34px 28px 28px!important;border-radius:24px!important}
   .rb-editorial-access:after{border-radius:19px}
-  .rb-gallery-access.rb-editorial-access{left:16px!important;right:16px!important;top:auto!important;bottom:16px!important;width:auto;min-height:0;padding:32px 26px 26px!important;transform:none!important}
+  .rb-gallery-access.rb-editorial-access{position:absolute!important;left:16px!important;right:16px!important;top:auto!important;bottom:16px!important;width:auto;min-height:0;padding:32px 26px 26px!important;transform:none!important}
   .rb-smoke-access .rb-panel-brand{margin-bottom:24px}
   .rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:72px;width:72px}
 }
