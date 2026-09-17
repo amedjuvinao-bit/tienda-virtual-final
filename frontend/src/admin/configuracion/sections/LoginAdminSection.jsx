@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import galleryImmersiveDefault from '../../../assets/login/gallery-immersive-default.webp';
+import galleryImmersiveLightBlue from '../../../assets/login/gallery-immersive-light-blue.webp';
+import galleryImmersiveRoseGold from '../../../assets/login/gallery-immersive-rose-gold.webp';
 import liquidGlassDefault from '../../../assets/login/liquid-glass-default.webp';
 import {
   Check,
@@ -74,6 +76,12 @@ const ACCESS_TEXT_CONTROLS = [
   { field: 'buttonText', label: 'Texto del botón', maxLength: 32 },
 ];
 
+const GALLERY_IMAGE_ASSETS = Object.freeze({
+  black: galleryImmersiveDefault,
+  roseGold: galleryImmersiveRoseGold,
+  lightBlue: galleryImmersiveLightBlue,
+});
+
 function ThemeMark({ themeId, size = 30 }) {
   const Icon = LOGIN_THEMES[themeId]?.icon || LOGIN_THEMES[DEFAULT_LOGIN_SETTINGS.theme].icon;
   return <Icon size={size} aria-hidden="true" />;
@@ -97,7 +105,7 @@ function LoginPreview({ settings, store }) {
   const imageMode = background.mode === 'image' && previewImage;
   const defaultThemeImages = {
     liquidGlass: liquidGlassDefault,
-    immersiveGallery: galleryImmersiveDefault,
+    immersiveGallery: GALLERY_IMAGE_ASSETS[galleryTone.id],
     smokeGlass: '',
   };
   const resolvedPreviewImage = imageMode ? previewImage : defaultThemeImages[theme.id] || '';
@@ -138,9 +146,7 @@ function LoginPreview({ settings, store }) {
             <div
               className="login-settings-preview-overlay"
               style={{
-                background: theme.id === 'immersiveGallery'
-                  ? `${galleryTone.overlay},rgba(0,0,0,${imageMode ? background.overlay : defaultOverlay})`
-                  : `${lightTheme ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})`,
+                background: `${lightTheme ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})`,
               }}
             />
           </>
@@ -365,7 +371,7 @@ export default function LoginAdminSection() {
             </div>
 
             {form.theme === 'immersiveGallery' ? <div className="login-gallery-tone-picker">
-              <div className="login-theme-preset-heading"><b>Tonalidad de la imagen</b><small>La misma imagen cambia de ambiente sin reemplazarse.</small></div>
+              <div className="login-theme-preset-heading"><b>Color real de la imagen</b><small>Cada opción carga la tela terminada en ese material.</small></div>
               <div className="login-gallery-tone-options">
                 {LOGIN_GALLERY_IMAGE_TONES.map((tone) => <button
                   type="button"
@@ -375,7 +381,7 @@ export default function LoginAdminSection() {
                   aria-pressed={currentCustomization.imageTone === tone.id}
                   onClick={() => setCustomization('imageTone', tone.id)}
                 >
-                  <i style={{ background: tone.swatch }} aria-hidden="true" />
+                  <i style={{ backgroundImage: `url("${GALLERY_IMAGE_ASSETS[tone.id]}")` }} aria-hidden="true" />
                   <span>{tone.name}</span>
                   {currentCustomization.imageTone === tone.id ? <Check size={14} aria-hidden="true" /> : null}
                 </button>)}

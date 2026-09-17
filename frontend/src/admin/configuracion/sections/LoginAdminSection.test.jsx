@@ -118,16 +118,20 @@ describe('LoginAdminSection', () => {
     expect(screen.getByText('Subir imagen')).toBeInTheDocument();
   });
 
-  it('permite cambiar la tonalidad de la misma imagen en Galería Inmersiva', async () => {
+  it('permite cambiar la imagen terminada de Galería Inmersiva', async () => {
     const user = userEvent.setup();
-    render(<LoginAdminSection />);
+    const { container } = render(<LoginAdminSection />);
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
     await user.selectOptions(screen.getByLabelText('Tema visual'), 'immersiveGallery');
     await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
-    expect(screen.getByText('Tonalidad de la imagen')).toBeInTheDocument();
+    expect(screen.getByText('Color real de la imagen')).toBeInTheDocument();
+    const previewImage = container.querySelector('.login-settings-preview-image');
+    const blackBackground = previewImage.style.backgroundImage;
     await user.click(screen.getByRole('button', { name: 'Usar tonalidad Rosa y dorado' }));
     expect(screen.getByRole('button', { name: 'Usar tonalidad Rosa y dorado' })).toHaveAttribute('aria-pressed', 'true');
+    expect(previewImage.style.backgroundImage).not.toBe(blackBackground);
+    expect(previewImage.style.backgroundImage).toContain('gallery-immersive-rose-gold');
 
     await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
     await waitFor(() => expect(updateAdminLoginSettings).toHaveBeenCalledTimes(1));

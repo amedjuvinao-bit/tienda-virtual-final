@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import galleryImmersiveDefault from "../assets/login/gallery-immersive-default.webp";
+import galleryImmersiveLightBlue from "../assets/login/gallery-immersive-light-blue.webp";
+import galleryImmersiveRoseGold from "../assets/login/gallery-immersive-rose-gold.webp";
 import liquidGlassDefault from "../assets/login/liquid-glass-default.webp";
 import {
   Lock,
@@ -41,6 +43,12 @@ const LOGIN_REMEMBER_USERNAME_KEY = "admin_login_remember_username";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 2 * 60 * 1000;
+
+const GALLERY_IMAGE_ASSETS = Object.freeze({
+  black: galleryImmersiveDefault,
+  roseGold: galleryImmersiveRoseGold,
+  lightBlue: galleryImmersiveLightBlue,
+});
 
 function getFailedAttempts() {
   try {
@@ -1130,8 +1138,10 @@ export default function Login() {
     || DEFAULT_LOGIN_SETTINGS.customizations.liquidGlass;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
   const liquidBackground = hasCustomImageBg ? loginBg.image : liquidGlassDefault;
-  const galleryBackground = hasCustomImageBg ? loginBg.image : galleryImmersiveDefault;
   const galleryImageTone = getLoginGalleryImageTone(activeCustomization.imageTone);
+  const galleryBackground = hasCustomImageBg
+    ? loginBg.image
+    : GALLERY_IMAGE_ASSETS[galleryImageTone.id];
   const smokeBackground = hasCustomImageBg ? loginBg.image : "";
 
   const loginPageBackground =
@@ -1444,7 +1454,7 @@ export default function Login() {
 
   const renderImmersiveGallery = () => <section className="rb-gallery-stage" data-gallery-tone={galleryImageTone.id} aria-label={`Acceso administrativo de ${storeName}`}>
     <div className="rb-gallery-media" style={{ backgroundImage: `url("${galleryBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
-    <div className="rb-gallery-overlay" style={{ background: `${galleryImageTone.overlay},rgba(0,0,0,${hasCustomImageBg ? loginBg.overlay : 0.18})` }} />
+    <div className="rb-gallery-overlay" style={{ "--gallery-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.18 }} />
     <div className="rb-gallery-ambient" aria-hidden="true"><i /><i /></div>
     <div className="rb-gallery-story">
       <CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} />
