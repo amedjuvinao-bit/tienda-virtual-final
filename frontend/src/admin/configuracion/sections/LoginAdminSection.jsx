@@ -151,10 +151,13 @@ function LoginPreview({ settings, store }) {
             </div>
           </div>
           <div className="login-settings-curated-access">
+            <span className="login-settings-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
+            <em className="login-settings-editorial-kicker">ACCESO</em>
             <strong>{customization.welcomeTitle}</strong>
             <small>{customization.welcomeSubtitle}</small>
             <i /><i />
             <button type="button"><span>{customization.buttonText}</span><b>→</b></button>
+            <span className="login-settings-editorial-security">SESIÓN SEGURA</span>
           </div>
         </div>
       </div>

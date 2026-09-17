@@ -833,31 +833,39 @@ function CuratedCredentialsForm({
 
         <div className="rb-curated-auth__field">
           <label htmlFor={`${inputId}-username`}>Usuario</label>
-          <input
-            id={`${inputId}-username`}
-            name="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Nombre de usuario"
-            autoComplete="username"
-            required
-            disabled={isSubmitting || isLocked}
-          />
+          <div className="rb-curated-auth__input-shell">
+            <span className="rb-curated-auth__input-icon" aria-hidden="true"><User size={17} /></span>
+            <input
+              id={`${inputId}-username`}
+              name="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Nombre de usuario"
+              autoComplete="username"
+              required
+              disabled={isSubmitting || isLocked}
+            />
+            <span className="rb-curated-auth__input-beam" aria-hidden="true" />
+          </div>
         </div>
 
         <div className="rb-curated-auth__field">
           <label htmlFor={`${inputId}-password`}>Contraseña</label>
-          <input
-            id={`${inputId}-password`}
-            type="password"
-            name="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Escribe tu contraseña"
-            autoComplete="current-password"
-            required
-            disabled={isSubmitting || isLocked}
-          />
+          <div className="rb-curated-auth__input-shell">
+            <span className="rb-curated-auth__input-icon" aria-hidden="true"><Lock size={17} /></span>
+            <input
+              id={`${inputId}-password`}
+              type="password"
+              name="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Escribe tu contraseña"
+              autoComplete="current-password"
+              required
+              disabled={isSubmitting || isLocked}
+            />
+            <span className="rb-curated-auth__input-beam" aria-hidden="true" />
+          </div>
         </div>
 
         <button
@@ -1426,7 +1434,12 @@ export default function Login() {
     <div className="rb-liquid-overlay" style={{ "--liquid-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.06 }} />
     <div className="rb-liquid-depth" aria-hidden="true"><i /><i /><i /></div>
     <div className="rb-liquid-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-liquid-copy" /></div>
-    <div className="rb-liquid-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
+    <div className="rb-liquid-access rb-editorial-access">
+      <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
+      <span className="rb-editorial-kicker">ACCESO</span>
+      <CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" />
+      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
+    </div>
   </section>;
 
   const renderImmersiveGallery = () => <section className="rb-gallery-stage" aria-label={`Acceso administrativo de ${storeName}`}>
@@ -1438,10 +1451,11 @@ export default function Login() {
       <StoryCopy className="rb-theme-copy rb-gallery-copy" />
       <span className="rb-gallery-caption">IDENTIDAD · GESTIÓN · CRECIMIENTO</span>
     </div>
-    <div className="rb-gallery-access">
-      <span className="rb-gallery-access-kicker">ACCESO PRIVADO</span>
+    <div className="rb-gallery-access rb-editorial-access">
+      <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
+      <span className="rb-editorial-kicker">ACCESO</span>
       <CuratedCredentialsForm {...curatedFormProps} inputId="rb-gallery" />
-      <span className="rb-gallery-security"><i /> Sesión protegida</span>
+      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
     </div>
   </section>;
 
@@ -1450,7 +1464,12 @@ export default function Login() {
     <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.2 }} />
     <div className="rb-smoke-depth" aria-hidden="true"><i /><i /><i /></div>
     <div className="rb-smoke-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-smoke-copy" /></div>
-    <div className="rb-smoke-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" /></div>
+    <div className="rb-smoke-access rb-editorial-access">
+      <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
+      <span className="rb-editorial-kicker">ACCESO</span>
+      <CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" />
+      <span className="rb-editorial-security"><ShieldCheck size={12} /> Conexión segura</span>
+    </div>
   </section>;
 
   const renderLayout = () => {
