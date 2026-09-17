@@ -31,13 +31,6 @@ import {
   getLoginThemeCustomization,
   LOGIN_THEMES,
 } from '../../login/loginThemes';
-import {
-  ArchitectMark,
-  EditorialMotionMark,
-  LiquidGlassMark,
-  NeonPortalMark,
-  OrbitCommerceMark,
-} from '../../login/LoginThemeMarks';
 import './LoginAdminSection.css';
 
 function clone(value) {
@@ -78,11 +71,17 @@ const ACCESS_TEXT_CONTROLS = [
 ];
 
 function ThemeMark({ themeId, size = 30 }) {
-  if (themeId === 'liquidGlass') return <LiquidGlassMark size={size} />;
-  if (themeId === 'neonPortal') return <NeonPortalMark size={size} />;
-  if (themeId === 'editorialMotion') return <EditorialMotionMark size={size} />;
-  if (themeId === 'architectMono') return <ArchitectMark size={size} />;
-  return <OrbitCommerceMark size={size} />;
+  const Icon = LOGIN_THEMES[themeId]?.icon || LOGIN_THEMES[DEFAULT_LOGIN_SETTINGS.theme].icon;
+  return <Icon size={size} aria-hidden="true" />;
+}
+
+function StoreLogo({ store, className = '' }) {
+  const name = store?.name || 'Tu tienda';
+  return (
+    <span className={`login-store-logo ${className}`.trim()}>
+      {store?.logo ? <img src={store.logo} alt={`Logo de ${name}`} /> : <b aria-label={`Inicial de ${name}`}>{name.trim().charAt(0).toUpperCase() || 'T'}</b>}
+    </span>
+  );
 }
 
 function LoginPreview({ settings, store }) {
@@ -110,23 +109,12 @@ function LoginPreview({ settings, store }) {
         data-preview-theme={theme.id}
         style={{
           background: pageBackground,
-          '--preview-glow': theme.glowSoft,
-          '--preview-strong': theme.glowStrong,
-          '--preview-accent': theme.glowColor,
-          '--preview-inner': theme.cardInnerBorder,
-          '--preview-font': theme.displayFont,
           '--login-primary': customization.primary,
           '--login-secondary': customization.secondary,
           '--login-accent': customization.accent,
           '--login-surface': customization.surface,
         }}
       >
-        <div className="login-settings-preview-aura aura-one" style={{ background: theme.deco1 }} />
-        <div className="login-settings-preview-aura aura-two" style={{ background: theme.deco2 }} />
-        <div
-          className="login-settings-preview-pattern"
-          style={{ backgroundImage: theme.pagePattern, backgroundSize: theme.patternSize }}
-        />
         {imageMode ? (
           <>
             <div
@@ -141,9 +129,10 @@ function LoginPreview({ settings, store }) {
         ) : null}
 
         <div className="login-settings-curated-scene">
+          <div className="login-settings-theme-motion" aria-hidden="true"><i /><i /></div>
           <div className="login-settings-curated-story">
             <div className="login-settings-curated-brand">
-              <ThemeMark themeId={theme.id} size={32} />
+              <StoreLogo store={store} />
               <b>{store?.name || 'Tu tienda'}</b>
             </div>
             <div className="login-settings-curated-copy">
@@ -151,10 +140,9 @@ function LoginPreview({ settings, store }) {
               <strong>{customization.headline}<em>{customization.highlight}</em></strong>
               <p>{customization.description}</p>
             </div>
-            <ThemeMark themeId={theme.id} size={150} />
           </div>
           <div className="login-settings-curated-access">
-            <ThemeMark themeId={theme.id} size={31} />
+            <StoreLogo store={store} className="access" />
             <strong>{customization.welcomeTitle}</strong>
             <small>{customization.welcomeSubtitle}</small>
             <i /><i />

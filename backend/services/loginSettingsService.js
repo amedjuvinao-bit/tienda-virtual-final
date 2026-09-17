@@ -3,44 +3,39 @@
 const SiteSettings = require('../models/SiteSettings');
 
 const LOGIN_THEMES = Object.freeze([
-  { value: 'orbit3d', label: 'Órbita 3D', description: 'Esferas en profundidad y movimiento espacial elegante.' },
   { value: 'liquidGlass', label: 'Cristal Líquido', description: 'Volúmenes translúcidos, reflejos suaves y profundidad fluida.' },
-  { value: 'neonPortal', label: 'Portal Neón', description: 'Umbral de luz, energía digital y acceso inmersivo.' },
-  { value: 'editorialMotion', label: 'Editorial Motion', description: 'Tipografía protagonista, ritmo gráfico y movimiento expresivo.' },
-  { value: 'architectMono', label: 'Arquitectura Mono', description: 'Planos, bloques flotantes y precisión minimalista.' },
+  { value: 'immersiveGallery', label: 'Galería Inmersiva', description: 'Una imagen protagonista de la tienda con acceso flotante.' },
+  { value: 'smokeGlass', label: 'Cristal Humo', description: 'Vidrio oscuro sobrio, reflejos discretos y acabado elegante.' },
 ]);
 
 const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
-  orbit3d: Object.freeze({
-    primary: '#07132f', secondary: '#183b73', accent: '#64f5d2', surface: '#f2fbff',
-    eyebrow: 'CENTRO DE OPERACIONES', headline: 'Todo tu negocio.', highlight: 'En una sola órbita.',
-    description: 'Controla la operación de tu tienda desde un espacio visual, seguro y conectado.',
-    welcomeTitle: 'Acceso administrativo', welcomeSubtitle: 'Ingresa para continuar gestionando tu comercio.', buttonText: 'Entrar al panel',
-  }),
   liquidGlass: Object.freeze({
     primary: '#16324a', secondary: '#876fd4', accent: '#ff8f70', surface: '#f8fdff',
     eyebrow: 'ESPACIO DE GESTIÓN', headline: 'Claridad que fluye.', highlight: 'Control sin esfuerzo.',
     description: 'Una experiencia ligera y luminosa para administrar cualquier tipo de tienda.',
     welcomeTitle: 'Hola de nuevo', welcomeSubtitle: 'Tu espacio de trabajo está listo.', buttonText: 'Continuar',
   }),
-  neonPortal: Object.freeze({
-    primary: '#06091c', secondary: '#30236b', accent: '#56e7ff', surface: '#f5f3ff',
-    eyebrow: 'PORTAL SEGURO', headline: 'Cruza al centro.', highlight: 'Activa el control.',
-    description: 'Una entrada inmersiva diseñada para operaciones rápidas y decisiones precisas.',
-    welcomeTitle: 'Validar identidad', welcomeSubtitle: 'Acceso exclusivo para el equipo autorizado.', buttonText: 'Abrir portal',
+  immersiveGallery: Object.freeze({
+    primary: '#111827', secondary: '#44546a', accent: '#e7d7bd', surface: '#f8fafc',
+    eyebrow: 'TU NEGOCIO, EN PRIMER PLANO', headline: 'Una entrada visual.', highlight: 'Tu identidad primero.',
+    description: 'Presenta la esencia de tu tienda con una imagen propia y un acceso limpio.',
+    welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa para gestionar tu tienda.', buttonText: 'Ingresar',
   }),
-  editorialMotion: Object.freeze({
-    primary: '#111111', secondary: '#d7432f', accent: '#f4d84c', surface: '#f3eddf',
-    eyebrow: 'ADMINISTRACIÓN EN MOVIMIENTO', headline: 'Haz que ocurra.', highlight: 'Dirige con intención.',
-    description: 'Un acceso gráfico, directo y memorable para equipos que trabajan con ritmo.',
-    welcomeTitle: 'Entra al estudio', welcomeSubtitle: 'Continúa construyendo tu próxima gran venta.', buttonText: 'Comenzar ahora',
+  smokeGlass: Object.freeze({
+    primary: '#090b0e', secondary: '#242a31', accent: '#aab8c8', surface: '#f5f7fa',
+    eyebrow: 'COMERCIO SIN LÍMITES', headline: 'Tu tienda,', highlight: 'más lejos.',
+    description: 'Administra, crece y haz que cada decisión cuente.',
+    welcomeTitle: 'Acceso administrativo', welcomeSubtitle: 'Identifícate para continuar.', buttonText: 'Ingresar',
   }),
-  architectMono: Object.freeze({
-    primary: '#181a18', secondary: '#5c625d', accent: '#b6ff45', surface: '#f5f5ef',
-    eyebrow: 'SISTEMA DE CONTROL', headline: 'Orden visible.', highlight: 'Decisiones simples.',
-    description: 'Una estructura limpia y precisa que pone la operación por encima del ruido.',
-    welcomeTitle: 'Acceso al sistema', welcomeSubtitle: 'Identifícate para abrir tu espacio de gestión.', buttonText: 'Ingresar',
-  }),
+});
+
+const LOGIN_THEME_MIGRATIONS = Object.freeze({
+  orbit3d: 'liquidGlass',
+  neonPortal: 'liquidGlass',
+  editorialMotion: 'liquidGlass',
+  architectMono: 'liquidGlass',
+  roseLuxuryLight: 'immersiveGallery',
+  noirGallery: 'smokeGlass',
 });
 
 const LOGIN_COLOR_FIELDS = Object.freeze(['primary', 'secondary', 'accent', 'surface']);
@@ -64,7 +59,7 @@ const LOGIN_LAYOUTS = Object.freeze([
 ]);
 
 const DEFAULT_LOGIN_SETTINGS = Object.freeze({
-  theme: 'orbit3d',
+  theme: 'liquidGlass',
   layout: 'centeredCard',
   customizations: LOGIN_THEME_CUSTOMIZATIONS,
   background: Object.freeze({
@@ -105,12 +100,24 @@ function optionExists(options, value) {
   return options.some((option) => option.value === value);
 }
 
+function supportedThemeId(value) {
+  if (optionExists(LOGIN_THEMES, value)) return value;
+  return LOGIN_THEME_MIGRATIONS[value] || DEFAULT_LOGIN_SETTINGS.theme;
+}
+
+function customizationInput(input, themeId) {
+  if (input?.[themeId]) return input[themeId];
+  if (themeId === 'immersiveGallery') return input?.roseLuxuryLight || {};
+  if (themeId === 'smokeGlass') return input?.noirGallery || {};
+  return input?.liquidGlass || {};
+}
+
 function validHex(value) {
   return /^#[0-9a-f]{6}$/i.test(cleanText(value, 20));
 }
 
 function normalizeThemeCustomization(themeId, input = {}) {
-  const defaults = LOGIN_THEME_CUSTOMIZATIONS[themeId] || LOGIN_THEME_CUSTOMIZATIONS.orbit3d;
+  const defaults = LOGIN_THEME_CUSTOMIZATIONS[themeId] || LOGIN_THEME_CUSTOMIZATIONS.liquidGlass;
   const normalized = {};
 
   LOGIN_COLOR_FIELDS.forEach((field) => {
@@ -130,7 +137,7 @@ function normalizeCustomizations(input = {}) {
   return Object.fromEntries(
     LOGIN_THEMES.map(({ value }) => [
       value,
-      normalizeThemeCustomization(value, input?.[value] || {}),
+      normalizeThemeCustomization(value, customizationInput(input, value)),
     ])
   );
 }
@@ -154,7 +161,7 @@ function normalizeLoginSettings(input = {}) {
   const mode = cleanText(background.mode, 20);
 
   return {
-    theme: optionExists(LOGIN_THEMES, theme) ? theme : DEFAULT_LOGIN_SETTINGS.theme,
+    theme: supportedThemeId(theme),
     layout: optionExists(LOGIN_LAYOUTS, layout) ? layout : DEFAULT_LOGIN_SETTINGS.layout,
     customizations: normalizeCustomizations(input.customizations),
     background: {
@@ -178,7 +185,7 @@ function validateLoginSettings(input = {}) {
   const background = input?.background || {};
   const mode = cleanText(background.mode, 20);
 
-  if (!optionExists(LOGIN_THEMES, theme)) {
+  if (!optionExists(LOGIN_THEMES, theme) && !LOGIN_THEME_MIGRATIONS[theme]) {
     details.push({ field: 'theme', message: 'Selecciona un tema disponible.' });
   }
   if (!optionExists(LOGIN_LAYOUTS, layout)) {
@@ -233,7 +240,7 @@ function storeIdentity(document = {}) {
   const logo = plain(theme.logo);
   return {
     name: cleanText(store.name, 120) || 'Tu tienda',
-    logo: cleanText(header.logoLight || logo.light || logo.dark, 2048),
+    logo: cleanText(header.logoLight || header.logoDark || logo.light || logo.dark, 2048),
   };
 }
 

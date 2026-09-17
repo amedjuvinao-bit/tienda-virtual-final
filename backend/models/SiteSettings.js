@@ -350,7 +350,7 @@ const LoginAdminAppearanceSchema = new Schema(
   {
     theme: {
       type: String,
-      default: "roseLuxuryLight",
+      default: "liquidGlass",
     },
 
     layout: {
@@ -364,7 +364,7 @@ const LoginAdminAppearanceSchema = new Schema(
         enum: ["theme", "color", "image"],
         default: "theme",
       },
-      color: { type: String, default: "#fff7fb" },
+      color: { type: String, default: "#16324a" },
       image: { type: String, default: "" },
       imageOpacity: { type: Number, default: 0.35 },
       overlay: { type: Number, default: 0.35 },

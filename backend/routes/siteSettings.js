@@ -134,11 +134,11 @@ function buildDefaultSettings() {
     },
 
     loginAdmin: {
-      theme: "roseLuxuryLight",
+      theme: "liquidGlass",
       layout: "centeredCard",
       background: {
         mode: "theme",
-        color: "#fff7fb",
+        color: "#16324a",
         image: "",
         imageOpacity: 0.35,
         overlay: 0.35,
@@ -300,11 +300,11 @@ async function ensureAdminAppearanceExists() {
 
   if (!doc.loginAdmin) {
     $set.loginAdmin = {
-      theme: "roseLuxuryLight",
+      theme: "liquidGlass",
       layout: "centeredCard",
       background: {
         mode: "theme",
-        color: "#fff7fb",
+        color: "#16324a",
         image: "",
         imageOpacity: 0.35,
         overlay: 0.35,

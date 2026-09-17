@@ -28,7 +28,13 @@ describe('loginSettings', () => {
 
   it('compara configuraciones por su forma canónica', () => {
     expect(loginSettingsEqual(DEFAULT_LOGIN_SETTINGS, normalizeLoginSettings(DEFAULT_LOGIN_SETTINGS))).toBe(true);
-    expect(loginSettingsEqual(DEFAULT_LOGIN_SETTINGS, { ...DEFAULT_LOGIN_SETTINGS, theme: 'neonPortal' })).toBe(false);
+    expect(loginSettingsEqual(DEFAULT_LOGIN_SETTINGS, { ...DEFAULT_LOGIN_SETTINGS, theme: 'smokeGlass' })).toBe(false);
+  });
+
+  it('convierte temas retirados sin volver a mostrarlos', () => {
+    expect(normalizeLoginSettings({ theme: 'orbit3d' }).theme).toBe('liquidGlass');
+    expect(normalizeLoginSettings({ theme: 'noirGallery' }).theme).toBe('smokeGlass');
+    expect(normalizeLoginSettings({ theme: 'roseLuxuryLight' }).theme).toBe('immersiveGallery');
   });
 
   it('conserva colores y textos válidos por cada tema', () => {

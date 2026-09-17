@@ -20,16 +20,18 @@ function response(overrides = {}) {
   return {
     ok: true,
     settings: {
-      theme: 'orbit3d',
+      theme: 'liquidGlass',
       layout: 'centeredCard',
-      background: { mode: 'theme', color: '#fff7fb', image: '', imageOpacity: 0.35, overlay: 0.35 },
+      background: { mode: 'theme', color: '#16324a', image: '', imageOpacity: 0.35, overlay: 0.35 },
       ...overrides.settings,
     },
     revision: overrides.revision ?? 2,
-    store: { name: 'Rosa Boutique', logo: '' },
+    store: { name: 'Rosa Boutique', logo: 'https://cdn.example.com/logo.png' },
     meta: {
       themes: [
-        { value: 'orbit3d', label: 'Órbita 3D', description: 'Movimiento espacial.' },
+        { value: 'liquidGlass', label: 'Cristal Líquido', description: 'Cristal luminoso.' },
+        { value: 'immersiveGallery', label: 'Galería Inmersiva', description: 'Imagen protagonista.' },
+        { value: 'smokeGlass', label: 'Cristal Humo', description: 'Vidrio oscuro.' },
       ],
       layouts: [
         { value: 'centeredCard', label: 'Tarjeta centrada', description: 'Acceso directo.' },
@@ -41,9 +43,9 @@ function response(overrides = {}) {
         { value: 'image', label: 'Imagen personalizada' },
       ],
       defaults: {
-        theme: 'orbit3d',
+        theme: 'liquidGlass',
         layout: 'centeredCard',
-        background: { mode: 'theme', color: '#fff7fb', image: '', imageOpacity: 0.35, overlay: 0.35 },
+        background: { mode: 'theme', color: '#16324a', image: '', imageOpacity: 0.35, overlay: 0.35 },
       },
     },
     message: overrides.message,
@@ -58,7 +60,7 @@ describe('LoginAdminSection', () => {
     getAdminLoginSettings.mockResolvedValue(response());
     updateAdminLoginSettings.mockResolvedValue(response({
       revision: 3,
-      settings: { theme: 'neonPortal' },
+      settings: { theme: 'smokeGlass' },
       message: 'Diseño guardado.',
     }));
     uploadAdminLoginBackground.mockResolvedValue('https://cdn.example.com/login.webp');
@@ -69,9 +71,11 @@ describe('LoginAdminSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Login de Rosa Boutique' })).toBeInTheDocument();
     expect(screen.getByText('Sincronizado')).toBeInTheDocument();
-    expect(screen.getByText('Órbita 3D · composición exclusiva')).toBeInTheDocument();
+    expect(screen.getByText('Cristal Líquido · composición exclusiva')).toBeInTheDocument();
     expect(screen.getByText('Escoge el diseño')).toBeInTheDocument();
-    expect(screen.getByText('Todo tu negocio.')).toBeInTheDocument();
+    expect(screen.getByText('Claridad que fluye.')).toBeInTheDocument();
+    expect(screen.getAllByAltText('Logo de Rosa Boutique').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('option')).toHaveLength(3);
     expect(screen.getByText('Versión 2 · se aplicará al login real después de guardar.')).toBeInTheDocument();
     expect(getAdminLoginSettings).toHaveBeenCalledTimes(1);
   });
@@ -81,7 +85,7 @@ describe('LoginAdminSection', () => {
     render(<LoginAdminSection />);
     await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
 
-    await user.selectOptions(screen.getByLabelText('Tema visual'), 'neonPortal');
+    await user.selectOptions(screen.getByLabelText('Tema visual'), 'smokeGlass');
     await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     await user.click(screen.getByText('Cambiar textos del diseño'));
     await user.clear(screen.getByLabelText('Título principal'));
@@ -93,9 +97,9 @@ describe('LoginAdminSection', () => {
     expect(updateAdminLoginSettings).toHaveBeenCalledWith(expect.objectContaining({
       revision: 2,
       settings: expect.objectContaining({
-        theme: 'neonPortal',
+        theme: 'smokeGlass',
         customizations: expect.objectContaining({
-          neonPortal: expect.objectContaining({ headline: 'Mi negocio,' }),
+          smokeGlass: expect.objectContaining({ headline: 'Mi negocio,' }),
         }),
       }),
     }));

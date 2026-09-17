@@ -17,6 +17,27 @@ export const LOGIN_TEXT_LIMITS = Object.freeze({
   buttonText: 32,
 });
 
+const LOGIN_THEME_MIGRATIONS = Object.freeze({
+  orbit3d: 'liquidGlass',
+  neonPortal: 'liquidGlass',
+  editorialMotion: 'liquidGlass',
+  architectMono: 'liquidGlass',
+  roseLuxuryLight: 'immersiveGallery',
+  noirGallery: 'smokeGlass',
+});
+
+function supportedThemeId(value) {
+  if (CURATED_LOGIN_THEME_IDS.includes(value)) return value;
+  return LOGIN_THEME_MIGRATIONS[value] || DEFAULT_LOGIN_SETTINGS.theme;
+}
+
+function customizationInput(input, themeId) {
+  if (input?.[themeId]) return input[themeId];
+  if (themeId === 'immersiveGallery') return input?.roseLuxuryLight || {};
+  if (themeId === 'smokeGlass') return input?.noirGallery || {};
+  return input?.liquidGlass || {};
+}
+
 function defaultCustomizations() {
   return Object.fromEntries(
     CURATED_LOGIN_THEME_IDS.map((themeId) => [themeId, getLoginThemeCustomization(themeId)])
@@ -75,16 +96,14 @@ export function normalizeLoginCustomizations(input = {}) {
   return Object.fromEntries(
     CURATED_LOGIN_THEME_IDS.map((themeId) => [
       themeId,
-      normalizeThemeCustomization(themeId, input?.[themeId] || {}),
+      normalizeThemeCustomization(themeId, customizationInput(input, themeId)),
     ])
   );
 }
 
 export function normalizeLoginSettings(input = {}) {
   const background = input?.background || {};
-  const theme = CURATED_LOGIN_THEME_IDS.includes(input.theme)
-    ? input.theme
-    : DEFAULT_LOGIN_SETTINGS.theme;
+  const theme = supportedThemeId(input.theme);
   const layout = LOGIN_LAYOUTS[input.layout] ? input.layout : DEFAULT_LOGIN_SETTINGS.layout;
   const mode = ['theme', 'color', 'image'].includes(background.mode)
     ? background.mode

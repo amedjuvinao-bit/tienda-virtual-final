@@ -18,13 +18,6 @@ import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
-import {
-  ArchitectMark,
-  EditorialMotionMark,
-  LiquidGlassMark,
-  NeonPortalMark,
-  OrbitCommerceMark,
-} from "./login/LoginThemeMarks";
 import "./login/LoginFlagship.css";
 import "./login/LoginCuratedThemes.css";
 import {
@@ -168,6 +161,22 @@ function StoreIdentity({ theme, storeName, storeLogo, compact = false }) {
           {storeName}
         </strong>
       </span>
+    </div>
+  );
+}
+
+function CuratedStoreBrand({ storeName, storeLogo, className = "" }) {
+  const initial = String(storeName || "T").trim().charAt(0).toUpperCase() || "T";
+  return (
+    <div className={`rb-curated-brand ${className}`.trim()}>
+      <span className="rb-curated-brand__logo">
+        {storeLogo ? (
+          <img src={storeLogo} alt={`Logo de ${storeName}`} />
+        ) : (
+          <b aria-label={`Inicial de ${storeName}`}>{initial}</b>
+        )}
+      </span>
+      <strong>{storeName}</strong>
     </div>
   );
 }
@@ -1102,15 +1111,13 @@ export default function Login() {
   const isLocked = lockRemaining > 0;
   const dark = isDarkTheme(activeTheme);
   const gold = isGoldTheme(activeTheme);
-  const isOrbit3d = activeTheme.id === "orbit3d";
   const isLiquidGlass = activeTheme.id === "liquidGlass";
-  const isNeonPortal = activeTheme.id === "neonPortal";
-  const isEditorialMotion = activeTheme.id === "editorialMotion";
-  const isArchitectMono = activeTheme.id === "architectMono";
-  const isCuratedTheme = isOrbit3d || isLiquidGlass || isNeonPortal || isEditorialMotion || isArchitectMono;
+  const isImmersiveGallery = activeTheme.id === "immersiveGallery";
+  const isSmokeGlass = activeTheme.id === "smokeGlass";
+  const isCuratedTheme = isLiquidGlass || isImmersiveGallery || isSmokeGlass;
   const activeCustomization = loginCustomizations[activeTheme.id]
     || DEFAULT_LOGIN_SETTINGS.customizations[activeTheme.id]
-    || DEFAULT_LOGIN_SETTINGS.customizations.orbit3d;
+    || DEFAULT_LOGIN_SETTINGS.customizations.liquidGlass;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
 
   const loginPageBackground =
@@ -1409,42 +1416,30 @@ export default function Login() {
     <p>{activeCustomization.description}</p>
   </div>;
 
-  const renderOrbit3d = () => <section className="rb-orbit-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-orbit-access"><div className="rb-theme-brand"><i />{storeName}</div><CuratedCredentialsForm {...curatedFormProps} inputId="rb-orbit" /></div>
-    <div className="rb-orbit-world"><div className="rb-orbit-object"><OrbitCommerceMark /></div><StoryCopy className="rb-theme-copy rb-orbit-copy" /></div>
-  </section>;
-
   const renderLiquidGlass = () => <section className="rb-liquid-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-liquid-blob one" /><div className="rb-liquid-blob two" /><LiquidGlassMark className="rb-liquid-mark" />
-    <StoryCopy className="rb-theme-copy rb-liquid-copy" />
-    <div className="rb-liquid-access"><div className="rb-theme-brand"><i />{storeName}</div><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
+    <div className="rb-liquid-blob one" /><div className="rb-liquid-blob two" />
+    <div className="rb-liquid-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-liquid-copy" /></div>
+    <div className="rb-liquid-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
   </section>;
 
-  const renderNeonPortal = () => <section className="rb-portal-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-portal-brand">{storeName}<span>ACCESO CIFRADO</span></div>
-    <div className="rb-portal-rings" aria-hidden="true"><NeonPortalMark /></div>
-    <StoryCopy className="rb-theme-copy rb-portal-copy" />
-    <div className="rb-portal-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-portal" /></div>
+  const renderImmersiveGallery = () => <section className="rb-gallery-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    {hasCustomImageBg ? <div className="rb-gallery-media" style={{ backgroundImage: `url("${loginBg.image}")`, opacity: loginBg.imageOpacity }} /> : null}
+    <div className="rb-gallery-overlay" style={{ opacity: hasCustomImageBg ? loginBg.overlay : undefined }} />
+    <div className="rb-gallery-lens" aria-hidden="true" />
+    <div className="rb-gallery-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-gallery-copy" /></div>
+    <div className="rb-gallery-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-gallery" /></div>
   </section>;
 
-  const renderEditorialMotion = () => <section className="rb-editorial-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-editorial-grid" /><div className="rb-editorial-ticker"><span>{storeName} · OPERACIÓN · CONTROL · CRECIMIENTO · {storeName} · OPERACIÓN · CONTROL · CRECIMIENTO · </span></div>
-    <StoryCopy className="rb-theme-copy rb-editorial-copy" />
-    <div className="rb-editorial-mark"><EditorialMotionMark /><strong>{storeName}</strong></div>
-    <div className="rb-editorial-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-editorial" /></div>
-  </section>;
-
-  const renderArchitectMono = () => <section className="rb-architect-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-architect-plan"><div className="rb-architect-brand">{storeName}</div><ArchitectMark /><StoryCopy className="rb-theme-copy rb-architect-copy" /></div>
-    <div className="rb-architect-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-architect" /></div>
+  const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+    <div className="rb-smoke-halo" aria-hidden="true" /><div className="rb-smoke-wave" aria-hidden="true" />
+    <div className="rb-smoke-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-smoke-copy" /></div>
+    <div className="rb-smoke-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" /></div>
   </section>;
 
   const renderLayout = () => {
-    if (isOrbit3d) return renderOrbit3d();
     if (isLiquidGlass) return renderLiquidGlass();
-    if (isNeonPortal) return renderNeonPortal();
-    if (isEditorialMotion) return renderEditorialMotion();
-    if (isArchitectMono) return renderArchitectMono();
+    if (isImmersiveGallery) return renderImmersiveGallery();
+    if (isSmokeGlass) return renderSmokeGlass();
 
     switch (activeLayout.id) {
       case "electricCircle":
@@ -1473,6 +1468,7 @@ export default function Login() {
         "--login-secondary": activeCustomization.secondary,
         "--login-accent": activeCustomization.accent,
         "--login-surface": activeCustomization.surface,
+        "--login-page-background": loginPageBackground,
       }}
     >
       <style>
