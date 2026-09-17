@@ -60,6 +60,12 @@ const MailSettingsSchema = new mongoose.Schema(
       default: false,
     },
 
+    revision: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     provider: {
       type: String,
       enum: MAIL_PROVIDERS,
@@ -173,6 +179,12 @@ const MailSettingsSchema = new mongoose.Schema(
       default: null,
     },
 
+    lastTestFingerprint: {
+      type: String,
+      default: '',
+      select: false,
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AdminUser',
@@ -187,6 +199,7 @@ const MailSettingsSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   }
 );
 
@@ -238,6 +251,7 @@ MailSettingsSchema.methods.toSafeObject = function toSafeObject() {
 
   delete settings.smtpPasswordEncrypted;
   delete settings.passwordUpdatedAt;
+  delete settings.lastTestFingerprint;
   delete settings.__v;
 
   return settings;
@@ -245,7 +259,8 @@ MailSettingsSchema.methods.toSafeObject = function toSafeObject() {
 
 MailSettingsSchema.statics.getSingleton = async function getSingleton() {
   let settings = await this.findOne({ key: MAIL_SETTINGS_KEY }).select(
-    '+smtpPasswordEncrypted +passwordUpdatedAt'
+    '+smtpPasswordEncrypted +passwordUpdatedAt' +
+      ' +lastTestFingerprint'
   );
 
   if (!settings) {

@@ -3,6 +3,7 @@
 const nodemailer = require('nodemailer');
 
 const MailSettings = require('../../models/MailSettings');
+const SiteSettings = require('../../models/SiteSettings');
 const { decryptText } = require('./encryption');
 
 const MAIL_SETTINGS_KEY = 'main';
@@ -39,12 +40,12 @@ async function getMailSettingsWithSecret() {
   return settings;
 }
 
-function validateMailSettings(settings) {
+function validateMailSettings(settings, options = {}) {
   if (!settings) {
     throw new Error('No existe configuración de correo.');
   }
 
-  if (!settings.enabled) {
+  if (options.requireEnabled !== false && !settings.enabled) {
     throw new Error('La configuración de correo está desactivada.');
   }
 
@@ -95,16 +96,16 @@ function buildFromAddress(settings) {
   const fromEmail = normalizeEmail(settings.fromEmail);
 
   if (fromName) {
-    return `"${fromName}" <${fromEmail}>`;
+    return { name: fromName, address: fromEmail };
   }
 
   return fromEmail;
 }
 
-async function createMailTransporter() {
+async function createMailTransporter(options = {}) {
   const settings = await getMailSettingsWithSecret();
 
-  validateMailSettings(settings);
+  validateMailSettings(settings, options);
 
   const transportOptions = buildTransportOptions(settings);
   const transporter = nodemailer.createTransport(transportOptions);
@@ -115,6 +116,11 @@ async function createMailTransporter() {
   };
 }
 
+async function getDynamicStoreName() {
+  const siteSettings = await SiteSettings.findOne().select('store.name').lean();
+  return normalizeText(siteSettings?.store?.name);
+}
+
 async function verifyMailTransporter() {
   const { transporter } = await createMailTransporter();
 
@@ -123,14 +129,14 @@ async function verifyMailTransporter() {
   return true;
 }
 
-async function sendMail({
+async function sendConfiguredMail({
   to,
   subject,
   text = '',
   html = '',
   replyTo = '',
   attachments = [],
-}) {
+}, options = {}) {
   const cleanTo = normalizeEmail(to);
   const cleanSubject = normalizeText(subject);
 
@@ -146,10 +152,14 @@ async function sendMail({
     throw new Error('Falta el contenido del correo.');
   }
 
-  const { settings, transporter } = await createMailTransporter();
+  const { settings, transporter } = await createMailTransporter(options);
+  const storeName = await getDynamicStoreName().catch(() => '');
 
   const message = {
-    from: buildFromAddress(settings),
+    from: buildFromAddress({
+      ...settings.toObject(),
+      fromName: storeName || settings.fromName,
+    }),
     to: cleanTo,
     subject: cleanSubject,
     text,
@@ -166,9 +176,18 @@ async function sendMail({
   return transporter.sendMail(message);
 }
 
+async function sendMail(message) {
+  return sendConfiguredMail(message, { requireEnabled: true });
+}
+
+async function sendTestMail(message) {
+  return sendConfiguredMail(message, { requireEnabled: false });
+}
+
 module.exports = {
   getMailSettingsWithSecret,
   createMailTransporter,
   verifyMailTransporter,
   sendMail,
+  sendTestMail,
 };

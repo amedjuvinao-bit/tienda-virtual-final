@@ -132,13 +132,13 @@ export default function ConfiguracionPage() {
   };
 
   const ActiveIcon = activeTabData.icon || Settings2;
-  const compactShippingView = activeTab === 'envios';
+  const compactOperationalView = ['envios', 'correo'].includes(activeTab);
 
   return (
     <div className="mx-auto max-w-7xl p-3 md:p-5">
 
       {/* 🔥 HERO MEJORADO */}
-      {!compactShippingView && <div
+      {!compactOperationalView && <div
         className="mb-5 overflow-hidden rounded-[32px] border p-5 shadow-sm backdrop-blur-2xl md:p-6 relative"
         style={{
           background: 'linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.05))',
@@ -230,7 +230,7 @@ export default function ConfiguracionPage() {
       <section>
 
         {/* 🔥 BARRA (YA NO TARJETA REPETIDA) */}
-        {!compactShippingView && <div
+        {!compactOperationalView && <div
           className="mb-4 rounded-[20px] border px-5 py-3 backdrop-blur-xl flex items-center gap-4"
           style={{
             background: 'rgba(255,255,255,0.12)',

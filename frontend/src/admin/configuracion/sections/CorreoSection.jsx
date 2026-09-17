@@ -1,16 +1,19 @@
-// frontend/src/admin/configuracion/sections/CorreoSection.jsx
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
+  AlertCircle,
+  Check,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Mail,
+  RefreshCw,
   Save,
   Send,
   Server,
   ShieldCheck,
+  Store,
 } from 'lucide-react';
 
 import {
@@ -18,14 +21,13 @@ import {
   sendAdminMailTest,
   updateAdminMailSettings,
 } from '../../api/adminMailSettingsApi';
+import './CorreoSection.css';
 
 const DEFAULT_FORM = {
-  enabled: false,
-  provider: 'smtp',
-  fromName: '',
+  provider: 'gmail',
   fromEmail: '',
   replyToEmail: '',
-  smtpHost: '',
+  smtpHost: 'smtp.gmail.com',
   smtpPort: 465,
   smtpSecurity: 'ssl',
   smtpUser: '',
@@ -34,771 +36,496 @@ const DEFAULT_FORM = {
   testEmail: '',
 };
 
-const LOCAL_PRESETS = {
-  gmail: {
-    smtpHost: 'smtp.gmail.com',
-    smtpPort: 465,
-    smtpSecurity: 'ssl',
-  },
-  outlook: {
-    smtpHost: 'smtp.office365.com',
-    smtpPort: 587,
-    smtpSecurity: 'starttls',
-  },
-  zoho: {
-    smtpHost: 'smtp.zoho.com',
-    smtpPort: 465,
-    smtpSecurity: 'ssl',
-  },
-  smtp: {
-    smtpHost: '',
-    smtpPort: 465,
-    smtpSecurity: 'ssl',
+const FALLBACK_META = {
+  providers: [
+    { value: 'gmail', label: 'Gmail', description: 'Cuenta de Google con contraseña de aplicación.' },
+    { value: 'outlook', label: 'Outlook / Microsoft 365', description: 'Cuenta de Microsoft con acceso SMTP habilitado.' },
+    { value: 'zoho', label: 'Zoho Mail', description: 'Cuenta de Zoho con acceso SMTP habilitado.' },
+    { value: 'smtp', label: 'Otro correo', description: 'Correo corporativo de otro proveedor.' },
+  ],
+  securityTypes: [
+    { value: 'ssl', label: 'SSL / TLS' },
+    { value: 'starttls', label: 'STARTTLS' },
+    { value: 'none', label: 'Sin cifrado' },
+  ],
+  presetDefaults: {
+    gmail: { smtpHost: 'smtp.gmail.com', smtpPort: 465, smtpSecurity: 'ssl' },
+    outlook: { smtpHost: 'smtp.office365.com', smtpPort: 587, smtpSecurity: 'starttls' },
+    zoho: { smtpHost: 'smtp.zoho.com', smtpPort: 465, smtpSecurity: 'ssl' },
+    smtp: { smtpHost: '', smtpPort: 465, smtpSecurity: 'ssl' },
   },
 };
 
-function getApiMessage(error, fallback) {
+const TABS = [
+  { id: 'identity', label: 'Remitente', detail: 'Nombre y proveedor', Icon: Mail },
+  { id: 'access', label: 'Acceso', detail: 'Cuenta protegida', Icon: KeyRound },
+  { id: 'verify', label: 'Comprobar', detail: 'Prueba y activación', Icon: ShieldCheck },
+];
+
+function apiMessage(error, fallback) {
   return error?.userMessage || error?.response?.data?.message || error?.message || fallback;
 }
 
-function normalizeSettingsToForm(settings = {}) {
+function normalizeForm(settings = {}, store = {}) {
   return {
-    enabled: Boolean(settings.enabled),
-    provider: settings.provider || 'smtp',
-    fromName: settings.fromName || '',
-    fromEmail: settings.fromEmail || '',
-    replyToEmail: settings.replyToEmail || '',
+    provider: settings.provider || 'gmail',
+    fromEmail: settings.fromEmail || store.email || '',
+    replyToEmail: settings.replyToEmail || store.supportEmail || '',
     smtpHost: settings.smtpHost || '',
     smtpPort: settings.smtpPort || 465,
     smtpSecurity: settings.smtpSecurity || 'ssl',
     smtpUser: settings.smtpUser || '',
     smtpPassword: '',
     clearSmtpPassword: false,
-    testEmail: settings.testEmail || '',
+    testEmail: settings.testEmail || store.email || '',
   };
 }
 
-function FieldLabel({ children, required = false }) {
+function comparableForm(form) {
+  return JSON.stringify({
+    provider: form.provider,
+    fromEmail: form.fromEmail.trim().toLowerCase(),
+    replyToEmail: form.replyToEmail.trim().toLowerCase(),
+    smtpHost: form.smtpHost.trim().toLowerCase(),
+    smtpPort: Number(form.smtpPort),
+    smtpSecurity: form.smtpSecurity,
+    smtpUser: form.smtpUser.trim(),
+    testEmail: form.testEmail.trim().toLowerCase(),
+    passwordChanged: Boolean(form.smtpPassword || form.clearSmtpPassword),
+  });
+}
+
+function Field({ label, required = false, hint = '', error = '', children }) {
   return (
-    <label
-      className="mb-1 block text-xs font-semibold uppercase tracking-wide"
-      style={{ color: 'var(--admin-card-muted-text)' }}
-    >
+    <label className="mail-field">
+      <span className="mail-field__label">
+        {label}{required ? <b aria-hidden="true">*</b> : null}
+      </span>
       {children}
-      {required ? (
-        <span className="ml-1" style={{ color: 'var(--admin-primary)' }}>
-          *
-        </span>
-      ) : null}
+      {error ? <span className="mail-field__error">{error}</span> : null}
+      {!error && hint ? <span className="mail-field__hint">{hint}</span> : null}
     </label>
   );
 }
 
-function TextInput({
-  value,
-  onChange,
-  placeholder = '',
-  type = 'text',
-  disabled = false,
-  autoComplete = 'off',
-}) {
+function Notice({ type = 'info', children }) {
   return (
-    <input
-      type={type}
-      value={value}
-      disabled={disabled}
-      autoComplete={autoComplete}
-      placeholder={placeholder}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-60"
-      style={{
-        backgroundColor: 'var(--admin-input-bg, rgba(255,255,255,0.72))',
-        borderColor: 'var(--admin-glass-border)',
-        color: 'var(--admin-card-text)',
-      }}
-    />
-  );
-}
-
-function SelectInput({ value, onChange, children, disabled = false }) {
-  return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-60"
-      style={{
-        backgroundColor: 'var(--admin-input-bg, rgba(255,255,255,0.72))',
-        borderColor: 'var(--admin-glass-border)',
-        color: 'var(--admin-card-text)',
-      }}
-    >
-      {children}
-    </select>
-  );
-}
-
-function InfoBox({ type = 'info', children }) {
-  const config = {
-    info: {
-      Icon: ShieldCheck,
-      bg: 'rgba(59,130,246,0.08)',
-      border: 'rgba(59,130,246,0.22)',
-      color: '#1d4ed8',
-    },
-    warning: {
-      Icon: AlertTriangle,
-      bg: 'rgba(245,158,11,0.10)',
-      border: 'rgba(245,158,11,0.28)',
-      color: '#b45309',
-    },
-    success: {
-      Icon: CheckCircle2,
-      bg: 'rgba(34,197,94,0.10)',
-      border: 'rgba(34,197,94,0.24)',
-      color: '#15803d',
-    },
-    error: {
-      Icon: AlertTriangle,
-      bg: 'rgba(239,68,68,0.10)',
-      border: 'rgba(239,68,68,0.24)',
-      color: '#b91c1c',
-    },
-  };
-
-  const current = config[type] || config.info;
-  const Icon = current.Icon;
-
-  return (
-    <div
-      className="flex gap-3 rounded-2xl border p-4 text-sm leading-6"
-      style={{
-        backgroundColor: current.bg,
-        borderColor: current.border,
-        color: current.color,
-      }}
-    >
-      <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
-      <div>{children}</div>
+    <div className={`mail-notice mail-notice--${type}`} role={type === 'error' ? 'alert' : 'status'}>
+      {type === 'success' ? <CheckCircle2 /> : <AlertCircle />}
+      <span>{children}</span>
     </div>
   );
 }
 
 export default function CorreoSection() {
+  const [activeTab, setActiveTab] = useState('identity');
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [settings, setSettings] = useState(null);
-  const [meta, setMeta] = useState(null);
-
+  const [savedForm, setSavedForm] = useState(DEFAULT_FORM);
+  const [settings, setSettings] = useState({});
+  const [store, setStore] = useState({});
+  const [readiness, setReadiness] = useState({ checks: [], completed: 0, required: 5 });
+  const [meta, setMeta] = useState(FALLBACK_META);
+  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusType, setStatusType] = useState('info');
+  const providers = meta.providers?.length ? meta.providers : FALLBACK_META.providers;
+  const securityTypes = meta.securityTypes?.length
+    ? meta.securityTypes
+    : FALLBACK_META.securityTypes;
+  const selectedProvider = providers.find((item) => item.value === form.provider) || providers[0];
+  const hasPassword = Boolean(settings.hasSmtpPassword) && !form.clearSmtpPassword;
+  const dirty = comparableForm(form) !== comparableForm(savedForm);
+  const progress = readiness.required
+    ? Math.round((readiness.completed / readiness.required) * 100)
+    : 0;
 
-  const providers = useMemo(() => {
-    return meta?.providers?.length
-      ? meta.providers
-      : [
-          {
-            value: 'gmail',
-            label: 'Gmail',
-            description: 'Usa smtp.gmail.com con contraseña de aplicación.',
-          },
-          {
-            value: 'outlook',
-            label: 'Outlook / Microsoft 365',
-            description: 'Usa smtp.office365.com con STARTTLS.',
-          },
-          {
-            value: 'zoho',
-            label: 'Zoho Mail',
-            description: 'Usa smtp.zoho.com.',
-          },
-          {
-            value: 'smtp',
-            label: 'SMTP personalizado',
-            description: 'Para Hostinger, GoDaddy, cPanel u otro correo corporativo.',
-          },
-        ];
-  }, [meta]);
+  const status = useMemo(() => {
+    if (readiness.active) return { label: 'Activo', detail: 'La tienda está enviando correos.', tone: 'success' };
+    if (readiness.tested) return { label: 'Comprobado', detail: 'Ya puedes activar los correos.', tone: 'ready' };
+    if (readiness.canTest) return { label: 'Listo para probar', detail: 'Envía una prueba para comprobarlo.', tone: 'warning' };
+    return { label: 'En preparación', detail: 'Completa los datos pendientes.', tone: 'neutral' };
+  }, [readiness]);
 
-  const securityTypes = useMemo(() => {
-    return meta?.securityTypes?.length
-      ? meta.securityTypes
-      : [
-          {
-            value: 'ssl',
-            label: 'SSL / TLS',
-            description: 'Normalmente puerto 465.',
-          },
-          {
-            value: 'starttls',
-            label: 'STARTTLS',
-            description: 'Normalmente puerto 587.',
-          },
-          {
-            value: 'none',
-            label: 'Sin cifrado',
-            description: 'No recomendado para producción.',
-          },
-        ];
-  }, [meta]);
-
-  const selectedProvider = useMemo(() => {
-    return providers.find((item) => item.value === form.provider) || providers[0];
-  }, [providers, form.provider]);
-
-  const hasPasswordConfigured = Boolean(settings?.hasSmtpPassword);
-
-  function updateField(field, value) {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  function applyResponse(response) {
+    const nextSettings = response.settings || {};
+    const nextStore = response.store || {};
+    const nextForm = normalizeForm(nextSettings, nextStore);
+    setSettings(nextSettings);
+    setStore(nextStore);
+    setReadiness(response.readiness || { checks: [], completed: 0, required: 5 });
+    setMeta(response.meta || meta || FALLBACK_META);
+    setRevision(Number(response.revision || 0));
+    setForm(nextForm);
+    setSavedForm(nextForm);
+    setFieldErrors({});
   }
 
-  function handleProviderChange(provider) {
-    const presets = meta?.presetDefaults || LOCAL_PRESETS;
-    const preset = presets[provider] || LOCAL_PRESETS[provider] || LOCAL_PRESETS.smtp;
-
-    setForm((prev) => ({
-      ...prev,
-      provider,
-      smtpHost: preset.smtpHost ?? prev.smtpHost,
-      smtpPort: preset.smtpPort ?? prev.smtpPort,
-      smtpSecurity: preset.smtpSecurity ?? prev.smtpSecurity,
-    }));
-  }
-
-  async function loadSettings() {
+  async function load() {
     try {
       setLoading(true);
-      setStatusMessage('');
-      setStatusType('info');
-
-      const response = await getAdminMailSettings();
-
-      setSettings(response.settings || null);
-      setMeta(response.meta || null);
-      setForm(normalizeSettingsToForm(response.settings || {}));
+      setFeedback(null);
+      applyResponse(await getAdminMailSettings());
     } catch (error) {
-      setStatusType('error');
-      setStatusMessage(
-        getApiMessage(error, 'No se pudo cargar la configuración de correo.')
-      );
+      setFeedback({ type: 'error', message: apiMessage(error, 'No se pudo cargar la configuración de correo.') });
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSave(event) {
-    event.preventDefault();
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    try {
-      setSaving(true);
-      setStatusMessage('');
-      setStatusType('info');
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setFieldErrors((current) => ({ ...current, [field]: '' }));
+    setFeedback(null);
+  }
 
-      const payload = {
-        enabled: form.enabled,
+  function chooseProvider(provider) {
+    const preset = meta.presetDefaults?.[provider] || FALLBACK_META.presetDefaults[provider];
+    setForm((current) => ({
+      ...current,
+      provider,
+      smtpHost: preset?.smtpHost ?? current.smtpHost,
+      smtpPort: preset?.smtpPort ?? current.smtpPort,
+      smtpSecurity: preset?.smtpSecurity ?? current.smtpSecurity,
+    }));
+    setFeedback(null);
+  }
+
+  function validateCurrentForm() {
+    const errors = {};
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(form.fromEmail)) errors.fromEmail = 'Escribe un correo válido.';
+    if (form.replyToEmail && !emailPattern.test(form.replyToEmail)) {
+      errors.replyToEmail = 'Escribe un correo válido.';
+    }
+    if (!form.smtpUser.trim()) errors.smtpUser = 'Escribe el usuario de la cuenta.';
+    if (!hasPassword && !form.smtpPassword.trim() && !form.clearSmtpPassword) {
+      errors.smtpPassword = 'Escribe la clave de la cuenta.';
+    }
+    if (form.provider === 'smtp' && !form.smtpHost.trim()) errors.smtpHost = 'Escribe el servidor.';
+    const port = Number(form.smtpPort);
+    if (form.provider === 'smtp' && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      errors.smtpPort = 'Usa un puerto entre 1 y 65535.';
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setActiveTab(errors.fromEmail || errors.replyToEmail ? 'identity' : 'access');
+      setFeedback({ type: 'error', message: 'Revisa los datos marcados antes de guardar.' });
+      return false;
+    }
+    return true;
+  }
+
+  function payload(enabled = Boolean(settings.enabled)) {
+    return {
+      revision,
+      enabled,
+      settings: {
         provider: form.provider,
-        fromName: form.fromName,
         fromEmail: form.fromEmail,
         replyToEmail: form.replyToEmail,
         smtpHost: form.smtpHost,
-        smtpPort: Number(form.smtpPort || 465),
+        smtpPort: Number(form.smtpPort),
         smtpSecurity: form.smtpSecurity,
         smtpUser: form.smtpUser,
+        smtpPassword: form.smtpPassword,
+        clearSmtpPassword: form.clearSmtpPassword,
         testEmail: form.testEmail,
-      };
-
-      if (form.smtpPassword.trim()) {
-        payload.smtpPassword = form.smtpPassword;
-      }
-
-      if (form.clearSmtpPassword === true) {
-        payload.clearSmtpPassword = true;
-      }
-
-      const response = await updateAdminMailSettings(payload);
-
-      setSettings(response.settings || null);
-      setMeta(response.meta || meta);
-      setForm(normalizeSettingsToForm(response.settings || {}));
-
-      setStatusType('success');
-      setStatusMessage(response.message || 'Configuración de correo guardada correctamente.');
-    } catch (error) {
-      setStatusType('error');
-      setStatusMessage(
-        getApiMessage(error, 'No se pudo guardar la configuración de correo.')
-      );
-    } finally {
-      setSaving(false);
-    }
+      },
+    };
   }
 
-  async function handleSendTest() {
+  async function save() {
+    if (!validateCurrentForm()) return;
     try {
-      setTesting(true);
-      setStatusMessage('');
-      setStatusType('info');
-
-      const response = await sendAdminMailTest({
-        testEmail: form.testEmail,
-      });
-
-      setSettings(response.settings || settings);
-
-      if (response.settings) {
-        setForm((prev) => ({
-          ...prev,
-          testEmail: response.settings.testEmail || prev.testEmail,
-        }));
-      }
-
-      setStatusType('success');
-      setStatusMessage(response.message || 'Correo de prueba enviado correctamente.');
+      setBusy('save');
+      const response = await updateAdminMailSettings(payload());
+      applyResponse(response);
+      setFeedback({ type: 'success', message: response.message || 'Configuración guardada.' });
+      if (!response.readiness?.tested) setActiveTab('verify');
     } catch (error) {
-      const nextSettings = error?.response?.data?.settings;
-
-      if (nextSettings) {
-        setSettings(nextSettings);
-      }
-
-      setStatusType('error');
-      setStatusMessage(
-        getApiMessage(error, 'No se pudo enviar el correo de prueba.')
-      );
+      const details = error?.response?.data?.details || [];
+      setFieldErrors(Object.fromEntries(details.map((item) => [item.field, item.message])));
+      setFeedback({ type: 'error', message: apiMessage(error, 'No se pudo guardar la configuración.') });
     } finally {
-      setTesting(false);
+      setBusy('');
     }
   }
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  async function testConnection() {
+    if (dirty) {
+      setFeedback({ type: 'warning', message: 'Guarda primero los cambios para probar exactamente esa configuración.' });
+      return;
+    }
+    try {
+      setBusy('test');
+      const response = await sendAdminMailTest({ testEmail: form.testEmail, revision });
+      applyResponse(response);
+      setFeedback({ type: 'success', message: response.message || 'La prueba fue enviada.' });
+    } catch (error) {
+      const responseSettings = error?.response?.data?.settings;
+      if (responseSettings) setSettings(responseSettings);
+      setFeedback({ type: 'error', message: apiMessage(error, 'No se pudo enviar la prueba.') });
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function toggleActivation() {
+    if (dirty) {
+      setFeedback({ type: 'warning', message: 'Guarda los cambios antes de activar el correo.' });
+      return;
+    }
+    try {
+      setBusy('activate');
+      const response = await updateAdminMailSettings(payload(!readiness.active));
+      applyResponse(response);
+      setFeedback({ type: 'success', message: response.message });
+    } catch (error) {
+      setFeedback({ type: 'error', message: apiMessage(error, 'No se pudo cambiar el estado del correo.') });
+    } finally {
+      setBusy('');
+    }
+  }
 
   if (loading) {
     return (
-      <div
-        className="rounded-[28px] border p-6 shadow-sm"
-        style={{
-          backgroundColor: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-glass-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
-        <div className="flex items-center gap-3 text-sm font-semibold">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Cargando configuración de correo...
-        </div>
+      <div className="mail-loading">
+        <Loader2 className="animate-spin" />
+        Cargando correo de la tienda…
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      <div
-        className="rounded-[28px] border p-5 shadow-sm md:p-6"
-        style={{
-          backgroundColor: 'var(--admin-card-bg)',
-          borderColor: 'var(--admin-glass-border)',
-          color: 'var(--admin-card-text)',
-        }}
-      >
-        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <section className="mail-center">
+      <header className="mail-hero">
+        <div className="mail-hero__identity">
+          <span className="mail-hero__icon"><Mail /></span>
           <div>
-            <div
-              className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-              style={{
-                backgroundColor: 'var(--admin-primary-soft-bg)',
-                borderColor: 'var(--admin-primary-soft-border)',
-                color: 'var(--admin-primary-soft-text)',
-              }}
-            >
-              <Mail className="h-4 w-4" />
-              Servidor de correo
-            </div>
-
-            <h3
-              className="mt-3 text-xl font-bold"
-              style={{ color: 'var(--admin-card-text)' }}
-            >
-              Configuración SMTP de producción
-            </h3>
-
-            <p
-              className="mt-2 max-w-3xl text-sm leading-6"
-              style={{ color: 'var(--admin-card-muted-text)' }}
-            >
-              Define el correo que usará la tienda para recuperación de contraseña,
-              confirmaciones, notificaciones y mensajes internos. La clave SMTP se
-              guarda cifrada y nunca se muestra en pantalla.
-            </p>
-          </div>
-
-          <div
-            className="rounded-2xl border px-4 py-3 text-sm"
-            style={{
-              backgroundColor: form.enabled
-                ? 'rgba(34,197,94,0.10)'
-                : 'rgba(245,158,11,0.10)',
-              borderColor: form.enabled
-                ? 'rgba(34,197,94,0.24)'
-                : 'rgba(245,158,11,0.28)',
-              color: form.enabled ? '#15803d' : '#b45309',
-            }}
-          >
-            <div className="flex items-center gap-2 font-semibold">
-              {form.enabled ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <AlertTriangle className="h-4 w-4" />
-              )}
-              {form.enabled ? 'Correo activo' : 'Correo desactivado'}
-            </div>
+            <span className="mail-eyebrow">COMUNICACIONES DE LA TIENDA</span>
+            <h1>Correo de {store.name || 'la tienda'}</h1>
+            <p>Configura una vez la cuenta que enviará comprobantes, avisos y recuperaciones.</p>
           </div>
         </div>
+        <div className={`mail-state mail-state--${status.tone}`}>
+          <b>{status.label}</b>
+          <span>{status.detail}</span>
+        </div>
+      </header>
 
-        {statusMessage ? (
-          <div className="mb-5">
-            <InfoBox type={statusType}>{statusMessage}</InfoBox>
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSave} className="space-y-6">
-          <div
-            className="rounded-[24px] border p-4"
-            style={{
-              borderColor: 'var(--admin-glass-border)',
-              backgroundColor: 'rgba(255,255,255,0.10)',
-            }}
+      <nav className="mail-tabs" aria-label="Configuración del correo">
+        {TABS.map(({ id, label, detail, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className="mail-tab"
+            data-active={activeTab === id}
+            onClick={() => setActiveTab(id)}
+            aria-label={`Abrir ${label}`}
           >
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h4 className="text-sm font-bold" style={{ color: 'var(--admin-card-text)' }}>
-                  Activar envío de correos
-                </h4>
-                <p
-                  className="mt-1 text-sm"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                >
-                  Si está desactivado, el sistema no enviará correos automáticos.
-                </p>
+            <Icon />
+            <span><b>{label}</b><small>{detail}</small></span>
+          </button>
+        ))}
+      </nav>
+
+      {feedback ? <Notice type={feedback.type}>{feedback.message}</Notice> : null}
+
+      <div className="mail-layout">
+        <main className="mail-panel">
+          {activeTab === 'identity' ? (
+            <div className="mail-section">
+              <div className="mail-section__title">
+                <div><span className="mail-step">01</span><h2>¿Quién envía los mensajes?</h2></div>
+                <p>El cliente verá el nombre actualizado de la tienda.</p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => updateField('enabled', !form.enabled)}
-                className="rounded-2xl border px-5 py-3 text-sm font-semibold transition hover:scale-[1.01] active:scale-[0.99]"
-                style={{
-                  backgroundColor: form.enabled
-                    ? 'var(--admin-primary)'
-                    : 'rgba(255,255,255,0.20)',
-                  borderColor: form.enabled
-                    ? 'var(--admin-primary)'
-                    : 'var(--admin-glass-border)',
-                  color: form.enabled ? '#fff' : 'var(--admin-card-text)',
-                }}
-              >
-                {form.enabled ? 'Activo' : 'Desactivado'}
-              </button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <FieldLabel required>Proveedor</FieldLabel>
-              <SelectInput value={form.provider} onChange={handleProviderChange}>
-                {providers.map((provider) => (
-                  <option key={provider.value} value={provider.value}>
-                    {provider.label}
-                  </option>
-                ))}
-              </SelectInput>
-              {selectedProvider?.description ? (
-                <p
-                  className="mt-2 text-xs leading-5"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                >
-                  {selectedProvider.description}
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <FieldLabel required>Nombre del remitente</FieldLabel>
-              <TextInput
-                value={form.fromName}
-                onChange={(value) => updateField('fromName', value)}
-                placeholder="Rosa Boutique"
-              />
-            </div>
-
-            <div>
-              <FieldLabel required>Correo remitente</FieldLabel>
-              <TextInput
-                value={form.fromEmail}
-                onChange={(value) => updateField('fromEmail', value)}
-                placeholder="ventas@tutienda.com"
-              />
-            </div>
-
-            <div>
-              <FieldLabel>Correo de respuesta</FieldLabel>
-              <TextInput
-                value={form.replyToEmail}
-                onChange={(value) => updateField('replyToEmail', value)}
-                placeholder="soporte@tutienda.com"
-              />
-            </div>
-          </div>
-
-          <div
-            className="rounded-[24px] border p-4"
-            style={{
-              borderColor: 'var(--admin-glass-border)',
-              backgroundColor: 'rgba(255,255,255,0.10)',
-            }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <Server className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} />
-              <h4 className="text-sm font-bold" style={{ color: 'var(--admin-card-text)' }}>
-                Datos SMTP
-              </h4>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <FieldLabel required>Servidor SMTP</FieldLabel>
-                <TextInput
-                  value={form.smtpHost}
-                  onChange={(value) => updateField('smtpHost', value)}
-                  placeholder="smtp.gmail.com"
-                  disabled={form.provider !== 'smtp'}
-                />
+              <div className="mail-store-source">
+                <Store />
+                <div><span>Nombre tomado de Configuración → Tienda</span><b>{store.name || 'Nombre pendiente'}</b></div>
+                <CheckCircle2 />
               </div>
 
-              <div>
-                <FieldLabel required>Puerto</FieldLabel>
-                <TextInput
-                  type="number"
-                  value={form.smtpPort}
-                  onChange={(value) => updateField('smtpPort', value)}
-                  placeholder="465"
-                  disabled={form.provider !== 'smtp'}
-                />
-              </div>
-
-              <div>
-                <FieldLabel required>Seguridad</FieldLabel>
-                <SelectInput
-                  value={form.smtpSecurity}
-                  onChange={(value) => updateField('smtpSecurity', value)}
-                  disabled={form.provider !== 'smtp'}
-                >
-                  {securityTypes.map((security) => (
-                    <option key={security.value} value={security.value}>
-                      {security.label}
-                    </option>
-                  ))}
-                </SelectInput>
-              </div>
-
-              <div>
-                <FieldLabel required>Usuario SMTP</FieldLabel>
-                <TextInput
-                  value={form.smtpUser}
-                  onChange={(value) => updateField('smtpUser', value)}
-                  placeholder="ventas@tutienda.com"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-[24px] border p-4"
-            style={{
-              borderColor: 'var(--admin-glass-border)',
-              backgroundColor: 'rgba(255,255,255,0.10)',
-            }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <KeyRound className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} />
-              <h4 className="text-sm font-bold" style={{ color: 'var(--admin-card-text)' }}>
-                Clave SMTP
-              </h4>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <FieldLabel>
-                  {hasPasswordConfigured ? 'Cambiar clave SMTP' : 'Clave SMTP'}
-                </FieldLabel>
-                <TextInput
-                  type="password"
-                  value={form.smtpPassword}
-                  onChange={(value) => updateField('smtpPassword', value)}
-                  placeholder={
-                    hasPasswordConfigured
-                      ? 'Dejar vacío para conservar la clave actual'
-                      : 'Contraseña de aplicación o clave SMTP'
-                  }
-                  autoComplete="new-password"
-                />
-
-                <p
-                  className="mt-2 text-xs leading-5"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                >
-                  {hasPasswordConfigured
-                    ? 'Ya existe una clave configurada. No se muestra por seguridad.'
-                    : 'Debes configurar una clave para enviar correos.'}
-                </p>
-              </div>
-
-              <div>
-                <FieldLabel>Estado de la clave</FieldLabel>
-
-                <div
-                  className="rounded-2xl border px-4 py-3 text-sm"
-                  style={{
-                    backgroundColor: hasPasswordConfigured
-                      ? 'rgba(34,197,94,0.10)'
-                      : 'rgba(245,158,11,0.10)',
-                    borderColor: hasPasswordConfigured
-                      ? 'rgba(34,197,94,0.24)'
-                      : 'rgba(245,158,11,0.28)',
-                    color: hasPasswordConfigured ? '#15803d' : '#b45309',
-                  }}
-                >
-                  <div className="flex items-center gap-2 font-semibold">
-                    {hasPasswordConfigured ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4" />
-                    )}
-                    {hasPasswordConfigured
-                      ? 'Clave configurada y protegida'
-                      : 'Clave no configurada'}
-                  </div>
+              <div className="mail-grid">
+                <Field label="Proveedor de correo" required>
+                  <select value={form.provider} onChange={(event) => chooseProvider(event.target.value)}>
+                    {providers.map((provider) => (
+                      <option key={provider.value} value={provider.value}>{provider.label}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="mail-provider-note">
+                  <Server /><span><b>{selectedProvider?.label}</b>{selectedProvider?.description}</span>
                 </div>
+                <Field label="Correo remitente" required error={fieldErrors.fromEmail} hint="Dirección que verá el cliente.">
+                  <input
+                    type="email"
+                    value={form.fromEmail}
+                    onChange={(event) => updateField('fromEmail', event.target.value)}
+                    placeholder="ventas@mitienda.com"
+                  />
+                </Field>
+                <Field label="Respuestas de clientes" error={fieldErrors.replyToEmail} hint="Opcional. Puede ser el correo de soporte.">
+                  <input
+                    type="email"
+                    value={form.replyToEmail}
+                    onChange={(event) => updateField('replyToEmail', event.target.value)}
+                    placeholder="soporte@mitienda.com"
+                  />
+                </Field>
+              </div>
+            </div>
+          ) : null}
 
-                {hasPasswordConfigured ? (
-                  <label
-                    className="mt-3 flex cursor-pointer items-center gap-2 text-sm"
-                    style={{ color: 'var(--admin-card-muted-text)' }}
-                  >
+          {activeTab === 'access' ? (
+            <div className="mail-section">
+              <div className="mail-section__title">
+                <div><span className="mail-step">02</span><h2>Acceso a la cuenta</h2></div>
+                <p>La clave se guarda protegida y nunca vuelve a mostrarse.</p>
+              </div>
+
+              <div className="mail-grid">
+                <Field label="Usuario de correo" required error={fieldErrors.smtpUser} hint="Generalmente es la dirección completa.">
+                  <input
+                    value={form.smtpUser}
+                    onChange={(event) => updateField('smtpUser', event.target.value)}
+                    placeholder="ventas@mitienda.com"
+                    autoComplete="username"
+                  />
+                </Field>
+                <Field
+                  label={hasPassword ? 'Cambiar clave' : 'Clave de acceso'}
+                  required={!hasPassword}
+                  error={fieldErrors.smtpPassword}
+                  hint={hasPassword ? 'Déjala vacía para conservar la clave guardada.' : 'En Gmail usa una contraseña de aplicación.'}
+                >
+                  <span className="mail-password">
                     <input
-                      type="checkbox"
-                      checked={form.clearSmtpPassword}
-                      onChange={(event) =>
-                        updateField('clearSmtpPassword', event.target.checked)
-                      }
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.smtpPassword}
+                      onChange={(event) => updateField('smtpPassword', event.target.value)}
+                      placeholder={hasPassword ? '•••••••• configurada' : 'Escribe la clave'}
+                      autoComplete="new-password"
+                      disabled={form.clearSmtpPassword}
                     />
-                    Eliminar clave SMTP guardada
-                  </label>
+                    <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar clave' : 'Mostrar clave'}>
+                      {showPassword ? <EyeOff /> : <Eye />}
+                    </button>
+                  </span>
+                </Field>
+              </div>
+
+              <div className={`mail-credential-state ${hasPassword ? 'is-ready' : ''}`}>
+                {hasPassword ? <CheckCircle2 /> : <AlertCircle />}
+                <span><b>{hasPassword ? 'Clave protegida' : 'Falta la clave'}</b>{hasPassword ? 'No necesitas escribirla nuevamente.' : 'Guárdala para poder enviar la prueba.'}</span>
+                {hasPassword ? (
+                  <label><input type="checkbox" checked={form.clearSmtpPassword} onChange={(event) => setForm((current) => ({ ...current, clearSmtpPassword: event.target.checked, smtpPassword: '' }))} /> Eliminar clave guardada</label>
                 ) : null}
               </div>
-            </div>
-          </div>
 
-          <div
-            className="rounded-[24px] border p-4"
-            style={{
-              borderColor: 'var(--admin-glass-border)',
-              backgroundColor: 'rgba(255,255,255,0.10)',
-            }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <Send className="h-5 w-5" style={{ color: 'var(--admin-primary)' }} />
-              <h4 className="text-sm font-bold" style={{ color: 'var(--admin-card-text)' }}>
-                Prueba de envío
-              </h4>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-              <div>
-                <FieldLabel>Correo de prueba</FieldLabel>
-                <TextInput
-                  value={form.testEmail}
-                  onChange={(value) => updateField('testEmail', value)}
-                  placeholder="admin@tutienda.com"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSendTest}
-                disabled={testing || saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-semibold transition hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.18)',
-                  borderColor: 'var(--admin-glass-border)',
-                  color: 'var(--admin-card-text)',
-                }}
-              >
-                {testing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Enviar prueba
-              </button>
-            </div>
-
-            {settings?.lastTestStatus && settings.lastTestStatus !== 'none' ? (
-              <div className="mt-4">
-                <InfoBox type={settings.lastTestStatus === 'success' ? 'success' : 'error'}>
-                  <strong>Última prueba:</strong>{' '}
-                  {settings.lastTestMessage || 'Sin mensaje registrado.'}
-                </InfoBox>
-              </div>
-            ) : null}
-          </div>
-
-          <InfoBox type="warning">
-            Para Gmail debes usar una contraseña de aplicación, no la contraseña normal
-            de la cuenta. Para Hostinger, GoDaddy, cPanel u otro proveedor, usa la
-            configuración SMTP que entregue el proveedor del dominio.
-          </InfoBox>
-
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-            <button
-              type="button"
-              onClick={loadSettings}
-              disabled={saving || testing}
-              className="rounded-2xl border px-5 py-3 text-sm font-semibold transition hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.18)',
-                borderColor: 'var(--admin-glass-border)',
-                color: 'var(--admin-card-text)',
-              }}
-            >
-              Recargar
-            </button>
-
-            <button
-              type="submit"
-              disabled={saving || testing}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                backgroundColor: 'var(--admin-primary)',
-                borderColor: 'var(--admin-primary)',
-              }}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {form.provider === 'smtp' ? (
+                <details className="mail-advanced" open>
+                  <summary>Datos del servidor</summary>
+                  <div className="mail-grid mail-grid--three">
+                    <Field label="Servidor" required error={fieldErrors.smtpHost}>
+                      <input value={form.smtpHost} onChange={(event) => updateField('smtpHost', event.target.value)} placeholder="smtp.proveedor.com" />
+                    </Field>
+                    <Field label="Puerto" required error={fieldErrors.smtpPort}>
+                      <input type="number" value={form.smtpPort} onChange={(event) => updateField('smtpPort', event.target.value)} />
+                    </Field>
+                    <Field label="Seguridad" required>
+                      <select value={form.smtpSecurity} onChange={(event) => updateField('smtpSecurity', event.target.value)}>
+                        {securityTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                </details>
               ) : (
-                <Save className="h-4 w-4" />
+                <div className="mail-server-summary">
+                  <Server /><span><b>Servidor configurado automáticamente</b>{form.smtpHost} · puerto {form.smtpPort}</span>
+                </div>
               )}
-              Guardar configuración
+            </div>
+          ) : null}
+
+          {activeTab === 'verify' ? (
+            <div className="mail-section">
+              <div className="mail-section__title">
+                <div><span className="mail-step">03</span><h2>Comprueba antes de activar</h2></div>
+                <p>Recibe un mensaje real en la dirección que elijas.</p>
+              </div>
+
+              <div className="mail-test-box">
+                <div className="mail-test-box__copy">
+                  <span className="mail-test-box__icon"><Send /></span>
+                  <div><b>Enviar correo de prueba</b><span>No activa avisos automáticos todavía.</span></div>
+                </div>
+                <Field label="Recibir la prueba en" error={fieldErrors.testEmail}>
+                  <input type="email" value={form.testEmail} onChange={(event) => updateField('testEmail', event.target.value)} placeholder="admin@mitienda.com" />
+                </Field>
+                <button type="button" className="mail-button mail-button--primary" onClick={testConnection} disabled={Boolean(busy) || !readiness.canTest || dirty}>
+                  {busy === 'test' ? <Loader2 className="animate-spin" /> : <Send />}
+                  Enviar prueba
+                </button>
+              </div>
+
+              {dirty ? <Notice type="warning">Hay cambios sin guardar. Guárdalos antes de enviar la prueba.</Notice> : null}
+              {!feedback && settings.lastTestStatus === 'success' && readiness.tested ? (
+                <Notice type="success">{settings.lastTestMessage || 'La conexión fue comprobada correctamente.'}</Notice>
+              ) : null}
+              {!feedback && settings.lastTestStatus === 'error' ? (
+                <Notice type="error">No se pudo entregar la última prueba. Revisa el acceso de la cuenta.</Notice>
+              ) : null}
+
+              <div className={`mail-activation ${readiness.tested ? 'is-ready' : ''}`}>
+                <div><ShieldCheck /><span><b>Correos automáticos</b><small>{readiness.active ? 'Activos para comprobantes, avisos y recuperaciones.' : readiness.tested ? 'La conexión está comprobada y se puede activar.' : 'Se habilitan después de recibir la prueba.'}</small></span></div>
+                <button type="button" onClick={toggleActivation} disabled={Boolean(busy) || (!readiness.tested && !readiness.active)}>
+                  {busy === 'activate' ? <Loader2 className="animate-spin" /> : null}
+                  {readiness.active ? 'Desactivar' : 'Activar correos'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </main>
+
+        <aside className="mail-summary">
+          <div className="mail-summary__top">
+            <div><span>ESTADO GENERAL</span><b>{progress}%</b></div>
+            <div className="mail-progress"><span style={{ width: `${progress}%` }} /></div>
+          </div>
+          <div className="mail-checks">
+            {(readiness.checks || []).map((check) => (
+              <div key={check.key} data-ready={check.ready}>
+                <span>{check.ready ? <Check /> : '—'}</span>{check.label}
+              </div>
+            ))}
+          </div>
+          <div className="mail-summary__identity">
+            <span>Remitente visible</span>
+            <b>{store.name || 'Tienda'}</b>
+            <small>{form.fromEmail || 'Correo pendiente'}</small>
+          </div>
+          <div className="mail-summary__actions">
+            <button type="button" className="mail-button" onClick={() => applyResponse({ settings, store, readiness, meta, revision })} disabled={!dirty || Boolean(busy)}>
+              <RefreshCw /> Descartar
+            </button>
+            <button type="button" className="mail-button mail-button--primary" onClick={save} disabled={!dirty || Boolean(busy)}>
+              {busy === 'save' ? <Loader2 className="animate-spin" /> : <Save />}
+              Guardar
             </button>
           </div>
-        </form>
+          <small className="mail-version">Versión {revision}</small>
+        </aside>
       </div>
-    </div>
+    </section>
   );
 }
