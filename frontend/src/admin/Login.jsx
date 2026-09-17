@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import galleryImmersiveDefault from "../assets/login/gallery-immersive-default.webp";
+import liquidGlassDefault from "../assets/login/liquid-glass-default.webp";
+import smokeGlassDefault from "../assets/login/smoke-glass-default.webp";
 import {
   Lock,
   User,
@@ -169,7 +171,7 @@ function StoreIdentity({ theme, storeName, storeLogo, compact = false }) {
 function CuratedStoreBrand({ storeName, storeLogo, className = "" }) {
   const initial = String(storeName || "T").trim().charAt(0).toUpperCase() || "T";
   return (
-    <div className={`rb-curated-brand ${storeLogo ? "has-image" : "has-initial"} ${className}`.trim()}>
+    <div className={`rb-curated-brand ${storeLogo ? "has-image" : "has-initial"} ${className}`.trim()} aria-label={storeName}>
       <span className="rb-curated-brand__logo">
         {storeLogo ? (
           <img src={storeLogo} alt={`Logo de ${storeName}`} />
@@ -177,7 +179,6 @@ function CuratedStoreBrand({ storeName, storeLogo, className = "" }) {
           <b aria-label={`Inicial de ${storeName}`}>{initial}</b>
         )}
       </span>
-      <strong>{storeName}</strong>
     </div>
   );
 }
@@ -1120,7 +1121,9 @@ export default function Login() {
     || DEFAULT_LOGIN_SETTINGS.customizations[activeTheme.id]
     || DEFAULT_LOGIN_SETTINGS.customizations.liquidGlass;
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
+  const liquidBackground = hasCustomImageBg ? loginBg.image : liquidGlassDefault;
   const galleryBackground = hasCustomImageBg ? loginBg.image : galleryImmersiveDefault;
+  const smokeBackground = hasCustomImageBg ? loginBg.image : smokeGlassDefault;
 
   const loginPageBackground =
     loginBg.mode === "color" ? loginBg.color : activeTheme.pageBg;
@@ -1419,7 +1422,9 @@ export default function Login() {
   </div>;
 
   const renderLiquidGlass = () => <section className="rb-liquid-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-liquid-blob one" /><div className="rb-liquid-blob two" />
+    <div className="rb-liquid-media" style={{ backgroundImage: `url("${liquidBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
+    <div className="rb-liquid-overlay" style={{ "--liquid-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.06 }} />
+    <div className="rb-liquid-depth" aria-hidden="true"><i /><i /><i /></div>
     <div className="rb-liquid-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-liquid-copy" /></div>
     <div className="rb-liquid-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
   </section>;
@@ -1441,7 +1446,9 @@ export default function Login() {
   </section>;
 
   const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-smoke-halo" aria-hidden="true" /><div className="rb-smoke-wave" aria-hidden="true" />
+    <div className="rb-smoke-media" style={{ backgroundImage: `url("${smokeBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
+    <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.2 }} />
+    <div className="rb-smoke-depth" aria-hidden="true"><i /><i /><i /></div>
     <div className="rb-smoke-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-smoke-copy" /></div>
     <div className="rb-smoke-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" /></div>
   </section>;
