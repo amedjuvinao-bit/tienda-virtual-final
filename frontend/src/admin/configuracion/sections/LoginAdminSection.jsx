@@ -146,7 +146,6 @@ function LoginPreview({ settings, store }) {
             </div>
           </div>
           <div className="login-settings-curated-access">
-            {theme.id !== 'immersiveGallery' ? <StoreLogo store={store} className="access" /> : null}
             <strong>{customization.welcomeTitle}</strong>
             <small>{customization.welcomeSubtitle}</small>
             <i /><i />

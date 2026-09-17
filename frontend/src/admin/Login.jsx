@@ -169,7 +169,7 @@ function StoreIdentity({ theme, storeName, storeLogo, compact = false }) {
 function CuratedStoreBrand({ storeName, storeLogo, className = "" }) {
   const initial = String(storeName || "T").trim().charAt(0).toUpperCase() || "T";
   return (
-    <div className={`rb-curated-brand ${className}`.trim()}>
+    <div className={`rb-curated-brand ${storeLogo ? "has-image" : "has-initial"} ${className}`.trim()}>
       <span className="rb-curated-brand__logo">
         {storeLogo ? (
           <img src={storeLogo} alt={`Logo de ${storeName}`} />
@@ -1421,7 +1421,7 @@ export default function Login() {
   const renderLiquidGlass = () => <section className="rb-liquid-stage" aria-label={`Acceso administrativo de ${storeName}`}>
     <div className="rb-liquid-blob one" /><div className="rb-liquid-blob two" />
     <div className="rb-liquid-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-liquid-copy" /></div>
-    <div className="rb-liquid-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
+    <div className="rb-liquid-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-liquid" /></div>
   </section>;
 
   const renderImmersiveGallery = () => <section className="rb-gallery-stage" aria-label={`Acceso administrativo de ${storeName}`}>
@@ -1443,7 +1443,7 @@ export default function Login() {
   const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>
     <div className="rb-smoke-halo" aria-hidden="true" /><div className="rb-smoke-wave" aria-hidden="true" />
     <div className="rb-smoke-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-smoke-copy" /></div>
-    <div className="rb-smoke-access"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} className="compact" /><CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" /></div>
+    <div className="rb-smoke-access"><CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" /></div>
   </section>;
 
   const renderLayout = () => {
