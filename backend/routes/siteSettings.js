@@ -138,10 +138,10 @@ function buildDefaultSettings() {
       layout: "centeredCard",
       background: {
         mode: "theme",
-        color: "",
+        color: "#fff7fb",
         image: "",
-        imageOpacity: 1,
-        overlay: 0,
+        imageOpacity: 0.35,
+        overlay: 0.35,
       },
     },
 
@@ -304,10 +304,10 @@ async function ensureAdminAppearanceExists() {
       layout: "centeredCard",
       background: {
         mode: "theme",
-        color: "",
+        color: "#fff7fb",
         image: "",
-        imageOpacity: 1,
-        overlay: 0,
+        imageOpacity: 0.35,
+        overlay: 0.35,
       },
     };
   }
@@ -446,13 +446,15 @@ router.get("/", async (_req, res, next) => {
 
 /**
  * PUT /api/site-settings
- * Guarda cambios globales de theme, menus, admin, loginAdmin y/o billing.
+ * Guarda cambios globales de theme, menus, admin y/o billing.
  * Tienda se actualiza exclusivamente mediante /api/admin/store-settings.
- * body: { theme?, menus?, admin?, loginAdmin?, billing? }
+ * Login administrativo se actualiza exclusivamente mediante
+ * /api/admin/login-settings para conservar su revisión.
+ * body: { theme?, menus?, admin?, billing? }
  */
 router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, res, next) => {
   try {
-    const { theme, menus, admin, loginAdmin, billing } = req.body || {};
+    const { theme, menus, admin, billing } = req.body || {};
     const unsupportedKeys = getUnsupportedSiteSettingsKeys(req.body);
 
     if (unsupportedKeys.length) {
@@ -477,6 +479,14 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
         ok: false,
         error: "STORE_DEDICATED_ENDPOINT_REQUIRED",
         message: "Los datos de Tienda deben guardarse desde su módulo protegido.",
+      });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "loginAdmin")) {
+      return res.status(409).json({
+        ok: false,
+        error: "LOGIN_SETTINGS_DEDICATED_ENDPOINT_REQUIRED",
+        message: "El diseño del Login administrativo debe guardarse desde su módulo protegido.",
       });
     }
 
@@ -511,9 +521,6 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
     }
-    if (isInvalidSettingsSection(loginAdmin)) {
-      return res.status(400).json({ error: "loginAdmin debe ser un objeto" });
-    }
     if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });
     }
@@ -539,11 +546,6 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     if (admin) {
       const flatAdmin = flattenForSet(admin, "admin");
       Object.assign($set, flatAdmin);
-    }
-
-    if (loginAdmin) {
-      const flatLoginAdmin = flattenForSet(loginAdmin, "loginAdmin");
-      Object.assign($set, flatLoginAdmin);
     }
 
     if (menus) {

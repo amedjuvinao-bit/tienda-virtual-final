@@ -60,8 +60,10 @@ jobs:
           npm --prefix backend run test:shipping-settings
           npm --prefix backend run test:order-shipping-composition
 
-      - name: Validar configuracion de correo
-        run: npm --prefix backend run test:configuration-level-plus-stage4
+      - name: Validar configuracion de correo y login administrativo
+        run: |
+          npm --prefix backend run test:configuration-level-plus-stage4
+          npm --prefix backend run test:configuration-level-plus-stage5
 
       - name: Validar interfaz de Configuracion
         run: |
@@ -70,6 +72,7 @@ jobs:
           npm --prefix frontend run test:configuration-level-plus-stage2
           npm --prefix frontend run test:configuration-level-plus-stage3
           npm --prefix frontend run test:configuration-level-plus-stage4
+          npm --prefix frontend run test:configuration-level-plus-stage5
 
       - name: Compilar frontend
         run: npm --prefix frontend run build

@@ -364,10 +364,10 @@ const LoginAdminAppearanceSchema = new Schema(
         enum: ["theme", "color", "image"],
         default: "theme",
       },
-      color: { type: String, default: "" },
+      color: { type: String, default: "#fff7fb" },
       image: { type: String, default: "" },
-      imageOpacity: { type: Number, default: 1 },
-      overlay: { type: Number, default: 0 },
+      imageOpacity: { type: Number, default: 0.35 },
+      overlay: { type: Number, default: 0.35 },
     },
   },
   { _id: false, strict: false }
@@ -561,6 +561,7 @@ const SiteSettingsSchema = new Schema(
       type: LoginAdminAppearanceSchema,
       default: () => ({}),
     },
+    loginAdminRevision: { type: Number, min: 0, default: 0 },
 
     billing: {
       type: BillingSettingsSchema,

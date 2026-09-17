@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { setAdminToken } from "../lib/api";
+import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import {
@@ -21,15 +22,10 @@ import {
   DEFAULT_LOGIN_THEME_ID,
   DEFAULT_LOGIN_LAYOUT_ID,
 } from "./login/loginThemes";
-
-const LOGIN_THEME_STORAGE_KEY = "admin_login_theme_id";
-const LOGIN_LAYOUT_STORAGE_KEY = "admin_login_layout_id";
-
-const LOGIN_BG_MODE_KEY = "admin_login_bg_mode";
-const LOGIN_BG_COLOR_KEY = "admin_login_bg_color";
-const LOGIN_BG_IMAGE_KEY = "admin_login_bg_image";
-const LOGIN_BG_IMAGE_OPACITY_KEY = "admin_login_bg_image_opacity";
-const LOGIN_BG_OVERLAY_KEY = "admin_login_bg_overlay";
+import {
+  DEFAULT_LOGIN_SETTINGS,
+  normalizeLoginSettings,
+} from "./login/loginSettings";
 
 const LOGIN_FAILED_ATTEMPTS_KEY = "admin_login_failed_attempts";
 const LOGIN_LOCK_UNTIL_KEY = "admin_login_lock_until";
@@ -38,44 +34,6 @@ const LOGIN_REMEMBER_USERNAME_KEY = "admin_login_remember_username";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 2 * 60 * 1000;
-
-function getSavedLoginThemeId() {
-  try {
-    const saved = localStorage.getItem(LOGIN_THEME_STORAGE_KEY);
-    if (saved && LOGIN_THEMES[saved]) return saved;
-  } catch {}
-  return DEFAULT_LOGIN_THEME_ID;
-}
-
-function getSavedLoginLayoutId() {
-  try {
-    const saved = localStorage.getItem(LOGIN_LAYOUT_STORAGE_KEY);
-    if (saved && LOGIN_LAYOUTS[saved]) return saved;
-  } catch {}
-  return DEFAULT_LOGIN_LAYOUT_ID;
-}
-
-function getStoredLoginBg() {
-  try {
-    return {
-      mode: localStorage.getItem(LOGIN_BG_MODE_KEY) || "theme",
-      color: localStorage.getItem(LOGIN_BG_COLOR_KEY) || "#fff7fb",
-      image: localStorage.getItem(LOGIN_BG_IMAGE_KEY) || "",
-      imageOpacity: Number(
-        localStorage.getItem(LOGIN_BG_IMAGE_OPACITY_KEY) || 0.35
-      ),
-      overlay: Number(localStorage.getItem(LOGIN_BG_OVERLAY_KEY) || 0.35),
-    };
-  } catch {
-    return {
-      mode: "theme",
-      color: "#fff7fb",
-      image: "",
-      imageOpacity: 0.35,
-      overlay: 0.35,
-    };
-  }
-}
 
 function getFailedAttempts() {
   try {
@@ -501,6 +459,7 @@ function CircleLoginForm({
   setRememberMe,
   handleSubmit,
   onForgotPassword,
+  subtitle = "Panel administrativo privado",
 }) {
   const dark = isDarkTheme(theme);
 
@@ -518,7 +477,7 @@ function CircleLoginForm({
         </h2>
 
         <p className="mt-2 text-xs" style={{ color: theme.mutedColor }}>
-          Panel administrativo privado
+          {subtitle}
         </p>
       </div>
 
@@ -625,12 +584,13 @@ export default function Login() {
   const [username, setUsername] = useState(rememberedLogin.username);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [activeThemeId, setActiveThemeId] = useState(getSavedLoginThemeId);
-  const [activeLayoutId, setActiveLayoutId] = useState(getSavedLoginLayoutId);
+  const [activeThemeId, setActiveThemeId] = useState(DEFAULT_LOGIN_THEME_ID);
+  const [activeLayoutId, setActiveLayoutId] = useState(DEFAULT_LOGIN_LAYOUT_ID);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lockRemaining, setLockRemaining] = useState(0);
   const [rememberMe, setRememberMe] = useState(rememberedLogin.remember);
-  const [loginBg, setLoginBg] = useState(getStoredLoginBg);
+  const [loginBg, setLoginBg] = useState(DEFAULT_LOGIN_SETTINGS.background);
+  const [storeName, setStoreName] = useState('tu tienda');
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
   const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
@@ -647,18 +607,36 @@ export default function Login() {
   }, [activeLayoutId]);
 
   useEffect(() => {
-    const syncLoginConfig = () => {
-      setActiveThemeId(getSavedLoginThemeId());
-      setActiveLayoutId(getSavedLoginLayoutId());
-      setLoginBg(getStoredLoginBg());
+    let active = true;
+
+    const applySettings = (settings, identity = {}) => {
+      const normalized = normalizeLoginSettings(settings);
+      setActiveThemeId(normalized.theme);
+      setActiveLayoutId(normalized.layout);
+      setLoginBg(normalized.background);
+      if (identity?.name) setStoreName(String(identity.name).trim());
     };
 
-    window.addEventListener("storage", syncLoginConfig);
-    window.addEventListener("admin-login-theme-updated", syncLoginConfig);
+    const loadSettings = async () => {
+      try {
+        const response = await fetchSiteSettings();
+        if (active) applySettings(response?.loginAdmin, response?.store);
+      } catch {
+        // El acceso continúa disponible con el diseño seguro predeterminado.
+      }
+    };
+
+    const syncLoginConfig = (event) => {
+      if (event?.detail) applySettings(event.detail);
+      else loadSettings();
+    };
+
+    loadSettings();
+    window.addEventListener("admin-login-settings-updated", syncLoginConfig);
 
     return () => {
-      window.removeEventListener("storage", syncLoginConfig);
-      window.removeEventListener("admin-login-theme-updated", syncLoginConfig);
+      active = false;
+      window.removeEventListener("admin-login-settings-updated", syncLoginConfig);
     };
   }, []);
 
@@ -826,6 +804,7 @@ export default function Login() {
     setRememberMe,
     handleSubmit,
     onForgotPassword: handleForgotPassword,
+    subtitle: `Accede al panel de ${storeName}`,
   };
 
   const cardStyle = {
@@ -930,7 +909,7 @@ export default function Login() {
             className="max-w-md text-5xl font-black leading-tight tracking-tight"
             style={{ color: activeTheme.titleColor }}
           >
-            Administra tu tienda con seguridad y estilo
+            Administra {storeName} con seguridad y estilo
           </h2>
 
           <p

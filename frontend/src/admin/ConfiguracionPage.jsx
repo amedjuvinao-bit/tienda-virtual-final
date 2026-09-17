@@ -132,7 +132,7 @@ export default function ConfiguracionPage() {
   };
 
   const ActiveIcon = activeTabData.icon || Settings2;
-  const compactOperationalView = ['envios', 'correo'].includes(activeTab);
+  const compactOperationalView = ['envios', 'correo', 'login-admin'].includes(activeTab);
 
   return (
     <div className="mx-auto max-w-7xl p-3 md:p-5">

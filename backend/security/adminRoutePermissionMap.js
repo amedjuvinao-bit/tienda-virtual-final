@@ -1327,6 +1327,19 @@ const ADMIN_ROUTE_PERMISSION_RULES = [
     dynamic: true,
     resolvePermissions: (req) => resolveSiteSettingsWritePermissions(req?.body),
   },
+  {
+    method: 'GET',
+    path: '/api/admin/login-settings',
+    permission: 'settings:login',
+    description: 'Consultar el diseño persistente del acceso administrativo.',
+  },
+  {
+    method: 'PUT',
+    path: '/api/admin/login-settings',
+    permission: 'settings:login',
+    description: 'Actualizar el diseño persistente del acceso administrativo.',
+    audit: true,
+  },
   /* =========================================================
    * CORREO ADMINISTRATIVO
    * ======================================================= */
