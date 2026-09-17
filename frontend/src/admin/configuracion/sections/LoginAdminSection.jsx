@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import galleryImmersiveDefault from '../../../assets/login/gallery-immersive-default.webp';
 import liquidGlassDefault from '../../../assets/login/liquid-glass-default.webp';
-import smokeGlassDefault from '../../../assets/login/smoke-glass-default.webp';
 import {
   Check,
   ExternalLink,
@@ -96,10 +95,11 @@ function LoginPreview({ settings, store }) {
   const defaultThemeImages = {
     liquidGlass: liquidGlassDefault,
     immersiveGallery: galleryImmersiveDefault,
-    smokeGlass: smokeGlassDefault,
+    smokeGlass: '',
   };
   const resolvedPreviewImage = imageMode ? previewImage : defaultThemeImages[theme.id] || '';
-  const defaultOverlay = theme.id === 'liquidGlass' ? 0.05 : theme.id === 'smokeGlass' ? 0.22 : 0.18;
+  const lightTheme = theme.id === 'liquidGlass' || theme.id === 'smokeGlass';
+  const defaultOverlay = theme.id === 'liquidGlass' ? 0.05 : theme.id === 'smokeGlass' ? 0.08 : 0.18;
   const pageBackground = background.mode === 'color' ? background.color : theme.pageBg;
 
   return (
@@ -133,7 +133,7 @@ function LoginPreview({ settings, store }) {
             />
             <div
               className="login-settings-preview-overlay"
-              style={{ background: `${theme.id === 'liquidGlass' ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})` }}
+              style={{ background: `${lightTheme ? 'rgba(255,255,255' : 'rgba(0,0,0'},${imageMode ? background.overlay : defaultOverlay})` }}
             />
           </>
         ) : null}
@@ -151,6 +151,7 @@ function LoginPreview({ settings, store }) {
             </div>
           </div>
           <div className="login-settings-curated-access">
+            {theme.id === 'smokeGlass' ? <StoreLogo store={store} className="access" /> : null}
             <span className="login-settings-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
             <em className="login-settings-editorial-kicker">ACCESO</em>
             <strong>{customization.welcomeTitle}</strong>

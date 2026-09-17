@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import galleryImmersiveDefault from "../assets/login/gallery-immersive-default.webp";
 import liquidGlassDefault from "../assets/login/liquid-glass-default.webp";
-import smokeGlassDefault from "../assets/login/smoke-glass-default.webp";
 import {
   Lock,
   User,
@@ -1131,7 +1130,7 @@ export default function Login() {
   const hasCustomImageBg = loginBg.mode === "image" && Boolean(loginBg.image);
   const liquidBackground = hasCustomImageBg ? loginBg.image : liquidGlassDefault;
   const galleryBackground = hasCustomImageBg ? loginBg.image : galleryImmersiveDefault;
-  const smokeBackground = hasCustomImageBg ? loginBg.image : smokeGlassDefault;
+  const smokeBackground = hasCustomImageBg ? loginBg.image : "";
 
   const loginPageBackground =
     loginBg.mode === "color" ? loginBg.color : activeTheme.pageBg;
@@ -1458,11 +1457,11 @@ export default function Login() {
   </section>;
 
   const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>
-    <div className="rb-smoke-media" style={{ backgroundImage: `url("${smokeBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
-    <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.2 }} />
+    <div className="rb-smoke-media" style={{ backgroundImage: smokeBackground ? `url("${smokeBackground}")` : "none", opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
+    <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.08 }} />
     <div className="rb-smoke-depth" aria-hidden="true"><i /><i /><i /></div>
-    <div className="rb-smoke-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-smoke-copy" /></div>
     <div className="rb-smoke-access rb-editorial-access">
+      <CuratedStoreBrand className="rb-panel-brand" storeName={storeName} storeLogo={storeLogo} />
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>
       <span className="rb-editorial-kicker">ACCESO</span>
       <CuratedCredentialsForm {...curatedFormProps} inputId="rb-smoke" />

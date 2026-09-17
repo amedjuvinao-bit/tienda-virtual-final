@@ -5,7 +5,7 @@ const SiteSettings = require('../models/SiteSettings');
 const LOGIN_THEMES = Object.freeze([
   { value: 'liquidGlass', label: 'Cristal Líquido', description: 'Volúmenes translúcidos, reflejos suaves y profundidad fluida.' },
   { value: 'immersiveGallery', label: 'Galería Inmersiva', description: 'Una imagen protagonista de la tienda con acceso flotante.' },
-  { value: 'smokeGlass', label: 'Cristal Humo', description: 'Vidrio oscuro sobrio, reflejos discretos y acabado elegante.' },
+  { value: 'smokeGlass', label: 'Cristal Perla', description: 'Vidrio óptico claro, bordes suaves y composición central.' },
 ]);
 
 const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
@@ -22,10 +22,10 @@ const LOGIN_THEME_CUSTOMIZATIONS = Object.freeze({
     welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa para gestionar tu tienda.', buttonText: 'Ingresar',
   }),
   smokeGlass: Object.freeze({
-    primary: '#090b0e', secondary: '#242a31', accent: '#aab8c8', surface: '#f5f7fa',
-    eyebrow: 'COMERCIO SIN LÍMITES', headline: 'Tu tienda,', highlight: 'más lejos.',
-    description: 'Administra, crece y haz que cada decisión cuente.',
-    welcomeTitle: 'Acceso administrativo', welcomeSubtitle: 'Identifícate para continuar.', buttonText: 'Ingresar',
+    primary: '#102a3b', secondary: '#718896', accent: '#315d73', surface: '#f8fbfd',
+    eyebrow: 'GESTIÓN PRIVADA', headline: 'Todo en orden.', highlight: 'Siempre claro.',
+    description: 'Un acceso limpio y sereno para administrar tu tienda.',
+    welcomeTitle: 'Bienvenido', welcomeSubtitle: 'Ingresa para gestionar tu tienda.', buttonText: 'Ingresar',
   }),
 });
 

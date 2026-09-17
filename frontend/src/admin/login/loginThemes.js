@@ -1,4 +1,4 @@
-import { Image, Layers3, MoonStar } from "lucide-react";
+import { Gem, Image, Layers3 } from "lucide-react";
 
 function theme({ id, name, description, icon, pageBg, colors, copy }) {
   return {
@@ -48,18 +48,18 @@ export const LOGIN_THEMES = {
   }),
   smokeGlass: theme({
     id: "smokeGlass",
-    name: "Cristal Humo",
-    icon: MoonStar,
-    description: "Vidrio oscuro sobrio, reflejos discretos y acabado elegante.",
-    pageBg: "linear-gradient(145deg, #07090c 0%, #161b22 48%, #050607 100%)",
-    colors: { primary: "#090b0e", secondary: "#242a31", accent: "#aab8c8", surface: "#f5f7fa" },
+    name: "Cristal Perla",
+    icon: Gem,
+    description: "Vidrio óptico claro, bordes suaves y composición central.",
+    pageBg: "linear-gradient(145deg, #f7fafc 0%, #e6eef3 48%, #d8e5eb 100%)",
+    colors: { primary: "#102a3b", secondary: "#718896", accent: "#315d73", surface: "#f8fbfd" },
     copy: {
-      eyebrow: "COMERCIO SIN LÍMITES",
-      headline: "Tu tienda,",
-      highlight: "más lejos.",
-      description: "Administra, crece y haz que cada decisión cuente.",
-      welcomeTitle: "Acceso administrativo",
-      welcomeSubtitle: "Identifícate para continuar.",
+      eyebrow: "GESTIÓN PRIVADA",
+      headline: "Todo en orden.",
+      highlight: "Siempre claro.",
+      description: "Un acceso limpio y sereno para administrar tu tienda.",
+      welcomeTitle: "Bienvenido",
+      welcomeSubtitle: "Ingresa para gestionar tu tienda.",
       buttonText: "Ingresar",
     },
   }),

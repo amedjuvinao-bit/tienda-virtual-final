@@ -65,3 +65,109 @@
 @media(max-width:940px){.rb-liquid-stage,.rb-smoke-stage{grid-template-columns:1fr;max-width:670px}.rb-liquid-story,.rb-smoke-story{min-height:340px;padding:42px}.rb-liquid-access,.rb-smoke-access{margin:0 42px 42px}.rb-gallery-stage{min-height:900px;max-width:670px}.rb-gallery-story{left:7%;right:7%;top:5%;bottom:auto;width:auto;height:315px}.rb-gallery-copy{margin-top:auto;margin-bottom:14px}.rb-gallery-copy h1{font-size:46px}.rb-gallery-access{left:7%;right:7%;top:auto;bottom:5%;width:auto;transform:none}}
 @media(max-width:600px){.rb-login-shell{padding:0}.rb-theme-copy h1{font-size:42px}.rb-theme-copy p{font-size:11px}.rb-liquid-stage,.rb-smoke-stage,.rb-gallery-stage{min-height:100vh;border-radius:0}.rb-liquid-story,.rb-smoke-story{min-height:300px;padding:30px 26px}.rb-liquid-access,.rb-smoke-access{margin:0 18px 18px}.rb-editorial-access{padding:28px 22px 24px 42px!important;border-radius:3px 22px 22px 3px!important}.rb-curated-brand{gap:14px}.rb-curated-brand__logo{height:70px;width:70px}.rb-curated-brand>strong{max-width:190px;font-size:16px}.rb-gallery-media{background-position:42% center}.rb-gallery-story{left:25px;right:25px;top:28px;height:260px}.rb-gallery-story .rb-curated-brand__logo{height:76px;width:76px}.rb-gallery-copy h1{font-size:39px}.rb-gallery-copy p,.rb-gallery-caption{display:none}.rb-gallery-access{left:18px;right:18px;bottom:18px}.rb-curated-auth__options{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.rb-liquid-media,.rb-liquid-depth i,.rb-gallery-media,.rb-gallery-ambient i,.rb-gallery-access:before,.rb-curated-brand__logo:before,.rb-curated-brand__logo:after,.rb-curated-brand__logo img,.rb-curated-brand__logo b,.rb-smoke-media,.rb-smoke-depth i,.rb-editorial-access:before,.rb-editorial-access:after,.rb-editorial-rail,.rb-editorial-access .rb-curated-auth__submit:before{animation:none!important}}
+
+/* Vidrio óptico estable: el fondo puede moverse, el contenedor nunca cambia de forma ni posición. */
+.rb-editorial-access{
+  --glass-fill:linear-gradient(145deg,rgba(255,255,255,.28),rgba(255,255,255,.11) 48%,rgba(214,229,237,.18));
+  --glass-edge:rgba(255,255,255,.72);
+  --glass-inner:rgba(255,255,255,.48);
+  position:relative;
+  isolation:isolate;
+  width:min(470px,calc(100% - 56px));
+  min-height:610px;
+  overflow:hidden!important;
+  border:1px solid var(--glass-edge)!important;
+  border-radius:28px!important;
+  background:var(--glass-fill)!important;
+  padding:52px 54px 40px!important;
+  box-shadow:0 30px 78px var(--mirror-shadow),inset 0 1px 0 var(--glass-inner),inset 0 -1px 0 rgba(52,78,92,.1)!important;
+  backdrop-filter:blur(30px) saturate(1.22) contrast(1.04)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(1.22) contrast(1.04)!important;
+  transform:none;
+}
+.rb-editorial-access:before{
+  position:absolute!important;
+  inset:0!important;
+  z-index:0!important;
+  height:auto!important;
+  width:auto!important;
+  border:0!important;
+  border-radius:inherit!important;
+  background:linear-gradient(132deg,rgba(255,255,255,.52) 0%,rgba(255,255,255,.08) 26%,transparent 48%,rgba(255,255,255,.1) 78%,rgba(176,202,215,.12) 100%)!important;
+  box-shadow:none!important;
+  content:""!important;
+  opacity:1!important;
+  pointer-events:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+  animation:none!important;
+  transform:none!important;
+}
+.rb-editorial-access:after{
+  position:absolute;
+  inset:5px;
+  z-index:1;
+  height:auto;
+  width:auto;
+  transform:none;
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:23px;
+  background:linear-gradient(112deg,transparent 0 10%,rgba(255,255,255,.2) 24%,transparent 38% 76%,rgba(255,255,255,.1) 90%,transparent);
+  box-shadow:inset 10px 0 24px rgba(255,255,255,.08),inset -12px -8px 24px rgba(35,62,77,.06);
+  content:"";
+  filter:none;
+  mix-blend-mode:normal;
+  opacity:1;
+  pointer-events:none;
+  animation:none!important;
+}
+.rb-editorial-rail{display:none!important}
+.rb-editorial-access .rb-curated-auth{max-width:none}
+.rb-editorial-access .rb-curated-auth__head h2{text-shadow:none!important}
+.rb-liquid-access.rb-editorial-access{justify-self:center;margin:38px auto;--glass-fill:linear-gradient(145deg,rgba(255,255,255,.38),rgba(244,251,255,.16) 48%,rgba(211,227,237,.2));--glass-edge:rgba(255,255,255,.82);--glass-inner:rgba(255,255,255,.62);--mirror-shadow:rgba(37,67,86,.2)}
+.rb-gallery-access.rb-editorial-access{width:min(470px,39%);min-height:610px;transform:translateY(-50%);--glass-fill:linear-gradient(145deg,rgba(13,18,25,.44),rgba(17,24,32,.2) 52%,rgba(255,255,255,.08));--glass-edge:rgba(255,255,255,.3);--glass-inner:rgba(255,255,255,.28);--mirror-shadow:rgba(0,0,0,.58)}
+
+/* Cristal Perla reemplaza al antiguo tema oscuro y centra el acceso. */
+.theme-smokeGlass{background:var(--login-page-background)!important;color:var(--login-primary)}
+.rb-smoke-stage{
+  display:grid;
+  min-height:min(780px,calc(100vh - 64px));
+  place-items:center;
+  border:1px solid rgba(255,255,255,.78);
+  border-radius:40px;
+  background:linear-gradient(145deg,#f7fafc 0%,#e7eff4 48%,#d9e6ec 100%);
+  box-shadow:0 42px 105px rgba(43,72,88,.2);
+}
+.rb-smoke-stage:before,.rb-smoke-stage:after{position:absolute;z-index:-3;border-radius:50%;content:"";pointer-events:none;filter:blur(3px)}
+.rb-smoke-stage:before{left:-9%;top:-28%;height:70%;width:67%;background:linear-gradient(155deg,rgba(255,255,255,.9),rgba(188,213,225,.3));animation:pearlLayerOne 18s ease-in-out infinite alternate}
+.rb-smoke-stage:after{right:-14%;bottom:-32%;height:72%;width:73%;background:linear-gradient(145deg,rgba(198,220,230,.5),rgba(255,255,255,.8));animation:pearlLayerTwo 22s ease-in-out infinite alternate}
+.rb-smoke-media{z-index:-5;animation:smokeMediaDrift 26s ease-in-out infinite alternate}
+.rb-smoke-overlay{z-index:-4;background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(216,230,237,.14)),rgb(255 255 255/var(--smoke-user-overlay,.08))}
+.rb-smoke-depth{z-index:-2;opacity:.5}
+.rb-smoke-depth i{border:1px solid rgba(255,255,255,.55);background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(145,179,195,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 28px 70px rgba(43,72,88,.08);backdrop-filter:blur(7px)}
+.rb-smoke-access.rb-editorial-access{justify-self:center;width:min(500px,calc(100% - 48px));min-height:700px;margin:38px auto;--glass-fill:linear-gradient(145deg,rgba(255,255,255,.35),rgba(245,251,253,.14) 52%,rgba(191,214,225,.18));--glass-edge:rgba(255,255,255,.86);--glass-inner:rgba(255,255,255,.66);--mirror-text:var(--login-primary);--mirror-muted:color-mix(in srgb,var(--login-primary) 65%,transparent);--mirror-shadow:rgba(43,72,88,.22);color:var(--login-primary)}
+.rb-smoke-access .rb-panel-brand{display:flex;width:100%;margin:0 0 38px;justify-content:center;color:var(--login-primary)}
+.rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:92px;width:92px}
+.rb-smoke-access .rb-panel-brand .rb-curated-brand__logo:before{opacity:.18}
+.rb-smoke-access .rb-curated-auth__field label{color:var(--login-accent)!important}
+.rb-smoke-access .rb-curated-auth__submit{background:var(--login-primary)!important;color:var(--login-surface)!important;border-color:rgba(255,255,255,.32)!important;box-shadow:0 16px 34px rgba(16,42,59,.18),inset 0 1px 0 rgba(255,255,255,.25)!important}
+.rb-smoke-access .rb-curated-auth__submit:before{display:none}
+
+@keyframes pearlLayerOne{to{transform:translate3d(3%,2%,0) scale(1.035)}}
+@keyframes pearlLayerTwo{to{transform:translate3d(-3%,-2%,0) scale(1.025)}}
+
+@media(max-width:940px){
+  .rb-liquid-access.rb-editorial-access,.rb-smoke-access.rb-editorial-access{width:min(500px,calc(100% - 48px));margin:30px auto}
+  .rb-gallery-access.rb-editorial-access{left:7%;right:7%;width:auto;min-height:560px;transform:none}
+}
+@media(max-width:600px){
+  .rb-editorial-access,.rb-liquid-access.rb-editorial-access,.rb-smoke-access.rb-editorial-access{width:calc(100% - 32px);min-height:0;margin:16px auto;padding:34px 28px 28px!important;border-radius:24px!important}
+  .rb-editorial-access:after{border-radius:19px}
+  .rb-gallery-access.rb-editorial-access{left:16px;right:16px;width:auto;min-height:0;padding:32px 26px 26px!important;transform:none}
+  .rb-smoke-access .rb-panel-brand{margin-bottom:24px}
+  .rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:72px;width:72px}
+}
+@media(prefers-reduced-motion:reduce){.rb-smoke-stage:before,.rb-smoke-stage:after{animation:none!important}}
