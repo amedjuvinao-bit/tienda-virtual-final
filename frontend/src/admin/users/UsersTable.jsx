@@ -184,8 +184,10 @@ export default function UsersTable({
   branches,
   statusSavingId,
   deleteSavingId,
+  canManageTwoFactor,
   onEditUser,
   onChangePassword,
+  onManageTwoFactor,
   onToggleStatus,
   onDeleteUser,
 }) {
@@ -382,6 +384,22 @@ export default function UsersTable({
                   {formatStatus(user.status)}
                 </span>
 
+                <span
+                  className={`inline-flex w-full justify-center rounded-full border px-3 py-1 text-[10px] font-black ${
+                    user.twoFactorEnabled
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      : user.twoFactorRequired
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-slate-200 bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  {user.twoFactorEnabled
+                    ? '2FA ACTIVO'
+                    : user.twoFactorRequired
+                      ? '2FA PENDIENTE'
+                      : '2FA OPCIONAL'}
+                </span>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -443,6 +461,25 @@ export default function UsersTable({
                         />
                         Cambiar contraseña
                       </button>
+
+                      {canManageTwoFactor ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeActions();
+                            onManageTwoFactor(user);
+                          }}
+                          className="mt-1 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-xs font-black transition hover:opacity-90"
+                          style={{
+                            borderColor: 'var(--admin-primary-soft-border)',
+                            background: 'var(--admin-primary-soft-bg)',
+                            color: 'var(--admin-primary-soft-text)',
+                          }}
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          Administrar 2FA
+                        </button>
+                      ) : null}
 
                       <button
                         type="button"

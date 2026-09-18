@@ -30,6 +30,9 @@ function testMandatoryTwoFactorPolicy() {
     {
       role: 'owner',
       enabled: false,
+      requirement: 'inherit',
+      requirementSource: 'role',
+      inheritedRequired: true,
       required: true,
       compliant: false,
       requiredRoles: ['owner', 'admin'],
@@ -42,6 +45,20 @@ function testMandatoryTwoFactorPolicy() {
     buildTwoFactorPolicy({ role: 'seller', twoFactorEnabled: false }, 'owner,admin').compliant,
     true
   );
+  assert.equal(
+    buildTwoFactorPolicy(
+      { role: 'owner', twoFactorEnabled: false, twoFactorRequirement: 'optional' },
+      'owner,admin'
+    ).required,
+    false
+  );
+  assert.equal(
+    buildTwoFactorPolicy(
+      { role: 'seller', twoFactorEnabled: false, twoFactorRequirement: 'required' },
+      'owner,admin'
+    ).required,
+    true
+  );
 }
 
 function testBootstrapRestriction() {
@@ -51,6 +68,10 @@ function testBootstrapRestriction() {
   );
   assert.equal(
     isTwoFactorBootstrapRequest({ originalUrl: '/api/admin/auth/2fa/reconfigure/confirm' }),
+    true
+  );
+  assert.equal(
+    isTwoFactorBootstrapRequest({ originalUrl: '/api/admin/users/507f1f77bcf86cd799439011/two-factor' }),
     true
   );
   assert.equal(
@@ -105,6 +126,13 @@ function testIntegrationContracts() {
   assert.match(authRoute, /router\.post\('\/sessions\/revoke-all'/);
   assert.match(authRoute, /sessions\/:sessionRecordId\/revoke/);
   assert.match(authRoute, /blocked_by_policy/);
+  assert.match(authRoute, /blocked_by_owner_policy/);
+  assert.match(authRoute, /canSelfActivate/);
+  assert.match(authRoute, /Solo el propietario puede desactivar el 2FA/);
+  const usersRoute = read('backend/routes/adminUsers.js');
+  assert.match(usersRoute, /requirePermission\.ownerOnly\(\)/);
+  assert.match(usersRoute, /'\/:id\/two-factor'/);
+  assert.match(usersRoute, /twoFactorRequirement = 'optional'/);
   assert.match(accessGate, /TWO_FACTOR_SETUP_REQUIRED/);
   assert.match(sessionService, /admin-device:/);
   assert.match(sessionService, /httpOnly:\s*true/);

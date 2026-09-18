@@ -95,6 +95,11 @@ function testSchemaProtection() {
   assert.equal(AdminUser.schema.path('twoFactorSecret').options.select, false);
   assert.equal(AdminUser.schema.path('twoFactorPendingSecret').options.select, false);
   assert.equal(AdminUser.schema.path('twoFactorRecoveryCodeHashes').options.select, false);
+  assert.deepEqual(AdminUser.schema.path('twoFactorRequirement').options.enum, [
+    'inherit',
+    'required',
+    'optional',
+  ]);
   assert.equal(AdminTwoFactorChallenge.schema.path('tokenHash').options.select, false);
   assert.equal(AdminTwoFactorChallenge.schema.path('maxAttempts').options.default, 5);
   const ttlIndex = AdminTwoFactorChallenge.schema.indexes().find(

@@ -39,13 +39,27 @@ function buildTwoFactorPolicy(adminUser, value) {
   const role = normalizeRole(adminUser?.role);
   const enabled = Boolean(adminUser?.twoFactorEnabled);
   const requiredRoles = getRequiredTwoFactorRoles(value);
-  const configuredRequired = requiredRoles.includes(role);
+  const requirement = ['required', 'optional'].includes(
+    String(adminUser?.twoFactorRequirement || '').trim().toLowerCase()
+  )
+    ? String(adminUser.twoFactorRequirement).trim().toLowerCase()
+    : 'inherit';
+  const inheritedRequired = requiredRoles.includes(role);
+  const configuredRequired =
+    requirement === 'required'
+      ? true
+      : requirement === 'optional'
+        ? false
+        : inheritedRequired;
   const enforcementReady = isTwoFactorEnforcementReady();
   const required = configuredRequired && enforcementReady;
 
   return {
     role,
     enabled,
+    requirement,
+    requirementSource: requirement === 'inherit' ? 'role' : 'user',
+    inheritedRequired,
     required,
     compliant: !required || enabled,
     requiredRoles,
@@ -59,6 +73,10 @@ function isTwoFactorBootstrapRequest(req) {
   const path = String(req?.originalUrl || req?.url || '')
     .split('?')[0]
     .replace(/\/+$/, '');
+
+  if (/^\/api\/admin\/users\/[^/]+\/two-factor$/.test(path)) {
+    return true;
+  }
 
   return [
     '/api/admin/auth/2fa/status',

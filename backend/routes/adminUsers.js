@@ -6,9 +6,22 @@ const mongoose = require('mongoose');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
 
+const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminUser = require('../models/AdminUser');
 const AdminRole = require('../models/AdminRole');
 const Branch = require('../models/Branch');
+const {
+  revokeAllUserSessions,
+  revokeOtherUserSessions,
+} = require('../security/adminSessionService');
+const {
+  decryptTwoFactorSecret,
+  hashRecoveryCode,
+  verifyTotp,
+} = require('../security/adminTwoFactorCrypto');
+const {
+  buildTwoFactorPolicy,
+} = require('../security/adminTwoFactorPolicy');
 
 const router = express.Router();
 
@@ -128,12 +141,174 @@ function buildUserPublicResponse(user) {
   return plain;
 }
 
+function buildUserSecurityResponse(user) {
+  const plain = buildUserPublicResponse(user);
+  const policy = buildTwoFactorPolicy(user);
+  return {
+    ...plain,
+    twoFactorEnabled: Boolean(user?.twoFactorEnabled),
+    twoFactorRequired: policy.required,
+    twoFactorSetupRequired: !policy.compliant,
+    twoFactorRequirement: policy.requirement,
+    twoFactorRequirementSource: policy.requirementSource,
+  };
+}
+
 function sendError(res, status, message, extra = {}) {
   return res.status(status).json({
     ok: false,
     message,
     ...extra,
   });
+}
+
+const OWNER_TWO_FACTOR_MAX_ATTEMPTS = 5;
+const OWNER_TWO_FACTOR_LOCK_MS = 10 * 60 * 1000;
+
+function getClientIp(req) {
+  return String(
+    req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || ''
+  )
+    .split(',')[0]
+    .trim()
+    .slice(0, 80);
+}
+
+function getUserAgent(req) {
+  return String(req.headers['user-agent'] || '').trim().slice(0, 500);
+}
+
+async function saveOwnerTwoFactorAudit(req, actor, target, {
+  action,
+  success,
+  description,
+  reason = '',
+  recoveryCodeUsed = false,
+  statusCode = success ? 200 : 400,
+}) {
+  try {
+    await AdminAuditLog.create({
+      action,
+      permission: 'seguridad:2fa:owner',
+      module: 'seguridad',
+      description,
+      method: req.method,
+      path: req.originalUrl || req.path,
+      routePattern: req.route?.path || '',
+      resourceId: String(target?._id || req.params?.id || ''),
+      adminUserId: actor?._id || null,
+      adminUsername: actor?.username || req.adminUsername || '',
+      adminRole: actor?.role || req.adminRole || '',
+      statusCode,
+      success,
+      ip: getClientIp(req),
+      userAgent: getUserAgent(req),
+      requestId: String(req.headers['x-request-id'] || '').slice(0, 120),
+      metadata: {
+        targetUserId: String(target?._id || req.params?.id || ''),
+        targetUsername: target?.username || '',
+        reason: cleanText(reason).slice(0, 500),
+        recoveryCodeUsed,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error guardando auditoría owner 2FA:', error.message);
+  }
+}
+
+function getOwnerTwoFactorLock(owner) {
+  const lockedUntil = owner?.twoFactorManagementLockedUntil;
+  if (!lockedUntil || new Date(lockedUntil).getTime() <= Date.now()) return null;
+  return Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000));
+}
+
+async function registerOwnerTwoFactorFailure(owner) {
+  owner.twoFactorManagementFailedAttempts =
+    Number(owner.twoFactorManagementFailedAttempts || 0) + 1;
+  if (owner.twoFactorManagementFailedAttempts >= OWNER_TWO_FACTOR_MAX_ATTEMPTS) {
+    owner.twoFactorManagementLockedUntil = new Date(
+      Date.now() + OWNER_TWO_FACTOR_LOCK_MS
+    );
+  }
+  await owner.save({ validateBeforeSave: false });
+  return getOwnerTwoFactorLock(owner);
+}
+
+async function clearOwnerTwoFactorFailures(owner) {
+  if (
+    Number(owner.twoFactorManagementFailedAttempts || 0) === 0 &&
+    !owner.twoFactorManagementLockedUntil
+  ) {
+    return;
+  }
+  owner.twoFactorManagementFailedAttempts = 0;
+  owner.twoFactorManagementLockedUntil = null;
+  await owner.save({ validateBeforeSave: false });
+}
+
+async function verifyOwnerTwoFactorCredentials(owner, { currentPassword, code }) {
+  const retryAfterSeconds = getOwnerTwoFactorLock(owner);
+  if (retryAfterSeconds) {
+    return { ok: false, retryAfterSeconds, reason: 'management_locked' };
+  }
+
+  if (!currentPassword || !(await owner.comparePassword(currentPassword))) {
+    const retryAfter = await registerOwnerTwoFactorFailure(owner);
+    return { ok: false, retryAfterSeconds: retryAfter, reason: 'invalid_password' };
+  }
+
+  if (!owner.twoFactorEnabled || !owner.twoFactorSecret) {
+    await clearOwnerTwoFactorFailures(owner);
+    return { ok: true, recoveryCodeUsed: false, twoFactorVerified: false };
+  }
+
+  let secret;
+  try {
+    secret = decryptTwoFactorSecret(owner.twoFactorSecret);
+  } catch {
+    return { ok: false, reason: 'invalid_secret' };
+  }
+
+  if (verifyTotp(secret, code)) {
+    await clearOwnerTwoFactorFailures(owner);
+    return { ok: true, recoveryCodeUsed: false, twoFactorVerified: true };
+  }
+
+  const recoveryHash = hashRecoveryCode(code);
+  const hasRecoveryCode =
+    recoveryHash &&
+    (owner.twoFactorRecoveryCodeHashes || []).includes(recoveryHash);
+  if (!hasRecoveryCode) {
+    const retryAfter = await registerOwnerTwoFactorFailure(owner);
+    return { ok: false, retryAfterSeconds: retryAfter, reason: 'invalid_code' };
+  }
+
+  await clearOwnerTwoFactorFailures(owner);
+  const update = await AdminUser.updateOne(
+    { _id: owner._id, twoFactorRecoveryCodeHashes: recoveryHash },
+    {
+      $pull: { twoFactorRecoveryCodeHashes: recoveryHash },
+      $set: { twoFactorLastUsedAt: new Date() },
+    }
+  );
+  if (!update.modifiedCount) {
+    return { ok: false, reason: 'recovery_code_used' };
+  }
+
+  return { ok: true, recoveryCodeUsed: true, twoFactorVerified: true };
+}
+
+function clearUserTwoFactor(targetUser) {
+  targetUser.twoFactorEnabled = false;
+  targetUser.twoFactorSecret = '';
+  targetUser.twoFactorPendingSecret = '';
+  targetUser.twoFactorPendingExpiresAt = null;
+  targetUser.twoFactorPendingAttempts = 0;
+  targetUser.twoFactorRecoveryCodeHashes = [];
+  targetUser.twoFactorEnabledAt = null;
+  targetUser.twoFactorLastUsedAt = null;
+  targetUser.twoFactorManagementFailedAttempts = 0;
+  targetUser.twoFactorManagementLockedUntil = null;
 }
 
 async function setTemporaryPassword(
@@ -490,7 +665,7 @@ router.get(
         limit,
         total,
         totalPages: Math.max(Math.ceil(total / limit), 1),
-        data: users,
+        data: users.map(buildUserSecurityResponse),
       });
     } catch (error) {
       console.error('❌ Error listando usuarios admin:', error.message);
@@ -530,7 +705,7 @@ router.get(
 
       return res.json({
         ok: true,
-        data: user,
+        data: buildUserSecurityResponse(user),
       });
     } catch (error) {
       console.error('❌ Error obteniendo usuario admin:', error.message);
@@ -1021,6 +1196,159 @@ router.patch(
         500,
         error.message || 'Error actualizando contraseña.'
       );
+    }
+  }
+);
+
+/* ============================
+ * ADMINISTRAR 2FA (SOLO OWNER)
+ * ============================ */
+
+router.patch(
+  '/:id/two-factor',
+  requireAdmin,
+  requirePermission.ownerOnly(),
+  async (req, res) => {
+    let actor = null;
+    let targetUser = null;
+    const action = cleanLower(req.body?.action);
+    const reason = cleanText(req.body?.reason).slice(0, 500);
+
+    try {
+      const { id } = req.params;
+      if (!isValidObjectId(id)) {
+        return sendError(res, 400, 'ID de usuario inválido.');
+      }
+      if (!['require', 'reset', 'disable'].includes(action)) {
+        return sendError(res, 400, 'Acción de seguridad 2FA inválida.');
+      }
+      if (reason.length < 3) {
+        return sendError(res, 400, 'Escribe el motivo del cambio de seguridad.');
+      }
+
+      actor = await AdminUser.findOne({
+        _id: getCurrentAdminId(req),
+        deletedAt: null,
+      }).select(
+        '+passwordHash +twoFactorSecret +twoFactorRecoveryCodeHashes +twoFactorManagementFailedAttempts +twoFactorManagementLockedUntil +tokenVersion'
+      );
+      if (!actor || !isOwnerRole(actor.role)) {
+        return sendError(res, 403, 'Solo el propietario puede administrar el 2FA.');
+      }
+
+      const isSelf = String(actor._id) === String(id);
+      targetUser = isSelf
+        ? actor
+        : await AdminUser.findOne({ _id: toObjectId(id), deletedAt: null }).select(
+            '+twoFactorSecret +twoFactorPendingSecret +twoFactorPendingExpiresAt +twoFactorPendingAttempts +twoFactorRecoveryCodeHashes +twoFactorManagementFailedAttempts +twoFactorManagementLockedUntil +tokenVersion'
+          );
+      if (!targetUser) {
+        return sendError(res, 404, 'Usuario administrativo no encontrado.');
+      }
+
+      const verification = await verifyOwnerTwoFactorCredentials(actor, {
+        currentPassword: String(req.body?.currentPassword || ''),
+        code: String(req.body?.code || ''),
+      });
+      if (!verification.ok) {
+        const status = verification.retryAfterSeconds ? 429 : 403;
+        await saveOwnerTwoFactorAudit(req, actor, targetUser, {
+          action: `2fa.owner.${action}`,
+          success: false,
+          description: 'Credenciales inválidas al administrar el 2FA de un usuario.',
+          reason,
+          statusCode: status,
+        });
+        return sendError(
+          res,
+          status,
+          verification.retryAfterSeconds
+            ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+            : 'La contraseña o el código de seguridad del propietario no son válidos.',
+          { retryAfterSeconds: verification.retryAfterSeconds }
+        );
+      }
+
+      if (!isSelf && !actor.twoFactorEnabled) {
+        await saveOwnerTwoFactorAudit(req, actor, targetUser, {
+          action: `2fa.owner.${action}`,
+          success: false,
+          description: 'El propietario intentó administrar otro usuario sin tener 2FA activo.',
+          reason,
+          statusCode: 409,
+        });
+        return sendError(
+          res,
+          409,
+          'Activa primero tu propio 2FA para administrar la seguridad de otros usuarios.'
+        );
+      }
+
+      if (action === 'require') {
+        targetUser.twoFactorRequirement = 'required';
+        if (!targetUser.twoFactorEnabled) {
+          targetUser.twoFactorPendingSecret = '';
+          targetUser.twoFactorPendingExpiresAt = null;
+          targetUser.twoFactorPendingAttempts = 0;
+        }
+      } else if (action === 'reset') {
+        clearUserTwoFactor(targetUser);
+        targetUser.twoFactorRequirement = 'required';
+      } else {
+        clearUserTwoFactor(targetUser);
+        targetUser.twoFactorRequirement = 'optional';
+      }
+
+      targetUser.twoFactorRequirementUpdatedAt = new Date();
+      targetUser.twoFactorRequirementUpdatedBy = actor._id;
+      targetUser.updatedBy = actor._id;
+      await targetUser.save({ validateBeforeSave: false });
+
+      const revokeReason = `two_factor_owner_${action}`;
+      if (isSelf) {
+        await revokeOtherUserSessions(targetUser._id, req.adminSessionId, revokeReason);
+      } else {
+        await revokeAllUserSessions(targetUser._id, revokeReason);
+      }
+
+      const descriptions = {
+        require: targetUser.twoFactorEnabled
+          ? 'El propietario estableció el 2FA como obligatorio para el usuario.'
+          : 'El propietario exigió configurar 2FA en el siguiente acceso del usuario.',
+        reset: 'El propietario restableció el 2FA y exigió una nueva vinculación.',
+        disable: 'El propietario desactivó el 2FA y lo dejó como opcional.',
+      };
+      await saveOwnerTwoFactorAudit(req, actor, targetUser, {
+        action: `2fa.owner.${action}`,
+        success: true,
+        description: descriptions[action],
+        reason,
+        recoveryCodeUsed: verification.recoveryCodeUsed,
+      });
+
+      const policy = buildTwoFactorPolicy(targetUser);
+      return res.json({
+        ok: true,
+        message: descriptions[action],
+        currentUserChanged: isSelf,
+        data: {
+          ...buildUserPublicResponse(targetUser),
+          twoFactorRequired: policy.required,
+          twoFactorSetupRequired: !policy.compliant,
+          twoFactorRequirement: policy.requirement,
+          twoFactorRequirementSource: policy.requirementSource,
+        },
+      });
+    } catch (error) {
+      console.error('❌ Error administrando 2FA por owner:', error.message);
+      await saveOwnerTwoFactorAudit(req, actor, targetUser, {
+        action: `2fa.owner.${action || 'unknown'}`,
+        success: false,
+        description: 'Error al administrar el 2FA de un usuario.',
+        reason,
+        statusCode: 500,
+      });
+      return sendError(res, 500, 'No se pudo actualizar la seguridad 2FA del usuario.');
     }
   }
 );

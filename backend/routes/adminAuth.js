@@ -1279,6 +1279,7 @@ router.get('/2fa/status', requireAdmin, async (req, res) => {
         new Date(adminUser.twoFactorPendingExpiresAt).getTime() > Date.now()
     );
     const policy = buildTwoFactorPolicy(adminUser);
+    const isOwner = String(adminUser.role || '').trim().toLowerCase() === 'owner';
 
     return res.json({
       ok: true,
@@ -1288,12 +1289,17 @@ router.get('/2fa/status', requireAdmin, async (req, res) => {
         lastUsedAt: adminUser.twoFactorLastUsedAt || null,
         recoveryCodesRemaining: (adminUser.twoFactorRecoveryCodeHashes || []).length,
         setupPending: pendingActive,
+        requirement: policy.requirement,
+        requirementSource: policy.requirementSource,
         required: policy.required,
         compliant: policy.compliant,
         requiredRoles: policy.requiredRoles,
         configuredRequired: policy.configuredRequired,
         enforcementReady: policy.enforcementReady,
         misconfigured: policy.misconfigured,
+        canSelfActivate: isOwner || policy.configuredRequired,
+        canSelfDisable: isOwner && !policy.required,
+        managedByOwner: !isOwner,
       },
     });
   } catch (error) {
@@ -1314,6 +1320,20 @@ router.post('/2fa/setup', requireAdmin, async (req, res) => {
     }
     if (adminUser.twoFactorEnabled) {
       return res.status(409).json({ ok: false, message: 'El segundo factor ya está activo.' });
+    }
+    const policy = buildTwoFactorPolicy(adminUser);
+    const isOwner = String(adminUser.role || '').trim().toLowerCase() === 'owner';
+    if (!isOwner && !policy.configuredRequired) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.setup.blocked_by_owner_policy',
+        success: false,
+        description: 'La política del propietario impidió activar el segundo factor.',
+        statusCode: 403,
+      });
+      return res.status(403).json({
+        ok: false,
+        message: 'Solo el propietario puede habilitar el 2FA para tu usuario.',
+      });
     }
 
     const currentLock = getTwoFactorManagementLock(adminUser);
@@ -1409,6 +1429,18 @@ router.post('/2fa/confirm', requireAdmin, async (req, res) => {
     }
     if (adminUser.twoFactorEnabled) {
       return res.status(409).json({ ok: false, message: 'El segundo factor ya está activo.' });
+    }
+    const policy = buildTwoFactorPolicy(adminUser);
+    const isOwner = String(adminUser.role || '').trim().toLowerCase() === 'owner';
+    if (!isOwner && !policy.configuredRequired) {
+      adminUser.twoFactorPendingSecret = '';
+      adminUser.twoFactorPendingExpiresAt = null;
+      adminUser.twoFactorPendingAttempts = 0;
+      await adminUser.save({ validateBeforeSave: false });
+      return res.status(403).json({
+        ok: false,
+        message: 'El propietario ya no autoriza activar el 2FA para tu usuario.',
+      });
     }
     if (
       !adminUser.twoFactorPendingSecret ||
@@ -1769,6 +1801,20 @@ router.post('/2fa/disable', requireAdmin, async (req, res) => {
     authResult = { adminUser };
     if (!adminUser) {
       return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const isOwner = String(adminUser.role || '').trim().toLowerCase() === 'owner';
+    if (!isOwner) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.disable.blocked_by_owner_policy',
+        success: false,
+        description: 'Un usuario sin rol propietario intentó desactivar el segundo factor.',
+        statusCode: 403,
+      });
+      return res.status(403).json({
+        ok: false,
+        message: 'Solo el propietario puede desactivar el 2FA de los usuarios.',
+      });
     }
 
     const policy = buildTwoFactorPolicy(adminUser);

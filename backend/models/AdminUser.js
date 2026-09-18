@@ -367,6 +367,23 @@ const AdminUserSchema = new mongoose.Schema(
       default: false,
     },
 
+    twoFactorRequirement: {
+      type: String,
+      enum: ['inherit', 'required', 'optional'],
+      default: 'inherit',
+    },
+
+    twoFactorRequirementUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+
+    twoFactorRequirementUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminUser',
+      default: null,
+    },
+
     twoFactorSecret: {
       type: String,
       select: false,

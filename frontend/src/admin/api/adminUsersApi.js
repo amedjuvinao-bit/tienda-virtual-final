@@ -198,6 +198,26 @@ export async function updateAdminUserPassword(userId, payload) {
   }
 }
 
+export async function updateAdminUserTwoFactor(userId, payload) {
+  if (!userId) {
+    throw new Error('El ID del usuario administrativo es obligatorio.');
+  }
+
+  if (!payload) {
+    throw new Error('Los datos de seguridad 2FA son obligatorios.');
+  }
+
+  try {
+    const response = await api.patch(`${BASE_URL}/${userId}/two-factor`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(
+      error,
+      'No se pudo actualizar la seguridad 2FA del usuario.'
+    );
+  }
+}
+
 export async function deleteAdminUser(userId) {
   if (!userId) {
     throw new Error('El ID del usuario administrativo es obligatorio.');
@@ -223,6 +243,7 @@ const adminUsersApi = {
   updateAdminUser,
   updateAdminUserStatus,
   updateAdminUserPassword,
+  updateAdminUserTwoFactor,
   deleteAdminUser,
 };
 

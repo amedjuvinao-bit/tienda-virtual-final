@@ -9,11 +9,14 @@ import {
   updateAdminUser,
   updateAdminUserPassword,
   updateAdminUserStatus,
+  updateAdminUserTwoFactor,
 } from '../api/adminUsersApi';
+import { useAuth } from '../../context/AuthContext';
 
 import UserFormModal from './UserFormModal';
 import UserPasswordModal from './UserPasswordModal';
 import UserConfirmModal from './UserConfirmModal';
+import UserTwoFactorModal from './UserTwoFactorModal';
 import UsersTable from './UsersTable';
 
 import {
@@ -35,7 +38,16 @@ const EMPTY_CONFIRM_MODAL = {
   actionText: '',
 };
 
+const EMPTY_TWO_FACTOR_FORM = {
+  action: '',
+  reason: '',
+  currentPassword: '',
+  code: '',
+  currentUserId: '',
+};
+
 export default function AdminUsersPage() {
+  const { adminUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -58,6 +70,15 @@ export default function AdminUsersPage() {
   const [confirmModal, setConfirmModal] = useState(EMPTY_CONFIRM_MODAL);
   const [form, setForm] = useState(EMPTY_FORM);
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
+  const [twoFactorUser, setTwoFactorUser] = useState(null);
+  const [twoFactorForm, setTwoFactorForm] = useState(EMPTY_TWO_FACTOR_FORM);
+  const [twoFactorSaving, setTwoFactorSaving] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState('');
+
+  const currentRole = String(
+    adminUser?.adminRole || adminUser?.actualRole || adminUser?.role || ''
+  ).toLowerCase();
+  const isOwner = currentRole === 'owner';
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -221,6 +242,61 @@ export default function AdminUsersPage() {
   const closeConfirmModal = () => {
     if (confirmModalLoading) return;
     setConfirmModal(EMPTY_CONFIRM_MODAL);
+  };
+
+  const openTwoFactorModal = (user) => {
+    setTwoFactorUser(user || null);
+    setTwoFactorError('');
+    setSuccessMessage('');
+    setTwoFactorForm({
+      ...EMPTY_TWO_FACTOR_FORM,
+      currentUserId: adminUser?.id || adminUser?._id || '',
+    });
+  };
+
+  const closeTwoFactorModal = () => {
+    if (twoFactorSaving) return;
+    setTwoFactorUser(null);
+    setTwoFactorError('');
+    setTwoFactorForm(EMPTY_TWO_FACTOR_FORM);
+  };
+
+  const handleSubmitTwoFactor = async (event) => {
+    event.preventDefault();
+    if (!twoFactorUser?._id || !twoFactorForm.action) {
+      setTwoFactorError('Selecciona una acción de seguridad.');
+      return;
+    }
+
+    try {
+      setTwoFactorSaving(true);
+      setTwoFactorError('');
+      setSuccessMessage('');
+      const response = await updateAdminUserTwoFactor(twoFactorUser._id, {
+        action: twoFactorForm.action,
+        reason: twoFactorForm.reason,
+        currentPassword: twoFactorForm.currentPassword,
+        code: twoFactorForm.code,
+      });
+
+      setTwoFactorUser(null);
+      setTwoFactorForm(EMPTY_TWO_FACTOR_FORM);
+      setSuccessMessage(response.message);
+
+      if (response.currentUserChanged) {
+        window.dispatchEvent(new CustomEvent('admin-two-factor-policy-updated'));
+      }
+      if (response.currentUserChanged && response.data?.twoFactorSetupRequired) {
+        window.location.assign('/admin/configuracion/seguridad');
+        return;
+      }
+      await loadUsers();
+    } catch (err) {
+      console.error('❌ Error administrando 2FA:', err);
+      setTwoFactorError(err?.userMessage || 'No se pudo actualizar el 2FA.');
+    } finally {
+      setTwoFactorSaving(false);
+    }
   };
 
   const handleSubmitUser = async (event) => {
@@ -612,6 +688,8 @@ export default function AdminUsersPage() {
             deleteSavingId={deleteSavingId}
             onEditUser={openEditModal}
             onChangePassword={openPasswordModal}
+            canManageTwoFactor={isOwner}
+            onManageTwoFactor={openTwoFactorModal}
             onToggleStatus={handleToggleUserStatus}
             onDeleteUser={handleDeleteUser}
           />
@@ -653,6 +731,18 @@ export default function AdminUsersPage() {
         loading={confirmModalLoading}
         onClose={closeConfirmModal}
         onConfirm={handleConfirmAction}
+      />
+
+      <UserTwoFactorModal
+        open={Boolean(twoFactorUser)}
+        user={twoFactorUser}
+        form={twoFactorForm}
+        setForm={setTwoFactorForm}
+        saving={twoFactorSaving}
+        error={twoFactorError}
+        ownerTwoFactorEnabled={Boolean(adminUser?.twoFactorEnabled)}
+        onClose={closeTwoFactorModal}
+        onSubmit={handleSubmitTwoFactor}
       />
     </div>
   );

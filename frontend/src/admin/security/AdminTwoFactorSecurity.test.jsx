@@ -36,7 +36,11 @@ describe('Seguridad administrativa 2FA', () => {
     vi.clearAllMocks();
     getAdminTwoFactorStatus.mockResolvedValue({
       ok: true,
-      twoFactor: { enabled: false, recoveryCodesRemaining: 0 },
+      twoFactor: {
+        enabled: false,
+        recoveryCodesRemaining: 0,
+        canSelfActivate: true,
+      },
     });
     getAdminSecurityCenter.mockResolvedValue({
       ok: true,
@@ -163,5 +167,22 @@ describe('Seguridad administrativa 2FA', () => {
       expect(confirmAdminTwoFactorReconfiguration).toHaveBeenCalledWith('123456');
     });
     expect(await screen.findByText('NEWCD-23456')).toBeInTheDocument();
+  });
+
+  it('impide que un usuario opcional active 2FA sin autorización del owner', async () => {
+    getAdminTwoFactorStatus.mockResolvedValue({
+      ok: true,
+      twoFactor: {
+        enabled: false,
+        required: false,
+        canSelfActivate: false,
+        managedByOwner: true,
+      },
+    });
+
+    render(<SeguridadSection />);
+
+    expect(await screen.findByText('2FA administrado por el propietario')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Configurar 2FA' })).not.toBeInTheDocument();
   });
 });
