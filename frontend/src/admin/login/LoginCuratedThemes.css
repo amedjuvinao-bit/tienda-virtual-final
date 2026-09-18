@@ -150,6 +150,8 @@
 .rb-smoke-overlay{z-index:-4;background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(216,230,237,.14)),rgb(255 255 255/var(--smoke-user-overlay,.08))}
 .rb-smoke-depth{z-index:-2;opacity:.5}
 .rb-smoke-depth i{border:1px solid rgba(255,255,255,.55);background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(145,179,195,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 28px 70px rgba(43,72,88,.08);backdrop-filter:blur(7px)}
+.rb-smoke-stage[data-custom-image=true] .rb-smoke-depth{opacity:1;border:1px solid rgba(255,255,255,.72);border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(216,231,238,.08) 52%,rgba(117,157,176,.14));box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 140px rgba(226,240,246,.22);backdrop-filter:blur(14px) saturate(1.12);-webkit-backdrop-filter:blur(14px) saturate(1.12)}
+.rb-smoke-stage[data-custom-image=true] .rb-smoke-depth i{display:none}
 .rb-smoke-access.rb-editorial-access{align-self:center;justify-self:center;width:min(520px,calc(100% - 48px));min-height:700px;margin:38px auto;--glass-fill:linear-gradient(145deg,rgba(255,255,255,.17),rgba(245,251,253,.055) 52%,rgba(151,190,207,.11));--glass-edge:rgba(255,255,255,.82);--glass-inner:rgba(255,255,255,.5);--mirror-text:var(--login-primary);--mirror-muted:color-mix(in srgb,var(--login-primary) 65%,transparent);--mirror-shadow:rgba(43,72,88,.19);color:var(--login-primary);backdrop-filter:blur(21px) saturate(1.18) contrast(1.045)!important;-webkit-backdrop-filter:blur(21px) saturate(1.18) contrast(1.045)!important}
 .rb-smoke-access .rb-panel-brand{display:flex;width:100%;margin:0 0 38px;justify-content:center;color:var(--login-primary)}
 .rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:92px;width:92px}

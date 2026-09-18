@@ -118,6 +118,27 @@ describe('LoginAdminSection', () => {
     expect(screen.getByText('Subir imagen')).toBeInTheDocument();
   });
 
+  it('reemplaza los paneles de Cristal Perla por un vidrio único al usar una imagen', async () => {
+    getAdminLoginSettings.mockResolvedValueOnce(response({
+      settings: {
+        theme: 'smokeGlass',
+        background: {
+          mode: 'image',
+          color: '#16324a',
+          image: 'https://cdn.example.com/login.webp',
+          imageOpacity: 0.8,
+          overlay: 0.2,
+        },
+      },
+    }));
+    const { container } = render(<LoginAdminSection />);
+    await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
+
+    const preview = container.querySelector('[data-preview-theme="smokeGlass"]');
+    expect(preview).toHaveAttribute('data-custom-image', 'true');
+    expect(preview.querySelectorAll('.login-settings-theme-motion i')).toHaveLength(0);
+  });
+
   it('permite cambiar la imagen terminada de Galería Inmersiva', async () => {
     const user = userEvent.setup();
     const { container } = render(<LoginAdminSection />);

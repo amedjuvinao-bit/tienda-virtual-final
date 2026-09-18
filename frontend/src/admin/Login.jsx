@@ -1468,10 +1468,10 @@ export default function Login() {
     </div>
   </section>;
 
-  const renderSmokeGlass = () => <section className="rb-smoke-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+  const renderSmokeGlass = () => <section className="rb-smoke-stage" data-custom-image={hasCustomImageBg ? "true" : undefined} aria-label={`Acceso administrativo de ${storeName}`}>
     <div className="rb-smoke-media" style={{ backgroundImage: smokeBackground ? `url("${smokeBackground}")` : "none", opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
     <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.08 }} />
-    <div className="rb-smoke-depth" aria-hidden="true"><i /><i /><i /></div>
+    <div className="rb-smoke-depth" aria-hidden="true">{hasCustomImageBg ? null : <><i /><i /><i /></>}</div>
     <div className="rb-smoke-access rb-editorial-access">
       <CuratedStoreBrand className="rb-panel-brand" storeName={storeName} storeLogo={storeLogo} />
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>

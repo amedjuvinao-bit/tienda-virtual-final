@@ -129,6 +129,7 @@ function LoginPreview({ settings, store }) {
         className="login-settings-preview curated-preview"
         data-preview-theme={theme.id}
         data-gallery-tone={theme.id === 'immersiveGallery' ? galleryTone.id : undefined}
+        data-custom-image={theme.id === 'smokeGlass' && imageMode ? 'true' : undefined}
         style={{
           background: pageBackground,
           '--login-primary': customization.primary,
@@ -153,7 +154,9 @@ function LoginPreview({ settings, store }) {
         ) : null}
 
         <div className="login-settings-curated-scene">
-          <div className="login-settings-theme-motion" aria-hidden="true"><i /><i /></div>
+          <div className="login-settings-theme-motion" aria-hidden="true">
+            {theme.id === 'smokeGlass' && imageMode ? null : <><i /><i /></>}
+          </div>
           <div className="login-settings-curated-story">
             <div className="login-settings-curated-brand">
               <StoreLogo store={store} />
