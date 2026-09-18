@@ -11,6 +11,7 @@ import {
 } from '../api/adminAuthApi';
 
 vi.mock('../api/adminAuthApi', () => ({
+  confirmAdminTwoFactorReconfiguration: vi.fn(),
   confirmAdminTwoFactorSetup: vi.fn(),
   disableAdminTwoFactor: vi.fn(),
   getAdminSecurityCenter: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('../api/adminAuthApi', () => ({
   revokeAdminSession: vi.fn(),
   revokeAllAdminSessions: vi.fn(),
   revokeOtherAdminSessions: vi.fn(),
+  startAdminTwoFactorReconfiguration: vi.fn(),
   startAdminTwoFactorSetup: vi.fn(),
 }));
 
@@ -103,6 +105,7 @@ describe('Centro de seguridad administrativa Etapa 4', () => {
     expect(screen.getByText('Nuevo dispositivo detectado')).toBeInTheDocument();
     expect(screen.getByText('Inicio de sesión correcto')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Desactivar 2FA' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cambiar aplicación 2FA' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
     await user.type(screen.getByPlaceholderText('Contraseña para cerrar sesiones'), 'Password!123');

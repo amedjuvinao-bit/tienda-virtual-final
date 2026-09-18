@@ -64,6 +64,8 @@ function isTwoFactorBootstrapRequest(req) {
     '/api/admin/auth/2fa/status',
     '/api/admin/auth/2fa/setup',
     '/api/admin/auth/2fa/confirm',
+    '/api/admin/auth/2fa/reconfigure',
+    '/api/admin/auth/2fa/reconfigure/confirm',
     '/api/admin/auth/security-center',
     '/api/admin/auth/sessions/revoke-others',
     '/api/admin/auth/logout',

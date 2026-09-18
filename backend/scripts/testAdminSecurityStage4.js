@@ -50,6 +50,10 @@ function testBootstrapRestriction() {
     true
   );
   assert.equal(
+    isTwoFactorBootstrapRequest({ originalUrl: '/api/admin/auth/2fa/reconfigure/confirm' }),
+    true
+  );
+  assert.equal(
     isTwoFactorBootstrapRequest({ originalUrl: '/api/admin/auth/security-center' }),
     true
   );

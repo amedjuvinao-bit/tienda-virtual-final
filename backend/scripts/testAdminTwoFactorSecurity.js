@@ -118,10 +118,15 @@ function testIntegrationContracts() {
 
   assert.match(route, /requiresTwoFactor:\s*true/);
   assert.match(route, /router\.post\('\/2fa\/verify'/);
+  assert.match(route, /router\.post\('\/2fa\/reconfigure'/);
+  assert.match(route, /router\.post\('\/2fa\/reconfigure\/confirm'/);
+  assert.match(route, /two_factor_reconfigured/);
   assert.match(route, /revokeOtherUserSessions/);
   assert.match(route, /requiresTwoFactorOnNextLogin:\s*true/);
   assert.match(login, /TwoFactorChallengeModal/);
   assert.match(security, /startAdminTwoFactorSetup/);
+  assert.match(security, /startAdminTwoFactorReconfiguration/);
+  assert.match(security, /confirmAdminTwoFactorReconfiguration/);
   assert.match(security, /regenerateAdminRecoveryCodes/);
   assert.match(migration, /expireAfterSeconds:\s*0/);
   assert.match(migration, /--confirm-db=/);

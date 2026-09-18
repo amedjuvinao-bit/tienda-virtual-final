@@ -6,15 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TwoFactorChallengeModal from '../login/TwoFactorChallengeModal';
 import SeguridadSection from '../configuracion/sections/SeguridadSection';
 import {
+  confirmAdminTwoFactorReconfiguration,
   confirmAdminTwoFactorSetup,
   getAdminSecurityCenter,
   getAdminTwoFactorStatus,
+  startAdminTwoFactorReconfiguration,
   startAdminTwoFactorSetup,
   verifyAdminTwoFactor,
 } from '../api/adminAuthApi';
 
 vi.mock('../api/adminAuthApi', () => ({
   cancelAdminTwoFactorChallenge: vi.fn().mockResolvedValue({ ok: true }),
+  confirmAdminTwoFactorReconfiguration: vi.fn(),
   confirmAdminTwoFactorSetup: vi.fn(),
   disableAdminTwoFactor: vi.fn(),
   getAdminTwoFactorStatus: vi.fn(),
@@ -23,6 +26,7 @@ vi.mock('../api/adminAuthApi', () => ({
   revokeAllAdminSessions: vi.fn(),
   revokeOtherAdminSessions: vi.fn(),
   regenerateAdminRecoveryCodes: vi.fn(),
+  startAdminTwoFactorReconfiguration: vi.fn(),
   startAdminTwoFactorSetup: vi.fn(),
   verifyAdminTwoFactor: vi.fn(),
 }));
@@ -108,5 +112,56 @@ describe('Seguridad administrativa 2FA', () => {
 
     expect(await screen.findByText('ABCDE-23456')).toBeInTheDocument();
     expect(screen.getByText(/Solo se muestran una vez/)).toBeInTheDocument();
+  });
+
+  it('cambia la aplicación 2FA sin desactivar la protección anterior', async () => {
+    const user = userEvent.setup();
+    getAdminTwoFactorStatus.mockResolvedValue({
+      ok: true,
+      twoFactor: {
+        enabled: true,
+        required: true,
+        compliant: true,
+        recoveryCodesRemaining: 8,
+      },
+    });
+    startAdminTwoFactorReconfiguration.mockResolvedValue({
+      ok: true,
+      message: 'Escanea el nuevo código QR.',
+      setup: {
+        qrCodeDataUrl: 'data:image/png;base64,BB==',
+        manualSecret: 'NEWSECRET2345678',
+      },
+    });
+    confirmAdminTwoFactorReconfiguration.mockResolvedValue({
+      ok: true,
+      message: 'Aplicación 2FA cambiada correctamente.',
+      recoveryCodes: ['NEWCD-23456'],
+      twoFactor: { enabled: true, recoveryCodesRemaining: 1 },
+    });
+
+    render(<SeguridadSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Cambiar aplicación 2FA' }));
+    await user.type(screen.getByPlaceholderText('Contraseña actual'), 'Password!123');
+    await user.type(screen.getByPlaceholderText('Código TOTP o de recuperación'), '654321');
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => {
+      expect(startAdminTwoFactorReconfiguration).toHaveBeenCalledWith({
+        currentPassword: 'Password!123',
+        code: '654321',
+      });
+    });
+    expect(await screen.findByAltText('Nuevo código QR para cambiar la aplicación 2FA')).toBeInTheDocument();
+    expect(screen.getByText('NEWSECRET2345678')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Código nuevo de 6 dígitos'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Confirmar cambio seguro' }));
+
+    await waitFor(() => {
+      expect(confirmAdminTwoFactorReconfiguration).toHaveBeenCalledWith('123456');
+    });
+    expect(await screen.findByText('NEWCD-23456')).toBeInTheDocument();
   });
 });

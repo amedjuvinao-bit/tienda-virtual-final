@@ -96,6 +96,24 @@ export async function confirmAdminTwoFactorSetup(code) {
   }
 }
 
+export async function startAdminTwoFactorReconfiguration(payload) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/reconfigure`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo iniciar el cambio de aplicación 2FA.');
+  }
+}
+
+export async function confirmAdminTwoFactorReconfiguration(code) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/reconfigure/confirm`, { code });
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo confirmar el cambio de aplicación 2FA.');
+  }
+}
+
 export async function regenerateAdminRecoveryCodes(payload) {
   try {
     const response = await api.post(`${BASE_URL}/2fa/recovery-codes`, payload);
@@ -199,6 +217,7 @@ export async function changeRequiredAdminPassword(payload) {
 
 const adminAuthApi = {
   cancelAdminTwoFactorChallenge,
+  confirmAdminTwoFactorReconfiguration,
   confirmAdminTwoFactorSetup,
   disableAdminTwoFactor,
   getAdminSecurityCenter,
@@ -208,6 +227,7 @@ const adminAuthApi = {
   revokeAdminSession,
   revokeAllAdminSessions,
   revokeOtherAdminSessions,
+  startAdminTwoFactorReconfiguration,
   startAdminTwoFactorSetup,
   verifyAdminTwoFactor,
   verifyAdminSession,

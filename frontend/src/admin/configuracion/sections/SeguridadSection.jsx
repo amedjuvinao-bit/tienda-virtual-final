@@ -17,6 +17,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import {
+  confirmAdminTwoFactorReconfiguration,
   confirmAdminTwoFactorSetup,
   disableAdminTwoFactor,
   getAdminSecurityCenter,
@@ -25,6 +26,7 @@ import {
   revokeAllAdminSessions,
   revokeAdminSession,
   revokeOtherAdminSessions,
+  startAdminTwoFactorReconfiguration,
   startAdminTwoFactorSetup,
 } from '../../api/adminAuthApi';
 
@@ -196,6 +198,8 @@ export default function SeguridadSection() {
   const [setup, setSetup] = useState(null);
   const [setupPassword, setSetupPassword] = useState('');
   const [setupCode, setSetupCode] = useState('');
+  const [reconfiguration, setReconfiguration] = useState(null);
+  const [reconfigurationCode, setReconfigurationCode] = useState('');
   const [action, setAction] = useState('');
   const [actionPassword, setActionPassword] = useState('');
   const [actionCode, setActionCode] = useState('');
@@ -254,13 +258,42 @@ export default function SeguridadSection() {
     try {
       setBusy(true); setFeedback(null);
       const payload = { currentPassword: actionPassword, code: actionCode };
-      const response = action === 'disable' ? await disableAdminTwoFactor(payload) : await regenerateAdminRecoveryCodes(payload);
+      const response = action === 'disable'
+        ? await disableAdminTwoFactor(payload)
+        : action === 'reconfigure'
+          ? await startAdminTwoFactorReconfiguration(payload)
+          : await regenerateAdminRecoveryCodes(payload);
+      if (action === 'reconfigure') {
+        setReconfiguration(response.setup);
+        setAction(''); setActionPassword(''); setActionCode('');
+        setFeedback({ type: 'success', text: response.message });
+        return;
+      }
       if (action === 'disable') { setStatus(EMPTY_STATUS); setRecoveryCodes([]); }
       else { setRecoveryCodes(response.recoveryCodes || []); setStatus((current) => ({ ...current, recoveryCodesRemaining: response.recoveryCodes?.length || 0 })); }
       setAction(''); setActionPassword(''); setActionCode(''); setFeedback({ type: 'success', text: response.message });
       await loadSecurity({ showLoader: false });
     } catch (error) { setFeedback({ type: 'error', text: error.userMessage }); }
     finally { setBusy(false); }
+  };
+
+  const confirmReconfiguration = async (event) => {
+    event.preventDefault();
+    try {
+      setBusy(true); setFeedback(null);
+      const response = await confirmAdminTwoFactorReconfiguration(reconfigurationCode);
+      setRecoveryCodes(response.recoveryCodes || []);
+      setStatus((current) => ({ ...current, ...response.twoFactor }));
+      setReconfiguration(null); setReconfigurationCode('');
+      setFeedback({ type: 'success', text: response.message });
+      await loadSecurity({ showLoader: false });
+    } catch (error) {
+      setFeedback({ type: 'error', text: error.userMessage });
+      if (error?.response?.data?.setupExpired) {
+        setReconfiguration(null);
+        setReconfigurationCode('');
+      }
+    } finally { setBusy(false); }
   };
 
   const submitSessionAction = async (event) => {
@@ -304,7 +337,29 @@ export default function SeguridadSection() {
 
       <RecoveryCodes codes={recoveryCodes} />
 
-      {!status.enabled ? <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>{!setup ? <form onSubmit={beginSetup} className="grid max-w-xl gap-4"><div className="flex items-center gap-3"><Smartphone /><div><h3 className="font-black">Vincula tu aplicación</h3><p className="text-sm opacity-65">Confirma primero tu contraseña actual.</p></div></div><input type="password" value={setupPassword} onChange={(event) => setSetupPassword(event.target.value)} placeholder="Contraseña actual" autoComplete="current-password" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><button disabled={busy} className="inline-flex w-fit items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={17} /> : <KeyRound size={17} />} Configurar 2FA</button></form> : <form onSubmit={confirmSetup} className="grid gap-5 md:grid-cols-[300px_1fr]"><div className="rounded-3xl bg-white p-3"><img src={setup.qrCodeDataUrl} alt="Código QR para configurar autenticación en dos pasos" className="w-full" /></div><div className="grid content-start gap-4"><div><h3 className="text-xl font-black">Escanea el código QR</h3><p className="mt-1 text-sm leading-6 opacity-70">Usa Google Authenticator, Microsoft Authenticator, Authy o cualquier aplicación TOTP.</p></div><div className="rounded-2xl border p-3 text-sm" style={{ borderColor: 'var(--admin-glass-border)' }}><small className="opacity-60">Clave manual</small><p className="mt-1 break-all font-mono font-bold tracking-wider">{setup.manualSecret}</p></div><input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="Código de 6 dígitos" required disabled={busy} className="rounded-2xl border px-4 py-3 text-center text-lg font-black tracking-[0.2em] outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><button disabled={busy} className="inline-flex w-fit items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />} Confirmar y activar</button></div></form>}</section> : <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>{!action ? <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setAction('regenerate')} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black" style={{ borderColor: 'var(--admin-glass-border)' }}><RefreshCw size={17} /> Regenerar códigos</button>{!status.required ? <button type="button" onClick={() => setAction('disable')} className="inline-flex items-center gap-2 rounded-2xl border border-rose-300 px-4 py-3 text-sm font-black text-rose-700"><ShieldOff size={17} /> Desactivar 2FA</button> : null}</div> : <form onSubmit={submitProtectedAction} className="grid max-w-xl gap-4"><div><h3 className="font-black">{action === 'disable' ? 'Desactivar segundo factor' : 'Crear códigos nuevos'}</h3><p className="mt-1 text-sm opacity-65">Confirma tu contraseña y un código TOTP o de recuperación. Las demás sesiones se revocarán.</p></div><input type="password" value={actionPassword} onChange={(event) => setActionPassword(event.target.value)} placeholder="Contraseña actual" autoComplete="current-password" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><input value={actionCode} onChange={(event) => setActionCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 11))} placeholder="Código TOTP o de recuperación" autoComplete="one-time-code" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><div className="flex flex-wrap gap-2"><button disabled={busy} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-60 ${action === 'disable' ? 'bg-rose-700' : 'bg-slate-950'}`}>{busy ? <Loader2 className="animate-spin" size={17} /> : <Check size={17} />} Confirmar</button><button type="button" onClick={() => setAction('')} disabled={busy} className="rounded-2xl border px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-glass-border)' }}>Cancelar</button></div></form>}</section>}
+      {!status.enabled ? (
+        <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>
+          {!setup ? <form onSubmit={beginSetup} className="grid max-w-xl gap-4"><div className="flex items-center gap-3"><Smartphone /><div><h3 className="font-black">Vincula tu aplicación</h3><p className="text-sm opacity-65">Confirma primero tu contraseña actual.</p></div></div><input type="password" value={setupPassword} onChange={(event) => setSetupPassword(event.target.value)} placeholder="Contraseña actual" autoComplete="current-password" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><button disabled={busy} className="inline-flex w-fit items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={17} /> : <KeyRound size={17} />} Configurar 2FA</button></form> : <form onSubmit={confirmSetup} className="grid gap-5 md:grid-cols-[300px_1fr]"><div className="rounded-3xl bg-white p-3"><img src={setup.qrCodeDataUrl} alt="Código QR para configurar autenticación en dos pasos" className="w-full" /></div><div className="grid content-start gap-4"><div><h3 className="text-xl font-black">Escanea el código QR</h3><p className="mt-1 text-sm leading-6 opacity-70">Usa Google Authenticator, Microsoft Authenticator, Authy o cualquier aplicación TOTP.</p></div><div className="rounded-2xl border p-3 text-sm" style={{ borderColor: 'var(--admin-glass-border)' }}><small className="opacity-60">Clave manual</small><p className="mt-1 break-all font-mono font-bold tracking-wider">{setup.manualSecret}</p></div><input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="Código de 6 dígitos" required disabled={busy} className="rounded-2xl border px-4 py-3 text-center text-lg font-black tracking-[0.2em] outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><button disabled={busy} className="inline-flex w-fit items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />} Confirmar y activar</button></div></form>}
+        </section>
+      ) : (
+        <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>
+          {reconfiguration ? (
+            <form onSubmit={confirmReconfiguration} className="grid gap-5 md:grid-cols-[300px_1fr]">
+              <div className="rounded-3xl bg-white p-3"><img src={reconfiguration.qrCodeDataUrl} alt="Nuevo código QR para cambiar la aplicación 2FA" className="w-full" /></div>
+              <div className="grid content-start gap-4">
+                <div><h3 className="text-xl font-black">Vincula la nueva aplicación</h3><p className="mt-1 text-sm leading-6 opacity-70">La aplicación anterior continúa activa hasta que confirmes un código generado por esta nueva vinculación.</p></div>
+                <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: 'var(--admin-glass-border)' }}><small className="opacity-60">Nueva clave manual</small><p className="mt-1 break-all font-mono font-bold tracking-wider">{reconfiguration.manualSecret}</p></div>
+                <input value={reconfigurationCode} onChange={(event) => setReconfigurationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="Código nuevo de 6 dígitos" required disabled={busy} className="rounded-2xl border px-4 py-3 text-center text-lg font-black tracking-[0.2em] outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} />
+                <div className="flex flex-wrap gap-2"><button disabled={busy} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={17} /> : <ShieldCheck size={17} />} Confirmar cambio seguro</button><button type="button" onClick={() => { setReconfiguration(null); setReconfigurationCode(''); setFeedback({ type: 'success', text: 'Cambio cancelado. La aplicación anterior continúa activa.' }); }} disabled={busy} className="rounded-2xl border px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-glass-border)' }}>Cancelar</button></div>
+              </div>
+            </form>
+          ) : !action ? (
+            <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setAction('reconfigure')} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black" style={{ borderColor: 'var(--admin-glass-border)' }}><Smartphone size={17} /> Cambiar aplicación 2FA</button><button type="button" onClick={() => setAction('regenerate')} className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black" style={{ borderColor: 'var(--admin-glass-border)' }}><RefreshCw size={17} /> Regenerar códigos</button>{!status.required ? <button type="button" onClick={() => setAction('disable')} className="inline-flex items-center gap-2 rounded-2xl border border-rose-300 px-4 py-3 text-sm font-black text-rose-700"><ShieldOff size={17} /> Desactivar 2FA</button> : null}</div>
+          ) : (
+            <form onSubmit={submitProtectedAction} className="grid max-w-xl gap-4"><div><h3 className="font-black">{action === 'disable' ? 'Desactivar segundo factor' : action === 'reconfigure' ? 'Autorizar cambio de aplicación' : 'Crear códigos nuevos'}</h3><p className="mt-1 text-sm opacity-65">Confirma tu contraseña y un código TOTP o de recuperación. {action === 'reconfigure' ? 'La aplicación anterior seguirá activa hasta validar la nueva.' : 'Las demás sesiones se revocarán.'}</p></div><input type="password" value={actionPassword} onChange={(event) => setActionPassword(event.target.value)} placeholder="Contraseña actual" autoComplete="current-password" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><input value={actionCode} onChange={(event) => setActionCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 11))} placeholder="Código TOTP o de recuperación" autoComplete="one-time-code" required disabled={busy} className="rounded-2xl border px-4 py-3 outline-none" style={{ background: 'var(--admin-input-bg)', borderColor: 'var(--admin-input-border)', color: 'var(--admin-input-text)' }} /><div className="flex flex-wrap gap-2"><button disabled={busy} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-60 ${action === 'disable' ? 'bg-rose-700' : 'bg-slate-950'}`}>{busy ? <Loader2 className="animate-spin" size={17} /> : <Check size={17} />} Confirmar</button><button type="button" onClick={() => setAction('')} disabled={busy} className="rounded-2xl border px-5 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-glass-border)' }}>Cancelar</button></div></form>
+          )}
+        </section>
+      )}
 
       <SessionList sessions={security.sessions || []} busy={busy} onRevoke={(session) => setSessionAction({ type: 'one', session })} onRevokeAll={() => setSessionAction({ type: 'all' })} onRevokeOthers={() => setSessionAction({ type: 'others' })} />
 

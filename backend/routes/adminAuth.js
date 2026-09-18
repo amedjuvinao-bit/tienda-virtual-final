@@ -1498,6 +1498,211 @@ router.post('/2fa/confirm', requireAdmin, async (req, res) => {
   }
 });
 
+router.post('/2fa/reconfigure', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    if (!adminUser.twoFactorEnabled || !adminUser.twoFactorSecret) {
+      return res.status(409).json({
+        ok: false,
+        message: 'Activa primero el segundo factor antes de cambiar la aplicación.',
+      });
+    }
+
+    const verification = await verifyTwoFactorManagementCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.reconfigure.request',
+        success: false,
+        description: 'Credenciales inválidas al iniciar el cambio de aplicación 2FA.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad actual no son válidos.',
+      });
+    }
+
+    const secret = generateTotpSecret();
+    const issuer = String(process.env.ADMIN_2FA_ISSUER || 'Tienda Virtual').trim();
+    const otpauthUrl = buildTotpUri({
+      secret,
+      username: adminUser.email || adminUser.username,
+      issuer,
+    });
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 280,
+    });
+
+    adminUser.twoFactorPendingSecret = encryptTwoFactorSecret(secret);
+    adminUser.twoFactorPendingExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    adminUser.twoFactorPendingAttempts = 0;
+    await adminUser.save({ validateBeforeSave: false });
+
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.reconfigure.request',
+      success: true,
+      description: 'Cambio de aplicación 2FA autorizado e iniciado.',
+      metadata: { recoveryCodeUsed: verification.recoveryCodeUsed },
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Escanea el nuevo código QR. La aplicación anterior seguirá activa hasta confirmar.',
+      setup: {
+        qrCodeDataUrl,
+        manualSecret: secret,
+        expiresAt: adminUser.twoFactorPendingExpiresAt,
+        issuer,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error iniciando cambio de aplicación 2FA:', error.message);
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.reconfigure.request',
+      success: false,
+      description: 'Error al iniciar el cambio de aplicación 2FA.',
+      errorMessage: error.message,
+      statusCode: error.code === 'ADMIN_2FA_KEY_MISSING' ? 503 : 500,
+    });
+    const misconfigured = error.code === 'ADMIN_2FA_KEY_MISSING';
+    return res.status(misconfigured ? 503 : 500).json({
+      ok: false,
+      message: misconfigured
+        ? 'El servidor aún no tiene configurada la clave segura para 2FA.'
+        : 'No se pudo iniciar el cambio de aplicación 2FA.',
+    });
+  }
+});
+
+router.post('/2fa/reconfigure/confirm', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    if (!adminUser.twoFactorEnabled || !adminUser.twoFactorSecret) {
+      return res.status(409).json({
+        ok: false,
+        message: 'El segundo factor actual ya no está activo.',
+      });
+    }
+    if (
+      !adminUser.twoFactorPendingSecret ||
+      !adminUser.twoFactorPendingExpiresAt ||
+      new Date(adminUser.twoFactorPendingExpiresAt).getTime() <= Date.now()
+    ) {
+      adminUser.twoFactorPendingSecret = '';
+      adminUser.twoFactorPendingExpiresAt = null;
+      adminUser.twoFactorPendingAttempts = 0;
+      await adminUser.save({ validateBeforeSave: false });
+      return res.status(400).json({
+        ok: false,
+        setupExpired: true,
+        message: 'El cambio venció. La aplicación anterior continúa activa.',
+      });
+    }
+
+    const pendingSecret = decryptTwoFactorSecret(adminUser.twoFactorPendingSecret);
+    const code = String(req.body?.code || '').trim();
+    if (!verifyTotp(pendingSecret, code)) {
+      adminUser.twoFactorPendingAttempts = Math.min(
+        5,
+        Number(adminUser.twoFactorPendingAttempts || 0) + 1
+      );
+      const remainingAttempts = Math.max(0, 5 - adminUser.twoFactorPendingAttempts);
+      if (remainingAttempts === 0) {
+        adminUser.twoFactorPendingSecret = '';
+        adminUser.twoFactorPendingExpiresAt = null;
+      }
+      await adminUser.save({ validateBeforeSave: false });
+
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.reconfigure.confirm',
+        success: false,
+        description: 'Código nuevo inválido al cambiar la aplicación 2FA.',
+        metadata: { remainingAttempts },
+        statusCode: 400,
+      });
+
+      return res.status(400).json({
+        ok: false,
+        setupExpired: remainingAttempts === 0,
+        remainingAttempts,
+        message:
+          remainingAttempts === 0
+            ? 'Se agotaron los intentos. La aplicación anterior continúa activa.'
+            : `Código nuevo incorrecto. Te quedan ${remainingAttempts} intento(s).`,
+      });
+    }
+
+    const recoveryCodes = generateRecoveryCodes(10);
+    adminUser.twoFactorSecret = adminUser.twoFactorPendingSecret;
+    adminUser.twoFactorPendingSecret = '';
+    adminUser.twoFactorPendingExpiresAt = null;
+    adminUser.twoFactorPendingAttempts = 0;
+    adminUser.twoFactorRecoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+    adminUser.twoFactorLastUsedAt = new Date();
+    await adminUser.save({ validateBeforeSave: false });
+
+    await revokeOtherUserSessions(
+      adminUser._id,
+      req.adminSessionId,
+      'two_factor_reconfigured'
+    );
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.reconfigure.confirm',
+      success: true,
+      description: 'Aplicación 2FA cambiada de forma segura.',
+      metadata: { recoveryCodesGenerated: recoveryCodes.length },
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Aplicación 2FA cambiada correctamente. Guarda los nuevos códigos.',
+      recoveryCodes,
+      twoFactor: {
+        enabled: true,
+        enabledAt: adminUser.twoFactorEnabledAt,
+        lastUsedAt: adminUser.twoFactorLastUsedAt,
+        recoveryCodesRemaining: recoveryCodes.length,
+        setupPending: false,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error confirmando cambio de aplicación 2FA:', error.message);
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.reconfigure.confirm',
+      success: false,
+      description: 'Error al confirmar el cambio de aplicación 2FA.',
+      errorMessage: error.message,
+      statusCode: 500,
+    });
+    return res.status(500).json({
+      ok: false,
+      message: 'No se pudo confirmar el cambio. La aplicación anterior continúa activa.',
+    });
+  }
+});
+
 router.post('/2fa/recovery-codes', requireAdmin, async (req, res) => {
   let authResult;
   try {
