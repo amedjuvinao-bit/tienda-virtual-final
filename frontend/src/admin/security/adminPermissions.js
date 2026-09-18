@@ -45,6 +45,7 @@ export const ADMIN_ROUTE_PERMISSIONS = {
   'configuracion/panel-admin': ['settings:panel'],
   'configuracion/usuarios': ['admin-users:view'],
   'configuracion/perfiles': ['roles:view'],
+  'configuracion/seguridad': [],
   'configuracion/logs': ['logs:view'],
 };
 

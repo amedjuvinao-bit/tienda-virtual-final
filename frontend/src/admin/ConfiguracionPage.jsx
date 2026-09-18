@@ -13,6 +13,7 @@ import {
   IdCard,
   FileSearch,
   Building2,
+  Fingerprint,
 } from 'lucide-react';
 
 // 🔹 IMPORTS MODULARES
@@ -26,6 +27,7 @@ import UsuariosSection from './configuracion/sections/UsuariosSection';
 import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
 import SedesSection from './configuracion/sections/SedesSection';
+import SeguridadSection from './configuracion/sections/SeguridadSection';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
@@ -84,6 +86,12 @@ const TABS = [
     description: 'Roles y permisos del sistema.',
   },
   {
+    id: 'seguridad',
+    label: 'Seguridad',
+    icon: Fingerprint,
+    description: 'Segundo factor y códigos de recuperación de tu cuenta.',
+  },
+  {
     id: 'logs',
     label: 'Logs',
     icon: FileSearch,
@@ -124,6 +132,8 @@ export default function ConfiguracionPage() {
         return <UsuariosSection />;
       case 'perfiles':
         return <PerfilesSection />;
+      case 'seguridad':
+        return <SeguridadSection />;
       case 'logs':
         return <LogsSection />;
       default:

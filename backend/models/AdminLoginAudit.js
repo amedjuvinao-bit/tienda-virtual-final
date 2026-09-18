@@ -17,7 +17,7 @@ const AdminLoginAuditSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['success', 'failed', 'blocked', 'error'],
+      enum: ['success', 'pending', 'failed', 'blocked', 'error'],
       required: true,
     },
 

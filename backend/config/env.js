@@ -126,6 +126,10 @@ const env = {
   integrationsEncryptionKeySource: integrationsEncryption.value
     ? integrationsEncryption.name
     : '',
+  adminTwoFactor: {
+    encryptionKey: clean(process.env.ADMIN_2FA_ENCRYPTION_KEY),
+    issuer: clean(process.env.ADMIN_2FA_ISSUER) || 'Tienda Virtual',
+  },
   cloudinary: {
     cloudName: cloudName.value,
     cloudNameSource: cloudName.name,
@@ -199,6 +203,13 @@ function assertEnv(config = env) {
     errors.push('INTEGRATIONS_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
   }
 
+  if (
+    config.adminTwoFactor?.encryptionKey &&
+    config.adminTwoFactor.encryptionKey.length < 32
+  ) {
+    errors.push('ADMIN_2FA_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
+  }
+
   if (config.mailEncryptionKey && config.mailEncryptionKey.length < 32) {
     errors.push('MAIL_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
   }
@@ -208,13 +219,16 @@ function assertEnv(config = env) {
   }
 
   if (
-    config.adminSession.cookieSameSite &&
+    config.adminSession?.cookieSameSite &&
     !['strict', 'lax', 'none'].includes(config.adminSession.cookieSameSite)
   ) {
     errors.push('ADMIN_COOKIE_SAME_SITE debe ser strict, lax o none.');
   }
 
-  if (config.adminSession.idleHours > config.adminSession.absoluteHours) {
+  if (
+    config.adminSession &&
+    config.adminSession.idleHours > config.adminSession.absoluteHours
+  ) {
     errors.push('ADMIN_SESSION_IDLE_HOURS no puede superar ADMIN_SESSION_ABSOLUTE_HOURS.');
   }
 
@@ -344,6 +358,21 @@ function getSafeEnvSummary() {
     ),
     integrationsEncryptionKeySource:
       env.integrationsEncryptionKeySource || 'not_configured',
+    adminTwoFactor: {
+      encryptionConfigured: Boolean(
+        (env.adminTwoFactor.encryptionKey &&
+          env.adminTwoFactor.encryptionKey.length >= 32) ||
+          (env.integrationsEncryptionKey &&
+            env.integrationsEncryptionKey.length >= 32)
+      ),
+      encryptionKeySource:
+        env.adminTwoFactor.encryptionKey?.length >= 32
+          ? 'ADMIN_2FA_ENCRYPTION_KEY'
+          : env.integrationsEncryptionKey?.length >= 32
+            ? env.integrationsEncryptionKeySource
+            : 'not_configured',
+      issuer: env.adminTwoFactor.issuer,
+    },
     cloudinary: {
       backendConfigured: cloudinaryBackendConfigured,
       cloudNameConfigured: Boolean(env.cloudinary.cloudName),

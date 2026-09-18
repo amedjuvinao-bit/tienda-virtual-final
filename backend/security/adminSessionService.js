@@ -7,6 +7,7 @@ const AdminSession = require('../models/AdminSession');
 
 const ACCESS_COOKIE_BASE = 'rb_admin_access';
 const REFRESH_COOKIE_BASE = 'rb_admin_refresh';
+const TWO_FACTOR_COOKIE_BASE = 'rb_admin_2fa';
 const JWT_ISSUER = 'tienda-virtual-backend';
 const JWT_AUDIENCE = 'tienda-virtual-admin';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -62,6 +63,9 @@ function getCookieNames() {
   return {
     access: secure ? `__Host-${ACCESS_COOKIE_BASE}` : ACCESS_COOKIE_BASE,
     refresh: secure ? `__Secure-${REFRESH_COOKIE_BASE}` : REFRESH_COOKIE_BASE,
+    twoFactor: secure
+      ? `__Secure-${TWO_FACTOR_COOKIE_BASE}`
+      : TWO_FACTOR_COOKIE_BASE,
   };
 }
 
@@ -112,6 +116,17 @@ function getRefreshToken(req) {
     cookies[names.refresh] ||
     cookies[REFRESH_COOKIE_BASE] ||
     cookies[`__Secure-${REFRESH_COOKIE_BASE}`] ||
+    ''
+  );
+}
+
+function getTwoFactorChallengeToken(req) {
+  const cookies = parseCookies(req?.headers?.cookie || '');
+  const names = getCookieNames();
+  return (
+    cookies[names.twoFactor] ||
+    cookies[TWO_FACTOR_COOKIE_BASE] ||
+    cookies[`__Secure-${TWO_FACTOR_COOKIE_BASE}`] ||
     ''
   );
 }
@@ -178,6 +193,23 @@ function clearSessionCookies(res) {
   res.clearCookie(
     names.refresh,
     buildCookieOptions({ maxAge: 0, path: '/api/admin/auth' })
+  );
+}
+
+function setTwoFactorChallengeCookie(res, token, maxAge = 5 * 60 * 1000) {
+  const names = getCookieNames();
+  res.cookie(
+    names.twoFactor,
+    token,
+    buildCookieOptions({ maxAge, path: '/api/admin/auth/2fa' })
+  );
+}
+
+function clearTwoFactorChallengeCookie(res) {
+  const names = getCookieNames();
+  res.clearCookie(
+    names.twoFactor,
+    buildCookieOptions({ maxAge: 0, path: '/api/admin/auth/2fa' })
   );
 }
 
@@ -416,6 +448,19 @@ async function revokeAllUserSessions(adminUserId, reason = 'security_change') {
   );
 }
 
+async function revokeOtherUserSessions(
+  adminUserId,
+  keepSessionId,
+  reason = 'security_change'
+) {
+  if (!adminUserId) return;
+  const filter = { adminUser: adminUserId, revokedAt: null };
+  if (keepSessionId) filter.sessionId = { $ne: keepSessionId };
+  await AdminSession.updateMany(filter, {
+    $set: { revokedAt: new Date(), revokeReason: reason },
+  });
+}
+
 function normalizeOrigin(value) {
   try {
     return new URL(String(value || '').trim()).origin;
@@ -459,17 +504,21 @@ function requireTrustedAdminOrigin(req, res, next) {
 
 module.exports = {
   clearSessionCookies,
+  clearTwoFactorChallengeCookie,
   getAccessCredential,
   getRefreshToken,
+  getTwoFactorChallengeToken,
   isTrustedRequestOrigin,
   issueRotatedSession,
   loadActiveSession,
   requireTrustedAdminOrigin,
   revokeAllUserSessions,
+  revokeOtherUserSessions,
   revokeRequestSession,
   revokeSessionById,
   rotateRefreshToken,
   signAccessToken,
+  setTwoFactorChallengeCookie,
   startAdminSession,
   verifyAccessToken,
 };

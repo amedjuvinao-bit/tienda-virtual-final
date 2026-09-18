@@ -43,6 +43,77 @@ export async function loginAdmin(credentials) {
   }
 }
 
+export async function verifyAdminTwoFactor(code) {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/2fa/verify`,
+      { code: code || '' },
+      { skipAdminRefresh: true }
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo verificar el segundo factor.');
+  }
+}
+
+export async function cancelAdminTwoFactorChallenge() {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/2fa/cancel`,
+      null,
+      { skipAdminRefresh: true }
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo cancelar el segundo factor.');
+  }
+}
+
+export async function getAdminTwoFactorStatus() {
+  try {
+    const response = await api.get(`${BASE_URL}/2fa/status`);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo consultar el estado del segundo factor.');
+  }
+}
+
+export async function startAdminTwoFactorSetup(currentPassword) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/setup`, { currentPassword });
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo iniciar la configuración del segundo factor.');
+  }
+}
+
+export async function confirmAdminTwoFactorSetup(code) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/confirm`, { code });
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo activar el segundo factor.');
+  }
+}
+
+export async function regenerateAdminRecoveryCodes(payload) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/recovery-codes`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudieron regenerar los códigos.');
+  }
+}
+
+export async function disableAdminTwoFactor(payload) {
+  try {
+    const response = await api.post(`${BASE_URL}/2fa/disable`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo desactivar el segundo factor.');
+  }
+}
+
 export async function verifyAdminSession() {
   try {
     const response = await api.get(`${BASE_URL}/verify`);
@@ -88,7 +159,14 @@ export async function changeRequiredAdminPassword(payload) {
 }
 
 const adminAuthApi = {
+  cancelAdminTwoFactorChallenge,
+  confirmAdminTwoFactorSetup,
+  disableAdminTwoFactor,
+  getAdminTwoFactorStatus,
   loginAdmin,
+  regenerateAdminRecoveryCodes,
+  startAdminTwoFactorSetup,
+  verifyAdminTwoFactor,
   verifyAdminSession,
   logoutAdminSession,
   changeRequiredAdminPassword,

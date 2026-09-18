@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
 import { loginAdmin, logoutAdminSession } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
+import TwoFactorChallengeModal from "./login/TwoFactorChallengeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
 import "./login/LoginFlagship.css";
 import "./login/LoginCuratedThemes.css";
@@ -923,6 +924,9 @@ export default function Login() {
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
   const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
+  const [showTwoFactorChallenge, setShowTwoFactorChallenge] = useState(false);
+  const [twoFactorUser, setTwoFactorUser] = useState(null);
+  const [pendingLoginName, setPendingLoginName] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -1028,34 +1032,64 @@ export default function Login() {
     });
   };
 
-  const handleRequiredPasswordSuccess = (response) => {
+  const completeAuthenticatedLogin = (response, loginName) => {
     if (!response?.user) {
       clearTemporaryAdminSession();
+      setError(
+        "No se recibió una sesión válida. Inicia sesión nuevamente."
+      );
+      return false;
+    }
+
+    saveRememberedLogin(loginName, rememberMe);
+    login(response.user);
+    clearLoginSecurityState();
+    if (!rememberMe) setUsername("");
+    setPassword("");
+    setPendingLoginName('');
+    navigate("/admin/dashboard");
+    return true;
+  };
+
+  const handleRequiredPasswordSuccess = (response) => {
+    if (!completeAuthenticatedLogin(response, pendingLoginName || username.trim())) {
       setShowRequiredPasswordChange(false);
       setRequiredPasswordUser(null);
-      setError(
-        "La contraseña se cambió, pero no se recibió una sesión válida. Inicia sesión nuevamente."
-      );
       return;
     }
 
-    saveRememberedLogin(username.trim(), rememberMe);
-    login(response.user);
-    clearLoginSecurityState();
-    setUsername("");
-    setPassword("");
     setShowRequiredPasswordChange(false);
     setRequiredPasswordUser(null);
-
-    navigate("/admin/dashboard");
   };
 
   const handleRequiredPasswordCancel = () => {
     clearTemporaryAdminSession();
     setShowRequiredPasswordChange(false);
     setRequiredPasswordUser(null);
+    setPendingLoginName('');
     setPassword("");
     setError("Debes cambiar la contraseña temporal para ingresar al panel.");
+  };
+
+  const handleTwoFactorSuccess = (response) => {
+    setShowTwoFactorChallenge(false);
+    setTwoFactorUser(null);
+
+    if (response?.user?.mustChangePassword === true) {
+      setRequiredPasswordUser(response.user);
+      setShowRequiredPasswordChange(true);
+      return;
+    }
+
+    completeAuthenticatedLogin(response, pendingLoginName);
+  };
+
+  const handleTwoFactorCancel = (message) => {
+    setShowTwoFactorChallenge(false);
+    setTwoFactorUser(null);
+    setPendingLoginName('');
+    setPassword('');
+    setError(message || 'Verificación de seguridad cancelada.');
   };
 
   const handleForgotPassword = () => {
@@ -1092,25 +1126,23 @@ export default function Login() {
 
       clearLoginSecurityState();
 
+      if (loginResult?.requiresTwoFactor === true) {
+        setPendingLoginName(cleanUsername);
+        setTwoFactorUser(loginResult.user);
+        setShowTwoFactorChallenge(true);
+        setPassword('');
+        return;
+      }
+
       if (loginResult?.user?.mustChangePassword === true) {
+        setPendingLoginName(cleanUsername);
         setRequiredPasswordUser(loginResult.user);
         setShowRequiredPasswordChange(true);
-        setUsername("");
         setPassword("");
         return;
       }
 
-      saveRememberedLogin(cleanUsername, rememberMe);
-
-      login(loginResult.user);
-
-      if (!rememberMe) {
-        setUsername("");
-      }
-
-      setPassword("");
-
-      navigate("/admin/dashboard");
+      completeAuthenticatedLogin(loginResult, cleanUsername);
     } catch (err) {
       registerFailedAttempt();
       setError(
@@ -1648,6 +1680,12 @@ export default function Login() {
         user={requiredPasswordUser}
         onSuccess={handleRequiredPasswordSuccess}
         onCancel={handleRequiredPasswordCancel}
+      />
+      <TwoFactorChallengeModal
+        open={showTwoFactorChallenge}
+        user={twoFactorUser}
+        onSuccess={handleTwoFactorSuccess}
+        onCancel={handleTwoFactorCancel}
       />
     </div>
   );

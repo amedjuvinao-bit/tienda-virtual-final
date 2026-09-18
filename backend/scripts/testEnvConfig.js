@@ -59,6 +59,12 @@ try {
     ok(`Cifrado de integraciones configurado desde ${summary.integrationsEncryptionKeySource}`);
   }
 
+  if (!summary.adminTwoFactor.encryptionConfigured) {
+    warn('El 2FA administrativo permanecera bloqueado hasta configurar ADMIN_2FA_ENCRYPTION_KEY o INTEGRATIONS_ENCRYPTION_KEY con al menos 32 caracteres.');
+  } else {
+    ok(`Cifrado 2FA configurado desde ${summary.adminTwoFactor.encryptionKeySource}`);
+  }
+
 
   if (!summary.mailEncryptionConfigured) {
     warn('MAIL_ENCRYPTION_KEY no esta configurado. No se podran guardar credenciales SMTP de forma segura.');

@@ -26,6 +26,8 @@ const SENSITIVE_BODY_KEYS = [
   'token',
   'accessToken',
   'refreshToken',
+  'twoFactorCode',
+  'recoveryCode',
   'authorization',
   'apiKey',
   'privateKey',

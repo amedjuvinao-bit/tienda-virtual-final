@@ -373,6 +373,55 @@ const AdminUserSchema = new mongoose.Schema(
       default: '',
     },
 
+    twoFactorPendingSecret: {
+      type: String,
+      select: false,
+      default: '',
+    },
+
+    twoFactorPendingExpiresAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+
+    twoFactorPendingAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+
+    twoFactorRecoveryCodeHashes: {
+      type: [String],
+      select: false,
+      default: [],
+    },
+
+    twoFactorEnabledAt: {
+      type: Date,
+      default: null,
+    },
+
+    twoFactorLastUsedAt: {
+      type: Date,
+      default: null,
+    },
+
+    twoFactorManagementFailedAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+      min: 0,
+    },
+
+    twoFactorManagementLockedUntil: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+
     failedLoginAttempts: {
       type: Number,
       default: 0,
@@ -859,6 +908,12 @@ AdminUserSchema.methods.toSafeObject = function toSafeObject() {
 
   delete user.passwordHash;
   delete user.twoFactorSecret;
+  delete user.twoFactorPendingSecret;
+  delete user.twoFactorPendingExpiresAt;
+  delete user.twoFactorPendingAttempts;
+  delete user.twoFactorRecoveryCodeHashes;
+  delete user.twoFactorManagementFailedAttempts;
+  delete user.twoFactorManagementLockedUntil;
   delete user.failedLoginAttempts;
   delete user.lockedUntil;
   delete user.lastLoginIp;
@@ -953,6 +1008,12 @@ AdminUserSchema.set('toJSON', {
   transform(_doc, ret) {
     delete ret.passwordHash;
     delete ret.twoFactorSecret;
+    delete ret.twoFactorPendingSecret;
+    delete ret.twoFactorPendingExpiresAt;
+    delete ret.twoFactorPendingAttempts;
+    delete ret.twoFactorRecoveryCodeHashes;
+    delete ret.twoFactorManagementFailedAttempts;
+    delete ret.twoFactorManagementLockedUntil;
     delete ret.failedLoginAttempts;
     delete ret.lockedUntil;
     delete ret.lastLoginIp;

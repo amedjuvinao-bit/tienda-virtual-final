@@ -246,6 +246,7 @@ export default function App() {
                     <Route path="configuracion/panel-admin" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/usuarios" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/perfiles" element={protectAdminContent(<ConfiguracionPage />)} />
+                    <Route path="configuracion/seguridad" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="configuracion/logs" element={protectAdminContent(<ConfiguracionPage />)} />
                     <Route path="paginas" element={protectAdminContent(<PagesAdmin />)} />
                     <Route path="paginas/:id" element={protectAdminContent(<PageEditor />)} />

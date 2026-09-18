@@ -2,7 +2,9 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
 
+const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
 const requireAdmin = require('../middleware/requireAdmin');
@@ -13,16 +15,32 @@ const {
 } = require('../security/legacyAdminAuthPolicy');
 const {
   clearSessionCookies,
+  clearTwoFactorChallengeCookie,
   getAccessCredential,
   issueRotatedSession,
   loadActiveSession,
   requireTrustedAdminOrigin,
   revokeAllUserSessions,
+  revokeOtherUserSessions,
   revokeRequestSession,
   rotateRefreshToken,
   startAdminSession,
   verifyAccessToken,
 } = require('../security/adminSessionService');
+const {
+  cancelLoginChallenge,
+  createLoginChallenge,
+  verifyLoginChallenge,
+} = require('../security/adminTwoFactorService');
+const {
+  buildTotpUri,
+  decryptTwoFactorSecret,
+  encryptTwoFactorSecret,
+  generateRecoveryCodes,
+  generateTotpSecret,
+  hashRecoveryCode,
+  verifyTotp,
+} = require('../security/adminTwoFactorCrypto');
 
 const router = express.Router();
 
@@ -127,6 +145,39 @@ async function saveLoginAudit(req, { username = '', status, reason = '' }) {
     });
   } catch (error) {
     console.error('❌ Error guardando auditoría login:', error.message);
+  }
+}
+
+async function saveTwoFactorAudit(req, authResult, {
+  action,
+  success,
+  description,
+  metadata = {},
+  errorMessage = '',
+  statusCode = success ? 200 : 400,
+}) {
+  try {
+    await AdminAuditLog.create({
+      action,
+      permission: 'seguridad:2fa',
+      module: 'seguridad',
+      description,
+      method: req.method,
+      path: req.originalUrl || req.path,
+      routePattern: req.route?.path || '',
+      adminUserId: authResult?.adminUser?._id || null,
+      adminUsername: authResult?.adminUser?.username || '',
+      adminRole: authResult?.adminUser?.role || '',
+      statusCode,
+      success,
+      ip: getClientIp(req),
+      userAgent: getUserAgent(req),
+      requestId: String(req.headers['x-request-id'] || '').slice(0, 120),
+      metadata,
+      errorMessage,
+    });
+  } catch (error) {
+    console.error('❌ Error guardando auditoría 2FA:', error.message);
   }
 }
 
@@ -404,6 +455,7 @@ function buildUserResponseFromDb(adminUser) {
     status: adminUser.status,
     active: adminUser.active,
     mustChangePassword: Boolean(adminUser.mustChangePassword),
+    twoFactorEnabled: Boolean(adminUser.twoFactorEnabled),
 
     profile: safeUser,
   };
@@ -505,6 +557,119 @@ async function findAdminUserForPasswordChange(decoded) {
     _id: decoded.adminUserId,
     deletedAt: null,
   }).select('+passwordHash +tokenVersion +failedLoginAttempts +lockedUntil');
+}
+
+async function findAdminUserForTwoFactor(decoded) {
+  if (!decoded?.adminUserId) return null;
+
+  return AdminUser.findOne({
+    _id: decoded.adminUserId,
+    deletedAt: null,
+  }).select(
+    '+passwordHash +twoFactorSecret +twoFactorPendingSecret +twoFactorPendingExpiresAt +twoFactorPendingAttempts +twoFactorRecoveryCodeHashes +twoFactorManagementFailedAttempts +twoFactorManagementLockedUntil +tokenVersion'
+  );
+}
+
+const TWO_FACTOR_MANAGEMENT_MAX_ATTEMPTS = 5;
+const TWO_FACTOR_MANAGEMENT_LOCK_MS = 10 * 60 * 1000;
+
+function getTwoFactorManagementLock(adminUser) {
+  const lockedUntil = adminUser?.twoFactorManagementLockedUntil;
+  if (!lockedUntil || new Date(lockedUntil).getTime() <= Date.now()) return null;
+  return {
+    reason: 'management_locked',
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000)
+    ),
+  };
+}
+
+async function registerTwoFactorManagementFailure(adminUser) {
+  const attempts = Number(adminUser.twoFactorManagementFailedAttempts || 0) + 1;
+  adminUser.twoFactorManagementFailedAttempts = attempts;
+  if (attempts >= TWO_FACTOR_MANAGEMENT_MAX_ATTEMPTS) {
+    adminUser.twoFactorManagementLockedUntil = new Date(
+      Date.now() + TWO_FACTOR_MANAGEMENT_LOCK_MS
+    );
+  }
+  await adminUser.save({ validateBeforeSave: false });
+  return getTwoFactorManagementLock(adminUser);
+}
+
+async function clearTwoFactorManagementFailures(adminUser) {
+  if (
+    Number(adminUser.twoFactorManagementFailedAttempts || 0) === 0 &&
+    !adminUser.twoFactorManagementLockedUntil
+  ) {
+    return;
+  }
+  adminUser.twoFactorManagementFailedAttempts = 0;
+  adminUser.twoFactorManagementLockedUntil = null;
+  await adminUser.save({ validateBeforeSave: false });
+}
+
+async function verifyTwoFactorManagementCredentials(adminUser, {
+  currentPassword,
+  code,
+  allowRecovery = true,
+  consumeRecovery = true,
+}) {
+  const currentLock = getTwoFactorManagementLock(adminUser);
+  if (currentLock) return { ok: false, ...currentLock };
+
+  if (!currentPassword || !(await adminUser.comparePassword(currentPassword))) {
+    const lock = await registerTwoFactorManagementFailure(adminUser);
+    return { ok: false, reason: 'invalid_password', ...(lock || {}) };
+  }
+  if (!adminUser.twoFactorEnabled || !adminUser.twoFactorSecret) {
+    return { ok: false, reason: 'two_factor_disabled' };
+  }
+
+  let secret;
+  try {
+    secret = decryptTwoFactorSecret(adminUser.twoFactorSecret);
+  } catch {
+    return { ok: false, reason: 'invalid_secret' };
+  }
+
+  if (verifyTotp(secret, code)) {
+    await clearTwoFactorManagementFailures(adminUser);
+    return { ok: true, recoveryCodeUsed: false };
+  }
+
+  if (!allowRecovery) {
+    const lock = await registerTwoFactorManagementFailure(adminUser);
+    return { ok: false, reason: 'invalid_code', ...(lock || {}) };
+  }
+  const recoveryHash = hashRecoveryCode(code);
+  if (!recoveryHash) {
+    const lock = await registerTwoFactorManagementFailure(adminUser);
+    return { ok: false, reason: 'invalid_code', ...(lock || {}) };
+  }
+
+  const hasRecoveryCode = (adminUser.twoFactorRecoveryCodeHashes || []).includes(
+    recoveryHash
+  );
+  if (!hasRecoveryCode) {
+    const lock = await registerTwoFactorManagementFailure(adminUser);
+    return { ok: false, reason: 'invalid_code', ...(lock || {}) };
+  }
+
+  await clearTwoFactorManagementFailures(adminUser);
+
+  if (consumeRecovery) {
+    const update = await AdminUser.updateOne(
+      { _id: adminUser._id, twoFactorRecoveryCodeHashes: recoveryHash },
+      {
+        $pull: { twoFactorRecoveryCodeHashes: recoveryHash },
+        $set: { twoFactorLastUsedAt: new Date() },
+      }
+    );
+    if (!update.modifiedCount) return { ok: false, reason: 'recovery_code_used' };
+  }
+
+  return { ok: true, recoveryCodeUsed: true };
 }
 
 async function findAdminUserForPasswordResetRequest(login) {
@@ -703,11 +868,6 @@ async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
     };
   }
 
-  await adminUser.resetLoginSecurity({
-    ip: getClientIp(req),
-    userAgent: getUserAgent(req),
-  });
-
   return {
     ok: true,
     found: true,
@@ -803,6 +963,44 @@ router.post('/login', async (req, res) => {
     if (dbLoginResult.ok) {
       clearAttempts(attemptKey);
 
+      if (dbLoginResult.adminUser.twoFactorEnabled === true) {
+        dbLoginResult.adminUser.failedLoginAttempts = 0;
+        dbLoginResult.adminUser.lockedUntil = null;
+        await dbLoginResult.adminUser.save({ validateBeforeSave: false });
+
+        const challenge = await createLoginChallenge(
+          req,
+          res,
+          dbLoginResult.adminUser
+        );
+
+        await saveLoginAudit(req, {
+          username: dbLoginResult.user.username,
+          status: 'pending',
+          reason: 'password_verified_2fa_required',
+        });
+
+        return res.status(202).json({
+          ok: true,
+          requiresTwoFactor: true,
+          message: 'Escribe el código de tu aplicación de autenticación.',
+          challenge: {
+            expiresAt: challenge.expiresAt,
+            maxAttempts: challenge.maxAttempts,
+          },
+          user: {
+            username: dbLoginResult.user.username,
+            displayName: dbLoginResult.user.displayName,
+          },
+        });
+      }
+
+      await dbLoginResult.adminUser.resetLoginSecurity({
+        ip: getClientIp(req),
+        userAgent: getUserAgent(req),
+      });
+      clearTwoFactorChallengeCookie(res);
+
       const sessionResult = await startAdminSession({
         req,
         res,
@@ -862,6 +1060,7 @@ router.post('/login', async (req, res) => {
 
     if (legacyLoginResult.ok) {
       clearAttempts(attemptKey);
+      clearTwoFactorChallengeCookie(res);
 
       const sessionResult = await startAdminSession({
         req,
@@ -926,6 +1125,450 @@ router.post('/login', async (req, res) => {
       ok: false,
       message: 'Error interno al iniciar sesión.',
     });
+  }
+});
+
+router.post('/2fa/verify', async (req, res) => {
+  const code = String(req.body?.code || '').trim();
+
+  try {
+    if (!code) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Escribe el código de autenticación o un código de recuperación.',
+      });
+    }
+
+    const verification = await verifyLoginChallenge(req, res, code);
+
+    if (!verification.ok) {
+      const expiredReasons = new Set([
+        'missing_challenge',
+        'invalid_challenge',
+        'challenge_expired',
+        'challenge_consumed',
+        'attempts_exhausted',
+        'user_invalid',
+        'secret_invalid',
+        'recovery_code_used',
+      ]);
+      const challengeEnded = expiredReasons.has(verification.reason);
+
+      await saveLoginAudit(req, {
+        username: verification.username || '',
+        status: challengeEnded ? 'blocked' : 'failed',
+        reason: `two_factor_${verification.reason || 'verification_failed'}`,
+      });
+
+      return res.status(challengeEnded ? 401 : 400).json({
+        ok: false,
+        challengeEnded,
+        remainingAttempts: verification.remainingAttempts,
+        message: challengeEnded
+          ? 'El desafío de seguridad terminó. Inicia sesión nuevamente.'
+          : `Código incorrecto. Te quedan ${verification.remainingAttempts} intento(s).`,
+      });
+    }
+
+    const { adminUser } = verification;
+    await adminUser.resetLoginSecurity({
+      ip: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
+
+    const sessionResult = await startAdminSession({
+      req,
+      res,
+      tokenPayload: buildDbTokenPayload(adminUser),
+      adminUserId: adminUser._id,
+      authType: 'db',
+      username: adminUser.username,
+      tokenVersion: adminUser.tokenVersion,
+    });
+
+    await saveLoginAudit(req, {
+      username: adminUser.username,
+      status: 'success',
+      reason: verification.recoveryCodeUsed
+        ? 'two_factor_recovery_login_success'
+        : 'two_factor_totp_login_success',
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Segundo factor verificado.',
+      recoveryCodeUsed: verification.recoveryCodeUsed,
+      user: buildUserResponseFromDb(adminUser),
+      session: {
+        expiresAt: sessionResult.expiresAt,
+        accessExpiresInSeconds: sessionResult.accessExpiresInSeconds,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error verificando segundo factor:', error.message);
+    clearTwoFactorChallengeCookie(res);
+    return res.status(500).json({
+      ok: false,
+      message: 'No se pudo verificar el segundo factor.',
+    });
+  }
+});
+
+router.post('/2fa/cancel', async (req, res) => {
+  try {
+    await cancelLoginChallenge(req, res);
+  } catch (error) {
+    console.error('❌ Error cancelando desafío 2FA:', error.message);
+    clearTwoFactorChallengeCookie(res);
+  }
+  return res.json({ ok: true });
+});
+
+router.get('/2fa/status', requireAdmin, async (req, res) => {
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const pendingActive = Boolean(
+      adminUser.twoFactorPendingSecret &&
+        adminUser.twoFactorPendingExpiresAt &&
+        new Date(adminUser.twoFactorPendingExpiresAt).getTime() > Date.now()
+    );
+
+    return res.json({
+      ok: true,
+      twoFactor: {
+        enabled: Boolean(adminUser.twoFactorEnabled),
+        enabledAt: adminUser.twoFactorEnabledAt || null,
+        lastUsedAt: adminUser.twoFactorLastUsedAt || null,
+        recoveryCodesRemaining: (adminUser.twoFactorRecoveryCodeHashes || []).length,
+        setupPending: pendingActive,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error consultando estado 2FA:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo consultar el 2FA.' });
+  }
+});
+
+router.post('/2fa/setup', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    if (adminUser.twoFactorEnabled) {
+      return res.status(409).json({ ok: false, message: 'El segundo factor ya está activo.' });
+    }
+
+    const currentLock = getTwoFactorManagementLock(adminUser);
+    if (currentLock) {
+      return res.status(429).json({
+        ok: false,
+        retryAfterSeconds: currentLock.retryAfterSeconds,
+        message: `Demasiados intentos. Intenta nuevamente en ${currentLock.retryAfterSeconds} segundos.`,
+      });
+    }
+
+    const currentPassword = String(req.body?.currentPassword || '');
+    if (!currentPassword || !(await adminUser.comparePassword(currentPassword))) {
+      const lock = await registerTwoFactorManagementFailure(adminUser);
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.setup.request',
+        success: false,
+        description: 'Contraseña inválida al iniciar configuración 2FA.',
+        statusCode: lock ? 429 : 403,
+      });
+      return res.status(lock ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: lock?.retryAfterSeconds,
+        message: lock
+          ? `Demasiados intentos. Intenta nuevamente en ${lock.retryAfterSeconds} segundos.`
+          : 'La contraseña actual no es válida.',
+      });
+    }
+
+    await clearTwoFactorManagementFailures(adminUser);
+
+    const secret = generateTotpSecret();
+    const issuer = String(process.env.ADMIN_2FA_ISSUER || 'Tienda Virtual').trim();
+    const otpauthUrl = buildTotpUri({
+      secret,
+      username: adminUser.email || adminUser.username,
+      issuer,
+    });
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 280,
+    });
+
+    adminUser.twoFactorPendingSecret = encryptTwoFactorSecret(secret);
+    adminUser.twoFactorPendingExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    adminUser.twoFactorPendingAttempts = 0;
+    await adminUser.save({ validateBeforeSave: false });
+
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.setup.request',
+      success: true,
+      description: 'Configuración 2FA iniciada.',
+    });
+
+    return res.json({
+      ok: true,
+      setup: {
+        qrCodeDataUrl,
+        manualSecret: secret,
+        expiresAt: adminUser.twoFactorPendingExpiresAt,
+        issuer,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error iniciando configuración 2FA:', error.message);
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.setup.request',
+      success: false,
+      description: 'Error al iniciar configuración 2FA.',
+      errorMessage: error.message,
+      statusCode: error.code === 'ADMIN_2FA_KEY_MISSING' ? 503 : 500,
+    });
+    const misconfigured = error.code === 'ADMIN_2FA_KEY_MISSING';
+    return res.status(misconfigured ? 503 : 500).json({
+      ok: false,
+      message: misconfigured
+        ? 'El servidor aún no tiene configurada la clave segura para 2FA.'
+        : 'No se pudo iniciar la configuración 2FA.',
+    });
+  }
+});
+
+router.post('/2fa/confirm', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    if (adminUser.twoFactorEnabled) {
+      return res.status(409).json({ ok: false, message: 'El segundo factor ya está activo.' });
+    }
+    if (
+      !adminUser.twoFactorPendingSecret ||
+      !adminUser.twoFactorPendingExpiresAt ||
+      new Date(adminUser.twoFactorPendingExpiresAt).getTime() <= Date.now()
+    ) {
+      adminUser.twoFactorPendingSecret = '';
+      adminUser.twoFactorPendingExpiresAt = null;
+      adminUser.twoFactorPendingAttempts = 0;
+      await adminUser.save({ validateBeforeSave: false });
+      return res.status(400).json({
+        ok: false,
+        setupExpired: true,
+        message: 'La configuración venció. Iníciala nuevamente.',
+      });
+    }
+
+    const secret = decryptTwoFactorSecret(adminUser.twoFactorPendingSecret);
+    const code = String(req.body?.code || '').trim();
+    if (!verifyTotp(secret, code)) {
+      adminUser.twoFactorPendingAttempts = Math.min(
+        5,
+        Number(adminUser.twoFactorPendingAttempts || 0) + 1
+      );
+      const remainingAttempts = Math.max(0, 5 - adminUser.twoFactorPendingAttempts);
+      if (remainingAttempts === 0) {
+        adminUser.twoFactorPendingSecret = '';
+        adminUser.twoFactorPendingExpiresAt = null;
+      }
+      await adminUser.save({ validateBeforeSave: false });
+
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.setup.confirm',
+        success: false,
+        description: 'Código inválido al confirmar configuración 2FA.',
+        metadata: { remainingAttempts },
+        statusCode: 400,
+      });
+
+      return res.status(400).json({
+        ok: false,
+        setupExpired: remainingAttempts === 0,
+        remainingAttempts,
+        message:
+          remainingAttempts === 0
+            ? 'Se agotaron los intentos. Inicia la configuración nuevamente.'
+            : `Código incorrecto. Te quedan ${remainingAttempts} intento(s).`,
+      });
+    }
+
+    const recoveryCodes = generateRecoveryCodes(10);
+    adminUser.twoFactorSecret = adminUser.twoFactorPendingSecret;
+    adminUser.twoFactorPendingSecret = '';
+    adminUser.twoFactorPendingExpiresAt = null;
+    adminUser.twoFactorPendingAttempts = 0;
+    adminUser.twoFactorRecoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+    adminUser.twoFactorEnabled = true;
+    adminUser.twoFactorEnabledAt = new Date();
+    adminUser.twoFactorLastUsedAt = new Date();
+    await adminUser.save({ validateBeforeSave: false });
+
+    await revokeOtherUserSessions(
+      adminUser._id,
+      req.adminSessionId,
+      'two_factor_enabled'
+    );
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.setup.confirm',
+      success: true,
+      description: 'Segundo factor habilitado.',
+      metadata: { recoveryCodesGenerated: recoveryCodes.length },
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Segundo factor activado correctamente.',
+      recoveryCodes,
+      twoFactor: {
+        enabled: true,
+        enabledAt: adminUser.twoFactorEnabledAt,
+        recoveryCodesRemaining: recoveryCodes.length,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error confirmando configuración 2FA:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo activar el 2FA.' });
+  }
+});
+
+router.post('/2fa/recovery-codes', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const verification = await verifyTwoFactorManagementCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.recovery_codes.regenerate',
+        success: false,
+        description: 'Credenciales inválidas al regenerar códigos de recuperación.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    const recoveryCodes = generateRecoveryCodes(10);
+    adminUser.twoFactorRecoveryCodeHashes = recoveryCodes.map(hashRecoveryCode);
+    await adminUser.save({ validateBeforeSave: false });
+    await revokeOtherUserSessions(
+      adminUser._id,
+      req.adminSessionId,
+      'two_factor_recovery_codes_regenerated'
+    );
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.recovery_codes.regenerate',
+      success: true,
+      description: 'Códigos de recuperación regenerados.',
+      metadata: { recoveryCodeUsed: verification.recoveryCodeUsed },
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Códigos de recuperación regenerados.',
+      recoveryCodes,
+    });
+  } catch (error) {
+    console.error('❌ Error regenerando códigos 2FA:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron regenerar los códigos.' });
+  }
+});
+
+router.post('/2fa/disable', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const verification = await verifyTwoFactorManagementCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.disable',
+        success: false,
+        description: 'Credenciales inválidas al desactivar el segundo factor.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    adminUser.twoFactorEnabled = false;
+    adminUser.twoFactorSecret = '';
+    adminUser.twoFactorPendingSecret = '';
+    adminUser.twoFactorPendingExpiresAt = null;
+    adminUser.twoFactorPendingAttempts = 0;
+    adminUser.twoFactorRecoveryCodeHashes = [];
+    adminUser.twoFactorEnabledAt = null;
+    adminUser.twoFactorLastUsedAt = null;
+    await adminUser.save({ validateBeforeSave: false });
+
+    await revokeOtherUserSessions(
+      adminUser._id,
+      req.adminSessionId,
+      'two_factor_disabled'
+    );
+    await saveTwoFactorAudit(req, authResult, {
+      action: '2fa.disable',
+      success: true,
+      description: 'Segundo factor desactivado.',
+      metadata: { recoveryCodeUsed: verification.recoveryCodeUsed },
+    });
+
+    return res.json({
+      ok: true,
+      message: 'Segundo factor desactivado.',
+      twoFactor: { enabled: false, recoveryCodesRemaining: 0 },
+    });
+  } catch (error) {
+    console.error('❌ Error desactivando 2FA:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo desactivar el 2FA.' });
   }
 });
 
@@ -1137,6 +1780,26 @@ router.post('/reset-password', async (req, res) => {
     await adminUser.save();
     await adminUser.populate('roleRef', 'name code level scope permissions');
     await revokeAllUserSessions(adminUser._id, 'password_reset');
+
+    if (adminUser.twoFactorEnabled === true) {
+      clearSessionCookies(res);
+      clearTwoFactorChallengeCookie(res);
+
+      await saveLoginAudit(req, {
+        username: adminUser.username,
+        status: 'success',
+        reason: 'reset_password_success_2fa_login_required',
+      });
+
+      return res.json({
+        ok: true,
+        message: 'Contraseña actualizada. Inicia sesión y confirma tu segundo factor.',
+        requiresLogin: true,
+        requiresTwoFactorOnNextLogin: true,
+      });
+    }
+
+    clearTwoFactorChallengeCookie(res);
     const sessionResult = await startAdminSession({
       req,
       res,
@@ -1377,6 +2040,7 @@ router.post('/logout', async (req, res) => {
     console.error('❌ Error revocando sesión admin:', error.message);
   } finally {
     clearSessionCookies(res);
+    clearTwoFactorChallengeCookie(res);
   }
 
   return res.json({ ok: true, message: 'Sesión cerrada correctamente.' });
@@ -1389,6 +2053,7 @@ router.post('/logout-all', requireAdmin, async (req, res) => {
     await revokeRequestSession(req, 'logout_all');
   }
   clearSessionCookies(res);
+  clearTwoFactorChallengeCookie(res);
   return res.json({ ok: true, message: 'Todas las sesiones fueron cerradas.' });
 });
 
