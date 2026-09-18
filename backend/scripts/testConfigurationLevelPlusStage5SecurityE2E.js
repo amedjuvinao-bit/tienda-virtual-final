@@ -12,7 +12,8 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const SCENARIO_ID = `configuration-stage5-security-${new Date()
   .toISOString()
   .replace(/[:.]/g, '-')}-${process.pid}`;
-const TEST_DATABASE_PREFIX = 'configuration_stage5_security_e2e';
+const TEST_DATABASE_PREFIX = 'cfg_s5_e2e';
+const MAX_TEST_DATABASE_NAME_BYTES = 38;
 const REPORT_DIRECTORY = path.join(
   __dirname,
   '..',
@@ -48,6 +49,20 @@ function databaseNameFromUri(uri) {
   }
 }
 
+function assertSafeTestDatabaseName(databaseName) {
+  assert.match(
+    databaseName,
+    /^cfg_s5_e2e(?:_|$)/,
+    `La base temporal debe comenzar por ${TEST_DATABASE_PREFIX}. Recibida: ${
+      databaseName || '(vacía)'
+    }`
+  );
+  assert.ok(
+    Buffer.byteLength(databaseName, 'utf8') <= MAX_TEST_DATABASE_NAME_BYTES,
+    `El nombre de la base temporal supera ${MAX_TEST_DATABASE_NAME_BYTES} bytes.`
+  );
+}
+
 function buildIsolatedMongoUri() {
   const sourceUri = readMongoSourceUri();
   assert.match(
@@ -62,21 +77,16 @@ function buildIsolatedMongoUri() {
 
   if (explicitTestUri) {
     const explicitDatabase = databaseNameFromUri(explicitTestUri);
-    assert.match(
-      explicitDatabase,
-      /^configuration_stage5_security_e2e(?:_|$)/,
-      `La base explícita debe comenzar por ${TEST_DATABASE_PREFIX}. Recibida: ${
-        explicitDatabase || '(vacía)'
-      }`
-    );
+    assertSafeTestDatabaseName(explicitDatabase);
     return { uri: explicitTestUri, databaseName: explicitDatabase };
   }
 
   const parsed = new URL(sourceUri);
-  const suffix = `${Date.now()}_${process.pid}_${crypto
+  const suffix = `${Date.now().toString(36)}_${process.pid.toString(36)}_${crypto
     .randomBytes(3)
     .toString('hex')}`;
   const databaseName = `${TEST_DATABASE_PREFIX}_${suffix}`;
+  assertSafeTestDatabaseName(databaseName);
   parsed.pathname = `/${databaseName}`;
 
   return { uri: parsed.toString(), databaseName };
@@ -1094,11 +1104,7 @@ async function main() {
   console.log('');
 
   try {
-    assert.match(
-      isolatedMongo.databaseName,
-      /^configuration_stage5_security_e2e(?:_|$)/,
-      'La prueba se negó a usar una base no aislada.'
-    );
+    assertSafeTestDatabaseName(isolatedMongo.databaseName);
 
     await mongoose.connect(isolatedMongo.uri, {
       autoIndex: true,
@@ -1144,11 +1150,7 @@ async function main() {
 
     if (connected || mongoose.connection.readyState !== 0) {
       try {
-        assert.match(
-          mongoose.connection.name,
-          /^configuration_stage5_security_e2e(?:_|$)/,
-          'Se bloqueó la limpieza porque la conexión no corresponde a la base temporal.'
-        );
+        assertSafeTestDatabaseName(mongoose.connection.name);
         await mongoose.connection.dropDatabase();
         report.cleanup.databaseDropped = true;
       } catch (error) {
