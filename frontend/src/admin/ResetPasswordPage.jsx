@@ -20,35 +20,14 @@ import api, { setAdminToken } from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
+import { getAdminPasswordPolicyError } from './security/adminPasswordPolicy';
 
 function getApiMessage(error, fallback) {
   return error?.userMessage || error?.response?.data?.message || error?.message || fallback;
 }
 
 function validatePassword(password) {
-  const value = String(password || '');
-
-  if (value.length < 10) {
-    return 'La contraseña debe tener mínimo 10 caracteres.';
-  }
-
-  if (!/[A-ZÁÉÍÓÚÑ]/.test(value)) {
-    return 'La contraseña debe incluir al menos una mayúscula.';
-  }
-
-  if (!/[a-záéíóúñ]/.test(value)) {
-    return 'La contraseña debe incluir al menos una minúscula.';
-  }
-
-  if (!/\d/.test(value)) {
-    return 'La contraseña debe incluir al menos un número.';
-  }
-
-  if (!/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/.test(value)) {
-    return 'La contraseña debe incluir al menos un símbolo.';
-  }
-
-  return '';
+  return getAdminPasswordPolicyError(password);
 }
 
 export default function ResetPasswordPage() {

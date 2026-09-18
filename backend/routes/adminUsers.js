@@ -2,7 +2,6 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
@@ -137,15 +136,12 @@ function sendError(res, status, message, extra = {}) {
   });
 }
 
-async function setTemporaryPassword(user, password) {
-  user.passwordHash = await bcrypt.hash(String(password), 12);
-  user.passwordChangedAt = new Date();
-
-  if (typeof user.tokenVersion === 'number') {
-    user.tokenVersion += 1;
-  } else {
-    user.tokenVersion = 1;
-  }
+async function setTemporaryPassword(
+  user,
+  password,
+  { mustChangePassword = true } = {}
+) {
+  await user.setPassword(password, { mustChangePassword });
 }
 
 async function countActiveOwners(excludeUserId = null) {
@@ -568,6 +564,12 @@ router.post(
         return sendError(res, 400, 'La contraseña inicial es obligatoria.');
       }
 
+      const passwordPolicyError = AdminUser.getPasswordPolicyError(temporaryPassword);
+
+      if (passwordPolicyError) {
+        return sendError(res, 400, passwordPolicyError);
+      }
+
       const roleDoc = await resolveRole({
         role: body.role || 'seller',
         roleRef: body.roleRef,
@@ -638,9 +640,9 @@ router.post(
         updatedBy: getCurrentAdminId(req),
       });
 
-      await setTemporaryPassword(user, temporaryPassword);
-
-      user.mustChangePassword = body.mustChangePassword !== false;
+      await setTemporaryPassword(user, temporaryPassword, {
+        mustChangePassword: body.mustChangePassword !== false,
+      });
 
       await user.save();
 
@@ -982,6 +984,12 @@ router.patch(
         return sendError(res, 400, 'La nueva contraseña es obligatoria.');
       }
 
+      const passwordPolicyError = AdminUser.getPasswordPolicyError(temporaryPassword);
+
+      if (passwordPolicyError) {
+        return sendError(res, 400, passwordPolicyError);
+      }
+
       const user = await AdminUser.findOne({
         _id: toObjectId(id),
         deletedAt: null,
@@ -993,9 +1001,9 @@ router.patch(
         return sendError(res, allowed.status, allowed.message);
       }
 
-      await setTemporaryPassword(user, temporaryPassword);
-
-      user.mustChangePassword = mustChangePassword === true;
+      await setTemporaryPassword(user, temporaryPassword, {
+        mustChangePassword: mustChangePassword === true,
+      });
       user.updatedBy = getCurrentAdminId(req);
 
       await user.save();

@@ -53,7 +53,6 @@ const passwordResetAttempts = new Map();
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_TIME_MS = 10 * 60 * 1000;
-const MIN_PASSWORD_LENGTH = 8;
 const loginAttempts = new Map();
 
 function isJwtConfigured() {
@@ -439,8 +438,10 @@ function validateRequiredPasswordChangePayload({
     return 'Debes escribir la nueva contraseña.';
   }
 
-  if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
-    return `La nueva contraseña debe tener mínimo ${MIN_PASSWORD_LENGTH} caracteres.`;
+  const passwordPolicyError = AdminUser.getPasswordPolicyError(newPassword);
+
+  if (passwordPolicyError) {
+    return passwordPolicyError;
   }
 
   if (!confirmPassword) {
@@ -467,8 +468,10 @@ function validateResetPasswordPayload({ token, newPassword, confirmPassword }) {
     return 'Debes escribir la nueva contraseña.';
   }
 
-  if (String(newPassword).length < 10) {
-    return 'La nueva contraseña debe tener mínimo 10 caracteres.';
+  const passwordPolicyError = AdminUser.getPasswordPolicyError(newPassword);
+
+  if (passwordPolicyError) {
+    return passwordPolicyError;
   }
 
   if (!confirmPassword) {
@@ -489,7 +492,7 @@ async function findAdminUserForToken(decoded) {
   _id: decoded.adminUserId,
   deletedAt: null,
   })
-    .select('+tokenVersion')
+    .select('+tokenVersion +failedLoginAttempts +lockedUntil')
     .populate('roleRef', 'name code level scope permissions');
 }
 
@@ -499,7 +502,7 @@ async function findAdminUserForPasswordChange(decoded) {
   return AdminUser.findOne({
     _id: decoded.adminUserId,
     deletedAt: null,
-  }).select('+passwordHash +tokenVersion');
+  }).select('+passwordHash +tokenVersion +failedLoginAttempts +lockedUntil');
 }
 
 async function findAdminUserForPasswordResetRequest(login) {
@@ -548,6 +551,18 @@ async function verifyAdminToken(req) {
           ok: false,
           status: 401,
           message: 'Usuario administrativo no encontrado.',
+        };
+      }
+
+      if (typeof adminUser.releaseExpiredLoginLock === 'function') {
+        await adminUser.releaseExpiredLoginLock();
+      }
+
+      if (typeof adminUser.isAccountLocked === 'function' && adminUser.isAccountLocked()) {
+        return {
+          ok: false,
+          status: 423,
+          message: 'Usuario administrativo bloqueado temporalmente.',
         };
       }
 
@@ -624,14 +639,8 @@ async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
     };
   }
 
-  if (adminUser.active !== true || adminUser.status !== 'active') {
-    return {
-      ok: false,
-      found: true,
-      status: 403,
-      reason: 'user_inactive',
-      message: 'Usuario administrativo inactivo o bloqueado.',
-    };
+  if (typeof adminUser.releaseExpiredLoginLock === 'function') {
+    await adminUser.releaseExpiredLoginLock();
   }
 
   if (adminUser.isAccountLocked()) {
@@ -646,6 +655,16 @@ async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
       reason: 'account_locked',
       message: `Usuario bloqueado temporalmente. Intenta nuevamente en ${seconds} segundos.`,
       retryAfterSeconds: seconds,
+    };
+  }
+
+  if (adminUser.active !== true || adminUser.status !== 'active') {
+    return {
+      ok: false,
+      found: true,
+      status: 403,
+      reason: 'user_inactive',
+      message: 'Usuario administrativo inactivo o bloqueado.',
     };
   }
 
@@ -1188,12 +1207,9 @@ router.post('/change-password-required', async (req, res) => {
       });
     }
 
-    adminUser.passwordHash = await bcrypt.hash(newPassword, 12);
-    adminUser.mustChangePassword = false;
-    adminUser.passwordChangedAt = new Date();
+    await adminUser.setPassword(newPassword);
     adminUser.failedLoginAttempts = 0;
     adminUser.lockedUntil = null;
-    adminUser.tokenVersion = Number(adminUser.tokenVersion || 0) + 1;
     adminUser.updatedBy = adminUser._id;
 
     await adminUser.save();

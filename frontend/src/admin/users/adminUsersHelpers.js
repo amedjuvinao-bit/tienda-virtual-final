@@ -1,5 +1,7 @@
 // frontend/src/admin/users/adminUsersHelpers.js
 
+import { getAdminPasswordPolicyError } from '../security/adminPasswordPolicy';
+
 export const EMPTY_FORM = {
   firstName: '',
   lastName: '',
@@ -142,6 +144,12 @@ export function validateUserForm(form, modalMode) {
     return 'La contraseña temporal es obligatoria.';
   }
 
+  if (modalMode === 'create') {
+    const passwordPolicyError = getAdminPasswordPolicyError(form.password);
+
+    if (passwordPolicyError) return passwordPolicyError;
+  }
+
   if (!form.role) {
     return 'Debes seleccionar un rol.';
   }
@@ -157,6 +165,10 @@ export function validatePasswordForm(form) {
   if (!form.password.trim()) {
     return 'La contraseña temporal es obligatoria.';
   }
+
+  const passwordPolicyError = getAdminPasswordPolicyError(form.password);
+
+  if (passwordPolicyError) return passwordPolicyError;
 
   if (!form.confirmPassword.trim()) {
     return 'Debes confirmar la contraseña temporal.';

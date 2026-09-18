@@ -35,6 +35,8 @@ const DEFAULT_SECURITY = {
   lockMinutes: 15,
 };
 
+const ADMIN_PASSWORD_MIN_LENGTH = 10;
+
 const CUSTOMER_SAVED_SEGMENT_LIMIT = 20;
 
 function normalizeText(value) {
@@ -70,6 +72,25 @@ function hashPasswordResetToken(token) {
 
 function minutesToMilliseconds(minutes) {
   return Number(minutes || 0) * 60 * 1000;
+}
+
+function getPasswordPolicyError(plainPassword) {
+  const password = String(plainPassword || '');
+
+  if (password.length < ADMIN_PASSWORD_MIN_LENGTH) {
+    return `La contraseña debe tener mínimo ${ADMIN_PASSWORD_MIN_LENGTH} caracteres.`;
+  }
+
+  const hasUppercase = /[A-ZÁÉÍÓÚÑ]/.test(password);
+  const hasLowercase = /[a-záéíóúñ]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSymbol = /[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/.test(password);
+
+  if (!hasUppercase || !hasLowercase || !hasNumber || !hasSymbol) {
+    return 'La contraseña debe incluir mayúscula, minúscula, número y símbolo.';
+  }
+
+  return '';
 }
 
 function normalizePermissions(input) {
@@ -575,26 +596,21 @@ AdminUserSchema.pre('save', function (next) {
  * Métodos de seguridad
  * ============================ */
 
-AdminUserSchema.methods.setPassword = async function setPassword(plainPassword) {
+AdminUserSchema.methods.setPassword = async function setPassword(
+  plainPassword,
+  { mustChangePassword = false } = {}
+) {
   const password = String(plainPassword || '');
+  const policyError = getPasswordPolicyError(password);
 
-  if (password.length < 10) {
-    throw new Error('La contraseña debe tener mínimo 10 caracteres.');
-  }
-
-  const hasUppercase = /[A-ZÁÉÍÓÚÑ]/.test(password);
-  const hasLowercase = /[a-záéíóúñ]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const hasSymbol = /[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/.test(password);
-
-  if (!hasUppercase || !hasLowercase || !hasNumber || !hasSymbol) {
-    throw new Error(
-      'La contraseña debe incluir mayúscula, minúscula, número y símbolo.'
-    );
+  if (policyError) {
+    const error = new Error(policyError);
+    error.code = 'ADMIN_PASSWORD_POLICY';
+    throw error;
   }
 
   this.passwordHash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
-  this.mustChangePassword = false;
+  this.mustChangePassword = Boolean(mustChangePassword);
 
   return this;
 };
@@ -728,20 +744,51 @@ AdminUserSchema.methods.isPasswordResetTokenValid =
     return this.passwordResetTokenHash === hashPasswordResetToken(cleanToken);
   };
 
-AdminUserSchema.methods.isAccountLocked = function isAccountLocked() {
-  return Boolean(this.lockedUntil && this.lockedUntil > new Date());
+AdminUserSchema.methods.isAccountLocked = function isAccountLocked({
+  now = new Date(),
+} = {}) {
+  const currentTime = now instanceof Date ? now : new Date(now);
+
+  return Boolean(this.lockedUntil && this.lockedUntil > currentTime);
 };
 
-AdminUserSchema.methods.registerFailedLogin = async function registerFailedLogin() {
+AdminUserSchema.methods.releaseExpiredLoginLock =
+  async function releaseExpiredLoginLock({ now = new Date() } = {}) {
+    const currentTime = now instanceof Date ? now : new Date(now);
+
+    if (!this.lockedUntil || this.lockedUntil > currentTime) {
+      return false;
+    }
+
+    this.failedLoginAttempts = 0;
+    this.lockedUntil = null;
+
+    // Los bloqueos administrativos manuales no tienen lockedUntil. Si existe
+    // una fecha vencida, el estado blocked fue generado por los intentos fallidos.
+    if (this.status === 'blocked') {
+      this.status = 'active';
+      this.active = true;
+    }
+
+    await this.save();
+
+    return true;
+  };
+
+AdminUserSchema.methods.registerFailedLogin = async function registerFailedLogin({
+  now = new Date(),
+} = {}) {
+  const currentTime = now instanceof Date ? now : new Date(now);
   const failedAttempts = Number(this.failedLoginAttempts || 0) + 1;
 
   this.failedLoginAttempts = failedAttempts;
 
   if (failedAttempts >= DEFAULT_SECURITY.maxFailedLoginAttempts) {
     this.lockedUntil = new Date(
-      Date.now() + DEFAULT_SECURITY.lockMinutes * 60 * 1000
+      currentTime.getTime() + DEFAULT_SECURITY.lockMinutes * 60 * 1000
     );
     this.status = this.status === 'active' ? 'blocked' : this.status;
+    this.active = this.status === 'blocked' ? false : this.active;
   }
 
   await this.save();
@@ -883,6 +930,10 @@ AdminUserSchema.statics.normalizeEmail = normalizeEmail;
 AdminUserSchema.statics.normalizeRoleCode = normalizeRoleCode;
 AdminUserSchema.statics.normalizePermissions = normalizePermissions;
 AdminUserSchema.statics.hashPasswordResetToken = hashPasswordResetToken;
+AdminUserSchema.statics.getPasswordPolicyError = getPasswordPolicyError;
+AdminUserSchema.statics.getPasswordMinimumLength = function getPasswordMinimumLength() {
+  return ADMIN_PASSWORD_MIN_LENGTH;
+};
 
 AdminUserSchema.statics.getRoles = function getRoles() {
   return [...ADMIN_USER_ROLES];

@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { KeyRound, ShieldCheck, X } from 'lucide-react';
 import { changeRequiredAdminPassword } from '../api/adminAuthApi';
+import {
+  ADMIN_PASSWORD_POLICY_HINT,
+  getAdminPasswordPolicyError,
+} from '../security/adminPasswordPolicy';
 
 const EMPTY_FORM = {
   currentPassword: '',
@@ -20,8 +24,10 @@ function validateForm(form) {
     return 'Escribe la nueva contraseña.';
   }
 
-  if (form.newPassword.length < 8) {
-    return 'La nueva contraseña debe tener mínimo 8 caracteres.';
+  const passwordPolicyError = getAdminPasswordPolicyError(form.newPassword);
+
+  if (passwordPolicyError) {
+    return passwordPolicyError;
   }
 
   if (!form.confirmPassword) {
@@ -240,7 +246,8 @@ export default function RequiredPasswordChangeModal({
                   updateField('newPassword', event.target.value)
                 }
                 className="rounded-2xl border px-4 py-3 text-sm outline-none"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 10 caracteres"
+                minLength={10}
                 autoComplete="new-password"
                 disabled={saving}
                 style={{
@@ -291,6 +298,7 @@ export default function RequiredPasswordChangeModal({
               />
 
               <p>
+                <strong>{ADMIN_PASSWORD_POLICY_HINT}</strong>{' '}
                 Después de guardar, tu sesión se actualizará automáticamente y
                 podrás ingresar al panel administrativo.
               </p>

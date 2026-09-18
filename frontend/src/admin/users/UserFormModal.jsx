@@ -305,7 +305,8 @@ export default function UserFormModal({
                         updateField('password', event.target.value)
                       }
                       className="rounded-2xl border px-4 py-3 text-sm outline-none"
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder="Mínimo 10 caracteres, con mayúscula, número y símbolo"
+                      minLength={10}
                       required
                       style={inputStyle}
                     />

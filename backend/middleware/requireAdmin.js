@@ -225,13 +225,8 @@ async function requireAdmin(req, res, next) {
         );
       }
 
-      if (adminUser.active !== true || adminUser.status !== 'active') {
-        return reject(
-          res,
-          403,
-          'FORBIDDEN',
-          'Usuario administrativo inactivo o bloqueado.'
-        );
+      if (typeof adminUser.releaseExpiredLoginLock === 'function') {
+        await adminUser.releaseExpiredLoginLock();
       }
 
       if (typeof adminUser.isAccountLocked === 'function' && adminUser.isAccountLocked()) {
@@ -240,6 +235,15 @@ async function requireAdmin(req, res, next) {
           423,
           'LOCKED',
           'Usuario administrativo bloqueado temporalmente.'
+        );
+      }
+
+      if (adminUser.active !== true || adminUser.status !== 'active') {
+        return reject(
+          res,
+          403,
+          'FORBIDDEN',
+          'Usuario administrativo inactivo o bloqueado.'
         );
       }
 
@@ -252,6 +256,15 @@ async function requireAdmin(req, res, next) {
           401,
           'UNAUTHORIZED',
           'La sesión ya no es válida. Inicia sesión nuevamente.'
+        );
+      }
+
+      if (adminUser.mustChangePassword === true) {
+        return reject(
+          res,
+          403,
+          'PASSWORD_CHANGE_REQUIRED',
+          'Debes cambiar la contraseña temporal antes de acceder al panel administrativo.'
         );
       }
 
