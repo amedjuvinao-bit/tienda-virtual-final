@@ -1145,6 +1145,8 @@ export default function Login() {
   const smokeBackground = hasCustomImageBg ? loginBg.image : "";
   const smokeGlassOpacity = 1 - loginBg.glassTransparency;
   const smokeGlassBlur = `${Math.round(smokeGlassOpacity * 1800) / 100}px`;
+  const liquidGlassOpacity = 1 - loginBg.glassTransparency;
+  const liquidGlassBlur = `${Math.round(liquidGlassOpacity * 1800) / 100}px`;
 
   const loginPageBackground =
     loginBg.mode === "color" ? loginBg.color : activeTheme.pageBg;
@@ -1442,10 +1444,18 @@ export default function Login() {
     <p>{activeCustomization.description}</p>
   </div>;
 
-  const renderLiquidGlass = () => <section className="rb-liquid-stage" aria-label={`Acceso administrativo de ${storeName}`}>
+  const renderLiquidGlass = () => <section
+    className="rb-liquid-stage"
+    data-custom-image={hasCustomImageBg ? "true" : undefined}
+    aria-label={`Acceso administrativo de ${storeName}`}
+    style={{
+      "--liquid-glass-opacity": liquidGlassOpacity,
+      "--liquid-glass-blur": liquidGlassBlur,
+    }}
+  >
     <div className="rb-liquid-media" style={{ backgroundImage: `url("${liquidBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
     <div className="rb-liquid-overlay" style={{ "--liquid-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.06 }} />
-    <div className="rb-liquid-depth" aria-hidden="true"><i /><i /><i /></div>
+    <div className="rb-liquid-depth" aria-hidden="true">{hasCustomImageBg ? null : <><i /><i /><i /></>}</div>
     <div className="rb-liquid-story"><CuratedStoreBrand storeName={storeName} storeLogo={storeLogo} /><StoryCopy className="rb-theme-copy rb-liquid-copy" /></div>
     <div className="rb-liquid-access rb-editorial-access">
       <span className="rb-editorial-rail" aria-hidden="true"><i /><i /><i /></span>

@@ -129,7 +129,7 @@ function LoginPreview({ settings, store }) {
         className="login-settings-preview curated-preview"
         data-preview-theme={theme.id}
         data-gallery-tone={theme.id === 'immersiveGallery' ? galleryTone.id : undefined}
-        data-custom-image={theme.id === 'smokeGlass' && imageMode ? 'true' : undefined}
+        data-custom-image={(theme.id === 'liquidGlass' || theme.id === 'smokeGlass') && imageMode ? 'true' : undefined}
         style={{
           background: pageBackground,
           '--login-primary': customization.primary,
@@ -138,6 +138,8 @@ function LoginPreview({ settings, store }) {
           '--login-surface': customization.surface,
           '--smoke-glass-opacity': 1 - background.glassTransparency,
           '--smoke-glass-blur': `${Math.round((1 - background.glassTransparency) * 1000) / 100}px`,
+          '--liquid-glass-opacity': 1 - background.glassTransparency,
+          '--liquid-glass-blur': `${Math.round((1 - background.glassTransparency) * 1000) / 100}px`,
           '--smoke-user-overlay': imageMode ? background.overlay : 0.08,
         }}
       >
@@ -158,7 +160,7 @@ function LoginPreview({ settings, store }) {
 
         <div className="login-settings-curated-scene">
           <div className="login-settings-theme-motion" aria-hidden="true">
-            {theme.id === 'smokeGlass' && imageMode ? null : <><i /><i /></>}
+            {(theme.id === 'liquidGlass' || theme.id === 'smokeGlass') && imageMode ? null : <><i /><i /></>}
           </div>
           <div className="login-settings-curated-story">
             <div className="login-settings-curated-brand">
@@ -336,6 +338,12 @@ export default function LoginAdminSection() {
       setBusy('save');
       setFeedback(null);
       const response = await updateAdminLoginSettings({ revision, settings: form });
+      if (!loginSettingsEqual(form, response?.settings)) {
+        applyResponse(response);
+        const persistenceError = new Error('LOGIN_SETTINGS_PERSISTENCE_FAILED');
+        persistenceError.userMessage = 'El servidor no confirmó todos los cambios. Reinicia el backend y vuelve a guardar.';
+        throw persistenceError;
+      }
       applyResponse(response);
       window.dispatchEvent(new CustomEvent('admin-login-settings-updated', { detail: response.settings }));
       setFeedback({ type: 'success', message: response.message || 'Diseño guardado.' });
@@ -511,7 +519,7 @@ export default function LoginAdminSection() {
                 <div className="login-settings-range-grid">
                   <label><span>Visibilidad: {Math.round(currentBackground.imageOpacity * 100)}%</span><input type="range" min="0.1" max="1" step="0.05" value={currentBackground.imageOpacity} onChange={(event) => setBackground('imageOpacity', Number(event.target.value))} /></label>
                   <label><span>Capa oscura: {Math.round(currentBackground.overlay * 100)}%</span><input type="range" min="0" max="0.85" step="0.05" value={currentBackground.overlay} onChange={(event) => setBackground('overlay', Number(event.target.value))} /></label>
-                  {form.theme === 'smokeGlass' ? <label><span>Transparencia del contenedor: {Math.round(currentBackground.glassTransparency * 100)}%</span><input aria-label="Transparencia del contenedor" type="range" min="0" max="1" step="0.05" value={currentBackground.glassTransparency} onChange={(event) => setBackground('glassTransparency', Number(event.target.value))} /></label> : null}
+                  {form.theme === 'liquidGlass' || form.theme === 'smokeGlass' ? <label><span>Transparencia del contenedor: {Math.round(currentBackground.glassTransparency * 100)}%</span><input aria-label="Transparencia del contenedor" type="range" min="0" max="1" step="0.05" value={currentBackground.glassTransparency} onChange={(event) => setBackground('glassTransparency', Number(event.target.value))} /></label> : null}
                 </div>
               </div>
             ) : null}

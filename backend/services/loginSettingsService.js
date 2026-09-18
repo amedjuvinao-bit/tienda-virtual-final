@@ -389,7 +389,13 @@ async function updateLoginSettings(input = {}, options = {}) {
     query,
     {
       $set: {
-        loginAdmin: normalized,
+        'loginAdmin.theme': normalized.theme,
+        'loginAdmin.layout': normalized.layout,
+        'loginAdmin.customizations': normalized.customizations,
+        'loginAdmin.background': normalized.background,
+        'loginAdmin.backgrounds.liquidGlass': normalized.backgrounds.liquidGlass,
+        'loginAdmin.backgrounds.immersiveGallery': normalized.backgrounds.immersiveGallery,
+        'loginAdmin.backgrounds.smokeGlass': normalized.backgrounds.smokeGlass,
         updatedBy: cleanText(options.actor, 120) || 'admin',
       },
       $inc: { loginAdminRevision: 1 },
@@ -406,7 +412,25 @@ async function updateLoginSettings(input = {}, options = {}) {
   }
 
   const response = buildResponse(updated);
-  response.message = 'El diseño del acceso administrativo quedó guardado para todos los dispositivos.';
+  const transparencyTheme = ['liquidGlass', 'smokeGlass'].includes(normalized.theme)
+    ? normalized.theme
+    : null;
+  if (transparencyTheme) {
+    const expectedTransparency = normalized.backgrounds[transparencyTheme].glassTransparency;
+    const storedTransparency = response.settings.backgrounds[transparencyTheme].glassTransparency;
+    if (storedTransparency !== expectedTransparency) {
+      throw new LoginSettingsError(
+        'La base de datos no confirmó la transparencia seleccionada. Vuelve a guardar.',
+        'LOGIN_SETTINGS_PERSISTENCE_FAILED',
+        500,
+        [{ field: `backgrounds.${transparencyTheme}.glassTransparency` }]
+      );
+    }
+    const transparencyThemeName = transparencyTheme === 'liquidGlass' ? 'Cristal Líquido' : 'Cristal Perla';
+    response.message = `Diseño guardado. Transparencia de ${transparencyThemeName}: ${Math.round(storedTransparency * 100)}%.`;
+  } else {
+    response.message = 'Diseño guardado.';
+  }
   return response;
 }
 

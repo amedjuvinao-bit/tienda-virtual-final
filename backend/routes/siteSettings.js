@@ -442,6 +442,7 @@ router.get(
 router.get("/", async (_req, res, next) => {
   try {
     const doc = await loadSettingsDocument();
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.json(buildPublicSiteSettings(doc));
   } catch (err) {
     next(err);

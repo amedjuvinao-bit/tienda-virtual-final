@@ -58,9 +58,9 @@ describe('LoginAdminSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getAdminLoginSettings.mockResolvedValue(response());
-    updateAdminLoginSettings.mockResolvedValue(response({
+    updateAdminLoginSettings.mockImplementation(async ({ settings }) => response({
       revision: 3,
-      settings: { theme: 'smokeGlass' },
+      settings,
       message: 'Diseño guardado.',
     }));
     uploadAdminLoginBackground.mockResolvedValue('https://cdn.example.com/login.webp');
@@ -118,6 +118,28 @@ describe('LoginAdminSection', () => {
     expect(screen.getByText('Subir imagen')).toBeInTheDocument();
   });
 
+  it('no anuncia éxito si el servidor devuelve otra transparencia', async () => {
+    const user = userEvent.setup();
+    updateAdminLoginSettings.mockResolvedValueOnce(response({
+      revision: 3,
+      settings: {
+        theme: 'smokeGlass',
+        background: { mode: 'image', color: '#07132f', image: 'https://cdn.example.com/perla.webp', imageOpacity: 1, overlay: 0, glassTransparency: 0.35 },
+      },
+    }));
+    render(<LoginAdminSection />);
+    await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
+
+    await user.selectOptions(screen.getByLabelText('Tema visual'), 'smokeGlass');
+    await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
+    await user.click(screen.getByRole('button', { name: 'Imagen personalizada' }));
+    await user.type(screen.getByPlaceholderText('https://...'), 'https://cdn.example.com/perla.webp');
+    fireEvent.change(screen.getByRole('slider', { name: 'Transparencia del contenedor' }), { target: { value: '0.8' } });
+    await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
+
+    expect(await screen.findByText('El servidor no confirmó todos los cambios. Reinicia el backend y vuelve a guardar.')).toBeInTheDocument();
+  });
+
   it('reemplaza los paneles de Cristal Perla por un vidrio único al usar una imagen', async () => {
     getAdminLoginSettings.mockResolvedValueOnce(response({
       settings: {
@@ -137,6 +159,45 @@ describe('LoginAdminSection', () => {
     const preview = container.querySelector('[data-preview-theme="smokeGlass"]');
     expect(preview).toHaveAttribute('data-custom-image', 'true');
     expect(preview.querySelectorAll('.login-settings-theme-motion i')).toHaveLength(0);
+  });
+
+  it('aplica el vidrio completo y la transparencia independiente a Cristal Líquido', async () => {
+    getAdminLoginSettings.mockResolvedValueOnce(response({
+      settings: {
+        theme: 'liquidGlass',
+        background: {
+          mode: 'image',
+          color: '#16324a',
+          image: 'https://cdn.example.com/liquido.webp',
+          imageOpacity: 0.9,
+          overlay: 0.1,
+          glassTransparency: 0.6,
+        },
+      },
+    }));
+    const user = userEvent.setup();
+    const { container } = render(<LoginAdminSection />);
+    await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
+
+    let preview = container.querySelector('[data-preview-theme="liquidGlass"]');
+    expect(preview).toHaveAttribute('data-custom-image', 'true');
+    expect(preview.querySelectorAll('.login-settings-theme-motion i')).toHaveLength(0);
+    expect(preview.style.getPropertyValue('--liquid-glass-opacity')).toBe('0.4');
+
+    await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Transparencia del contenedor' }), { target: { value: '0.8' } });
+    preview = container.querySelector('[data-preview-theme="liquidGlass"]');
+    expect(preview.style.getPropertyValue('--liquid-glass-opacity')).toBeCloseTo(0.2);
+
+    await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
+    await waitFor(() => expect(updateAdminLoginSettings).toHaveBeenCalledTimes(1));
+    expect(updateAdminLoginSettings).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({
+        backgrounds: expect.objectContaining({
+          liquidGlass: expect.objectContaining({ glassTransparency: 0.8 }),
+        }),
+      }),
+    }));
   });
 
   it('mantiene el fondo de cada tema independiente y controla la transparencia del vidrio', async () => {

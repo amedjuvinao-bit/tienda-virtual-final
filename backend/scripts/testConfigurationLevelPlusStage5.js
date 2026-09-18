@@ -39,7 +39,18 @@ function modelFor(current, options = {}) {
       if (options.conflict) return null;
       return {
         ...current,
-        ...update.$set,
+        updatedBy: update.$set.updatedBy,
+        loginAdmin: {
+          theme: update.$set['loginAdmin.theme'],
+          layout: update.$set['loginAdmin.layout'],
+          customizations: update.$set['loginAdmin.customizations'],
+          background: update.$set['loginAdmin.background'],
+          backgrounds: {
+            liquidGlass: update.$set['loginAdmin.backgrounds.liquidGlass'],
+            immersiveGallery: update.$set['loginAdmin.backgrounds.immersiveGallery'],
+            smokeGlass: update.$set['loginAdmin.backgrounds.smokeGlass'],
+          },
+        },
         loginAdminRevision: Number(current.loginAdminRevision || 0) + 1,
       };
     },
@@ -163,7 +174,14 @@ async function run() {
       theme: 'smokeGlass',
       layout: 'centeredCard',
       customizations: DEFAULT_LOGIN_SETTINGS.customizations,
-      background: { mode: 'color', color: '#ffffff', image: '', imageOpacity: 0.5, overlay: 0.2 },
+      background: {
+        mode: 'color',
+        color: '#ffffff',
+        image: '',
+        imageOpacity: 0.5,
+        overlay: 0.2,
+        glassTransparency: 0.8,
+      },
     },
   }, {
     SiteSettingsModel: modelFor(current, {
@@ -174,8 +192,36 @@ async function run() {
   assert.equal(captured.query.loginAdminRevision, 4);
   assert.equal(captured.update.$inc.loginAdminRevision, 1);
   assert.equal(captured.update.$set.updatedBy, 'owner');
+  assert.equal(
+    captured.update.$set['loginAdmin.backgrounds.smokeGlass'].glassTransparency,
+    0.8
+  );
   assert.equal(updated.settings.theme, 'smokeGlass');
+  assert.equal(updated.settings.backgrounds.smokeGlass.glassTransparency, 0.8);
   assert.equal(updated.revision, 5);
+  assert.equal(updated.message, 'Diseño guardado. Transparencia de Cristal Perla: 80%.');
+
+  const liquidUpdated = await updateLoginSettings({
+    revision: 5,
+    settings: {
+      theme: 'liquidGlass',
+      layout: 'splitPanel',
+      customizations: DEFAULT_LOGIN_SETTINGS.customizations,
+      background: {
+        mode: 'image',
+        color: '#ffffff',
+        image: 'https://cdn.example.com/liquido.webp',
+        imageOpacity: 0.9,
+        overlay: 0.1,
+        glassTransparency: 0.75,
+      },
+    },
+  }, {
+    SiteSettingsModel: modelFor(document({ loginAdminRevision: 5 })),
+    actor: 'owner',
+  });
+  assert.equal(liquidUpdated.settings.backgrounds.liquidGlass.glassTransparency, 0.75);
+  assert.equal(liquidUpdated.message, 'Diseño guardado. Transparencia de Cristal Líquido: 75%.');
 
   await assert.rejects(
     () => updateLoginSettings({ revision: 4, settings: DEFAULT_LOGIN_SETTINGS }, {
