@@ -56,6 +56,20 @@ export async function verifyAdminSession() {
   }
 }
 
+export async function logoutAdminSession() {
+  try {
+    const response = await api.post(`${BASE_URL}/logout`, null, {
+      skipAdminRefresh: true,
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(
+      error,
+      'No se pudo confirmar el cierre de la sesión administrativa.'
+    );
+  }
+}
+
 export async function changeRequiredAdminPassword(payload) {
   try {
     const response = await api.post(`${BASE_URL}/change-password-required`, {
@@ -76,6 +90,7 @@ export async function changeRequiredAdminPassword(payload) {
 const adminAuthApi = {
   loginAdmin,
   verifyAdminSession,
+  logoutAdminSession,
   changeRequiredAdminPassword,
 };
 

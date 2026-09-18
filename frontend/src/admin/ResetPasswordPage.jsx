@@ -16,7 +16,7 @@ import {
 
 import { resetAdminPassword } from './api/adminPasswordRecoveryApi';
 import { useAuth } from '../context/AuthContext';
-import api, { setAdminToken } from '../lib/api';
+import api from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
@@ -123,12 +123,8 @@ export default function ResetPasswordPage() {
       setStatusType('success');
       setStatusMessage(response?.message || 'Contraseña actualizada correctamente.');
 
-      if (response?.token) {
-        setAdminToken(response.token);
-
-        if (typeof login === 'function') {
-          login(response.token, response.user);
-        }
+      if (response?.user) {
+        if (typeof login === 'function') login(response.user);
 
         setTimeout(() => {
           navigate('/admin/dashboard', { replace: true });

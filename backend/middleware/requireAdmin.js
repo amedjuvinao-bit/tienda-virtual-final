@@ -8,7 +8,8 @@
  *
  * Valida:
  * - JWT_SECRET configurado.
- * - Token enviado por Authorization: Bearer ... o x-admin-token.
+ * - Token de acceso recibido en cookie HttpOnly (Bearer queda solo para
+ *   integraciones controladas y siempre debe pertenecer a una sesión real).
  * - Token con role: "admin".
  * - Usuario real activo, no eliminado, no bloqueado.
  * - tokenVersion para invalidar sesiones antiguas.
@@ -26,24 +27,16 @@
  */
 
 const jwt = require('jsonwebtoken');
-
 const AdminUser = require('../models/AdminUser');
 const {
   isLegacyAdminAuthEnabled,
 } = require('../security/legacyAdminAuthPolicy');
-
-function parseBearer(authHeader = '') {
-  const [type, value] = String(authHeader || '').split(' ');
-
-  return type?.toLowerCase() === 'bearer' && value ? value.trim() : '';
-}
-
-function getTokenFromRequest(req) {
-  const bearerToken = parseBearer(req.headers.authorization || '');
-  const headerToken = String(req.headers['x-admin-token'] || '').trim();
-
-  return bearerToken || headerToken;
-}
+const {
+  getAccessCredential,
+  isTrustedRequestOrigin,
+  loadActiveSession,
+  verifyAccessToken,
+} = require('../security/adminSessionService');
 
 function getJwtSecret() {
   return process.env.JWT_SECRET;
@@ -182,7 +175,8 @@ async function requireAdmin(req, res, next) {
       );
     }
 
-    const token = getTokenFromRequest(req);
+    const credential = getAccessCredential(req);
+    const token = credential.token;
 
     if (!token) {
       return reject(
@@ -193,7 +187,24 @@ async function requireAdmin(req, res, next) {
       );
     }
 
-    const decoded = jwt.verify(token, jwtSecret);
+    if (credential.source === 'cookie' && !isTrustedRequestOrigin(req)) {
+      return reject(
+        res,
+        403,
+        'UNTRUSTED_ORIGIN',
+        'Origen no autorizado para esta operación administrativa.'
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = verifyAccessToken(token);
+    } catch (error) {
+      if (credential.source !== 'header') {
+        throw error;
+      }
+      decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
+    }
 
     if (decoded?.role !== 'admin') {
       return reject(
@@ -203,6 +214,36 @@ async function requireAdmin(req, res, next) {
         'No tienes permisos de administrador.'
       );
     }
+
+    if (isLegacyToken(decoded) && !isLegacyAdminAuthEnabled()) {
+      return reject(
+        res,
+        403,
+        'LEGACY_ADMIN_DISABLED',
+        'La autenticación administrativa heredada está deshabilitada.'
+      );
+    }
+
+    const explicitLegacyHeader =
+      credential.source === 'header' &&
+      isLegacyToken(decoded) &&
+      isLegacyAdminAuthEnabled() &&
+      !decoded.sessionId;
+    const adminSession = explicitLegacyHeader
+      ? null
+      : await loadActiveSession(decoded, { req });
+
+    if (!adminSession && !explicitLegacyHeader) {
+      return reject(
+        res,
+        401,
+        'SESSION_REVOKED',
+        'La sesión expiró o fue revocada. Inicia sesión nuevamente.'
+      );
+    }
+
+    req.adminSession = adminSession;
+    req.adminSessionId = decoded.sessionId;
 
     if (isDbToken(decoded)) {
       const adminUser = await loadDbAdminUser(decoded);

@@ -38,7 +38,7 @@ import {
   CircleDollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import api, { setAdminToken } from '../lib/api';
+import api from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
@@ -151,8 +151,7 @@ export default function AdminLayout() {
   }, [isConfigRoute]);
 
   const handleLogout = () => {
-    logout();
-    setAdminToken(null);
+    void logout();
     navigate('/admin/login');
   };
 

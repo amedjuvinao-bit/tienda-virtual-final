@@ -103,6 +103,21 @@ const env = {
     max: toNumber(process.env.GLOBAL_RATE_LIMIT_MAX, 300, { min: 10, max: 100_000 }),
   },
   jwtSecret: clean(process.env.JWT_SECRET || process.env.ADMIN_JWT_SECRET),
+  adminSession: {
+    accessTokenMinutes: toNumber(process.env.ADMIN_ACCESS_TOKEN_MINUTES, 15, {
+      min: 5,
+      max: 60,
+    }),
+    idleHours: toNumber(process.env.ADMIN_SESSION_IDLE_HOURS, 12, {
+      min: 1,
+      max: 168,
+    }),
+    absoluteHours: toNumber(process.env.ADMIN_SESSION_ABSOLUTE_HOURS, 168, {
+      min: 2,
+      max: 720,
+    }),
+    cookieSameSite: clean(process.env.ADMIN_COOKIE_SAME_SITE).toLowerCase(),
+  },
   cartAccessSecret: clean(process.env.CART_ACCESS_SECRET),
   orderPaymentAccessSecret: clean(process.env.ORDER_PAYMENT_ACCESS_SECRET),
   billingEncryptionKey: clean(process.env.BILLING_ENCRYPTION_KEY),
@@ -190,6 +205,17 @@ function assertEnv(config = env) {
 
   if (config.jwtSecret && config.jwtSecret.length < 32) {
     errors.push('JWT_SECRET debe tener al menos 32 caracteres.');
+  }
+
+  if (
+    config.adminSession.cookieSameSite &&
+    !['strict', 'lax', 'none'].includes(config.adminSession.cookieSameSite)
+  ) {
+    errors.push('ADMIN_COOKIE_SAME_SITE debe ser strict, lax o none.');
+  }
+
+  if (config.adminSession.idleHours > config.adminSession.absoluteHours) {
+    errors.push('ADMIN_SESSION_IDLE_HOURS no puede superar ADMIN_SESSION_ABSOLUTE_HOURS.');
   }
 
   if (config.cartAccessSecret && config.cartAccessSecret.length < 32) {

@@ -18,9 +18,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { setAdminToken } from "../lib/api";
 import { fetchSiteSettings } from "../lib/siteSettingsApi";
-import { loginAdmin } from "./api/adminAuthApi";
+import { loginAdmin, logoutAdminSession } from "./api/adminAuthApi";
 import RequiredPasswordChangeModal from "./login/RequiredPasswordChangeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
 import "./login/LoginFlagship.css";
@@ -76,8 +75,7 @@ function clearTemporaryAdminSession() {
   try {
     localStorage.removeItem("admin_token");
   } catch {}
-
-  setAdminToken("");
+  void logoutAdminSession().catch(() => {});
 }
 
 function getLockUntil() {
@@ -190,10 +188,6 @@ function CuratedStoreBrand({ storeName, storeLogo, className = "" }) {
       </span>
     </div>
   );
-}
-
-function extractAdminToken(response) {
-  return response?.token || response?.adminToken || response?.accessToken || "";
 }
 
 function AnimatedBorderBox({
@@ -1028,25 +1022,14 @@ export default function Login() {
   };
 
   const authenticateAdmin = async ({ cleanUsername, cleanPassword }) => {
-    const response = await loginAdmin({
+    return loginAdmin({
       username: cleanUsername,
       password: cleanPassword,
     });
-
-    const token = extractAdminToken(response);
-
-    if (!token) throw new Error("LOGIN_TOKEN_MISSING");
-
-    return {
-      ...response,
-      token,
-    };
   };
 
   const handleRequiredPasswordSuccess = (response) => {
-    const token = extractAdminToken(response);
-
-    if (!token) {
+    if (!response?.user) {
       clearTemporaryAdminSession();
       setShowRequiredPasswordChange(false);
       setRequiredPasswordUser(null);
@@ -1056,9 +1039,8 @@ export default function Login() {
       return;
     }
 
-    setAdminToken(token);
     saveRememberedLogin(username.trim(), rememberMe);
-    login(token, response?.user);
+    login(response.user);
     clearLoginSecurityState();
     setUsername("");
     setPassword("");
@@ -1108,7 +1090,6 @@ export default function Login() {
         cleanPassword,
       });
 
-      setAdminToken(loginResult.token);
       clearLoginSecurityState();
 
       if (loginResult?.user?.mustChangePassword === true) {
@@ -1121,7 +1102,7 @@ export default function Login() {
 
       saveRememberedLogin(cleanUsername, rememberMe);
 
-      login(loginResult.token, loginResult.user);
+      login(loginResult.user);
 
       if (!rememberMe) {
         setUsername("");

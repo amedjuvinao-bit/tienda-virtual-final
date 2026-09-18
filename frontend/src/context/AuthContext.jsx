@@ -1,74 +1,16 @@
 // src/context/AuthContext.jsx
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-} from 'react';
-import api, { setAdminToken } from '../lib/api';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import api, {
+  clearLegacyAdminToken,
+  setAdminSessionActive,
+} from '../lib/api';
+import { logoutAdminSession } from '../admin/api/adminAuthApi';
 
 const AuthContext = createContext();
 
-function decodeJwtPayload(token) {
-  try {
-    const payload = token.split('.')[1];
-    if (!payload) return null;
-
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-        .join('')
-    );
-
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-function getTokenExpirationMs(token) {
-  const payload = decodeJwtPayload(token);
-
-  if (!payload?.exp) return null;
-
-  return payload.exp * 1000;
-}
-
-function buildFallbackAdminUserFromToken(token) {
-  const payload = decodeJwtPayload(token);
-
-  if (!payload) return null;
-
-  const username = payload.username || '';
-  const adminRole = payload.adminRole || payload.actualRole || payload.role || '';
-
-  return {
-    id: payload.adminUserId || '',
-    username,
-    displayName: username,
-    fullName: username,
-    email: '',
-    role: payload.role || 'admin',
-    adminRole,
-    actualRole: adminRole,
-    roleRef: payload.roleRef || null,
-    defaultBranch: payload.defaultBranch || null,
-    permissions: [],
-    branches: [],
-    status: 'active',
-    active: true,
-    mustChangePassword: false,
-  };
-}
-
-function normalizeAdminUser(user, fallbackToken = '') {
-  if (!user || typeof user !== 'object') {
-    return buildFallbackAdminUserFromToken(fallbackToken);
-  }
+function normalizeAdminUser(user) {
+  if (!user || typeof user !== 'object') return null;
 
   const username = user.username || user.profile?.username || '';
   const displayName =
@@ -78,7 +20,6 @@ function normalizeAdminUser(user, fallbackToken = '') {
     user.profile?.fullName ||
     username ||
     'Usuario';
-
   const adminRole =
     user.adminRole ||
     user.actualRole ||
@@ -106,135 +47,83 @@ function normalizeAdminUser(user, fallbackToken = '') {
   };
 }
 
+function removeLegacySessionStorage() {
+  clearLegacyAdminToken();
+  try {
+    localStorage.removeItem('auth');
+    localStorage.removeItem('admin_user');
+  } catch {
+    // El estado sensible ya no se persiste en JavaScript.
+  }
+}
+
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [adminToken, setAdminTokenState] = useState(null);
   const [adminUser, setAdminUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const logoutTimerRef = useRef(null);
-
-  const clearLogoutTimer = () => {
-    if (logoutTimerRef.current) {
-      clearTimeout(logoutTimerRef.current);
-      logoutTimerRef.current = null;
-    }
-  };
-
-  const logout = () => {
-    clearLogoutTimer();
+  const clearClientSession = () => {
+    setAdminSessionActive(false);
     setIsAuthenticated(false);
-    setAdminTokenState(null);
     setAdminUser(null);
-    localStorage.removeItem('auth');
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
-    setAdminToken(null);
-  };
-
-  const scheduleAutoLogout = (token) => {
-    clearLogoutTimer();
-
-    const expiresAt = getTokenExpirationMs(token);
-
-    if (!expiresAt) return;
-
-    const timeLeft = expiresAt - Date.now();
-
-    if (timeLeft <= 0) {
-      logout();
-      return;
-    }
-
-    logoutTimerRef.current = setTimeout(() => {
-      logout();
-    }, timeLeft);
+    removeLegacySessionStorage();
   };
 
   useEffect(() => {
+    let alive = true;
+
     const verifyStoredSession = async () => {
-      const storedToken = localStorage.getItem('admin_token');
-
-      if (!storedToken) {
-        logout();
-        setAuthLoading(false);
-        return;
-      }
-
-      const expiresAt = getTokenExpirationMs(storedToken);
-
-      if (expiresAt && expiresAt <= Date.now()) {
-        logout();
-        setAuthLoading(false);
-        return;
-      }
+      removeLegacySessionStorage();
 
       try {
-        setAdminToken(storedToken);
-
         const response = await api.get('/api/admin/auth/verify');
-        const verifiedUser = normalizeAdminUser(response?.data?.user, storedToken);
-
+        if (!alive) return;
+        const verifiedUser = normalizeAdminUser(response?.data?.user);
+        setAdminSessionActive(true);
         setIsAuthenticated(true);
-        setAdminTokenState(storedToken);
         setAdminUser(verifiedUser);
-        localStorage.setItem('auth', 'true');
-
-        if (verifiedUser) {
-          localStorage.setItem('admin_user', JSON.stringify(verifiedUser));
-        } else {
-          localStorage.removeItem('admin_user');
-        }
-
-        scheduleAutoLogout(storedToken);
       } catch {
-        logout();
+        if (alive) clearClientSession();
       } finally {
-        setAuthLoading(false);
+        if (alive) setAuthLoading(false);
       }
     };
 
+    const handleSessionExpired = () => {
+      if (alive) clearClientSession();
+    };
+
+    window.addEventListener('admin-session-expired', handleSessionExpired);
     verifyStoredSession();
 
     return () => {
-      clearLogoutTimer();
+      alive = false;
+      window.removeEventListener('admin-session-expired', handleSessionExpired);
     };
   }, []);
 
-  const login = (token, user = null) => {
-    const normalizedUser = normalizeAdminUser(user, token);
-
+  const login = (user = null) => {
+    const normalizedUser = normalizeAdminUser(user);
+    setAdminSessionActive(true);
     setIsAuthenticated(true);
-    setAdminTokenState(token);
     setAdminUser(normalizedUser);
+    removeLegacySessionStorage();
+  };
 
-    localStorage.setItem('auth', 'true');
-    localStorage.setItem('admin_token', token);
-
-    if (normalizedUser) {
-      localStorage.setItem('admin_user', JSON.stringify(normalizedUser));
-    } else {
-      localStorage.removeItem('admin_user');
+  const logout = async () => {
+    clearClientSession();
+    try {
+      await logoutAdminSession();
+    } catch {
+      // El servidor expirará la cookie si momentáneamente no hay conexión.
     }
-
-    setAdminToken(token);
-    scheduleAutoLogout(token);
   };
 
   const refreshAdminUser = async () => {
-    if (!adminToken) return null;
-
+    if (!isAuthenticated) return null;
     const response = await api.get('/api/admin/auth/verify');
-    const verifiedUser = normalizeAdminUser(response?.data?.user, adminToken);
-
+    const verifiedUser = normalizeAdminUser(response?.data?.user);
     setAdminUser(verifiedUser);
-
-    if (verifiedUser) {
-      localStorage.setItem('admin_user', JSON.stringify(verifiedUser));
-    } else {
-      localStorage.removeItem('admin_user');
-    }
-
     return verifiedUser;
   };
 
@@ -242,7 +131,9 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         isAuthenticated,
-        adminToken,
+        // Los módulos existentes solo comprueban si hay sesión; nunca reciben
+        // el JWT real, que permanece en una cookie HttpOnly.
+        adminToken: isAuthenticated ? 'http-only-session' : null,
         adminUser,
         currentAdminUser: adminUser,
         authLoading,

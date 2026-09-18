@@ -2,7 +2,6 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 const AdminLoginAudit = require('../models/AdminLoginAudit');
 const AdminUser = require('../models/AdminUser');
@@ -12,13 +11,24 @@ const { sendMail } = require('../lib/mail/mailer');
 const {
   isLegacyAdminAuthEnabled,
 } = require('../security/legacyAdminAuthPolicy');
+const {
+  clearSessionCookies,
+  getAccessCredential,
+  issueRotatedSession,
+  loadActiveSession,
+  requireTrustedAdminOrigin,
+  revokeAllUserSessions,
+  revokeRequestSession,
+  rotateRefreshToken,
+  startAdminSession,
+  verifyAccessToken,
+} = require('../security/adminSessionService');
 
 const router = express.Router();
 
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
 
 const FRONTEND_ADMIN_URL =
   process.env.ADMIN_PASSWORD_RESET_URL ||
@@ -97,15 +107,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
-function getBearerToken(req) {
-  const authHeader = req.headers.authorization || '';
-
-  if (authHeader.startsWith('Bearer ')) {
-    return authHeader.replace('Bearer ', '').trim();
-  }
-
-  return String(req.headers['x-admin-token'] || '').trim();
-}
+router.use(requireTrustedAdminOrigin);
 
 function buildAdminResetPasswordUrl(rawToken) {
   const baseUrl = String(FRONTEND_ADMIN_URL || 'http://localhost:5173').replace(/\/+$/, '');
@@ -530,7 +532,7 @@ async function verifyAdminToken(req) {
     };
   }
 
-  const token = getBearerToken(req);
+  const { token } = getAccessCredential(req);
 
   if (!token) {
     return {
@@ -541,7 +543,16 @@ async function verifyAdminToken(req) {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyAccessToken(token);
+    const adminSession = await loadActiveSession(decoded, { req });
+
+    if (!adminSession) {
+      return {
+        ok: false,
+        status: 401,
+        message: 'La sesión expiró o fue revocada. Inicia sesión nuevamente.',
+      };
+    }
 
     if (decoded.authType === 'db' || decoded.adminUserId) {
       const adminUser = await findAdminUserForToken(decoded);
@@ -588,6 +599,7 @@ async function verifyAdminToken(req) {
       return {
         ok: true,
         decoded,
+        adminSession,
         adminUser,
         user: buildUserResponseFromDb(adminUser),
       };
@@ -601,9 +613,18 @@ async function verifyAdminToken(req) {
       };
     }
 
+    if (!isLegacyAdminAuthEnabled()) {
+      return {
+        ok: false,
+        status: 403,
+        message: 'La autenticación administrativa heredada está deshabilitada.',
+      };
+    }
+
     return {
       ok: true,
       decoded,
+      adminSession,
       adminUser: null,
       user: buildUserResponseFromLegacy(decoded.username),
     };
@@ -687,14 +708,10 @@ async function loginWithDatabaseUser(req, { cleanUsername, cleanPassword }) {
     userAgent: getUserAgent(req),
   });
 
-  const token = jwt.sign(buildDbTokenPayload(adminUser), JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
-
   return {
     ok: true,
     found: true,
-    token,
+    adminUser,
     user: buildUserResponseFromDb(adminUser),
   };
 }
@@ -722,14 +739,9 @@ async function loginWithLegacyEnv({ cleanUsername, cleanPassword }) {
     };
   }
 
-  const token = jwt.sign(buildLegacyTokenPayload(cleanUsername), JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
-
   return {
     ok: true,
     found: true,
-    token,
     user: buildUserResponseFromLegacy(cleanUsername),
   };
 }
@@ -791,6 +803,16 @@ router.post('/login', async (req, res) => {
     if (dbLoginResult.ok) {
       clearAttempts(attemptKey);
 
+      const sessionResult = await startAdminSession({
+        req,
+        res,
+        tokenPayload: buildDbTokenPayload(dbLoginResult.adminUser),
+        adminUserId: dbLoginResult.adminUser._id,
+        authType: 'db',
+        username: dbLoginResult.adminUser.username,
+        tokenVersion: dbLoginResult.adminUser.tokenVersion,
+      });
+
       await saveLoginAudit(req, {
         username: dbLoginResult.user.username,
         status: 'success',
@@ -800,8 +822,11 @@ router.post('/login', async (req, res) => {
       return res.json({
         ok: true,
         message: 'Login exitoso.',
-        token: dbLoginResult.token,
         user: dbLoginResult.user,
+        session: {
+          expiresAt: sessionResult.expiresAt,
+          accessExpiresInSeconds: sessionResult.accessExpiresInSeconds,
+        },
       });
     }
 
@@ -838,6 +863,15 @@ router.post('/login', async (req, res) => {
     if (legacyLoginResult.ok) {
       clearAttempts(attemptKey);
 
+      const sessionResult = await startAdminSession({
+        req,
+        res,
+        tokenPayload: buildLegacyTokenPayload(cleanUsername),
+        authType: 'legacy',
+        username: cleanUsername,
+        tokenVersion: 0,
+      });
+
       await saveLoginAudit(req, {
         username: cleanUsername,
         status: 'success',
@@ -847,8 +881,11 @@ router.post('/login', async (req, res) => {
       return res.json({
         ok: true,
         message: 'Login exitoso.',
-        token: legacyLoginResult.token,
         user: legacyLoginResult.user,
+        session: {
+          expiresAt: sessionResult.expiresAt,
+          accessExpiresInSeconds: sessionResult.accessExpiresInSeconds,
+        },
       });
     }
 
@@ -1098,9 +1135,16 @@ router.post('/reset-password', async (req, res) => {
     adminUser.clearPasswordResetToken({ markAsUsed: true });
 
     await adminUser.save();
-
-    const loginToken = jwt.sign(buildDbTokenPayload(adminUser), JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+    await adminUser.populate('roleRef', 'name code level scope permissions');
+    await revokeAllUserSessions(adminUser._id, 'password_reset');
+    const sessionResult = await startAdminSession({
+      req,
+      res,
+      tokenPayload: buildDbTokenPayload(adminUser),
+      adminUserId: adminUser._id,
+      authType: 'db',
+      username: adminUser.username,
+      tokenVersion: adminUser.tokenVersion,
     });
 
     await saveLoginAudit(req, {
@@ -1112,8 +1156,11 @@ router.post('/reset-password', async (req, res) => {
     return res.json({
       ok: true,
       message: 'Contraseña actualizada correctamente.',
-      token: loginToken,
       user: buildUserResponseFromDb(adminUser),
+      session: {
+        expiresAt: sessionResult.expiresAt,
+        accessExpiresInSeconds: sessionResult.accessExpiresInSeconds,
+      },
     });
   } catch (error) {
     console.error('❌ Error restableciendo contraseña admin:', error.message);
@@ -1213,9 +1260,16 @@ router.post('/change-password-required', async (req, res) => {
     adminUser.updatedBy = adminUser._id;
 
     await adminUser.save();
-
-    const token = jwt.sign(buildDbTokenPayload(adminUser), JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+    await adminUser.populate('roleRef', 'name code level scope permissions');
+    await revokeAllUserSessions(adminUser._id, 'required_password_changed');
+    const sessionResult = await startAdminSession({
+      req,
+      res,
+      tokenPayload: buildDbTokenPayload(adminUser),
+      adminUserId: adminUser._id,
+      authType: 'db',
+      username: adminUser.username,
+      tokenVersion: adminUser.tokenVersion,
     });
 
     await saveLoginAudit(req, {
@@ -1227,8 +1281,11 @@ router.post('/change-password-required', async (req, res) => {
     return res.json({
       ok: true,
       message: 'Contraseña actualizada correctamente.',
-      token,
       user: buildUserResponseFromDb(adminUser),
+      session: {
+        expiresAt: sessionResult.expiresAt,
+        accessExpiresInSeconds: sessionResult.accessExpiresInSeconds,
+      },
     });
   } catch (error) {
     console.error('❌ Error en cambio obligatorio de contraseña:', error.message);
@@ -1238,6 +1295,101 @@ router.post('/change-password-required', async (req, res) => {
       message: 'Error interno al cambiar la contraseña.',
     });
   }
+});
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshResult = await rotateRefreshToken(req);
+
+    if (!refreshResult.ok) {
+      if (refreshResult.retryable) {
+        return res.status(409).json({
+          ok: false,
+          code: 'SESSION_REFRESH_IN_PROGRESS',
+          message: 'La sesión ya fue renovada en otra pestaña. Reintentando.',
+        });
+      }
+      clearSessionCookies(res);
+      return res.status(401).json({
+        ok: false,
+        message: 'La sesión expiró o fue revocada. Inicia sesión nuevamente.',
+      });
+    }
+
+    const { session, refreshToken } = refreshResult;
+    let tokenPayload;
+    let user;
+
+    if (session.authType === 'db') {
+      const adminUser = await findAdminUserForToken({
+        adminUserId: session.adminUser,
+      });
+
+      const invalidUser =
+        !adminUser ||
+        adminUser.deletedAt ||
+        adminUser.active !== true ||
+        adminUser.status !== 'active' ||
+        Number(adminUser.tokenVersion || 0) !== Number(session.tokenVersion || 0);
+
+      if (invalidUser) {
+        await revokeRequestSession(req, 'user_invalid_or_security_changed');
+        clearSessionCookies(res);
+        return res.status(401).json({
+          ok: false,
+          message: 'La sesión ya no es válida. Inicia sesión nuevamente.',
+        });
+      }
+
+      tokenPayload = buildDbTokenPayload(adminUser);
+      user = buildUserResponseFromDb(adminUser);
+    } else {
+      if (!isLegacyAdminAuthEnabled()) {
+        await revokeRequestSession(req, 'legacy_auth_disabled');
+        clearSessionCookies(res);
+        return res.status(401).json({
+          ok: false,
+          message: 'La autenticación administrativa heredada está deshabilitada.',
+        });
+      }
+
+      tokenPayload = buildLegacyTokenPayload(session.username);
+      user = buildUserResponseFromLegacy(session.username);
+    }
+
+    await issueRotatedSession(res, { session, refreshToken, tokenPayload });
+
+    return res.json({ ok: true, user });
+  } catch (error) {
+    console.error('❌ Error renovando sesión admin:', error.message);
+    clearSessionCookies(res);
+    return res.status(401).json({
+      ok: false,
+      message: 'No se pudo renovar la sesión administrativa.',
+    });
+  }
+});
+
+router.post('/logout', async (req, res) => {
+  try {
+    await revokeRequestSession(req, 'logout');
+  } catch (error) {
+    console.error('❌ Error revocando sesión admin:', error.message);
+  } finally {
+    clearSessionCookies(res);
+  }
+
+  return res.json({ ok: true, message: 'Sesión cerrada correctamente.' });
+});
+
+router.post('/logout-all', requireAdmin, async (req, res) => {
+  if (req.adminUserId) {
+    await revokeAllUserSessions(req.adminUserId, 'logout_all');
+  } else {
+    await revokeRequestSession(req, 'logout_all');
+  }
+  clearSessionCookies(res);
+  return res.json({ ok: true, message: 'Todas las sesiones fueron cerradas.' });
 });
 
 router.get('/verify', async (req, res) => {

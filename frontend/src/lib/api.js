@@ -4,13 +4,31 @@ import { API_BASE_URL } from '../config/apiBaseUrl';
 
 const API_BASE = API_BASE_URL;
 
-// ===== Claves de storage =====
-const ADMIN_TOKEN_KEY = 'admin_token';
 const SESSION_ID_KEY = 'session_id';
+const ADMIN_REFRESH_URL = '/api/admin/auth/refresh';
+const ADMIN_SESSION_EXPIRED_EVENT = 'admin-session-expired';
+
+let adminSessionActive = false;
+let refreshPromise = null;
+
+function wait(milliseconds) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
+}
+
+async function refreshAdminSessionCookie() {
+  try {
+    return await api.post(ADMIN_REFRESH_URL, null, { skipAdminRefresh: true });
+  } catch (error) {
+    if (error?.response?.status !== 409) throw error;
+    await wait(150);
+    return api.post(ADMIN_REFRESH_URL, null, { skipAdminRefresh: true });
+  }
+}
 
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -18,10 +36,13 @@ const api = axios.create({
 });
 
 /* ============ Helpers públicos ============ */
-export function setAdminToken(token) {
+export function setAdminSessionActive(active) {
+  adminSessionActive = Boolean(active);
+}
+
+export function clearLegacyAdminToken() {
   try {
-    if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
-    else localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem('admin_token');
   } catch { /* ignore */ }
 }
 
@@ -50,17 +71,6 @@ export function postIdempotent(url, data, idempotencyKey, config = {}) {
 
 /* ============ Interceptors ============ */
 api.interceptors.request.use((config) => {
-  let adminToken = '';
-  try {
-    adminToken = localStorage.getItem(ADMIN_TOKEN_KEY) || '';
-  } catch { /* ignore */ }
-
-  if (adminToken) {
-    if (!config.headers['Authorization'] && !config.headers['authorization']) {
-      config.headers['Authorization'] = `Bearer ${adminToken}`;
-    }
-  }
-
   try {
     const sessionId = localStorage.getItem(SESSION_ID_KEY);
     const headerNames = Object.keys(config.headers || {}).map((key) =>
@@ -90,8 +100,44 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
+    const originalRequest = error?.config || {};
+    const requestUrl = String(originalRequest.url || '');
+    const isVerifyRequest = requestUrl.includes('/api/admin/auth/verify');
+    const excludedAuthRequest = [
+      '/api/admin/auth/login',
+      '/api/admin/auth/forgot-password',
+      '/api/admin/auth/reset-password',
+      ADMIN_REFRESH_URL,
+    ].some((path) => requestUrl.includes(path));
+
+    if (
+      status === 401 &&
+      !originalRequest._adminSessionRetry &&
+      !originalRequest.skipAdminRefresh &&
+      !excludedAuthRequest &&
+      (adminSessionActive || isVerifyRequest)
+    ) {
+      originalRequest._adminSessionRetry = true;
+
+      try {
+        if (!refreshPromise) {
+          refreshPromise = refreshAdminSessionCookie().finally(() => {
+            refreshPromise = null;
+          });
+        }
+
+        await refreshPromise;
+        adminSessionActive = true;
+        return api(originalRequest);
+      } catch {
+        adminSessionActive = false;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(ADMIN_SESSION_EXPIRED_EVENT));
+        }
+      }
+    }
 
     if (status === 409) return Promise.reject(error);
 

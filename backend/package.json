@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:env": "node scripts/testEnvConfig.js",
     "test:admin-auth-security": "node scripts/testAdminAuthSecurityHardening.js",
+    "test:admin-session-security": "node scripts/testAdminSessionSecurity.js",
     "test:configuration-level-plus-stage0": "node scripts/testConfigurationLevelPlusStage0.js",
     "test:configuration-level-plus-stage1": "node scripts/testConfigurationLevelPlusStage1.js",
     "test:configuration-level-plus-stage2": "node scripts/testConfigurationLevelPlusStage2.js",

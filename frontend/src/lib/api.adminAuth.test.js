@@ -23,14 +23,15 @@ describe('autenticacion administrativa centralizada', () => {
     vi.restoreAllMocks();
   });
 
-  it('envia exclusivamente Bearer cuando existe una sesion legitima', async () => {
+  it('usa cookies del navegador y nunca expone el token legado', async () => {
     const token = 'header.payload.valid-admin-signature';
     localStorage.setItem('admin_token', token);
 
     const config = await requestWithCapturedConfig();
     const headers = config.headers.toJSON();
 
-    expect(headers.Authorization).toBe(`Bearer ${token}`);
+    expect(config.withCredentials).toBe(true);
+    expect(headers.Authorization).toBeUndefined();
     expect(headers['x-admin-token']).toBeUndefined();
     expect(headers['x-admin-user']).toBeUndefined();
     expect(config.url).toBe('/api/cart/admin');
@@ -46,7 +47,7 @@ describe('autenticacion administrativa centralizada', () => {
     expect(headers['x-admin-user']).toBeUndefined();
   });
 
-  it('el token legitimo no aparece en URL, query, body o logs', async () => {
+  it('el token legado no aparece en cabeceras, URL, query, body o logs', async () => {
     const token = 'header.payload.valid-admin-signature';
     localStorage.setItem('admin_token', token);
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -55,6 +56,7 @@ describe('autenticacion administrativa centralizada', () => {
     const config = await requestWithCapturedConfig('/api/cart/admin?page=1');
 
     expect(config.url).not.toContain(token);
+    expect(config.headers.toJSON().Authorization).toBeUndefined();
     expect(JSON.stringify(config.params || {})).not.toContain(token);
     expect(JSON.stringify(config.data || '')).not.toContain(token);
     expect(consoleSpy).not.toHaveBeenCalled();

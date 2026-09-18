@@ -8,6 +8,7 @@ process.env.JWT_SECRET =
   process.env.JWT_SECRET || 'admin-auth-security-test-secret-32-chars';
 
 const AdminUser = require('../models/AdminUser');
+const AdminSession = require('../models/AdminSession');
 const requireAdmin = require('../middleware/requireAdmin');
 
 function createResponse() {
@@ -110,6 +111,7 @@ async function testUnifiedPasswordPolicy() {
 
 async function testRequiredPasswordChangeIsEnforcedByBackend() {
   const originalFindOne = AdminUser.findOne;
+  const originalSessionFindOne = AdminSession.findOne;
   const userId = new mongoose.Types.ObjectId();
   const tokenVersion = 7;
   const pendingUser = {
@@ -131,6 +133,20 @@ async function testRequiredPasswordChangeIsEnforcedByBackend() {
   AdminUser.findOne = () => ({
     select: () => Promise.resolve(pendingUser),
   });
+  AdminSession.findOne = () => ({
+    select: () => Promise.resolve({
+      _id: new mongoose.Types.ObjectId(),
+      sessionId: 'security-session-id-1234567890',
+      adminUser: userId,
+      authType: 'db',
+      username: 'temporary-owner',
+      tokenVersion,
+      lastSeenAt: new Date(),
+      idleExpiresAt: new Date(Date.now() + 60_000),
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+    }),
+  });
 
   try {
     const token = jwt.sign(
@@ -138,10 +154,17 @@ async function testRequiredPasswordChangeIsEnforcedByBackend() {
         role: 'admin',
         authType: 'db',
         adminUserId: String(userId),
+        username: 'temporary-owner',
         tokenVersion,
+        sessionId: 'security-session-id-1234567890',
       },
       process.env.JWT_SECRET,
-      { expiresIn: '5m' }
+      {
+        algorithm: 'HS256',
+        audience: 'tienda-virtual-admin',
+        issuer: 'tienda-virtual-backend',
+        expiresIn: '5m',
+      }
     );
 
     const req = {
@@ -175,6 +198,7 @@ async function testRequiredPasswordChangeIsEnforcedByBackend() {
     assert.equal(allowedReq.adminUserId, String(userId));
   } finally {
     AdminUser.findOne = originalFindOne;
+    AdminSession.findOne = originalSessionFindOne;
   }
 }
 

@@ -23,6 +23,7 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { buildCorsOptions } = require('./config/corsOptions');
+const securityHeaders = require('./middleware/securityHeaders');
 const {
   applyMongooseIndexPolicy,
 } = require('./config/mongooseIndexPolicy');
@@ -30,6 +31,7 @@ const {
 const adminAccessGate = require('./middleware/adminAccessGate');
 
 const app = express();
+app.disable('x-powered-by');
 // Cloudflared entrega la IP real en X-Forwarded-For desde un proxy local.
 // Confiar solo en proxies privados/locales evita rechazos de express-rate-limit
 // sin permitir que un cliente directo suplante libremente esa cabecera.
@@ -64,6 +66,7 @@ function requireCritical(relPath) {
   return mod;
 }
 
+app.use(securityHeaders);
 app.use(cors(buildCorsOptions(env)));
 const shippingWebhookRoutes = tryRequire('./routes/shippingWebhookRoutes');
 if (shippingWebhookRoutes) {
@@ -179,7 +182,10 @@ if (paymentRoutes) app.use('/api/payments', paymentRoutes);
 if (dianProviderTestRoutes) app.use('/api/dian-provider', dianProviderTestRoutes);
 if (geoRoutes) app.use('/api/geo', geoRoutes);
 if (uploadRoutes) app.use('/api/uploads', uploadRoutes);
-if (adminAuthRoutes) app.use('/api/admin/auth', loginLimiter, adminAuthRoutes);
+if (adminAuthRoutes) {
+  app.use('/api/admin/auth/login', loginLimiter);
+  app.use('/api/admin/auth', adminAuthRoutes);
+}
 if (adminUsersRoutes) app.use('/api/admin/users', adminUsersRoutes);
 if (adminRolesRoutes) app.use('/api/admin/roles', adminRolesRoutes);
 if (adminBranchProtectionRoutes) app.use('/api/admin/branches', adminBranchProtectionRoutes);
