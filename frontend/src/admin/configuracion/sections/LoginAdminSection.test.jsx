@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -137,6 +137,59 @@ describe('LoginAdminSection', () => {
     const preview = container.querySelector('[data-preview-theme="smokeGlass"]');
     expect(preview).toHaveAttribute('data-custom-image', 'true');
     expect(preview.querySelectorAll('.login-settings-theme-motion i')).toHaveLength(0);
+  });
+
+  it('mantiene el fondo de cada tema independiente y controla la transparencia del vidrio', async () => {
+    getAdminLoginSettings.mockResolvedValueOnce(response({
+      settings: {
+        theme: 'smokeGlass',
+        background: {
+          mode: 'image',
+          color: '#16324a',
+          image: 'https://cdn.example.com/perla.webp',
+          imageOpacity: 0.8,
+          overlay: 0.2,
+          glassTransparency: 0.25,
+        },
+        backgrounds: {
+          liquidGlass: { mode: 'theme', color: '#07132f', image: '', imageOpacity: 0.35, overlay: 0.35, glassTransparency: 0.35 },
+          immersiveGallery: { mode: 'theme', color: '#07132f', image: '', imageOpacity: 0.35, overlay: 0.35, glassTransparency: 0.35 },
+          smokeGlass: { mode: 'image', color: '#16324a', image: 'https://cdn.example.com/perla.webp', imageOpacity: 0.8, overlay: 0.2, glassTransparency: 0.25 },
+        },
+      },
+    }));
+    const user = userEvent.setup();
+    const { container } = render(<LoginAdminSection />);
+    await screen.findByRole('heading', { name: 'Login de Rosa Boutique' });
+
+    let preview = container.querySelector('[data-preview-theme="smokeGlass"]');
+    expect(container.querySelector('.login-settings-preview-image').style.backgroundImage).toContain('perla.webp');
+    expect(preview.style.getPropertyValue('--smoke-glass-opacity')).toBe('0.75');
+
+    await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
+    const transparency = screen.getByRole('slider', { name: 'Transparencia del contenedor' });
+    fireEvent.change(transparency, { target: { value: '0.7' } });
+    preview = container.querySelector('[data-preview-theme="smokeGlass"]');
+    expect(preview.style.getPropertyValue('--smoke-glass-opacity')).toBeCloseTo(0.3);
+
+    await user.selectOptions(screen.getByLabelText('Tema visual'), 'liquidGlass');
+    preview = container.querySelector('[data-preview-theme="liquidGlass"]');
+    expect(preview).not.toHaveAttribute('data-custom-image');
+    expect(container.querySelector('.login-settings-preview-image').style.backgroundImage).not.toContain('perla.webp');
+
+    await user.click(screen.getByRole('button', { name: 'Guardar diseño' }));
+    await waitFor(() => expect(updateAdminLoginSettings).toHaveBeenCalledTimes(1));
+    expect(updateAdminLoginSettings).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({
+        backgrounds: expect.objectContaining({
+          liquidGlass: expect.objectContaining({ mode: 'theme', image: '' }),
+          smokeGlass: expect.objectContaining({
+            image: 'https://cdn.example.com/perla.webp',
+            glassTransparency: 0.7,
+          }),
+        }),
+      }),
+    }));
   });
 
   it('permite cambiar la imagen terminada de Galería Inmersiva', async () => {

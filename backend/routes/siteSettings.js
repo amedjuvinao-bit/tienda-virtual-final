@@ -142,7 +142,9 @@ function buildDefaultSettings() {
         image: "",
         imageOpacity: 0.35,
         overlay: 0.35,
+        glassTransparency: 0.35,
       },
+      backgrounds: {},
     },
 
     billing: {
@@ -308,7 +310,9 @@ async function ensureAdminAppearanceExists() {
         image: "",
         imageOpacity: 0.35,
         overlay: 0.35,
+        glassTransparency: 0.35,
       },
+      backgrounds: {},
     };
   }
 

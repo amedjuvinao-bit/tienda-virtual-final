@@ -78,6 +78,47 @@ describe('loginSettings', () => {
     expect(invalid.customizations.immersiveGallery.imageTone).toBe('black');
   });
 
+  it('migra el fondo anterior solo al tema seleccionado', () => {
+    const normalized = normalizeLoginSettings({
+      theme: 'smokeGlass',
+      layout: 'centeredCard',
+      background: {
+        mode: 'image',
+        color: '#123456',
+        image: 'https://cdn.example.com/perla.webp',
+        imageOpacity: 0.8,
+        overlay: 0.2,
+        glassTransparency: 0.6,
+      },
+    });
+
+    expect(normalized.backgrounds.smokeGlass).toMatchObject({
+      mode: 'image',
+      image: 'https://cdn.example.com/perla.webp',
+      glassTransparency: 0.6,
+    });
+    expect(normalized.backgrounds.liquidGlass).toMatchObject({ mode: 'theme', image: '' });
+    expect(normalized.backgrounds.immersiveGallery).toMatchObject({ mode: 'theme', image: '' });
+    expect(normalized.background).toEqual(normalized.backgrounds.smokeGlass);
+  });
+
+  it('conserva fondos diferentes para cada tema', () => {
+    const normalized = normalizeLoginSettings({
+      ...DEFAULT_LOGIN_SETTINGS,
+      theme: 'liquidGlass',
+      backgrounds: {
+        liquidGlass: { mode: 'color', color: '#abcdef' },
+        immersiveGallery: { mode: 'image', image: 'https://cdn.example.com/galeria.webp' },
+        smokeGlass: { mode: 'image', image: 'https://cdn.example.com/perla.webp', glassTransparency: 2 },
+      },
+    });
+
+    expect(normalized.backgrounds.liquidGlass.color).toBe('#abcdef');
+    expect(normalized.backgrounds.immersiveGallery.image).toBe('https://cdn.example.com/galeria.webp');
+    expect(normalized.backgrounds.smokeGlass.image).toBe('https://cdn.example.com/perla.webp');
+    expect(normalized.backgrounds.smokeGlass.glassTransparency).toBe(0.9);
+  });
+
   it('rechaza fondos con protocolos inseguros o URLs relativas a otro host', () => {
     expect(safeLoginImageUrl('javascript:alert(1)')).toBe('');
     expect(safeLoginImageUrl('//malicioso.example/fondo.png')).toBe('');

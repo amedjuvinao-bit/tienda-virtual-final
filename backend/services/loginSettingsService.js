@@ -59,17 +59,25 @@ const LOGIN_LAYOUTS = Object.freeze([
   { value: 'electricCircle', label: 'Círculo eléctrico', description: 'Acceso dentro de un aro luminoso.' },
 ]);
 
+const DEFAULT_LOGIN_BACKGROUND = Object.freeze({
+  mode: 'theme',
+  color: '#07132f',
+  image: '',
+  imageOpacity: 0.35,
+  overlay: 0.35,
+  glassTransparency: 0.35,
+});
+
+const DEFAULT_LOGIN_BACKGROUNDS = Object.freeze(Object.fromEntries(
+  LOGIN_THEMES.map(({ value }) => [value, DEFAULT_LOGIN_BACKGROUND])
+));
+
 const DEFAULT_LOGIN_SETTINGS = Object.freeze({
   theme: 'liquidGlass',
   layout: 'centeredCard',
   customizations: LOGIN_THEME_CUSTOMIZATIONS,
-  background: Object.freeze({
-    mode: 'theme',
-    color: '#07132f',
-    image: '',
-    imageOpacity: 0.35,
-    overlay: 0.35,
-  }),
+  background: DEFAULT_LOGIN_BACKGROUND,
+  backgrounds: DEFAULT_LOGIN_BACKGROUNDS,
 });
 
 class LoginSettingsError extends Error {
@@ -161,36 +169,71 @@ function safeImageUrl(value) {
   }
 }
 
+function normalizeBackground(input = {}) {
+  const mode = cleanText(input.mode, 20);
+  return {
+    mode: ['theme', 'color', 'image'].includes(mode)
+      ? mode
+      : DEFAULT_LOGIN_BACKGROUND.mode,
+    color: /^#[0-9a-f]{6}$/i.test(cleanText(input.color, 20))
+      ? cleanText(input.color, 20).toLowerCase()
+      : DEFAULT_LOGIN_BACKGROUND.color,
+    image: safeImageUrl(input.image),
+    imageOpacity: numberInRange(input.imageOpacity, 0.1, 1, DEFAULT_LOGIN_BACKGROUND.imageOpacity),
+    overlay: numberInRange(input.overlay, 0, 0.85, DEFAULT_LOGIN_BACKGROUND.overlay),
+    glassTransparency: numberInRange(
+      input.glassTransparency,
+      0,
+      0.9,
+      DEFAULT_LOGIN_BACKGROUND.glassTransparency
+    ),
+  };
+}
+
 function normalizeLoginSettings(input = {}) {
-  const background = input?.background || {};
   const theme = cleanText(input.theme, 80);
   const layout = cleanText(input.layout, 80);
-  const mode = cleanText(background.mode, 20);
+  const normalizedTheme = supportedThemeId(theme);
+  const suppliedBackgrounds = input?.backgrounds && typeof input.backgrounds === 'object'
+    ? input.backgrounds
+    : {};
+  const backgrounds = Object.fromEntries(LOGIN_THEMES.map(({ value: themeId }) => {
+    const supplied = Object.prototype.hasOwnProperty.call(suppliedBackgrounds, themeId)
+      ? suppliedBackgrounds[themeId]
+      : themeId === normalizedTheme
+        ? input?.background
+        : DEFAULT_LOGIN_BACKGROUND;
+    return [themeId, normalizeBackground(supplied || DEFAULT_LOGIN_BACKGROUND)];
+  }));
 
   return {
-    theme: supportedThemeId(theme),
+    theme: normalizedTheme,
     layout: optionExists(LOGIN_LAYOUTS, layout) ? layout : DEFAULT_LOGIN_SETTINGS.layout,
     customizations: normalizeCustomizations(input.customizations),
-    background: {
-      mode: ['theme', 'color', 'image'].includes(mode)
-        ? mode
-        : DEFAULT_LOGIN_SETTINGS.background.mode,
-      color: /^#[0-9a-f]{6}$/i.test(cleanText(background.color, 20))
-        ? cleanText(background.color, 20).toLowerCase()
-        : DEFAULT_LOGIN_SETTINGS.background.color,
-      image: safeImageUrl(background.image),
-      imageOpacity: numberInRange(background.imageOpacity, 0.1, 1, DEFAULT_LOGIN_SETTINGS.background.imageOpacity),
-      overlay: numberInRange(background.overlay, 0, 0.85, DEFAULT_LOGIN_SETTINGS.background.overlay),
-    },
+    background: backgrounds[normalizedTheme],
+    backgrounds,
   };
+}
+
+function validateBackground(background = {}, fieldPrefix = 'background') {
+  const details = [];
+  const mode = cleanText(background.mode, 20);
+  if (!['theme', 'color', 'image'].includes(mode)) {
+    details.push({ field: `${fieldPrefix}.mode`, message: 'Selecciona un tipo de fondo válido.' });
+  }
+  if (mode === 'color' && !/^#[0-9a-f]{6}$/i.test(cleanText(background.color, 20))) {
+    details.push({ field: `${fieldPrefix}.color`, message: 'Selecciona un color hexadecimal válido.' });
+  }
+  if (mode === 'image' && !safeImageUrl(background.image)) {
+    details.push({ field: `${fieldPrefix}.image`, message: 'Sube una imagen o escribe una URL válida.' });
+  }
+  return details;
 }
 
 function validateLoginSettings(input = {}) {
   const details = [];
   const theme = cleanText(input.theme, 80);
   const layout = cleanText(input.layout, 80);
-  const background = input?.background || {};
-  const mode = cleanText(background.mode, 20);
 
   if (!optionExists(LOGIN_THEMES, theme) && !LOGIN_THEME_MIGRATIONS[theme]) {
     details.push({ field: 'theme', message: 'Selecciona un tema disponible.' });
@@ -198,14 +241,24 @@ function validateLoginSettings(input = {}) {
   if (!optionExists(LOGIN_LAYOUTS, layout)) {
     details.push({ field: 'layout', message: 'Selecciona una estructura disponible.' });
   }
-  if (!['theme', 'color', 'image'].includes(mode)) {
-    details.push({ field: 'background.mode', message: 'Selecciona un tipo de fondo válido.' });
-  }
-  if (mode === 'color' && !/^#[0-9a-f]{6}$/i.test(cleanText(background.color, 20))) {
-    details.push({ field: 'background.color', message: 'Selecciona un color hexadecimal válido.' });
-  }
-  if (mode === 'image' && !safeImageUrl(background.image)) {
-    details.push({ field: 'background.image', message: 'Sube una imagen o escribe una URL válida.' });
+  const suppliedBackgrounds = input?.backgrounds && typeof input.backgrounds === 'object'
+    ? input.backgrounds
+    : null;
+  if (suppliedBackgrounds) {
+    const normalizedTheme = supportedThemeId(theme);
+    for (const { value: themeId } of LOGIN_THEMES) {
+      if (Object.prototype.hasOwnProperty.call(suppliedBackgrounds, themeId)) {
+        details.push(...validateBackground(suppliedBackgrounds[themeId], `backgrounds.${themeId}`));
+      }
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(suppliedBackgrounds, normalizedTheme)
+      && input?.background
+    ) {
+      details.push(...validateBackground(input.background));
+    }
+  } else {
+    details.push(...validateBackground(input?.background || {}));
   }
 
   for (const { value: themeId } of LOGIN_THEMES) {

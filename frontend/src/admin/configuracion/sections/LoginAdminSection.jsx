@@ -98,7 +98,7 @@ function StoreLogo({ store, className = '' }) {
 
 function LoginPreview({ settings, store }) {
   const theme = LOGIN_THEMES[settings.theme] || LOGIN_THEMES[DEFAULT_LOGIN_SETTINGS.theme];
-  const background = settings.background;
+  const background = settings.backgrounds?.[theme.id] || settings.background;
   const customization = settings.customizations?.[theme.id] || getLoginThemeCustomization(theme.id);
   const galleryTone = getLoginGalleryImageTone(customization.imageTone);
   const previewImage = safeLoginImageUrl(background.image);
@@ -136,6 +136,7 @@ function LoginPreview({ settings, store }) {
           '--login-secondary': customization.secondary,
           '--login-accent': customization.accent,
           '--login-surface': customization.surface,
+          '--smoke-glass-opacity': 1 - background.glassTransparency,
         }}
       >
         {resolvedPreviewImage ? (
@@ -197,6 +198,7 @@ export default function LoginAdminSection() {
   const dirty = useMemo(() => !loginSettingsEqual(form, saved), [form, saved]);
   const themeOptions = CURATED_LOGIN_THEME_IDS.map((themeId) => LOGIN_THEMES[themeId]).map((item) => ({ value: item.id, label: item.name, description: item.description }));
   const currentCustomization = form.customizations?.[form.theme] || getLoginThemeCustomization(form.theme);
+  const currentBackground = form.backgrounds?.[form.theme] || form.background;
 
   function applyResponse(response) {
     const next = normalizeLoginSettings(response?.settings || DEFAULT_LOGIN_SETTINGS);
@@ -224,17 +226,32 @@ export default function LoginAdminSection() {
     load();
   }, []);
 
-  function setRoot(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
-    setFieldErrors((current) => ({ ...current, [key]: '' }));
+  function setTheme(theme) {
+    setForm((current) => ({
+      ...current,
+      theme,
+      background: current.backgrounds?.[theme] || DEFAULT_LOGIN_SETTINGS.backgrounds[theme],
+    }));
+    setFieldErrors((current) => ({ ...current, theme: '' }));
   }
 
   function setBackground(key, value) {
     setForm((current) => ({
       ...current,
-      background: { ...current.background, [key]: value },
+      background: { ...(current.backgrounds?.[current.theme] || current.background), [key]: value },
+      backgrounds: {
+        ...current.backgrounds,
+        [current.theme]: {
+          ...(current.backgrounds?.[current.theme] || current.background),
+          [key]: value,
+        },
+      },
     }));
-    setFieldErrors((current) => ({ ...current, [`background.${key}`]: '' }));
+    setFieldErrors((current) => ({
+      ...current,
+      [`background.${key}`]: '',
+      [`backgrounds.${form.theme}.${key}`]: '',
+    }));
   }
 
   function setCustomization(key, value) {
@@ -294,7 +311,15 @@ export default function LoginAdminSection() {
       if (!url) throw new Error('UPLOAD_URL_MISSING');
       setForm((current) => ({
         ...current,
-        background: { ...current.background, image: url, mode: 'image' },
+        background: { ...(current.backgrounds?.[current.theme] || current.background), image: url, mode: 'image' },
+        backgrounds: {
+          ...current.backgrounds,
+          [current.theme]: {
+            ...(current.backgrounds?.[current.theme] || current.background),
+            image: url,
+            mode: 'image',
+          },
+        },
       }));
       setFeedback({ type: 'success', message: 'Imagen cargada. Guarda para aplicarla al login.' });
     } catch (error) {
@@ -357,7 +382,7 @@ export default function LoginAdminSection() {
             </div>
             <label className="login-theme-select-field">
               <span>Diseño del login</span>
-              <select aria-label="Tema visual" value={form.theme} onChange={(event) => { setRoot('theme', event.target.value); setCustomizerOpen(false); }}>
+              <select aria-label="Tema visual" value={form.theme} onChange={(event) => { setTheme(event.target.value); setCustomizerOpen(false); }}>
                 {themeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
@@ -446,13 +471,13 @@ export default function LoginAdminSection() {
           </section> : null}
 
           {customizerOpen ? <div className="login-settings-background">
-            <div className="login-settings-subtitle"><ImageIcon /><span><b>Fondo</b><small>Escoge una sola opción</small></span></div>
+            <div className="login-settings-subtitle"><ImageIcon /><span><b>Fondo</b><small>Se guarda por separado para este tema</small></span></div>
             <div className="login-settings-segments">
               {(meta.backgroundModes || []).map((mode) => (
                 <button
                   type="button"
                   key={mode.value}
-                  className={form.background.mode === mode.value ? 'active' : ''}
+                  className={currentBackground.mode === mode.value ? 'active' : ''}
                   onClick={() => setBackground('mode', mode.value)}
                 >
                   {mode.label}
@@ -460,21 +485,21 @@ export default function LoginAdminSection() {
               ))}
             </div>
 
-            {form.background.mode === 'color' ? (
+            {currentBackground.mode === 'color' ? (
               <label className="login-settings-color-row">
                 <span>Color del fondo</span>
-                <input type="color" value={form.background.color} onChange={(event) => setBackground('color', event.target.value)} />
-                <input value={form.background.color} onChange={(event) => setBackground('color', event.target.value)} />
-                {fieldErrors['background.color'] ? <em>{fieldErrors['background.color']}</em> : null}
+                <input type="color" value={currentBackground.color} onChange={(event) => setBackground('color', event.target.value)} />
+                <input value={currentBackground.color} onChange={(event) => setBackground('color', event.target.value)} />
+                {fieldErrors[`backgrounds.${form.theme}.color`] || fieldErrors['background.color'] ? <em>{fieldErrors[`backgrounds.${form.theme}.color`] || fieldErrors['background.color']}</em> : null}
               </label>
             ) : null}
 
-            {form.background.mode === 'image' ? (
+            {currentBackground.mode === 'image' ? (
               <div className="login-settings-image-fields">
                 <label>
                   <span>Imagen publicada</span>
-                  <input value={form.background.image} onChange={(event) => setBackground('image', event.target.value)} placeholder="https://..." />
-                  {fieldErrors['background.image'] ? <em>{fieldErrors['background.image']}</em> : null}
+                  <input value={currentBackground.image} onChange={(event) => setBackground('image', event.target.value)} placeholder="https://..." />
+                  {fieldErrors[`backgrounds.${form.theme}.image`] || fieldErrors['background.image'] ? <em>{fieldErrors[`backgrounds.${form.theme}.image`] || fieldErrors['background.image']}</em> : null}
                 </label>
                 <label className="login-settings-upload">
                   <input type="file" accept="image/*" onChange={uploadImage} />
@@ -482,8 +507,9 @@ export default function LoginAdminSection() {
                   {busy === 'upload' ? 'Subiendo…' : 'Subir imagen'}
                 </label>
                 <div className="login-settings-range-grid">
-                  <label><span>Visibilidad: {Math.round(form.background.imageOpacity * 100)}%</span><input type="range" min="0.1" max="1" step="0.05" value={form.background.imageOpacity} onChange={(event) => setBackground('imageOpacity', Number(event.target.value))} /></label>
-                  <label><span>Capa oscura: {Math.round(form.background.overlay * 100)}%</span><input type="range" min="0" max="0.85" step="0.05" value={form.background.overlay} onChange={(event) => setBackground('overlay', Number(event.target.value))} /></label>
+                  <label><span>Visibilidad: {Math.round(currentBackground.imageOpacity * 100)}%</span><input type="range" min="0.1" max="1" step="0.05" value={currentBackground.imageOpacity} onChange={(event) => setBackground('imageOpacity', Number(event.target.value))} /></label>
+                  <label><span>Capa oscura: {Math.round(currentBackground.overlay * 100)}%</span><input type="range" min="0" max="0.85" step="0.05" value={currentBackground.overlay} onChange={(event) => setBackground('overlay', Number(event.target.value))} /></label>
+                  {form.theme === 'smokeGlass' ? <label><span>Transparencia del contenedor: {Math.round(currentBackground.glassTransparency * 100)}%</span><input aria-label="Transparencia del contenedor" type="range" min="0" max="0.9" step="0.05" value={currentBackground.glassTransparency} onChange={(event) => setBackground('glassTransparency', Number(event.target.value))} /></label> : null}
                 </div>
               </div>
             ) : null}

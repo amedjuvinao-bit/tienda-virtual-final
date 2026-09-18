@@ -1468,7 +1468,12 @@ export default function Login() {
     </div>
   </section>;
 
-  const renderSmokeGlass = () => <section className="rb-smoke-stage" data-custom-image={hasCustomImageBg ? "true" : undefined} aria-label={`Acceso administrativo de ${storeName}`}>
+  const renderSmokeGlass = () => <section
+    className="rb-smoke-stage"
+    data-custom-image={hasCustomImageBg ? "true" : undefined}
+    aria-label={`Acceso administrativo de ${storeName}`}
+    style={{ "--smoke-glass-opacity": 1 - loginBg.glassTransparency }}
+  >
     <div className="rb-smoke-media" style={{ backgroundImage: smokeBackground ? `url("${smokeBackground}")` : "none", opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
     <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.08 }} />
     <div className="rb-smoke-depth" aria-hidden="true">{hasCustomImageBg ? null : <><i /><i /><i /></>}</div>

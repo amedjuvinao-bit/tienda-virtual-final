@@ -368,6 +368,12 @@ const LoginAdminAppearanceSchema = new Schema(
       image: { type: String, default: "" },
       imageOpacity: { type: Number, default: 0.35 },
       overlay: { type: Number, default: 0.35 },
+      glassTransparency: { type: Number, default: 0.35 },
+    },
+
+    backgrounds: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
   },
   { _id: false, strict: false }

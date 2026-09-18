@@ -45,17 +45,25 @@ function defaultCustomizations() {
   );
 }
 
+const DEFAULT_LOGIN_BACKGROUND = Object.freeze({
+  mode: 'theme',
+  color: '#07132f',
+  image: '',
+  imageOpacity: 0.35,
+  overlay: 0.35,
+  glassTransparency: 0.35,
+});
+
+const DEFAULT_LOGIN_BACKGROUNDS = Object.freeze(Object.fromEntries(
+  CURATED_LOGIN_THEME_IDS.map((themeId) => [themeId, DEFAULT_LOGIN_BACKGROUND])
+));
+
 export const DEFAULT_LOGIN_SETTINGS = Object.freeze({
   theme: DEFAULT_LOGIN_THEME_ID,
   layout: DEFAULT_LOGIN_LAYOUT_ID,
   customizations: Object.freeze(defaultCustomizations()),
-  background: Object.freeze({
-    mode: 'theme',
-    color: '#07132f',
-    image: '',
-    imageOpacity: 0.35,
-    overlay: 0.35,
-  }),
+  background: DEFAULT_LOGIN_BACKGROUND,
+  backgrounds: DEFAULT_LOGIN_BACKGROUNDS,
 });
 
 function numberInRange(value, min, max, fallback) {
@@ -108,28 +116,50 @@ export function normalizeLoginCustomizations(input = {}) {
   );
 }
 
+function normalizeBackground(input = {}) {
+  const mode = ['theme', 'color', 'image'].includes(input.mode)
+    ? input.mode
+    : DEFAULT_LOGIN_BACKGROUND.mode;
+  const color = /^#[0-9a-f]{6}$/i.test(String(input.color || ''))
+    ? String(input.color).toLowerCase()
+    : DEFAULT_LOGIN_BACKGROUND.color;
+
+  return {
+    mode,
+    color,
+    image: safeLoginImageUrl(input.image),
+    imageOpacity: numberInRange(input.imageOpacity, 0.1, 1, DEFAULT_LOGIN_BACKGROUND.imageOpacity),
+    overlay: numberInRange(input.overlay, 0, 0.85, DEFAULT_LOGIN_BACKGROUND.overlay),
+    glassTransparency: numberInRange(
+      input.glassTransparency,
+      0,
+      0.9,
+      DEFAULT_LOGIN_BACKGROUND.glassTransparency
+    ),
+  };
+}
+
 export function normalizeLoginSettings(input = {}) {
-  const background = input?.background || {};
   const theme = supportedThemeId(input.theme);
   const layout = LOGIN_LAYOUTS[input.layout] ? input.layout : DEFAULT_LOGIN_SETTINGS.layout;
-  const mode = ['theme', 'color', 'image'].includes(background.mode)
-    ? background.mode
-    : DEFAULT_LOGIN_SETTINGS.background.mode;
-  const color = /^#[0-9a-f]{6}$/i.test(String(background.color || ''))
-    ? String(background.color).toLowerCase()
-    : DEFAULT_LOGIN_SETTINGS.background.color;
+  const suppliedBackgrounds = input?.backgrounds && typeof input.backgrounds === 'object'
+    ? input.backgrounds
+    : {};
+  const backgrounds = Object.fromEntries(CURATED_LOGIN_THEME_IDS.map((themeId) => {
+    const supplied = Object.prototype.hasOwnProperty.call(suppliedBackgrounds, themeId)
+      ? suppliedBackgrounds[themeId]
+      : themeId === theme
+        ? input?.background
+        : DEFAULT_LOGIN_BACKGROUND;
+    return [themeId, normalizeBackground(supplied || DEFAULT_LOGIN_BACKGROUND)];
+  }));
 
   return {
     theme,
     layout,
     customizations: normalizeLoginCustomizations(input.customizations),
-    background: {
-      mode,
-      color,
-      image: safeLoginImageUrl(background.image),
-      imageOpacity: numberInRange(background.imageOpacity, 0.1, 1, DEFAULT_LOGIN_SETTINGS.background.imageOpacity),
-      overlay: numberInRange(background.overlay, 0, 0.85, DEFAULT_LOGIN_SETTINGS.background.overlay),
-    },
+    background: backgrounds[theme],
+    backgrounds,
   };
 }
 

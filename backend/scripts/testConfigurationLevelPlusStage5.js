@@ -72,6 +72,27 @@ async function run() {
   assert.equal(normalized.background.imageOpacity, 1);
   assert.equal(normalized.background.overlay, 0);
   assert.equal(normalized.background.color, '#abcdef');
+  assert.equal(normalized.backgrounds.liquidGlass.image, 'https://cdn.example.com/login.webp');
+  assert.equal(normalized.backgrounds.smokeGlass.image, '');
+
+  const independentBackgrounds = normalizeLoginSettings({
+    ...DEFAULT_LOGIN_SETTINGS,
+    theme: 'smokeGlass',
+    backgrounds: {
+      liquidGlass: { mode: 'color', color: '#abcdef' },
+      immersiveGallery: { mode: 'image', image: 'https://cdn.example.com/gallery.webp' },
+      smokeGlass: {
+        mode: 'image',
+        image: 'https://cdn.example.com/perla.webp',
+        glassTransparency: 2,
+      },
+    },
+  });
+  assert.equal(independentBackgrounds.backgrounds.liquidGlass.color, '#abcdef');
+  assert.equal(independentBackgrounds.backgrounds.immersiveGallery.image, 'https://cdn.example.com/gallery.webp');
+  assert.equal(independentBackgrounds.backgrounds.smokeGlass.image, 'https://cdn.example.com/perla.webp');
+  assert.equal(independentBackgrounds.backgrounds.smokeGlass.glassTransparency, 0.9);
+  assert.deepEqual(independentBackgrounds.background, independentBackgrounds.backgrounds.smokeGlass);
 
   const galleryTone = normalizeLoginSettings({
     ...DEFAULT_LOGIN_SETTINGS,
