@@ -15,6 +15,7 @@ import {
   Fingerprint,
   ArrowRight,
   Store,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { setAdminToken } from "../lib/api";
@@ -924,6 +925,7 @@ export default function Login() {
   );
   const [storeName, setStoreName] = useState('tu tienda');
   const [storeLogo, setStoreLogo] = useState('');
+  const [loginSettingsReady, setLoginSettingsReady] = useState(false);
   const [showRequiredPasswordChange, setShowRequiredPasswordChange] =
     useState(false);
   const [requiredPasswordUser, setRequiredPasswordUser] = useState(null);
@@ -967,11 +969,16 @@ export default function Login() {
         }
       } catch {
         // El acceso continúa disponible con el diseño seguro predeterminado.
+      } finally {
+        if (active) setLoginSettingsReady(true);
       }
     };
 
     const syncLoginConfig = (event) => {
-      if (event?.detail) applySettings(event.detail);
+      if (event?.detail) {
+        applySettings(event.detail);
+        setLoginSettingsReady(true);
+      }
       else loadSettings();
     };
 
@@ -1000,6 +1007,15 @@ export default function Login() {
 
     return () => window.clearInterval(timer);
   }, []);
+
+  if (!loginSettingsReady) {
+    return (
+      <main className="rb-login-bootstrap" aria-busy="true" aria-label="Preparando acceso administrativo">
+        <Loader2 className="rb-login-bootstrap__spinner" aria-hidden="true" />
+        <span>Preparando acceso seguro…</span>
+      </main>
+    );
+  }
 
   const registerFailedAttempt = () => {
     const nextAttempts = getFailedAttempts() + 1;

@@ -1,4 +1,5 @@
 .rb-login-shell{--login-primary:#16324a;--login-secondary:#876fd4;--login-accent:#ff8f70;--login-surface:#f8fdff}
+.rb-login-bootstrap{display:grid;min-height:100vh;place-content:center;justify-items:center;gap:14px;background:#f6f7f9;color:#334155;font-family:ui-sans-serif,system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em}.rb-login-bootstrap__spinner{height:28px;width:28px;color:#7c6bd8;animation:rbLoginBootstrapSpin .8s linear infinite}@keyframes rbLoginBootstrapSpin{to{transform:rotate(360deg)}}
 .rb-curated-auth{position:relative;z-index:5;width:100%;max-width:390px}
 .rb-curated-auth__head{margin-bottom:25px}.rb-curated-auth__head h2{margin:0;font-size:clamp(29px,3vw,38px);font-weight:500;line-height:1.05}.rb-curated-auth__head p{margin:9px 0 0;font-size:12px;line-height:1.55}
 .rb-curated-auth__error{margin-bottom:14px;border:1px solid #ef444466;border-radius:12px;padding:10px 12px;background:#7f1d1dcc;color:#fecaca;font-size:11px}
