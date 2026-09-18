@@ -23,6 +23,8 @@ import {
   getAdminSecurityCenter,
   getAdminTwoFactorStatus,
   regenerateAdminRecoveryCodes,
+  respondAdminSecurityAlert,
+  reviewAdminSecurityAlert,
   revokeAllAdminSessions,
   revokeAdminSession,
   revokeOtherAdminSessions,
@@ -173,13 +175,28 @@ function SessionList({ sessions, busy, onRevoke, onRevokeAll, onRevokeOthers }) 
   );
 }
 
-function AlertsAndActivity({ alerts, activity }) {
+function alertActionLabel(action) {
+  if (action === 'revoke_session') return 'Cerrar sesión';
+  if (action === 'revoke_all') return 'Cerrar todas';
+  if (action === 'block_user') return 'Bloquear usuario';
+  return 'Resolver';
+}
+
+function AlertsAndActivity({ alerts, activity, busy, onReview, onRespond }) {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>
         <div className="flex items-center gap-3"><AlertTriangle /><div><h2 className="font-black">Alertas de seguridad</h2><p className="text-sm opacity-60">Dispositivos nuevos, cambios de red y accesos rechazados.</p></div></div>
         <div className="mt-4 grid gap-3">
-          {alerts.length === 0 ? <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">No hay alertas recientes.</p> : alerts.map((alert) => <article key={alert.id} className={`rounded-2xl border p-4 ${alert.severity === 'high' ? 'border-rose-300 bg-rose-50 text-rose-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}><div className="flex items-start justify-between gap-3"><div><strong className="text-sm">{alert.title}</strong><p className="mt-1 text-xs leading-5 opacity-75">{alert.detail}</p></div><small className="shrink-0 text-[10px] opacity-60">{formatDate(alert.occurredAt)}</small></div></article>)}
+          {alerts.length === 0 ? <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">No hay alertas recientes.</p> : alerts.map((alert) => {
+            const actions = alert.availableActions || [];
+            const closed = alert.status === 'resolved';
+            return <article key={alert.id} className={`rounded-2xl border p-4 ${closed ? 'border-slate-200 bg-slate-50 text-slate-700' : alert.severity === 'high' || alert.severity === 'critical' ? 'border-rose-300 bg-rose-50 text-rose-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
+              <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{alert.title}</strong><span className="rounded-full bg-white/70 px-2 py-1 text-[9px] font-black uppercase">{alert.status === 'open' ? 'Pendiente' : alert.status === 'reviewed' ? 'Revisada' : 'Resuelta'}</span>{alert.occurrenceCount > 1 ? <span className="rounded-full bg-white/70 px-2 py-1 text-[9px] font-black">{alert.occurrenceCount} eventos</span> : null}</div><p className="mt-1 text-xs leading-5 opacity-75">{alert.detail}</p><p className="mt-1 text-[11px] opacity-60">Usuario: {alert.username || 'no identificado'}{alert.ip ? ` · IP ${alert.ip}` : ''}</p></div><small className="shrink-0 text-[10px] opacity-60">{formatDate(alert.occurredAt)}</small></div>
+              {actions.length ? <div className="mt-3 flex flex-wrap gap-2">{actions.includes('review') ? <button type="button" disabled={busy} onClick={() => onReview(alert)} className="rounded-xl border border-current/25 bg-white/70 px-3 py-2 text-xs font-black disabled:opacity-50">Marcar revisada</button> : null}{actions.filter((item) => item !== 'review').map((item) => <button key={item} type="button" disabled={busy} onClick={() => onRespond(alert, item)} className={`rounded-xl px-3 py-2 text-xs font-black disabled:opacity-50 ${item === 'block_user' ? 'bg-rose-700 text-white' : 'border border-current/25 bg-white/70'}`}>{alertActionLabel(item)}</button>)}</div> : null}
+              {closed && alert.resolutionReason ? <p className="mt-3 rounded-xl bg-white/60 p-2 text-xs"><strong>Respuesta:</strong> {alertActionLabel(alert.resolutionAction)} · {alert.resolutionReason}</p> : null}
+            </article>;
+          })}
         </div>
       </section>
       <section className="rounded-[28px] border p-5 md:p-6" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-glass-border)', color: 'var(--admin-card-text)' }}>
@@ -210,6 +227,10 @@ export default function SeguridadSection() {
   const [sessionPassword, setSessionPassword] = useState('');
   const [sessionCode, setSessionCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [alertAction, setAlertAction] = useState(null);
+  const [alertReason, setAlertReason] = useState('');
+  const [alertPassword, setAlertPassword] = useState('');
+  const [alertCode, setAlertCode] = useState('');
 
   const loadSecurity = async ({ showLoader = true } = {}) => {
     try {
@@ -321,6 +342,38 @@ export default function SeguridadSection() {
     finally { setBusy(false); }
   };
 
+  const reviewAlert = async (alert) => {
+    try {
+      setBusy(true); setFeedback(null);
+      const response = await reviewAdminSecurityAlert(alert.id);
+      setFeedback({ type: 'success', text: response.message });
+      await loadSecurity({ showLoader: false });
+    } catch (error) { setFeedback({ type: 'error', text: error.userMessage }); }
+    finally { setBusy(false); }
+  };
+
+  const submitAlertResponse = async (event) => {
+    event.preventDefault();
+    if (!alertAction) return;
+    try {
+      setBusy(true); setFeedback(null);
+      const response = await respondAdminSecurityAlert(alertAction.alert.id, {
+        action: alertAction.type,
+        reason: alertReason,
+        currentPassword: alertPassword,
+        code: alertCode,
+      });
+      setFeedback({ type: 'success', text: response.message });
+      setAlertAction(null); setAlertReason(''); setAlertPassword(''); setAlertCode('');
+      if (response.currentSessionRevoked) {
+        window.dispatchEvent(new CustomEvent('admin-session-expired'));
+        return;
+      }
+      await loadSecurity({ showLoader: false });
+    } catch (error) { setFeedback({ type: 'error', text: error.userMessage }); }
+    finally { setBusy(false); }
+  };
+
   if (loading) return <div className="flex min-h-64 items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -368,7 +421,9 @@ export default function SeguridadSection() {
 
       {sessionAction ? <section className="rounded-[28px] border border-rose-200 bg-rose-50 p-5 text-rose-950 md:p-6"><form onSubmit={submitSessionAction} className="grid max-w-xl gap-4"><div><h3 className="font-black">{sessionAction.type === 'others' ? 'Cerrar las demás sesiones' : sessionAction.type === 'all' ? 'Cerrar todas las sesiones' : 'Cerrar sesión seleccionada'}</h3><p className="mt-1 text-sm opacity-70">Confirma tu identidad antes de revocar el acceso. Esta acción queda registrada.</p></div><input type="password" value={sessionPassword} onChange={(event) => setSessionPassword(event.target.value)} placeholder="Contraseña para cerrar sesiones" autoComplete="current-password" required disabled={busy} className="rounded-2xl border border-rose-200 bg-white px-4 py-3 outline-none" />{status.enabled ? <input value={sessionCode} onChange={(event) => setSessionCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 11))} placeholder="Código de seguridad para cerrar sesiones" autoComplete="one-time-code" required disabled={busy} className="rounded-2xl border border-rose-200 bg-white px-4 py-3 outline-none" /> : null}<div className="flex gap-2"><button disabled={busy} className="inline-flex items-center gap-2 rounded-2xl bg-rose-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={17} /> : <LogOut size={17} />} Confirmar cierre</button><button type="button" onClick={() => setSessionAction(null)} disabled={busy} className="rounded-2xl border border-rose-300 px-5 py-3 text-sm font-bold">Cancelar</button></div></form></section> : null}
 
-      <AlertsAndActivity alerts={security.alerts || []} activity={security.activity || []} />
+      {alertAction ? <section className="rounded-[28px] border border-amber-300 bg-amber-50 p-5 text-amber-950 md:p-6"><form onSubmit={submitAlertResponse} className="grid max-w-xl gap-4"><div><h3 className="font-black">Responder alerta: {alertActionLabel(alertAction.type)}</h3><p className="mt-1 text-sm opacity-75">{alertAction.alert.title} · usuario {alertAction.alert.username || 'no identificado'}. Confirma tu identidad y deja una justificación para la auditoría.</p></div><textarea value={alertReason} onChange={(event) => setAlertReason(event.target.value.slice(0, 500))} minLength={8} maxLength={500} rows={3} placeholder="Motivo de la respuesta (mínimo 8 caracteres)" required disabled={busy} className="rounded-2xl border border-amber-300 bg-white px-4 py-3 outline-none" /><input type="password" value={alertPassword} onChange={(event) => setAlertPassword(event.target.value)} placeholder="Contraseña actual" autoComplete="current-password" required disabled={busy} className="rounded-2xl border border-amber-300 bg-white px-4 py-3 outline-none" />{status.enabled ? <input value={alertCode} onChange={(event) => setAlertCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 11))} placeholder="Código TOTP o de recuperación" autoComplete="one-time-code" required disabled={busy} className="rounded-2xl border border-amber-300 bg-white px-4 py-3 outline-none" /> : null}<div className="flex flex-wrap gap-2"><button disabled={busy} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-50 ${alertAction.type === 'block_user' ? 'bg-rose-700' : 'bg-slate-950'}`}>{busy ? <Loader2 className="animate-spin" size={17} /> : <ShieldAlert size={17} />} Confirmar respuesta</button><button type="button" onClick={() => { setAlertAction(null); setAlertReason(''); setAlertPassword(''); setAlertCode(''); }} disabled={busy} className="rounded-2xl border border-amber-400 px-5 py-3 text-sm font-bold">Cancelar</button></div></form></section> : null}
+
+      <AlertsAndActivity alerts={security.alerts || []} activity={security.activity || []} busy={busy} onReview={reviewAlert} onRespond={(alert, type) => { setAlertAction({ alert, type }); setAlertReason(''); setAlertPassword(''); setAlertCode(''); }} />
     </div>
   );
 }

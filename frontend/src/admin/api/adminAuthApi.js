@@ -141,6 +141,29 @@ export async function getAdminSecurityCenter() {
   }
 }
 
+export async function reviewAdminSecurityAlert(alertId) {
+  try {
+    const response = await api.patch(
+      `${BASE_URL}/security-alerts/${encodeURIComponent(alertId)}/review`
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo marcar la alerta como revisada.');
+  }
+}
+
+export async function respondAdminSecurityAlert(alertId, payload) {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/security-alerts/${encodeURIComponent(alertId)}/respond`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo ejecutar la respuesta de seguridad.');
+  }
+}
+
 export async function revokeAdminSession(sessionId, payload) {
   try {
     const response = await api.post(
@@ -224,6 +247,8 @@ const adminAuthApi = {
   getAdminTwoFactorStatus,
   loginAdmin,
   regenerateAdminRecoveryCodes,
+  respondAdminSecurityAlert,
+  reviewAdminSecurityAlert,
   revokeAdminSession,
   revokeAllAdminSessions,
   revokeOtherAdminSessions,

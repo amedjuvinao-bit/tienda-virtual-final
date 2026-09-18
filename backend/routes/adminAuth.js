@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
+const AdminSecurityAlert = require('../models/AdminSecurityAlert');
 const AdminUser = require('../models/AdminUser');
 const requireAdmin = require('../middleware/requireAdmin');
 const requirePermission = require('../middleware/requirePermission');
@@ -32,6 +33,10 @@ const {
 const {
   getAdminSecurityCenter,
 } = require('../security/adminSecurityCenterService');
+const {
+  recordLoginAlert,
+  recordTwoFactorChangeAlert,
+} = require('../security/adminSecurityAlertService');
 const {
   buildTwoFactorPolicy,
 } = require('../security/adminTwoFactorPolicy');
@@ -144,13 +149,21 @@ function buildAdminResetPasswordUrl(rawToken) {
 
 async function saveLoginAudit(req, { username = '', status, reason = '' }) {
   try {
-    await AdminLoginAudit.create({
+    const audit = await AdminLoginAudit.create({
       username,
       ip: getClientIp(req),
       status,
       reason,
       userAgent: getUserAgent(req),
     });
+    if (['failed', 'blocked'].includes(status)) {
+      const adminUser = username
+        ? await AdminUser.findOne({ username: normalizeLogin(username), deletedAt: null })
+            .select('_id username')
+            .lean()
+        : null;
+      await recordLoginAlert({ audit, adminUser });
+    }
   } catch (error) {
     console.error('❌ Error guardando auditoría login:', error.message);
   }
@@ -166,7 +179,7 @@ async function saveTwoFactorAudit(req, authResult, {
   statusCode = success ? 200 : 400,
 }) {
   try {
-    await AdminAuditLog.create({
+    const audit = await AdminAuditLog.create({
       action,
       permission,
       module: 'seguridad',
@@ -185,6 +198,7 @@ async function saveTwoFactorAudit(req, authResult, {
       metadata,
       errorMessage,
     });
+    await recordTwoFactorChangeAlert({ audit, adminUser: authResult?.adminUser });
   } catch (error) {
     console.error('❌ Error guardando auditoría 2FA:', error.message);
   }
@@ -2389,6 +2403,188 @@ router.get('/security-center', requireAdmin, async (req, res) => {
       ok: false,
       message: 'No se pudo consultar el centro de seguridad.',
     });
+  }
+});
+
+async function findAccessibleSecurityAlert(alertId, adminUser) {
+  if (!mongoose.isValidObjectId(alertId) || !adminUser?._id) return null;
+  const isOwner = String(adminUser.role || '').toLowerCase() === 'owner';
+  const filter = { _id: alertId };
+  if (!isOwner) {
+    filter.$or = [
+      { adminUser: adminUser._id },
+      { adminUser: null, username: String(adminUser.username || '').toLowerCase() },
+    ];
+  }
+  return AdminSecurityAlert.findOne(filter)
+    .populate('adminUser', 'username role active status')
+    .populate('adminSession', '+sessionId revokedAt expiresAt idleExpiresAt');
+}
+
+router.patch('/security-alerts/:alertId/review', requireAdmin, async (req, res) => {
+  try {
+    const adminUser = await findAdminUserForTwoFactor({ adminUserId: req.adminUserId });
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    const alert = await findAccessibleSecurityAlert(req.params.alertId, adminUser);
+    if (!alert) {
+      return res.status(404).json({ ok: false, message: 'Alerta no encontrada.' });
+    }
+
+    if (alert.status === 'open') {
+      alert.status = 'reviewed';
+      alert.reviewedAt = new Date();
+      alert.reviewedBy = adminUser._id;
+      await alert.save();
+    }
+    await saveTwoFactorAudit(req, { adminUser }, {
+      action: 'security_alert.reviewed',
+      permission: 'seguridad:alertas',
+      success: true,
+      description: 'Alerta de seguridad marcada como revisada.',
+      metadata: { alertId: String(alert._id), alertType: alert.type },
+    });
+
+    return res.json({ ok: true, message: 'Alerta marcada como revisada.' });
+  } catch (error) {
+    console.error('❌ Error revisando alerta de seguridad:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo revisar la alerta.' });
+  }
+});
+
+router.post('/security-alerts/:alertId/respond', requireAdmin, async (req, res) => {
+  const allowedActions = new Set(['resolve', 'revoke_session', 'revoke_all', 'block_user']);
+  const responseAction = String(req.body?.action || '').trim().toLowerCase();
+  const reason = normalizeText(req.body?.reason).slice(0, 500);
+  let authResult;
+
+  try {
+    if (!allowedActions.has(responseAction)) {
+      return res.status(400).json({ ok: false, message: 'La acción de respuesta no es válida.' });
+    }
+    if (reason.length < 8) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Describe el motivo de la respuesta con al menos 8 caracteres.',
+      });
+    }
+
+    const adminUser = await findAdminUserForTwoFactor({ adminUserId: req.adminUserId });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+    const alert = await findAccessibleSecurityAlert(req.params.alertId, adminUser);
+    if (!alert) {
+      return res.status(404).json({ ok: false, message: 'Alerta no encontrada.' });
+    }
+    if (alert.status === 'resolved') {
+      return res.status(409).json({ ok: false, message: 'La alerta ya fue resuelta.' });
+    }
+
+    const verification = await verifySecurityActionCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: 'security_alert.response.denied',
+        permission: 'seguridad:alertas',
+        success: false,
+        description: 'Credenciales rechazadas al responder una alerta de seguridad.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+        metadata: { alertId: String(alert._id), responseAction },
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    const isOwner = String(adminUser.role || '').toLowerCase() === 'owner';
+    const targetUser = alert.adminUser;
+    const targetUserId = targetUser?._id || targetUser || null;
+    const isOwnAlert = String(targetUserId || '') === String(adminUser._id);
+    let currentSessionRevoked = false;
+
+    if (responseAction === 'revoke_session') {
+      if (!targetUserId || !alert.adminSession?._id) {
+        return res.status(409).json({ ok: false, message: 'La alerta no tiene una sesión activa asociada.' });
+      }
+      const revoked = await revokeUserSessionByRecordId(
+        targetUserId,
+        alert.adminSession._id,
+        'security_alert_response'
+      );
+      if (!revoked) {
+        return res.status(409).json({ ok: false, message: 'La sesión ya no está activa.' });
+      }
+      currentSessionRevoked = String(revoked.sessionId || '') === String(req.adminSessionId || '');
+    } else if (responseAction === 'revoke_all') {
+      if (!targetUserId || (!isOwner && !isOwnAlert)) {
+        return res.status(403).json({ ok: false, message: 'No puedes cerrar las sesiones de este usuario.' });
+      }
+      await revokeAllUserSessions(targetUserId, 'security_alert_response_all');
+      currentSessionRevoked = isOwnAlert;
+    } else if (responseAction === 'block_user') {
+      if (!isOwner || !targetUserId || isOwnAlert || targetUser?.role === 'owner') {
+        return res.status(403).json({
+          ok: false,
+          message: 'Solo el owner puede bloquear desde una alerta a un usuario que no sea owner.',
+        });
+      }
+      const blockedUser = await AdminUser.updateOne(
+        { _id: targetUserId, role: { $ne: 'owner' } },
+        { $set: { active: false, status: 'blocked' }, $inc: { tokenVersion: 1 } }
+      );
+      if (!blockedUser.modifiedCount) {
+        return res.status(409).json({
+          ok: false,
+          message: 'El usuario ya cambió o no puede bloquearse desde esta alerta.',
+        });
+      }
+      await revokeAllUserSessions(targetUserId, 'security_alert_user_blocked');
+    }
+
+    const now = new Date();
+    alert.status = 'resolved';
+    alert.reviewedAt = alert.reviewedAt || now;
+    alert.reviewedBy = alert.reviewedBy || adminUser._id;
+    alert.resolvedAt = now;
+    alert.resolvedBy = adminUser._id;
+    alert.resolutionAction = responseAction;
+    alert.resolutionReason = reason;
+    await alert.save();
+
+    if (currentSessionRevoked) clearSessionCookies(res);
+    await saveTwoFactorAudit(req, authResult, {
+      action: `security_alert.response.${responseAction}`,
+      permission: 'seguridad:alertas',
+      success: true,
+      description: 'Se ejecutó una respuesta sobre una alerta de seguridad.',
+      metadata: {
+        alertId: String(alert._id),
+        alertType: alert.type,
+        responseAction,
+        targetUsername: alert.username,
+        recoveryCodeUsed: verification.recoveryCodeUsed,
+      },
+    });
+
+    return res.json({
+      ok: true,
+      currentSessionRevoked,
+      message: responseAction === 'resolve'
+        ? 'Alerta resuelta y registrada.'
+        : 'Respuesta de seguridad ejecutada y alerta resuelta.',
+    });
+  } catch (error) {
+    console.error('❌ Error respondiendo alerta de seguridad:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo responder la alerta.' });
   }
 });
 

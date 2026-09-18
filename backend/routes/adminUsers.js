@@ -22,6 +22,9 @@ const {
 const {
   buildTwoFactorPolicy,
 } = require('../security/adminTwoFactorPolicy');
+const {
+  recordTwoFactorChangeAlert,
+} = require('../security/adminSecurityAlertService');
 
 const router = express.Router();
 
@@ -187,7 +190,7 @@ async function saveOwnerTwoFactorAudit(req, actor, target, {
   statusCode = success ? 200 : 400,
 }) {
   try {
-    await AdminAuditLog.create({
+    const audit = await AdminAuditLog.create({
       action,
       permission: 'seguridad:2fa:owner',
       module: 'seguridad',
@@ -211,6 +214,7 @@ async function saveOwnerTwoFactorAudit(req, actor, target, {
         recoveryCodeUsed,
       },
     });
+    await recordTwoFactorChangeAlert({ audit, adminUser: target });
   } catch (error) {
     console.error('❌ Error guardando auditoría owner 2FA:', error.message);
   }

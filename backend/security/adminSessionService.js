@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 
 const AdminSession = require('../models/AdminSession');
 const { describeUserAgent } = require('./adminSecurityCenterService');
+const { recordSessionRiskAlerts } = require('./adminSecurityAlertService');
 
 const ACCESS_COOKIE_BASE = 'rb_admin_access';
 const REFRESH_COOKIE_BASE = 'rb_admin_refresh';
@@ -326,6 +327,7 @@ async function startAdminSession({
     idleExpiresAt,
     expiresAt,
   });
+  await recordSessionRiskAlerts(session, riskSignals);
   const accessToken = signAccessToken(tokenPayload, sessionId);
 
   setSessionCookies(res, { accessToken, refreshToken, expiresAt });
@@ -390,6 +392,7 @@ async function loadActiveSession(decoded, { touch = true, req = null } = {}) {
       session.riskSignals = Array.from(
         new Set([...(session.riskSignals || []), 'ip_changed'])
       );
+      await recordSessionRiskAlerts(session, ['ip_changed']);
     }
   }
 
@@ -463,6 +466,9 @@ async function rotateRefreshToken(req) {
       { _id: existing._id, revokedAt: null },
       { $set: { revokedAt: now, revokeReason: 'refresh_token_reuse' } }
     );
+    existing.revokedAt = now;
+    existing.revokeReason = 'refresh_token_reuse';
+    await recordSessionRiskAlerts(existing, ['refresh_token_reuse']);
     return { ok: false, reason: 'refresh_token_reuse' };
   }
 

@@ -2,6 +2,7 @@
 
 const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
+const AdminSecurityAlert = require('../models/AdminSecurityAlert');
 const AdminSession = require('../models/AdminSession');
 const { buildTwoFactorPolicy } = require('./adminTwoFactorPolicy');
 
@@ -111,41 +112,53 @@ function serializeSecurityAudit(log) {
   };
 }
 
-function sessionAlerts(sessions = []) {
-  return sessions.flatMap((session) => {
-    const alerts = [];
-    if (session.active && session.riskSignals.includes('new_device')) {
-      alerts.push({
-        id: `new-device:${session.id}`,
-        severity: 'medium',
-        title: 'Nuevo dispositivo detectado',
-        detail: `${session.device.label} inició una sesión desde ${session.ip || 'una IP no identificada'}.`,
-        occurredAt: session.createdAt,
-        sessionId: session.id,
-      });
-    }
-    if (session.riskSignals.includes('ip_changed')) {
-      alerts.push({
-        id: `ip-change:${session.id}`,
-        severity: 'medium',
-        title: 'Cambio de red detectado',
-        detail: `La sesión de ${session.device.label} cambió de dirección IP.`,
-        occurredAt: session.lastSeenAt,
-        sessionId: session.id,
-      });
-    }
-    if (session.revokeReason === 'refresh_token_reuse') {
-      alerts.push({
-        id: `token-reuse:${session.id}`,
-        severity: 'high',
-        title: 'Reutilización de credencial bloqueada',
-        detail: 'El servidor revocó una sesión porque detectó reutilización del token de renovación.',
-        occurredAt: session.revokedAt,
-        sessionId: session.id,
-      });
-    }
-    return alerts;
-  });
+function serializeAlert(alert, { isOwner, currentUserId }) {
+  const targetUser = alert?.adminUser;
+  const targetUserId = String(targetUser?._id || targetUser || '');
+  const session = alert?.adminSession;
+  const sessionId = String(session?._id || session || '');
+  const belongsToViewer = targetUserId === String(currentUserId || '');
+  const open = alert?.status !== 'resolved';
+  const availableActions = [];
+
+  if (alert?.status === 'open') availableActions.push('review');
+  if (open) availableActions.push('resolve');
+  if (open && sessionId && isSessionActive(session)) {
+    availableActions.push('revoke_session');
+  }
+  if (open && targetUserId && (isOwner || belongsToViewer)) {
+    availableActions.push('revoke_all');
+  }
+  if (
+    open &&
+    isOwner &&
+    !belongsToViewer &&
+    targetUser?.role !== 'owner' &&
+    targetUser?.active !== false
+  ) {
+    availableActions.push('block_user');
+  }
+
+  return {
+    id: String(alert?._id || ''),
+    type: alert?.type || '',
+    severity: alert?.severity || 'medium',
+    status: alert?.status || 'open',
+    title: alert?.title || 'Alerta de seguridad',
+    detail: alert?.detail || '',
+    username: alert?.username || targetUser?.username || '',
+    ip: alert?.ip || '',
+    occurredAt: alert?.lastOccurredAt || alert?.createdAt || null,
+    firstOccurredAt: alert?.firstOccurredAt || null,
+    occurrenceCount: Number(alert?.occurrenceCount || 1),
+    sessionId: sessionId || null,
+    notificationStatus: alert?.notificationStatus || 'pending',
+    reviewedAt: alert?.reviewedAt || null,
+    resolvedAt: alert?.resolvedAt || null,
+    resolutionAction: alert?.resolutionAction || '',
+    resolutionReason: alert?.resolutionReason || '',
+    availableActions,
+  };
 }
 
 async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
@@ -153,8 +166,12 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
   const since24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const userId = adminUser?._id;
   const username = String(adminUser?.username || '').toLowerCase();
+  const isOwner = String(adminUser?.role || '').toLowerCase() === 'owner';
+  const alertFilter = isOwner
+    ? {}
+    : { $or: [{ adminUser: userId }, { adminUser: null, username }] };
 
-  const [sessionDocs, loginLogs, securityLogs] = await Promise.all([
+  const [sessionDocs, loginLogs, securityLogs, alertDocs, pendingAlerts] = await Promise.all([
     AdminSession.find({ adminUser: userId })
       .select('+sessionId +deviceIdHash')
       .sort({ lastSeenAt: -1 })
@@ -171,6 +188,13 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
       .sort({ createdAt: -1 })
       .limit(30)
       .lean(),
+    AdminSecurityAlert.find(alertFilter)
+      .populate('adminUser', 'username role active status')
+      .populate('adminSession', 'revokedAt expiresAt idleExpiresAt')
+      .sort({ status: 1, lastOccurredAt: -1 })
+      .limit(40)
+      .lean(),
+    AdminSecurityAlert.countDocuments({ ...alertFilter, status: 'open' }),
   ]);
 
   const sessions = sessionDocs.map((session) =>
@@ -182,18 +206,9 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
       ['failed', 'blocked', 'error'].includes(log.status) &&
       new Date(log.createdAt) >= since24Hours
   );
-  const alerts = [
-    ...sessionAlerts(sessions),
-    ...recentFailures.slice(0, 5).map((log) => ({
-      id: `login-alert:${log._id}`,
-      severity: log.status === 'blocked' ? 'high' : 'medium',
-      title: log.status === 'blocked' ? 'Intento de acceso bloqueado' : 'Intento de acceso fallido',
-      detail: `${LOGIN_REASON_LABELS[log.reason] || log.reason || 'Credenciales rechazadas'} desde ${log.ip || 'una IP no identificada'}.`,
-      occurredAt: log.createdAt,
-    })),
-  ]
-    .sort((left, right) => new Date(right.occurredAt || 0) - new Date(left.occurredAt || 0))
-    .slice(0, 12);
+  const alerts = alertDocs.map((alert) =>
+    serializeAlert(alert, { isOwner, currentUserId: userId })
+  );
 
   const activity = [
     ...loginLogs.map(serializeLoginActivity),
@@ -209,12 +224,13 @@ async function getAdminSecurityCenter({ adminUser, currentSessionId }) {
   );
 
   return {
+    viewer: { isOwner },
     policy: buildTwoFactorPolicy(adminUser),
     summary: {
       activeSessions: activeSessions.length,
       knownDevices: knownDeviceKeys.size,
       failedAttempts24Hours: recentFailures.length,
-      pendingAlerts: alerts.filter((alert) => ['medium', 'high'].includes(alert.severity)).length,
+      pendingAlerts,
     },
     sessions,
     alerts,
@@ -227,4 +243,5 @@ module.exports = {
   getAdminSecurityCenter,
   isSessionActive,
   serializeSession,
+  serializeAlert,
 };
