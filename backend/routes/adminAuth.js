@@ -3,6 +3,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 
 const AdminAuditLog = require('../models/AdminAuditLog');
 const AdminLoginAudit = require('../models/AdminLoginAudit');
@@ -23,10 +24,17 @@ const {
   revokeAllUserSessions,
   revokeOtherUserSessions,
   revokeRequestSession,
+  revokeUserSessionByRecordId,
   rotateRefreshToken,
   startAdminSession,
   verifyAccessToken,
 } = require('../security/adminSessionService');
+const {
+  getAdminSecurityCenter,
+} = require('../security/adminSecurityCenterService');
+const {
+  buildTwoFactorPolicy,
+} = require('../security/adminTwoFactorPolicy');
 const {
   cancelLoginChallenge,
   createLoginChallenge,
@@ -152,6 +160,7 @@ async function saveTwoFactorAudit(req, authResult, {
   action,
   success,
   description,
+  permission = 'seguridad:2fa',
   metadata = {},
   errorMessage = '',
   statusCode = success ? 200 : 400,
@@ -159,7 +168,7 @@ async function saveTwoFactorAudit(req, authResult, {
   try {
     await AdminAuditLog.create({
       action,
-      permission: 'seguridad:2fa',
+      permission,
       module: 'seguridad',
       description,
       method: req.method,
@@ -430,6 +439,7 @@ function buildUserResponseFromDb(adminUser) {
       : adminUser.toObject();
 
   const effectivePermissions = getMergedAdminPermissions(adminUser);
+  const twoFactorPolicy = buildTwoFactorPolicy(adminUser);
 
   safeUser.permissions = effectivePermissions;
 
@@ -456,6 +466,9 @@ function buildUserResponseFromDb(adminUser) {
     active: adminUser.active,
     mustChangePassword: Boolean(adminUser.mustChangePassword),
     twoFactorEnabled: Boolean(adminUser.twoFactorEnabled),
+    twoFactorRequired: twoFactorPolicy.required,
+    twoFactorSetupRequired: !twoFactorPolicy.compliant,
+    twoFactorPolicyMisconfigured: twoFactorPolicy.misconfigured,
 
     profile: safeUser,
   };
@@ -476,6 +489,10 @@ function buildUserResponseFromLegacy(username) {
     status: 'active',
     active: true,
     mustChangePassword: false,
+    twoFactorEnabled: false,
+    twoFactorRequired: false,
+    twoFactorSetupRequired: false,
+    twoFactorPolicyMisconfigured: false,
   };
 }
 
@@ -670,6 +687,29 @@ async function verifyTwoFactorManagementCredentials(adminUser, {
   }
 
   return { ok: true, recoveryCodeUsed: true };
+}
+
+async function verifySecurityActionCredentials(adminUser, {
+  currentPassword,
+  code,
+}) {
+  if (adminUser?.twoFactorEnabled) {
+    return verifyTwoFactorManagementCredentials(adminUser, {
+      currentPassword,
+      code,
+    });
+  }
+
+  const currentLock = getTwoFactorManagementLock(adminUser);
+  if (currentLock) return { ok: false, ...currentLock };
+
+  if (!currentPassword || !(await adminUser.comparePassword(currentPassword))) {
+    const lock = await registerTwoFactorManagementFailure(adminUser);
+    return { ok: false, reason: 'invalid_password', ...(lock || {}) };
+  }
+
+  await clearTwoFactorManagementFailures(adminUser);
+  return { ok: true, recoveryCodeUsed: false };
 }
 
 async function findAdminUserForPasswordResetRequest(login) {
@@ -1238,6 +1278,7 @@ router.get('/2fa/status', requireAdmin, async (req, res) => {
         adminUser.twoFactorPendingExpiresAt &&
         new Date(adminUser.twoFactorPendingExpiresAt).getTime() > Date.now()
     );
+    const policy = buildTwoFactorPolicy(adminUser);
 
     return res.json({
       ok: true,
@@ -1247,6 +1288,12 @@ router.get('/2fa/status', requireAdmin, async (req, res) => {
         lastUsedAt: adminUser.twoFactorLastUsedAt || null,
         recoveryCodesRemaining: (adminUser.twoFactorRecoveryCodeHashes || []).length,
         setupPending: pendingActive,
+        required: policy.required,
+        compliant: policy.compliant,
+        requiredRoles: policy.requiredRoles,
+        configuredRequired: policy.configuredRequired,
+        enforcementReady: policy.enforcementReady,
+        misconfigured: policy.misconfigured,
       },
     });
   } catch (error) {
@@ -1517,6 +1564,20 @@ router.post('/2fa/disable', requireAdmin, async (req, res) => {
     authResult = { adminUser };
     if (!adminUser) {
       return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const policy = buildTwoFactorPolicy(adminUser);
+    if (policy.required) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: '2fa.disable.blocked_by_policy',
+        success: false,
+        description: 'La política impidió desactivar el segundo factor.',
+        statusCode: 409,
+      });
+      return res.status(409).json({
+        ok: false,
+        message: 'Tu perfil exige autenticación en dos pasos y no permite desactivarla.',
+      });
     }
 
     const verification = await verifyTwoFactorManagementCredentials(adminUser, {
@@ -2055,6 +2116,208 @@ router.post('/logout-all', requireAdmin, async (req, res) => {
   clearSessionCookies(res);
   clearTwoFactorChallengeCookie(res);
   return res.json({ ok: true, message: 'Todas las sesiones fueron cerradas.' });
+});
+
+router.get('/security-center', requireAdmin, async (req, res) => {
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const security = await getAdminSecurityCenter({
+      adminUser,
+      currentSessionId: req.adminSessionId,
+    });
+    return res.json({ ok: true, security });
+  } catch (error) {
+    console.error('❌ Error consultando centro de seguridad:', error.message);
+    return res.status(500).json({
+      ok: false,
+      message: 'No se pudo consultar el centro de seguridad.',
+    });
+  }
+});
+
+router.post('/sessions/revoke-others', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const verification = await verifySecurityActionCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: 'sessions.revoke_others.denied',
+        permission: 'seguridad:sesiones',
+        success: false,
+        description: 'Credenciales rechazadas al intentar cerrar otras sesiones.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    await revokeOtherUserSessions(
+      adminUser._id,
+      req.adminSessionId,
+      'security_center_revoke_others'
+    );
+    await saveTwoFactorAudit(req, authResult, {
+      action: 'sessions.revoke_others',
+      permission: 'seguridad:sesiones',
+      success: true,
+      description: 'Se cerraron las demás sesiones administrativas.',
+      metadata: { recoveryCodeUsed: verification.recoveryCodeUsed },
+    });
+
+    return res.json({ ok: true, message: 'Las demás sesiones fueron cerradas.' });
+  } catch (error) {
+    console.error('❌ Error cerrando otras sesiones:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron cerrar las sesiones.' });
+  }
+});
+
+router.post('/sessions/revoke-all', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const verification = await verifySecurityActionCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: 'sessions.revoke_all.denied',
+        permission: 'seguridad:sesiones',
+        success: false,
+        description: 'Credenciales rechazadas al intentar cerrar todas las sesiones.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    await revokeAllUserSessions(adminUser._id, 'security_center_revoke_all');
+    clearSessionCookies(res);
+    await saveTwoFactorAudit(req, authResult, {
+      action: 'sessions.revoke_all',
+      permission: 'seguridad:sesiones',
+      success: true,
+      description: 'Se cerraron todas las sesiones administrativas.',
+      metadata: { recoveryCodeUsed: verification.recoveryCodeUsed },
+    });
+
+    return res.json({
+      ok: true,
+      currentSessionRevoked: true,
+      message: 'Todas las sesiones fueron cerradas.',
+    });
+  } catch (error) {
+    console.error('❌ Error cerrando todas las sesiones:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron cerrar las sesiones.' });
+  }
+});
+
+router.post('/sessions/:sessionRecordId/revoke', requireAdmin, async (req, res) => {
+  let authResult;
+  try {
+    const recordId = String(req.params.sessionRecordId || '');
+    if (!mongoose.isValidObjectId(recordId)) {
+      return res.status(400).json({ ok: false, message: 'La sesión indicada no es válida.' });
+    }
+
+    const adminUser = await findAdminUserForTwoFactor({
+      adminUserId: req.adminUserId,
+    });
+    authResult = { adminUser };
+    if (!adminUser) {
+      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    }
+
+    const verification = await verifySecurityActionCredentials(adminUser, {
+      currentPassword: String(req.body?.currentPassword || ''),
+      code: String(req.body?.code || ''),
+    });
+    if (!verification.ok) {
+      await saveTwoFactorAudit(req, authResult, {
+        action: 'sessions.revoke_one.denied',
+        permission: 'seguridad:sesiones',
+        success: false,
+        description: 'Credenciales rechazadas al intentar cerrar una sesión.',
+        statusCode: verification.retryAfterSeconds ? 429 : 403,
+      });
+      return res.status(verification.retryAfterSeconds ? 429 : 403).json({
+        ok: false,
+        retryAfterSeconds: verification.retryAfterSeconds,
+        message: verification.retryAfterSeconds
+          ? `Demasiados intentos. Intenta nuevamente en ${verification.retryAfterSeconds} segundos.`
+          : 'La contraseña o el código de seguridad no son válidos.',
+      });
+    }
+
+    const revokedSession = await revokeUserSessionByRecordId(
+      adminUser._id,
+      recordId,
+      'security_center_revoke'
+    );
+    if (!revokedSession) {
+      return res.status(404).json({ ok: false, message: 'La sesión ya no está activa.' });
+    }
+
+    const currentSessionRevoked =
+      String(revokedSession.sessionId || '') === String(req.adminSessionId || '');
+    if (currentSessionRevoked) clearSessionCookies(res);
+
+    await saveTwoFactorAudit(req, authResult, {
+      action: 'sessions.revoke_one',
+      permission: 'seguridad:sesiones',
+      success: true,
+      description: currentSessionRevoked
+        ? 'Se cerró la sesión administrativa actual.'
+        : 'Se cerró una sesión administrativa desde el centro de seguridad.',
+      metadata: {
+        currentSessionRevoked,
+        recoveryCodeUsed: verification.recoveryCodeUsed,
+      },
+    });
+
+    return res.json({
+      ok: true,
+      currentSessionRevoked,
+      message: 'Sesión cerrada correctamente.',
+    });
+  } catch (error) {
+    console.error('❌ Error revocando sesión:', error.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo cerrar la sesión.' });
+  }
 });
 
 router.get('/verify', async (req, res) => {

@@ -44,6 +44,10 @@ function normalizeAdminUser(user) {
     status: user.status || user.profile?.status || 'active',
     active: user.active !== undefined ? user.active : true,
     mustChangePassword: Boolean(user.mustChangePassword),
+    twoFactorEnabled: Boolean(user.twoFactorEnabled),
+    twoFactorRequired: Boolean(user.twoFactorRequired),
+    twoFactorSetupRequired: Boolean(user.twoFactorSetupRequired),
+    twoFactorPolicyMisconfigured: Boolean(user.twoFactorPolicyMisconfigured),
   };
 }
 
@@ -93,12 +97,30 @@ export function AuthProvider({ children }) {
       if (alive) clearClientSession();
     };
 
+    const handleTwoFactorPolicyUpdated = async () => {
+      try {
+        const response = await api.get('/api/admin/auth/verify');
+        if (!alive) return;
+        setAdminUser(normalizeAdminUser(response?.data?.user));
+      } catch {
+        if (alive) clearClientSession();
+      }
+    };
+
     window.addEventListener('admin-session-expired', handleSessionExpired);
+    window.addEventListener(
+      'admin-two-factor-policy-updated',
+      handleTwoFactorPolicyUpdated
+    );
     verifyStoredSession();
 
     return () => {
       alive = false;
       window.removeEventListener('admin-session-expired', handleSessionExpired);
+      window.removeEventListener(
+        'admin-two-factor-policy-updated',
+        handleTwoFactorPolicyUpdated
+      );
     };
   }, []);
 

@@ -23,6 +23,7 @@ function queryResult(value) {
 
 async function testHttpOnlySessionIssuance() {
   const originalCreate = AdminSession.create;
+  const originalFindOne = AdminSession.findOne;
   const cookies = [];
   let stored = null;
 
@@ -30,6 +31,11 @@ async function testHttpOnlySessionIssuance() {
     stored = { ...input, _id: new mongoose.Types.ObjectId() };
     return stored;
   };
+  AdminSession.findOne = () => ({
+    select() { return this; },
+    sort() { return this; },
+    async lean() { return null; },
+  });
 
   try {
     const res = {
@@ -60,13 +66,16 @@ async function testHttpOnlySessionIssuance() {
       tokenVersion: 4,
     });
 
-    assert.equal(cookies.length, 2);
+    assert.equal(cookies.length, 3);
     assert.equal(cookies.every((cookie) => cookie.options.httpOnly), true);
     assert.equal(cookies.every((cookie) => cookie.options.sameSite === 'lax'), true);
     assert.equal(cookies[0].options.path, '/');
     assert.equal(cookies[1].options.path, '/api/admin/auth');
+    assert.equal(cookies[2].options.path, '/');
     assert.notEqual(stored.refreshTokenHash, cookies[1].value);
     assert.equal(stored.refreshTokenHash.length, 64);
+    assert.equal(stored.deviceIdHash.length, 64);
+    assert.deepEqual(stored.riskSignals, ['new_device']);
     assert.ok(result.expiresAt instanceof Date);
 
     const decoded = verifyAccessToken(cookies[0].value);
@@ -80,6 +89,7 @@ async function testHttpOnlySessionIssuance() {
     assert.equal(credential.token, cookies[0].value);
   } finally {
     AdminSession.create = originalCreate;
+    AdminSession.findOne = originalFindOne;
   }
 }
 

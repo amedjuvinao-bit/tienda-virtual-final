@@ -55,6 +55,7 @@
     "test:configuration-level-plus-stage4": "vitest run src/admin/configuracion/sections/CorreoSection.test.jsx src/admin/api/adminMailSettingsApi.test.js",
     "test:configuration-level-plus-stage5": "vitest run src/admin/configuracion/sections/LoginAdminSection.test.jsx src/admin/Login.initialLoad.test.jsx src/admin/api/adminLoginSettingsApi.test.js src/admin/login/loginSettings.test.js",
     "test:admin-2fa-security": "vitest run src/admin/security/AdminTwoFactorSecurity.test.jsx",
+    "test:admin-security-stage4": "vitest run src/admin/security/AdminTwoFactorSecurity.test.jsx src/admin/security/AdminSecurityCenterStage4.test.jsx",
     "test:billing-invoice-preflight": "vitest run src/admin/billing/components/BillingInvoicePreflightModal.test.jsx src/admin/billing/api/adminBillingApi.test.js src/admin/billing/panels/BillingPendingOrdersPanel.test.jsx",
     "test:billing-configuration-ui": "vitest run src/admin/configuracion/sections/FacturacionSection.test.jsx"
   },

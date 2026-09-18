@@ -69,6 +69,44 @@ const AdminSessionSchema = new mongoose.Schema(
       maxlength: 500,
       default: '',
     },
+    deviceIdHash: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    deviceLabel: {
+      type: String,
+      trim: true,
+      maxlength: 180,
+      default: '',
+    },
+    browser: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: '',
+    },
+    operatingSystem: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: '',
+    },
+    deviceType: {
+      type: String,
+      enum: ['Computador', 'Teléfono', 'Tableta', 'Desconocido'],
+      default: 'Desconocido',
+    },
+    riskLevel: {
+      type: String,
+      enum: ['low', 'medium', 'high'],
+      default: 'low',
+    },
+    riskSignals: {
+      type: [String],
+      default: [],
+    },
     lastSeenAt: {
       type: Date,
       required: true,
@@ -107,6 +145,8 @@ const AdminSessionSchema = new mongoose.Schema(
 AdminSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 AdminSessionSchema.index({ adminUser: 1, revokedAt: 1, expiresAt: 1 });
 AdminSessionSchema.index({ sessionId: 1, revokedAt: 1 });
+AdminSessionSchema.index({ adminUser: 1, deviceIdHash: 1, createdAt: -1 });
+AdminSessionSchema.index({ adminUser: 1, lastSeenAt: -1 });
 
 module.exports =
   mongoose.models.AdminSession ||

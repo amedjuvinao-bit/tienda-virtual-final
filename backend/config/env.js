@@ -129,6 +129,7 @@ const env = {
   adminTwoFactor: {
     encryptionKey: clean(process.env.ADMIN_2FA_ENCRYPTION_KEY),
     issuer: clean(process.env.ADMIN_2FA_ISSUER) || 'Tienda Virtual',
+    requiredRoles: clean(process.env.ADMIN_2FA_REQUIRED_ROLES) || 'owner,admin',
   },
   cloudinary: {
     cloudName: cloudName.value,
@@ -208,6 +209,29 @@ function assertEnv(config = env) {
     config.adminTwoFactor.encryptionKey.length < 32
   ) {
     errors.push('ADMIN_2FA_ENCRYPTION_KEY debe tener al menos 32 caracteres.');
+  }
+
+  if (
+    config.adminTwoFactor?.requiredRoles &&
+    !/^(none|off|disabled|[a-z0-9._-]+(?:\s*,\s*[a-z0-9._-]+)*)$/i.test(
+      config.adminTwoFactor.requiredRoles
+    )
+  ) {
+    errors.push('ADMIN_2FA_REQUIRED_ROLES debe contener roles separados por comas o none.');
+  }
+
+  const twoFactorPolicyEnabled = !['none', 'off', 'disabled'].includes(
+    clean(config.adminTwoFactor?.requiredRoles).toLowerCase()
+  );
+  if (
+    config.nodeEnv === 'production' &&
+    twoFactorPolicyEnabled &&
+    !config.adminTwoFactor?.encryptionKey &&
+    !config.integrationsEncryptionKey
+  ) {
+    errors.push(
+      'Producción exige ADMIN_2FA_ENCRYPTION_KEY o INTEGRATIONS_ENCRYPTION_KEY cuando ADMIN_2FA_REQUIRED_ROLES está activo.'
+    );
   }
 
   if (config.mailEncryptionKey && config.mailEncryptionKey.length < 32) {

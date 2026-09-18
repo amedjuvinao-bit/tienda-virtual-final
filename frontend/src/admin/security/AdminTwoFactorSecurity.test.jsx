@@ -7,6 +7,7 @@ import TwoFactorChallengeModal from '../login/TwoFactorChallengeModal';
 import SeguridadSection from '../configuracion/sections/SeguridadSection';
 import {
   confirmAdminTwoFactorSetup,
+  getAdminSecurityCenter,
   getAdminTwoFactorStatus,
   startAdminTwoFactorSetup,
   verifyAdminTwoFactor,
@@ -17,6 +18,10 @@ vi.mock('../api/adminAuthApi', () => ({
   confirmAdminTwoFactorSetup: vi.fn(),
   disableAdminTwoFactor: vi.fn(),
   getAdminTwoFactorStatus: vi.fn(),
+  getAdminSecurityCenter: vi.fn(),
+  revokeAdminSession: vi.fn(),
+  revokeAllAdminSessions: vi.fn(),
+  revokeOtherAdminSessions: vi.fn(),
   regenerateAdminRecoveryCodes: vi.fn(),
   startAdminTwoFactorSetup: vi.fn(),
   verifyAdminTwoFactor: vi.fn(),
@@ -28,6 +33,20 @@ describe('Seguridad administrativa 2FA', () => {
     getAdminTwoFactorStatus.mockResolvedValue({
       ok: true,
       twoFactor: { enabled: false, recoveryCodesRemaining: 0 },
+    });
+    getAdminSecurityCenter.mockResolvedValue({
+      ok: true,
+      security: {
+        summary: {
+          activeSessions: 1,
+          knownDevices: 1,
+          failedAttempts24Hours: 0,
+          pendingAlerts: 0,
+        },
+        sessions: [],
+        alerts: [],
+        activity: [],
+      },
     });
   });
 

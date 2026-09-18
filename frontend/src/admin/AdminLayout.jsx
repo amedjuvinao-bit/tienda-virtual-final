@@ -102,6 +102,7 @@ export default function AdminLayout() {
       .toUpperCase() || 'UA';
 
   const isConfigRoute = location.pathname.startsWith('/admin/configuracion');
+  const twoFactorSetupRequired = Boolean(adminUser?.twoFactorSetupRequired);
   const [configMenuOpen, setConfigMenuOpen] = useState(isConfigRoute);
 
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
@@ -110,6 +111,15 @@ export default function AdminLayout() {
   const [reviews, setReviews] = useState([]);
   const [deletingReviewId, setDeletingReviewId] = useState('');
   const [adminBrandLogo, setAdminBrandLogo] = useState('');
+
+  useEffect(() => {
+    if (
+      twoFactorSetupRequired &&
+      location.pathname !== '/admin/configuracion/seguridad'
+    ) {
+      navigate('/admin/configuracion/seguridad', { replace: true });
+    }
+  }, [location.pathname, navigate, twoFactorSetupRequired]);
 
   useEffect(() => {
     let alive = true;

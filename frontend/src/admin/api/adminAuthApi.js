@@ -114,6 +114,45 @@ export async function disableAdminTwoFactor(payload) {
   }
 }
 
+export async function getAdminSecurityCenter() {
+  try {
+    const response = await api.get(`${BASE_URL}/security-center`);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo consultar el centro de seguridad.');
+  }
+}
+
+export async function revokeAdminSession(sessionId, payload) {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/sessions/${encodeURIComponent(sessionId)}/revoke`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo cerrar la sesión seleccionada.');
+  }
+}
+
+export async function revokeOtherAdminSessions(payload) {
+  try {
+    const response = await api.post(`${BASE_URL}/sessions/revoke-others`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudieron cerrar las demás sesiones.');
+  }
+}
+
+export async function revokeAllAdminSessions(payload) {
+  try {
+    const response = await api.post(`${BASE_URL}/sessions/revoke-all`, payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudieron cerrar todas las sesiones.');
+  }
+}
+
 export async function verifyAdminSession() {
   try {
     const response = await api.get(`${BASE_URL}/verify`);
@@ -162,9 +201,13 @@ const adminAuthApi = {
   cancelAdminTwoFactorChallenge,
   confirmAdminTwoFactorSetup,
   disableAdminTwoFactor,
+  getAdminSecurityCenter,
   getAdminTwoFactorStatus,
   loginAdmin,
   regenerateAdminRecoveryCodes,
+  revokeAdminSession,
+  revokeAllAdminSessions,
+  revokeOtherAdminSessions,
   startAdminTwoFactorSetup,
   verifyAdminTwoFactor,
   verifyAdminSession,

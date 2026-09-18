@@ -1047,7 +1047,11 @@ export default function Login() {
     if (!rememberMe) setUsername("");
     setPassword("");
     setPendingLoginName('');
-    navigate("/admin/dashboard");
+    navigate(
+      response.user.twoFactorSetupRequired
+        ? "/admin/configuracion/seguridad"
+        : "/admin/dashboard"
+    );
     return true;
   };
 

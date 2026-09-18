@@ -89,7 +89,7 @@ const TABS = [
     id: 'seguridad',
     label: 'Seguridad',
     icon: Fingerprint,
-    description: 'Segundo factor y códigos de recuperación de tu cuenta.',
+    description: '2FA, sesiones, dispositivos, alertas e historial de acceso.',
   },
   {
     id: 'logs',

@@ -125,6 +125,7 @@ async function testRequiredPasswordChangeIsEnforcedByBackend() {
     active: true,
     status: 'active',
     mustChangePassword: true,
+    twoFactorEnabled: true,
     tokenVersion,
     releaseExpiredLoginLock: async () => false,
     isAccountLocked: () => false,

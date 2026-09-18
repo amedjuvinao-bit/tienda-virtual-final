@@ -37,6 +37,10 @@ const {
   loadActiveSession,
   verifyAccessToken,
 } = require('../security/adminSessionService');
+const {
+  buildTwoFactorPolicy,
+  isTwoFactorBootstrapRequest,
+} = require('../security/adminTwoFactorPolicy');
 
 function getJwtSecret() {
   return process.env.JWT_SECRET;
@@ -310,6 +314,18 @@ async function requireAdmin(req, res, next) {
       }
 
       attachDbAdmin(req, adminUser, decoded);
+
+      const twoFactorPolicy = buildTwoFactorPolicy(adminUser);
+      req.adminTwoFactorPolicy = twoFactorPolicy;
+
+      if (!twoFactorPolicy.compliant && !isTwoFactorBootstrapRequest(req)) {
+        return reject(
+          res,
+          403,
+          'TWO_FACTOR_SETUP_REQUIRED',
+          'Debes activar la autenticación en dos pasos antes de continuar.'
+        );
+      }
 
       return next();
     }

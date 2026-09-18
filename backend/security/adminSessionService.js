@@ -4,10 +4,12 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const AdminSession = require('../models/AdminSession');
+const { describeUserAgent } = require('./adminSecurityCenterService');
 
 const ACCESS_COOKIE_BASE = 'rb_admin_access';
 const REFRESH_COOKIE_BASE = 'rb_admin_refresh';
 const TWO_FACTOR_COOKIE_BASE = 'rb_admin_2fa';
+const DEVICE_COOKIE_BASE = 'rb_admin_device';
 const JWT_ISSUER = 'tienda-virtual-backend';
 const JWT_AUDIENCE = 'tienda-virtual-admin';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -66,6 +68,7 @@ function getCookieNames() {
     twoFactor: secure
       ? `__Secure-${TWO_FACTOR_COOKIE_BASE}`
       : TWO_FACTOR_COOKIE_BASE,
+    device: secure ? `__Host-${DEVICE_COOKIE_BASE}` : DEVICE_COOKIE_BASE,
   };
 }
 
@@ -129,6 +132,18 @@ function getTwoFactorChallengeToken(req) {
     cookies[`__Secure-${TWO_FACTOR_COOKIE_BASE}`] ||
     ''
   );
+}
+
+function getDeviceToken(req) {
+  const cookies = parseCookies(req?.headers?.cookie || '');
+  const names = getCookieNames();
+  const token =
+    cookies[names.device] ||
+    cookies[DEVICE_COOKIE_BASE] ||
+    cookies[`__Host-${DEVICE_COOKIE_BASE}`] ||
+    '';
+
+  return /^[A-Za-z0-9_-]{32,160}$/.test(token) ? token : '';
 }
 
 function hashToken(value) {
@@ -213,6 +228,15 @@ function clearTwoFactorChallengeCookie(res) {
   );
 }
 
+function setDeviceCookie(res, token) {
+  const names = getCookieNames();
+  res.cookie(
+    names.device,
+    token,
+    buildCookieOptions({ maxAge: 365 * 24 * 60 * 60 * 1000, path: '/' })
+  );
+}
+
 function signAccessToken(payload, sessionId) {
   const { accessMinutes } = getConfig();
   return jwt.sign(
@@ -259,6 +283,27 @@ async function startAdminSession({
   );
   const sessionId = crypto.randomBytes(24).toString('base64url');
   const refreshToken = createOpaqueRefreshToken(sessionId);
+  const existingDeviceToken = getDeviceToken(req);
+  const deviceToken = existingDeviceToken || crypto.randomBytes(32).toString('base64url');
+  const deviceIdHash = hashToken(`admin-device:${deviceToken}`);
+  const clientIp = getClientIp(req);
+  const userAgent = getUserAgent(req);
+  const device = describeUserAgent(userAgent);
+  const previousDeviceSession = adminUserId
+    ? await AdminSession.findOne({ adminUser: adminUserId, deviceIdHash })
+        .select('+deviceIdHash')
+        .sort({ createdAt: -1 })
+        .lean()
+    : null;
+  const riskSignals = [];
+
+  if (!previousDeviceSession) riskSignals.push('new_device');
+  if (
+    previousDeviceSession?.lastIp &&
+    previousDeviceSession.lastIp !== clientIp
+  ) {
+    riskSignals.push('ip_changed');
+  }
 
   const session = await AdminSession.create({
     sessionId,
@@ -267,9 +312,16 @@ async function startAdminSession({
     username,
     tokenVersion: Number(tokenVersion || 0),
     refreshTokenHash: hashToken(refreshToken),
-    createdIp: getClientIp(req),
-    lastIp: getClientIp(req),
-    userAgent: getUserAgent(req),
+    createdIp: clientIp,
+    lastIp: clientIp,
+    userAgent,
+    deviceIdHash,
+    deviceLabel: device.label,
+    browser: device.browser,
+    operatingSystem: device.operatingSystem,
+    deviceType: device.deviceType,
+    riskLevel: riskSignals.length ? 'medium' : 'low',
+    riskSignals,
     lastSeenAt: now,
     idleExpiresAt,
     expiresAt,
@@ -277,6 +329,7 @@ async function startAdminSession({
   const accessToken = signAccessToken(tokenPayload, sessionId);
 
   setSessionCookies(res, { accessToken, refreshToken, expiresAt });
+  setDeviceCookie(res, deviceToken);
 
   return {
     session,
@@ -315,18 +368,29 @@ async function loadActiveSession(decoded, { touch = true, req = null } = {}) {
         now.getTime() + config.idleHours * 60 * 60 * 1000
       )
     );
+    const currentIp = req ? getClientIp(req) : session.lastIp;
+    const ipChanged = Boolean(session.lastIp && currentIp && session.lastIp !== currentIp);
     await AdminSession.updateOne(
       { _id: session._id, revokedAt: null },
       {
         $set: {
           lastSeenAt: now,
           idleExpiresAt,
-          lastIp: req ? getClientIp(req) : session.lastIp,
+          lastIp: currentIp,
+          ...(ipChanged ? { riskLevel: 'medium' } : {}),
         },
+        ...(ipChanged ? { $addToSet: { riskSignals: 'ip_changed' } } : {}),
       }
     );
     session.lastSeenAt = now;
     session.idleExpiresAt = idleExpiresAt;
+    session.lastIp = currentIp;
+    if (ipChanged) {
+      session.riskLevel = 'medium';
+      session.riskSignals = Array.from(
+        new Set([...(session.riskSignals || []), 'ip_changed'])
+      );
+    }
   }
 
   return session;
@@ -422,6 +486,19 @@ async function revokeSessionById(sessionId, reason = 'logout') {
   );
 }
 
+async function revokeUserSessionByRecordId(
+  adminUserId,
+  recordId,
+  reason = 'user_security_center'
+) {
+  if (!adminUserId || !recordId) return null;
+  return AdminSession.findOneAndUpdate(
+    { _id: recordId, adminUser: adminUserId, revokedAt: null },
+    { $set: { revokedAt: new Date(), revokeReason: reason } },
+    { new: true }
+  ).select('+sessionId');
+}
+
 async function revokeRequestSession(req, reason = 'logout') {
   const refreshSessionId = getRefreshSessionId(getRefreshToken(req));
   let accessSessionId = '';
@@ -506,6 +583,7 @@ module.exports = {
   clearSessionCookies,
   clearTwoFactorChallengeCookie,
   getAccessCredential,
+  getDeviceToken,
   getRefreshToken,
   getTwoFactorChallengeToken,
   isTrustedRequestOrigin,
@@ -516,6 +594,7 @@ module.exports = {
   revokeOtherUserSessions,
   revokeRequestSession,
   revokeSessionById,
+  revokeUserSessionByRecordId,
   rotateRefreshToken,
   signAccessToken,
   setTwoFactorChallengeCookie,

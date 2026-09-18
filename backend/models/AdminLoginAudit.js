@@ -42,5 +42,6 @@ AdminLoginAuditSchema.index({ createdAt: -1 });
 AdminLoginAuditSchema.index({ username: 1, createdAt: -1 });
 AdminLoginAuditSchema.index({ ip: 1, createdAt: -1 });
 AdminLoginAuditSchema.index({ status: 1, createdAt: -1 });
+AdminLoginAuditSchema.index({ username: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('AdminLoginAudit', AdminLoginAuditSchema);
