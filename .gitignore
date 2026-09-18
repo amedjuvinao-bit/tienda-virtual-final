@@ -12,4 +12,5 @@ backend-runtime*.log
 frontend/dist/
 backend/backups/
 backend/reports/qa50-catalog-v1/
+backend/reports/security-stage5-e2e/
 backend/tmp/qa50-catalog-v1/

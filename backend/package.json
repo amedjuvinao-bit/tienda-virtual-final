@@ -24,6 +24,7 @@
     "test:configuration-level-plus-stage3": "node scripts/testConfigurationLevelPlusStage3.js",
     "test:configuration-level-plus-stage4": "node scripts/testConfigurationLevelPlusStage4.js",
     "test:configuration-level-plus-stage5": "node scripts/testConfigurationLevelPlusStage5.js",
+    "test:configuration-level-plus-stage5-security-e2e": "node scripts/testConfigurationLevelPlusStage5SecurityE2E.js",
     "test:date-range": "node scripts/testDateRangeUtil.js",
     "test:customers": "node scripts/testCustomersModule.js",
     "test:customers-stage1": "node scripts/testCustomersStage1Integrity.js",
