@@ -116,7 +116,7 @@ describe('loginSettings', () => {
     expect(normalized.backgrounds.liquidGlass.color).toBe('#abcdef');
     expect(normalized.backgrounds.immersiveGallery.image).toBe('https://cdn.example.com/galeria.webp');
     expect(normalized.backgrounds.smokeGlass.image).toBe('https://cdn.example.com/perla.webp');
-    expect(normalized.backgrounds.smokeGlass.glassTransparency).toBe(0.9);
+    expect(normalized.backgrounds.smokeGlass.glassTransparency).toBe(1);
   });
 
   it('rechaza fondos con protocolos inseguros o URLs relativas a otro host', () => {

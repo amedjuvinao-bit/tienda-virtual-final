@@ -133,7 +133,7 @@ function normalizeBackground(input = {}) {
     glassTransparency: numberInRange(
       input.glassTransparency,
       0,
-      0.9,
+      1,
       DEFAULT_LOGIN_BACKGROUND.glassTransparency
     ),
   };

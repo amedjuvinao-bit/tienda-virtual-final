@@ -1143,6 +1143,8 @@ export default function Login() {
     ? loginBg.image
     : GALLERY_IMAGE_ASSETS[galleryImageTone.id];
   const smokeBackground = hasCustomImageBg ? loginBg.image : "";
+  const smokeGlassOpacity = 1 - loginBg.glassTransparency;
+  const smokeGlassBlur = `${Math.round(smokeGlassOpacity * 1800) / 100}px`;
 
   const loginPageBackground =
     loginBg.mode === "color" ? loginBg.color : activeTheme.pageBg;
@@ -1472,7 +1474,10 @@ export default function Login() {
     className="rb-smoke-stage"
     data-custom-image={hasCustomImageBg ? "true" : undefined}
     aria-label={`Acceso administrativo de ${storeName}`}
-    style={{ "--smoke-glass-opacity": 1 - loginBg.glassTransparency }}
+    style={{
+      "--smoke-glass-opacity": smokeGlassOpacity,
+      "--smoke-glass-blur": smokeGlassBlur,
+    }}
   >
     <div className="rb-smoke-media" style={{ backgroundImage: smokeBackground ? `url("${smokeBackground}")` : "none", opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
     <div className="rb-smoke-overlay" style={{ "--smoke-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.08 }} />
@@ -1510,6 +1515,7 @@ export default function Login() {
   return (
     <div
       data-login-theme={activeTheme.id}
+      data-login-custom-image={hasCustomImageBg ? "true" : undefined}
       className={`rb-login-shell relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8 theme-${activeTheme.id}`}
       style={{
         background: loginPageBackground,
@@ -1534,7 +1540,7 @@ export default function Login() {
         `}
       </style>
 
-      {hasCustomImageBg && (
+      {hasCustomImageBg && !isSmokeGlass && (
         <>
           <div
             className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"

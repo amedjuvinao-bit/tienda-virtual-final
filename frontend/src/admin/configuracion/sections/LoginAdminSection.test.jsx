@@ -165,12 +165,14 @@ describe('LoginAdminSection', () => {
     let preview = container.querySelector('[data-preview-theme="smokeGlass"]');
     expect(container.querySelector('.login-settings-preview-image').style.backgroundImage).toContain('perla.webp');
     expect(preview.style.getPropertyValue('--smoke-glass-opacity')).toBe('0.75');
+    expect(preview.style.getPropertyValue('--smoke-glass-blur')).toBe('7.5px');
 
     await user.click(screen.getByRole('button', { name: 'Personalizar este tema' }));
     const transparency = screen.getByRole('slider', { name: 'Transparencia del contenedor' });
     fireEvent.change(transparency, { target: { value: '0.7' } });
     preview = container.querySelector('[data-preview-theme="smokeGlass"]');
     expect(preview.style.getPropertyValue('--smoke-glass-opacity')).toBeCloseTo(0.3);
+    expect(preview.style.getPropertyValue('--smoke-glass-blur')).toBe('3px');
 
     await user.selectOptions(screen.getByLabelText('Tema visual'), 'liquidGlass');
     preview = container.querySelector('[data-preview-theme="liquidGlass"]');

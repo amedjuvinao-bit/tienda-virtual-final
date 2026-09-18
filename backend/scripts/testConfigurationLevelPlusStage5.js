@@ -91,7 +91,7 @@ async function run() {
   assert.equal(independentBackgrounds.backgrounds.liquidGlass.color, '#abcdef');
   assert.equal(independentBackgrounds.backgrounds.immersiveGallery.image, 'https://cdn.example.com/gallery.webp');
   assert.equal(independentBackgrounds.backgrounds.smokeGlass.image, 'https://cdn.example.com/perla.webp');
-  assert.equal(independentBackgrounds.backgrounds.smokeGlass.glassTransparency, 0.9);
+  assert.equal(independentBackgrounds.backgrounds.smokeGlass.glassTransparency, 1);
   assert.deepEqual(independentBackgrounds.background, independentBackgrounds.backgrounds.smokeGlass);
 
   const galleryTone = normalizeLoginSettings({
