@@ -114,7 +114,7 @@ export default function OrdersTable({
   return (
     <section
       aria-label="Bandeja operacional de órdenes"
-      className="overflow-hidden rounded-2xl border shadow-sm"
+      className="admin-widget-surface overflow-hidden rounded-2xl border shadow-sm"
       style={{
         borderColor: ADMIN_BORDER,
         background: 'var(--admin-card-bg)',

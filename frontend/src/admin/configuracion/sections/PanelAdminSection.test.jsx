@@ -87,10 +87,10 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('1px');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-bg')
-    ).toContain('rgba(255,255,255,0.17)');
+    ).toContain('rgba(255,255,255,0.11)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-contrast')
-    ).toBe('1.045');
+    ).toBe('1.08');
     expect(api.put).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));

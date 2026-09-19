@@ -95,7 +95,7 @@ export default function OrdersFiltersSummary({
           return (
             <article
               key={key}
-              className="orf-card-metric"
+              className="admin-widget-surface orf-card-metric"
               style={{
                 background: 'var(--admin-card-bg)',
                 border: `1px solid ${ADMIN_BORDER}`,

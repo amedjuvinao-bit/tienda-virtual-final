@@ -78,7 +78,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card,
     .admin-hero-glass,
     .admin-section-bar,
-    .admin-form-glass {
+    .admin-form-glass,
+    .admin-widget-surface {
       background: var(--admin-glass-bg) !important;
       border-color: var(--admin-glass-border) !important;
       color: var(--admin-card-text) !important;
@@ -105,7 +106,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card::before,
     .admin-hero-glass::before,
     .admin-section-bar::before,
-    .admin-form-glass::before {
+    .admin-form-glass::before,
+    .admin-widget-surface::before {
       content: "";
       position: absolute;
       inset: 0 0 auto 0;
@@ -129,7 +131,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card::after,
     .admin-hero-glass::after,
     .admin-section-bar::after,
-    .admin-form-glass::after {
+    .admin-form-glass::after,
+    .admin-widget-surface::after {
       content: "";
       position: absolute;
       inset: 1px;
@@ -148,7 +151,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card > *,
     .admin-hero-glass > *,
     .admin-section-bar > *,
-    .admin-form-glass > * {
+    .admin-form-glass > *,
+    .admin-widget-surface > * {
       position: relative;
       z-index: 1;
     }
@@ -187,6 +191,7 @@ export function applyAdminGlobalStyles() {
     .admin-hero-glass,
     .admin-section-bar,
     .admin-form-glass,
+    .admin-widget-surface,
     .admin-sidebar-glass,
     .admin-header-glass,
     html.admin-theme-dark .admin-card-glass,
@@ -207,7 +212,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card::before,
     .admin-hero-glass::before,
     .admin-section-bar::before,
-    .admin-form-glass::before {
+    .admin-form-glass::before,
+    .admin-widget-surface::before {
       background: linear-gradient(90deg, transparent, var(--admin-widget-surface-highlight), transparent);
     }
 
@@ -215,7 +221,8 @@ export function applyAdminGlobalStyles() {
     .admin-glass-card::after,
     .admin-hero-glass::after,
     .admin-section-bar::after,
-    .admin-form-glass::after {
+    .admin-form-glass::after,
+    .admin-widget-surface::after {
       background: var(--admin-widget-surface-overlay);
     }
 
@@ -990,8 +997,11 @@ export function applyAdminGlobalStyles() {
     .admin-area .admin-hero-glass,
     .admin-area .admin-section-bar,
     .admin-area .admin-form-glass,
+    .admin-area .admin-widget-surface,
     .admin-area :is(section, article, aside, form, div)[class*="rounded"][class*="border"][style*="--admin-card-bg"],
     .admin-area :is(section, article, aside, form, div)[class*="rounded"][class*="border"][style*="--admin-page-bg"],
+    .admin-area :is(section, article, aside, form, div)[style*="--admin-card-bg"][style*="border"],
+    .admin-area :is(section, article, aside, form, div)[style*="--admin-glass-bg"][style*="border"],
     .admin-area :is(section, article, aside, form)[class*="rounded"][class*="border"]:not([class*="bg-"]):not([style*="background"]) {
       background: var(--admin-widget-surface-bg) !important;
       border-color: var(--admin-widget-surface-border) !important;
@@ -1002,6 +1012,8 @@ export function applyAdminGlobalStyles() {
       -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
       filter: var(--admin-widget-texture-filter);
       background-clip: padding-box !important;
+      background-size: 165% 165% !important;
+      background-position: center !important;
       transition:
         border-radius 260ms cubic-bezier(0.22, 1, 0.36, 1),
         background 260ms ease,
@@ -1041,9 +1053,48 @@ export function applyAdminGlobalStyles() {
       box-shadow: var(--admin-widget-surface-shadow) !important;
     }
 
+    html[data-admin-widget-texture="liquidGlass"] .admin-area {
+      background:
+        linear-gradient(116deg, transparent 0 13%, color-mix(in srgb, var(--admin-primary) 12%, transparent) 24%, transparent 37% 62%, rgba(126,159,178,.11) 74%, transparent 86%),
+        linear-gradient(72deg, transparent 0 48%, rgba(255,255,255,.42) 56%, transparent 67%),
+        var(--admin-page-glass-overlay) !important;
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .admin-area::before {
+      opacity: var(--admin-widget-page-wash-opacity, .10);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
     html[data-admin-widget-texture="liquidGlass"] .admin-area::after {
-      opacity: .88;
-      filter: blur(8px) saturate(1.25);
+      background:
+        linear-gradient(112deg, transparent 0 12%, color-mix(in srgb, var(--admin-primary) 15%, transparent) 23%, rgba(255,255,255,.26) 28%, transparent 39% 69%, rgba(126,159,178,.16) 78%, transparent 89%),
+        linear-gradient(68deg, transparent 0 50%, rgba(255,255,255,.34) 58%, transparent 68%);
+      opacity: .92;
+      filter: blur(13px) saturate(1.28);
+    }
+
+    /* Structural canvases must remain transparent. If they are glass too,
+       child cards only blur a white layer and the mirror effect disappears. */
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card,
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage {
+      background: transparent !important;
+      border-color: rgba(255,255,255,.34) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.44), inset 0 -1px 0 rgba(48,70,84,.10) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      outline: none !important;
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .products-admin-header {
+      background: transparent !important;
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card::before,
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card::after,
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage::before,
+    html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage::after {
+      display: none !important;
     }
 
     /* Same double rim used by the login container. It is deliberately
@@ -1057,6 +1108,7 @@ export function applyAdminGlobalStyles() {
       .admin-hero-glass,
       .admin-section-bar,
       .admin-form-glass,
+      .admin-widget-surface,
       section[class*="rounded"][class*="border"],
       article[class*="rounded"][class*="border"],
       aside[class*="rounded"][class*="border"],
@@ -1094,10 +1146,9 @@ export function applyAdminGlobalStyles() {
     }
 
     /* Preserve color swatches / color pickers */
-    .admin-area [style*="background-color"],
-    .admin-area [style*="background:"],
+    .admin-area input[type="color"],
     .admin-area [class*="swatch"],
-    .admin-area [class*="color"],
+    .admin-area [class*="color-picker"],
     .admin-area .color-dot,
     .admin-area .color-circle {
       box-shadow: none;

@@ -636,8 +636,8 @@ export default function ProductosAdmin() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.shell}>
-        <div className="px-5 py-5 md:px-7 md:py-6" style={styles.header}>
+      <div className="admin-widget-stage" style={styles.shell}>
+        <div className="products-admin-header px-5 py-5 md:px-7 md:py-6" style={styles.header}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>
@@ -674,7 +674,7 @@ export default function ProductosAdmin() {
               const Icon = item.icon;
 
               return (
-                <div key={item.label} className="p-4" style={styles.kpi}>
+                <div key={item.label} className="admin-widget-surface p-4" style={styles.kpi}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.muted}>
@@ -983,7 +983,7 @@ export default function ProductosAdmin() {
               return (
                 <article
                   key={product._id}
-                  className="relative overflow-hidden p-4 transition hover:-translate-y-0.5 md:p-5"
+                  className="admin-widget-surface relative overflow-hidden p-4 transition hover:-translate-y-0.5 md:p-5"
                   style={styles.productCard}
                 >
                   <div
@@ -1082,16 +1082,16 @@ export default function ProductosAdmin() {
                     </div>
 
                     <div className="grid gap-2">
-                      <div className="p-3" style={styles.metricBox}>
+                      <div className="admin-widget-surface p-3" style={styles.metricBox}>
                         <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Venta</p>
                         <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(margin.price)}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="p-3" style={styles.metricBox}>
+                        <div className="admin-widget-surface p-3" style={styles.metricBox}>
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Costo</p>
                           <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{formatCurrency(margin.cost)}</p>
                         </div>
-                        <div className="p-3" style={styles.metricBox}>
+                        <div className="admin-widget-surface p-3" style={styles.metricBox}>
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Margen</p>
                           <p className="mt-1 text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{margin.marginPercent.toFixed(1)}%</p>
                         </div>
@@ -1103,15 +1103,15 @@ export default function ProductosAdmin() {
 
                     <div className="grid gap-2">
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="p-3 text-center" style={styles.metricBox}>
+                        <div className="admin-widget-surface p-3 text-center" style={styles.metricBox}>
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Stock</p>
                           <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatNumber(inventory.stock)}</p>
                         </div>
-                        <div className="p-3 text-center" style={styles.metricBox}>
+                        <div className="admin-widget-surface p-3 text-center" style={styles.metricBox}>
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Disp.</p>
                           <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatNumber(inventory.availableStock)}</p>
                         </div>
-                        <div className="p-3 text-center" style={styles.metricBox}>
+                        <div className="admin-widget-surface p-3 text-center" style={styles.metricBox}>
                           <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={styles.muted}>Res.</p>
                           <p className="mt-1 text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{formatNumber(inventory.reservedStock)}</p>
                         </div>
