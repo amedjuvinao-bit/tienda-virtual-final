@@ -541,7 +541,6 @@ AdminUserSchema.index({ deletedAt: 1 });
 AdminUserSchema.index(
   { passwordResetTokenHash: 1 },
   {
-    sparse: true,
     partialFilterExpression: {
       passwordResetTokenHash: { $type: 'string', $gt: '' },
     },
