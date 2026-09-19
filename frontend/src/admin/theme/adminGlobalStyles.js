@@ -701,8 +701,8 @@ export function applyAdminGlobalStyles() {
     html.admin-theme-dark .admin-area select,
     html.admin-theme-dark .admin-area textarea {
       color: var(--admin-input-text) !important;
-      background: color-mix(in srgb, var(--admin-card-bg) 92%, rgba(255,255,255,0.08)) !important;
-      border-color: color-mix(in srgb, var(--admin-primary) 42%, rgba(255,255,255,0.14)) !important;
+      background: var(--admin-widget-input-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
       caret-color: var(--admin-primary) !important;
     }
 
@@ -969,6 +969,98 @@ export function applyAdminGlobalStyles() {
       transform: translateY(-2px);
       border-color: color-mix(in srgb, var(--admin-primary) 40%, var(--admin-widget-surface-border)) !important;
       box-shadow: var(--admin-widget-surface-shadow-hover) !important;
+    }
+
+    /* ============================================================
+       LAYER 8B — EFFECTIVE WIDGET MATERIAL
+       Covers the real component patterns used across the panel,
+       including inline theme backgrounds that previously hid the
+       selected texture.
+       ============================================================ */
+
+    .admin-area .admin-content-card,
+    .admin-area .admin-card-glass,
+    .admin-area .admin-glass-card,
+    .admin-area .admin-hero-glass,
+    .admin-area .admin-section-bar,
+    .admin-area .admin-form-glass,
+    .admin-area :is(section, article, aside, form, div)[class*="rounded"][class*="border"][style*="--admin-card-bg"],
+    .admin-area :is(section, article, aside, form, div)[class*="rounded"][class*="border"][style*="--admin-page-bg"],
+    .admin-area :is(section, article, aside, form)[class*="rounded"][class*="border"]:not([class*="bg-"]):not([style*="background"]) {
+      background: var(--admin-widget-surface-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      border-width: var(--admin-widget-surface-border-width) !important;
+      border-radius: var(--admin-widget-surface-radius) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      filter: var(--admin-widget-texture-filter);
+      background-clip: padding-box !important;
+      transition:
+        border-radius 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        background 260ms ease,
+        border-color 220ms ease,
+        box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        filter 220ms ease !important;
+    }
+
+    .admin-area input,
+    .admin-area select,
+    .admin-area textarea {
+      border-width: var(--admin-widget-surface-border-width) !important;
+      border-radius: var(--admin-widget-control-radius) !important;
+    }
+
+    .admin-area button[class*="rounded"]:not(.no-glass):not(:disabled):not([disabled]),
+    .admin-area a[class*="rounded"][role="button"] {
+      border-width: var(--admin-widget-surface-border-width) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      border-radius: var(--admin-widget-control-radius) !important;
+      background-image: var(--admin-widget-button-overlay) !important;
+      background-blend-mode: screen;
+      box-shadow: var(--admin-widget-button-shadow) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+    }
+
+    .admin-area button[class*="rounded"]:not(.no-glass):not([class*="bg-"]):not([style*="background"]):not([style*="background-color"]):not(:disabled):not([disabled]) {
+      background: var(--admin-widget-button-bg) !important;
+      color: var(--admin-button-glass-text) !important;
+    }
+
+    .admin-area table,
+    .admin-area .overflow-x-auto,
+    .admin-area .overflow-auto {
+      border-radius: var(--admin-widget-surface-radius) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .admin-area::after {
+      opacity: .88;
+      filter: blur(8px) saturate(1.25);
+    }
+
+    html[data-admin-widget-texture="frostedGlass"] .admin-area::after {
+      opacity: .34;
+      filter: blur(30px) saturate(.8);
+    }
+
+    html[data-admin-widget-texture="pearl"] .admin-area::after {
+      background:
+        radial-gradient(circle at 16% 18%, rgba(255,220,245,.42), transparent 28%),
+        radial-gradient(circle at 86% 14%, rgba(214,242,255,.44), transparent 31%),
+        radial-gradient(circle at 78% 86%, color-mix(in srgb, var(--admin-primary) 16%, transparent), transparent 34%);
+      opacity: .76;
+    }
+
+    html[data-admin-widget-texture="solidPremium"] .admin-area::after {
+      opacity: .18;
+      filter: blur(28px);
+    }
+
+    html[data-admin-widget-texture="minimal"] .admin-area::after {
+      opacity: .06;
+      filter: none;
     }
 
     .admin-area [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {

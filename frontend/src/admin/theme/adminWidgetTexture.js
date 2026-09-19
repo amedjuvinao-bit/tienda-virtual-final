@@ -48,6 +48,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'radial-gradient(circle at 16% 0%, rgba(255,255,255,0.34), transparent 34%), linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 7%, transparent), transparent 48%)',
     blur: '24px',
     saturation: '1.5',
+    radius: '22px',
+    controlRadius: '14px',
+    borderWidth: '1px',
+    buttonBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 60%, transparent), color-mix(in srgb, var(--admin-primary) 12%, transparent))',
+    buttonOverlay: 'linear-gradient(135deg, rgba(255,255,255,0.34), transparent 48%)',
+    buttonShadow: '0 12px 28px color-mix(in srgb, var(--admin-primary) 16%, transparent), inset 0 1px 0 rgba(255,255,255,0.62)',
+    textureFilter: 'none',
   },
   liquidGlass: {
     bg: 'radial-gradient(circle at 16% -8%, rgba(255,255,255,0.72), transparent 34%), linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 42%, transparent), color-mix(in srgb, var(--admin-card-bg) 66%, var(--admin-primary) 15%))',
@@ -61,6 +68,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'radial-gradient(ellipse at 18% -12%, rgba(255,255,255,0.62), transparent 38%), radial-gradient(circle at 94% 18%, color-mix(in srgb, var(--admin-primary) 18%, transparent), transparent 28%), linear-gradient(115deg, transparent 28%, rgba(255,255,255,0.18) 48%, transparent 68%)',
     blur: '34px',
     saturation: '1.72',
+    radius: '30px',
+    controlRadius: '19px',
+    borderWidth: '2px',
+    buttonBg: 'radial-gradient(circle at 18% -20%, rgba(255,255,255,0.92), transparent 44%), linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 38%, transparent), color-mix(in srgb, var(--admin-primary) 28%, transparent))',
+    buttonOverlay: 'linear-gradient(112deg, transparent 18%, rgba(255,255,255,0.52) 45%, transparent 72%)',
+    buttonShadow: '0 18px 38px color-mix(in srgb, var(--admin-primary) 28%, transparent), inset 1px 1px 0 rgba(255,255,255,0.92), inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 24%, transparent)',
+    textureFilter: 'contrast(1.04)',
   },
   frostedGlass: {
     bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 78%, transparent), color-mix(in srgb, var(--admin-card-bg) 68%, var(--admin-primary) 7%))',
@@ -74,6 +88,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'linear-gradient(145deg, rgba(255,255,255,0.22), transparent 52%), radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--admin-primary) 10%, transparent), transparent 35%)',
     blur: '42px',
     saturation: '1.18',
+    radius: '20px',
+    controlRadius: '12px',
+    borderWidth: '1px',
+    buttonBg: 'color-mix(in srgb, var(--admin-card-bg) 76%, transparent)',
+    buttonOverlay: 'linear-gradient(145deg, rgba(255,255,255,0.48), transparent 64%)',
+    buttonShadow: '0 8px 20px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
+    textureFilter: 'saturate(.86)',
   },
   pearl: {
     bg: 'radial-gradient(circle at 18% 6%, rgba(255,255,255,0.78), transparent 34%), linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 88%, #f5eaff 12%), color-mix(in srgb, var(--admin-card-bg) 82%, #e6f6ff 18%))',
@@ -87,6 +108,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'linear-gradient(112deg, transparent 15%, rgba(255,225,246,0.22) 38%, rgba(222,246,255,0.30) 58%, transparent 82%)',
     blur: '18px',
     saturation: '1.34',
+    radius: '26px',
+    controlRadius: '18px',
+    borderWidth: '1px',
+    buttonBg: 'linear-gradient(125deg, color-mix(in srgb, var(--admin-card-bg) 80%, #ffe8f6 20%), color-mix(in srgb, var(--admin-card-bg) 78%, #e2f6ff 22%))',
+    buttonOverlay: 'linear-gradient(112deg, transparent 12%, rgba(255,225,246,0.44) 42%, rgba(220,246,255,0.50) 62%, transparent 88%)',
+    buttonShadow: '0 14px 30px rgba(88,70,120,0.16), inset 0 1px 0 #ffffff',
+    textureFilter: 'saturate(1.08)',
   },
   solidPremium: {
     bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 97%, var(--admin-primary) 3%), var(--admin-card-bg))',
@@ -100,6 +128,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'linear-gradient(145deg, rgba(255,255,255,0.08), transparent 45%)',
     blur: '0px',
     saturation: '1',
+    radius: '14px',
+    controlRadius: '10px',
+    borderWidth: '1px',
+    buttonBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 90%, var(--admin-primary) 10%), var(--admin-card-bg))',
+    buttonOverlay: 'linear-gradient(180deg, rgba(255,255,255,0.14), transparent 56%)',
+    buttonShadow: '0 9px 18px rgba(15,23,42,0.16), inset 0 1px 0 rgba(255,255,255,0.30)',
+    textureFilter: 'contrast(1.02)',
   },
   minimal: {
     bg: 'color-mix(in srgb, var(--admin-card-bg) 96%, transparent)',
@@ -113,6 +148,13 @@ const TEXTURE_TOKENS = Object.freeze({
     overlay: 'none',
     blur: '0px',
     saturation: '1',
+    radius: '6px',
+    controlRadius: '5px',
+    borderWidth: '1px',
+    buttonBg: 'var(--admin-card-bg)',
+    buttonOverlay: 'none',
+    buttonShadow: 'none',
+    textureFilter: 'none',
   },
 });
 
@@ -137,6 +179,13 @@ export function applyAdminWidgetTexture(value) {
   root.style.setProperty('--admin-widget-surface-overlay', tokens.overlay);
   root.style.setProperty('--admin-widget-surface-blur', tokens.blur);
   root.style.setProperty('--admin-widget-surface-saturation', tokens.saturation);
+  root.style.setProperty('--admin-widget-surface-radius', tokens.radius);
+  root.style.setProperty('--admin-widget-control-radius', tokens.controlRadius);
+  root.style.setProperty('--admin-widget-surface-border-width', tokens.borderWidth);
+  root.style.setProperty('--admin-widget-button-bg', tokens.buttonBg);
+  root.style.setProperty('--admin-widget-button-overlay', tokens.buttonOverlay);
+  root.style.setProperty('--admin-widget-button-shadow', tokens.buttonShadow);
+  root.style.setProperty('--admin-widget-texture-filter', tokens.textureFilter);
 
   return texture;
 }

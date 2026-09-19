@@ -78,6 +78,13 @@ describe('PanelAdminSection Nivel Plus', () => {
     await user.click(within(textureControls).getByRole('button', { name: /Vidrio líquido/i }));
 
     expect(screen.getByText('Vista previa sin guardar')).toBeInTheDocument();
+    expect(document.documentElement.dataset.adminWidgetTexture).toBe('liquidGlass');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-widget-surface-radius')
+    ).toBe('30px');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-widget-surface-border-width')
+    ).toBe('2px');
     expect(api.put).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
