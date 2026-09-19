@@ -1,10 +1,21 @@
 // src/admin/configuracion/sections/PanelAdminSection.jsx
-import React, { useEffect, useState } from 'react';
-import InfoCard from '../components/InfoCard';
-import EmptyHint from '../components/EmptyHint';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Check,
+  ChevronRight,
+  Eye,
+  LayoutDashboard,
+  LoaderCircle,
+  PanelLeft,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Undo2,
+} from 'lucide-react';
 import api from '../../../lib/api';
 import { applyAdminTheme, ADMIN_THEME_DEFAULT } from '../../theme/adminTheme';
 import { applyAdminLayoutStyles } from '../../theme/adminLayoutStyles';
+import './PanelAdminSection.css';
 
 const ADMIN_THEME_PRESETS = {
   electricNeon: {
@@ -432,6 +443,77 @@ const ADMIN_THEME_PRESETS = {
   },
 };
 
+const DEFAULT_PANEL_SELECTION = Object.freeze({
+  preset: 'systemDefault',
+  sidebar: 'expanded',
+});
+
+const ADMIN_THEME_OPTIONS = [
+  {
+    value: 'systemDefault',
+    label: 'Clásico del sistema',
+    description: 'Equilibrado, claro y familiar para el trabajo diario.',
+  },
+  {
+    value: 'roseLuxuryLight',
+    label: 'Rosa luxury',
+    description: 'Elegante y luminoso, alineado con una boutique premium.',
+  },
+  {
+    value: 'goldBoutiqueLight',
+    label: 'Dorado boutique',
+    description: 'Cálido, refinado y con acentos dorados.',
+  },
+  {
+    value: 'glassPastel',
+    label: 'Glass pastel',
+    description: 'Suave, moderno y con superficies ligeras.',
+  },
+  {
+    value: 'pearlFuture',
+    label: 'Perla futurista',
+    description: 'Neutral, limpio y enfocado en la información.',
+  },
+  {
+    value: 'neonRoseLight',
+    label: 'Rosa neón',
+    description: 'Vibrante y expresivo para una identidad audaz.',
+  },
+  {
+    value: 'minimalPro',
+    label: 'Minimal pro',
+    description: 'Sobrio, compacto y de alto contraste.',
+  },
+  {
+    value: 'electricNeon',
+    label: 'Neón eléctrico',
+    description: 'Oscuro con acentos cian de alta energía.',
+  },
+  {
+    value: 'darkCyber',
+    label: 'Oscuro cyber',
+    description: 'Profundo, compacto y con acentos violetas.',
+  },
+];
+
+const SIDEBAR_OPTIONS = [
+  {
+    value: 'compact',
+    label: 'Compacto',
+    description: 'Más espacio para tablas y operaciones.',
+  },
+  {
+    value: 'balanced',
+    label: 'Equilibrado',
+    description: 'Proporción cómoda para la mayoría de pantallas.',
+  },
+  {
+    value: 'expanded',
+    label: 'Amplio',
+    description: 'Mayor separación y lectura más descansada.',
+  },
+];
+
 function buildThemeWithSidebar(baseTheme, sidebarStyle) {
   const safeTheme = baseTheme || ADMIN_THEME_DEFAULT;
   const baseLayout = safeTheme.layout || {};
@@ -458,226 +540,360 @@ function buildThemeWithSidebar(baseTheme, sidebarStyle) {
     };
   }
 
+  if (sidebarStyle === 'balanced') {
+    return {
+      ...safeTheme,
+      layout: {
+        ...baseLayout,
+        sidebarWidth: 270,
+        density: 'comfortable',
+      },
+    };
+  }
+
   return safeTheme;
 }
 
-export default function PanelAdminSection() {
-  const [loading, setLoading] = useState(false);
+function resolveTheme(preset, sidebar) {
+  const baseTheme =
+    preset === 'systemDefault'
+      ? ADMIN_THEME_DEFAULT
+      : ADMIN_THEME_PRESETS[preset] || ADMIN_THEME_DEFAULT;
 
-  const [theme, setTheme] = useState('');
-  const [sidebar, setSidebar] = useState('');
+  return {
+    ...buildThemeWithSidebar(baseTheme, sidebar),
+    preset,
+  };
+}
+
+function applySelection(selection) {
+  const nextTheme = resolveTheme(selection.preset, selection.sidebar);
+  applyAdminTheme(nextTheme);
+  applyAdminLayoutStyles(nextTheme);
+  return nextTheme;
+}
+
+function applyThemeObject(theme) {
+  applyAdminTheme(theme);
+  applyAdminLayoutStyles(theme);
+}
+
+function selectionFromAdmin(admin = {}) {
+  const savedPreset = admin?.theme?.preset;
+  const preset = ADMIN_THEME_OPTIONS.some((item) => item.value === savedPreset)
+    ? savedPreset
+    : DEFAULT_PANEL_SELECTION.preset;
+  const sidebar = SIDEBAR_OPTIONS.some((item) => item.value === admin?.sidebar)
+    ? admin.sidebar
+    : DEFAULT_PANEL_SELECTION.sidebar;
+
+  return { preset, sidebar };
+}
+
+function getErrorMessage(error) {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    'No fue posible guardar la apariencia. Inténtalo nuevamente.'
+  );
+}
+
+export default function PanelAdminSection() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedSelection, setSavedSelection] = useState(DEFAULT_PANEL_SELECTION);
+  const [draftSelection, setDraftSelection] = useState(DEFAULT_PANEL_SELECTION);
+  const [feedback, setFeedback] = useState(null);
+  const savedSelectionRef = useRef(DEFAULT_PANEL_SELECTION);
+  const savedThemeRef = useRef(
+    resolveTheme(DEFAULT_PANEL_SELECTION.preset, DEFAULT_PANEL_SELECTION.sidebar)
+  );
+
+  const dirty =
+    draftSelection.preset !== savedSelection.preset ||
+    draftSelection.sidebar !== savedSelection.sidebar;
+
+  const selectedThemeOption = useMemo(
+    () =>
+      ADMIN_THEME_OPTIONS.find((item) => item.value === draftSelection.preset) ||
+      ADMIN_THEME_OPTIONS[0],
+    [draftSelection.preset]
+  );
+
+  const selectedTheme = useMemo(
+    () => resolveTheme(draftSelection.preset, draftSelection.sidebar),
+    [draftSelection]
+  );
 
   useEffect(() => {
+    let active = true;
+
     async function fetchSettings() {
       try {
         setLoading(true);
-        const res = await api.get('/api/site-settings');
+        const res = await api.get('/api/site-settings/admin');
+
+        if (!active) return;
 
         const admin = res?.data?.admin || {};
-        const savedTheme = admin?.theme || {};
+        const selection = selectionFromAdmin(admin);
+        const persistedTheme =
+          admin?.theme && Object.keys(admin.theme).length
+            ? admin.theme
+            : resolveTheme(selection.preset, selection.sidebar);
 
-        setTheme(savedTheme?.preset || '');
-        setSidebar(admin?.sidebar || '');
-
-        applyAdminTheme(savedTheme);
-        applyAdminLayoutStyles(savedTheme);
+        setSavedSelection(selection);
+        setDraftSelection(selection);
+        savedSelectionRef.current = selection;
+        savedThemeRef.current = persistedTheme;
+        applyThemeObject(persistedTheme);
       } catch (error) {
-        console.error('❌ Error cargando configuración admin:', error);
+        if (!active) return;
+        setFeedback({ type: 'error', text: getErrorMessage(error) });
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
     fetchSettings();
+
+    return () => {
+      active = false;
+      applyThemeObject(savedThemeRef.current);
+    };
   }, []);
 
-  const handleSave = async (newData) => {
+  const previewSelection = (nextSelection) => {
+    setDraftSelection(nextSelection);
+    setFeedback(null);
+    applySelection(nextSelection);
+  };
+
+  const handleSave = async () => {
+    if (!dirty || saving) return;
+
+    const previousSelection = savedSelection;
+    const requestedTheme = resolveTheme(
+      draftSelection.preset,
+      draftSelection.sidebar
+    );
+
     try {
-      await api.put('/api/site-settings', {
-        admin: newData,
+      setSaving(true);
+      setFeedback({ type: 'info', text: 'Guardando apariencia…' });
+      const response = await api.put('/api/site-settings', {
+        admin: {
+          theme: requestedTheme,
+          sidebar: draftSelection.sidebar,
+        },
+      });
+
+      const confirmedAdmin = response?.data?.admin || {};
+      const confirmedTheme = confirmedAdmin.theme || requestedTheme;
+      const confirmedSelection = selectionFromAdmin({
+        theme: confirmedTheme,
+        sidebar: confirmedAdmin.sidebar || draftSelection.sidebar,
+      });
+
+      setSavedSelection(confirmedSelection);
+      setDraftSelection(confirmedSelection);
+      savedSelectionRef.current = confirmedSelection;
+      savedThemeRef.current = confirmedTheme;
+      applyThemeObject(confirmedTheme);
+      setFeedback({
+        type: 'success',
+        text: 'Apariencia guardada y aplicada en todo el panel.',
       });
     } catch (error) {
-      console.error('❌ Error guardando configuración admin:', error);
+      setDraftSelection(previousSelection);
+      applyThemeObject(savedThemeRef.current);
+      setFeedback({ type: 'error', text: getErrorMessage(error) });
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleCancel = () => {
+    setDraftSelection(savedSelection);
+    applyThemeObject(savedThemeRef.current);
+    setFeedback({ type: 'info', text: 'Vista previa descartada.' });
+  };
+
+  const handleRestore = () => {
+    previewSelection(DEFAULT_PANEL_SELECTION);
+    setFeedback({
+      type: 'info',
+      text: 'Configuración predeterminada preparada. Guárdala para aplicarla.',
+    });
+  };
+
   return (
-    <div
-      className="grid"
-      style={{ gap: 'var(--admin-gap)' }}
-    >
-      <InfoCard
-        variant="hero"
-        title="Personalización del panel admin"
-        description="Configura la apariencia interna del panel administrativo sin afectar la tienda pública."
-      >
-        <div
-          className="relative overflow-hidden rounded-[calc(var(--admin-radius)*0.9)] border"
-          style={{
-            marginTop: 'calc(var(--admin-gap) * 0.9)',
-            padding: 'calc(var(--admin-padding) * 1.05)',
-            borderColor: 'var(--admin-glass-border)',
-            background:
-              'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 64%, transparent), color-mix(in srgb, var(--admin-primary) 10%, transparent))',
-            boxShadow:
-              '0 18px 48px color-mix(in srgb, var(--admin-primary) 12%, transparent), inset 0 1px 0 var(--admin-glass-highlight)',
-            backdropFilter: 'blur(22px) saturate(1.35)',
-            WebkitBackdropFilter: 'blur(22px) saturate(1.35)',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'radial-gradient(circle at 14% 20%, color-mix(in srgb, var(--admin-primary) 18%, transparent), transparent 34%), radial-gradient(circle at 86% 12%, rgba(255,255,255,0.22), transparent 32%)',
-              opacity: 0.72,
-              pointerEvents: 'none',
-            }}
-          />
+    <section className="panel-admin-level-plus" aria-labelledby="panel-admin-title">
+      <header className="panel-admin-hero">
+        <div className="panel-admin-hero__icon" aria-hidden="true">
+          <Sparkles size={23} />
+        </div>
+        <div className="panel-admin-hero__copy">
+          <span>Experiencia del equipo</span>
+          <h2 id="panel-admin-title">Diseña un panel cómodo para trabajar</h2>
+          <p>
+            Prueba el tema y la amplitud de navegación antes de guardarlos. Estos
+            cambios solo afectan el panel administrativo.
+          </p>
+        </div>
+        <div className={`panel-admin-sync panel-admin-sync--${dirty ? 'dirty' : 'saved'}`}>
+          {loading ? (
+            <><LoaderCircle className="panel-admin-spin" size={16} /> Cargando</>
+          ) : dirty ? (
+            <><Eye size={16} /> Vista previa sin guardar</>
+          ) : (
+            <><Check size={16} /> Configuración sincronizada</>
+          )}
+        </div>
+      </header>
 
-          <div
-            className="relative z-10 mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
-          >
+      {feedback && (
+        <div className={`panel-admin-feedback panel-admin-feedback--${feedback.type}`} role="status">
+          {feedback.text}
+        </div>
+      )}
+
+      <div className="panel-admin-workspace" aria-busy={loading || saving}>
+        <div className="panel-admin-settings">
+          <div className="panel-admin-section-heading">
             <div>
-              <p
-                className="text-[11px] font-bold uppercase tracking-[0.22em]"
-                style={{ color: 'var(--admin-primary)' }}
-              >
-                Apariencia interna
-              </p>
-              <h3
-                className="mt-1 text-lg font-semibold"
-                style={{ color: 'var(--admin-card-text)' }}
-              >
-                Ajustes visuales del panel
-              </h3>
+              <span>01 · Estilo visual</span>
+              <h3>Elige una personalidad</h3>
             </div>
+            <p>{ADMIN_THEME_OPTIONS.length} estilos disponibles</p>
+          </div>
 
-            <div
-              className="rounded-full border px-3 py-1 text-xs font-semibold"
-              style={{
-                borderColor: 'var(--admin-primary-soft-border)',
-                background: 'var(--admin-primary-soft-bg)',
-                color: 'var(--admin-primary-soft-text)',
-              }}
-            >
-              Cambios en tiempo real
+          <div className="panel-admin-theme-grid" role="group" aria-label="Temas del panel">
+            {ADMIN_THEME_OPTIONS.map((option) => {
+              const palette =
+                option.value === 'systemDefault'
+                  ? ADMIN_THEME_DEFAULT
+                  : ADMIN_THEME_PRESETS[option.value];
+              const selected = draftSelection.preset === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`panel-admin-theme-card${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  disabled={loading || saving}
+                  onClick={() =>
+                    previewSelection({ ...draftSelection, preset: option.value })
+                  }
+                >
+                  <span className="panel-admin-theme-card__palette" aria-hidden="true">
+                    {[palette.primary, palette.pageBg, palette.cardBg].map((color, index) => (
+                      <i key={`${color}-${index}`} style={{ background: color }} />
+                    ))}
+                  </span>
+                  <span className="panel-admin-theme-card__copy">
+                    <strong>{option.label}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                  <span className="panel-admin-theme-card__check" aria-hidden="true">
+                    <Check size={15} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="panel-admin-section-heading panel-admin-section-heading--layout">
+            <div>
+              <span>02 · Navegación</span>
+              <h3>Ajusta el espacio del menú</h3>
             </div>
           </div>
 
-          <div
-            className="relative z-10 grid md:grid-cols-2"
-            style={{ gap: 'var(--admin-gap)' }}
-          >
-            <label className="block">
-              <span
-                className="mb-1 block text-sm font-medium"
-                style={{ color: 'var(--admin-card-text)' }}
-              >
-                Tema del panel
-              </span>
-              <select
-                value={theme}
-                disabled={loading}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const selectedTheme =
-                    ADMIN_THEME_PRESETS[value] || ADMIN_THEME_DEFAULT;
-
-                  const finalTheme = buildThemeWithSidebar(selectedTheme, sidebar);
-
-                  setTheme(value);
-                  applyAdminTheme(finalTheme);
-                  applyAdminLayoutStyles(finalTheme);
-
-                  handleSave({
-                    theme: finalTheme,
-                    sidebar,
-                  });
-                }}
-                className="w-full outline-none transition-all"
-                style={{
-                  borderRadius: 'calc(var(--admin-radius) * 0.55)',
-                  border: '1px solid var(--admin-input-border)',
-                  background: 'var(--admin-input-bg)',
-                  color: 'var(--admin-input-text)',
-                  padding: 'calc(var(--admin-padding) * 0.55) calc(var(--admin-padding) * 0.75)',
-                }}
-              >
-                <option value="">Selecciona un tema</option>
-                <option value="electricNeon">Neón eléctrico</option>
-                <option value="darkCyber">Oscuro cyber</option>
-                <option value="roseLuxuryLight">Rosa luxury claro</option>
-                <option value="goldBoutiqueLight">Dorado boutique claro</option>
-                <option value="glassPastel">Glass pastel</option>
-                <option value="pearlFuture">Perla futurista</option>
-                <option value="neonRoseLight">Rosa neón claro</option>
-                <option value="minimalPro">Minimal pro claro</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span
-                className="mb-1 block text-sm font-medium"
-                style={{ color: 'var(--admin-card-text)' }}
-              >
-                Estilo del sidebar
-              </span>
-              <select
-                value={sidebar}
-                disabled={loading}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const selectedTheme =
-                    ADMIN_THEME_PRESETS[theme] || ADMIN_THEME_DEFAULT;
-
-                  const finalTheme = buildThemeWithSidebar(selectedTheme, value);
-
-                  setSidebar(value);
-                  applyAdminTheme(finalTheme);
-                  applyAdminLayoutStyles(finalTheme);
-
-                  handleSave({
-                    theme: finalTheme,
-                    sidebar: value,
-                  });
-                }}
-                className="w-full outline-none transition-all"
-                style={{
-                  borderRadius: 'calc(var(--admin-radius) * 0.55)',
-                  border: '1px solid var(--admin-input-border)',
-                  background: 'var(--admin-input-bg)',
-                  color: 'var(--admin-input-text)',
-                  padding: 'calc(var(--admin-padding) * 0.55) calc(var(--admin-padding) * 0.75)',
-                }}
-              >
-                <option value="">Selecciona estilo</option>
-                <option value="compact">Compacto</option>
-                <option value="expanded">Expandido</option>
-              </select>
-            </label>
+          <div className="panel-admin-sidebar-grid" role="group" aria-label="Amplitud del menú lateral">
+            {SIDEBAR_OPTIONS.map((option) => {
+              const selected = draftSelection.sidebar === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`panel-admin-sidebar-option${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  disabled={loading || saving}
+                  onClick={() =>
+                    previewSelection({ ...draftSelection, sidebar: option.value })
+                  }
+                >
+                  <PanelLeft size={19} />
+                  <span><strong>{option.label}</strong><small>{option.description}</small></span>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </InfoCard>
 
-      <div
-        className="relative overflow-hidden rounded-[calc(var(--admin-radius)*0.85)] border"
-        style={{
-          borderColor: 'var(--admin-glass-border)',
-          background:
-            'linear-gradient(135deg, color-mix(in srgb, var(--admin-primary) 10%, transparent), color-mix(in srgb, var(--admin-card-bg) 58%, transparent))',
-          boxShadow:
-            '0 14px 34px color-mix(in srgb, var(--admin-primary) 10%, transparent), inset 0 1px 0 var(--admin-glass-highlight)',
-          backdropFilter: 'blur(18px) saturate(1.25)',
-          WebkitBackdropFilter: 'blur(18px) saturate(1.25)',
-        }}
-      >
-        <EmptyHint
-          title="Configuración aplicada"
-          text="El panel tomará esta apariencia automáticamente desde la base de datos. Para que las tablas, cards, botones e inputs internos cambien de color."
-        />
+        <aside className="panel-admin-preview" aria-label="Vista previa del panel">
+          <div className="panel-admin-preview__heading">
+            <div>
+              <span><Eye size={15} /> Vista previa en vivo</span>
+              <h3>{selectedThemeOption.label}</h3>
+            </div>
+            <span className="panel-admin-preview__badge">
+              {SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}
+            </span>
+          </div>
+
+          <div
+            className="panel-admin-preview__canvas"
+            style={{
+              '--preview-primary': selectedTheme.primary,
+              '--preview-page': selectedTheme.pageBg,
+              '--preview-card': selectedTheme.cardBg,
+              '--preview-text': selectedTheme.cardText,
+              '--preview-muted': selectedTheme.cardMutedText,
+              '--preview-sidebar': selectedTheme.sidebarBg,
+              '--preview-radius': `${selectedTheme.layout?.radius || 18}px`,
+            }}
+          >
+            <div className={`panel-admin-preview__sidebar is-${draftSelection.sidebar}`}>
+              <i /><i /><i /><i />
+            </div>
+            <div className="panel-admin-preview__content">
+              <div className="panel-admin-preview__topbar" />
+              <div className="panel-admin-preview__title"><i /><span /></div>
+              <div className="panel-admin-preview__metrics"><i /><i /><i /></div>
+              <div className="panel-admin-preview__table"><i /><i /><i /></div>
+            </div>
+          </div>
+
+          <ul className="panel-admin-preview__summary">
+            <li><LayoutDashboard size={16} /><span><strong>Tema</strong>{selectedThemeOption.label}</span></li>
+            <li><PanelLeft size={16} /><span><strong>Navegación</strong>{SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}</span></li>
+            <li><Check size={16} /><span><strong>Alcance</strong>Todo el panel administrativo</span></li>
+          </ul>
+        </aside>
       </div>
-    </div>
+
+      <footer className="panel-admin-actions">
+        <div className="panel-admin-actions__note">
+          <Check size={16} />
+          <span>El cambio queda protegido por permisos y registrado en la auditoría.</span>
+        </div>
+        <div className="panel-admin-actions__buttons">
+          <button type="button" className="panel-admin-button panel-admin-button--ghost" onClick={handleRestore} disabled={loading || saving}>
+            <RotateCcw size={16} /> Restaurar predeterminado
+          </button>
+          <button type="button" className="panel-admin-button panel-admin-button--secondary" onClick={handleCancel} disabled={!dirty || saving}>
+            <Undo2 size={16} /> Cancelar
+          </button>
+          <button type="button" className="panel-admin-button panel-admin-button--primary" onClick={handleSave} disabled={!dirty || loading || saving}>
+            {saving ? <LoaderCircle className="panel-admin-spin" size={17} /> : <Save size={17} />}
+            {saving ? 'Guardando…' : 'Guardar apariencia'}
+            {!saving && <ChevronRight size={16} />}
+          </button>
+        </div>
+      </footer>
+    </section>
   );
 }
