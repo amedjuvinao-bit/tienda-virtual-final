@@ -8,6 +8,27 @@ import api, {
 import { logoutAdminSession } from '../admin/api/adminAuthApi';
 
 const AuthContext = createContext();
+let initialSessionVerificationPromise = null;
+
+function requestAdminSessionVerification() {
+  return api.get('/api/admin/auth/verify', { skipAdminRefresh: true });
+}
+
+async function verifyInitialAdminSession() {
+  if (!initialSessionVerificationPromise) {
+    initialSessionVerificationPromise = requestAdminSessionVerification()
+      .then(async (response) => {
+        if (!response?.data?.retryable) return response;
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 200));
+        return requestAdminSessionVerification();
+      })
+      .finally(() => {
+        initialSessionVerificationPromise = null;
+      });
+  }
+
+  return initialSessionVerificationPromise;
+}
 
 function normalizeAdminUser(user) {
   if (!user || typeof user !== 'object') return null;
@@ -80,7 +101,7 @@ export function AuthProvider({ children }) {
       removeLegacySessionStorage();
 
       try {
-        const response = await api.get('/api/admin/auth/verify');
+        const response = await verifyInitialAdminSession();
         if (!alive) return;
         const verifiedUser = normalizeAdminUser(response?.data?.user);
         if (response?.data?.authenticated === false || !verifiedUser) {
@@ -103,7 +124,7 @@ export function AuthProvider({ children }) {
 
     const handleTwoFactorPolicyUpdated = async () => {
       try {
-        const response = await api.get('/api/admin/auth/verify');
+        const response = await requestAdminSessionVerification();
         if (!alive) return;
         const verifiedUser = normalizeAdminUser(response?.data?.user);
         if (response?.data?.authenticated === false || !verifiedUser) {
@@ -152,7 +173,7 @@ export function AuthProvider({ children }) {
 
   const refreshAdminUser = async () => {
     if (!isAuthenticated) return null;
-    const response = await api.get('/api/admin/auth/verify');
+    const response = await requestAdminSessionVerification();
     const verifiedUser = normalizeAdminUser(response?.data?.user);
     if (response?.data?.authenticated === false || !verifiedUser) {
       clearClientSession();

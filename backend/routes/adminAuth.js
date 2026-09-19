@@ -2287,6 +2287,63 @@ router.post('/change-password-required', async (req, res) => {
   }
 });
 
+async function resolveRotatedAdminIdentity(req, refreshResult) {
+  const { session, refreshToken } = refreshResult;
+
+  if (session.authType === 'db') {
+    const adminUser = await findAdminUserForToken({
+      adminUserId: session.adminUser,
+    });
+
+    const invalidUser =
+      !adminUser ||
+      adminUser.deletedAt ||
+      adminUser.active !== true ||
+      adminUser.status !== 'active' ||
+      Number(adminUser.tokenVersion || 0) !== Number(session.tokenVersion || 0);
+
+    if (invalidUser) {
+      await revokeRequestSession(req, 'user_invalid_or_security_changed');
+      return {
+        ok: false,
+        message: 'La sesión ya no es válida. Inicia sesión nuevamente.',
+      };
+    }
+
+    return {
+      ok: true,
+      session,
+      refreshToken,
+      tokenPayload: buildDbTokenPayload(adminUser),
+      user: buildUserResponseFromDb(adminUser),
+    };
+  }
+
+  if (!isLegacyAdminAuthEnabled()) {
+    await revokeRequestSession(req, 'legacy_auth_disabled');
+    return {
+      ok: false,
+      message: 'La autenticación administrativa heredada está deshabilitada.',
+    };
+  }
+
+  return {
+    ok: true,
+    session,
+    refreshToken,
+    tokenPayload: buildLegacyTokenPayload(session.username),
+    user: buildUserResponseFromLegacy(session.username),
+  };
+}
+
+async function issueResolvedAdminSession(res, identity) {
+  await issueRotatedSession(res, {
+    session: identity.session,
+    refreshToken: identity.refreshToken,
+    tokenPayload: identity.tokenPayload,
+  });
+}
+
 router.post('/refresh', async (req, res) => {
   try {
     const refreshResult = await rotateRefreshToken(req);
@@ -2306,50 +2363,15 @@ router.post('/refresh', async (req, res) => {
       });
     }
 
-    const { session, refreshToken } = refreshResult;
-    let tokenPayload;
-    let user;
-
-    if (session.authType === 'db') {
-      const adminUser = await findAdminUserForToken({
-        adminUserId: session.adminUser,
-      });
-
-      const invalidUser =
-        !adminUser ||
-        adminUser.deletedAt ||
-        adminUser.active !== true ||
-        adminUser.status !== 'active' ||
-        Number(adminUser.tokenVersion || 0) !== Number(session.tokenVersion || 0);
-
-      if (invalidUser) {
-        await revokeRequestSession(req, 'user_invalid_or_security_changed');
-        clearSessionCookies(res);
-        return res.status(401).json({
-          ok: false,
-          message: 'La sesión ya no es válida. Inicia sesión nuevamente.',
-        });
-      }
-
-      tokenPayload = buildDbTokenPayload(adminUser);
-      user = buildUserResponseFromDb(adminUser);
-    } else {
-      if (!isLegacyAdminAuthEnabled()) {
-        await revokeRequestSession(req, 'legacy_auth_disabled');
-        clearSessionCookies(res);
-        return res.status(401).json({
-          ok: false,
-          message: 'La autenticación administrativa heredada está deshabilitada.',
-        });
-      }
-
-      tokenPayload = buildLegacyTokenPayload(session.username);
-      user = buildUserResponseFromLegacy(session.username);
+    const identity = await resolveRotatedAdminIdentity(req, refreshResult);
+    if (!identity.ok) {
+      clearSessionCookies(res);
+      return res.status(401).json({ ok: false, message: identity.message });
     }
 
-    await issueRotatedSession(res, { session, refreshToken, tokenPayload });
+    await issueResolvedAdminSession(res, identity);
 
-    return res.json({ ok: true, user });
+    return res.json({ ok: true, user: identity.user });
   } catch (error) {
     console.error('❌ Error renovando sesión admin:', error.message);
     clearSessionCookies(res);
@@ -2771,33 +2793,61 @@ router.post('/sessions/:sessionRecordId/revoke', requireAdmin, async (req, res) 
 router.get('/verify', async (req, res) => {
   const result = await verifyAdminToken(req);
 
-  if (!result.ok) {
-    const hasRefreshSession = Boolean(getRefreshToken(req));
+  if (result.ok) {
+    return res.json({
+      ok: true,
+      authenticated: true,
+      user: result.user,
+    });
+  }
 
-    // Abrir el login sin cookies es un estado normal, no un fallo de
-    // autenticacion. La respuesta 200 evita disparar una renovacion que no
-    // puede existir y mantiene la consola limpia. Si hay cookie de renovacion,
-    // conservamos el 401 para que el interceptor renueve la sesion HttpOnly.
-    if (!hasRefreshSession && Number(result.status || 401) < 500) {
-      clearSessionCookies(res);
-      return res.json({
-        ok: true,
-        authenticated: false,
-        user: null,
-      });
-    }
-
+  if (Number(result.status || 401) >= 500) {
     return res.status(result.status || 401).json({
       ok: false,
       message: result.message,
     });
   }
 
-  return res.json({
-    ok: true,
-    authenticated: true,
-    user: result.user,
-  });
+  if (!getRefreshToken(req)) {
+    clearSessionCookies(res);
+    return res.json({ ok: true, authenticated: false, user: null });
+  }
+
+  try {
+    const refreshResult = await rotateRefreshToken(req);
+
+    if (!refreshResult.ok) {
+      if (refreshResult.retryable) {
+        return res.json({
+          ok: true,
+          authenticated: false,
+          retryable: true,
+          user: null,
+        });
+      }
+
+      clearSessionCookies(res);
+      return res.json({ ok: true, authenticated: false, user: null });
+    }
+
+    const identity = await resolveRotatedAdminIdentity(req, refreshResult);
+    if (!identity.ok) {
+      clearSessionCookies(res);
+      return res.json({ ok: true, authenticated: false, user: null });
+    }
+
+    await issueResolvedAdminSession(res, identity);
+    return res.json({
+      ok: true,
+      authenticated: true,
+      refreshed: true,
+      user: identity.user,
+    });
+  } catch (error) {
+    console.error('❌ Error verificando sesión admin:', error.message);
+    clearSessionCookies(res);
+    return res.json({ ok: true, authenticated: false, user: null });
+  }
 });
 
 router.get('/logs', requireAdmin, requirePermission('logs:view'), async (req, res) => {
