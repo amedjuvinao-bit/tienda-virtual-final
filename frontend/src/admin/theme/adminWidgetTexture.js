@@ -57,17 +57,17 @@ const TEXTURE_TOKENS = Object.freeze({
     textureFilter: 'none',
   },
   liquidGlass: {
-    // Mirror glass needs transparent dark/light bands, not a broad white wash.
-    // The narrow highlights remain visible even on pale admin backgrounds.
-    bg: 'linear-gradient(118deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.025) 22%, rgba(176,204,219,0.18) 38%, rgba(255,255,255,0.035) 52%, rgba(63,88,105,0.10) 72%, color-mix(in srgb, var(--admin-primary) 9%, transparent) 86%, rgba(255,255,255,0.12) 100%)',
-    strongBg: 'linear-gradient(118deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.035) 22%, rgba(169,200,217,0.22) 38%, rgba(255,255,255,0.045) 52%, rgba(54,79,96,0.12) 72%, color-mix(in srgb, var(--admin-primary) 12%, transparent) 86%, rgba(255,255,255,0.15) 100%)',
-    softBg: 'linear-gradient(118deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.015) 28%, rgba(170,202,220,0.12) 43%, rgba(54,79,96,0.07) 72%, rgba(255,255,255,0.08) 100%)',
-    inputBg: 'linear-gradient(118deg, rgba(255,255,255,0.12), rgba(171,202,218,0.11) 42%, rgba(55,80,97,0.075) 74%, rgba(255,255,255,0.10))',
+    // Clean mirror glass: transparent tint and edge reflections without
+    // metallic bands that can read as grey stains on pale themes.
+    bg: 'linear-gradient(145deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.045) 48%, color-mix(in srgb, var(--admin-primary) 7%, transparent) 100%)',
+    strongBg: 'linear-gradient(145deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 48%, color-mix(in srgb, var(--admin-primary) 9%, transparent) 100%)',
+    softBg: 'linear-gradient(145deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.025) 54%, color-mix(in srgb, var(--admin-primary) 5%, transparent) 100%)',
+    inputBg: 'linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.045) 58%, color-mix(in srgb, var(--admin-primary) 5%, transparent))',
     border: 'rgba(255,255,255,0.66)',
     shadow: '0 26px 62px rgba(35,54,69,0.22), 0 10px 26px color-mix(in srgb, var(--admin-primary) 10%, transparent), inset 1px 1px 0 rgba(255,255,255,0.78), inset -1px -1px 0 rgba(43,65,80,0.20)',
     shadowHover: '0 34px 78px rgba(35,54,69,0.28), 0 16px 38px color-mix(in srgb, var(--admin-primary) 16%, transparent), inset 1px 1px 0 rgba(255,255,255,0.90), inset -1px -1px 0 rgba(43,65,80,0.24)',
     highlight: 'rgba(255,255,255,0.95)',
-    overlay: 'linear-gradient(112deg, transparent 0%, transparent 15%, rgba(255,255,255,0.42) 23%, rgba(255,255,255,0.07) 31%, transparent 40%, transparent 67%, rgba(148,183,202,0.18) 77%, rgba(255,255,255,0.30) 84%, transparent 93%)',
+    overlay: 'radial-gradient(ellipse at 18% -8%, rgba(255,255,255,0.28), transparent 40%), linear-gradient(145deg, rgba(255,255,255,0.10), transparent 34%, transparent 82%, rgba(255,255,255,0.06))',
     blur: '12px',
     saturation: '1.36',
     backdropContrast: '1.08',
@@ -77,8 +77,8 @@ const TEXTURE_TOKENS = Object.freeze({
     radius: '30px',
     controlRadius: '19px',
     borderWidth: '1px',
-    buttonBg: 'linear-gradient(118deg, rgba(255,255,255,0.14), rgba(169,201,218,0.15) 38%, rgba(55,80,97,0.10) 70%, color-mix(in srgb, var(--admin-primary) 14%, transparent))',
-    buttonOverlay: 'linear-gradient(112deg, transparent 12%, rgba(255,255,255,0.58) 34%, rgba(255,255,255,0.08) 44%, transparent 58%, rgba(155,190,208,0.18) 82%, transparent 94%)',
+    buttonBg: 'linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05) 55%, color-mix(in srgb, var(--admin-primary) 11%, transparent))',
+    buttonOverlay: 'linear-gradient(145deg, rgba(255,255,255,0.34), transparent 34%, transparent 84%, rgba(255,255,255,0.08))',
     buttonShadow: '0 18px 38px color-mix(in srgb, var(--admin-primary) 28%, transparent), inset 1px 1px 0 rgba(255,255,255,0.92), inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 24%, transparent)',
     textureFilter: 'none',
   },

@@ -1054,10 +1054,7 @@ export function applyAdminGlobalStyles() {
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area {
-      background:
-        linear-gradient(116deg, transparent 0 13%, color-mix(in srgb, var(--admin-primary) 12%, transparent) 24%, transparent 37% 62%, rgba(126,159,178,.11) 74%, transparent 86%),
-        linear-gradient(72deg, transparent 0 48%, rgba(255,255,255,.42) 56%, transparent 67%),
-        var(--admin-page-glass-overlay) !important;
+      background: var(--admin-page-glass-overlay) !important;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::before {
@@ -1067,11 +1064,9 @@ export function applyAdminGlobalStyles() {
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::after {
-      background:
-        linear-gradient(112deg, transparent 0 12%, color-mix(in srgb, var(--admin-primary) 15%, transparent) 23%, rgba(255,255,255,.26) 28%, transparent 39% 69%, rgba(126,159,178,.16) 78%, transparent 89%),
-        linear-gradient(68deg, transparent 0 50%, rgba(255,255,255,.34) 58%, transparent 68%);
-      opacity: .92;
-      filter: blur(13px) saturate(1.28);
+      background: linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 5%, transparent), transparent 42% 76%, rgba(255,255,255,.08));
+      opacity: .28;
+      filter: blur(34px) saturate(1.08);
     }
 
     /* Structural canvases must remain transparent. If they are glass too,
