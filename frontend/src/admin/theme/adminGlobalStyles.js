@@ -1054,19 +1054,23 @@ export function applyAdminGlobalStyles() {
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area {
-      background: var(--admin-page-glass-overlay) !important;
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--admin-page-bg) 96%, #ffffff 4%),
+        color-mix(in srgb, var(--admin-page-bg) 94%, var(--admin-primary) 6%)
+      ) !important;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::before {
-      opacity: var(--admin-widget-page-wash-opacity, .10);
+      opacity: 0;
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::after {
-      background: linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 5%, transparent), transparent 42% 76%, rgba(255,255,255,.08));
-      opacity: .28;
-      filter: blur(34px) saturate(1.08);
+      background: none;
+      opacity: 0;
+      filter: none;
     }
 
     /* Structural canvases must remain transparent. If they are glass too,
@@ -1075,7 +1079,7 @@ export function applyAdminGlobalStyles() {
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage {
       background: transparent !important;
       border-color: rgba(255,255,255,.34) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.44), inset 0 -1px 0 rgba(48,70,84,.10) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 8%, transparent) !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
       outline: none !important;
