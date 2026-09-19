@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import PanelAdminSection from './PanelAdminSection';
 import api from '../../../lib/api';
+import { applyAdminGlobalStyles } from '../../theme/adminGlobalStyles';
 
 vi.mock('../../../lib/api', () => ({
   default: {
@@ -153,5 +154,20 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Configuración predeterminada preparada. Guárdala para aplicarla.')).toBeInTheDocument();
     expect(api.put).not.toHaveBeenCalled();
+  });
+
+  it('extiende la textura seleccionada a contenedores propios de todos los módulos', () => {
+    applyAdminGlobalStyles();
+
+    const globalStyles = document.getElementById('admin-global-glass-styles');
+    expect(globalStyles).not.toBeNull();
+    expect(globalStyles.textContent).toContain('[class$="-hero"]');
+    expect(globalStyles.textContent).toContain('[class$="-workspace"]');
+    expect(globalStyles.textContent).toContain('[class$="-overview"]');
+    expect(globalStyles.textContent).toContain('[class$="-summary"]');
+    expect(globalStyles.textContent).toContain('[class$="-surface"]');
+    expect(globalStyles.textContent).toContain('[class$="-stats"]');
+    expect(globalStyles.textContent).toContain('[class$="-alerts"]');
+    expect(globalStyles.textContent).toContain('border-style: solid !important');
   });
 });
