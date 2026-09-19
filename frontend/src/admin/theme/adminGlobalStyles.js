@@ -179,6 +179,49 @@ export function applyAdminGlobalStyles() {
       box-shadow: var(--admin-glass-shadow-hover) !important;
     }
 
+    /* Widget material selected from Panel admin. The shell keeps the
+       current color theme while cards, forms and data surfaces share
+       one consistent physical finish. */
+    .admin-card-glass,
+    .admin-glass-card,
+    .admin-hero-glass,
+    .admin-section-bar,
+    .admin-form-glass,
+    html.admin-theme-dark .admin-card-glass,
+    html.admin-theme-dark .admin-glass-card,
+    html.admin-theme-dark .admin-hero-glass,
+    html.admin-theme-dark .admin-section-bar,
+    html.admin-theme-dark .admin-form-glass {
+      background: var(--admin-widget-surface-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+    }
+
+    .admin-card-glass::before,
+    .admin-glass-card::before,
+    .admin-hero-glass::before,
+    .admin-section-bar::before,
+    .admin-form-glass::before {
+      background: linear-gradient(90deg, transparent, var(--admin-widget-surface-highlight), transparent);
+    }
+
+    .admin-card-glass::after,
+    .admin-glass-card::after,
+    .admin-hero-glass::after,
+    .admin-section-bar::after,
+    .admin-form-glass::after {
+      background: var(--admin-widget-surface-overlay);
+    }
+
+    .admin-card-glass:hover,
+    .admin-glass-card:hover,
+    html.admin-theme-dark .admin-card-glass:hover,
+    html.admin-theme-dark .admin-glass-card:hover {
+      box-shadow: var(--admin-widget-surface-shadow-hover) !important;
+    }
+
 
     /* ============================================================
        LAYER 2 — THE 3 NEW GLASSMORPHISM CONTAINERS
@@ -195,13 +238,10 @@ export function applyAdminGlobalStyles() {
       border-radius: 24px;
       display: flex;
       align-items: stretch;
-      background: color-mix(in srgb, var(--admin-glass-bg) 90%, transparent) !important;
-      backdrop-filter: blur(30px) saturate(var(--admin-glass-saturation)) !important;
-      -webkit-backdrop-filter: blur(30px) saturate(var(--admin-glass-saturation)) !important;
-      box-shadow:
-        0 24px 70px color-mix(in srgb, var(--admin-primary) 13%, transparent),
-        0 12px 32px rgba(15,23,42,0.08),
-        inset 0 1px 0 var(--admin-glass-highlight) !important;
+      background: var(--admin-widget-surface-strong-bg) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
     }
 
     .admin-hero-glass .admin-hero-body {
@@ -297,12 +337,10 @@ export function applyAdminGlobalStyles() {
       align-items: center;
       gap: 14px;
       padding: 12px 18px;
-      background: color-mix(in srgb, var(--admin-glass-bg) 55%, transparent) !important;
-      backdrop-filter: blur(20px) saturate(var(--admin-glass-saturation)) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(var(--admin-glass-saturation)) !important;
-      box-shadow:
-        inset 0 1px 0 var(--admin-glass-highlight),
-        0 16px 34px color-mix(in srgb, var(--admin-primary) 9%, transparent) !important;
+      background: var(--admin-widget-surface-soft-bg) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
     }
 
     .admin-section-bar .admin-section-pill {
@@ -350,12 +388,10 @@ export function applyAdminGlobalStyles() {
 
     .admin-form-glass {
       border-radius: 24px;
-      background: color-mix(in srgb, var(--admin-glass-bg) 75%, transparent) !important;
-      backdrop-filter: blur(28px) saturate(var(--admin-glass-saturation)) !important;
-      -webkit-backdrop-filter: blur(28px) saturate(var(--admin-glass-saturation)) !important;
-      box-shadow:
-        0 12px 40px color-mix(in srgb, var(--admin-primary) 8%, transparent),
-        inset 0 1px 0 var(--admin-glass-highlight) !important;
+      background: var(--admin-widget-surface-bg) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
     }
 
     .admin-form-glass .admin-form-header {
@@ -646,13 +682,13 @@ export function applyAdminGlobalStyles() {
     .admin-area select,
     .admin-area textarea {
       color: var(--admin-input-text) !important;
-      background: var(--admin-input-bg) !important;
-      border-color: var(--admin-input-border) !important;
+      background: var(--admin-widget-input-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.12),
         0 8px 22px color-mix(in srgb, var(--admin-primary) 5%, transparent);
-      backdrop-filter: blur(12px) saturate(1.16);
-      -webkit-backdrop-filter: blur(12px) saturate(1.16);
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
       transition:
         border-color 210ms ease,
         box-shadow 230ms ease,
@@ -734,10 +770,10 @@ export function applyAdminGlobalStyles() {
     .admin-area .overflow-auto {
       color: var(--admin-table-text) !important;
       border-color: var(--admin-table-border) !important;
-      background: var(--admin-widget-glass-bg) !important;
-      border-color: var(--admin-widget-glass-border) !important;
-      backdrop-filter: blur(24px) saturate(1.34);
-      -webkit-backdrop-filter: blur(24px) saturate(1.34);
+      background: var(--admin-widget-surface-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
       border-collapse: separate;
       border-spacing: 0;
       overflow: hidden;
@@ -820,15 +856,12 @@ export function applyAdminGlobalStyles() {
     .admin-area .bg-amber-50,  .admin-area .bg-yellow-50,
     .admin-area .bg-orange-50, .admin-area .bg-green-50,
     .admin-area .bg-emerald-50,.admin-area .bg-red-50 {
-      background: var(--admin-glass-soft-bg) !important;
+      background: var(--admin-widget-surface-soft-bg) !important;
       color: var(--admin-card-text) !important;
-      border-color: var(--admin-glass-border) !important;
-      backdrop-filter: blur(14px) saturate(1.24);
-      -webkit-backdrop-filter: blur(14px) saturate(1.24);
-      box-shadow:
-        0 20px 52px rgba(15,23,42,0.10),
-        0 10px 26px color-mix(in srgb, var(--admin-primary) 8%, transparent),
-        inset 0 1px 0 var(--admin-glass-highlight);
+      border-color: var(--admin-widget-surface-border) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
+      box-shadow: var(--admin-widget-surface-shadow);
     }
 
     html.admin-theme-dark .admin-area .bg-white,
@@ -898,7 +931,7 @@ export function applyAdminGlobalStyles() {
     .admin-area .shadow-lg,
     .admin-area .shadow-xl,
     .admin-area .shadow-2xl {
-      box-shadow: var(--admin-widget-glass-shadow) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
       transition:
         box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
         transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -907,14 +940,14 @@ export function applyAdminGlobalStyles() {
     }
 
     .admin-area .border {
-      border-color: var(--admin-glass-border) !important;
+      border-color: var(--admin-widget-surface-border) !important;
     }
 
     .admin-area .rounded-lg,
     .admin-area .rounded-xl,
     .admin-area .rounded-2xl {
-      backdrop-filter: blur(20px) saturate(1.34);
-      -webkit-backdrop-filter: blur(20px) saturate(1.34);
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
     }
 
 
@@ -934,8 +967,8 @@ export function applyAdminGlobalStyles() {
     .admin-area .rounded-xl.border:hover,
     .admin-area .rounded-lg.border:hover {
       transform: translateY(-2px);
-      border-color: color-mix(in srgb, var(--admin-primary) 40%, var(--admin-glass-border)) !important;
-      box-shadow: var(--admin-glass-shadow-hover) !important;
+      border-color: color-mix(in srgb, var(--admin-primary) 40%, var(--admin-widget-surface-border)) !important;
+      box-shadow: var(--admin-widget-surface-shadow-hover) !important;
     }
 
     .admin-area [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {

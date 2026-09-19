@@ -4,6 +4,7 @@ import {
   Check,
   ChevronRight,
   Eye,
+  Gem,
   LayoutDashboard,
   LoaderCircle,
   PanelLeft,
@@ -15,6 +16,11 @@ import {
 import api from '../../../lib/api';
 import { applyAdminTheme, ADMIN_THEME_DEFAULT } from '../../theme/adminTheme';
 import { applyAdminLayoutStyles } from '../../theme/adminLayoutStyles';
+import {
+  ADMIN_WIDGET_TEXTURES,
+  DEFAULT_ADMIN_WIDGET_TEXTURE,
+  normalizeAdminWidgetTexture,
+} from '../../theme/adminWidgetTexture';
 import './PanelAdminSection.css';
 
 const ADMIN_THEME_PRESETS = {
@@ -446,6 +452,7 @@ const ADMIN_THEME_PRESETS = {
 const DEFAULT_PANEL_SELECTION = Object.freeze({
   preset: 'systemDefault',
   sidebar: 'expanded',
+  widgetTexture: DEFAULT_ADMIN_WIDGET_TEXTURE,
 });
 
 const ADMIN_THEME_OPTIONS = [
@@ -554,7 +561,7 @@ function buildThemeWithSidebar(baseTheme, sidebarStyle) {
   return safeTheme;
 }
 
-function resolveTheme(preset, sidebar) {
+function resolveTheme(preset, sidebar, widgetTexture = DEFAULT_ADMIN_WIDGET_TEXTURE) {
   const baseTheme =
     preset === 'systemDefault'
       ? ADMIN_THEME_DEFAULT
@@ -563,11 +570,16 @@ function resolveTheme(preset, sidebar) {
   return {
     ...buildThemeWithSidebar(baseTheme, sidebar),
     preset,
+    widgetTexture: normalizeAdminWidgetTexture(widgetTexture),
   };
 }
 
 function applySelection(selection) {
-  const nextTheme = resolveTheme(selection.preset, selection.sidebar);
+  const nextTheme = resolveTheme(
+    selection.preset,
+    selection.sidebar,
+    selection.widgetTexture
+  );
   applyAdminTheme(nextTheme);
   applyAdminLayoutStyles(nextTheme);
   return nextTheme;
@@ -586,8 +598,9 @@ function selectionFromAdmin(admin = {}) {
   const sidebar = SIDEBAR_OPTIONS.some((item) => item.value === admin?.sidebar)
     ? admin.sidebar
     : DEFAULT_PANEL_SELECTION.sidebar;
+  const widgetTexture = normalizeAdminWidgetTexture(admin?.theme?.widgetTexture);
 
-  return { preset, sidebar };
+  return { preset, sidebar, widgetTexture };
 }
 
 function getErrorMessage(error) {
@@ -606,12 +619,17 @@ export default function PanelAdminSection() {
   const [feedback, setFeedback] = useState(null);
   const savedSelectionRef = useRef(DEFAULT_PANEL_SELECTION);
   const savedThemeRef = useRef(
-    resolveTheme(DEFAULT_PANEL_SELECTION.preset, DEFAULT_PANEL_SELECTION.sidebar)
+    resolveTheme(
+      DEFAULT_PANEL_SELECTION.preset,
+      DEFAULT_PANEL_SELECTION.sidebar,
+      DEFAULT_PANEL_SELECTION.widgetTexture
+    )
   );
 
   const dirty =
     draftSelection.preset !== savedSelection.preset ||
-    draftSelection.sidebar !== savedSelection.sidebar;
+    draftSelection.sidebar !== savedSelection.sidebar ||
+    draftSelection.widgetTexture !== savedSelection.widgetTexture;
 
   const selectedThemeOption = useMemo(
     () =>
@@ -621,8 +639,21 @@ export default function PanelAdminSection() {
   );
 
   const selectedTheme = useMemo(
-    () => resolveTheme(draftSelection.preset, draftSelection.sidebar),
+    () =>
+      resolveTheme(
+        draftSelection.preset,
+        draftSelection.sidebar,
+        draftSelection.widgetTexture
+      ),
     [draftSelection]
+  );
+
+  const selectedTextureOption = useMemo(
+    () =>
+      ADMIN_WIDGET_TEXTURES.find(
+        (item) => item.value === draftSelection.widgetTexture
+      ) || ADMIN_WIDGET_TEXTURES[0],
+    [draftSelection.widgetTexture]
   );
 
   useEffect(() => {
@@ -640,7 +671,11 @@ export default function PanelAdminSection() {
         const persistedTheme =
           admin?.theme && Object.keys(admin.theme).length
             ? admin.theme
-            : resolveTheme(selection.preset, selection.sidebar);
+            : resolveTheme(
+                selection.preset,
+                selection.sidebar,
+                selection.widgetTexture
+              );
 
         setSavedSelection(selection);
         setDraftSelection(selection);
@@ -675,7 +710,8 @@ export default function PanelAdminSection() {
     const previousSelection = savedSelection;
     const requestedTheme = resolveTheme(
       draftSelection.preset,
-      draftSelection.sidebar
+      draftSelection.sidebar,
+      draftSelection.widgetTexture
     );
 
     try {
@@ -737,8 +773,8 @@ export default function PanelAdminSection() {
           <span>Experiencia del equipo</span>
           <h2 id="panel-admin-title">Diseña un panel cómodo para trabajar</h2>
           <p>
-            Prueba el tema y la amplitud de navegación antes de guardarlos. Estos
-            cambios solo afectan el panel administrativo.
+            Combina el tema, la amplitud de navegación y la textura de los widgets
+            antes de guardar. Estos cambios solo afectan el panel administrativo.
           </p>
         </div>
         <div className={`panel-admin-sync panel-admin-sync--${dirty ? 'dirty' : 'saved'}`}>
@@ -831,6 +867,53 @@ export default function PanelAdminSection() {
               );
             })}
           </div>
+
+          <div className="panel-admin-section-heading panel-admin-section-heading--texture">
+            <div>
+              <span>03 · Textura de widgets</span>
+              <h3>Elige el acabado de las superficies</h3>
+            </div>
+            <p>Se combina con cualquier estilo</p>
+          </div>
+
+          <div
+            className="panel-admin-texture-grid"
+            role="group"
+            aria-label="Textura de los widgets"
+          >
+            {ADMIN_WIDGET_TEXTURES.map((option) => {
+              const selected = draftSelection.widgetTexture === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  data-texture={option.value}
+                  className={`panel-admin-texture-option${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  disabled={loading || saving}
+                  onClick={() =>
+                    previewSelection({
+                      ...draftSelection,
+                      widgetTexture: option.value,
+                    })
+                  }
+                >
+                  <span className="panel-admin-texture-option__sample" aria-hidden="true">
+                    <i />
+                    <i />
+                  </span>
+                  <span className="panel-admin-texture-option__copy">
+                    <strong>{option.label}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                  <span className="panel-admin-texture-option__check" aria-hidden="true">
+                    <Check size={14} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <aside className="panel-admin-preview" aria-label="Vista previa del panel">
@@ -846,6 +929,7 @@ export default function PanelAdminSection() {
 
           <div
             className="panel-admin-preview__canvas"
+            data-widget-texture={draftSelection.widgetTexture}
             style={{
               '--preview-primary': selectedTheme.primary,
               '--preview-page': selectedTheme.pageBg,
@@ -870,6 +954,7 @@ export default function PanelAdminSection() {
           <ul className="panel-admin-preview__summary">
             <li><LayoutDashboard size={16} /><span><strong>Tema</strong>{selectedThemeOption.label}</span></li>
             <li><PanelLeft size={16} /><span><strong>Navegación</strong>{SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}</span></li>
+            <li><Gem size={16} /><span><strong>Textura</strong>{selectedTextureOption.label}</span></li>
             <li><Check size={16} /><span><strong>Alcance</strong>Todo el panel administrativo</span></li>
           </ul>
         </aside>

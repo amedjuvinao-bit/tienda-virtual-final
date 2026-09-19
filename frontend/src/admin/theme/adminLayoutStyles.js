@@ -1,5 +1,7 @@
 // src/admin/theme/adminLayoutStyles.js
 
+import { applyAdminWidgetTexture } from './adminWidgetTexture';
+
 export function applyAdminLayoutStyles(theme = {}) {
   const root = document.documentElement;
 
@@ -126,4 +128,6 @@ export function applyAdminLayoutStyles(theme = {}) {
     '--admin-page-glass-overlay',
     'linear-gradient(180deg, transparent, rgba(0,0,0,0.04))'
   );
+
+  applyAdminWidgetTexture(theme.widgetTexture);
 }

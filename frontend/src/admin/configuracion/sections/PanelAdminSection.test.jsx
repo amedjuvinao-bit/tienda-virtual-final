@@ -13,13 +13,18 @@ vi.mock('../../../lib/api', () => ({
   },
 }));
 
-function settingsResponse({ preset = 'roseLuxuryLight', sidebar = 'expanded' } = {}) {
+function settingsResponse({
+  preset = 'roseLuxuryLight',
+  sidebar = 'expanded',
+  widgetTexture = 'softGlass',
+} = {}) {
   return {
     data: {
       admin: {
         sidebar,
         theme: {
           preset,
+          widgetTexture,
           primary: '#ec4899',
           pageBg: '#fff1f7',
           cardBg: '#ffffff',
@@ -52,6 +57,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(screen.getByRole('heading', { name: 'Diseña un panel cómodo para trabajar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Rosa luxury/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Amplio/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(0);
     expect(api.put).not.toHaveBeenCalled();
   });
@@ -66,6 +72,10 @@ describe('PanelAdminSection Nivel Plus', () => {
       name: 'Amplitud del menú lateral',
     });
     await user.click(within(sidebarControls).getByRole('button', { name: /Compacto/i }));
+    const textureControls = screen.getByRole('group', {
+      name: 'Textura de los widgets',
+    });
+    await user.click(within(textureControls).getByRole('button', { name: /Vidrio líquido/i }));
 
     expect(screen.getByText('Vista previa sin guardar')).toBeInTheDocument();
     expect(api.put).not.toHaveBeenCalled();
@@ -78,6 +88,7 @@ describe('PanelAdminSection Nivel Plus', () => {
         sidebar: 'compact',
         theme: expect.objectContaining({
           preset: 'goldBoutiqueLight',
+          widgetTexture: 'liquidGlass',
           layout: expect.objectContaining({ density: 'compact', sidebarWidth: 220 }),
         }),
       }),
@@ -92,10 +103,12 @@ describe('PanelAdminSection Nivel Plus', () => {
     await screen.findByText('Configuración sincronizada');
 
     await user.click(screen.getByRole('button', { name: /Minimal pro/i }));
+    await user.click(screen.getByRole('button', { name: /Perlado/i }));
     expect(screen.getByRole('button', { name: /Minimal pro/i })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: /^Cancelar/i }));
 
     expect(screen.getByRole('button', { name: /Rosa luxury/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Vista previa descartada.')).toBeInTheDocument();
     expect(api.put).not.toHaveBeenCalled();
   });
@@ -124,6 +137,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     await user.click(screen.getByRole('button', { name: /Restaurar predeterminado/i }));
 
     expect(screen.getByRole('button', { name: /Clásico del sistema/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Configuración predeterminada preparada. Guárdala para aplicarla.')).toBeInTheDocument();
     expect(api.put).not.toHaveBeenCalled();
   });
