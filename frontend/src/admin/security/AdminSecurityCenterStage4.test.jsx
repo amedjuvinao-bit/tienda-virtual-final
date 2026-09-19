@@ -100,12 +100,10 @@ describe('Centro de seguridad administrativa Etapa 4', () => {
     const user = userEvent.setup();
     render(<SeguridadSection />);
 
+    expect(await screen.findByRole('heading', { name: 'Tu seguridad, en un solo vistazo' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Sesiones/ }));
     expect(await screen.findByRole('heading', { name: 'Sesiones y dispositivos' })).toBeInTheDocument();
     expect(screen.getByText('Safari · iOS')).toBeInTheDocument();
-    expect(screen.getByText('Nuevo dispositivo detectado')).toBeInTheDocument();
-    expect(screen.getByText('Inicio de sesión correcto')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Desactivar 2FA' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cambiar aplicación 2FA' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
     await user.type(screen.getByPlaceholderText('Contraseña para cerrar sesiones'), 'Password!123');
@@ -118,5 +116,13 @@ describe('Centro de seguridad administrativa Etapa 4', () => {
         { currentPassword: 'Password!123', code: '123456' }
       );
     });
+
+    await user.click(screen.getByRole('button', { name: /Alertas/ }));
+    expect(await screen.findByText('Nuevo dispositivo detectado')).toBeInTheDocument();
+    expect(screen.getByText('Inicio de sesión correcto')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Autenticación/ }));
+    expect(screen.queryByRole('button', { name: 'Desactivar 2FA' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cambiar aplicación 2FA' })).toBeInTheDocument();
   });
 });

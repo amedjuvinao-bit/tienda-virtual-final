@@ -104,6 +104,7 @@ describe('Seguridad administrativa 2FA', () => {
 
     render(<SeguridadSection />);
 
+    await user.click(await screen.findByRole('button', { name: /Autenticación/ }));
     expect(await screen.findByRole('heading', { name: 'Autenticación en dos pasos' })).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText('Contraseña actual'), 'Password!123');
     await user.click(screen.getByRole('button', { name: 'Configurar 2FA' }));
@@ -146,6 +147,7 @@ describe('Seguridad administrativa 2FA', () => {
 
     render(<SeguridadSection />);
 
+    await user.click(await screen.findByRole('button', { name: /Autenticación/ }));
     await user.click(await screen.findByRole('button', { name: 'Cambiar aplicación 2FA' }));
     await user.type(screen.getByPlaceholderText('Contraseña actual'), 'Password!123');
     await user.type(screen.getByPlaceholderText('Código TOTP o de recuperación'), '654321');
@@ -170,6 +172,7 @@ describe('Seguridad administrativa 2FA', () => {
   });
 
   it('impide que un usuario opcional active 2FA sin autorización del owner', async () => {
+    const user = userEvent.setup();
     getAdminTwoFactorStatus.mockResolvedValue({
       ok: true,
       twoFactor: {
@@ -182,6 +185,7 @@ describe('Seguridad administrativa 2FA', () => {
 
     render(<SeguridadSection />);
 
+    await user.click(await screen.findByRole('button', { name: /Autenticación/ }));
     expect(await screen.findByText('2FA administrado por el propietario')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Configurar 2FA' })).not.toBeInTheDocument();
   });
