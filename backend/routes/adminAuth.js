@@ -19,6 +19,7 @@ const {
   clearSessionCookies,
   clearTwoFactorChallengeCookie,
   getAccessCredential,
+  getRefreshToken,
   issueRotatedSession,
   loadActiveSession,
   requireTrustedAdminOrigin,
@@ -2771,6 +2772,21 @@ router.get('/verify', async (req, res) => {
   const result = await verifyAdminToken(req);
 
   if (!result.ok) {
+    const hasRefreshSession = Boolean(getRefreshToken(req));
+
+    // Abrir el login sin cookies es un estado normal, no un fallo de
+    // autenticacion. La respuesta 200 evita disparar una renovacion que no
+    // puede existir y mantiene la consola limpia. Si hay cookie de renovacion,
+    // conservamos el 401 para que el interceptor renueve la sesion HttpOnly.
+    if (!hasRefreshSession && Number(result.status || 401) < 500) {
+      clearSessionCookies(res);
+      return res.json({
+        ok: true,
+        authenticated: false,
+        user: null,
+      });
+    }
+
     return res.status(result.status || 401).json({
       ok: false,
       message: result.message,
@@ -2779,6 +2795,7 @@ router.get('/verify', async (req, res) => {
 
   return res.json({
     ok: true,
+    authenticated: true,
     user: result.user,
   });
 });

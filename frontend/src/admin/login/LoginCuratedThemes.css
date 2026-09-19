@@ -209,6 +209,16 @@
 .rb-smoke-access.rb-editorial-access{--mirror-muted:color-mix(in srgb,var(--login-primary) 82%,transparent)}
 .rb-editorial-access .rb-curated-auth__field label{font-size:11px;letter-spacing:.14em}
 .rb-editorial-access .rb-curated-auth__options{font-size:12px}
+.rb-liquid-access.rb-editorial-access .rb-curated-auth__options,
+.rb-smoke-access.rb-editorial-access .rb-curated-auth__options{
+  color:color-mix(in srgb,var(--login-primary) 68%,#111)!important;
+  font-weight:700;
+}
+.rb-gallery-access.rb-editorial-access .rb-curated-auth__options{
+  color:color-mix(in srgb,var(--login-surface) 90%,#fff)!important;
+  font-weight:700;
+  text-shadow:0 1px 5px rgba(0,0,0,.55);
+}
 
 .theme-immersiveGallery[data-login-custom-image=true]{padding:0!important}
 .rb-gallery-stage[data-custom-image=true]{width:100%;max-width:none;min-height:100vh;border:0;border-radius:0;box-shadow:none}
@@ -226,5 +236,28 @@
 
 @media(max-width:600px){
   .rb-theme-copy p{font-size:13px}
-  .rb-curated-auth__options{gap:4px}
+  .rb-curated-auth__options{align-items:center;flex-direction:row;gap:12px}
+  .rb-curated-auth__options button{white-space:nowrap}
+}
+
+@media(max-width:379px){
+  .rb-curated-auth__options{align-items:flex-start;flex-direction:column;gap:2px}
+}
+
+@media(max-width:600px) and (max-height:760px){
+  .rb-editorial-access,
+  .rb-liquid-access.rb-editorial-access,
+  .rb-smoke-access.rb-editorial-access{
+    margin:8px auto;
+    padding:20px 28px!important;
+  }
+  .rb-smoke-access .rb-panel-brand{margin-bottom:12px}
+  .rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:58px;width:58px}
+  .rb-editorial-kicker{margin-bottom:8px}
+  .rb-editorial-access .rb-curated-auth__head{margin-bottom:16px}
+  .rb-editorial-access .rb-curated-auth__head p{margin-top:7px}
+  .rb-editorial-access .rb-curated-auth__field{margin-bottom:10px}
+  .rb-editorial-access .rb-curated-auth__field input{height:46px}
+  .rb-editorial-access .rb-curated-auth__submit{height:50px;margin-top:14px}
+  .rb-curated-auth__options{margin-top:8px}
 }

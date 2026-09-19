@@ -83,6 +83,10 @@ export function AuthProvider({ children }) {
         const response = await api.get('/api/admin/auth/verify');
         if (!alive) return;
         const verifiedUser = normalizeAdminUser(response?.data?.user);
+        if (response?.data?.authenticated === false || !verifiedUser) {
+          clearClientSession();
+          return;
+        }
         setAdminSessionActive(true);
         setIsAuthenticated(true);
         setAdminUser(verifiedUser);
@@ -101,7 +105,12 @@ export function AuthProvider({ children }) {
       try {
         const response = await api.get('/api/admin/auth/verify');
         if (!alive) return;
-        setAdminUser(normalizeAdminUser(response?.data?.user));
+        const verifiedUser = normalizeAdminUser(response?.data?.user);
+        if (response?.data?.authenticated === false || !verifiedUser) {
+          clearClientSession();
+          return;
+        }
+        setAdminUser(verifiedUser);
       } catch {
         if (alive) clearClientSession();
       }
@@ -145,6 +154,10 @@ export function AuthProvider({ children }) {
     if (!isAuthenticated) return null;
     const response = await api.get('/api/admin/auth/verify');
     const verifiedUser = normalizeAdminUser(response?.data?.user);
+    if (response?.data?.authenticated === false || !verifiedUser) {
+      clearClientSession();
+      return null;
+    }
     setAdminUser(verifiedUser);
     return verifiedUser;
   };
