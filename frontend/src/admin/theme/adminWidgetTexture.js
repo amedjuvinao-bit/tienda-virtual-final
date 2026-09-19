@@ -57,20 +57,21 @@ const TEXTURE_TOKENS = Object.freeze({
     textureFilter: 'none',
   },
   liquidGlass: {
-    // Clean mirror glass: transparent tint and edge reflections without
-    // metallic bands that can read as grey stains on pale themes.
-    bg: 'linear-gradient(180deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.15) 42%, color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,0.10)) 100%)',
-    strongBg: 'linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.19) 42%, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.12)) 100%)',
-    softBg: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.10) 58%, color-mix(in srgb, var(--admin-primary) 6%, rgba(255,255,255,0.07)) 100%)',
-    inputBg: 'linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0.12) 64%, color-mix(in srgb, var(--admin-primary) 5%, rgba(255,255,255,0.08)))',
-    border: 'rgba(255,255,255,0.90)',
-    shadow: '0 14px 34px color-mix(in srgb, var(--admin-primary) 12%, transparent), inset 0 1px 0 rgba(255,255,255,0.98), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 12%, transparent)',
-    shadowHover: '0 20px 46px color-mix(in srgb, var(--admin-primary) 18%, transparent), inset 0 1px 0 #ffffff, inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent)',
-    highlight: 'rgba(255,255,255,0.95)',
-    overlay: 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 13%, transparent 32%, transparent 100%)',
-    blur: '9px',
-    saturation: '1.18',
-    backdropContrast: '1.04',
+    // Mirror glass is intentionally translucent. Two clean diagonal light
+    // sweeps create reflection without the grey radial stains rejected in
+    // the previous iteration.
+    bg: 'linear-gradient(122deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.12) 20%, rgba(255,255,255,0.035) 43%, rgba(255,255,255,0.16) 72%, color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.07)) 100%), linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 5%, transparent), color-mix(in srgb, var(--admin-primary) 11%, transparent))',
+    strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0.045) 43%, rgba(255,255,255,0.20) 72%, color-mix(in srgb, var(--admin-primary) 11%, rgba(255,255,255,0.08)) 100%), linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 6%, transparent), color-mix(in srgb, var(--admin-primary) 13%, transparent))',
+    softBg: 'linear-gradient(122deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 28%, rgba(255,255,255,0.025) 54%, color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.06)) 100%)',
+    inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.27), rgba(255,255,255,0.07) 48%, color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.055)))',
+    border: 'rgba(255,255,255,0.94)',
+    shadow: '0 16px 38px color-mix(in srgb, var(--admin-primary) 15%, transparent), 0 1px 0 rgba(255,255,255,0.72), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent)',
+    shadowHover: '0 22px 52px color-mix(in srgb, var(--admin-primary) 21%, transparent), 0 1px 0 rgba(255,255,255,0.82), inset 0 1px 0 #ffffff, inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 22%, transparent)',
+    highlight: 'rgba(255,255,255,1)',
+    overlay: 'linear-gradient(122deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.08) 24%, transparent 44%, rgba(255,255,255,0.12) 72%, transparent 100%)',
+    blur: '28px',
+    saturation: '1.32',
+    backdropContrast: '1.06',
     innerBorder: 'rgba(255,255,255,0.52)',
     innerBorderOffset: '-4px',
     pageWashOpacity: '0',
@@ -168,12 +169,45 @@ export function normalizeAdminWidgetTexture(value) {
   return TEXTURE_VALUES.has(value) ? value : DEFAULT_ADMIN_WIDGET_TEXTURE;
 }
 
+function restoreThemeSurfaceTokens(root) {
+  const restore = (target, source, fallback) => {
+    const value = root.style.getPropertyValue(source).trim() || fallback;
+    root.style.setProperty(target, value);
+  };
+
+  restore('--admin-card-bg', '--admin-theme-card-bg', '#ffffff');
+  restore('--admin-card-header-bg', '--admin-theme-card-header-bg', '#fdf2f8');
+  restore('--admin-card-border', '--admin-theme-card-border', '#fbcfe8');
+  restore('--admin-light-panel-bg', '--admin-theme-light-panel-bg', '#ffffff');
+  restore('--admin-table-head-bg', '--admin-theme-table-head-bg', '#f9fafb');
+  restore('--admin-table-border', '--admin-theme-table-border', '#e5e7eb');
+  restore('--admin-input-bg', '--admin-theme-input-bg', '#ffffff');
+  restore('--admin-input-border', '--admin-theme-input-border', '#d1d5db');
+  restore('--admin-modal-bg', '--admin-theme-modal-bg', '#ffffff');
+}
+
+function applyLiquidGlassCompatibilityTokens(root) {
+  const dark = root.dataset.adminThemeMode === 'dark';
+
+  root.style.setProperty('--admin-card-bg', dark ? 'rgba(8, 13, 27, 0.30)' : 'rgba(255, 255, 255, 0.13)');
+  root.style.setProperty('--admin-card-header-bg', dark ? 'rgba(15, 23, 42, 0.34)' : 'rgba(255, 255, 255, 0.18)');
+  root.style.setProperty('--admin-card-border', dark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.62)');
+  root.style.setProperty('--admin-light-panel-bg', dark ? 'rgba(8, 13, 27, 0.28)' : 'rgba(255, 255, 255, 0.12)');
+  root.style.setProperty('--admin-table-head-bg', dark ? 'rgba(15, 23, 42, 0.38)' : 'rgba(255, 255, 255, 0.17)');
+  root.style.setProperty('--admin-table-border', dark ? 'rgba(255, 255, 255, 0.17)' : 'rgba(255, 255, 255, 0.58)');
+  root.style.setProperty('--admin-input-bg', dark ? 'rgba(8, 13, 27, 0.34)' : 'rgba(255, 255, 255, 0.16)');
+  root.style.setProperty('--admin-input-border', dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.70)');
+  root.style.setProperty('--admin-modal-bg', dark ? 'rgba(8, 13, 27, 0.46)' : 'rgba(255, 255, 255, 0.18)');
+}
+
 export function applyAdminWidgetTexture(value) {
   const texture = normalizeAdminWidgetTexture(value);
   const tokens = TEXTURE_TOKENS[texture];
   const root = document.documentElement;
 
   root.dataset.adminWidgetTexture = texture;
+  restoreThemeSurfaceTokens(root);
+  if (texture === 'liquidGlass') applyLiquidGlassCompatibilityTokens(root);
   root.style.setProperty('--admin-widget-surface-bg', tokens.bg);
   root.style.setProperty('--admin-widget-surface-strong-bg', tokens.strongBg);
   root.style.setProperty('--admin-widget-surface-soft-bg', tokens.softBg);

@@ -88,10 +88,16 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('1px');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-bg')
-    ).toContain('rgba(255,255,255,0.30)');
+    ).toContain('rgba(255,255,255,0.34)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-contrast')
-    ).toBe('1.04');
+    ).toBe('1.06');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-card-bg')
+    ).toBe('rgba(255, 255, 255, 0.13)');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-input-bg')
+    ).toBe('rgba(255, 255, 255, 0.16)');
     expect(api.put).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
@@ -124,6 +130,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(screen.getByRole('button', { name: /Rosa luxury/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Vista previa descartada.')).toBeInTheDocument();
+    expect(document.documentElement.style.getPropertyValue('--admin-card-bg')).toBe('#ffffff');
     expect(api.put).not.toHaveBeenCalled();
   });
 
@@ -162,6 +169,8 @@ describe('PanelAdminSection Nivel Plus', () => {
     const globalStyles = document.getElementById('admin-global-glass-styles');
     expect(globalStyles).not.toBeNull();
     expect(globalStyles.textContent).toContain('[class$="-hero"]');
+    expect(globalStyles.textContent).toContain('[class$="-shell"]');
+    expect(globalStyles.textContent).toContain('[class$="__shell"]');
     expect(globalStyles.textContent).toContain('[class$="-workspace"]');
     expect(globalStyles.textContent).toContain('[class$="-overview"]');
     expect(globalStyles.textContent).toContain('[class$="-summary"]');
@@ -169,5 +178,6 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(globalStyles.textContent).toContain('[class$="-stats"]');
     expect(globalStyles.textContent).toContain('[class$="-alerts"]');
     expect(globalStyles.textContent).toContain('border-style: solid !important');
+    expect(globalStyles.textContent).toContain('background-attachment: fixed !important');
   });
 });

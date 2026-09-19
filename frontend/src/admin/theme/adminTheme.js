@@ -363,6 +363,12 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-page-text', pageTextAuto);
   root.style.setProperty('--admin-page-muted-text', pageMutedTextAuto);
 
+  /* Keep the opaque theme colors available as immutable sources. Widget
+     textures may temporarily replace the public surface variables and must
+     be able to restore them without losing the selected color theme. */
+  root.style.setProperty('--admin-theme-card-bg', t.cardBg);
+  root.style.setProperty('--admin-theme-card-header-bg', t.cardHeaderBg);
+  root.style.setProperty('--admin-theme-card-border', t.cardBorder);
   root.style.setProperty('--admin-card-bg', t.cardBg);
   root.style.setProperty('--admin-card-header-bg', t.cardHeaderBg);
   root.style.setProperty('--admin-card-header-text', cardHeaderTextAuto);
@@ -371,6 +377,7 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-card-text', cardTextAuto);
   root.style.setProperty('--admin-card-muted-text', cardMutedTextAuto);
 
+  root.style.setProperty('--admin-theme-light-panel-bg', '#ffffff');
   root.style.setProperty('--admin-light-panel-bg', '#ffffff');
   root.style.setProperty('--admin-light-panel-soft-bg', lightPanelSoftBgAuto);
   root.style.setProperty('--admin-light-panel-border', lightPanelBorderAuto);
@@ -398,6 +405,8 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-widget-glass-border', glassBorder);
   root.style.setProperty('--admin-widget-glass-shadow', glassShadow);
 
+  root.style.setProperty('--admin-theme-table-head-bg', t.tableHeadBg);
+  root.style.setProperty('--admin-theme-table-border', t.tableBorder);
   root.style.setProperty('--admin-table-head-bg', t.tableHeadBg);
   root.style.setProperty('--admin-table-head-text', tableHeadTextAuto);
   root.style.setProperty('--admin-table-border', t.tableBorder);
@@ -417,12 +426,15 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-disabled-text', disabledTextAuto);
   root.style.setProperty('--admin-disabled-border', t.disabledBorder);
 
+  root.style.setProperty('--admin-theme-input-bg', t.inputBg);
+  root.style.setProperty('--admin-theme-input-border', t.inputBorder);
   root.style.setProperty('--admin-input-bg', t.inputBg);
   root.style.setProperty('--admin-input-border', t.inputBorder);
   root.style.setProperty('--admin-input-text', inputTextAuto);
   root.style.setProperty('--admin-input-placeholder', inputPlaceholderAuto);
   root.style.setProperty('--admin-input-focus', t.inputFocus);
 
+  root.style.setProperty('--admin-theme-modal-bg', t.modalBg);
   root.style.setProperty('--admin-modal-bg', t.modalBg);
   root.style.setProperty('--admin-modal-text', modalTextAuto);
   root.style.setProperty('--admin-modal-muted-text', modalMutedTextAuto);

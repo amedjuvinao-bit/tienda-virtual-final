@@ -1009,6 +1009,10 @@ export function applyAdminGlobalStyles() {
     .admin-area :is(div, section, article, aside, form)[class*="-panel "],
     .admin-area :is(div, section, article, aside, form)[class$="__panel"],
     .admin-area :is(div, section, article, aside, form)[class*="__panel "],
+    .admin-area :is(div, section, article, aside, form)[class$="-shell"]:not(.admin-layout-shell),
+    .admin-area :is(div, section, article, aside, form)[class*="-shell "]:not(.admin-layout-shell),
+    .admin-area :is(div, section, article, aside, form)[class$="__shell"]:not(.rb-curated-auth__input-shell),
+    .admin-area :is(div, section, article, aside, form)[class*="__shell "]:not(.rb-curated-auth__input-shell),
     .admin-area :is(div, section, article, aside, form)[class$="-hero"],
     .admin-area :is(div, section, article, aside, form)[class*="-hero "],
     .admin-area :is(div, section, article, aside, form)[class$="__hero"],
@@ -1094,11 +1098,15 @@ export function applyAdminGlobalStyles() {
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area {
-      background: linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--admin-page-bg) 96%, #ffffff 4%),
-        color-mix(in srgb, var(--admin-page-bg) 94%, var(--admin-primary) 6%)
-      ) !important;
+      background:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--admin-page-bg) 78%, var(--admin-primary) 22%) 0%,
+          color-mix(in srgb, var(--admin-page-bg) 94%, #ffffff 6%) 38%,
+          color-mix(in srgb, var(--admin-page-bg) 86%, var(--admin-primary) 14%) 72%,
+          color-mix(in srgb, var(--admin-page-bg) 92%, #ffffff 8%) 100%
+        ) !important;
+      background-attachment: fixed !important;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::before {
@@ -1123,10 +1131,6 @@ export function applyAdminGlobalStyles() {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
       outline: none !important;
-    }
-
-    html[data-admin-widget-texture="liquidGlass"] .admin-area .products-admin-header {
-      background: transparent !important;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card::before,
@@ -1156,6 +1160,10 @@ export function applyAdminGlobalStyles() {
       :is(div, section, article, aside, form)[class*="-panel "],
       :is(div, section, article, aside, form)[class$="__panel"],
       :is(div, section, article, aside, form)[class*="__panel "],
+      :is(div, section, article, aside, form)[class$="-shell"]:not(.admin-layout-shell),
+      :is(div, section, article, aside, form)[class*="-shell "]:not(.admin-layout-shell),
+      :is(div, section, article, aside, form)[class$="__shell"]:not(.rb-curated-auth__input-shell),
+      :is(div, section, article, aside, form)[class*="__shell "]:not(.rb-curated-auth__input-shell),
       :is(div, section, article, aside, form)[class$="-hero"],
       :is(div, section, article, aside, form)[class*="-hero "],
       :is(div, section, article, aside, form)[class$="__hero"],
