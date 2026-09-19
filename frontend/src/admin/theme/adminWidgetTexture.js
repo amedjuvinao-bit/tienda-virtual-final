@@ -57,24 +57,31 @@ const TEXTURE_TOKENS = Object.freeze({
     textureFilter: 'none',
   },
   liquidGlass: {
-    bg: 'radial-gradient(circle at 16% -8%, rgba(255,255,255,0.72), transparent 34%), linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 42%, transparent), color-mix(in srgb, var(--admin-card-bg) 66%, var(--admin-primary) 15%))',
-    strongBg: 'radial-gradient(circle at 12% 0%, rgba(255,255,255,0.78), transparent 32%), linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 52%, transparent), color-mix(in srgb, var(--admin-primary) 22%, var(--admin-card-bg)))',
-    softBg: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 34%, transparent), color-mix(in srgb, var(--admin-primary) 13%, transparent))',
-    inputBg: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-input-bg) 58%, transparent), color-mix(in srgb, var(--admin-primary) 8%, transparent))',
-    border: 'color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,0.76))',
-    shadow: '0 26px 70px rgba(15,23,42,0.14), 0 12px 34px color-mix(in srgb, var(--admin-primary) 18%, transparent), inset 0 1px 0 rgba(255,255,255,0.82), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent)',
-    shadowHover: '0 34px 88px rgba(15,23,42,0.18), 0 18px 44px color-mix(in srgb, var(--admin-primary) 24%, transparent), inset 0 1px 0 rgba(255,255,255,0.92)',
-    highlight: 'rgba(255,255,255,0.88)',
-    overlay: 'radial-gradient(ellipse at 18% -12%, rgba(255,255,255,0.62), transparent 38%), radial-gradient(circle at 94% 18%, color-mix(in srgb, var(--admin-primary) 18%, transparent), transparent 28%), linear-gradient(115deg, transparent 28%, rgba(255,255,255,0.18) 48%, transparent 68%)',
-    blur: '34px',
-    saturation: '1.72',
+    // Keep every layer translucent. Mixing two opaque theme colours here used
+    // to flatten the material and prevented backdrop-filter from being seen.
+    // These values intentionally mirror the glass panel used by the login.
+    bg: 'linear-gradient(145deg, rgba(255,255,255,0.17), rgba(245,251,253,0.055) 52%, color-mix(in srgb, var(--admin-primary) 11%, transparent))',
+    strongBg: 'linear-gradient(145deg, rgba(255,255,255,0.22), rgba(245,251,253,0.075) 52%, color-mix(in srgb, var(--admin-primary) 13%, transparent))',
+    softBg: 'linear-gradient(145deg, rgba(255,255,255,0.13), rgba(245,251,253,0.035) 52%, color-mix(in srgb, var(--admin-primary) 8%, transparent))',
+    inputBg: 'linear-gradient(145deg, rgba(255,255,255,0.20), rgba(245,251,253,0.07) 58%, color-mix(in srgb, var(--admin-primary) 7%, transparent))',
+    border: 'rgba(255,255,255,0.82)',
+    shadow: '0 30px 78px rgba(43,72,88,0.19), 0 12px 34px color-mix(in srgb, var(--admin-primary) 12%, transparent), inset 0 1px 0 rgba(255,255,255,0.50), inset 0 -1px 0 rgba(52,78,92,0.10)',
+    shadowHover: '0 38px 92px rgba(43,72,88,0.24), 0 18px 44px color-mix(in srgb, var(--admin-primary) 18%, transparent), inset 0 1px 0 rgba(255,255,255,0.68), inset 0 -1px 0 rgba(52,78,92,0.12)',
+    highlight: 'rgba(255,255,255,0.95)',
+    overlay: 'linear-gradient(132deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.08) 26%, transparent 48%, rgba(255,255,255,0.10) 78%, color-mix(in srgb, var(--admin-primary) 8%, transparent) 100%)',
+    blur: '21px',
+    saturation: '1.18',
+    backdropContrast: '1.045',
+    innerBorder: 'rgba(255,255,255,0.24)',
+    innerBorderOffset: '-6px',
+    pageWashOpacity: '0.34',
     radius: '30px',
     controlRadius: '19px',
-    borderWidth: '2px',
-    buttonBg: 'radial-gradient(circle at 18% -20%, rgba(255,255,255,0.92), transparent 44%), linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 38%, transparent), color-mix(in srgb, var(--admin-primary) 28%, transparent))',
+    borderWidth: '1px',
+    buttonBg: 'linear-gradient(145deg, rgba(255,255,255,0.24), rgba(245,251,253,0.08) 52%, color-mix(in srgb, var(--admin-primary) 15%, transparent))',
     buttonOverlay: 'linear-gradient(112deg, transparent 18%, rgba(255,255,255,0.52) 45%, transparent 72%)',
     buttonShadow: '0 18px 38px color-mix(in srgb, var(--admin-primary) 28%, transparent), inset 1px 1px 0 rgba(255,255,255,0.92), inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 24%, transparent)',
-    textureFilter: 'contrast(1.04)',
+    textureFilter: 'none',
   },
   frostedGlass: {
     bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 78%, transparent), color-mix(in srgb, var(--admin-card-bg) 68%, var(--admin-primary) 7%))',
@@ -179,6 +186,7 @@ export function applyAdminWidgetTexture(value) {
   root.style.setProperty('--admin-widget-surface-overlay', tokens.overlay);
   root.style.setProperty('--admin-widget-surface-blur', tokens.blur);
   root.style.setProperty('--admin-widget-surface-saturation', tokens.saturation);
+  root.style.setProperty('--admin-widget-surface-contrast', tokens.backdropContrast ?? '1');
   root.style.setProperty('--admin-widget-surface-radius', tokens.radius);
   root.style.setProperty('--admin-widget-control-radius', tokens.controlRadius);
   root.style.setProperty('--admin-widget-surface-border-width', tokens.borderWidth);
@@ -186,6 +194,9 @@ export function applyAdminWidgetTexture(value) {
   root.style.setProperty('--admin-widget-button-overlay', tokens.buttonOverlay);
   root.style.setProperty('--admin-widget-button-shadow', tokens.buttonShadow);
   root.style.setProperty('--admin-widget-texture-filter', tokens.textureFilter);
+  root.style.setProperty('--admin-widget-inner-border', tokens.innerBorder ?? 'transparent');
+  root.style.setProperty('--admin-widget-inner-border-offset', tokens.innerBorderOffset ?? '0px');
+  root.style.setProperty('--admin-widget-page-wash-opacity', tokens.pageWashOpacity ?? '0.72');
 
   return texture;
 }

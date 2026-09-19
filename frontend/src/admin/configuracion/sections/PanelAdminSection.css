@@ -10,8 +10,8 @@
   border: 1px solid var(--admin-widget-surface-border, var(--admin-card-border));
   background: var(--admin-widget-surface-strong-bg, var(--admin-card-bg));
   box-shadow: var(--admin-widget-surface-shadow, 0 16px 45px rgba(15, 23, 42, 0.08));
-  backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2));
-  -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2));
+  backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2)) contrast(var(--admin-widget-surface-contrast, 1));
+  -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2)) contrast(var(--admin-widget-surface-contrast, 1));
 }
 
 .panel-admin-hero {
@@ -260,8 +260,11 @@
 .panel-admin-texture-option.is-selected .panel-admin-texture-option__check { color: var(--admin-button-text); background: var(--admin-primary); border-color: var(--admin-primary); }
 
 .panel-admin-texture-option[data-texture='liquidGlass'] .panel-admin-texture-option__sample {
-  background: radial-gradient(circle at 15% 0%, rgba(255,255,255,.95), transparent 38%), linear-gradient(145deg, color-mix(in srgb, var(--admin-primary) 28%, transparent), rgba(255,255,255,.30));
-  box-shadow: 0 16px 28px color-mix(in srgb, var(--admin-primary) 22%, transparent), inset 1px 1px 0 rgba(255,255,255,.95), inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 22%, transparent);
+  outline: 1px solid rgba(255,255,255,.34);
+  outline-offset: -5px;
+  background: linear-gradient(145deg, rgba(255,255,255,.17), rgba(245,251,253,.055) 52%, color-mix(in srgb, var(--admin-primary) 11%, transparent));
+  box-shadow: 0 16px 28px rgba(43,72,88,.19), inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(52,78,92,.1);
+  backdrop-filter: blur(10px) saturate(1.18) contrast(1.045);
 }
 
 .panel-admin-texture-option[data-texture='frostedGlass'] .panel-admin-texture-option__sample {
@@ -330,11 +333,20 @@
 }
 
 .panel-admin-preview__canvas[data-widget-texture='liquidGlass'] {
-  --preview-widget-bg: radial-gradient(circle at 14% 0%, rgba(255,255,255,.82), transparent 37%), linear-gradient(135deg, color-mix(in srgb, var(--preview-card) 48%, transparent), color-mix(in srgb, var(--preview-primary) 18%, var(--preview-card)));
-  --preview-widget-border: color-mix(in srgb, var(--preview-primary) 34%, rgba(255,255,255,.82));
-  --preview-widget-shadow: 0 12px 24px color-mix(in srgb, var(--preview-primary) 18%, transparent), inset 0 1px 0 rgba(255,255,255,.9);
-  --preview-widget-blur: 12px;
+  --preview-widget-bg: linear-gradient(145deg, rgba(255,255,255,.17), rgba(245,251,253,.055) 52%, color-mix(in srgb, var(--preview-primary) 11%, transparent));
+  --preview-widget-border: rgba(255,255,255,.82);
+  --preview-widget-shadow: 0 12px 24px rgba(43,72,88,.19), inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(52,78,92,.1);
+  --preview-widget-blur: 16px;
   --preview-widget-radius: 19px;
+}
+
+.panel-admin-preview__canvas[data-widget-texture='liquidGlass'] :is(
+  .panel-admin-preview__topbar,
+  .panel-admin-preview__metrics i,
+  .panel-admin-preview__table
+) {
+  outline: 1px solid rgba(255,255,255,.24);
+  outline-offset: -4px;
 }
 
 .panel-admin-preview__canvas[data-widget-texture='frostedGlass'] {

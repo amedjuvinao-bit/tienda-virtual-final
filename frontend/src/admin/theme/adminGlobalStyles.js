@@ -34,7 +34,7 @@ export function applyAdminGlobalStyles() {
       background:
         var(--admin-glass-overlay),
         linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
-      opacity: 0.94;
+      opacity: var(--admin-widget-page-wash-opacity, 0.72);
       backdrop-filter: blur(calc(var(--admin-page-glass-blur) + 1px)) saturate(1.28);
       -webkit-backdrop-filter: blur(calc(var(--admin-page-glass-blur) + 1px)) saturate(1.28);
     }
@@ -187,16 +187,20 @@ export function applyAdminGlobalStyles() {
     .admin-hero-glass,
     .admin-section-bar,
     .admin-form-glass,
+    .admin-sidebar-glass,
+    .admin-header-glass,
     html.admin-theme-dark .admin-card-glass,
     html.admin-theme-dark .admin-glass-card,
     html.admin-theme-dark .admin-hero-glass,
     html.admin-theme-dark .admin-section-bar,
-    html.admin-theme-dark .admin-form-glass {
+    html.admin-theme-dark .admin-form-glass,
+    html.admin-theme-dark .admin-sidebar-glass,
+    html.admin-theme-dark .admin-header-glass {
       background: var(--admin-widget-surface-bg) !important;
       border-color: var(--admin-widget-surface-border) !important;
       box-shadow: var(--admin-widget-surface-shadow) !important;
-      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
-      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
     }
 
     .admin-card-glass::before,
@@ -979,6 +983,8 @@ export function applyAdminGlobalStyles() {
        ============================================================ */
 
     .admin-area .admin-content-card,
+    .admin-area .admin-sidebar-glass,
+    .admin-area .admin-header-glass,
     .admin-area .admin-card-glass,
     .admin-area .admin-glass-card,
     .admin-area .admin-hero-glass,
@@ -992,8 +998,8 @@ export function applyAdminGlobalStyles() {
       border-width: var(--admin-widget-surface-border-width) !important;
       border-radius: var(--admin-widget-surface-radius) !important;
       box-shadow: var(--admin-widget-surface-shadow) !important;
-      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
-      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
       filter: var(--admin-widget-texture-filter);
       background-clip: padding-box !important;
       transition:
@@ -1038,6 +1044,26 @@ export function applyAdminGlobalStyles() {
     html[data-admin-widget-texture="liquidGlass"] .admin-area::after {
       opacity: .88;
       filter: blur(8px) saturate(1.25);
+    }
+
+    /* Same double rim used by the login container. It is deliberately
+       separate from the outer border so the material reads as glass. */
+    html[data-admin-widget-texture="liquidGlass"] .admin-area :is(
+      .admin-content-card,
+      .admin-sidebar-glass,
+      .admin-header-glass,
+      .admin-card-glass,
+      .admin-glass-card,
+      .admin-hero-glass,
+      .admin-section-bar,
+      .admin-form-glass,
+      section[class*="rounded"][class*="border"],
+      article[class*="rounded"][class*="border"],
+      aside[class*="rounded"][class*="border"],
+      form[class*="rounded"][class*="border"]
+    ) {
+      outline: 1px solid var(--admin-widget-inner-border);
+      outline-offset: var(--admin-widget-inner-border-offset);
     }
 
     html[data-admin-widget-texture="frostedGlass"] .admin-area::after {
