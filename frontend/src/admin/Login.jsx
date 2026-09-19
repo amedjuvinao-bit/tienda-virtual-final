@@ -892,6 +892,7 @@ function CuratedCredentialsForm({
         <button
           type="button"
           className="rb-curated-auth__remember"
+          aria-pressed={rememberMe}
           onClick={() => setRememberMe(!rememberMe)}
         >
           <span className={`rb-curated-auth__check ${rememberMe ? "active" : ""}`} aria-hidden="true" />
@@ -1497,7 +1498,12 @@ export default function Login() {
     </div>
   </section>;
 
-  const renderImmersiveGallery = () => <section className="rb-gallery-stage" data-gallery-tone={galleryImageTone.id} aria-label={`Acceso administrativo de ${storeName}`}>
+  const renderImmersiveGallery = () => <section
+    className="rb-gallery-stage"
+    data-custom-image={hasCustomImageBg ? "true" : undefined}
+    data-gallery-tone={galleryImageTone.id}
+    aria-label={`Acceso administrativo de ${storeName}`}
+  >
     <div className="rb-gallery-media" style={{ backgroundImage: `url("${galleryBackground}")`, opacity: hasCustomImageBg ? loginBg.imageOpacity : 1 }} />
     <div className="rb-gallery-overlay" style={{ "--gallery-user-overlay": hasCustomImageBg ? loginBg.overlay : 0.18 }} />
     <div className="rb-gallery-ambient" aria-hidden="true"><i /><i /></div>

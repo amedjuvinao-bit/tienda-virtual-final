@@ -28,6 +28,9 @@ if (!cloudinaryReady) {
 const storage = new CloudinaryMulterStorage({
   cloudinary,
   params: async (req, file) => {
+    const preserveLoginBackground =
+      req.query?.profile === 'login-background' && file.mimetype.startsWith('image/');
+
     return {
       folder: env.cloudinary.folder || 'tienda_virtual',
       resource_type: 'auto',
@@ -41,7 +44,7 @@ const storage = new CloudinaryMulterStorage({
         'ogg',
       ],
       transformation:
-        file.mimetype.startsWith('image/')
+        file.mimetype.startsWith('image/') && !preserveLoginBackground
           ? [{ quality: 'auto', fetch_format: 'auto' }]
           : undefined,
     };

@@ -186,3 +186,45 @@
   .rb-smoke-access .rb-panel-brand .rb-curated-brand__logo{height:72px;width:72px}
 }
 @media(prefers-reduced-motion:reduce){.rb-smoke-stage:before,.rb-smoke-stage:after{animation:none!important}}
+
+/* Legibilidad y fidelidad del fondo sin alterar la composicion de los temas. */
+.rb-curated-auth__head p{font-size:14px}
+.rb-curated-auth__field label{font-size:11px;letter-spacing:.14em}
+.rb-curated-auth__field input{font-size:16px}
+.rb-curated-auth__field input::placeholder{color:currentColor;opacity:.68}
+.rb-curated-auth__submit{font-size:12px;letter-spacing:.12em}
+.rb-curated-auth__options{font-size:12px}
+.rb-curated-auth__options button{min-height:36px;padding:6px 2px;cursor:pointer;font:inherit;text-underline-offset:3px}
+.rb-curated-auth__options button:hover{text-decoration:underline}
+.rb-curated-auth__options button:focus-visible{border-radius:6px;outline:2px solid var(--login-accent);outline-offset:3px}
+.rb-curated-auth__remember{gap:9px}
+.rb-curated-auth__check{position:relative;display:grid;height:18px;width:18px;flex:0 0 18px;place-items:center;border-width:1.5px;transition:background-color .2s,border-color .2s,box-shadow .2s}
+.rb-editorial-access .rb-curated-auth__check.active,.rb-curated-auth__check.active{border-color:var(--login-accent);background:var(--login-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--login-accent) 18%,transparent)}
+.rb-curated-auth__check.active:after{color:#fff;content:"\2713";font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;font-weight:900;line-height:1;text-shadow:0 1px 2px #0004}
+.rb-editorial-kicker,.rb-theme-copy small,.rb-gallery-copy small{font-size:11px;letter-spacing:.2em}
+.rb-theme-copy p,.rb-gallery-copy p{font-size:14px}
+.rb-gallery-caption,.rb-gallery-security{font-size:10px}
+.rb-liquid-access.rb-editorial-access{--mirror-muted:color-mix(in srgb,var(--login-primary) 82%,transparent)}
+.rb-gallery-access.rb-editorial-access{--mirror-muted:color-mix(in srgb,var(--login-surface) 84%,transparent)}
+.rb-smoke-access.rb-editorial-access{--mirror-muted:color-mix(in srgb,var(--login-primary) 82%,transparent)}
+.rb-editorial-access .rb-curated-auth__field label{font-size:11px;letter-spacing:.14em}
+.rb-editorial-access .rb-curated-auth__options{font-size:12px}
+
+.theme-immersiveGallery[data-login-custom-image=true]{padding:0!important}
+.rb-gallery-stage[data-custom-image=true]{width:100%;max-width:none;min-height:100vh;border:0;border-radius:0;box-shadow:none}
+.rb-liquid-stage[data-custom-image=true] .rb-liquid-media,
+.rb-gallery-stage[data-custom-image=true] .rb-gallery-media,
+.rb-smoke-stage[data-custom-image=true] .rb-smoke-media{
+  inset:0;
+  transform:none;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:cover;
+  animation:none;
+  will-change:auto;
+}
+
+@media(max-width:600px){
+  .rb-theme-copy p{font-size:13px}
+  .rb-curated-auth__options{gap:4px}
+}

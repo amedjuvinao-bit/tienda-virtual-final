@@ -13,6 +13,6 @@ export async function updateAdminLoginSettings(payload) {
 export async function uploadAdminLoginBackground(file) {
   const form = new FormData();
   form.append('image', file);
-  const { data } = await api.post('/api/uploads', form);
+  const { data } = await api.post('/api/uploads?profile=login-background', form);
   return data?.url || '';
 }

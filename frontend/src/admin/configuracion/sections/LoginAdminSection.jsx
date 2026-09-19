@@ -47,6 +47,25 @@ function apiMessage(error, fallback) {
   return error?.response?.data?.message || error?.userMessage || fallback;
 }
 
+function inspectImageDimensions(file) {
+  if (typeof Image !== 'function' || typeof URL?.createObjectURL !== 'function') {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    const finish = (dimensions) => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+
+    image.onload = () => finish({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => finish(null);
+    image.src = objectUrl;
+  });
+}
+
 const COLOR_CONTROLS = [
   { field: 'primary', label: 'Color principal' },
   { field: 'secondary', label: 'Color complementario' },
@@ -311,6 +330,7 @@ export default function LoginAdminSection() {
     }
     try {
       setBusy('upload');
+      const dimensions = await inspectImageDimensions(file);
       const url = await uploadAdminLoginBackground(file);
       if (!url) throw new Error('UPLOAD_URL_MISSING');
       setForm((current) => ({
@@ -325,7 +345,13 @@ export default function LoginAdminSection() {
           },
         },
       }));
-      setFeedback({ type: 'success', message: 'Imagen cargada. Guarda para aplicarla al login.' });
+      const lowResolution = dimensions && (dimensions.width < 1920 || dimensions.height < 1080);
+      setFeedback({
+        type: 'success',
+        message: lowResolution
+          ? `Imagen cargada (${dimensions.width} x ${dimensions.height}). Para conservar nitidez en pantallas grandes se recomienda mínimo 1920 x 1080. Puedes guardarla o elegir otra.`
+          : 'Imagen cargada en calidad original. Guarda para aplicarla al login.',
+      });
     } catch (error) {
       setFeedback({ type: 'error', message: apiMessage(error, 'No se pudo subir la imagen.') });
     } finally {

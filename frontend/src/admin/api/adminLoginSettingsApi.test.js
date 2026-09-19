@@ -30,6 +30,6 @@ describe('adminLoginSettingsApi', () => {
     const file = new File(['image'], 'login.webp', { type: 'image/webp' });
 
     await expect(uploadAdminLoginBackground(file)).resolves.toBe('https://cdn.example.com/login.webp');
-    expect(api.post).toHaveBeenCalledWith('/api/uploads', expect.any(FormData));
+    expect(api.post).toHaveBeenCalledWith('/api/uploads?profile=login-background', expect.any(FormData));
   });
 });

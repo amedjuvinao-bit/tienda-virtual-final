@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,5 +49,28 @@ describe('Login durante la carga inicial', () => {
       expect(container.querySelector('[data-login-theme="smokeGlass"]')).toBeInTheDocument();
     });
     expect(screen.queryByLabelText('Preparando acceso administrativo')).not.toBeInTheDocument();
+  });
+
+  it('muestra y comunica el estado del control Recordar usuario', async () => {
+    fetchSiteSettings.mockResolvedValueOnce({
+      loginAdmin: { theme: 'liquidGlass', layout: 'centeredCard' },
+      store: { name: 'Rosa Boutique' },
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    const rememberButton = await screen.findByRole('button', { name: 'Recordar usuario' });
+    const indicator = container.querySelector('.rb-curated-auth__check');
+    expect(rememberButton).toHaveAttribute('aria-pressed', 'false');
+    expect(indicator).not.toHaveClass('active');
+
+    fireEvent.click(rememberButton);
+
+    expect(rememberButton).toHaveAttribute('aria-pressed', 'true');
+    expect(indicator).toHaveClass('active');
   });
 });
