@@ -67,6 +67,10 @@
   gap: 12px;
 }
 
+.admin-module-hero__metrics--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .admin-module-hero__metric {
   min-width: 0;
   padding: 16px;
@@ -197,6 +201,7 @@ html[data-admin-widget-texture='liquidGlass'] .admin-module-hero {
   .admin-module-hero__actions { width: 100%; justify-content: stretch; }
   .admin-module-hero__actions > * { flex: 1; }
   .admin-module-hero__metrics { grid-template-columns: 1fr; }
+  .admin-module-hero__metrics--three { grid-template-columns: 1fr; }
   .admin-module-hero__watermark {
     right: -34px;
     width: 170px;
@@ -207,4 +212,5 @@ html[data-admin-widget-texture='liquidGlass'] .admin-module-hero {
 
 @media (min-width: 761px) and (max-width: 1180px) {
   .admin-module-hero__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-module-hero__metrics--three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -33,6 +33,7 @@ import { getCurrentCashSession } from '../api/adminCashSessionApi';
 import PosCheckoutPanel from './PosCheckoutPanel';
 import PosOperationsPanel from './PosOperationsPanel';
 import PosSaleReviewModal from './PosSaleReviewModal';
+import AdminModuleHero from '../components/AdminModuleHero';
 import {
   buildPosCommercialPayload,
   createInitialDiscount,
@@ -105,17 +106,17 @@ function Card({ children, className = '' }) {
 
 function Pill({ icon: Icon, label, value }) {
   return (
-    <div
-      className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"
-      style={{
-        borderColor: 'var(--admin-card-border)',
-        background: 'var(--admin-primary-soft-bg)',
-        color: 'var(--admin-primary-soft-text)',
-      }}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="opacity-75">{label}</span>
-      <span className="truncate" style={{ color: 'var(--admin-card-text)' }}>{value}</span>
+    <div className="admin-module-hero__metric flex items-center gap-3">
+      <span
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl"
+        style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0">
+        <span className="admin-module-hero__metric-label">{label}</span>
+        <strong className="admin-module-hero__metric-value truncate">{value}</strong>
+      </span>
     </div>
   );
 }
@@ -656,60 +657,68 @@ export default function PosSalesPageSafe() {
 
   return (
     <div className="min-h-full space-y-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
-            <Store className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--admin-card-text)' }}>POS / Ventas físicas</h1>
-            <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Registra ventas de mostrador conectadas a órdenes, pagos e inventario por sede.</p>
-          </div>
-        </div>
-        <button type="button" onClick={loadBootstrap} disabled={loading || saleLoading} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Actualizar POS
-        </button>
-      </div>
-
-      {error ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">No se pudo cargar la información del POS</p><p className="mt-1">{error}</p></div></div> : null}
-      {saleSuccess ? <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Venta confirmada</p><p className="mt-1">{saleSuccess}</p></div></div> : null}
-
-      {loading ? (
-        <Card className="flex min-h-[360px] items-center justify-center p-8"><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Cargando configuración del POS...</p></div></Card>
-      ) : (
-        <>
-          <div className="grid gap-3 lg:grid-cols-3">
+      <AdminModuleHero
+        icon={Store}
+        eyebrow="Venta presencial"
+        title="POS / Ventas físicas"
+        description="Registra ventas de mostrador conectadas a órdenes, pagos e inventario por sede. Revisa el estado operativo antes de iniciar cada cobro."
+        actions={(
+          <button type="button" onClick={loadBootstrap} disabled={loading || saleLoading} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Actualizar POS
+          </button>
+        )}
+      >
+        <div className="space-y-3">
+          <div className="admin-module-hero__metrics admin-module-hero__metrics--three">
             <Pill icon={Building2} label="Sede" value={selectedBranch?.name || 'Sin sede POS'} />
             <Pill icon={CreditCard} label="Pago" value={paymentLabel(paymentMethod)} />
             <Pill icon={ReceiptText} label="Facturación" value={billingActive ? `Activa (${bootstrap?.billing?.provider || 'proveedor'})` : 'No activa'} />
           </div>
 
-          <CashStatusPanel
-            session={cashSession}
-            loading={cashLoading}
-            error={cashError}
-            required={cashSessionRequired}
-            branchName={selectedBranch?.name || ''}
-            onRefresh={() => loadCashSession(branchId)}
-          />
+          {loading ? (
+            <Card className="flex min-h-32 items-center justify-center p-6">
+              <div className="text-center">
+                <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: 'var(--admin-primary)' }} />
+                <p className="mt-3 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Cargando estado operativo del POS...</p>
+              </div>
+            </Card>
+          ) : (
+            <>
+              <CashStatusPanel
+                session={cashSession}
+                loading={cashLoading}
+                error={cashError}
+                required={cashSessionRequired}
+                branchName={selectedBranch?.name || ''}
+                onRefresh={() => loadCashSession(branchId)}
+              />
 
-          <PosOperationsPanel
-            branchId={branchId}
-            branchName={selectedBranch?.name || ''}
-            cartItems={cartItems}
-            paymentMethod={paymentMethod}
-            paymentDetails={paymentDetails}
-            discount={discount}
-            permissions={permissions}
-            canSuperviseCash={permissions.canSuperviseCash === true}
-            currentHeldSaleId={currentHeldSaleId}
-            disabled={saleLoading || reviewLoading}
-            onHeld={holdCurrentSale}
-            onRestore={restoreHeldSale}
-            onDiscardCurrent={() => clearCurrentSale()}
-          />
+              <PosOperationsPanel
+                branchId={branchId}
+                branchName={selectedBranch?.name || ''}
+                cartItems={cartItems}
+                paymentMethod={paymentMethod}
+                paymentDetails={paymentDetails}
+                discount={discount}
+                permissions={permissions}
+                canSuperviseCash={permissions.canSuperviseCash === true}
+                currentHeldSaleId={currentHeldSaleId}
+                disabled={saleLoading || reviewLoading}
+                onHeld={holdCurrentSale}
+                onRestore={restoreHeldSale}
+                onDiscardCurrent={() => clearCurrentSale()}
+              />
+            </>
+          )}
+        </div>
+      </AdminModuleHero>
 
+      {error ? <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">No se pudo cargar la información del POS</p><p className="mt-1">{error}</p></div></div> : null}
+      {saleSuccess ? <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Venta confirmada</p><p className="mt-1">{saleSuccess}</p></div></div> : null}
+
+      {!loading ? (
+        <>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
             <div className="space-y-5">
               <Card className="p-5">
@@ -805,7 +814,7 @@ export default function PosSalesPageSafe() {
             </Card>
           </div>
         </>
-      )}
+      ) : null}
       <PosSaleReviewModal
         review={saleReview}
         saving={saleLoading}

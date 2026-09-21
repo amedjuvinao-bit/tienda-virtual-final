@@ -1,20 +1,7 @@
 // src/admin/ConfiguracionPage.jsx
 import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-  Store,
-  CreditCard,
-  Truck,
-  Mail,
-  ShieldCheck,
-  LayoutPanelTop,
-  Settings2,
-  Users,
-  IdCard,
-  FileSearch,
-  Building2,
-  Fingerprint,
-} from 'lucide-react';
+import { Store, CreditCard, Truck, Mail, ShieldCheck, LayoutPanelTop, Users, IdCard, FileSearch, Building2, Fingerprint } from 'lucide-react';
 
 // 🔹 IMPORTS MODULARES
 import EmpresaSection from './configuracion/sections/EmpresaSection';
@@ -28,7 +15,6 @@ import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
 import SedesSection from './configuracion/sections/SedesSection';
 import SeguridadSection from './configuracion/sections/SeguridadSection';
-import AdminModuleHero from './components/AdminModuleHero';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
@@ -109,10 +95,6 @@ export default function ConfiguracionPage() {
     return TABS.some((t) => t.id === last) ? last : 'empresa';
   }, [location.pathname]);
 
-  const activeTabData = useMemo(() => {
-    return TABS.find((t) => t.id === activeTab) || TABS[0];
-  }, [activeTab]);
-
   const renderContent = () => {
     switch (activeTab) {
       case 'empresa':
@@ -142,40 +124,8 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const ActiveIcon = activeTabData.icon || Settings2;
-
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-3 md:p-5">
-      <AdminModuleHero
-        icon={ActiveIcon}
-        eyebrow="Centro de configuración"
-        title={activeTabData.label}
-        description={activeTabData.description}
-      >
-        <div className="admin-module-hero__metrics">
-          <div className="admin-module-hero__metric">
-            <span className="admin-module-hero__metric-label">Área</span>
-            <strong className="admin-module-hero__metric-value">Configuración</strong>
-            <span className="admin-module-hero__metric-detail">Centro de control interno</span>
-          </div>
-          <div className="admin-module-hero__metric">
-            <span className="admin-module-hero__metric-label">Sección activa</span>
-            <strong className="admin-module-hero__metric-value">{activeTabData.label}</strong>
-            <span className="admin-module-hero__metric-detail">Edición especializada</span>
-          </div>
-          <div className="admin-module-hero__metric">
-            <span className="admin-module-hero__metric-label">Persistencia</span>
-            <strong className="admin-module-hero__metric-value">Base de datos</strong>
-            <span className="admin-module-hero__metric-detail">Cambios compartidos por el equipo</span>
-          </div>
-          <div className="admin-module-hero__metric">
-            <span className="admin-module-hero__metric-label">Alcance</span>
-            <strong className="admin-module-hero__metric-value">Toda la tienda</strong>
-            <span className="admin-module-hero__metric-detail">Experiencia y operación centralizadas</span>
-          </div>
-        </div>
-      </AdminModuleHero>
-
+    <div className="mx-auto max-w-7xl p-3 md:p-5">
       <section className="configuration-module-content">{renderContent()}</section>
     </div>
   );
