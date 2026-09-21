@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createPosSale, getPosBootstrap, getPosProducts } from '../api/adminPosApi';
+import AdminModuleHero from '../components/AdminModuleHero';
 
 const moneyFormatter = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -72,17 +73,17 @@ function toSafeQty(value, max = 1) {
 function InfoPill({ icon: Icon, label, value }) {
   return (
     <div
-      className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"
+      className="admin-module-hero__metric flex min-h-[82px] items-center gap-3 text-xs font-bold"
       style={{
-        borderColor: 'var(--admin-card-border)',
-        background: 'var(--admin-primary-soft-bg)',
         color: 'var(--admin-primary-soft-text)',
       }}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="whitespace-nowrap opacity-75">{label}</span>
-      <span className="truncate" style={{ color: 'var(--admin-card-text)' }}>
-        {value}
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl" style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="grid min-w-0 gap-1">
+        <span className="admin-module-hero__metric-label">{label}</span>
+        <strong className="truncate text-sm" style={{ color: 'var(--admin-card-text)' }}>{value}</strong>
       </span>
     </div>
   );
@@ -526,50 +527,51 @@ export default function PosSalesPage() {
 
   return (
     <div className="min-h-full space-y-5">
-      <div className="admin-module-hero flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <Store className="admin-module-hero__watermark" aria-hidden="true" />
-        <div>
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border"
-              style={{
-                borderColor: 'var(--admin-primary-soft-border)',
-                background: 'var(--admin-primary-soft-bg)',
-                color: 'var(--admin-primary)',
-              }}
-            >
-              <Store className="h-5 w-5" />
-            </div>
-
-            <div>
-              <h1
-                className="text-2xl font-black tracking-tight"
-                style={{ color: 'var(--admin-card-text)' }}
-              >
-                POS / Ventas físicas
-              </h1>
-              <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
-                Registra ventas de mostrador conectadas a órdenes, pagos e inventario por sede.
-              </p>
-            </div>
-          </div>
+      <AdminModuleHero
+        icon={Store}
+        eyebrow="Venta presencial conectada"
+        title="POS / Ventas físicas"
+        description="Registra ventas de mostrador conectadas a órdenes, pagos, caja e inventario por sede."
+        actions={(
+          <button
+            type="button"
+            onClick={loadBootstrap}
+            disabled={loading || saleLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: 'var(--admin-primary-soft-border)',
+              background: 'var(--admin-primary-soft-bg)',
+              color: 'var(--admin-primary)',
+            }}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Actualizar POS
+          </button>
+        )}
+      >
+        <div className="admin-module-hero__metrics">
+          <InfoPill
+            icon={Building2}
+            label="Sede"
+            value={loading ? 'Consultando…' : selectedBranch?.name || 'Sin sede POS'}
+          />
+          <InfoPill
+            icon={CreditCard}
+            label="Pago"
+            value={loading ? 'Consultando…' : getPaymentLabel(paymentMethod)}
+          />
+          <InfoPill
+            icon={ReceiptText}
+            label="Facturación"
+            value={loading ? 'Consultando…' : billingActive ? `Activa (${bootstrap?.billing?.provider || 'proveedor'})` : 'No activa'}
+          />
+          <InfoPill
+            icon={ShoppingBag}
+            label="Operación"
+            value={loading ? 'Preparando POS' : `${cart.length} producto${cart.length === 1 ? '' : 's'} en venta`}
+          />
         </div>
-
-        <button
-          type="button"
-          onClick={loadBootstrap}
-          disabled={loading || saleLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60"
-          style={{
-            borderColor: 'var(--admin-primary-soft-border)',
-            background: 'var(--admin-primary-soft-bg)',
-            color: 'var(--admin-primary)',
-          }}
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Actualizar POS
-        </button>
-      </div>
+      </AdminModuleHero>
 
       {error ? (
         <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -602,24 +604,6 @@ export default function PosSalesPage() {
         </PosCard>
       ) : (
         <>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <InfoPill
-              icon={Building2}
-              label="Sede"
-              value={selectedBranch?.name || 'Sin sede POS'}
-            />
-            <InfoPill
-              icon={CreditCard}
-              label="Pago"
-              value={getPaymentLabel(paymentMethod)}
-            />
-            <InfoPill
-              icon={ReceiptText}
-              label="Facturación"
-              value={billingActive ? `Activa (${bootstrap?.billing?.provider || 'proveedor'})` : 'No activa'}
-            />
-          </div>
-
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
             <div className="space-y-5">
               <PosCard className="p-5">

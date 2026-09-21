@@ -1,7 +1,9 @@
 // src/admin/pages/PagesAdmin.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FileCheck2, Files, FileText, PenLine } from "lucide-react";
 import { API_BASE_URL } from "../../config/apiBaseUrl";
+import AdminModuleHero from "../components/AdminModuleHero";
 
 const API_BASE = API_BASE_URL;
 const SYSTEM_CART_SLUG = "carrito";
@@ -204,6 +206,31 @@ export default function PagesAdmin() {
       return db - da;
     });
   }, [pages]);
+
+  const pageSummary = useMemo(() => {
+    const systemTypes = new Set([
+      SYSTEM_CART_PAGE_TYPE,
+      SYSTEM_CHECKOUT_PAGE_TYPE,
+      SYSTEM_THANKS_PAGE_TYPE,
+      SYSTEM_FAVORITES_PAGE_TYPE,
+      SYSTEM_NOT_FOUND_PAGE_TYPE,
+    ]);
+    const systemSlugs = new Set([
+      SYSTEM_CART_SLUG,
+      SYSTEM_CHECKOUT_SLUG,
+      SYSTEM_THANKS_SLUG,
+      SYSTEM_FAVORITES_SLUG,
+      SYSTEM_NOT_FOUND_SLUG,
+    ]);
+    const total = sortedPages.length;
+    const active = sortedPages.filter((page) => page?.enabled !== false).length;
+    const system = sortedPages.filter((page) => (
+      systemTypes.has(String(page?.pageType || '').toLowerCase())
+      || systemSlugs.has(String(page?.slug || '').toLowerCase())
+    )).length;
+
+    return { total, active, system, editable: Math.max(0, total - system) };
+  }, [sortedPages]);
 
   const loadPages = async () => {
     try {
@@ -427,15 +454,39 @@ export default function PagesAdmin() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <div className="rounded-3xl border border-gray-200 bg-white p-4 md:p-5">
-        <div className="mb-5">
-          <h1 className="text-2xl font-semibold text-gray-900">Páginas dinámicas</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Crea páginas nuevas independientes del Home. Después podrás agregarles
-            bloques con configuración propia.
-          </p>
+      <AdminModuleHero
+        icon={Files}
+        eyebrow="Arquitectura del sitio"
+        title="Páginas"
+        description="Crea y administra páginas independientes, plantillas del sistema y experiencias editables de la tienda."
+      >
+        <div className="admin-module-hero__metrics">
+          {[
+            { label: 'Páginas', value: pageSummary.total, detail: 'Total registradas', icon: Files },
+            { label: 'Activas', value: pageSummary.active, detail: 'Visibles para clientes', icon: FileCheck2 },
+            { label: 'Del sistema', value: pageSummary.system, detail: 'Procesos esenciales', icon: FileText },
+            { label: 'Personalizables', value: pageSummary.editable, detail: 'Contenido administrable', icon: PenLine },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div className="admin-module-hero__metric" key={item.label}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="admin-module-hero__metric-label">{item.label}</span>
+                    <strong className="admin-module-hero__metric-value">{item.value}</strong>
+                    <span className="admin-module-hero__metric-detail">{item.detail}</span>
+                  </div>
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl" style={{ background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}>
+                    <Icon size={19} />
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
+      </AdminModuleHero>
 
+      <div className="admin-widget-stage rounded-[28px] border p-4 md:p-5" style={{ borderColor: 'var(--admin-card-border)' }}>
         <div className="mb-6">
           <InfoCard
             title="Cómo funciona"

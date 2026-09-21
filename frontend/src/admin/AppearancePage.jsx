@@ -1,5 +1,6 @@
 // src/admin/AppearancePage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Eye, Image, LayoutTemplate, Palette, RotateCcw, Rows3, Save, Type } from "lucide-react";
 import { fetchSiteSettings, saveSiteSettings } from "../lib/siteSettingsApi";
 import { applyTheme } from "../theme/applyTheme";
 import GeneralPanel from "./appearance/general/GeneralPanel";
@@ -11,6 +12,7 @@ import { API_BASE_URL } from "../config/apiBaseUrl";
 import BannerPanel from "./appearance/banner/BannerPanel";
 import SectionsPanel from "./appearance/sections/SectionsPanel";
 import FooterPanel from "./appearance/footer/FooterPanel";
+import AdminModuleHero from "./components/AdminModuleHero";
 import {
   LOOK_SECTION_DEFAULTS,
   normalizeLookSection,
@@ -849,100 +851,74 @@ export default function AppearancePage() {
 
   // ✅ Tabs: reemplazado Home/Body por Secciones
   const tabs = [
-    { id: "general", label: "General" },
-    { id: "header", label: "Header" },
-    { id: "banner", label: "Banner" },
-    { id: "sections", label: "Secciones" },
-    { id: "footer", label: "Footer" },
+    { id: "general", label: "General", detail: "Colores y tipografías", icon: Palette },
+    { id: "header", label: "Encabezado", detail: "Logo y navegación", icon: LayoutTemplate },
+    { id: "banner", label: "Banner", detail: "Portada visual", icon: Image },
+    { id: "sections", label: "Secciones", detail: "Contenido de inicio", icon: Rows3 },
+    { id: "footer", label: "Pie de página", detail: "Cierre y enlaces", icon: Type },
   ];
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      {/* Encabezado + Acciones */}
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-pink-700">Apariencia del sitio</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Ajusta el tema y guarda. Usa <span className="font-medium">Aplicar</span> para
-            previsualizar sin guardar.
-          </p>
-        </div>
-
-        <div className="hidden md:flex gap-2">
+    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+      <AdminModuleHero
+        icon={Palette}
+        eyebrow="Identidad visual de la tienda"
+        title="Apariencia del sitio"
+        description="Personaliza el estilo público de la tienda y revisa cada cambio antes de guardarlo."
+        actions={(
+          <>
           <button
             onClick={onPreview}
-            className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
+            style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-card-bg)', color: 'var(--admin-card-text)' }}
             type="button"
           >
-            Aplicar
+            <Eye size={17} /> Aplicar
           </button>
           <button
             onClick={onSave}
-            className="px-4 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white"
+            style={{ background: 'var(--admin-primary)' }}
             type="button"
           >
-            Guardar
+            <Save size={17} /> Guardar
           </button>
           <button
             onClick={onReset}
-            className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black"
+            style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}
             type="button"
           >
-            Reset
+            <RotateCcw size={17} /> Restaurar
           </button>
-        </div>
-      </div>
-
-      {/* Tabs arriba */}
-      <div className="mb-4">
-        <div className="rounded-2xl border bg-white shadow-sm p-2">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {tabs.map((tab) => (
+          </>
+        )}
+      >
+        <nav className="admin-module-hero__metrics" aria-label="Áreas de apariencia">
+          {tabs.map((tab) => {
+            const TabIcon = tab.icon;
+            const selected = activeTab === tab.id;
+            return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={
-                  "px-4 py-2 rounded-xl text-sm font-medium transition " +
-                  (activeTab === tab.id
-                    ? "bg-pink-50 text-pink-700 border border-pink-200"
-                    : "text-gray-600 hover:text-pink-600 hover:bg-gray-50 border border-transparent")
-                }
+                className="admin-module-hero__metric admin-module-hero__nav-card"
+                data-active={selected}
                 type="button"
               >
-                {tab.label}
+                <TabIcon size={19} />
+                <span>
+                  <strong>{tab.label}</strong>
+                  <small>{tab.detail}</small>
+                </span>
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Acciones mobile */}
-        <div className="md:hidden mt-3 grid grid-cols-3 gap-2">
-          <button
-            onClick={onPreview}
-            className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm"
-            type="button"
-          >
-            Aplicar
-          </button>
-          <button
-            onClick={onSave}
-            className="px-3 py-2 rounded-xl bg-pink-600 text-white hover:bg-pink-700 text-sm"
-            type="button"
-          >
-            Guardar
-          </button>
-          <button
-            onClick={onReset}
-            className="px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm"
-            type="button"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
+            );
+          })}
+        </nav>
+      </AdminModuleHero>
 
       {/* Contenido */}
-      <main className="rounded-2xl border bg-white shadow-sm min-w-0">
+      <main className="admin-widget-surface min-w-0 overflow-hidden rounded-[28px] border">
         <div className="p-4 md:p-5 min-w-0">
           {/* GENERAL */}
           {activeTab === "general" && <GeneralPanel theme={theme} setPath={setPath} />}

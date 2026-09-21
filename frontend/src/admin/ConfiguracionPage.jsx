@@ -28,6 +28,7 @@ import PerfilesSection from './configuracion/sections/PerfilesSection';
 import LogsSection from './configuracion/sections/LogsSection';
 import SedesSection from './configuracion/sections/SedesSection';
 import SeguridadSection from './configuracion/sections/SeguridadSection';
+import AdminModuleHero from './components/AdminModuleHero';
 
 // 🔹 CONFIG CENTRAL DE TABS
 const TABS = [
@@ -142,132 +143,40 @@ export default function ConfiguracionPage() {
   };
 
   const ActiveIcon = activeTabData.icon || Settings2;
-  const compactOperationalView = ['envios', 'correo', 'login-admin'].includes(activeTab);
 
   return (
-    <div className="mx-auto max-w-7xl p-3 md:p-5">
-
-      {/* 🔥 HERO MEJORADO */}
-      {!compactOperationalView && <div
-        className="mb-5 overflow-hidden rounded-[32px] border p-5 shadow-sm backdrop-blur-2xl md:p-6 relative"
-        style={{
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.05))',
-          borderColor: 'var(--admin-glass-border)',
-          backdropFilter: 'blur(28px)',
-          boxShadow: '0 25px 70px rgba(0,0,0,0.08)',
-        }}
+    <div className="mx-auto max-w-7xl space-y-5 p-3 md:p-5">
+      <AdminModuleHero
+        icon={ActiveIcon}
+        eyebrow="Centro de configuración"
+        title={activeTabData.label}
+        description={activeTabData.description}
       >
-
-        {/* ✨ capa de profundidad */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.35), transparent 60%)',
-            opacity: 0.4,
-            pointerEvents: 'none',
-          }}
-        />
-
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between relative z-10">
-          <div>
-            <div
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
-              style={{
-                backgroundColor: 'var(--admin-primary-soft-bg)',
-                color: 'var(--admin-primary-soft-text)',
-                border: '1px solid var(--admin-primary-soft-border)',
-              }}
-            >
-              <Settings2 className="h-4 w-4" />
-              Configuración
-            </div>
-
-            <h1
-              className="mt-3 text-2xl font-bold tracking-tight md:text-3xl"
-              style={{ color: 'var(--admin-card-text)' }}
-            >
-              Centro de configuración interna
-            </h1>
-
-            <p
-              className="mt-2 max-w-3xl text-sm leading-6"
-              style={{ color: 'var(--admin-card-muted-text)' }}
-            >
-              Configura tienda, sedes, facturación, pagos, envíos, correo,
-              usuarios, perfiles, seguridad, logs y comportamiento del sistema.
-            </p>
+        <div className="admin-module-hero__metrics">
+          <div className="admin-module-hero__metric">
+            <span className="admin-module-hero__metric-label">Área</span>
+            <strong className="admin-module-hero__metric-value">Configuración</strong>
+            <span className="admin-module-hero__metric-detail">Centro de control interno</span>
           </div>
-
-          <div
-            className="rounded-[22px] border px-4 py-3 backdrop-blur-xl"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              borderColor: 'var(--admin-primary-soft-border)',
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm"
-                style={{
-                  backgroundColor: 'var(--admin-card-bg)',
-                  color: 'var(--admin-primary)',
-                }}
-              >
-                <ActiveIcon className="h-5 w-5" />
-              </div>
-
-              <div>
-                <p
-                  className="text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: 'var(--admin-primary)' }}
-                >
-                  Sección activa
-                </p>
-                <p
-                  className="text-sm font-semibold"
-                  style={{ color: 'var(--admin-card-text)' }}
-                >
-                  {activeTabData.label}
-                </p>
-              </div>
-            </div>
+          <div className="admin-module-hero__metric">
+            <span className="admin-module-hero__metric-label">Sección activa</span>
+            <strong className="admin-module-hero__metric-value">{activeTabData.label}</strong>
+            <span className="admin-module-hero__metric-detail">Edición especializada</span>
+          </div>
+          <div className="admin-module-hero__metric">
+            <span className="admin-module-hero__metric-label">Persistencia</span>
+            <strong className="admin-module-hero__metric-value">Base de datos</strong>
+            <span className="admin-module-hero__metric-detail">Cambios compartidos por el equipo</span>
+          </div>
+          <div className="admin-module-hero__metric">
+            <span className="admin-module-hero__metric-label">Alcance</span>
+            <strong className="admin-module-hero__metric-value">Toda la tienda</strong>
+            <span className="admin-module-hero__metric-detail">Experiencia y operación centralizadas</span>
           </div>
         </div>
-      </div>}
+      </AdminModuleHero>
 
-      <section>
-
-        {/* 🔥 BARRA (YA NO TARJETA REPETIDA) */}
-        {!compactOperationalView && <div
-          className="mb-4 rounded-[20px] border px-5 py-3 backdrop-blur-xl flex items-center gap-4"
-          style={{
-            background: 'rgba(255,255,255,0.12)',
-            borderColor: 'var(--admin-glass-border)',
-          }}
-        >
-          <div className="w-1 h-10 bg-pink-500 rounded-full" />
-
-          <div>
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: 'var(--admin-card-text)' }}
-            >
-              {activeTabData.label}
-            </h2>
-
-            <p
-              className="text-sm"
-              style={{ color: 'var(--admin-card-muted-text)' }}
-            >
-              {activeTabData.description}
-            </p>
-          </div>
-        </div>}
-
-        {renderContent()}
-      </section>
+      <section className="configuration-module-content">{renderContent()}</section>
     </div>
   );
 }
