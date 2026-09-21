@@ -806,8 +806,9 @@ export default function AdminLayout() {
       `}</style>
 
       <div
-        className="admin-area min-h-screen relative overflow-x-hidden"
+        className="admin-area min-h-screen relative"
         style={{
+          overflowX: 'clip',
           background: `
             radial-gradient(
               circle at 15% 18%,

@@ -294,6 +294,8 @@
   align-self: start;
   position: sticky;
   top: 16px;
+  z-index: 3;
+  height: max-content;
   max-height: none;
   overflow: visible;
   padding: 16px;
