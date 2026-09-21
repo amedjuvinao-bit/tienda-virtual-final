@@ -412,6 +412,15 @@ export default function AdminLayout() {
         }
 
         .admin-sidebar-panel {
+          position: sticky;
+          top: var(--admin-padding);
+          align-self: flex-start;
+          height: calc(100vh - (var(--admin-padding) * 2));
+          height: calc(100dvh - (var(--admin-padding) * 2));
+          max-height: calc(100vh - (var(--admin-padding) * 2));
+          max-height: calc(100dvh - (var(--admin-padding) * 2));
+          overflow: hidden;
+          z-index: 40;
           border-radius: var(--admin-radius);
           padding: calc(var(--admin-padding) * 0.75);
         }
