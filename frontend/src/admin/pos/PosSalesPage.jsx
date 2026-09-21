@@ -526,7 +526,8 @@ export default function PosSalesPage() {
 
   return (
     <div className="min-h-full space-y-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="admin-module-hero flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <Store className="admin-module-hero__watermark" aria-hidden="true" />
         <div>
           <div className="flex items-center gap-3">
             <div

@@ -1201,6 +1201,58 @@ export function applyAdminGlobalStyles() {
       outline-offset: var(--admin-widget-inner-border-offset);
     }
 
+    /* Modules with their own glass variables used opaque white fallbacks.
+       Route those variables through the selected mirror material so their
+       metrics, filters and tables visibly match the rest of the panel. */
+    html[data-admin-widget-texture="liquidGlass"] .cart-admin-page {
+      --cart-glass-bg: var(--admin-widget-surface-bg);
+      --cart-glass-strong: var(--admin-widget-surface-strong-bg);
+      --cart-glass-subtle: var(--admin-widget-surface-soft-bg);
+      --cart-glass-fallback: transparent;
+      --cart-glass-border: var(--admin-widget-surface-border);
+      --cart-glass-line: color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.72));
+      --cart-glass-shadow: var(--admin-widget-surface-shadow);
+      --cart-glass-inset: inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 14%, transparent);
+      --cart-neutral-surface: var(--admin-widget-surface-soft-bg);
+      --cart-row-hover: color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,.16));
+      --cart-control-bg: var(--admin-widget-input-bg);
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .favorites-admin-page {
+      --fav-glass: var(--admin-widget-surface-bg);
+      --fav-glass-strong: var(--admin-widget-surface-strong-bg);
+      --fav-glass-soft: var(--admin-widget-surface-soft-bg);
+      --fav-line: color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.72));
+      --fav-control: var(--admin-widget-input-bg);
+      --fav-hover: color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,.16));
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .cart-admin-glass,
+    html[data-admin-widget-texture="liquidGlass"] .favorites-admin-glass {
+      border-color: var(--admin-widget-surface-border) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast)) !important;
+    }
+
+    /* Portal modals must remain readable over the panel. They use a dense
+       mirror surface and a stronger veil, while cards keep lighter glass. */
+    html[data-admin-widget-texture="liquidGlass"] .coupon-form-overlay > button:first-child,
+    html[data-admin-widget-texture="liquidGlass"] .order-detail-modal-backdrop {
+      background: var(--admin-modal-overlay) !important;
+      backdrop-filter: blur(10px) saturate(.82) !important;
+      -webkit-backdrop-filter: blur(10px) saturate(.82) !important;
+    }
+
+    html[data-admin-widget-texture="liquidGlass"] .coupon-form-dialog,
+    html[data-admin-widget-texture="liquidGlass"] .order-detail-professional-shell {
+      background: var(--admin-modal-glass-bg) !important;
+      border-color: rgba(255,255,255,.94) !important;
+      box-shadow: 0 34px 110px rgba(15,23,42,.42), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+      backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
+      -webkit-backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
+    }
+
     html[data-admin-widget-texture="frostedGlass"] .admin-area::after {
       opacity: .34;
       filter: blur(30px) saturate(.8);

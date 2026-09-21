@@ -1154,7 +1154,8 @@ export default function AdminFinancePage() {
 
       <div className="finance-workspace-shell" style={styles.shell}>
         <header className="finance-workspace-header">
-          <div className="finance-workspace-hero">
+          <div className="admin-module-hero finance-workspace-hero">
+            <WalletCards className="admin-module-hero__watermark" aria-hidden="true" />
             <div className="finance-workspace-identity">
               <p className="finance-eyebrow">Control financiero</p>
               <h1>Finanzas</h1>

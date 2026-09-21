@@ -673,8 +673,8 @@ export default function InventoryAdmin() {
 
   return (
     <section className="inventory-plus" style={styles.pageText}>
-      <header className="inventory-shell">
-        <Boxes className="inventory-shell__watermark" strokeWidth={0.75} />
+      <header className="admin-module-hero inventory-shell">
+        <Boxes className="admin-module-hero__watermark inventory-shell__watermark" strokeWidth={0.75} />
         <div className="inventory-shell__top">
           <div className="inventory-shell__identity">
             <span className="inventory-shell__logo"><Boxes size={23} /></span>

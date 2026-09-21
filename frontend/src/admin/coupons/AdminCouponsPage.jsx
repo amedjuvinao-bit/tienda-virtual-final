@@ -541,10 +541,10 @@ function CouponFormModal({
         onSubmit={handleWizardSubmit}
         className="coupon-form-dialog relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden border shadow-2xl"
         style={{
-          background: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 94%, var(--admin-primary) 6%), var(--admin-card-bg))',
+          background: 'var(--admin-modal-glass-bg, var(--admin-modal-bg))',
           borderColor: 'var(--admin-card-border)',
           color: 'var(--admin-card-text)',
-          boxShadow: '0 36px 120px rgba(0,0,0,0.35)',
+          boxShadow: '0 36px 120px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.9)',
         }}
       >
         <div

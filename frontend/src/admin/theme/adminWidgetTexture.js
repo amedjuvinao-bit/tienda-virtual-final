@@ -184,6 +184,8 @@ function restoreThemeSurfaceTokens(root) {
   restore('--admin-input-bg', '--admin-theme-input-bg', '#ffffff');
   restore('--admin-input-border', '--admin-theme-input-border', '#d1d5db');
   restore('--admin-modal-bg', '--admin-theme-modal-bg', '#ffffff');
+  restore('--admin-modal-overlay', '--admin-theme-modal-overlay', 'rgba(0, 0, 0, 0.4)');
+  root.style.setProperty('--admin-modal-glass-bg', 'var(--admin-modal-bg)');
 }
 
 function applyLiquidGlassCompatibilityTokens(root) {
@@ -197,7 +199,16 @@ function applyLiquidGlassCompatibilityTokens(root) {
   root.style.setProperty('--admin-table-border', dark ? 'rgba(255, 255, 255, 0.17)' : 'rgba(255, 255, 255, 0.58)');
   root.style.setProperty('--admin-input-bg', dark ? 'rgba(8, 13, 27, 0.34)' : 'rgba(255, 255, 255, 0.16)');
   root.style.setProperty('--admin-input-border', dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.70)');
-  root.style.setProperty('--admin-modal-bg', dark ? 'rgba(8, 13, 27, 0.46)' : 'rgba(255, 255, 255, 0.18)');
+  // A modal needs denser glass than a dashboard card. Reusing the 13% card
+  // surface made the page below compete with labels, inputs and summaries.
+  root.style.setProperty('--admin-modal-bg', dark ? 'rgba(8, 13, 27, 0.88)' : 'rgba(255, 247, 252, 0.82)');
+  root.style.setProperty('--admin-modal-overlay', dark ? 'rgba(2, 6, 23, 0.76)' : 'rgba(30, 20, 30, 0.62)');
+  root.style.setProperty(
+    '--admin-modal-glass-bg',
+    dark
+      ? 'linear-gradient(122deg, rgba(255,255,255,0.15), rgba(255,255,255,0.035) 38%, rgba(255,255,255,0.08) 72%, color-mix(in srgb, var(--admin-primary) 12%, transparent)), rgba(8,13,27,0.88)'
+      : 'linear-gradient(122deg, rgba(255,255,255,0.96), rgba(255,255,255,0.60) 38%, rgba(255,255,255,0.78) 72%, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,247,252,0.74))), rgba(255,247,252,0.82)'
+  );
 }
 
 export function applyAdminWidgetTexture(value) {

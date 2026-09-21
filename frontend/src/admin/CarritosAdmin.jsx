@@ -433,7 +433,8 @@ export default function CarritosAdmin() {
 
   return (
     <main className="cart-admin-page">
-      <header className="cart-admin-header">
+      <header className="admin-module-hero cart-admin-header">
+        <ShoppingCart className="admin-module-hero__watermark" aria-hidden="true" />
         <div className="cart-admin-heading">
           <span className="cart-admin-eyebrow">Operacion comercial</span>
           <h1>Supervision de carritos</h1>

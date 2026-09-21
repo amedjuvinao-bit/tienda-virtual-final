@@ -435,6 +435,7 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-input-focus', t.inputFocus);
 
   root.style.setProperty('--admin-theme-modal-bg', t.modalBg);
+  root.style.setProperty('--admin-theme-modal-overlay', t.modalOverlay);
   root.style.setProperty('--admin-modal-bg', t.modalBg);
   root.style.setProperty('--admin-modal-text', modalTextAuto);
   root.style.setProperty('--admin-modal-muted-text', modalMutedTextAuto);

@@ -1,7 +1,7 @@
 // frontend/src/admin/orders/components/orderDetail/orderDetailTheme.js
 
 export const ORDER_DETAIL_THEME = {
-  cardBg: 'var(--admin-card-bg)',
+  cardBg: 'var(--admin-modal-glass-bg, var(--admin-modal-bg, var(--admin-card-bg)))',
   cardText: 'var(--admin-card-text)',
   mutedText: 'var(--admin-card-muted-text)',
 

@@ -44,6 +44,7 @@ import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
 import { canAccessAdminPath } from './security/adminPermissions';
+import './theme/adminModuleHero.css';
 
 const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
 
@@ -802,7 +803,7 @@ export default function AdminLayout() {
       `}</style>
 
       <div
-        className="admin-area min-h-screen relative overflow-hidden"
+        className="admin-area min-h-screen relative overflow-x-hidden"
         style={{
           background: `
             radial-gradient(

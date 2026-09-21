@@ -313,7 +313,8 @@ export default function FavoritosAdmin() {
 
   return (
     <main className="favorites-admin-page">
-      <header className="favorites-admin-header">
+      <header className="admin-module-hero favorites-admin-header">
+        <Heart className="admin-module-hero__watermark" aria-hidden="true" />
         <div className="favorites-admin-heading">
           <span className="favorites-admin-eyebrow">Intención de compra</span>
           <h1>Favoritos de clientes</h1>

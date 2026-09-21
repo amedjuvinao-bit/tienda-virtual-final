@@ -98,6 +98,12 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(
       document.documentElement.style.getPropertyValue('--admin-input-bg')
     ).toBe('rgba(255, 255, 255, 0.16)');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-modal-bg')
+    ).toBe('rgba(255, 247, 252, 0.82)');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-modal-glass-bg')
+    ).toContain('rgba(255,255,255,0.96)');
     expect(api.put).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
@@ -179,5 +185,9 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(globalStyles.textContent).toContain('[class$="-alerts"]');
     expect(globalStyles.textContent).toContain('border-style: solid !important');
     expect(globalStyles.textContent).toContain('background-attachment: fixed !important');
+    expect(globalStyles.textContent).toContain('.cart-admin-page');
+    expect(globalStyles.textContent).toContain('.favorites-admin-page');
+    expect(globalStyles.textContent).toContain('.coupon-form-dialog');
+    expect(globalStyles.textContent).toContain('.order-detail-professional-shell');
   });
 });

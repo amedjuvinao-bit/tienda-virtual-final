@@ -1,0 +1,120 @@
+.customer-admin-page {
+  display: grid;
+  gap: 16px;
+}
+
+.customer-admin-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  padding: clamp(24px, 3vw, 38px);
+}
+
+.customer-admin-hero__copy,
+.customer-admin-hero__actions { position: relative; z-index: 2; }
+.customer-admin-hero__copy { max-width: 760px; }
+.customer-admin-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-primary);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.customer-admin-hero h1 {
+  margin: 8px 0 0;
+  color: var(--admin-card-text);
+  font-size: clamp(34px, 4.4vw, 54px);
+  font-weight: 950;
+  line-height: .98;
+  letter-spacing: -.045em;
+}
+.customer-admin-hero__lead {
+  max-width: 700px;
+  margin: 14px 0 0;
+  color: var(--admin-card-muted-text);
+  font-size: clamp(14px, 1.3vw, 17px);
+  font-weight: 650;
+  line-height: 1.55;
+}
+.customer-admin-journey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  color: var(--admin-card-muted-text);
+  font-size: 12px;
+  font-weight: 750;
+}
+.customer-admin-journey span { display: inline-flex; align-items: center; gap: 7px; }
+.customer-admin-journey strong {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border: 1px solid var(--admin-primary-soft-border);
+  border-radius: 7px;
+  background: var(--admin-primary-soft-bg);
+  color: var(--admin-primary);
+  font-size: 10px;
+}
+.customer-admin-hero__actions {
+  display: grid;
+  width: min(100%, 220px);
+  gap: 10px;
+}
+.customer-admin-hero__actions button { width: 100%; min-height: 44px; }
+.customer-admin-tabs {
+  position: relative;
+  z-index: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  margin: 0 clamp(-38px, -3vw, -24px) clamp(-38px, -3vw, -24px);
+  padding: 0 clamp(24px, 3vw, 38px);
+  border-top: 1px solid color-mix(in srgb, var(--admin-primary) 18%, transparent);
+}
+.customer-admin-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 14px 16px 13px;
+  background: transparent !important;
+  color: var(--admin-card-muted-text);
+  font-size: 13px;
+  font-weight: 850;
+  box-shadow: none !important;
+}
+.customer-admin-view-tab.is-active {
+  border-bottom-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+
+.customer-admin-surface {
+  border-color: var(--admin-widget-surface-border, var(--admin-card-border)) !important;
+  background: var(--admin-widget-surface-bg, var(--admin-card-bg)) !important;
+  box-shadow: var(--admin-widget-surface-shadow, 0 10px 30px rgba(15,23,42,.05)) !important;
+  backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2));
+  -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur, 18px)) saturate(var(--admin-widget-surface-saturation, 1.2));
+}
+
+html[data-admin-widget-texture='liquidGlass'] .customer-admin-page :is(.bg-white, [class*='bg-white'], [class*='bg-slate-50']) {
+  background: var(--admin-widget-surface-soft-bg) !important;
+  border-color: var(--admin-widget-surface-border) !important;
+}
+
+html[data-admin-widget-texture='liquidGlass'] .customer-admin-page :is(input, select, textarea) {
+  background: var(--admin-widget-input-bg) !important;
+}
+
+@media (max-width: 760px) {
+  .customer-admin-hero { grid-template-columns: 1fr; }
+  .customer-admin-hero__actions { width: 100%; grid-template-columns: 1fr 1fr; }
+  .customer-admin-tabs { overflow-x: auto; }
+}
+

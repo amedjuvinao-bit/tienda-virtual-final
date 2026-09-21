@@ -283,7 +283,7 @@ export default function OrderDetailProfessionalView({
           padding: 18,
           background: `
             radial-gradient(circle at top left, color-mix(in srgb, var(--admin-primary) 8%, transparent), transparent 28%),
-            var(--admin-bg)
+            color-mix(in srgb, var(--admin-modal-bg) 94%, var(--admin-primary) 6%)
           `,
         }}
       >

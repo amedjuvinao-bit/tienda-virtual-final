@@ -679,7 +679,7 @@
 .coupon-form-dialog { border-radius: 22px; }
 .coupon-form-header {
   position: relative;
-  background: linear-gradient(105deg, color-mix(in srgb, var(--admin-card-bg) 86%, var(--admin-primary) 14%), var(--admin-card-bg));
+  background: linear-gradient(105deg, color-mix(in srgb, var(--admin-modal-bg) 86%, var(--admin-primary) 14%), var(--admin-modal-bg));
 }
 
 .coupon-form-header::before {
@@ -704,10 +704,10 @@
 
 .coupon-form-step { min-height: 64px; }
 .coupon-form-step.is-active { box-shadow: inset 0 -3px 0 var(--admin-primary); }
-.coupon-form-step.is-complete { background: color-mix(in srgb, #16a34a 5%, var(--admin-card-bg)) !important; }
+.coupon-form-step.is-complete { background: color-mix(in srgb, #16a34a 5%, var(--admin-modal-bg)) !important; }
 .coupon-form-main section { animation: coupon-step-enter 0.24s ease both; }
 .coupon-form-summary { box-shadow: inset 1px 0 0 color-mix(in srgb, var(--admin-primary) 8%, transparent); }
-.coupon-form-footer { background: color-mix(in srgb, var(--admin-card-bg) 96%, var(--admin-primary) 4%); }
+.coupon-form-footer { background: color-mix(in srgb, var(--admin-modal-bg) 96%, var(--admin-primary) 4%); }
 
 @keyframes coupon-panel-enter {
   from { opacity: 0; transform: translateY(8px); }

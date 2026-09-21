@@ -64,7 +64,8 @@ export default function AdminBillingPage() {
   return (
     <div className="mx-auto grid max-w-7xl gap-5 p-3 md:p-5">
       <section className="overflow-hidden rounded-[32px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
-        <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between md:p-6" style={{ borderColor: 'var(--admin-card-border)' }}>
+        <div className="admin-module-hero flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between md:p-6" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <ActiveIcon className="admin-module-hero__watermark" aria-hidden="true" />
           <div className="flex items-start gap-4">
             <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
               <ActiveIcon className="h-6 w-6" />

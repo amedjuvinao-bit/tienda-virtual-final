@@ -34,6 +34,7 @@ import {
   UsersRound,
   WalletCards,
   X,
+  ChevronRight,
 } from 'lucide-react';
 import {
   createAdminCustomer,
@@ -55,6 +56,7 @@ import CustomerCrmWorkspace from './CustomerCrmWorkspace';
 import CustomerSavedSegments from './CustomerSavedSegments';
 import CustomerPrivacyPanel from './CustomerPrivacyPanel';
 import CustomerFollowUpResultModal from './CustomerFollowUpResultModal';
+import './customerAdminExperience.css';
 
 const EMPTY_FORM = {
   fullName: '',
@@ -255,11 +257,11 @@ function buildLocalSummary(customers = [], total = 0) {
 function Card({ children, className = '', style = {} }) {
   return (
     <section
-      className={`rounded-xl border ${className}`}
+      className={`customer-admin-surface rounded-xl border ${className}`}
       style={{
         borderColor: 'var(--admin-card-border)',
-        background: '#fff',
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.05)',
+        background: 'var(--admin-widget-surface-bg, var(--admin-card-bg))',
+        boxShadow: 'var(--admin-widget-surface-shadow, 0 10px 30px rgba(15, 23, 42, 0.05))',
         ...style,
       }}
     >
@@ -274,7 +276,7 @@ function IconBox({ icon: Icon }) {
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
       style={{
         borderColor: 'rgba(236, 72, 153, 0.22)',
-        background: 'linear-gradient(135deg, #fff, #fdf2f8)',
+        background: 'var(--admin-widget-surface-soft-bg, var(--admin-primary-soft-bg))',
         color: 'var(--admin-primary)',
         boxShadow: '0 6px 18px rgba(236, 72, 153, 0.08)',
       }}
@@ -298,7 +300,7 @@ function TextInput(props) {
     <input
       {...props}
       className={`w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none ${props.className || ''}`}
-      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: '#fff', color: 'var(--admin-card-text)', ...(props.style || {}) }}
+      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
     />
   );
 }
@@ -308,7 +310,7 @@ function TextArea(props) {
     <textarea
       {...props}
       className={`min-h-[88px] w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none ${props.className || ''}`}
-      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: '#fff', color: 'var(--admin-card-text)', ...(props.style || {}) }}
+      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
     />
   );
 }
@@ -331,8 +333,8 @@ function MetricCard({ icon: Icon, label, value, helper, highlight = false }) {
       className="rounded-[24px] border p-4"
       style={{
         borderColor: highlight ? 'rgba(236,72,153,0.32)' : 'rgba(236,72,153,0.18)',
-        background: highlight ? 'linear-gradient(135deg, rgba(236,72,153,0.12), #fff)' : '#fff',
-        boxShadow: '0 12px 28px rgba(15, 23, 42, 0.05)',
+        background: highlight ? 'linear-gradient(135deg, rgba(236,72,153,0.12), var(--admin-widget-surface-soft-bg, var(--admin-card-bg)))' : 'var(--admin-widget-surface-soft-bg, var(--admin-card-bg))',
+        boxShadow: 'var(--admin-widget-surface-shadow, 0 12px 28px rgba(15, 23, 42, 0.05))',
       }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -1108,7 +1110,7 @@ export default function AdminCustomersPageTabbed() {
   ]);
 
   return (
-    <div className="min-h-full space-y-4">
+    <div className="customer-admin-page min-h-full">
       {detailData ? (
         <CustomerDetailModal
           data={detailData}
@@ -1120,30 +1122,31 @@ export default function AdminCustomersPageTabbed() {
         />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
-          <div className="flex items-start gap-4">
-            <IconBox icon={UserRound} />
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Gestión comercial</p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight lg:text-3xl" style={{ color: 'var(--admin-card-text)' }}>Clientes</h1>
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--admin-card-muted-text)' }}>Consulta el directorio o trabaja los seguimientos CRM en espacios separados.</p>
-            </div>
+      <Card className="admin-module-hero customer-admin-hero">
+        <UsersRound className="admin-module-hero__watermark" aria-hidden="true" />
+        <div className="customer-admin-hero__copy">
+          <p className="customer-admin-hero__eyebrow"><UserRound className="h-4 w-4" /> Gestión comercial</p>
+          <h1>Clientes</h1>
+          <p className="customer-admin-hero__lead">Centraliza el directorio, entiende cada relación comercial y convierte los seguimientos en acciones claras.</p>
+          <div className="customer-admin-journey" aria-label="Recorrido para administrar clientes">
+            <span><strong>1</strong> Identifica</span><ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <span><strong>2</strong> Segmenta</span><ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <span><strong>3</strong> Acompaña</span>
           </div>
-          <div className="flex flex-wrap gap-2">
+        </div>
+        <div className="customer-admin-hero__actions">
             <button type="button" onClick={() => loadCustomers(page, searchTerm, sourceFilter, segmentFilter)} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{ borderColor: 'rgba(236,72,153,0.24)', color: 'var(--admin-primary)' }}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Actualizar
             </button>
             <button type="button" onClick={() => { setWorkspaceView('directory'); setShowForm((prev) => !prev); }} className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-black text-white transition hover:brightness-95" style={{ background: 'var(--admin-primary)' }}>
               <Plus className="h-4 w-4" /> Nuevo cliente
             </button>
-          </div>
         </div>
-        <nav aria-label="Vista de clientes" className="flex border-t" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
-          <button type="button" onClick={() => setWorkspaceView('directory')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'directory' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'directory' ? '#fff7fb' : '#fff', color: workspaceView === 'directory' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+        <nav aria-label="Vista de clientes" className="customer-admin-tabs">
+          <button type="button" onClick={() => setWorkspaceView('directory')} className={`customer-admin-view-tab${workspaceView === 'directory' ? ' is-active' : ''}`}>
             <UsersRound className="h-4 w-4" /> Directorio
           </button>
-          <button type="button" onClick={() => setWorkspaceView('crm')} className="inline-flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-black transition" style={{ borderColor: workspaceView === 'crm' ? 'var(--admin-primary)' : 'transparent', background: workspaceView === 'crm' ? '#fff7fb' : '#fff', color: workspaceView === 'crm' ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)' }}>
+          <button type="button" onClick={() => setWorkspaceView('crm')} className={`customer-admin-view-tab${workspaceView === 'crm' ? ' is-active' : ''}`}>
             <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
           </button>
         </nav>
@@ -1156,7 +1159,7 @@ export default function AdminCustomersPageTabbed() {
 
       {workspaceView === 'directory' ? (
         <>
-          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.04)' }}>
+          <section className="customer-admin-surface overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.04)' }}>
             <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
               <div className="px-5 py-4">
                 <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes activos</p>
@@ -1203,7 +1206,7 @@ export default function AdminCustomersPageTabbed() {
             </Card>
           ) : null}
 
-          <section className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
+          <section className="customer-admin-surface overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
             <header className="grid gap-4 border-b p-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.65fr)] lg:items-center" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Directorio comercial</p>

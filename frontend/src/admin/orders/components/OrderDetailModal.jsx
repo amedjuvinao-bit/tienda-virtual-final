@@ -158,7 +158,7 @@ export default function OrderDetailModal({
 
   return createPortal(
     <div
-      className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center p-2 md:p-4"
+      className="order-detail-modal fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center p-2 md:p-4"
       aria-modal="true"
       role="dialog"
       onKeyDown={isolateOrderDetailKeyboardEvent}
@@ -174,9 +174,9 @@ export default function OrderDetailModal({
       onClick={isolateOrderDetailPointerEvent}
     >
       <div
-        className="absolute inset-0 backdrop-blur-sm"
+        className="order-detail-modal-backdrop absolute inset-0 backdrop-blur-sm"
         style={{
-          background: ORDER_DETAIL_THEME.overlayBg || 'rgba(15, 23, 42, 0.56)',
+          background: 'var(--admin-modal-overlay, rgba(15, 23, 42, 0.56))',
         }}
       />
 

@@ -28,7 +28,7 @@ export default function OrdersFiltersSummary({
   return (
     <>
       <div
-        className="orders-admin-heading"
+        className="admin-module-hero orders-admin-heading"
         style={{
           display: 'flex',
           alignItems: 'flex-end',
@@ -37,6 +37,7 @@ export default function OrdersFiltersSummary({
           flexWrap: 'wrap',
         }}
       >
+        <ShoppingBag className="admin-module-hero__watermark" aria-hidden="true" />
         <div>
           <h1
             style={{

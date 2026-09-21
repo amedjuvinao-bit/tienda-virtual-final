@@ -637,7 +637,8 @@ export default function ProductosAdmin() {
   return (
     <div style={styles.page}>
       <div className="admin-widget-stage" style={styles.shell}>
-        <div className="products-admin-header px-5 py-5 md:px-7 md:py-6" style={styles.header}>
+        <div className="admin-module-hero products-admin-header px-5 py-5 md:px-7 md:py-6" style={styles.header}>
+          <PackageSearch className="admin-module-hero__watermark" aria-hidden="true" />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <p className="text-[11px] font-black uppercase" style={styles.eyebrow}>

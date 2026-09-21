@@ -21,6 +21,7 @@ import {
   UnlockKeyhole,
   UserCheck,
   Wallet,
+  WalletCards,
   X,
   XCircle,
 } from 'lucide-react';
@@ -1286,7 +1287,8 @@ export default function CashSessionsPageReport() {
   return (
     <section className="cash-workspace">
       <Card className="cash-workspace__shell overflow-hidden">
-        <header className="cash-workspace__hero">
+        <header className="admin-module-hero cash-workspace__hero">
+          <WalletCards className="admin-module-hero__watermark" aria-hidden="true" />
           <div className="cash-workspace__identity">
             <p className="cash-eyebrow">Control operativo</p>
             <h1>Caja</h1>
