@@ -1253,6 +1253,61 @@ export function applyAdminGlobalStyles() {
       -webkit-backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
     }
 
+    /* Portal modals live outside .admin-area. The modal contract marks the
+       veil and the actual dialog surface so all modules keep readable glass. */
+    html[data-admin-route-active="true"] [data-admin-modal-overlay="true"] {
+      background: var(--admin-modal-overlay, rgba(30, 20, 30, .62)) !important;
+      backdrop-filter: blur(12px) saturate(.82) brightness(.84) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(.82) brightness(.84) !important;
+    }
+
+    html[data-admin-route-active="true"] [data-admin-modal-surface="true"] {
+      --admin-card-bg: var(--admin-modal-bg) !important;
+      --admin-card-text: var(--admin-modal-text) !important;
+      --admin-card-muted-text: var(--admin-modal-muted-text) !important;
+      --admin-light-panel-bg: color-mix(in srgb, var(--admin-modal-bg) 94%, transparent) !important;
+      --admin-input-bg: color-mix(in srgb, var(--admin-modal-bg) 92%, var(--admin-primary) 8%) !important;
+      --admin-input-border: color-mix(in srgb, var(--admin-primary) 26%, rgba(255,255,255,.88)) !important;
+      background: var(--admin-modal-glass-bg, var(--admin-modal-bg)) !important;
+      color: var(--admin-modal-text, var(--admin-card-text)) !important;
+      border: 1px solid rgba(255,255,255,.94) !important;
+      box-shadow:
+        0 34px 110px rgba(15,23,42,.44),
+        inset 0 1px 0 rgba(255,255,255,.98),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+      backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
+      -webkit-backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
+      isolation: isolate;
+    }
+
+    html[data-admin-route-active="true"] [data-admin-modal-surface="true"] :is(input, select, textarea) {
+      background: var(--admin-input-bg) !important;
+      border-color: var(--admin-input-border) !important;
+      color: var(--admin-modal-text, var(--admin-card-text)) !important;
+      opacity: 1 !important;
+    }
+
+    html[data-admin-route-active="true"] [data-admin-modal-surface="true"] :is(label, legend) {
+      color: var(--admin-modal-text, var(--admin-card-text)) !important;
+      opacity: 1 !important;
+    }
+
+    html[data-admin-route-active="true"] [data-admin-modal-surface="true"] :is(input, textarea)::placeholder {
+      color: var(--admin-modal-muted-text, var(--admin-card-muted-text)) !important;
+      opacity: .78 !important;
+    }
+
+    html[data-admin-route-active="true"] [data-admin-modal-surface="true"] :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100) {
+      background-color: color-mix(in srgb, var(--admin-modal-bg) 88%, transparent) !important;
+    }
+
+    /* Sticky previews need an unclipped ancestor. The generic glass card is
+       clipped for reflections, which otherwise disables sticky positioning. */
+    .admin-area .admin-content-card:has(.login-settings-preview-wrap),
+    .admin-area .admin-content-card:has(.panel-admin-preview) {
+      overflow: visible !important;
+    }
+
     html[data-admin-widget-texture="frostedGlass"] .admin-area::after {
       opacity: .34;
       filter: blur(30px) saturate(.8);

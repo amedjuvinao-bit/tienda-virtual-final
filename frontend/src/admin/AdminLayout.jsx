@@ -43,6 +43,7 @@ import api from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
+import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import './theme/adminModuleHero.css';
 
@@ -112,6 +113,8 @@ export default function AdminLayout() {
   const [reviews, setReviews] = useState([]);
   const [deletingReviewId, setDeletingReviewId] = useState('');
   const [adminBrandLogo, setAdminBrandLogo] = useState('');
+
+  useEffect(() => installAdminModalContract(), []);
 
   useEffect(() => {
     if (
