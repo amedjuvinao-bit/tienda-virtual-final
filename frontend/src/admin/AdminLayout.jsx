@@ -1,5 +1,5 @@
 // src/admin/AdminLayout.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Outlet,
   useNavigate,
@@ -37,6 +37,8 @@ import {
   WalletCards,
   CircleDollarSign,
   Fingerprint,
+  Command,
+  ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
@@ -65,6 +67,14 @@ const CONFIG_SUBLINKS = [
 
 function applyHoverColor(e, color) {
   e.currentTarget.style.backgroundColor = color;
+}
+
+function normalizeAdminSearch(value = '') {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim();
 }
 
 function filterLinksByPermission(adminUser, links) {
@@ -113,6 +123,9 @@ export default function AdminLayout() {
   const [reviews, setReviews] = useState([]);
   const [deletingReviewId, setDeletingReviewId] = useState('');
   const [adminBrandLogo, setAdminBrandLogo] = useState('');
+  const [commandQuery, setCommandQuery] = useState('');
+  const [commandOpen, setCommandOpen] = useState(false);
+  const commandInputRef = useRef(null);
 
   useEffect(() => installAdminModalContract(), []);
 
@@ -314,6 +327,55 @@ export default function AdminLayout() {
   const visibleConfigSublinks = filterLinksByPermission(adminUser, CONFIG_SUBLINKS);
   const hasVisibleConfigLinks = visibleConfigSublinks.length > 0;
 
+  const commandItems = [
+    ...visibleMainLinks.map((item) => ({ ...item, group: 'Operación' })),
+    ...visibleDesignLinks.map((item) => ({ ...item, group: 'Diseño' })),
+    ...visibleConfigSublinks.map((item) => ({ ...item, group: 'Configuración' })),
+  ];
+
+  const normalizedCommandQuery = normalizeAdminSearch(commandQuery);
+  const filteredCommandItems = commandItems
+    .filter((item) => {
+      if (!normalizedCommandQuery) return true;
+      return normalizeAdminSearch(`${item.label} ${item.group}`).includes(
+        normalizedCommandQuery
+      );
+    })
+    .slice(0, 7);
+
+  const activeCommandItem = [...commandItems]
+    .sort((a, b) => b.to.length - a.to.length)
+    .find(
+      (item) =>
+        location.pathname === item.to ||
+        location.pathname.startsWith(`${item.to}/`)
+    );
+
+  const headerQuickActions = [
+    { to: '/admin/pos', label: 'Venta POS', icon: Store },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },
+    { to: '/admin/inventario', label: 'Stock', icon: PackageSearch },
+  ].filter((item) => canAccessAdminPath(adminUser, item.to));
+
+  const handleCommandSelect = (path) => {
+    setCommandQuery('');
+    setCommandOpen(false);
+    navigate(path);
+  };
+
+  useEffect(() => {
+    const handleCommandShortcut = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCommandOpen(true);
+        commandInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleCommandShortcut);
+    return () => window.removeEventListener('keydown', handleCommandShortcut);
+  }, []);
+
   const linkBase =
     'group flex items-center admin-nav-item-gap admin-nav-padding rounded-[calc(var(--admin-radius)*0.55)] transition-all duration-200 text-sm font-medium';
 
@@ -368,10 +430,10 @@ export default function AdminLayout() {
           gap: calc(var(--admin-gap) * 0.45);
         }
 
-        .admin-brand-card {
-          border-radius: 0;
-          padding: calc(var(--admin-padding) * 0.7);
-          margin-bottom: calc(var(--admin-gap) * 1.2);
+        .admin-brand-float {
+          min-height: 132px;
+          padding: calc(var(--admin-padding) * 0.35) 0 calc(var(--admin-padding) * 0.6);
+          margin-bottom: calc(var(--admin-gap) * 0.7);
           position: relative;
           overflow: visible;
           background: transparent !important;
@@ -379,59 +441,13 @@ export default function AdminLayout() {
           box-shadow: none !important;
           backdrop-filter: none !important;
           -webkit-backdrop-filter: none !important;
+          outline: none !important;
+          transform-style: preserve-3d;
+          perspective: 900px;
         }
 
         .admin-logo-floating {
           isolation: isolate;
-        }
-
-        .admin-logo-floating::before {
-          content: "";
-          position: absolute;
-          width: 145px;
-          height: 145px;
-          border-radius: 999px;
-          background:
-            radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 34%, transparent), transparent 62%);
-          filter: blur(18px);
-          opacity: 0.9;
-          z-index: -1;
-        }
-
-        /* ✨ brillo tipo diamante */
-        .admin-brand-card::after {
-          content: "";
-          position: absolute;
-          top: -40%;
-          left: -60%;
-          width: 120%;
-          height: 200%;
-
-          background: linear-gradient(
-            120deg,
-            transparent 0%,
-            rgba(255,255,255,0.15) 35%,
-            rgba(255,255,255,0.45) 50%,
-            rgba(255,255,255,0.15) 65%,
-            transparent 100%
-          );
-
-          transform: rotate(25deg);
-          opacity: 0.0;
-
-          transition: all 0.6s ease;
-        }
-
-        /* 💎 animación al hover */
-        .admin-brand-card:hover::after {
-          left: 120%;
-          opacity: 1;
-        }
-
-        /* 💥 efecto flotante */
-        .admin-brand-card:hover {
-          transform: translateY(-2px) scale(1.01);
-          box-shadow: var(--admin-glass-shadow-hover);
         }
 
         .admin-nav-padding {
@@ -652,6 +668,7 @@ export default function AdminLayout() {
         }
 
         .admin-search-bar {
+          position: relative;
           display: flex;
           align-items: center;
           gap: calc(var(--admin-gap) * 0.6);
@@ -665,6 +682,266 @@ export default function AdminLayout() {
         .admin-search-bar:focus-within {
           border-color: var(--admin-primary);
           box-shadow: 0 0 0 3px var(--admin-primary-soft-bg);
+        }
+
+        .admin-header-panel {
+          grid-template-columns: minmax(150px, 0.65fr) minmax(280px, 1.35fr) auto;
+          align-items: center;
+          overflow: visible;
+        }
+
+        .admin-header-context {
+          min-width: 0;
+          display: grid;
+          gap: 3px;
+        }
+
+        .admin-header-context__eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--admin-primary);
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+
+        .admin-header-context h1 {
+          margin: 0;
+          color: var(--admin-card-text);
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: clamp(17px, 1.55vw, 22px);
+          line-height: 1.05;
+        }
+
+        .admin-header-context p {
+          margin: 0;
+          overflow: hidden;
+          color: var(--admin-card-muted-text);
+          font-size: 10px;
+          font-weight: 700;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-command-center {
+          position: relative;
+          min-width: 0;
+        }
+
+        .admin-command-center .admin-search-bar {
+          width: 100%;
+          max-width: none;
+          min-height: 42px;
+          margin: 0;
+          padding-right: 8px;
+          background: color-mix(in srgb, var(--admin-card-bg) 78%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.56);
+        }
+
+        .admin-command-center kbd {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          flex: 0 0 auto;
+          border: 1px solid var(--admin-card-border);
+          border-radius: 8px;
+          padding: 4px 7px;
+          background: var(--admin-primary-soft-bg);
+          color: var(--admin-card-muted-text);
+          font: 800 9px/1 'DM Sans', sans-serif;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
+        }
+
+        .admin-command-results {
+          position: absolute;
+          z-index: 80;
+          top: calc(100% + 9px);
+          right: 0;
+          left: 0;
+          display: grid;
+          gap: 5px;
+          max-height: 344px;
+          overflow-y: auto;
+          border: 1px solid var(--admin-widget-surface-border);
+          border-radius: calc(var(--admin-radius) * .72);
+          padding: 9px;
+          background: color-mix(in srgb, var(--admin-card-bg) 92%, transparent);
+          color: var(--admin-card-text);
+          box-shadow: 0 24px 60px rgba(54, 31, 48, .2), inset 0 1px 0 rgba(255,255,255,.78);
+          backdrop-filter: blur(28px) saturate(1.55);
+          -webkit-backdrop-filter: blur(28px) saturate(1.55);
+        }
+
+        .admin-command-results__label {
+          padding: 4px 7px 6px;
+          color: var(--admin-card-muted-text);
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: .14em;
+          text-transform: uppercase;
+        }
+
+        .admin-command-result {
+          display: grid;
+          grid-template-columns: 34px minmax(0, 1fr) 24px;
+          align-items: center;
+          gap: 9px;
+          width: 100%;
+          border: 1px solid transparent;
+          border-radius: calc(var(--admin-radius) * .48);
+          padding: 7px;
+          background: transparent;
+          color: inherit;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .admin-command-result:hover,
+        .admin-command-result:focus-visible {
+          border-color: var(--admin-primary-soft-border);
+          background: var(--admin-primary-soft-bg);
+          outline: none;
+        }
+
+        .admin-command-result__icon {
+          display: grid;
+          width: 34px;
+          height: 34px;
+          place-items: center;
+          border: 1px solid var(--admin-primary-soft-border);
+          border-radius: 11px;
+          background: color-mix(in srgb, var(--admin-card-bg) 84%, transparent);
+          color: var(--admin-primary);
+        }
+
+        .admin-command-result strong,
+        .admin-command-result small {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-command-result strong { font-size: 12px; }
+        .admin-command-result small { margin-top: 2px; color: var(--admin-card-muted-text); font-size: 9px; }
+        .admin-command-result > svg { color: var(--admin-primary); opacity: .72; }
+
+        .admin-command-empty {
+          padding: 16px 10px;
+          color: var(--admin-card-muted-text);
+          font-size: 12px;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .admin-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .admin-process-shortcuts {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          border: 1px solid var(--admin-card-border);
+          border-radius: calc(var(--admin-radius) * .6);
+          padding: 4px;
+          background: color-mix(in srgb, var(--admin-card-bg) 66%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.58);
+        }
+
+        .admin-process-shortcut {
+          display: inline-flex;
+          min-height: 32px;
+          align-items: center;
+          gap: 5px;
+          border-radius: calc(var(--admin-radius) * .4);
+          padding: 0 8px;
+          color: var(--admin-card-muted-text);
+          font-size: 10px;
+          font-weight: 900;
+          transition: background .18s ease, color .18s ease, transform .18s ease;
+        }
+
+        .admin-process-shortcut:hover,
+        .admin-process-shortcut.active {
+          background: var(--admin-primary-soft-bg);
+          color: var(--admin-primary);
+          transform: translateY(-1px);
+        }
+
+        .admin-profile-compact {
+          display: grid;
+          grid-template-columns: 34px minmax(0, 1fr);
+          align-items: center;
+          gap: 8px;
+          width: 148px;
+          min-height: 42px;
+          border: 1px solid var(--admin-primary-soft-border);
+          border-radius: calc(var(--admin-radius) * .6);
+          padding: 4px 9px 4px 5px;
+          background: var(--admin-primary-soft-bg);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.62);
+        }
+
+        .admin-profile-compact__avatar {
+          display: grid;
+          width: 34px;
+          height: 34px;
+          place-items: center;
+          border: 1px solid var(--admin-primary-soft-border);
+          border-radius: 12px;
+          background: color-mix(in srgb, var(--admin-card-bg) 86%, transparent);
+          color: var(--admin-primary);
+          font-size: 10px;
+          font-weight: 950;
+        }
+
+        .admin-profile-compact p {
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-profile-compact p:first-child { color: var(--admin-card-text); font-size: 10px; font-weight: 900; }
+        .admin-profile-compact p:last-child { color: var(--admin-card-muted-text); font-size: 9px; font-weight: 750; }
+
+        .admin-header-icon-button {
+          display: grid;
+          position: relative;
+          width: 40px;
+          height: 40px;
+          flex: 0 0 auto;
+          place-items: center;
+          border: 1px solid var(--admin-primary-soft-border);
+          border-radius: calc(var(--admin-radius) * .55);
+          background: var(--admin-primary-soft-bg);
+          color: var(--admin-primary-soft-text);
+          cursor: pointer;
+          transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        .admin-header-icon-button:hover {
+          background: var(--admin-primary-soft-hover);
+          box-shadow: var(--admin-shadow-sm);
+          transform: translateY(-1px);
+        }
+
+        .admin-header-icon-button--exit {
+          background: var(--admin-primary);
+          color: #fff;
+        }
+
+        @media (max-width: 1380px) {
+          .admin-header-panel { grid-template-columns: 132px minmax(230px, 1fr) auto; }
+          .admin-process-shortcut span { display: none; }
+          .admin-process-shortcut { width: 32px; justify-content: center; padding: 0; }
+          .admin-profile-compact { width: 42px; grid-template-columns: 34px; padding: 3px; }
+          .admin-profile-compact > div:last-child { display: none; }
         }
 
         .admin-btn-ghost {
@@ -764,44 +1041,24 @@ export default function AdminLayout() {
         .admin-logo-3d {
           position: relative;
           z-index: 2;
-
-          /* ✨ sombra principal (profundidad) */
+          width: auto;
+          max-width: 92%;
+          max-height: 138px;
           filter:
-            drop-shadow(0 12px 24px rgba(0,0,0,0.25))
-            drop-shadow(0 4px 10px rgba(0,0,0,0.15));
-
-          /* 💎 sensación 3D */
-          transform: perspective(800px) translateZ(0);
-
-          transition: all 0.35s ease;
+            drop-shadow(0 20px 18px rgba(65, 35, 55, .22))
+            drop-shadow(0 7px 7px color-mix(in srgb, var(--admin-primary) 32%, transparent))
+            drop-shadow(0 -2px 2px rgba(255,255,255,.78));
+          transform: perspective(900px) rotateX(2deg) rotateY(-3deg) translateZ(26px);
+          transform-origin: center;
+          transition: transform 0.35s cubic-bezier(.22,1,.36,1), filter .35s ease;
         }
 
-        /* 🌟 halo de luz (no invade el fondo) */
-        .admin-logo-3d::after {
-          content: "";
-          position: absolute;
-          inset: -10px;
-          border-radius: 999px;
-
-          background:
-            radial-gradient(circle,
-              rgba(255,255,255,0.35),
-              rgba(255,255,255,0.15),
-              transparent 70%
-            );
-
-          filter: blur(12px);
-          opacity: 0.6;
-          z-index: -1;
-        }
-
-        /* 💥 efecto flotante al hover */
         .admin-logo-3d:hover {
-          transform: perspective(800px) translateY(-4px) scale(1.04);
-
+          transform: perspective(900px) rotateX(-1deg) rotateY(3deg) translateY(-5px) translateZ(34px) scale(1.035);
           filter:
-            drop-shadow(0 18px 40px rgba(0,0,0,0.35))
-            drop-shadow(0 8px 18px rgba(0,0,0,0.2));
+            drop-shadow(0 26px 22px rgba(65, 35, 55, .26))
+            drop-shadow(0 9px 9px color-mix(in srgb, var(--admin-primary) 38%, transparent))
+            drop-shadow(0 -2px 2px rgba(255,255,255,.9));
         }
       `}</style>
 
@@ -878,13 +1135,13 @@ export default function AdminLayout() {
             className="admin-sidebar-glass admin-sidebar-panel hidden md:flex md:flex-col shrink-0"
             style={{ width: 'var(--admin-sidebar-width)' }}
           >
-            <div className="admin-brand-card admin-logo-floating flex items-center justify-center min-h-[96px]">
+            <div className="admin-brand-float admin-logo-floating flex items-center justify-center">
               {adminBrandLogo ? (
                 <img
                   src={adminBrandLogo}
                   alt=""
                   aria-hidden="true"
-                  className="h-22 max-h-35 w-auto object-contain transition-all duration-300 admin-logo-3d"
+                  className="w-auto object-contain admin-logo-3d"
                 />
               ) : (
                 <div className="flex items-center admin-inline-gap-sm">
@@ -1015,94 +1272,136 @@ export default function AdminLayout() {
 
           <main className="admin-main-column flex-1 min-w-0 flex flex-col">
             <header
-              className="admin-header-glass admin-header-panel hidden md:flex items-center"
+              className="admin-header-glass admin-header-panel hidden md:grid"
               style={{ boxShadow: 'var(--admin-shadow-header, 0 8px 32px rgba(0,0,0,0.06))' }}
             >
-              <div className="shrink-0">
-                <h1
-                  className="text-base font-bold leading-tight"
-                  style={{ color: 'var(--admin-card-text)' }}
-                >
-                  Panel Administrativo
-                </h1>
-                <p
-                  className="text-xs mt-0.5"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                >
-                  Gestiona tu tienda en tiempo real
-                </p>
+              <div className="admin-header-context">
+                <span className="admin-header-context__eyebrow">
+                  <Command className="h-3 w-3" /> Centro operativo
+                </span>
+                <h1>{activeCommandItem?.label || 'Panel administrativo'}</h1>
+                <p>{activeCommandItem?.group || 'Gestión integral'} · operación en tiempo real</p>
               </div>
 
-              <div className="admin-search-bar flex-1 max-w-md mx-auto">
-                <Search
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar productos, órdenes, páginas..."
-                  className="w-full bg-transparent text-sm outline-none"
-                  style={{
-                    color: 'var(--admin-card-text)',
-                    caretColor: 'var(--admin-primary)',
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <div
-                  className="flex min-w-[210px] max-w-[260px] items-center gap-3 rounded-[calc(var(--admin-radius)*0.65)] border px-3 py-2"
-                  style={{
-                    borderColor: 'var(--admin-primary-soft-border)',
-                    background: 'var(--admin-primary-soft-bg)',
-                    color: 'var(--admin-primary-soft-text)',
-                    boxShadow: 'var(--admin-shadow-sm, 0 4px 14px rgba(0,0,0,0.08))',
-                  }}
-                >
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border text-xs font-black"
-                    style={{
-                      borderColor: 'var(--admin-primary-soft-border)',
-                      background: 'var(--admin-card-bg)',
-                      color: 'var(--admin-primary)',
+              <div className="admin-command-center">
+                <div className="admin-search-bar">
+                  <Search
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: 'var(--admin-primary)' }}
+                  />
+                  <input
+                    ref={commandInputRef}
+                    type="search"
+                    value={commandQuery}
+                    onChange={(event) => {
+                      setCommandQuery(event.target.value);
+                      setCommandOpen(true);
                     }}
-                  >
+                    onFocus={() => setCommandOpen(true)}
+                    onBlur={() => window.setTimeout(() => setCommandOpen(false), 120)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setCommandOpen(false);
+                        event.currentTarget.blur();
+                      }
+                      if (event.key === 'Enter' && filteredCommandItems[0]) {
+                        event.preventDefault();
+                        handleCommandSelect(filteredCommandItems[0].to);
+                      }
+                    }}
+                    placeholder="Ir a productos, órdenes, caja, configuración..."
+                    aria-label="Buscar y abrir un módulo del panel"
+                    aria-expanded={commandOpen}
+                    className="w-full bg-transparent text-sm outline-none"
+                    style={{
+                      color: 'var(--admin-card-text)',
+                      caretColor: 'var(--admin-primary)',
+                    }}
+                  />
+                  <kbd><Command className="h-2.5 w-2.5" /> K</kbd>
+                </div>
+
+                {commandOpen && (
+                  <div className="admin-command-results" role="listbox">
+                    <div className="admin-command-results__label">Navegación inteligente</div>
+                    {filteredCommandItems.length > 0 ? (
+                      filteredCommandItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.to}
+                            type="button"
+                            role="option"
+                            aria-selected={item.to === activeCommandItem?.to}
+                            className="admin-command-result"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleCommandSelect(item.to)}
+                          >
+                            <span className="admin-command-result__icon"><Icon className="h-4 w-4" /></span>
+                            <span><strong>{item.label}</strong><small>{item.group}</small></span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="admin-command-empty">No hay módulos que coincidan.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-header-actions">
+                {headerQuickActions.length > 0 && (
+                  <div className="admin-process-shortcuts" aria-label="Procesos rápidos">
+                    {headerQuickActions.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          title={`Abrir ${item.label}`}
+                          className={`admin-process-shortcut${isActive ? ' active' : ''}`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="admin-profile-compact" title={`${activeAdminName} · ${activeAdminRole}`}>
+                  <div className="admin-profile-compact__avatar">
                     {activeAdminInitials || <UserRound className="h-4 w-4" />}
                   </div>
-
                   <div className="min-w-0">
-                    <p
-                      className="truncate text-xs font-black leading-4"
-                      style={{ color: 'var(--admin-card-text)' }}
-                    >
-                      {activeAdminName}
-                    </p>
-
-                    <p
-                      className="truncate text-[11px] font-bold leading-4"
-                      style={{ color: 'var(--admin-card-muted-text)' }}
-                    >
-                      Perfil: {activeAdminRole}
-                    </p>
+                    <p>{activeAdminName}</p>
+                    <p>Perfil: {activeAdminRole}</p>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleOpenReviewsModal}
-                  className="admin-btn-ghost"
+                  className="admin-header-icon-button"
+                  aria-label="Abrir reseñas"
+                  title="Reseñas y alertas"
                 >
                   <Bell className="h-4 w-4" />
-                  <span>Reseñas</span>
-
                   {unseenCount > 0 && (
                     <span className="admin-badge">{unseenCount}</span>
                   )}
                 </button>
 
-                <button onClick={handleLogout} className="admin-btn-primary">
+                <button
+                  onClick={handleLogout}
+                  className="admin-header-icon-button admin-header-icon-button--exit"
+                  aria-label="Cerrar sesión"
+                  title="Cerrar sesión"
+                >
                   <LogOut className="h-4 w-4" />
-                  Salir
                 </button>
               </div>
             </header>
