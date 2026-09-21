@@ -698,6 +698,9 @@ export default function AdminLayout() {
           grid-template-columns: minmax(155px, 0.62fr) minmax(320px, 1.38fr) auto;
           align-items: center;
           overflow: visible;
+          position: relative;
+          z-index: 60;
+          isolation: isolate;
         }
 
         .admin-header-context {
@@ -737,6 +740,7 @@ export default function AdminLayout() {
 
         .admin-command-center {
           position: relative;
+          z-index: 2;
           min-width: 0;
         }
 
@@ -780,6 +784,7 @@ export default function AdminLayout() {
           background: color-mix(in srgb, var(--admin-page-bg) 94%, var(--admin-card-text) 6%) !important;
           color: var(--admin-card-text);
           opacity: 1 !important;
+          pointer-events: auto;
           box-shadow: 0 26px 70px rgba(54, 31, 48, .28), inset 0 1px 0 rgba(255,255,255,.88);
           backdrop-filter: none !important;
           -webkit-backdrop-filter: none !important;
@@ -1353,19 +1358,22 @@ export default function AdminLayout() {
                       filteredCommandItems.map((item) => {
                         const Icon = item.icon;
                         return (
-                          <button
+                          <NavLink
                             key={item.to}
-                            type="button"
+                            to={item.to}
                             role="option"
                             aria-selected={item.to === activeCommandItem?.to}
                             className="admin-command-result"
                             onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => handleCommandSelect(item.to)}
+                            onClick={() => {
+                              setCommandQuery('');
+                              setCommandOpen(false);
+                            }}
                           >
                             <span className="admin-command-result__icon"><Icon className="h-4 w-4" /></span>
                             <span><strong>{item.label}</strong><small>{item.group}</small></span>
                             <ArrowRight className="h-3.5 w-3.5" />
-                          </button>
+                          </NavLink>
                         );
                       })
                     ) : (
