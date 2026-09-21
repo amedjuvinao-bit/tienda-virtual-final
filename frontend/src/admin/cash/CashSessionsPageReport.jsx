@@ -1307,20 +1307,19 @@ export default function CashSessionsPageReport() {
               <span>Actualizar</span>
             </button>
           </div>
+          <div className="cash-journey-progress" aria-label="Flujo de la jornada">
+            {journeySteps.map((step) => (
+              <div
+                key={step.number}
+                className={`cash-journey-progress__step ${step.number === activeJourneyStep ? 'is-active' : ''} ${step.number < activeJourneyStep ? 'is-complete' : ''}`}
+                aria-current={step.number === activeJourneyStep ? 'step' : undefined}
+              >
+                <strong>{String(step.number).padStart(2, '0')} · {step.title}</strong>
+                <span>{step.helper}</span>
+              </div>
+            ))}
+          </div>
         </header>
-
-        <div className="cash-journey-progress" aria-label="Flujo de la jornada">
-          {journeySteps.map((step) => (
-            <div
-              key={step.number}
-              className={`cash-journey-progress__step ${step.number === activeJourneyStep ? 'is-active' : ''} ${step.number < activeJourneyStep ? 'is-complete' : ''}`}
-              aria-current={step.number === activeJourneyStep ? 'step' : undefined}
-            >
-              <strong>{String(step.number).padStart(2, '0')} · {step.title}</strong>
-              <span>{step.helper}</span>
-            </div>
-          ))}
-        </div>
 
         <div className="cash-workspace__body">
           {error && !operationDialog ? <Message type="error">{error}</Message> : null}

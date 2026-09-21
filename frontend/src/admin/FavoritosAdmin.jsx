@@ -330,22 +330,21 @@ export default function FavoritosAdmin() {
             </button>
           )}
         </div>
+        <section className="favorites-admin-metrics" aria-label="Indicadores de favoritos">
+          {METRIC_CARDS.map(({ key, label, help, icon: Icon, money: isMoney, tone = '' }) => (
+            <article className={`favorites-admin-glass favorites-admin-metric ${tone}`} key={key}>
+              <div className="favorites-admin-metric-topline">
+                <span>{label}</span>
+                <span className="favorites-admin-metric-icon"><Icon size={15} /></span>
+              </div>
+              <strong>{summary ? (isMoney ? money(summary[key]) : Number(summary[key] || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })) : '—'}</strong>
+              <small>{help}</small>
+            </article>
+          ))}
+        </section>
       </header>
 
       {sessionError && <div className="favorites-admin-feedback error" role="alert">{sessionError}</div>}
-
-      <section className="favorites-admin-metrics" aria-label="Indicadores de favoritos">
-        {METRIC_CARDS.map(({ key, label, help, icon: Icon, money: isMoney, tone = '' }) => (
-          <article className={`favorites-admin-glass favorites-admin-metric ${tone}`} key={key}>
-            <div className="favorites-admin-metric-topline">
-              <span>{label}</span>
-              <span className="favorites-admin-metric-icon"><Icon size={15} /></span>
-            </div>
-            <strong>{summary ? (isMoney ? money(summary[key]) : Number(summary[key] || 0).toLocaleString('es-CO', { maximumFractionDigits: 1 })) : '—'}</strong>
-            <small>{help}</small>
-          </article>
-        ))}
-      </section>
 
       {summaryError && <div className="favorites-admin-feedback warning" role="alert">{summaryError}</div>}
 

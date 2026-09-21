@@ -1182,6 +1182,13 @@ export default function AdminFinancePage() {
                 </button>
               ) : null}
             </div>
+
+            <div className="finance-summary-grid" role="group" aria-label="Indicadores del periodo">
+              <FinanceMetric label="Ingresos netos" value={formatCurrency(kpis.revenue)} sub={`Bruto ${formatCurrency(kpis.grossRevenue)} · Devoluciones ${formatCurrency(kpis.refunds)}`} />
+              <FinanceMetric label="Costos netos" value={formatCurrency(kpis.cogs)} sub={`Costo devuelto ${formatCurrency(kpis.returnedCogs)} · Margen ${formatPercent(kpis.grossMarginPercent)}`} />
+              <FinanceMetric label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} />
+              <FinanceMetric label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
+            </div>
           </div>
 
           <div className="finance-workspace-filters">
@@ -1273,12 +1280,6 @@ export default function AdminFinancePage() {
               </div>
             )}
 
-            <div className="finance-summary-grid" role="group" aria-label="Indicadores del periodo">
-              <FinanceMetric label="Ingresos netos" value={formatCurrency(kpis.revenue)} sub={`Bruto ${formatCurrency(kpis.grossRevenue)} · Devoluciones ${formatCurrency(kpis.refunds)}`} />
-              <FinanceMetric label="Costos netos" value={formatCurrency(kpis.cogs)} sub={`Costo devuelto ${formatCurrency(kpis.returnedCogs)} · Margen ${formatPercent(kpis.grossMarginPercent)}`} />
-              <FinanceMetric label="Gastos" value={formatCurrency(kpis.operatingExpenses)} sub={`Manual ${formatCurrency(kpis.manualExpenses)} · Caja ${formatCurrency(kpis.cashOperatingExpenses)}`} />
-              <FinanceMetric label="Utilidad neta" value={formatCurrency(kpis.netProfit)} sub={`Margen neto ${formatPercent(kpis.netMarginPercent)}`} tone={Number(kpis.netProfit || 0) >= 0 ? 'success' : 'danger'} />
-            </div>
             </section>
 
             <section className="finance-workspace-view" hidden={activeSection !== 'budget'} aria-label="Control presupuestal">

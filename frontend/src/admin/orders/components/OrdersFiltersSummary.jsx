@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Truck,
 } from 'lucide-react';
+import AdminModuleHero from '../../components/AdminModuleHero';
 
 const METRIC_ICONS = {
   dian: CheckCircle2,
@@ -26,43 +27,12 @@ export default function OrdersFiltersSummary({
   total,
 }) {
   return (
-    <>
-      <div
-        className="admin-module-hero orders-admin-heading"
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <ShoppingBag className="admin-module-hero__watermark" aria-hidden="true" />
-        <div>
-          <h1
-            style={{
-              fontSize: 28,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              color: 'var(--admin-card-text)',
-              margin: 0,
-            }}
-          >
-            Órdenes
-          </h1>
-          <p
-            style={{
-              marginTop: 4,
-              fontSize: 13,
-              color: 'var(--admin-card-muted-text)',
-              lineHeight: 1.5,
-            }}
-          >
-            Gestiona tus ventas, revisa estados, sedes y controla la facturación electrónica.
-          </p>
-        </div>
-
-        {canExport ? (
+    <AdminModuleHero
+      icon={ShoppingBag}
+      eyebrow="Operación comercial"
+      title="Órdenes"
+      description="Gestiona tus ventas, revisa estados, sedes y controla la facturación electrónica."
+      actions={canExport ? (
           <button
             onClick={exportCsv}
             disabled={loading || total === 0}
@@ -88,8 +58,7 @@ export default function OrdersFiltersSummary({
             Exportar CSV
           </button>
         ) : null}
-      </div>
-
+    >
       <div className="orders-admin-metrics orf-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
         {cards.map(({ key, label, value, helper, accent }) => {
           const Icon = METRIC_ICONS[key];
@@ -133,6 +102,6 @@ export default function OrdersFiltersSummary({
           );
         })}
       </div>
-    </>
+    </AdminModuleHero>
   );
 }

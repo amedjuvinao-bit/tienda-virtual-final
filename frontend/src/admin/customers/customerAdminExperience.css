@@ -68,6 +68,12 @@
   gap: 10px;
 }
 .customer-admin-hero__actions button { width: 100%; min-height: 44px; }
+.customer-admin-hero__metrics {
+  position: relative;
+  z-index: 2;
+  grid-column: 1 / -1;
+  width: 100%;
+}
 .customer-admin-tabs {
   position: relative;
   z-index: 2;
@@ -117,4 +123,3 @@ html[data-admin-widget-texture='liquidGlass'] .customer-admin-page :is(input, se
   .customer-admin-hero__actions { width: 100%; grid-template-columns: 1fr 1fr; }
   .customer-admin-tabs { overflow-x: auto; }
 }
-

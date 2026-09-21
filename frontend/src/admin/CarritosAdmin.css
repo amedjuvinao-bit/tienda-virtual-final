@@ -68,6 +68,7 @@ html.admin-theme-dark .cart-admin-glass::before { opacity: 0.18; }
 
 .cart-admin-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1.25rem;
@@ -159,6 +160,12 @@ html.admin-theme-dark .cart-admin-feedback.error { color: #fda4af; background-co
   grid-template-columns: repeat(6, minmax(128px, 1fr));
   gap: 0.62rem;
   margin-bottom: 0.72rem;
+}
+
+.cart-admin-header > .cart-admin-metrics {
+  flex: 1 0 100%;
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .cart-admin-metric {

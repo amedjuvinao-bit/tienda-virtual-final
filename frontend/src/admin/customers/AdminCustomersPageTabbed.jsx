@@ -1142,24 +1142,8 @@ export default function AdminCustomersPageTabbed() {
               <Plus className="h-4 w-4" /> Nuevo cliente
             </button>
         </div>
-        <nav aria-label="Vista de clientes" className="customer-admin-tabs">
-          <button type="button" onClick={() => setWorkspaceView('directory')} className={`customer-admin-view-tab${workspaceView === 'directory' ? ' is-active' : ''}`}>
-            <UsersRound className="h-4 w-4" /> Directorio
-          </button>
-          <button type="button" onClick={() => setWorkspaceView('crm')} className={`customer-admin-view-tab${workspaceView === 'crm' ? ' is-active' : ''}`}>
-            <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
-          </button>
-        </nav>
-      </Card>
-
-      {error ? <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
-      {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
-
-      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
-
-      {workspaceView === 'directory' ? (
-        <>
-          <section className="customer-admin-surface overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.04)' }}>
+        {workspaceView === 'directory' ? (
+          <section className="customer-admin-hero__metrics customer-admin-surface overflow-hidden rounded-xl border" aria-label="Indicadores de clientes">
             <div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
               <div className="px-5 py-4">
                 <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>Clientes activos</p>
@@ -1183,7 +1167,24 @@ export default function AdminCustomersPageTabbed() {
               </div>
             </div>
           </section>
+        ) : null}
+        <nav aria-label="Vista de clientes" className="customer-admin-tabs">
+          <button type="button" onClick={() => setWorkspaceView('directory')} className={`customer-admin-view-tab${workspaceView === 'directory' ? ' is-active' : ''}`}>
+            <UsersRound className="h-4 w-4" /> Directorio
+          </button>
+          <button type="button" onClick={() => setWorkspaceView('crm')} className={`customer-admin-view-tab${workspaceView === 'crm' ? ' is-active' : ''}`}>
+            <BriefcaseBusiness className="h-4 w-4" /> Seguimientos CRM
+          </button>
+        </nav>
+      </Card>
 
+      {error ? <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Error</p><p className="mt-1">{error}</p></div></div> : null}
+      {success ? <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Listo</p><p className="mt-1">{success}</p></div></div> : null}
+
+      {workspaceView === 'crm' ? <CustomerCrmWorkspace onOpenCustomer={openCustomerDetail} /> : null}
+
+      {workspaceView === 'directory' ? (
+        <>
           {showForm ? (
             <Card className="p-5">
               <form className="space-y-4" onSubmit={handleCreateCustomer}>

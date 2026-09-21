@@ -707,6 +707,13 @@ export default function InventoryAdmin() {
           </div>
         </div>
 
+        <div className="inventory-dashboard__facts" aria-label="Indicadores de inventario">
+          <DashboardFact label="Stock físico" value={summary.totalStock} help="Unidades registradas" />
+          <DashboardFact label="Productos con stock" value={summary.productsWithStock} help="Referencias disponibles" />
+          <DashboardFact label="Sedes activas" value={branchOptions.length} help="Ubicaciones visibles" />
+          <DashboardFact label="Movimientos" value={summary.totalMovements} help="Registros históricos" />
+        </div>
+
         <div className="inventory-shell__navigation">
           <nav className="inventory-view-tabs" aria-label="Secciones de inventario">
             {INVENTORY_VIEWS.map(({ id, label, icon: Icon }) => {
@@ -762,13 +769,6 @@ export default function InventoryAdmin() {
             <div className="inventory-priority-line inventory-priority-line--neutral">
               <span><ShieldCheck size={18} /></span><div><strong>{formatNumber(summary.totalReserved)} unidades reservadas</strong><small>Separadas para pedidos en proceso</small></div>
             </div>
-          </div>
-
-          <div className="inventory-dashboard__facts">
-            <DashboardFact label="Stock físico" value={summary.totalStock} help="Unidades registradas" />
-            <DashboardFact label="Productos con stock" value={summary.productsWithStock} help="Referencias disponibles" />
-            <DashboardFact label="Sedes activas" value={branchOptions.length} help="Ubicaciones visibles" />
-            <DashboardFact label="Movimientos" value={summary.totalMovements} help="Registros históricos" />
           </div>
 
           <div className="inventory-dashboard__guide">

@@ -247,6 +247,7 @@ describe('composición profesional de filtros de órdenes', () => {
     );
 
     expect(container.querySelectorAll('.orf-card-metric')).toHaveLength(6);
+    expect(container.querySelectorAll('.admin-module-hero .orf-card-metric')).toHaveLength(6);
     expect(screen.getByRole('complementary', { name: 'Filtros y estados de órdenes' }))
       .toHaveAttribute('id', 'orders-control-panel');
     expect(screen.getByText('Reembolsadas')).toBeInTheDocument();

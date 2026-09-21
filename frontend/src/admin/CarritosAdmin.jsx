@@ -452,31 +452,30 @@ export default function CarritosAdmin() {
             </button>
           )}
         </div>
+        <section className="cart-admin-metrics" aria-label="Resumen ejecutivo">
+          {METRIC_CARDS.map(({ key, label, description, icon: Icon, tone, money: isMoney }) => {
+            const value = summary
+              ? isMoney
+                ? money(summary[key])
+                : summary[key]
+              : '\u2014';
+            return (
+              <article key={key} className={`cart-admin-metric cart-admin-glass ${tone}`}>
+                <div className="cart-admin-metric-topline">
+                  <span>{label}</span>
+                  <span className="cart-admin-metric-icon" aria-hidden="true"><Icon size={17} /></span>
+                </div>
+                <strong>{value}</strong>
+                <small>{description}</small>
+              </article>
+            );
+          })}
+        </section>
       </header>
 
       {error && <div className="cart-admin-feedback error cart-admin-glass" role="alert"><span>{error}</span><button type="button" onClick={load}>Reintentar</button></div>}
       {listError && <div className="cart-admin-feedback error cart-admin-glass" role="alert"><span>{listError}</span><button type="button" onClick={load}>Reintentar listado</button></div>}
       {summaryError && <div className="cart-admin-feedback error cart-admin-glass" role="alert"><span>{summaryError}</span><button type="button" onClick={load}>Reintentar resumen</button></div>}
-
-      <section className="cart-admin-metrics" aria-label="Resumen ejecutivo">
-        {METRIC_CARDS.map(({ key, label, description, icon: Icon, tone, money: isMoney }) => {
-          const value = summary
-            ? isMoney
-              ? money(summary[key])
-              : summary[key]
-            : '\u2014';
-          return (
-            <article key={key} className={`cart-admin-metric cart-admin-glass ${tone}`}>
-              <div className="cart-admin-metric-topline">
-                <span>{label}</span>
-                <span className="cart-admin-metric-icon" aria-hidden="true"><Icon size={17} /></span>
-              </div>
-              <strong>{value}</strong>
-              <small>{description}</small>
-            </article>
-          );
-        })}
-      </section>
 
       <section className="cart-admin-controls cart-admin-glass" aria-label="Filtros de carritos">
         <div className="cart-admin-controls-topline">

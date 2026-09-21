@@ -12,10 +12,16 @@
 
 .finance-workspace-hero {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 28px;
   padding: 28px 34px 22px;
+}
+
+.finance-workspace-hero > .finance-summary-grid {
+  flex: 1 0 100%;
+  width: 100%;
 }
 
 .finance-workspace-identity { min-width: 0; }

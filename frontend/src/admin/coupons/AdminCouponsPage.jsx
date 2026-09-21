@@ -1244,22 +1244,21 @@ export default function AdminCouponsPage() {
             ) : null}
           </div>
         </div>
-      </section>
-
-      <section className="coupon-admin-overview" aria-labelledby="coupon-overview-title">
-        <div className="coupon-admin-section-heading">
-          <div>
-            <p className="coupon-admin-section-kicker">Pulso comercial</p>
-            <h2 id="coupon-overview-title">Así están funcionando tus campañas</h2>
+        <section className="coupon-admin-overview coupon-admin-overview--embedded" aria-labelledby="coupon-overview-title">
+          <div className="coupon-admin-section-heading">
+            <div>
+              <p className="coupon-admin-section-kicker">Pulso comercial</p>
+              <h2 id="coupon-overview-title">Así están funcionando tus campañas</h2>
+            </div>
+            <p>Los indicadores se actualizan con la actividad real del checkout y del POS.</p>
           </div>
-          <p>Los indicadores se actualizan con la actividad real del checkout y del POS.</p>
-        </div>
-        <div className="coupon-admin-stats">
-          <StatCard label="Activos" value={stats.active} helper="Compradores pueden usarlos ahora" icon={Check} tone="success" />
-          <StatCard label="Programados" value={stats.scheduled} helper="Listos para una fecha futura" icon={CalendarClock} tone="scheduled" />
-          <StatCard label="Agotados" value={stats.exhausted} helper="Necesitan más usos o revisión" icon={AlertTriangle} tone="warning" />
-          <StatCard label="Usos totales" value={stats.totalUses} helper="Beneficios confirmados" icon={BadgePercent} tone="primary" />
-        </div>
+          <div className="coupon-admin-stats">
+            <StatCard label="Activos" value={stats.active} helper="Compradores pueden usarlos ahora" icon={Check} tone="success" />
+            <StatCard label="Programados" value={stats.scheduled} helper="Listos para una fecha futura" icon={CalendarClock} tone="scheduled" />
+            <StatCard label="Agotados" value={stats.exhausted} helper="Necesitan más usos o revisión" icon={AlertTriangle} tone="warning" />
+            <StatCard label="Usos totales" value={stats.totalUses} helper="Beneficios confirmados" icon={BadgePercent} tone="primary" />
+          </div>
+        </section>
       </section>
 
       {dashboard.alerts?.length ? (
