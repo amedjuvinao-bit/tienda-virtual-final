@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyAdminTheme } from './adminTheme';
+import { applyAdminWidgetTexture } from './adminWidgetTexture';
 
 describe('adminTheme Nivel Plus', () => {
   afterEach(() => {
@@ -58,5 +59,30 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#111827');
     expect(root.style.getPropertyValue('--admin-input-text')).toBe('#111827');
     expect(root.style.getPropertyValue('--admin-radius')).toBe('32px');
+  });
+
+  it('mantiene vidrio líquido oscuro detrás del texto claro', () => {
+    applyAdminTheme({
+      preset: 'darkCyber',
+      pageBg: '#030712',
+      sidebarBg: '#09090b',
+      headerBg: '#18181b',
+      cardBg: '#111827',
+      cardHeaderBg: '#181026',
+      inputBg: '#09090b',
+      modalBg: '#111827',
+      primary: '#a855f7',
+    });
+
+    applyAdminWidgetTexture('liquidGlass');
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
+      'rgba(8,13,27,0.64)'
+    );
+    expect(root.style.getPropertyValue('--admin-widget-button-bg')).toContain(
+      'rgba(8,13,27,0.58)'
+    );
+    expect(root.style.getPropertyValue('--admin-card-text')).toBe('#ffffff');
   });
 });

@@ -165,6 +165,26 @@ const TEXTURE_TOKENS = Object.freeze({
   },
 });
 
+/* Liquid glass uses white reflections in light themes. Reusing that exact
+   material in a dark theme creates a pale surface with white text, making
+   navigation labels and module data disappear. Keep the reflections, but
+   place them over a dark translucent base when the selected theme is dark. */
+const DARK_LIQUID_GLASS_TOKENS = Object.freeze({
+  bg: 'linear-gradient(122deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 24%, transparent 44%, rgba(255,255,255,0.08) 72%, color-mix(in srgb, var(--admin-primary) 14%, rgba(8,13,27,0.58)) 100%), rgba(8,13,27,0.64)',
+  strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.055) 24%, transparent 44%, rgba(255,255,255,0.10) 72%, color-mix(in srgb, var(--admin-primary) 18%, rgba(8,13,27,0.66)) 100%), rgba(8,13,27,0.76)',
+  softBg: 'linear-gradient(122deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 48%, color-mix(in srgb, var(--admin-primary) 10%, rgba(8,13,27,0.48))), rgba(8,13,27,0.54)',
+  inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 48%, color-mix(in srgb, var(--admin-primary) 9%, rgba(8,13,27,0.68))), rgba(8,13,27,0.72)',
+  border: 'color-mix(in srgb, var(--admin-primary) 30%, rgba(255,255,255,0.34))',
+  shadow: '0 18px 46px rgba(0,0,0,0.38), 0 10px 28px color-mix(in srgb, var(--admin-primary) 16%, transparent), inset 0 1px 0 rgba(255,255,255,0.18)',
+  shadowHover: '0 24px 58px rgba(0,0,0,0.46), 0 14px 34px color-mix(in srgb, var(--admin-primary) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.24)',
+  highlight: 'rgba(255,255,255,0.34)',
+  overlay: 'linear-gradient(122deg, rgba(255,255,255,0.13), rgba(255,255,255,0.025) 28%, transparent 48%, rgba(255,255,255,0.06) 72%, transparent)',
+  buttonBg: 'linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.055) 58%, color-mix(in srgb, var(--admin-primary) 14%, rgba(8,13,27,0.54))), rgba(8,13,27,0.58)',
+  buttonOverlay: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.04) 30%, transparent 62%)',
+  buttonShadow: '0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22)',
+  innerBorder: 'rgba(255,255,255,0.22)',
+});
+
 export function normalizeAdminWidgetTexture(value) {
   return TEXTURE_VALUES.has(value) ? value : DEFAULT_ADMIN_WIDGET_TEXTURE;
 }
@@ -213,8 +233,11 @@ function applyLiquidGlassCompatibilityTokens(root) {
 
 export function applyAdminWidgetTexture(value) {
   const texture = normalizeAdminWidgetTexture(value);
-  const tokens = TEXTURE_TOKENS[texture];
   const root = document.documentElement;
+  const tokens =
+    texture === 'liquidGlass' && root.dataset.adminThemeMode === 'dark'
+      ? { ...TEXTURE_TOKENS[texture], ...DARK_LIQUID_GLASS_TOKENS }
+      : TEXTURE_TOKENS[texture];
 
   root.dataset.adminWidgetTexture = texture;
   restoreThemeSurfaceTokens(root);
