@@ -1204,13 +1204,20 @@ export function applyAdminGlobalStyles() {
       outline-offset: var(--admin-widget-inner-border-offset);
     }
 
-    /* These are layout-only wrappers inside an already outlined card. Giving
-       them another liquid-glass rim draws that rim through headings, labels
-       and helper text because the wrappers intentionally have no padding. */
-    html[data-admin-widget-texture="liquidGlass"] .admin-area :is(
+    /* These are layout-only wrappers inside an already styled card. The
+       generic "-panel" material must not turn them into another surface:
+       its border and rounded corners otherwise cross headings and fields. */
+    html .admin-area :is(
       .store-panel,
       .payments-panel
     ) {
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      filter: none !important;
       outline: none !important;
     }
 

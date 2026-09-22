@@ -190,7 +190,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(globalStyles.textContent).toContain('.coupon-form-dialog');
     expect(globalStyles.textContent).toContain('.order-detail-professional-shell');
     expect(globalStyles.textContent).toMatch(
-      /:is\(\s*\.store-panel,\s*\.payments-panel\s*\)\s*\{\s*outline: none !important;/,
+      /:is\(\s*\.store-panel,\s*\.payments-panel\s*\)\s*\{[^}]*background: transparent !important;[^}]*border: 0 !important;[^}]*box-shadow: none !important;[^}]*outline: none !important;/s,
     );
   });
 });
