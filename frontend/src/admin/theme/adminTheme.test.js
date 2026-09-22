@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { applyAdminGlobalStyles } from './adminGlobalStyles';
 import { applyAdminTheme } from './adminTheme';
 import { applyAdminWidgetTexture } from './adminWidgetTexture';
 
@@ -11,6 +12,7 @@ describe('adminTheme Nivel Plus', () => {
     document.documentElement.removeAttribute('data-admin-theme-style');
     document.documentElement.removeAttribute('data-admin-font-preset');
     document.documentElement.removeAttribute('style');
+    document.getElementById('admin-global-glass-styles')?.remove();
   });
 
   it('genera texto claro y firma visual para un tema oscuro', () => {
@@ -84,5 +86,15 @@ describe('adminTheme Nivel Plus', () => {
       'rgba(8,13,27,0.58)'
     );
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#ffffff');
+  });
+
+  it('evita que una imagen clara atraviese el lienzo del vidrio oscuro', () => {
+    applyAdminGlobalStyles();
+
+    const css = document.getElementById('admin-global-glass-styles')?.textContent || '';
+    expect(css).toContain(
+      'html.admin-theme-dark[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card'
+    );
+    expect(css).toContain('background: var(--admin-widget-surface-bg) !important');
   });
 });

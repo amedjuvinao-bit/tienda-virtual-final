@@ -1306,6 +1306,19 @@ export function applyAdminGlobalStyles() {
       outline: none !important;
     }
 
+    /* A bright custom image can cross the transparent structural canvas and
+       visually wash out every dark widget above it. Dark themes therefore
+       keep the same liquid material as a translucent base instead of exposing
+       the image directly. This is intentionally scoped to dark liquid glass. */
+    html.admin-theme-dark[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card,
+    html.admin-theme-dark[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage {
+      background: var(--admin-widget-surface-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      box-shadow: var(--admin-widget-surface-shadow) !important;
+      backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
+      -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation)) contrast(var(--admin-widget-surface-contrast, 1)) !important;
+    }
+
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card::before,
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card::after,
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage::before,
