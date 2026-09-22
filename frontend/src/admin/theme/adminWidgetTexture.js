@@ -165,61 +165,6 @@ const TEXTURE_TOKENS = Object.freeze({
   },
 });
 
-/* Dark themes need illuminated, tinted surfaces instead of stacking almost
-   black panels on an already dark page. These retain each texture's identity
-   while keeping widget boundaries and controls visible. */
-const DARK_TEXTURE_TOKENS = Object.freeze({
-  softGlass: {
-    bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 72%, #334155 28%), color-mix(in srgb, var(--admin-primary) 20%, #172033 80%))',
-    strongBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 62%, #475569 38%), color-mix(in srgb, var(--admin-primary) 24%, #1e293b 76%))',
-    softBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 75%, #334155 25%), color-mix(in srgb, var(--admin-primary) 14%, #172033 86%))',
-    inputBg: 'color-mix(in srgb, var(--admin-input-bg) 72%, #334155 28%)',
-    border: 'color-mix(in srgb, var(--admin-primary) 42%, rgba(255,255,255,.24))',
-    highlight: 'rgba(255,255,255,.20)',
-  },
-  liquidGlass: {
-    bg: 'linear-gradient(122deg, rgba(255,255,255,.18), rgba(255,255,255,.055) 24%, transparent 46%, rgba(255,255,255,.10) 72%, color-mix(in srgb, var(--admin-primary) 18%, rgba(20,28,48,.72))), rgba(20,28,48,.68)',
-    strongBg: 'linear-gradient(122deg, rgba(255,255,255,.23), rgba(255,255,255,.075) 24%, transparent 46%, rgba(255,255,255,.12) 72%, color-mix(in srgb, var(--admin-primary) 22%, rgba(30,41,59,.78))), rgba(30,41,59,.72)',
-    softBg: 'linear-gradient(122deg, rgba(255,255,255,.13), rgba(255,255,255,.035) 45%, color-mix(in srgb, var(--admin-primary) 13%, rgba(20,28,48,.66)))',
-    inputBg: 'linear-gradient(122deg, rgba(255,255,255,.14), rgba(255,255,255,.035) 48%, color-mix(in srgb, var(--admin-primary) 12%, rgba(15,23,42,.76)))',
-    border: 'color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,.48))',
-    highlight: 'rgba(255,255,255,.46)',
-  },
-  frostedGlass: {
-    bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 58%, #475569 42%), color-mix(in srgb, var(--admin-primary) 13%, #273449 87%))',
-    strongBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 48%, #526176 52%), color-mix(in srgb, var(--admin-primary) 17%, #334155 83%))',
-    softBg: 'color-mix(in srgb, var(--admin-card-bg) 62%, #3d4b61 38%)',
-    inputBg: 'color-mix(in srgb, var(--admin-input-bg) 62%, #3d4b61 38%)',
-    border: 'color-mix(in srgb, var(--admin-primary) 28%, rgba(255,255,255,.32))',
-    highlight: 'rgba(255,255,255,.28)',
-  },
-  pearl: {
-    bg: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 68%, #554267 32%), color-mix(in srgb, var(--admin-card-bg) 70%, #31566b 30%))',
-    strongBg: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 56%, #6b4e78 44%), color-mix(in srgb, var(--admin-card-bg) 62%, #3d6478 38%))',
-    softBg: 'linear-gradient(135deg, color-mix(in srgb, var(--admin-card-bg) 72%, #4d3b60 28%), color-mix(in srgb, var(--admin-card-bg) 74%, #315465 26%))',
-    inputBg: 'color-mix(in srgb, var(--admin-input-bg) 70%, #4b415e 30%)',
-    border: 'color-mix(in srgb, var(--admin-primary) 28%, rgba(255,255,255,.38))',
-    highlight: 'rgba(255,255,255,.32)',
-  },
-  solidPremium: {
-    bg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 70%, #334155 30%), color-mix(in srgb, var(--admin-card-bg) 80%, var(--admin-primary) 20%))',
-    strongBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 58%, #475569 42%), color-mix(in srgb, var(--admin-card-bg) 72%, var(--admin-primary) 28%))',
-    softBg: 'color-mix(in srgb, var(--admin-card-bg) 72%, #334155 28%)',
-    inputBg: 'color-mix(in srgb, var(--admin-input-bg) 68%, #334155 32%)',
-    border: 'color-mix(in srgb, var(--admin-primary) 38%, rgba(255,255,255,.26))',
-    buttonBg: 'linear-gradient(145deg, color-mix(in srgb, var(--admin-card-bg) 55%, #475569 45%), color-mix(in srgb, var(--admin-card-bg) 68%, var(--admin-primary) 32%))',
-    highlight: 'rgba(255,255,255,.20)',
-  },
-  minimal: {
-    bg: 'color-mix(in srgb, var(--admin-card-bg) 72%, #273449 28%)',
-    strongBg: 'color-mix(in srgb, var(--admin-card-bg) 60%, #334155 40%)',
-    softBg: 'color-mix(in srgb, var(--admin-card-bg) 76%, #273449 24%)',
-    inputBg: 'color-mix(in srgb, var(--admin-input-bg) 72%, #273449 28%)',
-    border: 'color-mix(in srgb, var(--admin-primary) 24%, rgba(255,255,255,.24))',
-    buttonBg: 'color-mix(in srgb, var(--admin-card-bg) 58%, #3b4960 42%)',
-  },
-});
-
 export function normalizeAdminWidgetTexture(value) {
   return TEXTURE_VALUES.has(value) ? value : DEFAULT_ADMIN_WIDGET_TEXTURE;
 }
@@ -268,11 +213,8 @@ function applyLiquidGlassCompatibilityTokens(root) {
 
 export function applyAdminWidgetTexture(value) {
   const texture = normalizeAdminWidgetTexture(value);
+  const tokens = TEXTURE_TOKENS[texture];
   const root = document.documentElement;
-  const dark = root.dataset.adminThemeMode === 'dark';
-  const tokens = dark
-    ? { ...TEXTURE_TOKENS[texture], ...DARK_TEXTURE_TOKENS[texture] }
-    : TEXTURE_TOKENS[texture];
 
   root.dataset.adminWidgetTexture = texture;
   restoreThemeSurfaceTokens(root);

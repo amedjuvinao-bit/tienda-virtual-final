@@ -15,9 +15,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(118deg, rgba(255,255,255,.28), transparent 34%, color-mix(in srgb, var(--admin-primary) 12%, transparent))',
     navMarker: '4px',
     headingSpacing: '-0.02em',
-    cardRadius: '18px',
-    headerRadius: '18px',
-    navRadius: '12px',
   },
   roseLuxuryLight: {
     style: 'couture',
@@ -25,9 +22,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.48), transparent 38%, color-mix(in srgb, var(--admin-primary) 16%, transparent))',
     navMarker: '7px',
     headingSpacing: '-0.035em',
-    cardRadius: '30px 10px 30px 10px',
-    headerRadius: '26px 10px 26px 10px',
-    navRadius: '18px 6px 18px 6px',
   },
   goldBoutiqueLight: {
     style: 'gilded',
@@ -35,9 +29,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(105deg, rgba(255,255,255,.44), transparent 32%, color-mix(in srgb, var(--admin-primary) 22%, transparent))',
     navMarker: '5px',
     headingSpacing: '-0.018em',
-    cardRadius: '10px',
-    headerRadius: '12px',
-    navRadius: '8px',
   },
   glassPastel: {
     style: 'aero',
@@ -45,9 +36,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(125deg, rgba(255,255,255,.58), transparent 42%, color-mix(in srgb, var(--admin-primary) 14%, transparent))',
     navMarker: '8px',
     headingSpacing: '-0.03em',
-    cardRadius: '30px',
-    headerRadius: '28px',
-    navRadius: '18px',
   },
   pearlFuture: {
     style: 'technical',
@@ -55,9 +43,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(132deg, rgba(255,255,255,.40), transparent 45%, color-mix(in srgb, var(--admin-primary) 12%, transparent))',
     navMarker: '3px',
     headingSpacing: '-0.012em',
-    cardRadius: '7px',
-    headerRadius: '7px',
-    navRadius: '5px',
   },
   neonRoseLight: {
     style: 'pulse',
@@ -65,9 +50,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.42), transparent 34%, color-mix(in srgb, var(--admin-primary) 22%, transparent))',
     navMarker: '8px',
     headingSpacing: '-0.028em',
-    cardRadius: '24px',
-    headerRadius: '24px',
-    navRadius: '999px',
   },
   minimalPro: {
     style: 'minimal',
@@ -75,9 +57,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(180deg, rgba(255,255,255,.12), transparent)',
     navMarker: '3px',
     headingSpacing: '-0.015em',
-    cardRadius: '4px',
-    headerRadius: '4px',
-    navRadius: '4px',
   },
   electricNeon: {
     style: 'electric',
@@ -85,9 +64,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.08), transparent 34%, color-mix(in srgb, var(--admin-primary) 28%, transparent))',
     navMarker: '6px',
     headingSpacing: '-0.018em',
-    cardRadius: '4px 24px 4px 24px',
-    headerRadius: '4px 22px 4px 22px',
-    navRadius: '3px 16px 3px 16px',
   },
   darkCyber: {
     style: 'cyber',
@@ -95,9 +71,6 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(118deg, rgba(255,255,255,.07), transparent 38%, color-mix(in srgb, var(--admin-primary) 30%, transparent))',
     navMarker: '7px',
     headingSpacing: '-0.025em',
-    cardRadius: '5px 22px 5px 22px',
-    headerRadius: '5px 20px 5px 20px',
-    navRadius: '4px 14px 4px 14px',
   },
 });
 
@@ -291,17 +264,6 @@ function getContrastText(bgColor) {
   return darkRatio >= lightRatio ? darkText : lightText;
 }
 
-function getPreferredContrastText(bgColor, preferredText, minimumRatio = 4.5) {
-  if (
-    colorToRgb(preferredText) &&
-    getContrastRatio(bgColor, preferredText) >= minimumRatio
-  ) {
-    return preferredText;
-  }
-
-  return getContrastText(bgColor);
-}
-
 function getMutedContrastText(bgColor) {
   const baseText = getContrastText(bgColor);
   return baseText === '#ffffff' ? '#cbd5e1' : '#6b7280';
@@ -368,9 +330,6 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-theme-header-sheen', signature.headerSheen);
   root.style.setProperty('--admin-theme-nav-marker', signature.navMarker);
   root.style.setProperty('--admin-theme-heading-spacing', signature.headingSpacing);
-  root.style.setProperty('--admin-theme-card-radius', signature.cardRadius);
-  root.style.setProperty('--admin-theme-header-radius', signature.headerRadius);
-  root.style.setProperty('--admin-theme-nav-radius', signature.navRadius);
 
   const pageTextAuto = getContrastText(t.pageBg);
   const pageMutedTextAuto = getMutedContrastText(t.pageBg);
@@ -391,9 +350,9 @@ export function applyAdminTheme(theme) {
   const tableTextAuto = getContrastText(t.cardBg);
   const tableMutedTextAuto = getMutedContrastText(t.cardBg);
 
-  const buttonTextAuto = getPreferredContrastText(t.buttonBg, t.buttonText, 3);
-  const buttonHoverTextAuto = getPreferredContrastText(t.buttonHover, t.buttonText, 3);
-  const buttonSoftTextAuto = getPreferredContrastText(t.buttonSoftBg, t.buttonSoftText);
+  const buttonTextAuto = getContrastText(t.buttonBg);
+  const buttonHoverTextAuto = getContrastText(t.buttonHover);
+  const buttonSoftTextAuto = getContrastText(t.buttonSoftBg);
 
   const disabledTextAuto = getMutedContrastText(t.disabledBg);
 
@@ -408,9 +367,9 @@ export function applyAdminTheme(theme) {
   const lightPanelBorderAuto = '#e5e7eb';
   const lightPanelSoftBgAuto = '#f9fafb';
 
-  const activeNavTextAuto = getPreferredContrastText(t.activeNavBg, t.activeNavText, 3);
+  const activeNavTextAuto = getContrastText(t.activeNavBg);
   const primaryTextAuto = getContrastText(t.primary);
-  const primarySoftTextAuto = getPreferredContrastText(t.primarySoftBg, t.primarySoftText);
+  const primarySoftTextAuto = getContrastText(t.primarySoftBg);
 
   const dangerTextAuto = getContrastText(t.dangerSoftBg);
   const dangerButtonTextAuto = getContrastText(t.danger);

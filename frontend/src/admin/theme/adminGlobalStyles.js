@@ -22,7 +22,6 @@ export function applyAdminGlobalStyles() {
     .admin-area {
       min-height: 100vh;
       font-family: var(--admin-font-body, 'Inter', system-ui, sans-serif);
-      letter-spacing: var(--admin-font-body-spacing, 0);
       background:
         var(--admin-page-glass-overlay),
         var(--admin-page-bg) !important;
@@ -524,7 +523,6 @@ export function applyAdminGlobalStyles() {
     .admin-area h6 {
       color: var(--admin-card-text) !important;
       font-family: var(--admin-font-heading, 'Playfair Display', Georgia, serif);
-      font-weight: var(--admin-font-heading-weight, 700);
       letter-spacing: var(--admin-theme-heading-spacing, -0.02em);
     }
 
@@ -532,16 +530,6 @@ export function applyAdminGlobalStyles() {
     .admin-area label,
     .admin-area small {
       color: inherit;
-    }
-
-    .admin-area :is(h1,h2,h3,h4,h5,h6,p,label,small,td,th,button,a) {
-      max-width: 100%;
-      overflow-wrap: anywhere;
-      word-break: normal;
-    }
-
-    .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) > * {
-      min-width: 0;
     }
 
     .admin-area span:not([class*="bg-"]):not([class*="text-"]) {
@@ -614,12 +602,6 @@ export function applyAdminGlobalStyles() {
     .admin-area .admin-nav-link {
       position: relative;
       overflow: hidden;
-      border-radius: var(--admin-theme-nav-radius, 12px) !important;
-      color: var(--admin-sidebar-text) !important;
-    }
-
-    .admin-area :is(.admin-nav-link,.admin-nav-link-mobile)[aria-current="page"] {
-      color: var(--admin-active-nav-text) !important;
     }
 
     .admin-area .admin-nav-link[aria-current="page"]::before {
@@ -647,29 +629,6 @@ export function applyAdminGlobalStyles() {
       outline-offset: -5px;
     }
 
-    .admin-area .admin-header-panel {
-      border-radius: var(--admin-theme-header-radius, 18px) !important;
-    }
-
-    .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface,.admin-module-hero,.panel-admin-shell,.panel-admin-preview,.panel-admin-actions) {
-      border-radius: var(--admin-theme-card-radius, var(--admin-widget-surface-radius, 18px)) !important;
-    }
-
-    html[data-admin-theme-style="couture"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
-      border-top-width: 2px !important;
-      box-shadow: -12px 18px 50px color-mix(in srgb, var(--admin-primary) 14%, transparent), inset 0 1px 0 rgba(255,255,255,.42) !important;
-    }
-
-    html[data-admin-theme-style="technical"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
-      border-style: solid !important;
-      box-shadow: 8px 8px 0 color-mix(in srgb, var(--admin-primary) 8%, transparent) !important;
-    }
-
-    html[data-admin-theme-style="technical"] .admin-area .admin-section-label {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      letter-spacing: .16em;
-    }
-
     html[data-admin-theme-style="couture"] .admin-area .admin-header-context h1,
     html[data-admin-theme-style="couture"] .admin-area .admin-module-hero__title {
       font-style: italic;
@@ -689,22 +648,12 @@ export function applyAdminGlobalStyles() {
         0 12px 30px color-mix(in srgb, var(--admin-primary) 22%, transparent) !important;
     }
 
-    html[data-admin-theme-style="pulse"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
-      border-bottom-width: 3px !important;
-      border-bottom-color: color-mix(in srgb, var(--admin-primary) 64%, transparent) !important;
-    }
-
     html[data-admin-theme-style="electric"] .admin-area :is(.admin-header-panel,.admin-sidebar-panel) {
       border-color: color-mix(in srgb, var(--admin-primary) 64%, rgba(255,255,255,.12)) !important;
       box-shadow:
         0 0 0 1px color-mix(in srgb, var(--admin-primary) 18%, transparent),
         0 22px 68px rgba(0,0,0,.38),
         0 0 34px color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
-    }
-
-    html[data-admin-theme-style="electric"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
-      border-top-color: color-mix(in srgb, var(--admin-primary) 72%, white 12%) !important;
-      border-right-color: color-mix(in srgb, var(--admin-primary) 46%, transparent) !important;
     }
 
     html[data-admin-theme-style="cyber"] .admin-area :is(.admin-header-panel,.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
@@ -821,14 +770,10 @@ export function applyAdminGlobalStyles() {
     }
 
     /* Inline-styled buttons (preserve their custom color) */
-    .admin-area button[style*="backgroundColor"]:not(.admin-nav-link):not(.admin-nav-link-mobile),
-    .admin-area button[style*="background-color"]:not(.admin-nav-link):not(.admin-nav-link-mobile),
-    .admin-area button[style*="background:"]:not(.admin-nav-link):not(.admin-nav-link-mobile) {
+    .admin-area button[style*="backgroundColor"],
+    .admin-area button[style*="background-color"],
+    .admin-area button[style*="background:"] {
       color: var(--admin-button-text) !important;
-    }
-
-    html.admin-theme-dark .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface,.panel-admin-preview,.panel-admin-actions) {
-      color: var(--admin-card-text) !important;
     }
 
     /* Disabled state */

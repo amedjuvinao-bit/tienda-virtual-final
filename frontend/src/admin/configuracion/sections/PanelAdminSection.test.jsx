@@ -297,9 +297,6 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(globalStyles.textContent).toContain('[class$="-alerts"]');
     expect(globalStyles.textContent).toContain('border-style: solid !important');
     expect(globalStyles.textContent).toContain('background-attachment: fixed !important');
-    expect(globalStyles.textContent).toContain('overflow-wrap: anywhere');
-    expect(globalStyles.textContent).toContain(':not(.admin-nav-link):not(.admin-nav-link-mobile)');
-    expect(globalStyles.textContent).toContain('--admin-theme-card-radius');
     expect(globalStyles.textContent).toContain('.cart-admin-page');
     expect(globalStyles.textContent).toContain('.favorites-admin-page');
     expect(globalStyles.textContent).toContain('.coupon-form-dialog');

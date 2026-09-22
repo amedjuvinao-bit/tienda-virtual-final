@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyAdminTheme } from './adminTheme';
-import { ADMIN_FONT_PRESETS } from './adminTypography';
-import { applyAdminWidgetTexture } from './adminWidgetTexture';
 
 describe('adminTheme Nivel Plus', () => {
   afterEach(() => {
@@ -26,13 +24,8 @@ describe('adminTheme Nivel Plus', () => {
       inputBg: '#09090b',
       modalBg: '#111827',
       primary: '#a855f7',
-      activeNavBg: '#581c87',
-      activeNavText: '#f5d0fe',
-      buttonBg: '#9333ea',
-      buttonText: '#ffffff',
       layout: { radius: 30 },
     });
-    applyAdminWidgetTexture('solidPremium');
 
     const root = document.documentElement;
     expect(root.dataset.adminThemeMode).toBe('dark');
@@ -42,21 +35,7 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-input-text')).toBe('#ffffff');
     expect(root.style.getPropertyValue('--admin-font-heading')).toContain('Cormorant Garamond');
     expect(root.style.getPropertyValue('--admin-theme-pattern')).toContain('repeating-linear-gradient');
-    expect(root.style.getPropertyValue('--admin-theme-card-radius')).toBe('5px 22px 5px 22px');
-    expect(root.style.getPropertyValue('--admin-active-nav-text')).toBe('#f5d0fe');
-    expect(root.style.getPropertyValue('--admin-button-text')).toBe('#ffffff');
-    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain('#334155');
     expect(root.style.getPropertyValue('--admin-radius')).toBe('30px');
-  });
-
-  it('ofrece familias tipográficas distintas también para el texto de lectura', () => {
-    const bodies = new Set(ADMIN_FONT_PRESETS.map((preset) => preset.body));
-    const combinations = new Set(
-      ADMIN_FONT_PRESETS.map((preset) => `${preset.body}|${preset.heading}`)
-    );
-
-    expect(bodies.size).toBe(ADMIN_FONT_PRESETS.length);
-    expect(combinations.size).toBe(ADMIN_FONT_PRESETS.length);
   });
 
   it('genera texto oscuro sobre superficies claras y limita radios extremos', () => {
