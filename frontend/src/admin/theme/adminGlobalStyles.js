@@ -23,7 +23,12 @@ export function applyAdminGlobalStyles() {
       min-height: 100vh;
       background:
         var(--admin-page-glass-overlay),
+        var(--admin-panel-background-image, none),
         var(--admin-page-bg) !important;
+      background-attachment: fixed, fixed, fixed !important;
+      background-position: center, center, center !important;
+      background-repeat: no-repeat, no-repeat, no-repeat !important;
+      background-size: cover, cover, cover !important;
       color: var(--admin-page-text) !important;
     }
 
@@ -47,6 +52,14 @@ export function applyAdminGlobalStyles() {
         var(--admin-glass-overlay),
         linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
       opacity: 0.88;
+    }
+
+    html[data-admin-panel-background="image"] .admin-area::before {
+      opacity: 0.54;
+    }
+
+    html.admin-theme-dark[data-admin-panel-background="image"] .admin-area::before {
+      opacity: 0.68;
     }
 
     /* Ambient radial glows */

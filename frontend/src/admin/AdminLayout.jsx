@@ -46,6 +46,10 @@ import api from '../lib/api';
 import { applyAdminTheme } from './theme/adminTheme';
 import { applyAdminLayoutStyles } from './theme/adminLayoutStyles';
 import { applyAdminGlobalStyles } from './theme/adminGlobalStyles';
+import {
+  applyAdminPanelBackground,
+  DEFAULT_ADMIN_PANEL_BACKGROUND,
+} from './theme/adminPanelBackground';
 import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import './theme/adminModuleHero.css';
@@ -163,6 +167,9 @@ export default function AdminLayout() {
         applyAdminTheme(theme);
         applyAdminLayoutStyles(theme);
         applyAdminGlobalStyles();
+        applyAdminPanelBackground(
+          res?.data?.admin?.background || DEFAULT_ADMIN_PANEL_BACKGROUND
+        );
         setAdminBrandLogo(headerLogo);
       } catch (error) {
         console.error('❌ Error al cargar apariencia del panel admin:', error);
@@ -170,6 +177,7 @@ export default function AdminLayout() {
         applyAdminTheme({});
         applyAdminLayoutStyles({});
         applyAdminGlobalStyles();
+        applyAdminPanelBackground(DEFAULT_ADMIN_PANEL_BACKGROUND);
         setAdminBrandLogo('');
       }
     }

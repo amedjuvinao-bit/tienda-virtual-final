@@ -131,6 +131,10 @@ function buildDefaultSettings() {
       theme: {},
       layout: "default",
       sidebar: "expanded",
+      background: {
+        enabled: false,
+        image: "",
+      },
     },
 
     loginAdmin: {
@@ -266,6 +270,56 @@ function isInvalidSettingsSection(value) {
   );
 }
 
+function validateAdminBackground(admin) {
+  if (
+    !admin ||
+    !Object.prototype.hasOwnProperty.call(admin, "background")
+  ) {
+    return null;
+  }
+
+  const background = admin.background;
+  if (!background || typeof background !== "object" || Array.isArray(background)) {
+    return "admin.background debe ser un objeto";
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(background, "enabled") &&
+    typeof background.enabled !== "boolean"
+  ) {
+    return "admin.background.enabled debe ser verdadero o falso";
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(background, "image") &&
+    typeof background.image !== "string"
+  ) {
+    return "admin.background.image debe ser una URL";
+  }
+
+  const image = String(background.image || "").trim();
+  if (background.enabled && !image) {
+    return "Debes cargar una imagen antes de activar el fondo del panel";
+  }
+
+  if (!image) return null;
+
+  try {
+    const url = new URL(image);
+    if (
+      url.protocol !== "https:" ||
+      url.hostname !== "res.cloudinary.com" ||
+      !url.pathname.includes("/image/upload/")
+    ) {
+      return "El fondo del panel debe ser una imagen segura de Cloudinary";
+    }
+  } catch {
+    return "La URL del fondo del panel no es válida";
+  }
+
+  return null;
+}
+
 /**
  * ✅ autocorrige documentos viejos para que tengan theme.sections
  */
@@ -297,6 +351,10 @@ async function ensureAdminAppearanceExists() {
       theme: {},
       layout: "default",
       sidebar: "expanded",
+      background: {
+        enabled: false,
+        image: "",
+      },
     };
   }
 
@@ -525,6 +583,14 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
     }
     if (isInvalidSettingsSection(admin)) {
       return res.status(400).json({ error: "admin debe ser un objeto" });
+    }
+    const adminBackgroundError = validateAdminBackground(admin);
+    if (adminBackgroundError) {
+      return res.status(400).json({
+        ok: false,
+        error: "INVALID_ADMIN_BACKGROUND",
+        message: adminBackgroundError,
+      });
     }
     if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });

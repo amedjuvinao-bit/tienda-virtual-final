@@ -341,6 +341,11 @@ const AdminAppearanceSchema = new Schema(
       type: String,
       default: "expanded",
     },
+
+    background: {
+      enabled: { type: Boolean, default: false },
+      image: { type: String, default: "" },
+    },
   },
   { _id: false, strict: false }
 );

@@ -48,6 +48,8 @@ class CloudinaryMulterStorage {
           size: result.bytes,
           filename: result.public_id,
           resourceType: result.resource_type,
+          width: result.width,
+          height: result.height,
         });
       })
       .catch(callback);

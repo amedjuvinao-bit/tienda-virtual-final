@@ -5,6 +5,8 @@ import {
   ChevronRight,
   Eye,
   Gem,
+  Image as ImageIcon,
+  ImageOff,
   LayoutDashboard,
   LoaderCircle,
   PanelLeft,
@@ -12,10 +14,16 @@ import {
   Save,
   Sparkles,
   Undo2,
+  UploadCloud,
 } from 'lucide-react';
 import api from '../../../lib/api';
 import { applyAdminTheme, ADMIN_THEME_DEFAULT } from '../../theme/adminTheme';
 import { applyAdminLayoutStyles } from '../../theme/adminLayoutStyles';
+import {
+  applyAdminPanelBackground,
+  DEFAULT_ADMIN_PANEL_BACKGROUND,
+  normalizeAdminPanelBackground,
+} from '../../theme/adminPanelBackground';
 import {
   ADMIN_WIDGET_TEXTURES,
   DEFAULT_ADMIN_WIDGET_TEXTURE,
@@ -453,7 +461,38 @@ const DEFAULT_PANEL_SELECTION = Object.freeze({
   preset: 'systemDefault',
   sidebar: 'expanded',
   widgetTexture: DEFAULT_ADMIN_WIDGET_TEXTURE,
+  background: DEFAULT_ADMIN_PANEL_BACKGROUND,
 });
+
+const ADMIN_BACKGROUND_MAX_BYTES = 8 * 1024 * 1024;
+const ADMIN_BACKGROUND_FORMATS = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
+function inspectImageDimensions(file) {
+  if (
+    typeof globalThis.Image !== 'function' ||
+    typeof globalThis.URL?.createObjectURL !== 'function'
+  ) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = globalThis.URL.createObjectURL(file);
+    const image = new globalThis.Image();
+    const finish = (dimensions) => {
+      globalThis.URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+
+    image.onload = () =>
+      finish({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => finish(null);
+    image.src = objectUrl;
+  });
+}
 
 const ADMIN_THEME_OPTIONS = [
   {
@@ -582,12 +621,14 @@ function applySelection(selection) {
   );
   applyAdminTheme(nextTheme);
   applyAdminLayoutStyles(nextTheme);
+  applyAdminPanelBackground(selection.background);
   return nextTheme;
 }
 
-function applyThemeObject(theme) {
+function applyThemeObject(theme, background = DEFAULT_ADMIN_PANEL_BACKGROUND) {
   applyAdminTheme(theme);
   applyAdminLayoutStyles(theme);
+  applyAdminPanelBackground(background);
 }
 
 function selectionFromAdmin(admin = {}) {
@@ -599,14 +640,17 @@ function selectionFromAdmin(admin = {}) {
     ? admin.sidebar
     : DEFAULT_PANEL_SELECTION.sidebar;
   const widgetTexture = normalizeAdminWidgetTexture(admin?.theme?.widgetTexture);
+  const background = normalizeAdminPanelBackground(admin?.background);
 
-  return { preset, sidebar, widgetTexture };
+  return { preset, sidebar, widgetTexture, background };
 }
 
 function getErrorMessage(error) {
   return (
     error?.response?.data?.message ||
     error?.response?.data?.error ||
+    error?.userMessage ||
+    error?.message ||
     'No fue posible guardar la apariencia. Inténtalo nuevamente.'
   );
 }
@@ -614,6 +658,7 @@ function getErrorMessage(error) {
 export default function PanelAdminSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
   const [savedSelection, setSavedSelection] = useState(DEFAULT_PANEL_SELECTION);
   const [draftSelection, setDraftSelection] = useState(DEFAULT_PANEL_SELECTION);
   const [feedback, setFeedback] = useState(null);
@@ -629,7 +674,9 @@ export default function PanelAdminSection() {
   const dirty =
     draftSelection.preset !== savedSelection.preset ||
     draftSelection.sidebar !== savedSelection.sidebar ||
-    draftSelection.widgetTexture !== savedSelection.widgetTexture;
+    draftSelection.widgetTexture !== savedSelection.widgetTexture ||
+    draftSelection.background.enabled !== savedSelection.background.enabled ||
+    draftSelection.background.image !== savedSelection.background.image;
 
   const selectedThemeOption = useMemo(
     () =>
@@ -681,7 +728,7 @@ export default function PanelAdminSection() {
         setDraftSelection(selection);
         savedSelectionRef.current = selection;
         savedThemeRef.current = persistedTheme;
-        applyThemeObject(persistedTheme);
+        applyThemeObject(persistedTheme, selection.background);
       } catch (error) {
         if (!active) return;
         setFeedback({ type: 'error', text: getErrorMessage(error) });
@@ -694,7 +741,10 @@ export default function PanelAdminSection() {
 
     return () => {
       active = false;
-      applyThemeObject(savedThemeRef.current);
+      applyThemeObject(
+        savedThemeRef.current,
+        savedSelectionRef.current.background
+      );
     };
   }, []);
 
@@ -702,6 +752,77 @@ export default function PanelAdminSection() {
     setDraftSelection(nextSelection);
     setFeedback(null);
     applySelection(nextSelection);
+  };
+
+  const handleBackgroundUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!ADMIN_BACKGROUND_FORMATS.has(file.type)) {
+      setFeedback({
+        type: 'error',
+        text: 'Formato no permitido. Usa una imagen JPG, PNG o WebP.',
+      });
+      return;
+    }
+
+    if (file.size > ADMIN_BACKGROUND_MAX_BYTES) {
+      setFeedback({
+        type: 'error',
+        text: 'La imagen supera 8 MB. Optimízala antes de volver a cargarla.',
+      });
+      return;
+    }
+
+    try {
+      setUploadingBackground(true);
+      setFeedback({ type: 'info', text: 'Subiendo fondo seguro a Cloudinary…' });
+      const dimensions = await inspectImageDimensions(file);
+      const form = new FormData();
+      form.append('image', file);
+      const response = await api.post(
+        '/api/uploads?profile=admin-panel-background',
+        form,
+        { timeout: 60000 }
+      );
+      const background = normalizeAdminPanelBackground({
+        enabled: true,
+        image: response?.data?.url,
+      });
+
+      if (!background.image) {
+        throw new Error('El servidor no devolvió una URL válida de Cloudinary.');
+      }
+
+      previewSelection({ ...draftSelection, background });
+
+      const lowResolution =
+        dimensions && (dimensions.width < 1920 || dimensions.height < 1080);
+      setFeedback({
+        type: lowResolution ? 'info' : 'success',
+        text: dimensions
+          ? lowResolution
+            ? `Fondo cargado (${dimensions.width} × ${dimensions.height} px). Se verá mejor con mínimo 1920 × 1080 px. Guarda para aplicarlo definitivamente.`
+            : `Fondo cargado (${dimensions.width} × ${dimensions.height} px). Guarda para aplicarlo definitivamente.`
+          : 'Fondo cargado en Cloudinary. Guarda para aplicarlo definitivamente.',
+      });
+    } catch (error) {
+      setFeedback({ type: 'error', text: getErrorMessage(error) });
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
+
+  const handleBackgroundRemove = () => {
+    previewSelection({
+      ...draftSelection,
+      background: DEFAULT_ADMIN_PANEL_BACKGROUND,
+    });
+    setFeedback({
+      type: 'info',
+      text: 'El fondo se quitó de la vista previa. Guarda para confirmar el cambio.',
+    });
   };
 
   const handleSave = async () => {
@@ -721,6 +842,7 @@ export default function PanelAdminSection() {
         admin: {
           theme: requestedTheme,
           sidebar: draftSelection.sidebar,
+          background: draftSelection.background,
         },
       });
 
@@ -729,20 +851,21 @@ export default function PanelAdminSection() {
       const confirmedSelection = selectionFromAdmin({
         theme: confirmedTheme,
         sidebar: confirmedAdmin.sidebar || draftSelection.sidebar,
+        background: confirmedAdmin.background || draftSelection.background,
       });
 
       setSavedSelection(confirmedSelection);
       setDraftSelection(confirmedSelection);
       savedSelectionRef.current = confirmedSelection;
       savedThemeRef.current = confirmedTheme;
-      applyThemeObject(confirmedTheme);
+      applyThemeObject(confirmedTheme, confirmedSelection.background);
       setFeedback({
         type: 'success',
         text: 'Apariencia guardada y aplicada en todo el panel.',
       });
     } catch (error) {
       setDraftSelection(previousSelection);
-      applyThemeObject(savedThemeRef.current);
+      applyThemeObject(savedThemeRef.current, previousSelection.background);
       setFeedback({ type: 'error', text: getErrorMessage(error) });
     } finally {
       setSaving(false);
@@ -751,12 +874,15 @@ export default function PanelAdminSection() {
 
   const handleCancel = () => {
     setDraftSelection(savedSelection);
-    applyThemeObject(savedThemeRef.current);
+    applyThemeObject(savedThemeRef.current, savedSelection.background);
     setFeedback({ type: 'info', text: 'Vista previa descartada.' });
   };
 
   const handleRestore = () => {
-    previewSelection(DEFAULT_PANEL_SELECTION);
+    previewSelection({
+      ...DEFAULT_PANEL_SELECTION,
+      background: { ...DEFAULT_ADMIN_PANEL_BACKGROUND },
+    });
     setFeedback({
       type: 'info',
       text: 'Configuración predeterminada preparada. Guárdala para aplicarla.',
@@ -794,7 +920,10 @@ export default function PanelAdminSection() {
         </div>
       )}
 
-      <div className="panel-admin-workspace" aria-busy={loading || saving}>
+      <div
+        className="panel-admin-workspace"
+        aria-busy={loading || saving || uploadingBackground}
+      >
         <div className="panel-admin-settings">
           <div className="panel-admin-section-heading">
             <div>
@@ -818,7 +947,7 @@ export default function PanelAdminSection() {
                   type="button"
                   className={`panel-admin-theme-card${selected ? ' is-selected' : ''}`}
                   aria-pressed={selected}
-                  disabled={loading || saving}
+                  disabled={loading || saving || uploadingBackground}
                   onClick={() =>
                     previewSelection({ ...draftSelection, preset: option.value })
                   }
@@ -856,7 +985,7 @@ export default function PanelAdminSection() {
                   type="button"
                   className={`panel-admin-sidebar-option${selected ? ' is-selected' : ''}`}
                   aria-pressed={selected}
-                  disabled={loading || saving}
+                  disabled={loading || saving || uploadingBackground}
                   onClick={() =>
                     previewSelection({ ...draftSelection, sidebar: option.value })
                   }
@@ -891,7 +1020,7 @@ export default function PanelAdminSection() {
                   data-texture={option.value}
                   className={`panel-admin-texture-option${selected ? ' is-selected' : ''}`}
                   aria-pressed={selected}
-                  disabled={loading || saving}
+                  disabled={loading || saving || uploadingBackground}
                   onClick={() =>
                     previewSelection({
                       ...draftSelection,
@@ -913,6 +1042,99 @@ export default function PanelAdminSection() {
                 </button>
               );
             })}
+          </div>
+
+          <div className="panel-admin-section-heading panel-admin-section-heading--background">
+            <div>
+              <span>04 · Fondo general</span>
+              <h3>Personaliza todo el panel con tu imagen</h3>
+            </div>
+            <p>Se mantiene fija mientras navegas</p>
+          </div>
+
+          <div className="panel-admin-background-editor">
+            <div
+              className={`panel-admin-background-preview${
+                draftSelection.background.enabled ? ' has-image' : ''
+              }`}
+              style={
+                draftSelection.background.enabled
+                  ? {
+                      backgroundImage: `linear-gradient(135deg, rgba(15,23,42,.18), rgba(255,255,255,.08)), url("${draftSelection.background.image}")`,
+                    }
+                  : undefined
+              }
+            >
+              {draftSelection.background.enabled ? (
+                <div className="panel-admin-background-preview__status">
+                  <Check size={16} /> Imagen lista para usar
+                </div>
+              ) : (
+                <div className="panel-admin-background-preview__empty">
+                  <ImageIcon size={30} />
+                  <strong>Fondo del tema actual</strong>
+                  <span>Sube una imagen para verla aquí y en todo el panel.</span>
+                </div>
+              )}
+            </div>
+
+            <div className="panel-admin-background-guide">
+              <div className="panel-admin-background-guide__heading">
+                <ImageIcon size={18} />
+                <div>
+                  <strong>Cómo debe ser la imagen</strong>
+                  <span>Estas medidas evitan pixelación y recortes incómodos.</span>
+                </div>
+              </div>
+              <ul>
+                <li><b>Ideal:</b> 2560 × 1440 px, formato horizontal 16:9.</li>
+                <li><b>Mínimo:</b> 1920 × 1080 px.</li>
+                <li><b>Formatos:</b> WebP recomendado; también JPG o PNG.</li>
+                <li><b>Peso máximo:</b> 8 MB. Evita texto importante en los bordes.</li>
+              </ul>
+              <div className="panel-admin-background-actions">
+                <label
+                  className={`panel-admin-button panel-admin-button--primary panel-admin-upload-button${
+                    uploadingBackground ? ' is-disabled' : ''
+                  }`}
+                >
+                  {uploadingBackground ? (
+                    <LoaderCircle className="panel-admin-spin" size={17} />
+                  ) : (
+                    <UploadCloud size={17} />
+                  )}
+                  {uploadingBackground
+                    ? 'Subiendo a Cloudinary…'
+                    : draftSelection.background.enabled
+                      ? 'Cambiar imagen'
+                      : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-label="Seleccionar imagen de fondo del panel"
+                    disabled={loading || saving || uploadingBackground}
+                    onChange={handleBackgroundUpload}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="panel-admin-button panel-admin-button--danger-soft"
+                  disabled={
+                    !draftSelection.background.enabled ||
+                    loading ||
+                    saving ||
+                    uploadingBackground
+                  }
+                  onClick={handleBackgroundRemove}
+                >
+                  <ImageOff size={17} /> Quitar fondo
+                </button>
+              </div>
+              <small>
+                La carga se guarda en Cloudinary. El panel conserva una capa de
+                contraste para que menús y textos sigan siendo legibles.
+              </small>
+            </div>
           </div>
         </div>
 
@@ -938,6 +1160,9 @@ export default function PanelAdminSection() {
               '--preview-muted': selectedTheme.cardMutedText,
               '--preview-sidebar': selectedTheme.sidebarBg,
               '--preview-radius': `${selectedTheme.layout?.radius || 18}px`,
+              '--preview-background-image': draftSelection.background.enabled
+                ? `url("${draftSelection.background.image}")`
+                : 'none',
             }}
           >
             <div className={`panel-admin-preview__sidebar is-${draftSelection.sidebar}`}>
@@ -955,6 +1180,7 @@ export default function PanelAdminSection() {
             <li><LayoutDashboard size={16} /><span><strong>Tema</strong>{selectedThemeOption.label}</span></li>
             <li><PanelLeft size={16} /><span><strong>Navegación</strong>{SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}</span></li>
             <li><Gem size={16} /><span><strong>Textura</strong>{selectedTextureOption.label}</span></li>
+            <li><ImageIcon size={16} /><span><strong>Fondo</strong>{draftSelection.background.enabled ? 'Imagen personalizada' : 'Color del tema'}</span></li>
             <li><Check size={16} /><span><strong>Alcance</strong>Todo el panel administrativo</span></li>
           </ul>
         </aside>
@@ -966,13 +1192,13 @@ export default function PanelAdminSection() {
           <span>El cambio queda protegido por permisos y registrado en la auditoría.</span>
         </div>
         <div className="panel-admin-actions__buttons">
-          <button type="button" className="panel-admin-button panel-admin-button--ghost" onClick={handleRestore} disabled={loading || saving}>
+          <button type="button" className="panel-admin-button panel-admin-button--ghost" onClick={handleRestore} disabled={loading || saving || uploadingBackground}>
             <RotateCcw size={16} /> Restaurar predeterminado
           </button>
-          <button type="button" className="panel-admin-button panel-admin-button--secondary" onClick={handleCancel} disabled={!dirty || saving}>
+          <button type="button" className="panel-admin-button panel-admin-button--secondary" onClick={handleCancel} disabled={!dirty || saving || uploadingBackground}>
             <Undo2 size={16} /> Cancelar
           </button>
-          <button type="button" className="panel-admin-button panel-admin-button--primary" onClick={handleSave} disabled={!dirty || loading || saving}>
+          <button type="button" className="panel-admin-button panel-admin-button--primary" onClick={handleSave} disabled={!dirty || loading || saving || uploadingBackground}>
             {saving ? <LoaderCircle className="panel-admin-spin" size={17} /> : <Save size={17} />}
             {saving ? 'Guardando…' : 'Guardar apariencia'}
             {!saving && <ChevronRight size={16} />}

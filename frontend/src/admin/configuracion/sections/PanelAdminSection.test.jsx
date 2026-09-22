@@ -11,6 +11,7 @@ vi.mock('../../../lib/api', () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -18,11 +19,13 @@ function settingsResponse({
   preset = 'roseLuxuryLight',
   sidebar = 'expanded',
   widgetTexture = 'softGlass',
+  background = { enabled: false, image: '' },
 } = {}) {
   return {
     data: {
       admin: {
         sidebar,
+        background,
         theme: {
           preset,
           widgetTexture,
@@ -48,6 +51,11 @@ describe('PanelAdminSection Nivel Plus', () => {
     api.put.mockImplementation(async (_url, body) => ({
       data: { admin: body.admin },
     }));
+    api.post.mockResolvedValue({
+      data: {
+        url: 'https://res.cloudinary.com/demo/image/upload/admin/panel.webp',
+      },
+    });
   });
 
   it('carga la configuración protegida y presenta controles claros sin guardar', async () => {
@@ -59,8 +67,80 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(screen.getByRole('button', { name: /Rosa luxury/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Amplio/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Cómo debe ser la imagen')).toBeInTheDocument();
+    expect(screen.getByText(/2560 × 1440 px/i)).toBeInTheDocument();
+    expect(screen.getByText(/Peso máximo:/i)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(0);
     expect(api.put).not.toHaveBeenCalled();
+  });
+
+  it('sube el fondo a Cloudinary, lo previsualiza y lo guarda para todo el panel', async () => {
+    const user = userEvent.setup();
+    render(<PanelAdminSection />);
+    await screen.findByText('Configuración sincronizada');
+
+    const file = new File(['fondo-panel'], 'fondo-panel.webp', {
+      type: 'image/webp',
+    });
+    await user.upload(
+      screen.getByLabelText('Seleccionar imagen de fondo del panel'),
+      file
+    );
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/uploads?profile=admin-panel-background',
+        expect.any(FormData),
+        { timeout: 60000 }
+      )
+    );
+    expect(await screen.findByText('Imagen lista para usar')).toBeInTheDocument();
+    expect(document.documentElement.dataset.adminPanelBackground).toBe('image');
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--admin-panel-background-image'
+      )
+    ).toContain('res.cloudinary.com');
+
+    await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    expect(api.put).toHaveBeenCalledWith('/api/site-settings', {
+      admin: expect.objectContaining({
+        background: {
+          enabled: true,
+          image: 'https://res.cloudinary.com/demo/image/upload/admin/panel.webp',
+        },
+      }),
+    });
+  });
+
+  it('permite quitar una imagen guardada y volver al fondo del tema', async () => {
+    const user = userEvent.setup();
+    api.get.mockResolvedValueOnce(
+      settingsResponse({
+        background: {
+          enabled: true,
+          image: 'https://res.cloudinary.com/demo/image/upload/admin/existing.webp',
+        },
+      })
+    );
+    render(<PanelAdminSection />);
+    await screen.findByText('Configuración sincronizada');
+
+    await user.click(screen.getByRole('button', { name: /Quitar fondo/i }));
+
+    expect(screen.getByText('Fondo del tema actual')).toBeInTheDocument();
+    expect(document.documentElement.dataset.adminPanelBackground).toBe('theme');
+    expect(screen.getByText(/El fondo se quitó de la vista previa/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    expect(api.put).toHaveBeenCalledWith('/api/site-settings', {
+      admin: expect.objectContaining({
+        background: { enabled: false, image: '' },
+      }),
+    });
   });
 
   it('mantiene los cambios como vista previa hasta que el usuario guarda', async () => {
