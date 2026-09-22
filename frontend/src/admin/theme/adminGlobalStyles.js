@@ -769,12 +769,9 @@ export function applyAdminGlobalStyles() {
       -webkit-backdrop-filter: blur(18px) saturate(1.5);
     }
 
-    /* Inline-styled buttons (preserve their custom color) */
-    .admin-area button[style*="backgroundColor"],
-    .admin-area button[style*="background-color"],
-    .admin-area button[style*="background:"] {
-      color: var(--admin-button-text) !important;
-    }
+    /* Inline-styled buttons keep the foreground declared by their component.
+       A blanket primary-text override made soft dark buttons render dark ink
+       over a dark surface and also broke white labels on light surfaces. */
 
     /* Disabled state */
     .admin-area button:disabled,
@@ -1074,13 +1071,15 @@ export function applyAdminGlobalStyles() {
         inset 0 1px 0 rgba(255,255,255,0.08);
     }
 
-    /* Inline white backgrounds in dark mode */
-    html.admin-theme-dark .admin-area [style*="background-color: rgb(255"],
-    html.admin-theme-dark .admin-area [style*="background-color:#fff"],
-    html.admin-theme-dark .admin-area [style*="background-color: #fff"],
-    html.admin-theme-dark .admin-area [style*="background: rgb(255"],
-    html.admin-theme-dark .admin-area [style*="background:#fff"],
-    html.admin-theme-dark .admin-area [style*="background: #fff"] {
+    /* An explicitly white inline surface always needs dark ink, independent
+       of the active theme. This also covers legacy components that combine
+       a white background with a fixed white text utility. */
+    .admin-area [style*="background-color: rgb(255"],
+    .admin-area [style*="background-color:#fff"],
+    .admin-area [style*="background-color: #fff"],
+    .admin-area [style*="background: rgb(255"],
+    .admin-area [style*="background:#fff"],
+    .admin-area [style*="background: #fff"] {
       color: #111827 !important;
     }
 

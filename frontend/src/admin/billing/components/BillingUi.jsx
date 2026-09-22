@@ -47,7 +47,7 @@ export function BillingMetricCard({
           <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>
             {label}
           </p>
-          <p className={`${featured ? 'text-3xl' : 'text-2xl'} mt-2 break-words font-black leading-tight [overflow-wrap:anywhere]`}>{value}</p>
+          <p className={`${featured ? 'text-3xl' : 'text-2xl'} mt-2 break-words font-black leading-tight`}>{value}</p>
           <p className="mt-2 break-words text-xs font-semibold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
             {helper}
           </p>

@@ -264,6 +264,17 @@ function getContrastText(bgColor) {
   return darkRatio >= lightRatio ? darkText : lightText;
 }
 
+function getPreferredContrastText(bgColor, preferredText, minimumRatio = 4.5) {
+  if (
+    colorToRgb(preferredText) &&
+    getContrastRatio(bgColor, preferredText) >= minimumRatio
+  ) {
+    return preferredText;
+  }
+
+  return getContrastText(bgColor);
+}
+
 function getMutedContrastText(bgColor) {
   const baseText = getContrastText(bgColor);
   return baseText === '#ffffff' ? '#cbd5e1' : '#6b7280';
@@ -350,11 +361,17 @@ export function applyAdminTheme(theme) {
   const tableTextAuto = getContrastText(t.cardBg);
   const tableMutedTextAuto = getMutedContrastText(t.cardBg);
 
-  const buttonTextAuto = getContrastText(t.buttonBg);
-  const buttonHoverTextAuto = getContrastText(t.buttonHover);
-  const buttonSoftTextAuto = getContrastText(t.buttonSoftBg);
+  const buttonTextAuto = getPreferredContrastText(t.buttonBg, t.buttonText, 3);
+  const buttonHoverTextAuto = getPreferredContrastText(t.buttonHover, t.buttonText, 3);
+  const buttonSoftTextAuto = getPreferredContrastText(t.buttonSoftBg, t.buttonSoftText);
 
-  const disabledTextAuto = getMutedContrastText(t.disabledBg);
+  const hasDisabledBg = Object.prototype.hasOwnProperty.call(normalizedTheme, 'disabledBg');
+  const hasDisabledText = Object.prototype.hasOwnProperty.call(normalizedTheme, 'disabledText');
+  const hasDisabledBorder = Object.prototype.hasOwnProperty.call(normalizedTheme, 'disabledBorder');
+  const disabledBg = hasDisabledBg ? t.disabledBg : t.buttonSoftBg;
+  const disabledText = hasDisabledText ? t.disabledText : t.buttonSoftText;
+  const disabledBorder = hasDisabledBorder ? t.disabledBorder : t.buttonSoftBorder;
+  const disabledTextAuto = getPreferredContrastText(disabledBg, disabledText);
 
   const inputTextAuto = getContrastText(t.inputBg);
   const inputPlaceholderAuto = getPlaceholderContrastText(t.inputBg);
@@ -425,6 +442,8 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-primary', t.primary);
   root.style.setProperty('--admin-primary-hover', t.primaryHover);
   root.style.setProperty('--admin-primary-text', primaryTextAuto);
+  root.style.setProperty('--admin-accent', t.primary);
+  root.style.setProperty('--admin-accent-text', primaryTextAuto);
 
   root.style.setProperty('--admin-primary-soft-bg', t.primarySoftBg);
   root.style.setProperty('--admin-primary-soft-hover', t.primarySoftHover);
@@ -504,10 +523,12 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-button-soft-bg', t.buttonSoftBg);
   root.style.setProperty('--admin-button-soft-text', buttonSoftTextAuto);
   root.style.setProperty('--admin-button-soft-border', t.buttonSoftBorder);
+  root.style.setProperty('--admin-soft-bg', t.buttonSoftBg);
+  root.style.setProperty('--admin-soft-text', buttonSoftTextAuto);
 
-  root.style.setProperty('--admin-disabled-bg', t.disabledBg);
+  root.style.setProperty('--admin-disabled-bg', disabledBg);
   root.style.setProperty('--admin-disabled-text', disabledTextAuto);
-  root.style.setProperty('--admin-disabled-border', t.disabledBorder);
+  root.style.setProperty('--admin-disabled-border', disabledBorder);
 
   root.style.setProperty('--admin-theme-input-bg', t.inputBg);
   root.style.setProperty('--admin-theme-input-border', t.inputBorder);

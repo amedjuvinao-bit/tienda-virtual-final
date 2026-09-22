@@ -36,9 +36,34 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.dataset.adminFontPreset).toBe('boutiqueEditorial');
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#ffffff');
     expect(root.style.getPropertyValue('--admin-input-text')).toBe('#ffffff');
+    expect(root.style.getPropertyValue('--admin-accent')).toBe('#a855f7');
     expect(root.style.getPropertyValue('--admin-font-heading')).toContain('Cormorant Garamond');
     expect(root.style.getPropertyValue('--admin-theme-pattern')).toContain('repeating-linear-gradient');
     expect(root.style.getPropertyValue('--admin-radius')).toBe('30px');
+  });
+
+  it('define superficies suaves y estados deshabilitados legibles en oscuro', () => {
+    applyAdminTheme({
+      preset: 'darkCyber',
+      pageBg: '#030712',
+      sidebarBg: '#09090b',
+      headerBg: '#18181b',
+      cardBg: '#111827',
+      cardHeaderBg: '#181026',
+      buttonSoftBg: '#181026',
+      buttonSoftText: '#d8b4fe',
+      buttonSoftBorder: '#7e22ce',
+      inputBg: '#09090b',
+      modalBg: '#111827',
+      primary: '#a855f7',
+    });
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-soft-bg')).toBe('#181026');
+    expect(root.style.getPropertyValue('--admin-soft-text')).toBe('#d8b4fe');
+    expect(root.style.getPropertyValue('--admin-disabled-bg')).toBe('#181026');
+    expect(root.style.getPropertyValue('--admin-disabled-text')).toBe('#d8b4fe');
+    expect(root.style.getPropertyValue('--admin-disabled-border')).toBe('#7e22ce');
   });
 
   it('genera texto oscuro sobre superficies claras y limita radios extremos', () => {
@@ -96,5 +121,7 @@ describe('adminTheme Nivel Plus', () => {
       'html.admin-theme-dark[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card'
     );
     expect(css).toContain('background: var(--admin-widget-surface-bg) !important');
+    expect(css).toContain('An explicitly white inline surface always needs dark ink');
+    expect(css).not.toContain('color: var(--admin-button-text) !important;\n    }\n\n    /* Disabled state */');
   });
 });
