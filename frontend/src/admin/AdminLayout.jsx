@@ -1292,6 +1292,11 @@ export default function AdminLayout() {
         }}
       >
         <div
+          className="admin-panel-custom-background"
+          aria-hidden="true"
+        />
+
+        <div
           className="admin-blob"
           style={{
             width: 520,

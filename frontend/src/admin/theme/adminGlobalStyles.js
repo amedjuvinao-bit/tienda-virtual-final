@@ -23,13 +23,41 @@ export function applyAdminGlobalStyles() {
       min-height: 100vh;
       background:
         var(--admin-page-glass-overlay),
-        var(--admin-panel-background-image, none),
         var(--admin-page-bg) !important;
-      background-attachment: fixed, fixed, fixed !important;
-      background-position: center, center, center !important;
-      background-repeat: no-repeat, no-repeat, no-repeat !important;
-      background-size: cover, cover, cover !important;
+      background-attachment: fixed, fixed !important;
+      background-position: center, center !important;
+      background-repeat: no-repeat, no-repeat !important;
+      background-size: cover, cover !important;
       color: var(--admin-page-text) !important;
+    }
+
+    .admin-panel-custom-background {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--admin-page-bg) 16%, transparent),
+          color-mix(in srgb, var(--admin-primary) 8%, transparent)
+        ),
+        var(--admin-panel-background-image, none);
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      filter: saturate(1.04) contrast(1.02);
+    }
+
+    html[data-admin-panel-background="image"] .admin-panel-custom-background {
+      display: block;
+    }
+
+    html.admin-theme-dark[data-admin-panel-background="image"] .admin-panel-custom-background {
+      background-image:
+        linear-gradient(rgba(2, 6, 23, .28), rgba(2, 6, 23, .28)),
+        var(--admin-panel-background-image, none);
     }
 
     /* Fixed frosted-glass wash behind all content */

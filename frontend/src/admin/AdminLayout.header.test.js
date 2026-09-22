@@ -6,6 +6,7 @@ function source(relativeUrl) {
 }
 
 const layoutSource = source('./AdminLayout.jsx');
+const globalStylesSource = source('./theme/adminGlobalStyles.js');
 
 describe('encabezado principal del panel administrativo', () => {
   it('permanece visible y adopta una versión compacta durante el scroll', () => {
@@ -22,6 +23,18 @@ describe('encabezado principal del panel administrativo', () => {
     expect(layoutSource).toContain('Tipo de usuario: <b>{activeAdminRoleLabel}</b>');
     expect(layoutSource).not.toContain(
       '.admin-profile-compact > div:last-child { display: none; }',
+    );
+  });
+
+  it('muestra el fondo personalizado en una capa fija que no tapa el tema', () => {
+    expect(layoutSource).toContain(
+      'className="admin-panel-custom-background"'
+    );
+    expect(globalStylesSource).toMatch(
+      /\.admin-panel-custom-background\s*\{[^}]*position: fixed;[^}]*background-image:/s,
+    );
+    expect(globalStylesSource).toContain(
+      'html[data-admin-panel-background="image"] .admin-panel-custom-background',
     );
   });
 });
