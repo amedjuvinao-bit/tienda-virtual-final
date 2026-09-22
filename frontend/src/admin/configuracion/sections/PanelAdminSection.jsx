@@ -1103,13 +1103,23 @@ export default function PanelAdminSection() {
                   <span
                     className="panel-admin-font-option__sample"
                     aria-hidden="true"
-                    style={{ fontFamily: option.heading }}
+                    style={{
+                      fontFamily: option.heading,
+                      fontWeight: option.headingWeight,
+                    }}
                   >
                     {option.sample}
                   </span>
                   <span className="panel-admin-font-option__copy">
-                    <strong style={{ fontFamily: option.heading }}>{option.label}</strong>
-                    <small>{option.description}</small>
+                    <strong
+                      style={{
+                        fontFamily: option.heading,
+                        fontWeight: option.headingWeight,
+                      }}
+                    >
+                      {option.label}
+                    </strong>
+                    <small style={{ fontFamily: option.body }}>{option.description}</small>
                   </span>
                   <span className="panel-admin-font-option__check" aria-hidden="true">
                     <Check size={14} />

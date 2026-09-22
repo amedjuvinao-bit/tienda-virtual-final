@@ -523,6 +523,7 @@ export function applyAdminGlobalStyles() {
     .admin-area h6 {
       color: var(--admin-card-text) !important;
       font-family: var(--admin-font-heading, 'Playfair Display', Georgia, serif);
+      font-weight: var(--admin-font-heading-weight, 700);
       letter-spacing: var(--admin-theme-heading-spacing, -0.02em);
     }
 

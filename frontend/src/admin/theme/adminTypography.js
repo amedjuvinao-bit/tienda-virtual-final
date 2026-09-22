@@ -4,42 +4,47 @@ export const ADMIN_FONT_PRESETS = Object.freeze([
   Object.freeze({
     value: 'modernElegant',
     label: 'Moderna elegante',
-    description: 'Inter para operar y Playfair para títulos con presencia.',
-    body: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    description: 'Manrope precisa con títulos Playfair de alto contraste.',
+    body: "'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     heading: "'Playfair Display', Georgia, serif",
     sample: 'Aa',
+    headingWeight: '600',
   }),
   Object.freeze({
     value: 'boutiqueEditorial',
     label: 'Boutique editorial',
-    description: 'Montserrat con Cormorant para una estética refinada.',
-    body: "'Montserrat', 'Inter', system-ui, sans-serif",
+    description: 'Source Sans humanista con Cormorant de aire editorial.',
+    body: "'Source Sans 3', 'Segoe UI', sans-serif",
     heading: "'Cormorant Garamond', Georgia, serif",
     sample: 'Rr',
+    headingWeight: '600',
   }),
   Object.freeze({
     value: 'executiveSerif',
     label: 'Ejecutiva premium',
-    description: 'Inter y DM Serif: sobria, clara y con jerarquía ejecutiva.',
-    body: "'Inter', system-ui, sans-serif",
-    heading: "'DM Serif Display', Georgia, serif",
+    description: 'IBM Plex Sans y Serif: técnica, sobria y ejecutiva.',
+    body: "'IBM Plex Sans', Arial, sans-serif",
+    heading: "'IBM Plex Serif', Georgia, serif",
     sample: 'Ee',
+    headingWeight: '600',
   }),
   Object.freeze({
     value: 'contemporary',
     label: 'Contemporánea',
-    description: 'Poppins uniforme para un panel moderno y tecnológico.',
-    body: "'Poppins', 'Inter', system-ui, sans-serif",
-    heading: "'Poppins', 'Inter', system-ui, sans-serif",
-    sample: 'Pp',
+    description: 'Space Grotesk geométrica para un panel digital y directo.',
+    body: "'Space Grotesk', Arial, sans-serif",
+    heading: "'Space Grotesk', Arial, sans-serif",
+    sample: 'Gg',
+    headingWeight: '700',
   }),
   Object.freeze({
     value: 'classicCalm',
     label: 'Clásica serena',
-    description: 'Lora e Inter para una lectura cálida, elegante y descansada.',
-    body: "'Inter', system-ui, sans-serif",
-    heading: "'Lora', Georgia, serif",
+    description: 'Lora con Libre Baskerville para una lectura clásica y cálida.',
+    body: "'Lora', Georgia, serif",
+    heading: "'Libre Baskerville', Georgia, serif",
     sample: 'Ll',
+    headingWeight: '700',
   }),
 ]);
 
@@ -62,6 +67,7 @@ export function applyAdminTypography(value) {
   root.dataset.adminFontPreset = preset.value;
   root.style.setProperty('--admin-font-body', preset.body);
   root.style.setProperty('--admin-font-heading', preset.heading);
+  root.style.setProperty('--admin-font-heading-weight', preset.headingWeight || '700');
 
   return preset.value;
 }

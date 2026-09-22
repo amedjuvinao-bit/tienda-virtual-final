@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyAdminGlobalStyles } from './adminGlobalStyles';
 import { applyAdminTheme } from './adminTheme';
+import {
+  ADMIN_FONT_PRESETS,
+  applyAdminTypography,
+} from './adminTypography';
 import { applyAdminWidgetTexture } from './adminWidgetTexture';
 
 describe('adminTheme Nivel Plus', () => {
@@ -86,6 +90,22 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#111827');
     expect(root.style.getPropertyValue('--admin-input-text')).toBe('#111827');
     expect(root.style.getPropertyValue('--admin-radius')).toBe('32px');
+  });
+
+  it('ofrece cinco voces tipográficas realmente diferentes', () => {
+    const bodyFamilies = ADMIN_FONT_PRESETS.map((preset) => preset.body);
+    const headingFamilies = ADMIN_FONT_PRESETS.map((preset) => preset.heading);
+
+    expect(new Set(bodyFamilies).size).toBe(ADMIN_FONT_PRESETS.length);
+    expect(new Set(headingFamilies).size).toBe(ADMIN_FONT_PRESETS.length);
+
+    applyAdminTypography('executiveSerif');
+
+    const root = document.documentElement;
+    expect(root.dataset.adminFontPreset).toBe('executiveSerif');
+    expect(root.style.getPropertyValue('--admin-font-body')).toContain('IBM Plex Sans');
+    expect(root.style.getPropertyValue('--admin-font-heading')).toContain('IBM Plex Serif');
+    expect(root.style.getPropertyValue('--admin-font-heading-weight')).toBe('600');
   });
 
   it('mantiene vidrio líquido oscuro detrás del texto claro', () => {
