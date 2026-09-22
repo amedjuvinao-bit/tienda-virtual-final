@@ -20,7 +20,10 @@ export function applyAdminGlobalStyles() {
     }
 
     .admin-area {
-      background: var(--admin-page-glass-overlay) !important;
+      min-height: 100vh;
+      background:
+        var(--admin-page-glass-overlay),
+        var(--admin-page-bg) !important;
       color: var(--admin-page-text) !important;
     }
 

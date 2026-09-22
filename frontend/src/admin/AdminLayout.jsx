@@ -299,7 +299,6 @@ export default function AdminLayout() {
     color: 'var(--admin-active-nav-text)',
     fontWeight: 700,
     boxShadow: 'var(--admin-shadow-active, 0 8px 24px rgba(0,0,0,0.12))',
-    transform: 'translateY(-1px)',
   };
 
   const normalNavStyle = {
@@ -579,6 +578,24 @@ export default function AdminLayout() {
         .admin-nav-link:hover {
           background: var(--admin-primary-soft-bg) !important;
           color: var(--admin-primary) !important;
+        }
+
+        .admin-sidebar-panel,
+        .admin-sidebar-panel:hover,
+        .admin-sidebar-panel .admin-nav-link,
+        .admin-sidebar-panel .admin-nav-link:hover,
+        .admin-sidebar-panel .admin-nav-link:focus-visible,
+        .admin-sidebar-panel button,
+        .admin-sidebar-panel button:hover,
+        .admin-sidebar-panel button:focus-visible,
+        .admin-sidebar-panel .admin-icon-wrap,
+        .admin-sidebar-panel .admin-nav-link:hover .admin-icon-wrap {
+          transform: none !important;
+        }
+
+        .admin-sidebar-panel .admin-nav-link,
+        .admin-sidebar-panel button {
+          transition-property: background-color, color, border-color, box-shadow, filter !important;
         }
 
         .admin-nav-link-mobile:hover {
