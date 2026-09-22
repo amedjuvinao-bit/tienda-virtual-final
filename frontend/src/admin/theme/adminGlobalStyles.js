@@ -21,6 +21,7 @@ export function applyAdminGlobalStyles() {
 
     .admin-area {
       min-height: 100vh;
+      font-family: var(--admin-font-body, 'Inter', system-ui, sans-serif);
       background:
         var(--admin-page-glass-overlay),
         var(--admin-page-bg) !important;
@@ -56,7 +57,13 @@ export function applyAdminGlobalStyles() {
 
     html.admin-theme-dark[data-admin-panel-background="image"] .admin-panel-custom-background {
       background-image:
-        linear-gradient(rgba(2, 6, 23, .28), rgba(2, 6, 23, .28)),
+        linear-gradient(rgba(2, 6, 23, .52), rgba(2, 6, 23, .52)),
+        var(--admin-panel-background-image, none);
+    }
+
+    html.admin-theme-light[data-admin-panel-background="image"] .admin-panel-custom-background {
+      background-image:
+        linear-gradient(rgba(255, 255, 255, .42), rgba(255, 255, 255, .42)),
         var(--admin-panel-background-image, none);
     }
 
@@ -98,6 +105,7 @@ export function applyAdminGlobalStyles() {
       pointer-events: none;
       z-index: 0;
       background:
+        var(--admin-theme-pattern, linear-gradient(transparent, transparent)),
         radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--admin-primary) 16%, transparent), transparent 24%),
         radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--admin-card-bg) 22%, transparent), transparent 30%),
         radial-gradient(circle at 80% 88%, color-mix(in srgb, var(--admin-primary) 12%, transparent), transparent 32%);
@@ -514,6 +522,8 @@ export function applyAdminGlobalStyles() {
     .admin-area h5,
     .admin-area h6 {
       color: var(--admin-card-text) !important;
+      font-family: var(--admin-font-heading, 'Playfair Display', Georgia, serif);
+      letter-spacing: var(--admin-theme-heading-spacing, -0.02em);
     }
 
     .admin-area p,
@@ -551,7 +561,10 @@ export function applyAdminGlobalStyles() {
     html.admin-theme-dark .admin-area .text-blue-900,   html.admin-theme-dark .admin-area .text-cyan-900,
     html.admin-theme-dark .admin-area .text-amber-900,  html.admin-theme-dark .admin-area .text-yellow-900,
     html.admin-theme-dark .admin-area .text-orange-900, html.admin-theme-dark .admin-area .text-green-900,
-    html.admin-theme-dark .admin-area .text-emerald-900,html.admin-theme-dark .admin-area .text-red-900 {
+    html.admin-theme-dark .admin-area .text-emerald-900,html.admin-theme-dark .admin-area .text-red-900,
+    html.admin-theme-dark .admin-area .text-gray-950,   html.admin-theme-dark .admin-area .text-slate-950,
+    html.admin-theme-dark .admin-area .text-zinc-950,   html.admin-theme-dark .admin-area .text-neutral-950,
+    html.admin-theme-dark .admin-area .text-stone-950 {
       color: var(--admin-card-text) !important;
     }
 
@@ -567,7 +580,103 @@ export function applyAdminGlobalStyles() {
 
     html.admin-theme-dark .admin-area .text-white { color: #ffffff !important; }
 
+    /* Semantic colors keep their meaning but use a luminance that remains
+       readable over every dark glass surface. */
+    html.admin-theme-dark .admin-area :is(.text-green-500,.text-green-600,.text-green-700,.text-green-800,.text-green-900,.text-emerald-500,.text-emerald-600,.text-emerald-700,.text-emerald-800,.text-emerald-900,.text-emerald-950) { color: #86efac !important; }
+    html.admin-theme-dark .admin-area :is(.text-red-500,.text-red-600,.text-red-700,.text-red-800,.text-red-900,.text-rose-500,.text-rose-600,.text-rose-700,.text-rose-800,.text-rose-900,.text-rose-950) { color: #fda4af !important; }
+    html.admin-theme-dark .admin-area :is(.text-amber-500,.text-amber-600,.text-amber-700,.text-amber-800,.text-amber-900,.text-amber-950,.text-yellow-500,.text-yellow-600,.text-yellow-700,.text-yellow-800,.text-yellow-900,.text-orange-500,.text-orange-600,.text-orange-700,.text-orange-800,.text-orange-900) { color: #fde68a !important; }
+    html.admin-theme-dark .admin-area :is(.text-blue-500,.text-blue-600,.text-blue-700,.text-blue-800,.text-blue-900,.text-cyan-500,.text-cyan-600,.text-cyan-700,.text-cyan-800,.text-cyan-900,.text-indigo-500,.text-indigo-600,.text-indigo-700,.text-indigo-800,.text-indigo-900) { color: #93c5fd !important; }
+    html.admin-theme-dark .admin-area :is(.text-pink-500,.text-pink-600,.text-pink-700,.text-pink-800,.text-pink-900,.text-fuchsia-500,.text-fuchsia-600,.text-fuchsia-700,.text-fuchsia-800,.text-fuchsia-900,.text-purple-500,.text-purple-600,.text-purple-700,.text-purple-800,.text-purple-900) { color: #f0abfc !important; }
+
     .admin-area .admin-icon-wrap { color: var(--admin-primary); }
+
+    /* ============================================================
+       THEME SIGNATURES — each preset has its own visual language
+       ============================================================ */
+
+    .admin-area .admin-header-panel::after {
+      background: var(--admin-theme-header-sheen, linear-gradient(transparent, transparent)) !important;
+      opacity: .78;
+    }
+
+    .admin-area .admin-nav-link {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .admin-area .admin-nav-link[aria-current="page"]::before {
+      position: absolute;
+      top: 18%;
+      bottom: 18%;
+      left: 0;
+      width: var(--admin-theme-nav-marker, 4px);
+      border-radius: 999px;
+      background: var(--admin-primary);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--admin-primary) 56%, transparent);
+      content: "";
+    }
+
+    html[data-admin-theme-style="technical"] .admin-area::after {
+      background-size: 28px 28px, 28px 28px, auto, auto, auto;
+    }
+
+    html[data-admin-theme-style="electric"] .admin-area::after {
+      background-size: 28px 28px, 28px 28px, auto, auto, auto, auto;
+    }
+
+    html[data-admin-theme-style="gilded"] .admin-area :is(.admin-sidebar-panel,.admin-header-panel,.admin-card-glass,.admin-glass-card) {
+      outline: 1px solid color-mix(in srgb, var(--admin-primary) 30%, transparent);
+      outline-offset: -5px;
+    }
+
+    html[data-admin-theme-style="couture"] .admin-area .admin-header-context h1,
+    html[data-admin-theme-style="couture"] .admin-area .admin-module-hero__title {
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    html[data-admin-theme-style="aero"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
+      transform: translateZ(0);
+      box-shadow:
+        0 26px 70px color-mix(in srgb, var(--admin-primary) 14%, transparent),
+        inset 0 1px 0 rgba(255,255,255,.78) !important;
+    }
+
+    html[data-admin-theme-style="pulse"] .admin-area .admin-nav-link[aria-current="page"] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 46%, transparent),
+        0 12px 30px color-mix(in srgb, var(--admin-primary) 22%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="electric"] .admin-area :is(.admin-header-panel,.admin-sidebar-panel) {
+      border-color: color-mix(in srgb, var(--admin-primary) 64%, rgba(255,255,255,.12)) !important;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 18%, transparent),
+        0 22px 68px rgba(0,0,0,.38),
+        0 0 34px color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="cyber"] .admin-area :is(.admin-header-panel,.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
+      border-left-width: 3px !important;
+      border-left-color: var(--admin-primary) !important;
+      box-shadow:
+        inset 10px 0 28px color-mix(in srgb, var(--admin-primary) 7%, transparent),
+        var(--admin-widget-surface-shadow) !important;
+    }
+
+    html[data-admin-theme-style="minimal"] .admin-area::after {
+      opacity: .12;
+      filter: none;
+    }
+
+    html[data-admin-theme-style="minimal"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface,.admin-header-panel,.admin-sidebar-panel) {
+      box-shadow: 0 1px 2px rgba(15,23,42,.08) !important;
+    }
+
+    html[data-admin-theme-style="minimal"] .admin-area :is(.admin-card-glass,.admin-glass-card):hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(15,23,42,.10) !important;
+    }
 
 
     /* ============================================================
@@ -919,6 +1028,15 @@ export function applyAdminGlobalStyles() {
       box-shadow: var(--admin-widget-surface-shadow);
     }
 
+    /* A white utility surface is converted to the active widget material.
+       Any text-white nested inside it must follow the resulting surface,
+       otherwise light themes produce white-on-white labels. */
+    .admin-area :is(.bg-white,[class*="bg-white"],.bg-gray-50,.bg-gray-100,.bg-slate-50,.bg-neutral-50) > .text-white,
+    .admin-area :is(.bg-white,[class*="bg-white"],.bg-gray-50,.bg-gray-100,.bg-slate-50,.bg-neutral-50).text-white,
+    .admin-area :is(.bg-white,[class*="bg-white"],.bg-gray-50,.bg-gray-100,.bg-slate-50,.bg-neutral-50) :is(p,span,strong,small,label,h1,h2,h3,h4,h5,h6).text-white {
+      color: var(--admin-card-text) !important;
+    }
+
     html.admin-theme-dark .admin-area .bg-white,
     html.admin-theme-dark .admin-area [class*="bg-white"],
     html.admin-theme-dark .admin-area .bg-gray-50,   html.admin-theme-dark .admin-area .bg-gray-100,
@@ -966,13 +1084,24 @@ export function applyAdminGlobalStyles() {
       color: #111827 !important;
     }
 
-    html.admin-theme-dark .admin-area [style*="background-color: rgb(255"] .text-white,
-    html.admin-theme-dark .admin-area [style*="background-color:#fff"] .text-white,
-    html.admin-theme-dark .admin-area [style*="background-color: #fff"] .text-white,
-    html.admin-theme-dark .admin-area [style*="background: rgb(255"] .text-white,
-    html.admin-theme-dark .admin-area [style*="background:#fff"] .text-white,
-    html.admin-theme-dark .admin-area [style*="background: #fff"] .text-white {
+    .admin-area [style*="background-color: rgb(255"] .text-white,
+    .admin-area [style*="background-color:#fff"] .text-white,
+    .admin-area [style*="background-color: #fff"] .text-white,
+    .admin-area [style*="background: rgb(255"] .text-white,
+    .admin-area [style*="background:#fff"] .text-white,
+    .admin-area [style*="background: #fff"] .text-white {
       color: #111827 !important;
+    }
+
+    /* React serializes many legacy inline dark colors as rgb(). These rules
+       prevent them from surviving on dark themes while preserving status
+       colors handled above. */
+    html.admin-theme-dark .admin-area [style*="color: rgb(17, 24, 39)"],
+    html.admin-theme-dark .admin-area [style*="color: rgb(31, 41, 55)"],
+    html.admin-theme-dark .admin-area [style*="color: rgb(55, 65, 81)"],
+    html.admin-theme-dark .admin-area [style*="color:#111827"],
+    html.admin-theme-dark .admin-area [style*="color: #111827"] {
+      color: var(--admin-card-text) !important;
     }
 
 

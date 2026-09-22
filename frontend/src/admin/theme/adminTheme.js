@@ -1,9 +1,83 @@
 // src/admin/theme/adminTheme.js
 
+import {
+  applyAdminTypography,
+  DEFAULT_ADMIN_FONT_PRESET,
+  normalizeAdminFontPreset,
+} from './adminTypography';
+
 const ADMIN_PANEL_RADIUS = 18;
+
+const ADMIN_THEME_SIGNATURES = Object.freeze({
+  systemDefault: {
+    style: 'classic',
+    pattern: 'linear-gradient(135deg, transparent 0 48%, color-mix(in srgb, var(--admin-primary) 7%, transparent) 48% 52%, transparent 52% 100%)',
+    headerSheen: 'linear-gradient(118deg, rgba(255,255,255,.28), transparent 34%, color-mix(in srgb, var(--admin-primary) 12%, transparent))',
+    navMarker: '4px',
+    headingSpacing: '-0.02em',
+  },
+  roseLuxuryLight: {
+    style: 'couture',
+    pattern: 'radial-gradient(ellipse at 12% 8%, color-mix(in srgb, var(--admin-primary) 20%, transparent), transparent 34%), linear-gradient(128deg, transparent 0 70%, rgba(255,255,255,.24) 70% 72%, transparent 72%)',
+    headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.48), transparent 38%, color-mix(in srgb, var(--admin-primary) 16%, transparent))',
+    navMarker: '7px',
+    headingSpacing: '-0.035em',
+  },
+  goldBoutiqueLight: {
+    style: 'gilded',
+    pattern: 'repeating-linear-gradient(135deg, transparent 0 24px, color-mix(in srgb, var(--admin-primary) 8%, transparent) 24px 25px)',
+    headerSheen: 'linear-gradient(105deg, rgba(255,255,255,.44), transparent 32%, color-mix(in srgb, var(--admin-primary) 22%, transparent))',
+    navMarker: '5px',
+    headingSpacing: '-0.018em',
+  },
+  glassPastel: {
+    style: 'aero',
+    pattern: 'radial-gradient(circle at 18% 18%, rgba(255,255,255,.52), transparent 25%), radial-gradient(circle at 82% 22%, color-mix(in srgb, var(--admin-primary) 18%, transparent), transparent 28%)',
+    headerSheen: 'linear-gradient(125deg, rgba(255,255,255,.58), transparent 42%, color-mix(in srgb, var(--admin-primary) 14%, transparent))',
+    navMarker: '8px',
+    headingSpacing: '-0.03em',
+  },
+  pearlFuture: {
+    style: 'technical',
+    pattern: 'linear-gradient(color-mix(in srgb, var(--admin-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--admin-primary) 7%, transparent) 1px, transparent 1px)',
+    headerSheen: 'linear-gradient(132deg, rgba(255,255,255,.40), transparent 45%, color-mix(in srgb, var(--admin-primary) 12%, transparent))',
+    navMarker: '3px',
+    headingSpacing: '-0.012em',
+  },
+  neonRoseLight: {
+    style: 'pulse',
+    pattern: 'radial-gradient(circle at 14% 16%, color-mix(in srgb, var(--admin-primary) 24%, transparent), transparent 26%), linear-gradient(118deg, transparent 0 64%, color-mix(in srgb, var(--admin-primary) 10%, transparent) 64% 66%, transparent 66%)',
+    headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.42), transparent 34%, color-mix(in srgb, var(--admin-primary) 22%, transparent))',
+    navMarker: '8px',
+    headingSpacing: '-0.028em',
+  },
+  minimalPro: {
+    style: 'minimal',
+    pattern: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--admin-primary) 3%, transparent))',
+    headerSheen: 'linear-gradient(180deg, rgba(255,255,255,.12), transparent)',
+    navMarker: '3px',
+    headingSpacing: '-0.015em',
+  },
+  electricNeon: {
+    style: 'electric',
+    pattern: 'linear-gradient(color-mix(in srgb, var(--admin-primary) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--admin-primary) 10%, transparent) 1px, transparent 1px), radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--admin-primary) 20%, transparent), transparent 30%)',
+    headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.08), transparent 34%, color-mix(in srgb, var(--admin-primary) 28%, transparent))',
+    navMarker: '6px',
+    headingSpacing: '-0.018em',
+  },
+  darkCyber: {
+    style: 'cyber',
+    pattern: 'repeating-linear-gradient(180deg, transparent 0 7px, rgba(255,255,255,.025) 7px 8px), radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--admin-primary) 24%, transparent), transparent 30%)',
+    headerSheen: 'linear-gradient(118deg, rgba(255,255,255,.07), transparent 38%, color-mix(in srgb, var(--admin-primary) 30%, transparent))',
+    navMarker: '7px',
+    headingSpacing: '-0.025em',
+  },
+});
 
 // 🎨 Tema por defecto del panel admin
 export const ADMIN_THEME_DEFAULT = {
+  preset: 'systemDefault',
+  fontPreset: DEFAULT_ADMIN_FONT_PRESET,
   radius: ADMIN_PANEL_RADIUS,
 
   layout: {
@@ -74,20 +148,17 @@ function normalizeAdminThemeRadius(theme) {
       ? safeTheme.layout
       : {};
 
-  if (theme && typeof theme === 'object') {
-    theme.radius = ADMIN_PANEL_RADIUS;
-    theme.layout = {
-      ...safeLayout,
-      radius: ADMIN_PANEL_RADIUS,
-    };
-  }
+  const requestedRadius = Number(safeLayout.radius ?? safeTheme.radius);
+  const radius = Number.isFinite(requestedRadius)
+    ? Math.min(32, Math.max(10, requestedRadius))
+    : ADMIN_PANEL_RADIUS;
 
   return {
     ...safeTheme,
-    radius: ADMIN_PANEL_RADIUS,
+    radius,
     layout: {
       ...safeLayout,
-      radius: ADMIN_PANEL_RADIUS,
+      radius,
     },
   };
 }
@@ -220,19 +291,27 @@ export function applyAdminTheme(theme) {
   const t = {
     ...ADMIN_THEME_DEFAULT,
     ...normalizedTheme,
-    radius: ADMIN_PANEL_RADIUS,
+    radius: normalizedTheme.radius,
     layout: {
       ...(ADMIN_THEME_DEFAULT.layout || {}),
       ...(normalizedTheme.layout || {}),
-      radius: ADMIN_PANEL_RADIUS,
+      radius: normalizedTheme.layout?.radius ?? normalizedTheme.radius,
     },
   };
 
   const root = document.documentElement;
+  const preset = ADMIN_THEME_SIGNATURES[t.preset]
+    ? t.preset
+    : ADMIN_THEME_DEFAULT.preset;
+  const signature = ADMIN_THEME_SIGNATURES[preset];
+  const fontPreset = normalizeAdminFontPreset(t.fontPreset);
   const mode = detectAdminThemeMode(t);
   const isDark = mode === 'dark';
 
   root.dataset.adminThemeMode = mode;
+  root.dataset.adminThemePreset = preset;
+  root.dataset.adminThemeStyle = signature.style;
+  applyAdminTypography(fontPreset);
 
   if (mode === 'dark') {
     root.classList.add('admin-theme-dark');
@@ -246,7 +325,11 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-is-dark', mode === 'dark' ? '1' : '0');
   root.style.setProperty('--admin-is-light', mode === 'light' ? '1' : '0');
 
-  root.style.setProperty('--admin-radius', `${ADMIN_PANEL_RADIUS}px`);
+  root.style.setProperty('--admin-radius', `${t.layout.radius}px`);
+  root.style.setProperty('--admin-theme-pattern', signature.pattern);
+  root.style.setProperty('--admin-theme-header-sheen', signature.headerSheen);
+  root.style.setProperty('--admin-theme-nav-marker', signature.navMarker);
+  root.style.setProperty('--admin-theme-heading-spacing', signature.headingSpacing);
 
   const pageTextAuto = getContrastText(t.pageBg);
   const pageMutedTextAuto = getMutedContrastText(t.pageBg);
@@ -460,11 +543,12 @@ export function saveAdminTheme(theme) {
   return {
     ...ADMIN_THEME_DEFAULT,
     ...normalizedTheme,
-    radius: ADMIN_PANEL_RADIUS,
+    fontPreset: normalizeAdminFontPreset(normalizedTheme.fontPreset),
+    radius: normalizedTheme.radius,
     layout: {
       ...(ADMIN_THEME_DEFAULT.layout || {}),
       ...(normalizedTheme.layout || {}),
-      radius: ADMIN_PANEL_RADIUS,
+      radius: normalizedTheme.layout?.radius ?? normalizedTheme.radius,
     },
   };
 }
@@ -476,11 +560,12 @@ export function loadAdminTheme(theme) {
   return {
     ...ADMIN_THEME_DEFAULT,
     ...normalizedTheme,
-    radius: ADMIN_PANEL_RADIUS,
+    fontPreset: normalizeAdminFontPreset(normalizedTheme.fontPreset),
+    radius: normalizedTheme.radius,
     layout: {
       ...(ADMIN_THEME_DEFAULT.layout || {}),
       ...(normalizedTheme.layout || {}),
-      radius: ADMIN_PANEL_RADIUS,
+      radius: normalizedTheme.layout?.radius ?? normalizedTheme.radius,
     },
   };
 }

@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Save,
   Sparkles,
+  Type,
   Undo2,
   UploadCloud,
 } from 'lucide-react';
@@ -29,6 +30,12 @@ import {
   DEFAULT_ADMIN_WIDGET_TEXTURE,
   normalizeAdminWidgetTexture,
 } from '../../theme/adminWidgetTexture';
+import {
+  ADMIN_FONT_PRESETS,
+  DEFAULT_ADMIN_FONT_PRESET,
+  getAdminFontPreset,
+  normalizeAdminFontPreset,
+} from '../../theme/adminTypography';
 import './PanelAdminSection.css';
 
 const ADMIN_THEME_PRESETS = {
@@ -88,7 +95,7 @@ const ADMIN_THEME_PRESETS = {
   darkCyber: {
     preset: 'darkCyber',
     layout: {
-      radius: 50,
+      radius: 30,
       blur: 5,
       shadow: '0 5px 20px rgba(0,0,0,0.8)',
       sidebarWidth: 180,
@@ -141,7 +148,7 @@ const ADMIN_THEME_PRESETS = {
   roseLuxuryLight: {
     preset: 'roseLuxuryLight',
     layout: {
-      radius: 36,
+      radius: 30,
       blur: 24,
       shadow: '0 24px 70px rgba(236,72,153,0.12)',
       sidebarWidth: 300,
@@ -247,7 +254,7 @@ const ADMIN_THEME_PRESETS = {
   glassPastel: {
     preset: 'glassPastel',
     layout: {
-      radius: 34,
+      radius: 30,
       blur: 32,
       shadow: '0 24px 80px rgba(251,113,133,0.14)',
       sidebarWidth: 290,
@@ -353,7 +360,7 @@ const ADMIN_THEME_PRESETS = {
   neonRoseLight: {
     preset: 'neonRoseLight',
     layout: {
-      radius: 42,
+      radius: 30,
       blur: 26,
       shadow: '0 24px 80px rgba(255,45,149,0.18)',
       sidebarWidth: 300,
@@ -461,6 +468,7 @@ const DEFAULT_PANEL_SELECTION = Object.freeze({
   preset: 'systemDefault',
   sidebar: 'expanded',
   widgetTexture: DEFAULT_ADMIN_WIDGET_TEXTURE,
+  fontPreset: DEFAULT_ADMIN_FONT_PRESET,
   background: DEFAULT_ADMIN_PANEL_BACKGROUND,
 });
 
@@ -498,47 +506,47 @@ const ADMIN_THEME_OPTIONS = [
   {
     value: 'systemDefault',
     label: 'Clásico del sistema',
-    description: 'Equilibrado, claro y familiar para el trabajo diario.',
+    description: 'Geometría equilibrada, jerarquía limpia y navegación familiar.',
   },
   {
     value: 'roseLuxuryLight',
     label: 'Rosa luxury',
-    description: 'Elegante y luminoso, alineado con una boutique premium.',
+    description: 'Composición editorial, curvas couture y brillo de boutique.',
   },
   {
     value: 'goldBoutiqueLight',
     label: 'Dorado boutique',
-    description: 'Cálido, refinado y con acentos dorados.',
+    description: 'Marcos interiores, ritmo clásico y detalles tipo joyería.',
   },
   {
     value: 'glassPastel',
     label: 'Glass pastel',
-    description: 'Suave, moderno y con superficies ligeras.',
+    description: 'Capas flotantes, profundidad aérea y superficies luminosas.',
   },
   {
     value: 'pearlFuture',
     label: 'Perla futurista',
-    description: 'Neutral, limpio y enfocado en la información.',
+    description: 'Retícula técnica, precisión visual y lectura enfocada.',
   },
   {
     value: 'neonRoseLight',
     label: 'Rosa neón',
-    description: 'Vibrante y expresivo para una identidad audaz.',
+    description: 'Navegación con pulso, halos activos y energía controlada.',
   },
   {
     value: 'minimalPro',
     label: 'Minimal pro',
-    description: 'Sobrio, compacto y de alto contraste.',
+    description: 'Volumen reducido, líneas finas y máxima densidad útil.',
   },
   {
     value: 'electricNeon',
     label: 'Neón eléctrico',
-    description: 'Oscuro con acentos cian de alta energía.',
+    description: 'Retícula digital, bordes luminosos y profundidad eléctrica.',
   },
   {
     value: 'darkCyber',
     label: 'Oscuro cyber',
-    description: 'Profundo, compacto y con acentos violetas.',
+    description: 'Trama escaneada, bordes laterales y capas violetas profundas.',
   },
 ];
 
@@ -600,7 +608,12 @@ function buildThemeWithSidebar(baseTheme, sidebarStyle) {
   return safeTheme;
 }
 
-function resolveTheme(preset, sidebar, widgetTexture = DEFAULT_ADMIN_WIDGET_TEXTURE) {
+function resolveTheme(
+  preset,
+  sidebar,
+  widgetTexture = DEFAULT_ADMIN_WIDGET_TEXTURE,
+  fontPreset = DEFAULT_ADMIN_FONT_PRESET
+) {
   const baseTheme =
     preset === 'systemDefault'
       ? ADMIN_THEME_DEFAULT
@@ -610,6 +623,7 @@ function resolveTheme(preset, sidebar, widgetTexture = DEFAULT_ADMIN_WIDGET_TEXT
     ...buildThemeWithSidebar(baseTheme, sidebar),
     preset,
     widgetTexture: normalizeAdminWidgetTexture(widgetTexture),
+    fontPreset: normalizeAdminFontPreset(fontPreset),
   };
 }
 
@@ -617,7 +631,8 @@ function applySelection(selection) {
   const nextTheme = resolveTheme(
     selection.preset,
     selection.sidebar,
-    selection.widgetTexture
+    selection.widgetTexture,
+    selection.fontPreset
   );
   applyAdminTheme(nextTheme);
   applyAdminLayoutStyles(nextTheme);
@@ -640,9 +655,10 @@ function selectionFromAdmin(admin = {}) {
     ? admin.sidebar
     : DEFAULT_PANEL_SELECTION.sidebar;
   const widgetTexture = normalizeAdminWidgetTexture(admin?.theme?.widgetTexture);
+  const fontPreset = normalizeAdminFontPreset(admin?.theme?.fontPreset);
   const background = normalizeAdminPanelBackground(admin?.background);
 
-  return { preset, sidebar, widgetTexture, background };
+  return { preset, sidebar, widgetTexture, fontPreset, background };
 }
 
 function getErrorMessage(error) {
@@ -667,7 +683,8 @@ export default function PanelAdminSection() {
     resolveTheme(
       DEFAULT_PANEL_SELECTION.preset,
       DEFAULT_PANEL_SELECTION.sidebar,
-      DEFAULT_PANEL_SELECTION.widgetTexture
+      DEFAULT_PANEL_SELECTION.widgetTexture,
+      DEFAULT_PANEL_SELECTION.fontPreset
     )
   );
 
@@ -675,6 +692,7 @@ export default function PanelAdminSection() {
     draftSelection.preset !== savedSelection.preset ||
     draftSelection.sidebar !== savedSelection.sidebar ||
     draftSelection.widgetTexture !== savedSelection.widgetTexture ||
+    draftSelection.fontPreset !== savedSelection.fontPreset ||
     draftSelection.background.enabled !== savedSelection.background.enabled ||
     draftSelection.background.image !== savedSelection.background.image;
 
@@ -690,7 +708,8 @@ export default function PanelAdminSection() {
       resolveTheme(
         draftSelection.preset,
         draftSelection.sidebar,
-        draftSelection.widgetTexture
+        draftSelection.widgetTexture,
+        draftSelection.fontPreset
       ),
     [draftSelection]
   );
@@ -701,6 +720,11 @@ export default function PanelAdminSection() {
         (item) => item.value === draftSelection.widgetTexture
       ) || ADMIN_WIDGET_TEXTURES[0],
     [draftSelection.widgetTexture]
+  );
+
+  const selectedFontOption = useMemo(
+    () => getAdminFontPreset(draftSelection.fontPreset),
+    [draftSelection.fontPreset]
   );
 
   useEffect(() => {
@@ -721,7 +745,8 @@ export default function PanelAdminSection() {
             : resolveTheme(
                 selection.preset,
                 selection.sidebar,
-                selection.widgetTexture
+                selection.widgetTexture,
+                selection.fontPreset
               );
 
         setSavedSelection(selection);
@@ -832,7 +857,8 @@ export default function PanelAdminSection() {
     const requestedTheme = resolveTheme(
       draftSelection.preset,
       draftSelection.sidebar,
-      draftSelection.widgetTexture
+      draftSelection.widgetTexture,
+      draftSelection.fontPreset
     );
 
     try {
@@ -1044,9 +1070,58 @@ export default function PanelAdminSection() {
             })}
           </div>
 
+          <div className="panel-admin-section-heading panel-admin-section-heading--typography">
+            <div>
+              <span>04 · Tipografía</span>
+              <h3>Elige la voz visual del panel</h3>
+            </div>
+            <p>Lectura clara con títulos elegantes</p>
+          </div>
+
+          <div
+            className="panel-admin-font-grid"
+            role="group"
+            aria-label="Tipografía del panel"
+          >
+            {ADMIN_FONT_PRESETS.map((option) => {
+              const selected = draftSelection.fontPreset === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`panel-admin-font-option${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  disabled={loading || saving || uploadingBackground}
+                  onClick={() =>
+                    previewSelection({
+                      ...draftSelection,
+                      fontPreset: option.value,
+                    })
+                  }
+                >
+                  <span
+                    className="panel-admin-font-option__sample"
+                    aria-hidden="true"
+                    style={{ fontFamily: option.heading }}
+                  >
+                    {option.sample}
+                  </span>
+                  <span className="panel-admin-font-option__copy">
+                    <strong style={{ fontFamily: option.heading }}>{option.label}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                  <span className="panel-admin-font-option__check" aria-hidden="true">
+                    <Check size={14} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="panel-admin-section-heading panel-admin-section-heading--background">
             <div>
-              <span>04 · Fondo general</span>
+              <span>05 · Fondo general</span>
               <h3>Personaliza todo el panel con tu imagen</h3>
             </div>
             <p>Se mantiene fija mientras navegas</p>
@@ -1160,6 +1235,8 @@ export default function PanelAdminSection() {
               '--preview-muted': selectedTheme.cardMutedText,
               '--preview-sidebar': selectedTheme.sidebarBg,
               '--preview-radius': `${selectedTheme.layout?.radius || 18}px`,
+              '--preview-font-body': selectedFontOption.body,
+              '--preview-font-heading': selectedFontOption.heading,
               '--preview-background-image': draftSelection.background.enabled
                 ? `url("${draftSelection.background.image}")`
                 : 'none',
@@ -1180,6 +1257,7 @@ export default function PanelAdminSection() {
             <li><LayoutDashboard size={16} /><span><strong>Tema</strong>{selectedThemeOption.label}</span></li>
             <li><PanelLeft size={16} /><span><strong>Navegación</strong>{SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}</span></li>
             <li><Gem size={16} /><span><strong>Textura</strong>{selectedTextureOption.label}</span></li>
+            <li><Type size={16} /><span><strong>Tipografía</strong>{selectedFontOption.label}</span></li>
             <li><ImageIcon size={16} /><span><strong>Fondo</strong>{draftSelection.background.enabled ? 'Imagen personalizada' : 'Color del tema'}</span></li>
             <li><Check size={16} /><span><strong>Alcance</strong>Todo el panel administrativo</span></li>
           </ul>

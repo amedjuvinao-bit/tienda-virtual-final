@@ -191,13 +191,13 @@ function restoreThemeSurfaceTokens(root) {
 function applyLiquidGlassCompatibilityTokens(root) {
   const dark = root.dataset.adminThemeMode === 'dark';
 
-  root.style.setProperty('--admin-card-bg', dark ? 'rgba(8, 13, 27, 0.30)' : 'rgba(255, 255, 255, 0.13)');
-  root.style.setProperty('--admin-card-header-bg', dark ? 'rgba(15, 23, 42, 0.34)' : 'rgba(255, 255, 255, 0.18)');
+  root.style.setProperty('--admin-card-bg', dark ? 'rgba(8, 13, 27, 0.56)' : 'rgba(255, 255, 255, 0.46)');
+  root.style.setProperty('--admin-card-header-bg', dark ? 'rgba(15, 23, 42, 0.62)' : 'rgba(255, 255, 255, 0.54)');
   root.style.setProperty('--admin-card-border', dark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.62)');
-  root.style.setProperty('--admin-light-panel-bg', dark ? 'rgba(8, 13, 27, 0.28)' : 'rgba(255, 255, 255, 0.12)');
-  root.style.setProperty('--admin-table-head-bg', dark ? 'rgba(15, 23, 42, 0.38)' : 'rgba(255, 255, 255, 0.17)');
+  root.style.setProperty('--admin-light-panel-bg', dark ? 'rgba(8, 13, 27, 0.54)' : 'rgba(255, 255, 255, 0.44)');
+  root.style.setProperty('--admin-table-head-bg', dark ? 'rgba(15, 23, 42, 0.64)' : 'rgba(255, 255, 255, 0.52)');
   root.style.setProperty('--admin-table-border', dark ? 'rgba(255, 255, 255, 0.17)' : 'rgba(255, 255, 255, 0.58)');
-  root.style.setProperty('--admin-input-bg', dark ? 'rgba(8, 13, 27, 0.34)' : 'rgba(255, 255, 255, 0.16)');
+  root.style.setProperty('--admin-input-bg', dark ? 'rgba(8, 13, 27, 0.68)' : 'rgba(255, 255, 255, 0.58)');
   root.style.setProperty('--admin-input-border', dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.70)');
   // A modal needs denser glass than a dashboard card. Reusing the 13% card
   // surface made the page below compete with labels, inputs and summaries.

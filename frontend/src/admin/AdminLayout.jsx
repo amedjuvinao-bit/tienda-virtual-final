@@ -422,7 +422,7 @@ export default function AdminLayout() {
     <>
       <style>{`
         .admin-area {
-          font-family: 'DM Sans', 'Outfit', system-ui, sans-serif;
+          font-family: var(--admin-font-body, 'Inter', system-ui, sans-serif);
         }
 
         .admin-layout-shell {
@@ -868,7 +868,7 @@ export default function AdminLayout() {
         .admin-header-context h1 {
           margin: 0;
           color: var(--admin-card-text);
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: var(--admin-font-heading, 'Playfair Display', Georgia, serif);
           font-size: clamp(17px, 1.55vw, 22px);
           line-height: 1.05;
         }

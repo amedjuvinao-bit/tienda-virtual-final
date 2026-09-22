@@ -63,7 +63,7 @@
 
 .panel-admin-hero__copy h2 {
   margin: 3px 0 4px;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--admin-font-heading, 'Playfair Display', Georgia, serif);
   font-size: clamp(22px, 3vw, 32px);
   line-height: 1.15;
 }
@@ -128,6 +128,7 @@
 
 .panel-admin-section-heading--layout,
 .panel-admin-section-heading--texture,
+.panel-admin-section-heading--typography,
 .panel-admin-section-heading--background { margin-top: 26px; }
 .panel-admin-section-heading h3 { margin: 3px 0 0; font-size: 18px; }
 
@@ -139,7 +140,8 @@
 
 .panel-admin-theme-card,
 .panel-admin-sidebar-option,
-.panel-admin-texture-option {
+.panel-admin-texture-option,
+.panel-admin-font-option {
   appearance: none;
   width: 100%;
   color: var(--admin-card-text);
@@ -155,7 +157,8 @@
 
 .panel-admin-theme-card:hover:not(:disabled),
 .panel-admin-sidebar-option:hover:not(:disabled),
-.panel-admin-texture-option:hover:not(:disabled) {
+.panel-admin-texture-option:hover:not(:disabled),
+.panel-admin-font-option:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: var(--admin-primary);
 }
@@ -163,6 +166,7 @@
 .panel-admin-theme-card:focus-visible,
 .panel-admin-sidebar-option:focus-visible,
 .panel-admin-texture-option:focus-visible,
+.panel-admin-font-option:focus-visible,
 .panel-admin-button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--admin-primary) 35%, transparent);
   outline-offset: 2px;
@@ -181,7 +185,8 @@
 
 .panel-admin-theme-card.is-selected,
 .panel-admin-sidebar-option.is-selected,
-.panel-admin-texture-option.is-selected {
+.panel-admin-texture-option.is-selected,
+.panel-admin-font-option.is-selected {
   border-color: var(--admin-primary);
   background: var(--admin-primary-soft-bg);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--admin-primary) 12%, transparent);
@@ -259,6 +264,71 @@
 .panel-admin-texture-option__copy small { color: var(--admin-card-muted-text); font-size: 10px; line-height: 1.32; }
 .panel-admin-texture-option__check { display: grid; place-items: center; width: 20px; height: 20px; color: transparent; border: 1px solid var(--admin-card-border); border-radius: 999px; }
 .panel-admin-texture-option.is-selected .panel-admin-texture-option__check { color: var(--admin-button-text); background: var(--admin-primary); border-color: var(--admin-primary); }
+
+.panel-admin-font-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.panel-admin-font-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 11px;
+  min-height: 86px;
+  padding: 11px;
+  border-radius: var(--admin-widget-control-radius, 16px);
+}
+
+.panel-admin-font-option__sample {
+  display: grid;
+  width: 44px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--admin-primary) 30%, var(--admin-card-border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--admin-primary-soft-bg) 84%, transparent);
+  color: var(--admin-primary-soft-text);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.48);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.panel-admin-font-option__copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.panel-admin-font-option__copy strong {
+  color: var(--admin-card-text);
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.panel-admin-font-option__copy small {
+  color: var(--admin-card-muted-text);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.panel-admin-font-option__check {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--admin-card-border);
+  border-radius: 999px;
+  color: transparent;
+}
+
+.panel-admin-font-option.is-selected .panel-admin-font-option__check {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary);
+  color: var(--admin-button-text);
+}
 
 .panel-admin-background-editor {
   display: grid;
@@ -413,6 +483,7 @@
   background-position: center;
   background-size: cover;
   box-shadow: 0 18px 36px color-mix(in srgb, var(--preview-primary) 12%, transparent);
+  font-family: var(--preview-font-body, sans-serif);
 }
 
 .panel-admin-preview__canvas[data-widget-texture='softGlass'] {
@@ -495,7 +566,7 @@
 .panel-admin-actions__buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .panel-admin-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 9px 13px; border-radius: var(--admin-widget-control-radius, 12px); border: var(--admin-widget-surface-border-width, 1px) solid transparent; font-size: 12px; font-weight: 750; cursor: pointer; transition: transform .16s ease, opacity .16s ease; }
 .panel-admin-button:hover:not(:disabled) { transform: translateY(-1px); }
-.panel-admin-button:disabled, .panel-admin-theme-card:disabled, .panel-admin-sidebar-option:disabled, .panel-admin-texture-option:disabled { cursor: not-allowed; opacity: .55; }
+.panel-admin-button:disabled, .panel-admin-theme-card:disabled, .panel-admin-sidebar-option:disabled, .panel-admin-texture-option:disabled, .panel-admin-font-option:disabled { cursor: not-allowed; opacity: .55; }
 .panel-admin-button--ghost { color: var(--admin-card-muted-text); background: var(--admin-widget-button-bg, transparent); border-color: var(--admin-widget-surface-border, var(--admin-card-border)); box-shadow: var(--admin-widget-button-shadow, none); }
 .panel-admin-button--secondary { color: var(--admin-primary-soft-text); background: var(--admin-widget-button-bg, var(--admin-primary-soft-bg)); border-color: var(--admin-widget-surface-border, var(--admin-primary-soft-border)); box-shadow: var(--admin-widget-button-shadow, none); }
 .panel-admin-button--primary { color: var(--admin-button-text); background-color: var(--admin-button-bg); background-image: var(--admin-widget-button-overlay, none); background-blend-mode: screen; box-shadow: var(--admin-widget-button-shadow, 0 10px 24px color-mix(in srgb, var(--admin-button-bg) 24%, transparent)); }
@@ -512,13 +583,13 @@
 @media (max-width: 760px) {
   .panel-admin-hero { grid-template-columns: auto minmax(0, 1fr); }
   .panel-admin-sync { grid-column: 1 / -1; justify-self: start; }
-  .panel-admin-theme-grid, .panel-admin-sidebar-grid, .panel-admin-texture-grid { grid-template-columns: 1fr; }
+  .panel-admin-theme-grid, .panel-admin-sidebar-grid, .panel-admin-texture-grid, .panel-admin-font-grid { grid-template-columns: 1fr; }
   .panel-admin-actions { align-items: stretch; flex-direction: column; }
   .panel-admin-actions__buttons { display: grid; grid-template-columns: 1fr; }
   .panel-admin-button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel-admin-theme-card, .panel-admin-sidebar-option, .panel-admin-texture-option, .panel-admin-button { transition: none; }
+  .panel-admin-theme-card, .panel-admin-sidebar-option, .panel-admin-texture-option, .panel-admin-font-option, .panel-admin-button { transition: none; }
   .panel-admin-spin { animation-duration: 1.6s; }
 }

@@ -19,6 +19,7 @@ function settingsResponse({
   preset = 'roseLuxuryLight',
   sidebar = 'expanded',
   widgetTexture = 'softGlass',
+  fontPreset = 'modernElegant',
   background = { enabled: false, image: '' },
 } = {}) {
   return {
@@ -29,6 +30,7 @@ function settingsResponse({
         theme: {
           preset,
           widgetTexture,
+          fontPreset,
           primary: '#ec4899',
           pageBg: '#fff1f7',
           cardBg: '#ffffff',
@@ -67,6 +69,7 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(screen.getByRole('button', { name: /Rosa luxury/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Amplio/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Cristal suave/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Moderna elegante/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Cómo debe ser la imagen')).toBeInTheDocument();
     expect(screen.getByText(/2560 × 1440 px/i)).toBeInTheDocument();
     expect(screen.getByText(/Peso máximo:/i)).toBeInTheDocument();
@@ -174,10 +177,10 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('1.06');
     expect(
       document.documentElement.style.getPropertyValue('--admin-card-bg')
-    ).toBe('rgba(255, 255, 255, 0.13)');
+    ).toBe('rgba(255, 255, 255, 0.46)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-input-bg')
-    ).toBe('rgba(255, 255, 255, 0.16)');
+    ).toBe('rgba(255, 255, 255, 0.58)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-modal-bg')
     ).toBe('rgba(255, 247, 252, 0.82)');
@@ -195,12 +198,41 @@ describe('PanelAdminSection Nivel Plus', () => {
         theme: expect.objectContaining({
           preset: 'goldBoutiqueLight',
           widgetTexture: 'liquidGlass',
+          fontPreset: 'modernElegant',
           layout: expect.objectContaining({ density: 'compact', sidebarWidth: 220 }),
         }),
       }),
     });
     expect(await screen.findByText('Apariencia guardada y aplicada en todo el panel.')).toBeInTheDocument();
     expect(screen.getByText('Configuración sincronizada')).toBeInTheDocument();
+  });
+
+  it('permite previsualizar y guardar una tipografía para todo el panel', async () => {
+    const user = userEvent.setup();
+    render(<PanelAdminSection />);
+    await screen.findByText('Configuración sincronizada');
+
+    const typographyControls = screen.getByRole('group', {
+      name: 'Tipografía del panel',
+    });
+    await user.click(
+      within(typographyControls).getByRole('button', { name: /Boutique editorial/i })
+    );
+
+    expect(document.documentElement.dataset.adminFontPreset).toBe('boutiqueEditorial');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-font-heading')
+    ).toContain('Cormorant Garamond');
+    expect(screen.getByText('Vista previa sin guardar')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    expect(api.put).toHaveBeenCalledWith('/api/site-settings', {
+      admin: expect.objectContaining({
+        theme: expect.objectContaining({ fontPreset: 'boutiqueEditorial' }),
+      }),
+    });
   });
 
   it('cancela una vista previa y recupera la selección guardada', async () => {
