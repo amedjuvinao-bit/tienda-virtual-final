@@ -105,6 +105,11 @@ export default function AdminLayout() {
     adminUser?.role ||
     'admin';
 
+  const activeAdminRoleLabel = String(activeAdminRole)
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .toLocaleUpperCase('es-CO');
+
   const activeAdminInitials =
     activeAdminName
       .split(' ')
@@ -127,6 +132,7 @@ export default function AdminLayout() {
   const [commandQuery, setCommandQuery] = useState('');
   const [commandOpen, setCommandOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [headerCondensed, setHeaderCondensed] = useState(false);
   const commandInputRef = useRef(null);
 
   useEffect(() => installAdminModalContract(), []);
@@ -385,6 +391,16 @@ export default function AdminLayout() {
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const updateHeaderDensity = () => {
+      setHeaderCondensed(window.scrollY > 56);
+    };
+
+    updateHeaderDensity();
+    window.addEventListener('scroll', updateHeaderDensity, { passive: true });
+    return () => window.removeEventListener('scroll', updateHeaderDensity);
+  }, []);
+
   const linkBase =
     'group flex items-center admin-nav-item-gap admin-nav-padding rounded-[calc(var(--admin-radius)*0.55)] transition-all duration-200 text-sm font-medium';
 
@@ -424,17 +440,49 @@ export default function AdminLayout() {
           padding: calc(var(--admin-padding) * 1.35);
         }
 
-        .admin-header-panel {
+        .admin-area .admin-header-panel {
           min-height: var(--admin-header-height);
-          border-radius: calc(var(--admin-radius) * 0.9);
+          border-radius: calc(var(--admin-radius) * 0.9) !important;
           padding: calc(var(--admin-padding) * 0.75) calc(var(--admin-padding) * 1.2);
           gap: var(--admin-gap);
+          transition:
+            min-height 220ms ease,
+            padding 220ms ease,
+            gap 220ms ease,
+            border-radius 220ms ease,
+            box-shadow 220ms ease;
         }
 
-        .admin-mobile-header-panel {
+        .admin-area .admin-mobile-header-panel {
+          position: sticky;
+          top: var(--admin-padding);
+          z-index: 70;
           border-radius: calc(var(--admin-radius) * 0.85);
           padding: calc(var(--admin-padding) * 0.75);
           gap: calc(var(--admin-gap) * 0.6);
+          background:
+            linear-gradient(135deg,
+              color-mix(in srgb, var(--admin-header-bg) 88%, var(--admin-primary) 12%),
+              color-mix(in srgb, var(--admin-header-bg) 96%, transparent)) !important;
+          border-color: color-mix(in srgb, var(--admin-primary) 28%, var(--admin-card-border)) !important;
+          box-shadow: 0 16px 38px color-mix(in srgb, var(--admin-primary) 16%, transparent), inset 0 1px 0 rgba(255,255,255,.72) !important;
+        }
+
+        .admin-mobile-header-copy { min-width: 0; }
+        .admin-mobile-header-copy h1 { margin: 0; }
+        .admin-mobile-header-copy p {
+          margin: 3px 0 0;
+          overflow: hidden;
+          color: var(--admin-card-muted-text);
+          font-size: 10px;
+          font-weight: 750;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-mobile-header-copy p strong {
+          color: var(--admin-primary-soft-text);
+          font-weight: 900;
         }
 
         .admin-mobile-nav-panel {
@@ -713,13 +761,83 @@ export default function AdminLayout() {
           box-shadow: 0 0 0 3px var(--admin-primary-soft-bg);
         }
 
-        .admin-header-panel {
+        .admin-area .admin-header-panel {
           grid-template-columns: minmax(155px, 0.62fr) minmax(320px, 1.38fr) auto;
           align-items: center;
           overflow: visible;
-          position: relative;
-          z-index: 60;
+          position: sticky;
+          top: var(--admin-padding);
+          z-index: 70;
           isolation: isolate;
+          background:
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--admin-primary) 22%, transparent), transparent 38%),
+            linear-gradient(118deg,
+              color-mix(in srgb, var(--admin-header-bg) 84%, rgba(255,255,255,.18)),
+              color-mix(in srgb, var(--admin-header-bg) 93%, var(--admin-primary) 7%) 58%,
+              color-mix(in srgb, var(--admin-header-bg) 88%, rgba(255,255,255,.14))) !important;
+          border-color: color-mix(in srgb, var(--admin-primary) 32%, var(--admin-card-border)) !important;
+          box-shadow:
+            0 20px 46px color-mix(in srgb, var(--admin-primary) 17%, transparent),
+            0 8px 22px rgba(30, 18, 28, .08),
+            inset 0 1px 0 rgba(255,255,255,.82) !important;
+        }
+
+        .admin-area .admin-header-panel[data-condensed="true"] {
+          min-height: 56px;
+          gap: 9px;
+          border-radius: calc(var(--admin-radius) * .72) !important;
+          padding: 6px 10px;
+          box-shadow:
+            0 14px 34px color-mix(in srgb, var(--admin-primary) 20%, transparent),
+            0 6px 18px rgba(30, 18, 28, .10),
+            inset 0 1px 0 rgba(255,255,255,.84) !important;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-context {
+          gap: 0;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-context__eyebrow,
+        .admin-header-panel[data-condensed="true"] .admin-header-context p {
+          display: none;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-context h1 {
+          font-size: 16px;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-command-center .admin-search-bar {
+          min-height: 36px;
+          padding-block: 5px;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-status {
+          min-width: 36px;
+          min-height: 36px;
+          grid-template-columns: 30px;
+          padding: 2px;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-status__icon,
+        .admin-header-panel[data-condensed="true"] .admin-profile-compact__avatar {
+          width: 30px;
+          height: 30px;
+          border-radius: 10px;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-status > div:last-child {
+          display: none;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-profile-compact {
+          min-height: 36px;
+          grid-template-columns: 30px minmax(0, 1fr);
+          padding: 2px 8px 2px 3px;
+        }
+
+        .admin-header-panel[data-condensed="true"] .admin-header-icon-button {
+          width: 36px;
+          height: 36px;
         }
 
         .admin-header-context {
@@ -927,13 +1045,16 @@ export default function AdminLayout() {
           grid-template-columns: 34px minmax(0, 1fr);
           align-items: center;
           gap: 8px;
-          width: 148px;
+          width: clamp(200px, 17vw, 240px);
           min-height: 42px;
           border: 1px solid var(--admin-primary-soft-border);
           border-radius: calc(var(--admin-radius) * .6);
           padding: 4px 9px 4px 5px;
-          background: var(--admin-primary-soft-bg);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.62);
+          background:
+            linear-gradient(135deg,
+              color-mix(in srgb, var(--admin-primary-soft-bg) 82%, rgba(255,255,255,.18)),
+              color-mix(in srgb, var(--admin-primary-soft-bg) 92%, transparent));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 8px 20px color-mix(in srgb, var(--admin-primary) 12%, transparent);
         }
 
         .admin-profile-compact__avatar {
@@ -949,15 +1070,24 @@ export default function AdminLayout() {
           font-weight: 950;
         }
 
-        .admin-profile-compact p {
+        .admin-profile-compact__identity {
+          display: grid;
+          min-width: 0;
+          gap: 2px;
+        }
+
+        .admin-profile-compact__identity strong,
+        .admin-profile-compact__identity span {
+          display: block;
           margin: 0;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
-        .admin-profile-compact p:first-child { color: var(--admin-card-text); font-size: 10px; font-weight: 900; }
-        .admin-profile-compact p:last-child { color: var(--admin-card-muted-text); font-size: 9px; font-weight: 750; }
+        .admin-profile-compact__identity strong { color: var(--admin-card-text); font-size: 12px; font-weight: 900; }
+        .admin-profile-compact__identity span { color: var(--admin-card-muted-text); font-size: 9px; font-weight: 750; letter-spacing: .01em; }
+        .admin-profile-compact__identity b { color: var(--admin-primary-soft-text); font-weight: 950; }
 
         .admin-header-icon-button {
           display: grid;
@@ -989,8 +1119,20 @@ export default function AdminLayout() {
           .admin-header-panel { grid-template-columns: 132px minmax(230px, 1fr) auto; }
           .admin-header-status { min-width: 42px; grid-template-columns: 34px; padding: 3px; }
           .admin-header-status > div:last-child { display: none; }
-          .admin-profile-compact { width: 42px; grid-template-columns: 34px; padding: 3px; }
-          .admin-profile-compact > div:last-child { display: none; }
+          .admin-profile-compact { width: 200px; }
+        }
+
+        @media (max-width: 1120px) {
+          .admin-header-panel { grid-template-columns: 122px minmax(190px, 1fr) auto; }
+          .admin-header-status { display: none; }
+          .admin-profile-compact { width: 188px; }
+        }
+
+        @media (max-width: 980px) {
+          .admin-header-panel { grid-template-columns: minmax(120px, 1fr) auto; }
+          .admin-command-center { display: none; }
+          .admin-profile-compact { width: 178px; }
+          .admin-header-context p { display: none; }
         }
 
         .admin-btn-ghost {
@@ -1323,7 +1465,7 @@ export default function AdminLayout() {
           <main className="admin-main-column flex-1 min-w-0 flex flex-col">
             <header
               className="admin-header-glass admin-header-panel hidden md:grid"
-              style={{ boxShadow: 'var(--admin-shadow-header, 0 8px 32px rgba(0,0,0,0.06))' }}
+              data-condensed={headerCondensed}
             >
               <div className="admin-header-context">
                 <span className="admin-header-context__eyebrow">
@@ -1417,13 +1559,17 @@ export default function AdminLayout() {
                   </div>
                 </div>
 
-                <div className="admin-profile-compact" title={`${activeAdminName} · ${activeAdminRole}`}>
+                <div
+                  className="admin-profile-compact"
+                  title={`${activeAdminName} · Tipo de usuario: ${activeAdminRoleLabel}`}
+                  aria-label={`${activeAdminName}. Tipo de usuario: ${activeAdminRoleLabel}`}
+                >
                   <div className="admin-profile-compact__avatar">
                     {activeAdminInitials || <UserRound className="h-4 w-4" />}
                   </div>
-                  <div className="min-w-0">
-                    <p>{activeAdminName}</p>
-                    <p>Perfil: {activeAdminRole}</p>
+                  <div className="admin-profile-compact__identity">
+                    <strong>{activeAdminName}</strong>
+                    <span>Tipo de usuario: <b>{activeAdminRoleLabel}</b></span>
                   </div>
                 </div>
 
@@ -1453,12 +1599,15 @@ export default function AdminLayout() {
 
             <div className="md:hidden space-y-3">
               <div className="admin-header-glass admin-mobile-header-panel flex items-center justify-between">
-                <h1
-                  className="text-base font-bold"
-                  style={{ color: 'var(--admin-card-text)' }}
-                >
-                  Panel Admin
-                </h1>
+                <div className="admin-mobile-header-copy">
+                  <h1
+                    className="text-base font-bold"
+                    style={{ color: 'var(--admin-card-text)' }}
+                  >
+                    Panel Admin
+                  </h1>
+                  <p>{activeAdminName} · <strong>{activeAdminRoleLabel}</strong></p>
+                </div>
 
                 <div className="flex items-center admin-inline-gap-sm">
                   <button
