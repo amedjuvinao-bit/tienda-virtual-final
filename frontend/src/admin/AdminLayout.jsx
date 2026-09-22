@@ -1115,6 +1115,7 @@ export default function AdminLayout() {
         className="admin-area min-h-screen relative"
         style={{
           overflowX: 'clip',
+          overflowY: 'clip',
           background: `
             radial-gradient(
               circle at 15% 18%,
