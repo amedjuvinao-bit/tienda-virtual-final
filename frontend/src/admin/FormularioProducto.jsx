@@ -499,6 +499,97 @@ function actionButtonStyle(kind = 'primary') {
   };
 }
 
+export const PRODUCT_FORM_STEPS = [
+  {
+    title: 'Información',
+    helper: 'Datos básicos',
+  },
+  {
+    title: 'Configuración',
+    helper: 'Entrega o composición',
+  },
+  {
+    title: 'Inventario',
+    helper: 'Stock y variantes',
+  },
+  {
+    title: 'Operación',
+    helper: 'Finanzas y clasificación',
+  },
+  {
+    title: 'Contenido',
+    helper: 'SEO, imágenes y detalles',
+  },
+  {
+    title: 'Revisión',
+    helper: 'Confirmar y guardar',
+  },
+];
+
+export function getProductFormStepIssues(step, values = {}) {
+  const issues = [];
+
+  if (step === 0) {
+    const price = Number(values.price);
+    if (!String(values.sku || '').trim()) {
+      issues.push('Elige una categoría para generar el SKU.');
+    }
+    if (!String(values.title || '').trim()) {
+      issues.push('Escribe el título del producto.');
+    }
+    if (!String(values.category || '').trim()) {
+      issues.push('Selecciona o escribe la categoría principal.');
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      issues.push('El precio debe ser mayor a 0.');
+    }
+  }
+
+  if (step === 1) {
+    if (
+      values.productType === 'digital' &&
+      values.digitalDelivery?.deliveryMode === 'automatic' &&
+      !String(values.digitalDelivery?.assetUrl || '').trim()
+    ) {
+      issues.push('Agrega el enlace privado para la entrega automática.');
+    }
+
+    if (
+      values.productType === 'service' &&
+      values.serviceDelivery?.fulfillmentMode === 'scheduled' &&
+      !String(values.serviceDelivery?.bookingUrl || '').trim()
+    ) {
+      issues.push('Agrega la URL de reserva para el servicio.');
+    }
+
+    if (values.productType === 'bundle') {
+      const components = Array.isArray(values.bundleComponents)
+        ? values.bundleComponents
+        : [];
+      if (components.length === 0) {
+        issues.push('Agrega al menos un producto al combo.');
+      } else if (components.some((component) => !component?.product)) {
+        issues.push('Selecciona el producto de cada componente del combo.');
+      } else if (values.bundleReady === false) {
+        issues.push('Completa las variantes requeridas de los componentes del combo.');
+      } else if (values.bundleHasDuplicates) {
+        issues.push('El combo no puede repetir el mismo producto y variante.');
+      }
+    }
+  }
+
+  if (step === 2) {
+    if (Number(values.variantCombinationCount || 0) > 300) {
+      issues.push('Las variantes superan el máximo de 300 combinaciones.');
+    }
+    if (values.hasInventoryDuplicates) {
+      issues.push('Hay combinaciones duplicadas en la matriz de variantes.');
+    }
+  }
+
+  return issues;
+}
+
 export default function FormularioProducto() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -511,6 +602,9 @@ export default function FormularioProducto() {
   const [imagenes, setImagenes] = useState([]);
   const [activo, setActivo] = useState(true);
   const [cargando, setCargando] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState(() => new Set());
+  const [stepAttempted, setStepAttempted] = useState(() => new Set());
 
   const [productType, setProductType] = useState('physical');
   const [trackInventory, setTrackInventory] = useState(true);
@@ -1441,13 +1535,143 @@ export default function FormularioProducto() {
       }));
   }, [trackInventory, advancedVariants, precio, cost, averageCost, id, variantAxes]);
 
-  const formInvalid = useMemo(() => {
-    const price = Number(precio);
-    if (!titulo.trim()) return true;
-    if (!categoria.trim()) return true;
-    if (!price || price <= 0 || Number.isNaN(price)) return true;
-    return false;
-  }, [titulo, categoria, precio]);
+  const variantCombinationCount = useMemo(() => {
+    const activeAxes = normalizeVariantAxes(variantAxes).filter(
+      (axis) => axis.values.length > 0
+    );
+    return activeAxes.reduce(
+      (total, axis) => total * Math.max(1, axis.values.length),
+      activeAxes.length ? 1 : 0
+    );
+  }, [variantAxes]);
+
+  const bundleValidation = useMemo(() => {
+    let ready = true;
+    let hasDuplicates = false;
+    const identities = new Set();
+
+    for (const component of bundleComponents) {
+      if (!component?.product) {
+        ready = false;
+        continue;
+      }
+
+      const detail = bundleProductDetails[component.product];
+      if (!detail?._id) {
+        ready = false;
+        continue;
+      }
+
+      const variants = (detail.variants || []).filter(
+        (variant) => variant.active !== false
+      );
+      const selectedVariantKey =
+        component.variantKey ||
+        (variants.length === 1 ? variants[0].variantKey : '');
+
+      if (
+        variants.length > 1 &&
+        !variants.some(
+          (variant) => variant.variantKey === selectedVariantKey
+        )
+      ) {
+        ready = false;
+        continue;
+      }
+
+      const identity = `${component.product}:${selectedVariantKey || 'default__default'}`;
+      if (identities.has(identity)) hasDuplicates = true;
+      identities.add(identity);
+    }
+
+    return { ready, hasDuplicates };
+  }, [bundleComponents, bundleProductDetails]);
+
+  const stepIssues = useMemo(
+    () =>
+      PRODUCT_FORM_STEPS.map((_, step) =>
+        getProductFormStepIssues(step, {
+          sku,
+          title: titulo,
+          category: categoria,
+          price: precio,
+          productType,
+          digitalDelivery,
+          serviceDelivery,
+          bundleComponents,
+          bundleReady: bundleValidation.ready,
+          bundleHasDuplicates: bundleValidation.hasDuplicates,
+          variantCombinationCount,
+          hasInventoryDuplicates:
+            trackInventory && hasInventoryDuplicatesFront(inventoryArray),
+        })
+      ),
+    [
+      sku,
+      titulo,
+      categoria,
+      precio,
+      productType,
+      digitalDelivery,
+      serviceDelivery,
+      bundleComponents,
+      bundleValidation,
+      variantCombinationCount,
+      trackInventory,
+      inventoryArray,
+    ]
+  );
+
+  const formInvalid = stepIssues.some((issues, index) =>
+    index < PRODUCT_FORM_STEPS.length - 1 && issues.length > 0
+  );
+
+  const scrollWizardToTop = () => {
+    document
+      .getElementById('product-form-wizard')
+      ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  };
+
+  const openWizardStep = (targetStep) => {
+    if (targetStep <= activeStep) {
+      setActiveStep(targetStep);
+      scrollWizardToTop();
+      return;
+    }
+
+    for (let step = 0; step < targetStep; step += 1) {
+      if (stepIssues[step]?.length) {
+        setStepAttempted((previous) => new Set(previous).add(step));
+        setActiveStep(step);
+        toast.error(stepIssues[step][0]);
+        scrollWizardToTop();
+        return;
+      }
+    }
+
+    setCompletedSteps((previous) => {
+      const next = new Set(previous);
+      for (let step = 0; step < targetStep; step += 1) next.add(step);
+      return next;
+    });
+    setActiveStep(targetStep);
+    scrollWizardToTop();
+  };
+
+  const advanceWizard = () => {
+    const issues = stepIssues[activeStep] || [];
+    setStepAttempted((previous) => new Set(previous).add(activeStep));
+    if (issues.length) {
+      toast.error(issues[0]);
+      return;
+    }
+
+    setCompletedSteps((previous) => new Set(previous).add(activeStep));
+    setActiveStep((previous) =>
+      Math.min(previous + 1, PRODUCT_FORM_STEPS.length - 1)
+    );
+    scrollWizardToTop();
+  };
 
   const guardarProducto = async (event) => {
     event.preventDefault();
@@ -1716,7 +1940,7 @@ export default function FormularioProducto() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-6" style={{ color: 'var(--admin-card-text)' }}>
+    <div id="product-form-wizard" className="mx-auto max-w-6xl p-6" style={{ color: 'var(--admin-card-text)' }}>
       <div style={cardStyle}>
         <div className="border-b px-6 py-5" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-glass-bg)' }}>
           <p className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--admin-primary)' }}>
@@ -1728,7 +1952,118 @@ export default function FormularioProducto() {
           </p>
         </div>
 
-        <form onSubmit={guardarProducto} className="space-y-8 p-6">
+        <form onSubmit={guardarProducto} className="space-y-6 p-6">
+          <div
+            className="rounded-2xl border p-3"
+            style={{
+              borderColor: 'var(--admin-card-border)',
+              background: 'var(--admin-soft-bg)',
+            }}
+          >
+            <div
+              role="tablist"
+              aria-label="Pasos para configurar el producto"
+              className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6"
+            >
+              {PRODUCT_FORM_STEPS.map((step, index) => {
+                const selected = activeStep === index;
+                const complete =
+                  completedSteps.has(index) && !stepIssues[index]?.length;
+                const hasError =
+                  stepAttempted.has(index) && stepIssues[index]?.length > 0;
+
+                return (
+                  <button
+                    key={step.title}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`product-step-panel-${index}`}
+                    onClick={() => openWizardStep(index)}
+                    className="min-w-0 rounded-xl border px-3 py-3 text-left transition"
+                    style={{
+                      borderColor: selected
+                        ? 'var(--admin-primary)'
+                        : hasError
+                          ? 'var(--admin-danger)'
+                          : 'var(--admin-card-border)',
+                      background: selected
+                        ? 'color-mix(in srgb, var(--admin-primary) 18%, var(--admin-card-bg) 82%)'
+                        : 'var(--admin-card-bg)',
+                      color: 'var(--admin-card-text)',
+                      boxShadow: selected
+                        ? '0 10px 24px color-mix(in srgb, var(--admin-primary) 18%, transparent)'
+                        : 'none',
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-black"
+                        style={{
+                          borderColor: hasError
+                            ? 'var(--admin-danger)'
+                            : complete || selected
+                              ? 'var(--admin-primary)'
+                              : 'var(--admin-card-border)',
+                          background: complete
+                            ? 'var(--admin-primary)'
+                            : 'var(--admin-soft-bg)',
+                          color: complete
+                            ? 'var(--admin-button-text)'
+                            : hasError
+                              ? 'var(--admin-danger)'
+                              : 'var(--admin-card-text)',
+                        }}
+                      >
+                        {complete ? '✓' : index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-black">
+                          {step.title}
+                        </span>
+                        <span
+                          className="block truncate text-[10px]"
+                          style={{ color: 'var(--admin-card-muted-text)' }}
+                        >
+                          {hasError ? 'Requiere atención' : step.helper}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1">
+              <p className="text-sm font-bold">
+                Paso {activeStep + 1} de {PRODUCT_FORM_STEPS.length}: {PRODUCT_FORM_STEPS[activeStep].title}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Completa los campos obligatorios para continuar.
+              </p>
+            </div>
+
+            {stepAttempted.has(activeStep) && stepIssues[activeStep]?.length > 0 && (
+              <div
+                role="alert"
+                className="mt-3 rounded-xl border px-4 py-3 text-sm font-semibold"
+                style={{
+                  borderColor: 'var(--admin-danger)',
+                  background: 'color-mix(in srgb, var(--admin-danger) 12%, var(--admin-card-bg) 88%)',
+                  color: 'var(--admin-card-text)',
+                }}
+              >
+                {stepIssues[activeStep][0]}
+              </div>
+            )}
+          </div>
+
+          {activeStep === 0 && (
+            <div
+              id="product-step-panel-0"
+              role="tabpanel"
+              className="space-y-6"
+            >
           <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <div className="space-y-2">
               <FieldLabel required helper="se genera por categoría">SKU</FieldLabel>
@@ -1806,6 +2141,25 @@ export default function FormularioProducto() {
               <textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Descripción comercial, características, uso, cuidados o condiciones del servicio." />
             </div>
           </section>
+            </div>
+          )}
+
+          {activeStep === 1 && (
+            <div
+              id="product-step-panel-1"
+              role="tabpanel"
+              className="space-y-6"
+            >
+          {productType === 'physical' && (
+            <section className="rounded-2xl border p-5" style={sectionStyle}>
+              <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>
+                Producto físico listo para inventario
+              </p>
+              <p className="mt-2 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Este tipo no necesita una modalidad de entrega especial. Continúa para configurar existencias y variantes.
+              </p>
+            </section>
+          )}
 
           {productType === 'digital' && (
             <section className="space-y-5 rounded-2xl border p-4" style={sectionStyle}>
@@ -2118,7 +2472,7 @@ export default function FormularioProducto() {
                     ])
                   }
                   className="rounded-xl px-4 py-2 text-sm font-bold"
-                  style={buttonStyle('soft')}
+                  style={actionButtonStyle('soft')}
                   disabled={bundleCandidatesLoading}
                 >
                   Agregar componente
@@ -2219,7 +2573,7 @@ export default function FormularioProducto() {
                           type="button"
                           onClick={() => removeBundleComponent(index)}
                           className="rounded-xl px-3 py-2 text-sm font-bold"
-                          style={buttonStyle('soft')}
+                          style={actionButtonStyle('soft')}
                         >
                           Quitar
                         </button>
@@ -2230,7 +2584,15 @@ export default function FormularioProducto() {
               </div>
             </section>
           )}
+            </div>
+          )}
 
+          {activeStep === 2 && (
+            <div
+              id="product-step-panel-2"
+              role="tabpanel"
+              className="space-y-6"
+            >
           <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-2" style={sectionStyle}>
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Inventario</h3>
@@ -2515,7 +2877,15 @@ export default function FormularioProducto() {
               )}
             </section>
           )}
+            </div>
+          )}
 
+          {activeStep === 3 && (
+            <div
+              id="product-step-panel-3"
+              role="tabpanel"
+              className="space-y-6"
+            >
           <section className="grid gap-5 rounded-2xl border p-4 md:grid-cols-3" style={{ borderColor: 'var(--admin-card-border)' }}>
             <div>
               <h3 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-primary)' }}>Finanzas y logística</h3>
@@ -2678,7 +3048,15 @@ export default function FormularioProducto() {
               </div>
             )}
           </section>
+            </div>
+          )}
 
+          {activeStep === 4 && (
+            <div
+              id="product-step-panel-4"
+              role="tabpanel"
+              className="space-y-6"
+            >
           <section className="grid gap-6 rounded-2xl border p-5 lg:grid-cols-2" style={{ borderColor: 'var(--admin-card-border)' }}>
             <div className="space-y-4">
               <div>
@@ -2773,10 +3151,142 @@ export default function FormularioProducto() {
           </section>
 
           <section className="space-y-2"><FieldLabel>Notas internas</FieldLabel><textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Observaciones internas para inventario, compras o finanzas." /></section>
+            </div>
+          )}
 
-          <section className="flex flex-wrap items-center justify-between gap-4 border-t pt-5" style={{ borderColor: 'var(--admin-card-border)' }}>
-            <label className="flex items-center gap-3"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} className="h-5 w-5" style={{ accentColor: 'var(--admin-primary)' }} /><span className="text-sm font-semibold">Producto activo en la tienda</span></label>
-            <div className="flex gap-3"><button type="button" onClick={() => navigate('/admin/productos')} className="rounded-xl border px-5 py-2.5 text-sm font-semibold" style={actionButtonStyle('soft')}>Cancelar</button><button disabled={cargando || formInvalid} className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={actionButtonStyle()}>{cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}</button></div>
+          {activeStep === 5 && (
+            <div
+              id="product-step-panel-5"
+              role="tabpanel"
+              className="space-y-5"
+            >
+              <section
+                className="overflow-hidden rounded-2xl border"
+                style={{ borderColor: 'var(--admin-card-border)' }}
+              >
+                <div
+                  className="border-b px-5 py-4"
+                  style={{
+                    borderColor: 'var(--admin-card-border)',
+                    background: 'var(--admin-soft-bg)',
+                  }}
+                >
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-primary)' }}>
+                    Revisión final
+                  </p>
+                  <h3 className="mt-1 text-xl font-bold">
+                    Confirma la ficha antes de {id ? 'guardar los cambios' : 'crear el producto'}
+                  </h3>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>
+                    Puedes volver a cualquier paso anterior sin perder la información ingresada.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    ['Producto', titulo || 'Sin título'],
+                    ['Tipo', selectedType.label],
+                    ['Categoría', categoria || 'Sin categoría'],
+                    ['Precio base', Number(precio || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })],
+                    ['Inventario', trackInventory ? `${advancedVariants.length || 1} variante(s)` : 'No controlado'],
+                    ['Imágenes', `${imagen ? 1 : 0} portada · ${imagenes.length} en galería`],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="min-w-0 rounded-xl border p-4"
+                      style={{
+                        borderColor: 'var(--admin-card-border)',
+                        background: 'var(--admin-soft-bg)',
+                      }}
+                    >
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}>
+                        {label}
+                      </p>
+                      <p className="mt-1 break-words text-sm font-bold">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <label
+                className="flex items-center justify-between gap-4 rounded-2xl border px-5 py-4"
+                style={{
+                  borderColor: 'var(--admin-card-border)',
+                  background: 'var(--admin-soft-bg)',
+                }}
+              >
+                <span>
+                  <span className="block text-sm font-bold">Producto activo en la tienda</span>
+                  <span className="mt-1 block text-xs" style={{ color: 'var(--admin-card-muted-text)' }}>
+                    Si lo desactivas, se guardará sin aparecer en el catálogo público.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={activo}
+                  onChange={(event) => setActivo(event.target.checked)}
+                  className="h-5 w-5 shrink-0"
+                  style={{ accentColor: 'var(--admin-primary)' }}
+                />
+              </label>
+            </div>
+          )}
+
+          <section
+            className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3"
+            style={{
+              borderColor: 'var(--admin-card-border)',
+              background: 'color-mix(in srgb, var(--admin-card-bg) 92%, transparent)',
+              boxShadow: 'var(--admin-glass-shadow)',
+              backdropFilter: 'blur(18px)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/productos')}
+                className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
+                style={actionButtonStyle('soft')}
+              >
+                Cancelar
+              </button>
+              <span className="hidden text-xs sm:block" style={{ color: 'var(--admin-card-muted-text)' }}>
+                Paso {activeStep + 1} de {PRODUCT_FORM_STEPS.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {activeStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => openWizardStep(activeStep - 1)}
+                  className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
+                  style={actionButtonStyle('soft')}
+                >
+                  Anterior
+                </button>
+              )}
+
+              {activeStep < PRODUCT_FORM_STEPS.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={advanceWizard}
+                  className="rounded-xl px-5 py-2.5 text-sm font-semibold"
+                  style={actionButtonStyle()}
+                >
+                  Validar y continuar
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={cargando || formInvalid}
+                  className="rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  style={actionButtonStyle()}
+                >
+                  {cargando ? 'Guardando...' : id ? 'Guardar cambios' : 'Crear producto'}
+                </button>
+              )}
+            </div>
           </section>
         </form>
       </div>

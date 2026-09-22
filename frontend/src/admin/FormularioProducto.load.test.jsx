@@ -1,7 +1,7 @@
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiGet, apiPut, toastError, toastSuccess } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -26,12 +26,17 @@ vi.mock('react-toastify', () => ({
 }));
 
 import FormularioProducto, {
+  getProductFormStepIssues,
   formatProductSaveError,
   normalizeLoadedVariants,
   shouldPreserveLegacyEmptyVariants,
 } from './FormularioProducto';
 
 describe('FormularioProducto: carga de edición', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('acepta la doble ejecución de StrictMode sin mostrar un falso error de carga', async () => {
     const productId = '6a6bcb06c53f1f9391483ee9';
     const product = {
@@ -88,6 +93,9 @@ describe('FormularioProducto: carga de edición', () => {
           data: { categories: [], collections: [], legacyCategories: [] },
         });
       }
+      if (url === '/api/geo/countries') {
+        return Promise.resolve({ data: [] });
+      }
       return Promise.reject(new Error(`Solicitud inesperada: ${url}`));
     });
 
@@ -119,12 +127,14 @@ describe('FormularioProducto: carga de edición', () => {
     expect(toastError).not.toHaveBeenCalled();
 
     apiPut.mockResolvedValueOnce({ data: { ok: true } });
+    fireEvent.click(screen.getByRole('tab', { name: /Contenido/i }));
     fireEvent.change(
       screen.getByPlaceholderText(
         'Observaciones internas para inventario, compras o finanzas.'
       ),
       { target: { value: 'Cambio comprobado' } }
     );
+    fireEvent.click(screen.getByRole('tab', { name: /Revisión/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
@@ -223,5 +233,78 @@ describe('FormularioProducto: carga de edición', () => {
         ],
       })
     ).toBe(false);
+  });
+
+  it('bloquea el avance del primer paso cuando faltan campos obligatorios', () => {
+    expect(
+      getProductFormStepIssues(0, {
+        sku: '',
+        title: '',
+        category: '',
+        price: 0,
+      })
+    ).toEqual([
+      'Elige una categoría para generar el SKU.',
+      'Escribe el título del producto.',
+      'Selecciona o escribe la categoría principal.',
+      'El precio debe ser mayor a 0.',
+    ]);
+  });
+
+  it('valida los requisitos dinámicos de entrega y variantes por paso', () => {
+    expect(
+      getProductFormStepIssues(1, {
+        productType: 'digital',
+        digitalDelivery: { deliveryMode: 'automatic', assetUrl: '' },
+      })
+    ).toContain('Agrega el enlace privado para la entrega automática.');
+
+    expect(
+      getProductFormStepIssues(2, {
+        variantCombinationCount: 301,
+        hasInventoryDuplicates: true,
+      })
+    ).toEqual([
+      'Las variantes superan el máximo de 300 combinaciones.',
+      'Hay combinaciones duplicadas en la matriz de variantes.',
+    ]);
+  });
+
+  it('mantiene al usuario en el paso actual cuando intenta saltar campos obligatorios', async () => {
+    apiGet.mockImplementation((url) => {
+      if (url === '/api/products/admin/taxonomy') {
+        return Promise.resolve({
+          data: { categories: [], collections: [], legacyCategories: [] },
+        });
+      }
+      if (url === '/api/geo/countries') {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.reject(new Error(`Solicitud inesperada: ${url}`));
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/admin/productos/nuevo']}>
+        <Routes>
+          <Route
+            path="/admin/productos/nuevo"
+            element={<FormularioProducto />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const inventoryTab = await screen.findByRole('tab', {
+      name: /Inventario/i,
+    });
+    fireEvent.click(inventoryTab);
+
+    expect(toastError).toHaveBeenCalledWith(
+      'Elige una categoría para generar el SKU.'
+    );
+    expect(
+      screen.getByRole('tab', { name: /Información/i })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(inventoryTab).toHaveAttribute('aria-selected', 'false');
   });
 });
