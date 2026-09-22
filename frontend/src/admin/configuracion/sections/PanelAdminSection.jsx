@@ -972,6 +972,7 @@ export default function PanelAdminSection() {
                   key={option.value}
                   type="button"
                   className={`panel-admin-theme-card${selected ? ' is-selected' : ''}`}
+                  data-theme-preset={option.value}
                   aria-pressed={selected}
                   disabled={loading || saving || uploadingBackground}
                   onClick={() =>
@@ -1109,7 +1110,8 @@ export default function PanelAdminSection() {
                   </span>
                   <span className="panel-admin-font-option__copy">
                     <strong style={{ fontFamily: option.heading }}>{option.label}</strong>
-                    <small>{option.description}</small>
+                    <small style={{ fontFamily: option.body }}>{option.description}</small>
+                    <em style={{ fontFamily: option.body }}>Texto de lectura · 123</em>
                   </span>
                   <span className="panel-admin-font-option__check" aria-hidden="true">
                     <Check size={14} />
@@ -1227,6 +1229,7 @@ export default function PanelAdminSection() {
           <div
             className="panel-admin-preview__canvas"
             data-widget-texture={draftSelection.widgetTexture}
+            data-theme-preset={draftSelection.preset}
             style={{
               '--preview-primary': selectedTheme.primary,
               '--preview-page': selectedTheme.pageBg,

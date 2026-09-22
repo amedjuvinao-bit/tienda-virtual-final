@@ -316,7 +316,7 @@ export default function AdminLayout() {
   };
 
   const normalNavStyle = {
-    color: 'var(--admin-primary-soft-text)',
+    color: 'var(--admin-sidebar-text)',
   };
 
   const mainLinks = [
@@ -632,8 +632,8 @@ export default function AdminLayout() {
         }
 
         .admin-nav-link:hover {
-          background: var(--admin-primary-soft-bg) !important;
-          color: var(--admin-primary) !important;
+          background: var(--admin-active-nav-bg) !important;
+          color: var(--admin-active-nav-text) !important;
         }
 
         .admin-sidebar-panel,
@@ -655,8 +655,8 @@ export default function AdminLayout() {
         }
 
         .admin-nav-link-mobile:hover {
-          background: var(--admin-primary-soft-bg) !important;
-          color: var(--admin-primary) !important;
+          background: var(--admin-active-nav-bg) !important;
+          color: var(--admin-active-nav-text) !important;
         }
 
         .admin-sidebar-glass {
@@ -1426,6 +1426,7 @@ export default function AdminLayout() {
                     onClick={handleConfigMenuClick}
                     className={`${linkBase} admin-nav-link w-full justify-between`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
+                    aria-current={isConfigRoute ? 'page' : undefined}
                   >
                     <span className="flex items-center admin-inline-gap-md">
                       <span className="admin-icon-wrap">
@@ -1716,6 +1717,7 @@ export default function AdminLayout() {
                     onClick={handleConfigMenuClick}
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
+                    aria-current={isConfigRoute ? 'page' : undefined}
                   >
                     <span
                       className="admin-icon-wrap"
