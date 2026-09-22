@@ -415,11 +415,6 @@ export default function AdminLayout() {
           position: sticky;
           top: var(--admin-padding);
           align-self: flex-start;
-          height: calc(100vh - (var(--admin-padding) * 2));
-          height: calc(100dvh - (var(--admin-padding) * 2));
-          max-height: calc(100vh - (var(--admin-padding) * 2));
-          max-height: calc(100dvh - (var(--admin-padding) * 2));
-          overflow: hidden;
           z-index: 40;
           border-radius: var(--admin-radius);
           padding: calc(var(--admin-padding) * 0.75);
@@ -584,7 +579,6 @@ export default function AdminLayout() {
         .admin-nav-link:hover {
           background: var(--admin-primary-soft-bg) !important;
           color: var(--admin-primary) !important;
-          transform: translateX(3px);
         }
 
         .admin-nav-link-mobile:hover {
@@ -646,7 +640,6 @@ export default function AdminLayout() {
 
         .admin-nav-link:hover .admin-icon-wrap,
         .admin-nav-link-mobile:hover .admin-icon-wrap {
-          transform: scale(1.1);
           box-shadow: var(--admin-shadow-sm, 0 4px 12px rgba(0,0,0,0.1));
         }
 
@@ -1201,7 +1194,7 @@ export default function AdminLayout() {
             </div>
 
             <nav
-              className="flex-1 overflow-y-auto admin-thin-scrollbar space-y-5 pr-0.5"
+              className="flex-1 space-y-5"
               aria-label="Menú lateral admin"
             >
               {visibleMainLinks.length > 0 && (
