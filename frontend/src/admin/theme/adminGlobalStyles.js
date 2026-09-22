@@ -1204,6 +1204,16 @@ export function applyAdminGlobalStyles() {
       outline-offset: var(--admin-widget-inner-border-offset);
     }
 
+    /* These are layout-only wrappers inside an already outlined card. Giving
+       them another liquid-glass rim draws that rim through headings, labels
+       and helper text because the wrappers intentionally have no padding. */
+    html[data-admin-widget-texture="liquidGlass"] .admin-area :is(
+      .store-panel,
+      .payments-panel
+    ) {
+      outline: none !important;
+    }
+
     /* Modules with their own glass variables used opaque white fallbacks.
        Route those variables through the selected mirror material so their
        metrics, filters and tables visibly match the rest of the panel. */

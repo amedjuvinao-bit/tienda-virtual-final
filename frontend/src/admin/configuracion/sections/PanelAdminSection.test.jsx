@@ -189,5 +189,8 @@ describe('PanelAdminSection Nivel Plus', () => {
     expect(globalStyles.textContent).toContain('.favorites-admin-page');
     expect(globalStyles.textContent).toContain('.coupon-form-dialog');
     expect(globalStyles.textContent).toContain('.order-detail-professional-shell');
+    expect(globalStyles.textContent).toMatch(
+      /:is\(\s*\.store-panel,\s*\.payments-panel\s*\)\s*\{\s*outline: none !important;/,
+    );
   });
 });
