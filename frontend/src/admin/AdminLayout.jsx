@@ -715,40 +715,77 @@ export default function AdminLayout() {
         .admin-premium-nav-icon {
           position: relative;
           display: grid;
-          width: 32px;
-          height: 32px;
-          flex: 0 0 32px;
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
           place-items: center;
           isolation: isolate;
         }
 
         .admin-premium-nav-icon__halo {
           position: absolute;
-          left: 5px;
-          right: 5px;
-          bottom: 1px;
-          height: 8px;
+          left: 6px;
+          right: 6px;
+          bottom: 2px;
+          height: 9px;
           z-index: -1;
           border-radius: 50%;
           background: color-mix(in srgb, var(--admin-primary) 38%, transparent);
           filter: blur(5px);
-          opacity: .42;
-          transition: opacity .2s ease, filter .2s ease;
+          opacity: .38;
+          transform: scale(.9);
+          animation: adminCrystalHaloPulse 4.6s ease-in-out infinite;
+          transition: opacity .24s ease, filter .24s ease;
         }
 
         .admin-premium-nav-icon__miniature {
           position: relative;
           z-index: 1;
           display: block;
-          width: 31px;
-          height: 31px;
+          width: 36px;
+          height: 36px;
           object-fit: contain;
           pointer-events: none;
           user-select: none;
           filter:
+            contrast(1.05)
             drop-shadow(0 1px 0 rgba(255,255,255,.5))
-            drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 24%, rgba(38,20,34,.2)));
-          transition: filter .2s ease;
+            drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 30%, rgba(38,20,34,.28)));
+          animation: adminCrystalIconGleam 5.2s ease-in-out infinite;
+          transform: translateZ(0);
+          transition: filter .24s ease, transform .24s ease;
+        }
+
+        @keyframes adminCrystalIconGleam {
+          0%, 68%, 100% {
+            filter:
+              contrast(1.05)
+              brightness(1)
+              drop-shadow(0 1px 0 rgba(255,255,255,.5))
+              drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 30%, rgba(38,20,34,.28)));
+          }
+          78% {
+            filter:
+              contrast(1.08)
+              brightness(1.13)
+              drop-shadow(0 1px 0 rgba(255,255,255,.72))
+              drop-shadow(0 4px 7px color-mix(in srgb, var(--admin-primary) 42%, rgba(38,20,34,.3)));
+          }
+        }
+
+        @keyframes adminCrystalHaloPulse {
+          0%, 100% { opacity: .3; transform: scale(.88); }
+          50% { opacity: .62; transform: scale(1.06); }
+        }
+
+        .admin-nav-link:nth-child(3n + 2) .admin-premium-nav-icon__miniature,
+        .admin-nav-link-mobile:nth-child(3n + 2) .admin-premium-nav-icon__miniature {
+          animation-delay: -1.7s;
+        }
+
+        .admin-nav-link:nth-child(3n) .admin-premium-nav-icon__miniature,
+        .admin-nav-link-mobile:nth-child(3n) .admin-premium-nav-icon__miniature {
+          animation-delay: -3.4s;
         }
 
         .admin-premium-nav-icon__fallback {
@@ -759,32 +796,43 @@ export default function AdminLayout() {
         }
 
         .admin-premium-nav-icon--compact {
-          width: 26px;
-          height: 26px;
-          flex-basis: 26px;
+          width: 30px;
+          height: 30px;
+          flex-basis: 30px;
         }
 
         .admin-premium-nav-icon--compact .admin-premium-nav-icon__miniature {
-          width: 25px;
-          height: 25px;
+          width: 30px;
+          height: 30px;
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__halo,
         .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo,
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__halo {
+          animation: none;
           opacity: .92;
           filter: blur(9px);
+          transform: scale(1.08);
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__miniature,
         .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature,
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
+          animation: none;
           filter:
             brightness(1.06)
             drop-shadow(0 1px 0 rgba(255,255,255,.55))
             drop-shadow(0 4px 6px color-mix(in srgb, var(--admin-primary) 38%, rgba(38,20,34,.2)));
+          transform: translateY(-1px) scale(1.06);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .admin-premium-nav-icon__miniature,
+          .admin-premium-nav-icon__halo {
+            animation: none;
+          }
         }
 
         .admin-nav-link:hover .admin-icon-wrap,
