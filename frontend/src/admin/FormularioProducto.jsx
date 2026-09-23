@@ -2950,7 +2950,7 @@ export default function FormularioProducto() {
             <div className="grid gap-5 lg:grid-cols-2">
               <div className="space-y-3">
                 <FieldLabel>Categorías asociadas</FieldLabel>
-                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                <div className="h-52 space-y-2 overflow-x-hidden overflow-y-scroll rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)', scrollbarGutter: 'stable' }}>
                   {taxonomy.categories.length === 0 ? (
                     <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Crea la primera categoría en el bloque inferior.</p>
                   ) : (
@@ -2973,7 +2973,7 @@ export default function FormularioProducto() {
 
               <div className="space-y-3">
                 <FieldLabel>Colecciones</FieldLabel>
-                <div className="max-h-52 space-y-2 overflow-auto rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
+                <div className="h-52 space-y-2 overflow-x-hidden overflow-y-scroll rounded-xl border p-3" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)', scrollbarGutter: 'stable' }}>
                   {taxonomy.collections.length === 0 ? (
                     <p className="text-sm" style={{ color: 'var(--admin-card-muted-text)' }}>Todavía no hay colecciones creadas.</p>
                   ) : (
