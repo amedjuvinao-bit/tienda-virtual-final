@@ -715,122 +715,128 @@ export default function AdminLayout() {
         .admin-premium-nav-icon {
           position: relative;
           display: grid;
-          width: 36px;
-          height: 36px;
-          flex: 0 0 36px;
+          width: 38px;
+          height: 38px;
+          flex: 0 0 38px;
           place-items: center;
           isolation: isolate;
+          overflow: visible;
         }
 
         .admin-premium-nav-icon__halo {
           position: absolute;
-          left: 6px;
-          right: 6px;
-          bottom: 2px;
-          height: 9px;
+          left: 4px;
+          right: 4px;
+          bottom: 1px;
+          height: 11px;
           z-index: -1;
           border-radius: 50%;
-          background: color-mix(in srgb, var(--admin-primary) 38%, transparent);
+          background: rgba(255,255,255,.62);
           filter: blur(5px);
-          opacity: .38;
+          opacity: .2;
           transform: scale(.9);
-          animation: adminCrystalHaloPulse 4.6s ease-in-out infinite;
-          transition: opacity .24s ease, filter .24s ease;
+          transition: opacity .24s ease, filter .24s ease, transform .24s ease;
         }
 
         .admin-premium-nav-icon__miniature {
           position: relative;
           z-index: 1;
           display: block;
-          width: 36px;
-          height: 36px;
+          width: 46px;
+          height: 46px;
+          max-width: none;
+          flex: 0 0 auto;
           object-fit: contain;
           pointer-events: none;
           user-select: none;
           filter:
-            contrast(1.05)
-            drop-shadow(0 1px 0 rgba(255,255,255,.5))
-            drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 30%, rgba(38,20,34,.28)));
-          animation: adminCrystalIconGleam 5.2s ease-in-out infinite;
+            contrast(1.08)
+            drop-shadow(0 1px 1px rgba(255,255,255,.88))
+            drop-shadow(0 3px 4px rgba(17,24,39,.42));
           transform: translateZ(0);
           transition: filter .24s ease, transform .24s ease;
         }
 
-        @keyframes adminCrystalIconGleam {
-          0%, 68%, 100% {
-            filter:
-              contrast(1.05)
-              brightness(1)
-              drop-shadow(0 1px 0 rgba(255,255,255,.5))
-              drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 30%, rgba(38,20,34,.28)));
-          }
-          78% {
-            filter:
-              contrast(1.08)
-              brightness(1.13)
-              drop-shadow(0 1px 0 rgba(255,255,255,.72))
-              drop-shadow(0 4px 7px color-mix(in srgb, var(--admin-primary) 42%, rgba(38,20,34,.3)));
-          }
-        }
-
-        @keyframes adminCrystalHaloPulse {
-          0%, 100% { opacity: .3; transform: scale(.88); }
-          50% { opacity: .62; transform: scale(1.06); }
-        }
-
-        .admin-nav-link:nth-child(3n + 2) .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile:nth-child(3n + 2) .admin-premium-nav-icon__miniature {
-          animation-delay: -1.7s;
-        }
-
-        .admin-nav-link:nth-child(3n) .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile:nth-child(3n) .admin-premium-nav-icon__miniature {
-          animation-delay: -3.4s;
-        }
-
         .admin-premium-nav-icon__fallback {
-          width: 20px;
-          height: 20px;
+          width: 24px;
+          height: 24px;
           color: var(--admin-primary);
           filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 25%, transparent));
         }
 
         .admin-premium-nav-icon--compact {
-          width: 30px;
-          height: 30px;
-          flex-basis: 30px;
+          width: 32px;
+          height: 32px;
+          flex-basis: 32px;
         }
 
         .admin-premium-nav-icon--compact .admin-premium-nav-icon__miniature {
-          width: 30px;
-          height: 30px;
+          width: 38px;
+          height: 38px;
+        }
+
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__halo {
+          background: rgba(255,255,255,.72);
+          opacity: .28;
+          filter: blur(6px);
+          transform: scale(.98);
+        }
+
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
+          filter:
+            contrast(1.1)
+            brightness(1.04)
+            drop-shadow(0 1px 1px rgba(255,255,255,.92))
+            drop-shadow(0 4px 6px rgba(17,24,39,.48));
+          transform: scale(1.03);
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__halo,
-        .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo,
-        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
-        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__halo {
-          animation: none;
-          opacity: .92;
-          filter: blur(9px);
-          transform: scale(1.08);
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo {
+          background: color-mix(in srgb, var(--admin-primary) 52%, transparent);
+          animation: adminCrystalHaloHover .52s cubic-bezier(.2,.75,.25,1) both;
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature,
-        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
-          animation: none;
-          filter:
-            brightness(1.06)
-            drop-shadow(0 1px 0 rgba(255,255,255,.55))
-            drop-shadow(0 4px 6px color-mix(in srgb, var(--admin-primary) 38%, rgba(38,20,34,.2)));
-          transform: translateY(-1px) scale(1.06);
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature {
+          animation: adminCrystalIconHover .52s cubic-bezier(.2,.75,.25,1) both;
+        }
+
+        @keyframes adminCrystalIconHover {
+          0% {
+            transform: translateY(0) scale(1);
+          }
+          48% {
+            transform: translateY(-2px) scale(1.13);
+            filter:
+              contrast(1.09)
+              brightness(1.15)
+              drop-shadow(0 1px 1px rgba(255,255,255,.96))
+              drop-shadow(0 6px 9px rgba(17,24,39,.55));
+          }
+          100% {
+            transform: translateY(-1px) scale(1.08);
+            filter:
+              contrast(1.08)
+              brightness(1.08)
+              drop-shadow(0 1px 1px rgba(255,255,255,.9))
+              drop-shadow(0 5px 7px rgba(17,24,39,.5));
+          }
+        }
+
+        @keyframes adminCrystalHaloHover {
+          0% { opacity: .2; transform: scale(.9); filter: blur(5px); }
+          52% { opacity: .96; transform: scale(1.16); filter: blur(10px); }
+          100% { opacity: .78; transform: scale(1.08); filter: blur(8px); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .admin-premium-nav-icon__miniature,
-          .admin-premium-nav-icon__halo {
+          .admin-nav-link:hover .admin-premium-nav-icon__miniature,
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature,
+          .admin-nav-link:hover .admin-premium-nav-icon__halo,
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo {
             animation: none;
           }
         }
