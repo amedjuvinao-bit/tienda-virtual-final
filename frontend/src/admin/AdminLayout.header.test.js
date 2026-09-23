@@ -76,7 +76,8 @@ describe('menú lateral contraíble', () => {
     )?.[1] || '';
 
     expect(glassRule).toContain('rgba(255,255,255,.035)');
-    expect(glassRule).toContain('backdrop-filter: blur(10px)');
+    expect(glassRule).toContain('backdrop-filter: blur(2px)');
+    expect(glassRule).toContain('transparent 52%');
     expect(glassRule).not.toContain('var(--admin-card-bg)');
     expect(glassRule).not.toContain('rgba(15,23,42');
   });
