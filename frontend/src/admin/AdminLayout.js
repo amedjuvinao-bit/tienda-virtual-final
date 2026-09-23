@@ -31,7 +31,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Facturación',
     mobileLabel: 'Facturación',
     icon: ReceiptText,
-    tone: 'magenta',
+    artwork: '🧾',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -40,7 +40,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Clientes',
     mobileLabel: 'Clientes',
     icon: UserRound,
-    tone: 'cyan',
+    artwork: '🧑‍💼',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -49,7 +49,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'POS / Ventas físicas',
     mobileLabel: 'POS',
     icon: Store,
-    tone: 'coral',
+    artwork: '🏪',
     slotAfter: '/admin/clientes',
   },
   {
@@ -58,7 +58,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Caja',
     mobileLabel: 'Caja',
     icon: Wallet,
-    tone: 'emerald',
+    artwork: '👛',
     slotAfter: '/admin/pos',
   },
   {
@@ -67,7 +67,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Cupones',
     mobileLabel: 'Cupones',
     icon: BadgePercent,
-    tone: 'ruby',
+    artwork: '🏷️',
     slotAfter: '/admin/finanzas',
   },
 ];
@@ -172,7 +172,7 @@ function AdminExtraMenuLink({ menuLink, mobile = false }) {
     },
     React.createElement(PremiumAdminNavIcon, {
       icon: Icon,
-      tone: menuLink.tone,
+      artwork: menuLink.artwork,
       compact: mobile,
     }),
     React.createElement('span', null, mobile ? menuLink.mobileLabel : menuLink.label)

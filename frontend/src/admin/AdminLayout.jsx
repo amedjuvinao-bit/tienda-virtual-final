@@ -321,21 +321,21 @@ export default function AdminLayout() {
   };
 
   const mainLinks = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, tone: 'violet' },
-    { to: '/admin/productos', label: 'Productos', icon: Package, tone: 'sapphire' },
-    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, tone: 'amber' },
-    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, tone: 'cyan' },
-    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, tone: 'coral' },
-    { to: '/admin/caja', label: 'Caja', icon: WalletCards, tone: 'emerald' },
-    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, tone: 'gold' },
-    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, tone: 'teal' },
-    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, tone: 'indigo' },
-    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, tone: 'rose' },
+    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, artwork: '🪟' },
+    { to: '/admin/productos', label: 'Productos', icon: Package, artwork: '📦' },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, artwork: '📋' },
+    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, artwork: '🧑‍💼' },
+    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, artwork: '🏪' },
+    { to: '/admin/caja', label: 'Caja', icon: WalletCards, artwork: '👛' },
+    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, artwork: '🪙' },
+    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, artwork: '🗄️' },
+    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, artwork: '🛒' },
+    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, artwork: '💗' },
   ];
 
   const designLinks = [
-    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, tone: 'prism' },
-    { to: '/admin/paginas', label: 'Páginas', icon: FileText, tone: 'sky' },
+    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, artwork: '🎨' },
+    { to: '/admin/paginas', label: 'Páginas', icon: FileText, artwork: '📑' },
   ];
 
   const visibleMainLinks = filterLinksByPermission(adminUser, mainLinks);
@@ -724,80 +724,56 @@ export default function AdminLayout() {
 
         .admin-premium-nav-icon__halo {
           position: absolute;
-          inset: 5px;
+          left: 5px;
+          right: 5px;
+          bottom: 1px;
+          height: 8px;
           z-index: -1;
-          border-radius: 12px;
-          background: var(--nav-icon-glow);
-          filter: blur(7px);
-          opacity: .58;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--admin-primary) 38%, transparent);
+          filter: blur(5px);
+          opacity: .42;
           transition: opacity .2s ease, filter .2s ease;
         }
 
-        .admin-premium-nav-icon__gem {
-          position: relative;
-          display: grid;
-          width: 28px;
-          height: 28px;
-          overflow: hidden;
-          place-items: center;
-          border: 1px solid rgba(255,255,255,.64);
-          border-radius: 11px;
-          background:
-            radial-gradient(circle at 24% 18%, rgba(255,255,255,.62), transparent 29%),
-            linear-gradient(145deg, var(--nav-icon-a) 0%, var(--nav-icon-b) 78%);
-          color: #fff;
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,.76),
-            inset 0 -5px 10px rgba(15,23,42,.22),
-            0 5px 10px var(--nav-icon-glow),
-            0 2px 3px rgba(15,23,42,.18);
-          transition: box-shadow .2s ease, filter .2s ease;
-        }
-
-        .admin-premium-nav-icon__gem::before {
-          content: '';
-          position: absolute;
-          width: 24px;
-          height: 8px;
-          top: 0;
-          left: -5px;
-          border-radius: 999px;
-          background: rgba(255,255,255,.34);
-          filter: blur(2px);
-          rotate: -24deg;
-        }
-
-        .admin-premium-nav-icon__gem::after {
-          content: '';
-          position: absolute;
-          right: 3px;
-          bottom: 2px;
-          width: 10px;
-          height: 4px;
-          border-radius: 50%;
-          background: rgba(255,255,255,.22);
-          filter: blur(2px);
-        }
-
-        .admin-premium-nav-icon__gem svg {
+        .admin-premium-nav-icon__miniature {
           position: relative;
           z-index: 1;
-          width: 15px;
-          height: 15px;
-          filter: drop-shadow(0 1px 1px rgba(15,23,42,.3));
+          display: block;
+          font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+          font-size: 23px;
+          line-height: 1;
+          filter:
+            saturate(.62)
+            sepia(.08)
+            contrast(.96)
+            drop-shadow(0 1px 0 rgba(255,255,255,.88))
+            drop-shadow(0 3px 3px color-mix(in srgb, var(--admin-primary) 28%, rgba(38,20,34,.18)));
+          transform: translateY(-1px);
+          transform-origin: center;
+          transition: filter .2s ease;
         }
 
-        .admin-premium-nav-icon__spark {
+        .admin-premium-nav-icon__facet {
           position: absolute;
-          top: 1px;
-          right: 1px;
+          top: 4px;
+          left: 8px;
           z-index: 2;
-          width: 5px;
-          height: 5px;
-          border: 1px solid rgba(255,255,255,.94);
-          border-radius: 50%;
-          background: var(--nav-icon-a);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-sidebar-bg) 82%, transparent), 0 0 8px var(--nav-icon-glow);
+          width: 8px;
+          height: 3px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.72);
+          filter: blur(.6px);
+          opacity: .72;
+          rotate: -20deg;
+          pointer-events: none;
+        }
+
+        .admin-premium-nav-icon__fallback {
+          width: 20px;
+          height: 20px;
+          color: var(--admin-primary);
+          filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 25%, transparent));
         }
 
         .admin-premium-nav-icon--compact {
@@ -806,20 +782,14 @@ export default function AdminLayout() {
           flex-basis: 26px;
         }
 
-        .admin-premium-nav-icon--compact .admin-premium-nav-icon__gem {
-          width: 23px;
-          height: 23px;
-          border-radius: 9px;
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__miniature {
+          font-size: 19px;
         }
 
-        .admin-premium-nav-icon--compact .admin-premium-nav-icon__gem svg {
-          width: 13px;
-          height: 13px;
-        }
-
-        .admin-premium-nav-icon--compact .admin-premium-nav-icon__spark {
-          width: 4px;
-          height: 4px;
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__facet {
+          top: 3px;
+          left: 6px;
+          width: 6px;
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__halo,
@@ -830,16 +800,17 @@ export default function AdminLayout() {
           filter: blur(9px);
         }
 
-        .admin-nav-link:hover .admin-premium-nav-icon__gem,
-        .admin-nav-link-mobile:hover .admin-premium-nav-icon__gem,
-        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__gem,
-        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__gem {
-          filter: saturate(1.18) brightness(1.06);
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,.88),
-            inset 0 -5px 10px rgba(15,23,42,.18),
-            0 7px 16px var(--nav-icon-glow),
-            0 2px 4px rgba(15,23,42,.2);
+        .admin-nav-link:hover .admin-premium-nav-icon__miniature,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature,
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
+          filter:
+            saturate(.78)
+            sepia(.04)
+            contrast(1.02)
+            brightness(1.06)
+            drop-shadow(0 1px 0 rgba(255,255,255,.94))
+            drop-shadow(0 4px 6px color-mix(in srgb, var(--admin-primary) 46%, rgba(38,20,34,.18)));
         }
 
         .admin-nav-link:hover .admin-icon-wrap,
@@ -1514,7 +1485,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <PremiumAdminNavIcon icon={Icon} tone={item.tone} />
+                          <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1536,7 +1507,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <PremiumAdminNavIcon icon={Icon} tone={item.tone} />
+                          <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1555,7 +1526,7 @@ export default function AdminLayout() {
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
                     <span className="flex items-center admin-inline-gap-md">
-                      <PremiumAdminNavIcon icon={Settings} tone="graphite" />
+                      <PremiumAdminNavIcon icon={Settings} artwork="⚙️" />
                       <span>Configuración</span>
                     </span>
                     <ChevronDown
@@ -1796,7 +1767,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <PremiumAdminNavIcon icon={Icon} tone={item.tone} compact />
+                      <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1811,7 +1782,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <PremiumAdminNavIcon icon={Icon} tone={item.tone} compact />
+                      <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1824,7 +1795,7 @@ export default function AdminLayout() {
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
-                    <PremiumAdminNavIcon icon={Settings} tone="graphite" compact />
+                    <PremiumAdminNavIcon icon={Settings} artwork="⚙️" compact />
                     Config
                   </button>
                 )}
