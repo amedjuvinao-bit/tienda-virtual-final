@@ -93,6 +93,63 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-radius')).toBe('32px');
   });
 
+  it('mantiene éxito, advertencia y error independientes del color del tema', () => {
+    applyAdminTheme({
+      preset: 'goldBoutiqueLight',
+      pageBg: '#fffbeb',
+      sidebarBg: '#fffdf5',
+      headerBg: '#ffffff',
+      cardBg: '#ffffff',
+      cardHeaderBg: '#fffbeb',
+      inputBg: '#ffffff',
+      modalBg: '#ffffff',
+      primary: '#d4af37',
+      success: '#d4af37',
+      warning: '#d4af37',
+      warningSoftBg: '#ffffff',
+      warningText: '#d4af37',
+      danger: '#d4af37',
+      dangerHover: '#d4af37',
+      dangerSoftBg: '#ffffff',
+      dangerText: '#d4af37',
+    });
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-success')).toBe('#16a34a');
+    expect(root.style.getPropertyValue('--admin-success-soft-bg')).toBe('#f0fdf4');
+    expect(root.style.getPropertyValue('--admin-success-text')).toBe('#166534');
+    expect(root.style.getPropertyValue('--admin-warning')).toBe('#d97706');
+    expect(root.style.getPropertyValue('--admin-warning-soft-bg')).toBe('#fffbeb');
+    expect(root.style.getPropertyValue('--admin-warning-text')).toBe('#92400e');
+    expect(root.style.getPropertyValue('--admin-danger')).toBe('#dc2626');
+    expect(root.style.getPropertyValue('--admin-danger-soft-bg')).toBe('#fef2f2');
+    expect(root.style.getPropertyValue('--admin-danger-text')).toBe('#991b1b');
+  });
+
+  it('conserva los tonos semánticos y adapta solo su contraste en modo oscuro', () => {
+    applyAdminTheme({
+      preset: 'darkCyber',
+      pageBg: '#030712',
+      sidebarBg: '#09090b',
+      headerBg: '#18181b',
+      cardBg: '#111827',
+      cardHeaderBg: '#181026',
+      inputBg: '#09090b',
+      modalBg: '#111827',
+      primary: '#a855f7',
+      warning: '#a855f7',
+      danger: '#a855f7',
+    });
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-success')).toBe('#16a34a');
+    expect(root.style.getPropertyValue('--admin-success-soft-bg')).toBe('#052e16');
+    expect(root.style.getPropertyValue('--admin-warning')).toBe('#d97706');
+    expect(root.style.getPropertyValue('--admin-warning-soft-bg')).toBe('#451a03');
+    expect(root.style.getPropertyValue('--admin-danger')).toBe('#dc2626');
+    expect(root.style.getPropertyValue('--admin-danger-soft-bg')).toBe('#450a0a');
+  });
+
   it('aplica el fondo propio y la firma clara del tema Horizonte azul', () => {
     applyAdminTheme({
       preset: 'azureHorizonLight',
@@ -169,6 +226,10 @@ describe('adminTheme Nivel Plus', () => {
     expect(css).toContain('background: var(--admin-widget-surface-bg) !important');
     expect(css).toContain('An explicitly white inline surface always needs dark ink');
     expect(css).toContain('html[data-admin-theme-style="azure"]');
+    expect(css).toContain('Semantic buttons are deliberately independent from the selected theme');
+    expect(css).toContain('background: var(--admin-success-soft-bg) !important');
+    expect(css).toContain('background: var(--admin-warning-soft-bg) !important');
+    expect(css).toContain('background: var(--admin-danger-soft-bg) !important');
     expect(css).not.toContain('color: var(--admin-button-text) !important;\n    }\n\n    /* Disabled state */');
   });
 });

@@ -336,7 +336,7 @@
   white-space: nowrap;
 }
 
-.finance-summary-stat[data-tone="success"] > strong { color: var(--admin-primary); }
+.finance-summary-stat[data-tone="success"] > strong { color: var(--admin-success-text); }
 .finance-summary-stat[data-tone="danger"] > strong { color: var(--admin-danger-text); }
 
 .finance-summary-stat > small {

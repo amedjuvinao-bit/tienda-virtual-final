@@ -9,6 +9,43 @@ import azureHorizonDashboard from '../../assets/admin/azure-horizon-dashboard.we
 
 const ADMIN_PANEL_RADIUS = 18;
 
+/* Semantic feedback must keep the same meaning in every visual preset.
+   Themes may customize decorative accents, but never success, warning or
+   danger. Only the soft surface changes with the light/dark mode so the
+   message remains readable. */
+const ADMIN_SEMANTIC_COLORS = Object.freeze({
+  success: Object.freeze({
+    base: '#16a34a',
+    hover: '#15803d',
+    lightSoftBg: '#f0fdf4',
+    lightText: '#166534',
+    lightBorder: '#86efac',
+    darkSoftBg: '#052e16',
+    darkText: '#86efac',
+    darkBorder: '#166534',
+  }),
+  warning: Object.freeze({
+    base: '#d97706',
+    hover: '#b45309',
+    lightSoftBg: '#fffbeb',
+    lightText: '#92400e',
+    lightBorder: '#fcd34d',
+    darkSoftBg: '#451a03',
+    darkText: '#fde68a',
+    darkBorder: '#92400e',
+  }),
+  danger: Object.freeze({
+    base: '#dc2626',
+    hover: '#b91c1c',
+    lightSoftBg: '#fef2f2',
+    lightText: '#991b1b',
+    lightBorder: '#fca5a5',
+    darkSoftBg: '#450a0a',
+    darkText: '#fca5a5',
+    darkBorder: '#991b1b',
+  }),
+});
+
 const ADMIN_THEME_BACKGROUNDS = Object.freeze({
   azureHorizonLight: azureHorizonDashboard,
 });
@@ -410,10 +447,19 @@ export function applyAdminTheme(theme) {
   const primaryTextAuto = getContrastText(t.primary);
   const primarySoftTextAuto = getContrastText(t.primarySoftBg);
 
-  const dangerTextAuto = getContrastText(t.dangerSoftBg);
-  const dangerButtonTextAuto = getContrastText(t.danger);
-  const warningTextAuto = getContrastText(t.warningSoftBg);
-  const warningButtonTextAuto = getContrastText(t.warning);
+  const semanticMode = isDark ? 'dark' : 'light';
+  const successSemantic = ADMIN_SEMANTIC_COLORS.success;
+  const warningSemantic = ADMIN_SEMANTIC_COLORS.warning;
+  const dangerSemantic = ADMIN_SEMANTIC_COLORS.danger;
+  const successSoftBg = successSemantic[`${semanticMode}SoftBg`];
+  const successText = successSemantic[`${semanticMode}Text`];
+  const successBorder = successSemantic[`${semanticMode}Border`];
+  const warningSoftBg = warningSemantic[`${semanticMode}SoftBg`];
+  const warningText = warningSemantic[`${semanticMode}Text`];
+  const warningBorder = warningSemantic[`${semanticMode}Border`];
+  const dangerSoftBg = dangerSemantic[`${semanticMode}SoftBg`];
+  const dangerText = dangerSemantic[`${semanticMode}Text`];
+  const dangerBorder = dangerSemantic[`${semanticMode}Border`];
 
   const primaryRgb = colorToRgb(t.primary);
   const cardRgb = colorToRgb(t.cardBg);
@@ -567,16 +613,26 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-modal-muted-text', modalMutedTextAuto);
   root.style.setProperty('--admin-modal-overlay', t.modalOverlay);
 
-  root.style.setProperty('--admin-danger', t.danger);
-  root.style.setProperty('--admin-danger-hover', t.dangerHover);
-  root.style.setProperty('--admin-danger-text-on-bg', dangerButtonTextAuto);
-  root.style.setProperty('--admin-danger-soft-bg', t.dangerSoftBg);
-  root.style.setProperty('--admin-danger-text', dangerTextAuto);
+  root.style.setProperty('--admin-success', successSemantic.base);
+  root.style.setProperty('--admin-success-hover', successSemantic.hover);
+  root.style.setProperty('--admin-success-text-on-bg', getContrastText(successSemantic.base));
+  root.style.setProperty('--admin-success-soft-bg', successSoftBg);
+  root.style.setProperty('--admin-success-text', successText);
+  root.style.setProperty('--admin-success-border', successBorder);
 
-  root.style.setProperty('--admin-warning', t.warning);
-  root.style.setProperty('--admin-warning-text-on-bg', warningButtonTextAuto);
-  root.style.setProperty('--admin-warning-soft-bg', t.warningSoftBg);
-  root.style.setProperty('--admin-warning-text', warningTextAuto);
+  root.style.setProperty('--admin-warning', warningSemantic.base);
+  root.style.setProperty('--admin-warning-hover', warningSemantic.hover);
+  root.style.setProperty('--admin-warning-text-on-bg', getContrastText(warningSemantic.base));
+  root.style.setProperty('--admin-warning-soft-bg', warningSoftBg);
+  root.style.setProperty('--admin-warning-text', warningText);
+  root.style.setProperty('--admin-warning-border', warningBorder);
+
+  root.style.setProperty('--admin-danger', dangerSemantic.base);
+  root.style.setProperty('--admin-danger-hover', dangerSemantic.hover);
+  root.style.setProperty('--admin-danger-text-on-bg', getContrastText(dangerSemantic.base));
+  root.style.setProperty('--admin-danger-soft-bg', dangerSoftBg);
+  root.style.setProperty('--admin-danger-text', dangerText);
+  root.style.setProperty('--admin-danger-border', dangerBorder);
 }
 
 // 💾 Compatibilidad: ya NO guarda en localStorage.

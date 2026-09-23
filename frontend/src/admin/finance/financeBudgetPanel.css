@@ -82,7 +82,7 @@
 .finance-budget-line__progress i[data-tone="warning"] { background: var(--admin-warning); }
 .finance-budget-line__progress i[data-tone="danger"] { background: var(--admin-danger); }
 .finance-budget-line__footer { grid-column: 1 / -1; justify-content: space-between; color: var(--admin-card-muted-text); font-size: 12px; }
-.finance-budget-line__footer b[data-tone="success"] { color: var(--admin-primary); }
+.finance-budget-line__footer b[data-tone="success"] { color: var(--admin-success-text); }
 .finance-budget-line__footer b[data-tone="warning"] { color: var(--admin-warning-text); }
 .finance-budget-line__footer b[data-tone="danger"] { color: var(--admin-danger-text); }
 

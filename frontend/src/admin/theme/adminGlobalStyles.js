@@ -814,9 +814,6 @@ export function applyAdminGlobalStyles() {
     .admin-area button.bg-pink-500,   .admin-area button.bg-pink-600,
     .admin-area button.bg-rose-500,   .admin-area button.bg-rose-600,
     .admin-area button.bg-blue-500,   .admin-area button.bg-blue-600,
-    .admin-area button.bg-amber-500,  .admin-area button.bg-amber-600,
-    .admin-area button.bg-green-500,  .admin-area button.bg-green-600,
-    .admin-area button.bg-emerald-500,.admin-area button.bg-emerald-600,
     .admin-area button.bg-cyan-500,   .admin-area button.bg-cyan-600,
     .admin-area button.bg-indigo-500, .admin-area button.bg-indigo-600,
     .admin-area button.bg-purple-500, .admin-area button.bg-purple-600 {
@@ -833,6 +830,33 @@ export function applyAdminGlobalStyles() {
         inset 0 1px 0 rgba(255,255,255,0.34) !important;
       backdrop-filter: blur(16px) saturate(1.35);
       -webkit-backdrop-filter: blur(16px) saturate(1.35);
+    }
+
+    /* Semantic buttons are deliberately independent from the selected theme. */
+    .admin-area button.bg-green-500,
+    .admin-area button.bg-green-600,
+    .admin-area button.bg-emerald-500,
+    .admin-area button.bg-emerald-600 {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--admin-success) 92%, white 8%), var(--admin-success-hover)) !important;
+      color: var(--admin-success-text-on-bg) !important;
+      border-color: var(--admin-success-border) !important;
+      box-shadow:
+        0 16px 34px color-mix(in srgb, var(--admin-success) 26%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.24) !important;
+    }
+
+    .admin-area button.bg-amber-500,
+    .admin-area button.bg-amber-600,
+    .admin-area button.bg-yellow-500,
+    .admin-area button.bg-yellow-600,
+    .admin-area button.bg-orange-500,
+    .admin-area button.bg-orange-600 {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--admin-warning) 92%, white 8%), var(--admin-warning-hover)) !important;
+      color: var(--admin-warning-text-on-bg) !important;
+      border-color: var(--admin-warning-border) !important;
+      box-shadow:
+        0 16px 34px color-mix(in srgb, var(--admin-warning) 26%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.24) !important;
     }
 
     /* Danger buttons */
@@ -947,6 +971,21 @@ export function applyAdminGlobalStyles() {
       box-shadow:
         0 12px 28px color-mix(in srgb, var(--admin-primary) 22%, transparent),
         inset 0 1px 0 rgba(255,255,255,0.24) !important;
+    }
+
+    .admin-area button:is(.bg-green-500,.bg-green-600,.bg-emerald-500,.bg-emerald-600):not(:disabled):hover {
+      background: var(--admin-success-hover) !important;
+      box-shadow: 0 14px 30px color-mix(in srgb, var(--admin-success) 30%, transparent) !important;
+    }
+
+    .admin-area button:is(.bg-amber-500,.bg-amber-600,.bg-yellow-500,.bg-yellow-600,.bg-orange-500,.bg-orange-600):not(:disabled):hover {
+      background: var(--admin-warning-hover) !important;
+      box-shadow: 0 14px 30px color-mix(in srgb, var(--admin-warning) 30%, transparent) !important;
+    }
+
+    .admin-area button:is(.bg-red-500,.bg-red-600):not(:disabled):hover {
+      background: var(--admin-danger-hover) !important;
+      box-shadow: 0 14px 30px color-mix(in srgb, var(--admin-danger) 30%, transparent) !important;
     }
 
 
@@ -1139,10 +1178,7 @@ export function applyAdminGlobalStyles() {
     .admin-area .bg-stone-50,  .admin-area .bg-stone-100,
     .admin-area .bg-pink-50,   .admin-area .bg-rose-50,
     .admin-area .bg-fuchsia-50,.admin-area .bg-purple-50,
-    .admin-area .bg-blue-50,   .admin-area .bg-cyan-50,
-    .admin-area .bg-amber-50,  .admin-area .bg-yellow-50,
-    .admin-area .bg-orange-50, .admin-area .bg-green-50,
-    .admin-area .bg-emerald-50,.admin-area .bg-red-50 {
+    .admin-area .bg-blue-50,   .admin-area .bg-cyan-50 {
       background: var(--admin-widget-surface-soft-bg) !important;
       color: var(--admin-card-text) !important;
       border-color: var(--admin-widget-surface-border) !important;
@@ -1173,21 +1209,12 @@ export function applyAdminGlobalStyles() {
     html.admin-theme-dark .admin-area .bg-pink-50,   html.admin-theme-dark .admin-area .bg-rose-50,
     html.admin-theme-dark .admin-area .bg-fuchsia-50,html.admin-theme-dark .admin-area .bg-purple-50,
     html.admin-theme-dark .admin-area .bg-blue-50,   html.admin-theme-dark .admin-area .bg-cyan-50,
-    html.admin-theme-dark .admin-area .bg-amber-50,  html.admin-theme-dark .admin-area .bg-yellow-50,
-    html.admin-theme-dark .admin-area .bg-orange-50, html.admin-theme-dark .admin-area .bg-green-50,
-    html.admin-theme-dark .admin-area .bg-emerald-50,html.admin-theme-dark .admin-area .bg-red-50,
     html.admin-theme-dark .admin-area [class*="bg-pink-100"],
     html.admin-theme-dark .admin-area [class*="bg-rose-100"],
     html.admin-theme-dark .admin-area [class*="bg-fuchsia-100"],
     html.admin-theme-dark .admin-area [class*="bg-purple-100"],
     html.admin-theme-dark .admin-area [class*="bg-blue-100"],
-    html.admin-theme-dark .admin-area [class*="bg-cyan-100"],
-    html.admin-theme-dark .admin-area [class*="bg-amber-100"],
-    html.admin-theme-dark .admin-area [class*="bg-yellow-100"],
-    html.admin-theme-dark .admin-area [class*="bg-orange-100"],
-    html.admin-theme-dark .admin-area [class*="bg-green-100"],
-    html.admin-theme-dark .admin-area [class*="bg-emerald-100"],
-    html.admin-theme-dark .admin-area [class*="bg-red-100"] {
+    html.admin-theme-dark .admin-area [class*="bg-cyan-100"] {
       background: var(--admin-glass-soft-bg) !important;
       color: var(--admin-card-text) !important;
       border-color: color-mix(in srgb, var(--admin-primary) 52%, rgba(255,255,255,0.14)) !important;
@@ -1195,6 +1222,30 @@ export function applyAdminGlobalStyles() {
         0 18px 46px rgba(0,0,0,0.34),
         0 8px 22px color-mix(in srgb, var(--admin-primary) 10%, transparent),
         inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    /* Preserve semantic feedback surfaces instead of converting them to the
+       active glass/accent color. This covers legacy Tailwind alerts as well
+       as current components based on semantic CSS variables. */
+    .admin-area :is(.bg-green-50,.bg-green-100,.bg-emerald-50,.bg-emerald-100) {
+      background: var(--admin-success-soft-bg) !important;
+      color: var(--admin-success-text) !important;
+      border-color: var(--admin-success-border) !important;
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-success) 10%, transparent) !important;
+    }
+
+    .admin-area :is(.bg-amber-50,.bg-amber-100,.bg-yellow-50,.bg-yellow-100,.bg-orange-50,.bg-orange-100) {
+      background: var(--admin-warning-soft-bg) !important;
+      color: var(--admin-warning-text) !important;
+      border-color: var(--admin-warning-border) !important;
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-warning) 10%, transparent) !important;
+    }
+
+    .admin-area :is(.bg-red-50,.bg-red-100) {
+      background: var(--admin-danger-soft-bg) !important;
+      color: var(--admin-danger-text) !important;
+      border-color: var(--admin-danger-border) !important;
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-danger) 10%, transparent) !important;
     }
 
     /* An explicitly white inline surface always needs dark ink, independent
