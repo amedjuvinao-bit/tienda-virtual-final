@@ -31,7 +31,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Facturación',
     mobileLabel: 'Facturación',
     icon: ReceiptText,
-    artwork: '🧾',
+    artwork: '/admin-icons/crystal/billing.webp',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -40,7 +40,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Clientes',
     mobileLabel: 'Clientes',
     icon: UserRound,
-    artwork: '🧑‍💼',
+    artwork: '/admin-icons/crystal/customers.webp',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -49,7 +49,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'POS / Ventas físicas',
     mobileLabel: 'POS',
     icon: Store,
-    artwork: '🏪',
+    artwork: '/admin-icons/crystal/pos.webp',
     slotAfter: '/admin/clientes',
   },
   {
@@ -58,7 +58,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Caja',
     mobileLabel: 'Caja',
     icon: Wallet,
-    artwork: '👛',
+    artwork: '/admin-icons/crystal/cash.webp',
     slotAfter: '/admin/pos',
   },
   {
@@ -67,7 +67,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Cupones',
     mobileLabel: 'Cupones',
     icon: BadgePercent,
-    artwork: '🏷️',
+    artwork: '/admin-icons/crystal/coupons.webp',
     slotAfter: '/admin/finanzas',
   },
 ];

@@ -321,21 +321,21 @@ export default function AdminLayout() {
   };
 
   const mainLinks = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, artwork: '🪟' },
-    { to: '/admin/productos', label: 'Productos', icon: Package, artwork: '📦' },
-    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, artwork: '📋' },
-    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, artwork: '🧑‍💼' },
-    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, artwork: '🏪' },
-    { to: '/admin/caja', label: 'Caja', icon: WalletCards, artwork: '👛' },
-    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, artwork: '🪙' },
-    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, artwork: '🗄️' },
-    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, artwork: '🛒' },
-    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, artwork: '💗' },
+    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, artwork: '/admin-icons/crystal/dashboard.webp' },
+    { to: '/admin/productos', label: 'Productos', icon: Package, artwork: '/admin-icons/crystal/products.webp' },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, artwork: '/admin-icons/crystal/orders.webp' },
+    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, artwork: '/admin-icons/crystal/customers.webp' },
+    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, artwork: '/admin-icons/crystal/pos.webp' },
+    { to: '/admin/caja', label: 'Caja', icon: WalletCards, artwork: '/admin-icons/crystal/cash.webp' },
+    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, artwork: '/admin-icons/crystal/finance.webp' },
+    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, artwork: '/admin-icons/crystal/inventory.webp' },
+    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, artwork: '/admin-icons/crystal/cart.webp' },
+    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, artwork: '/admin-icons/crystal/favorites.webp' },
   ];
 
   const designLinks = [
-    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, artwork: '🎨' },
-    { to: '/admin/paginas', label: 'Páginas', icon: FileText, artwork: '📑' },
+    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, artwork: '/admin-icons/crystal/appearance.webp' },
+    { to: '/admin/paginas', label: 'Páginas', icon: FileText, artwork: '/admin-icons/crystal/pages.webp' },
   ];
 
   const visibleMainLinks = filterLinksByPermission(adminUser, mainLinks);
@@ -740,33 +740,15 @@ export default function AdminLayout() {
           position: relative;
           z-index: 1;
           display: block;
-          font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
-          font-size: 23px;
-          line-height: 1;
-          filter:
-            saturate(.62)
-            sepia(.08)
-            contrast(.96)
-            drop-shadow(0 1px 0 rgba(255,255,255,.88))
-            drop-shadow(0 3px 3px color-mix(in srgb, var(--admin-primary) 28%, rgba(38,20,34,.18)));
-          transform: translateY(-1px);
-          transform-origin: center;
-          transition: filter .2s ease;
-        }
-
-        .admin-premium-nav-icon__facet {
-          position: absolute;
-          top: 4px;
-          left: 8px;
-          z-index: 2;
-          width: 8px;
-          height: 3px;
-          border-radius: 999px;
-          background: rgba(255,255,255,.72);
-          filter: blur(.6px);
-          opacity: .72;
-          rotate: -20deg;
+          width: 31px;
+          height: 31px;
+          object-fit: contain;
           pointer-events: none;
+          user-select: none;
+          filter:
+            drop-shadow(0 1px 0 rgba(255,255,255,.5))
+            drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 24%, rgba(38,20,34,.2)));
+          transition: filter .2s ease;
         }
 
         .admin-premium-nav-icon__fallback {
@@ -783,13 +765,8 @@ export default function AdminLayout() {
         }
 
         .admin-premium-nav-icon--compact .admin-premium-nav-icon__miniature {
-          font-size: 19px;
-        }
-
-        .admin-premium-nav-icon--compact .admin-premium-nav-icon__facet {
-          top: 3px;
-          left: 6px;
-          width: 6px;
+          width: 25px;
+          height: 25px;
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__halo,
@@ -805,12 +782,9 @@ export default function AdminLayout() {
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
           filter:
-            saturate(.78)
-            sepia(.04)
-            contrast(1.02)
             brightness(1.06)
-            drop-shadow(0 1px 0 rgba(255,255,255,.94))
-            drop-shadow(0 4px 6px color-mix(in srgb, var(--admin-primary) 46%, rgba(38,20,34,.18)));
+            drop-shadow(0 1px 0 rgba(255,255,255,.55))
+            drop-shadow(0 4px 6px color-mix(in srgb, var(--admin-primary) 38%, rgba(38,20,34,.2)));
         }
 
         .admin-nav-link:hover .admin-icon-wrap,
@@ -1526,7 +1500,7 @@ export default function AdminLayout() {
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
                     <span className="flex items-center admin-inline-gap-md">
-                      <PremiumAdminNavIcon icon={Settings} artwork="⚙️" />
+                      <PremiumAdminNavIcon icon={Settings} artwork="/admin-icons/crystal/settings.webp" />
                       <span>Configuración</span>
                     </span>
                     <ChevronDown
@@ -1795,7 +1769,7 @@ export default function AdminLayout() {
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
-                    <PremiumAdminNavIcon icon={Settings} artwork="⚙️" compact />
+                    <PremiumAdminNavIcon icon={Settings} artwork="/admin-icons/crystal/settings.webp" compact />
                     Config
                   </button>
                 )}
