@@ -741,36 +741,37 @@ export function applyAdminGlobalStyles() {
       :is(div, section, article, aside, form)[class*="rounded"][class*="border"],
       :is(div, section, article, aside, form)[style*="--admin-card-bg"][style*="border"]
     ) {
-      border-color: rgba(255,255,255,.94) !important;
+      border-color: color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,.98)) !important;
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--admin-primary) 22%, transparent),
-        0 18px 44px color-mix(in srgb, var(--admin-primary) 10%, transparent),
-        inset 0 1px 0 rgba(255,255,255,.98),
-        inset 1px 0 0 rgba(255,255,255,.70),
-        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 32%, transparent),
+        0 12px 34px color-mix(in srgb, var(--admin-primary) 13%, transparent),
+        0 0 24px color-mix(in srgb, var(--admin-primary) 8%, transparent),
+        inset 0 2px 0 rgba(255,255,255,.96),
+        inset 2px 0 0 rgba(255,255,255,.72),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 27%, transparent) !important;
     }
 
     html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea) {
-      border: 1px solid rgba(255,255,255,.96) !important;
+      border: 1px solid color-mix(in srgb, var(--admin-primary) 40%, rgba(255,255,255,.98)) !important;
       background-clip: padding-box !important;
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--admin-primary) 21%, transparent),
-        0 8px 20px color-mix(in srgb, var(--admin-primary) 7%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 25%, transparent),
+        0 8px 20px color-mix(in srgb, var(--admin-primary) 10%, transparent),
         inset 0 1px 0 rgba(255,255,255,1),
-        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 14%, transparent) !important;
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 24%, transparent) !important;
     }
 
     html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea):hover {
-      border-color: rgba(255,255,255,1) !important;
+      border-color: color-mix(in srgb, var(--admin-primary) 48%, rgba(255,255,255,1)) !important;
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--admin-primary) 29%, transparent),
-        0 10px 24px color-mix(in srgb, var(--admin-primary) 9%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 34%, transparent),
+        0 10px 24px color-mix(in srgb, var(--admin-primary) 12%, transparent),
         inset 0 1px 0 #ffffff,
-        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 29%, transparent) !important;
     }
 
     html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea):focus {
-      border-color: rgba(255,255,255,1) !important;
+      border-color: color-mix(in srgb, var(--admin-primary) 56%, rgba(255,255,255,1)) !important;
       box-shadow:
         0 0 0 2px color-mix(in srgb, var(--admin-primary) 34%, transparent),
         0 14px 30px color-mix(in srgb, var(--admin-primary) 13%, transparent),
@@ -1664,13 +1665,14 @@ export function applyAdminGlobalStyles() {
       :is(div, section, article, aside, form)[class$="__panel"]
     ) {
       border-radius: 28px 13px 28px 13px !important;
-      border-color: rgba(255,255,255,.94) !important;
+      border-color: color-mix(in srgb, var(--admin-primary) 34%, rgba(255,255,255,.98)) !important;
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--admin-primary) 22%, transparent),
-        var(--admin-widget-surface-shadow),
-        inset 0 1px 0 rgba(255,255,255,.98),
-        inset 1px 0 0 rgba(255,255,255,.70),
-        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 32%, transparent),
+        0 12px 34px color-mix(in srgb, var(--admin-primary) 13%, transparent),
+        0 0 24px color-mix(in srgb, var(--admin-primary) 8%, transparent),
+        inset 0 2px 0 rgba(255,255,255,.96),
+        inset 2px 0 0 rgba(255,255,255,.72),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 27%, transparent) !important;
     }
 
     html[data-admin-theme-style="azure"] .admin-area .admin-header-panel {
