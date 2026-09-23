@@ -171,10 +171,10 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('1px');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-bg')
-    ).toContain('rgba(255,255,255,0.52)');
+    ).toContain('rgba(255,255,255,0.44)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-contrast')
-    ).toBe('1.1');
+    ).toBe('1.16');
     expect(
       document.documentElement.style.getPropertyValue('--admin-card-bg')
     ).toBe('rgba(255, 255, 255, 0.46)');

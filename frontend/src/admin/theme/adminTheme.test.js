@@ -164,8 +164,12 @@ describe('adminTheme Nivel Plus', () => {
       expect(root.style.getPropertyValue(token)).not.toContain('var(--admin-primary)');
     });
     expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
-      'rgba(255,255,255,0.52)'
+      'rgba(255,255,255,0.44)'
     );
+    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
+      'rgba(15,23,42,0.075)'
+    );
+    expect(root.style.getPropertyValue('--admin-widget-surface-contrast')).toBe('1.16');
     expect(root.style.getPropertyValue('--admin-modal-bg')).toBe('rgba(255, 255, 255, 0.84)');
   });
 
