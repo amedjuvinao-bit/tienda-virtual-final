@@ -1105,7 +1105,7 @@ export default function AdminLayout() {
           inset: 1px;
           z-index: 1;
           overflow: hidden;
-          border: .75px solid rgba(255,255,255,.76);
+          border: .75px solid rgba(255,255,255,.82);
           border-radius: 12px;
           background:
             linear-gradient(145deg, rgba(255,255,255,.24) 0%, rgba(255,255,255,.035) 34%, transparent 52%, rgba(255,255,255,.07) 76%, rgba(255,255,255,.16) 100%);
@@ -1113,6 +1113,7 @@ export default function AdminLayout() {
             inset 1px 1px 0 rgba(255,255,255,.82),
             inset -1px -1px 0 rgba(255,255,255,.18),
             inset 0 0 8px rgba(255,255,255,.06),
+            0 0 0 .75px color-mix(in srgb, var(--admin-card-text) 14%, transparent),
             0 3px 8px color-mix(in srgb, var(--admin-primary) 6%, transparent);
           backdrop-filter: blur(2px) saturate(1.18) brightness(1.04);
           -webkit-backdrop-filter: blur(2px) saturate(1.18) brightness(1.04);
@@ -1151,7 +1152,7 @@ export default function AdminLayout() {
           border-radius: 50%;
           background: radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.08)) 0%, transparent 68%);
           filter: blur(2px);
-          opacity: .14;
+          opacity: .05;
           transform: scale(.86);
           transition: opacity .22s ease, transform .22s ease;
         }
@@ -1159,14 +1160,15 @@ export default function AdminLayout() {
         .admin-premium-nav-icon__glyph {
           position: relative;
           z-index: 3;
-          width: 24px;
-          height: 24px;
-          color: color-mix(in srgb, var(--admin-primary) 74%, #fff 26%);
+          width: 25px;
+          height: 25px;
+          color: color-mix(in srgb, var(--admin-card-text) 88%, var(--admin-primary) 12%);
+          stroke-width: 2.15;
           stroke-linecap: round;
           stroke-linejoin: round;
           filter:
-            drop-shadow(0 .5px 0 rgba(255,255,255,.7))
-            drop-shadow(0 1.5px 2px color-mix(in srgb, var(--admin-card-text) 16%, transparent));
+            drop-shadow(0 .5px 0 rgba(255,255,255,.84))
+            drop-shadow(0 1px 1px color-mix(in srgb, var(--admin-card-text) 18%, transparent));
           transform: translateZ(0);
           transition: color .22s ease, filter .22s ease, transform .22s ease;
         }
@@ -1196,19 +1198,20 @@ export default function AdminLayout() {
         }
 
         .admin-premium-nav-icon--compact .admin-premium-nav-icon__glyph {
-          width: 20px;
-          height: 20px;
+          width: 21px;
+          height: 21px;
         }
 
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__glass,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__glass {
-          border-color: color-mix(in srgb, var(--admin-primary) 14%, #fff 86%);
+          border-color: color-mix(in srgb, var(--admin-primary) 22%, #fff 78%);
           background:
             linear-gradient(145deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,.04) 34%, transparent 52%, rgba(255,255,255,.08) 76%, rgba(255,255,255,.18) 100%);
           box-shadow:
             inset 1px 1px 0 rgba(255,255,255,.88),
             inset -1px -1px 0 rgba(255,255,255,.22),
             inset 0 0 8px rgba(255,255,255,.07),
+            0 0 0 .75px color-mix(in srgb, var(--admin-card-text) 18%, transparent),
             0 4px 10px color-mix(in srgb, var(--admin-primary) 8%, transparent);
         }
 
@@ -1221,23 +1224,24 @@ export default function AdminLayout() {
 
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__tint,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__tint {
-          opacity: .2;
+          opacity: .08;
           transform: scale(.92);
         }
 
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__glyph,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__glyph {
-          color: color-mix(in srgb, var(--admin-primary) 82%, #fff 18%);
+          color: color-mix(in srgb, var(--admin-card-text) 70%, var(--admin-primary) 30%);
           filter:
             drop-shadow(0 .5px 0 rgba(255,255,255,.8))
-            drop-shadow(0 2px 3px color-mix(in srgb, var(--admin-primary) 20%, transparent));
+            drop-shadow(0 1.5px 2px color-mix(in srgb, var(--admin-primary) 18%, transparent));
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__glass,
         .admin-nav-link-mobile:hover .admin-premium-nav-icon__glass {
-          border-color: color-mix(in srgb, var(--admin-primary) 28%, #fff 72%);
+          border-color: color-mix(in srgb, var(--admin-primary) 20%, #fff 80%);
           box-shadow:
             inset .5px .5px 0 rgba(255,255,255,.84),
+            0 0 0 .75px color-mix(in srgb, var(--admin-card-text) 18%, transparent),
             0 5px 12px color-mix(in srgb, var(--admin-primary) 18%, transparent);
         }
 
@@ -1268,9 +1272,9 @@ export default function AdminLayout() {
         }
 
         @keyframes adminCrystalTintHover {
-          0% { opacity: .14; transform: scale(.86); }
-          52% { opacity: .3; transform: scale(1.02); }
-          100% { opacity: .2; transform: scale(.92); }
+          0% { opacity: .05; transform: scale(.86); }
+          52% { opacity: .18; transform: scale(1.02); }
+          100% { opacity: .08; transform: scale(.92); }
         }
 
         @keyframes adminCrystalHaloHover {

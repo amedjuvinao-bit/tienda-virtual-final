@@ -80,5 +80,12 @@ describe('menú lateral contraíble', () => {
     expect(glassRule).toContain('transparent 52%');
     expect(glassRule).not.toContain('var(--admin-card-bg)');
     expect(glassRule).not.toContain('rgba(15,23,42');
+
+    const glyphRule = layoutSource.match(
+      /\.admin-premium-nav-icon__glyph\s*\{([\s\S]*?)\n\s*\}/,
+    )?.[1] || '';
+
+    expect(glyphRule).toContain('var(--admin-card-text) 88%');
+    expect(glyphRule).toContain('stroke-width: 2.15');
   });
 });
