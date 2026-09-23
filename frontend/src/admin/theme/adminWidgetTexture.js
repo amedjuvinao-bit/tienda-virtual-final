@@ -57,30 +57,31 @@ const TEXTURE_TOKENS = Object.freeze({
     textureFilter: 'none',
   },
   liquidGlass: {
-    // Mirror glass is intentionally translucent. Two clean diagonal light
-    // sweeps create reflection without the grey radial stains rejected in
-    // the previous iteration.
-    bg: 'linear-gradient(122deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.12) 20%, rgba(255,255,255,0.035) 43%, rgba(255,255,255,0.16) 72%, color-mix(in srgb, var(--admin-primary) 9%, rgba(255,255,255,0.07)) 100%), linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 5%, transparent), color-mix(in srgb, var(--admin-primary) 11%, transparent))',
-    strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0.045) 43%, rgba(255,255,255,0.20) 72%, color-mix(in srgb, var(--admin-primary) 11%, rgba(255,255,255,0.08)) 100%), linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 6%, transparent), color-mix(in srgb, var(--admin-primary) 13%, transparent))',
-    softBg: 'linear-gradient(122deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 28%, rgba(255,255,255,0.025) 54%, color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.06)) 100%)',
-    inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.27), rgba(255,255,255,0.07) 48%, color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.055)))',
-    border: 'rgba(255,255,255,0.94)',
-    shadow: '0 16px 38px color-mix(in srgb, var(--admin-primary) 15%, transparent), 0 1px 0 rgba(255,255,255,0.72), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent)',
-    shadowHover: '0 22px 52px color-mix(in srgb, var(--admin-primary) 21%, transparent), 0 1px 0 rgba(255,255,255,0.82), inset 0 1px 0 #ffffff, inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 22%, transparent)',
+    // Neutral mirror glass: the selected theme remains visible behind the
+    // widget, but it never dyes the material itself. The two white sweeps,
+    // neutral lower edge and soft graphite shadow make the surface readable
+    // over pink, gold, image and other similarly coloured backgrounds.
+    bg: 'linear-gradient(122deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.19) 19%, rgba(255,255,255,0.045) 42%, rgba(255,255,255,0.28) 70%, rgba(255,255,255,0.10) 100%), rgba(255,255,255,0.10)',
+    strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.64) 0%, rgba(255,255,255,0.25) 19%, rgba(255,255,255,0.07) 42%, rgba(255,255,255,0.34) 70%, rgba(255,255,255,0.14) 100%), rgba(255,255,255,0.14)',
+    softBg: 'linear-gradient(122deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.13) 27%, rgba(255,255,255,0.035) 52%, rgba(255,255,255,0.18) 100%), rgba(255,255,255,0.07)',
+    inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.48), rgba(255,255,255,0.13) 48%, rgba(255,255,255,0.24)), rgba(255,255,255,0.10)',
+    border: 'rgba(255,255,255,0.88)',
+    shadow: '0 18px 44px rgba(15,23,42,0.14), 0 3px 12px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.98), inset 0 -1px 0 rgba(15,23,42,0.10)',
+    shadowHover: '0 24px 58px rgba(15,23,42,0.18), 0 5px 16px rgba(15,23,42,0.09), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(15,23,42,0.12)',
     highlight: 'rgba(255,255,255,1)',
-    overlay: 'linear-gradient(122deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.08) 24%, transparent 44%, rgba(255,255,255,0.12) 72%, transparent 100%)',
-    blur: '28px',
-    saturation: '1.32',
-    backdropContrast: '1.06',
+    overlay: 'linear-gradient(122deg, rgba(255,255,255,0.44) 0%, rgba(255,255,255,0.10) 23%, transparent 43%, rgba(255,255,255,0.18) 70%, transparent 100%)',
+    blur: '30px',
+    saturation: '1.08',
+    backdropContrast: '1.1',
     innerBorder: 'rgba(255,255,255,0.52)',
     innerBorderOffset: '-4px',
     pageWashOpacity: '0',
     radius: '30px',
     controlRadius: '19px',
     borderWidth: '1px',
-    buttonBg: 'linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.13) 58%, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,0.08)))',
+    buttonBg: 'linear-gradient(180deg, rgba(255,255,255,0.46), rgba(255,255,255,0.17) 58%, rgba(255,255,255,0.10)), rgba(255,255,255,0.08)',
     buttonOverlay: 'linear-gradient(180deg, rgba(255,255,255,0.44), rgba(255,255,255,0.08) 28%, transparent 60%)',
-    buttonShadow: '0 10px 24px color-mix(in srgb, var(--admin-primary) 18%, transparent), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent)',
+    buttonShadow: '0 10px 24px rgba(15,23,42,0.13), inset 0 1px 0 rgba(255,255,255,0.96), inset 0 -1px 0 rgba(15,23,42,0.10)',
     textureFilter: 'none',
   },
   frostedGlass: {
@@ -170,16 +171,16 @@ const TEXTURE_TOKENS = Object.freeze({
    navigation labels and module data disappear. Keep the reflections, but
    place them over a dark translucent base when the selected theme is dark. */
 const DARK_LIQUID_GLASS_TOKENS = Object.freeze({
-  bg: 'linear-gradient(122deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 24%, transparent 44%, rgba(255,255,255,0.08) 72%, color-mix(in srgb, var(--admin-primary) 14%, rgba(8,13,27,0.58)) 100%), rgba(8,13,27,0.64)',
-  strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.055) 24%, transparent 44%, rgba(255,255,255,0.10) 72%, color-mix(in srgb, var(--admin-primary) 18%, rgba(8,13,27,0.66)) 100%), rgba(8,13,27,0.76)',
-  softBg: 'linear-gradient(122deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 48%, color-mix(in srgb, var(--admin-primary) 10%, rgba(8,13,27,0.48))), rgba(8,13,27,0.54)',
-  inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 48%, color-mix(in srgb, var(--admin-primary) 9%, rgba(8,13,27,0.68))), rgba(8,13,27,0.72)',
-  border: 'color-mix(in srgb, var(--admin-primary) 30%, rgba(255,255,255,0.34))',
-  shadow: '0 18px 46px rgba(0,0,0,0.38), 0 10px 28px color-mix(in srgb, var(--admin-primary) 16%, transparent), inset 0 1px 0 rgba(255,255,255,0.18)',
-  shadowHover: '0 24px 58px rgba(0,0,0,0.46), 0 14px 34px color-mix(in srgb, var(--admin-primary) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.24)',
+  bg: 'linear-gradient(122deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 23%, transparent 43%, rgba(255,255,255,0.095) 70%, rgba(255,255,255,0.025) 100%), rgba(7,10,18,0.68)',
+  strongBg: 'linear-gradient(122deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.065) 23%, transparent 43%, rgba(255,255,255,0.12) 70%, rgba(255,255,255,0.035) 100%), rgba(7,10,18,0.78)',
+  softBg: 'linear-gradient(122deg, rgba(255,255,255,0.11), rgba(255,255,255,0.028) 48%, rgba(255,255,255,0.065)), rgba(7,10,18,0.58)',
+  inputBg: 'linear-gradient(122deg, rgba(255,255,255,0.12), rgba(255,255,255,0.032) 48%, rgba(255,255,255,0.07)), rgba(7,10,18,0.74)',
+  border: 'rgba(255,255,255,0.30)',
+  shadow: '0 20px 50px rgba(0,0,0,0.46), 0 4px 14px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.28)',
+  shadowHover: '0 26px 64px rgba(0,0,0,0.54), 0 6px 18px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.32)',
   highlight: 'rgba(255,255,255,0.34)',
   overlay: 'linear-gradient(122deg, rgba(255,255,255,0.13), rgba(255,255,255,0.025) 28%, transparent 48%, rgba(255,255,255,0.06) 72%, transparent)',
-  buttonBg: 'linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.055) 58%, color-mix(in srgb, var(--admin-primary) 14%, rgba(8,13,27,0.54))), rgba(8,13,27,0.58)',
+  buttonBg: 'linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06) 58%, rgba(255,255,255,0.035)), rgba(7,10,18,0.62)',
   buttonOverlay: 'linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.04) 30%, transparent 62%)',
   buttonShadow: '0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22)',
   innerBorder: 'rgba(255,255,255,0.22)',
@@ -221,13 +222,13 @@ function applyLiquidGlassCompatibilityTokens(root) {
   root.style.setProperty('--admin-input-border', dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.70)');
   // A modal needs denser glass than a dashboard card. Reusing the 13% card
   // surface made the page below compete with labels, inputs and summaries.
-  root.style.setProperty('--admin-modal-bg', dark ? 'rgba(8, 13, 27, 0.88)' : 'rgba(255, 247, 252, 0.82)');
+  root.style.setProperty('--admin-modal-bg', dark ? 'rgba(7, 10, 18, 0.90)' : 'rgba(255, 255, 255, 0.84)');
   root.style.setProperty('--admin-modal-overlay', dark ? 'rgba(2, 6, 23, 0.76)' : 'rgba(30, 20, 30, 0.62)');
   root.style.setProperty(
     '--admin-modal-glass-bg',
     dark
-      ? 'linear-gradient(122deg, rgba(255,255,255,0.15), rgba(255,255,255,0.035) 38%, rgba(255,255,255,0.08) 72%, color-mix(in srgb, var(--admin-primary) 12%, transparent)), rgba(8,13,27,0.88)'
-      : 'linear-gradient(122deg, rgba(255,255,255,0.96), rgba(255,255,255,0.60) 38%, rgba(255,255,255,0.78) 72%, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,247,252,0.74))), rgba(255,247,252,0.82)'
+      ? 'linear-gradient(122deg, rgba(255,255,255,0.17), rgba(255,255,255,0.04) 38%, rgba(255,255,255,0.09) 72%, rgba(255,255,255,0.025)), rgba(7,10,18,0.90)'
+      : 'linear-gradient(122deg, rgba(255,255,255,0.98), rgba(255,255,255,0.64) 38%, rgba(255,255,255,0.82) 72%, rgba(255,255,255,0.54)), rgba(255,255,255,0.84)'
   );
 }
 
