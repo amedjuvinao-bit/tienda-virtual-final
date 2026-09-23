@@ -60,4 +60,13 @@ describe('menú lateral contraíble', () => {
     expect(layoutSource).toContain('data-tooltip={item.label}');
     expect(layoutSource).toContain('data-sidebar-collapsed={sidebarCollapsed}');
   });
+
+  it('incluye facturación y cupones en el menú nativo para evitar portales desbordados', () => {
+    expect(layoutSource).toContain(
+      "{ to: '/admin/facturacion', label: 'Facturación', icon: ReceiptText }",
+    );
+    expect(layoutSource).toContain(
+      "{ to: '/admin/cupones', label: 'Cupones', icon: BadgePercent }",
+    );
+  });
 });
