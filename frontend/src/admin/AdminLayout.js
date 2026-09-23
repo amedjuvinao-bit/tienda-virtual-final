@@ -31,7 +31,6 @@ const EXTRA_MAIN_LINKS = [
     label: 'Facturación',
     mobileLabel: 'Facturación',
     icon: ReceiptText,
-    artwork: '/admin-icons/crystal/billing.webp',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -40,7 +39,6 @@ const EXTRA_MAIN_LINKS = [
     label: 'Clientes',
     mobileLabel: 'Clientes',
     icon: UserRound,
-    artwork: '/admin-icons/crystal/customers.webp',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -49,7 +47,6 @@ const EXTRA_MAIN_LINKS = [
     label: 'POS / Ventas físicas',
     mobileLabel: 'POS',
     icon: Store,
-    artwork: '/admin-icons/crystal/pos.webp',
     slotAfter: '/admin/clientes',
   },
   {
@@ -58,7 +55,6 @@ const EXTRA_MAIN_LINKS = [
     label: 'Caja',
     mobileLabel: 'Caja',
     icon: Wallet,
-    artwork: '/admin-icons/crystal/cash.webp',
     slotAfter: '/admin/pos',
   },
   {
@@ -67,7 +63,6 @@ const EXTRA_MAIN_LINKS = [
     label: 'Cupones',
     mobileLabel: 'Cupones',
     icon: BadgePercent,
-    artwork: '/admin-icons/crystal/coupons.webp',
     slotAfter: '/admin/finanzas',
   },
 ];
@@ -172,7 +167,6 @@ function AdminExtraMenuLink({ menuLink, mobile = false }) {
     },
     React.createElement(PremiumAdminNavIcon, {
       icon: Icon,
-      artwork: menuLink.artwork,
       compact: mobile,
     }),
     React.createElement('span', null, mobile ? menuLink.mobileLabel : menuLink.label)

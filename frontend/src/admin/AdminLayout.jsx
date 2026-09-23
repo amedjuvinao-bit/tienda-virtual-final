@@ -321,21 +321,21 @@ export default function AdminLayout() {
   };
 
   const mainLinks = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, artwork: '/admin-icons/crystal/dashboard.webp' },
-    { to: '/admin/productos', label: 'Productos', icon: Package, artwork: '/admin-icons/crystal/products.webp' },
-    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, artwork: '/admin-icons/crystal/orders.webp' },
-    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, artwork: '/admin-icons/crystal/customers.webp' },
-    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, artwork: '/admin-icons/crystal/pos.webp' },
-    { to: '/admin/caja', label: 'Caja', icon: WalletCards, artwork: '/admin-icons/crystal/cash.webp' },
-    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, artwork: '/admin-icons/crystal/finance.webp' },
-    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, artwork: '/admin-icons/crystal/inventory.webp' },
-    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, artwork: '/admin-icons/crystal/cart.webp' },
-    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, artwork: '/admin-icons/crystal/favorites.webp' },
+    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/admin/productos', label: 'Productos', icon: Package },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },
+    { to: '/admin/clientes', label: 'Clientes', icon: UserRound },
+    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store },
+    { to: '/admin/caja', label: 'Caja', icon: WalletCards },
+    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign },
+    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch },
+    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart },
+    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart },
   ];
 
   const designLinks = [
-    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, artwork: '/admin-icons/crystal/appearance.webp' },
-    { to: '/admin/paginas', label: 'Páginas', icon: FileText, artwork: '/admin-icons/crystal/pages.webp' },
+    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette },
+    { to: '/admin/paginas', label: 'Páginas', icon: FileText },
   ];
 
   const visibleMainLinks = filterLinksByPermission(adminUser, mainLinks);
@@ -715,130 +715,203 @@ export default function AdminLayout() {
         .admin-premium-nav-icon {
           position: relative;
           display: grid;
-          width: 38px;
-          height: 38px;
-          flex: 0 0 38px;
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
           place-items: center;
           isolation: isolate;
-          overflow: visible;
+          overflow: hidden;
+          border-radius: 13px;
         }
 
         .admin-premium-nav-icon__halo {
           position: absolute;
-          left: 4px;
-          right: 4px;
-          bottom: 1px;
-          height: 11px;
-          z-index: -1;
-          border-radius: 50%;
-          background: rgba(255,255,255,.62);
-          filter: blur(5px);
-          opacity: .2;
-          transform: scale(.9);
-          transition: opacity .24s ease, filter .24s ease, transform .24s ease;
+          inset: 7px;
+          z-index: 0;
+          border-radius: 10px;
+          background: color-mix(in srgb, var(--admin-primary) 36%, transparent);
+          filter: blur(8px);
+          opacity: .34;
+          transform: scale(.82);
+          transition: opacity .22s ease, filter .22s ease, transform .22s ease;
         }
 
-        .admin-premium-nav-icon__miniature {
-          position: relative;
+        .admin-premium-nav-icon__glass {
+          position: absolute;
+          inset: 1px;
           z-index: 1;
-          display: block;
-          width: 46px;
-          height: 46px;
-          max-width: none;
-          flex: 0 0 auto;
-          object-fit: contain;
-          pointer-events: none;
-          user-select: none;
-          filter:
-            contrast(1.08)
-            drop-shadow(0 1px 1px rgba(255,255,255,.88))
-            drop-shadow(0 3px 4px rgba(17,24,39,.42));
-          transform: translateZ(0);
-          transition: filter .24s ease, transform .24s ease;
+          border: 1px solid color-mix(in srgb, #fff 76%, var(--admin-primary) 24%);
+          border-radius: 12px;
+          background:
+            linear-gradient(145deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,.26) 38%, rgba(255,255,255,.08) 62%, color-mix(in srgb, var(--admin-primary) 13%, transparent) 100%),
+            color-mix(in srgb, var(--admin-card-bg) 66%, transparent);
+          box-shadow:
+            inset 1px 1px 0 rgba(255,255,255,.9),
+            inset -1px -1px 0 color-mix(in srgb, var(--admin-card-text) 16%, transparent),
+            0 4px 10px color-mix(in srgb, var(--admin-card-text) 18%, transparent);
+          backdrop-filter: blur(9px) saturate(1.25);
+          -webkit-backdrop-filter: blur(9px) saturate(1.25);
+          transition: border-color .22s ease, box-shadow .22s ease, background .22s ease;
         }
 
-        .admin-premium-nav-icon__fallback {
+        .admin-premium-nav-icon__tint {
+          position: absolute;
+          inset: 8px;
+          z-index: 2;
+          border-radius: 50%;
+          background: radial-gradient(circle, color-mix(in srgb, var(--admin-primary) 54%, transparent) 0%, transparent 72%);
+          filter: blur(4px);
+          opacity: .44;
+          transform: scale(.86);
+          transition: opacity .22s ease, transform .22s ease;
+        }
+
+        .admin-premium-nav-icon__glyph {
+          position: relative;
+          z-index: 3;
           width: 24px;
           height: 24px;
-          color: var(--admin-primary);
-          filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 25%, transparent));
+          color: color-mix(in srgb, var(--admin-primary) 62%, var(--admin-card-text) 38%);
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          filter:
+            drop-shadow(0 1px 0 rgba(255,255,255,.88))
+            drop-shadow(0 2px 2px color-mix(in srgb, var(--admin-card-text) 30%, transparent));
+          transform: translateZ(0);
+          transition: color .22s ease, filter .22s ease, transform .22s ease;
+        }
+
+        .admin-premium-nav-icon__shine {
+          position: absolute;
+          top: -7px;
+          bottom: -7px;
+          left: -16px;
+          z-index: 4;
+          width: 10px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.88), transparent);
+          opacity: 0;
+          pointer-events: none;
+          transform: translateX(-10px) rotate(18deg);
         }
 
         .admin-premium-nav-icon--compact {
-          width: 32px;
-          height: 32px;
-          flex-basis: 32px;
+          width: 34px;
+          height: 34px;
+          flex-basis: 34px;
+          border-radius: 11px;
         }
 
-        .admin-premium-nav-icon--compact .admin-premium-nav-icon__miniature {
-          width: 38px;
-          height: 38px;
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__glass {
+          border-radius: 10px;
+        }
+
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__glyph {
+          width: 20px;
+          height: 20px;
+        }
+
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__glass,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__glass {
+          border-color: color-mix(in srgb, var(--admin-primary) 62%, #fff 38%);
+          background:
+            linear-gradient(145deg, rgba(255,255,255,.78) 0%, color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.22)) 48%, color-mix(in srgb, var(--admin-primary) 28%, transparent) 100%),
+            color-mix(in srgb, var(--admin-card-bg) 62%, transparent);
+          box-shadow:
+            inset 1px 1px 0 rgba(255,255,255,.94),
+            inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 28%, transparent),
+            0 5px 12px color-mix(in srgb, var(--admin-primary) 28%, transparent);
         }
 
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__halo {
-          background: rgba(255,255,255,.72);
-          opacity: .28;
-          filter: blur(6px);
-          transform: scale(.98);
+          opacity: .72;
+          filter: blur(7px);
+          transform: scale(1.02);
         }
 
-        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__miniature {
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__tint,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__tint {
+          opacity: .7;
+          transform: scale(1.02);
+        }
+
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__glyph,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__glyph {
+          color: color-mix(in srgb, var(--admin-primary) 80%, var(--admin-card-text) 20%);
           filter:
-            contrast(1.1)
-            brightness(1.04)
-            drop-shadow(0 1px 1px rgba(255,255,255,.92))
-            drop-shadow(0 4px 6px rgba(17,24,39,.48));
-          transform: scale(1.03);
+            drop-shadow(0 1px 0 rgba(255,255,255,.94))
+            drop-shadow(0 3px 4px color-mix(in srgb, var(--admin-primary) 38%, transparent));
+        }
+
+        .admin-nav-link:hover .admin-premium-nav-icon__glass,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__glass {
+          border-color: color-mix(in srgb, var(--admin-primary) 55%, #fff 45%);
+          box-shadow:
+            inset 1px 1px 0 rgba(255,255,255,.95),
+            inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 24%, transparent),
+            0 6px 14px color-mix(in srgb, var(--admin-primary) 30%, transparent);
         }
 
         .admin-nav-link:hover .admin-premium-nav-icon__halo,
         .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo {
-          background: color-mix(in srgb, var(--admin-primary) 52%, transparent);
-          animation: adminCrystalHaloHover .52s cubic-bezier(.2,.75,.25,1) both;
+          animation: adminCrystalHaloHover .48s cubic-bezier(.2,.75,.25,1) both;
         }
 
-        .admin-nav-link:hover .admin-premium-nav-icon__miniature,
-        .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature {
-          animation: adminCrystalIconHover .52s cubic-bezier(.2,.75,.25,1) both;
+        .admin-nav-link:hover .admin-premium-nav-icon__tint,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__tint {
+          animation: adminCrystalTintHover .48s cubic-bezier(.2,.75,.25,1) both;
         }
 
-        @keyframes adminCrystalIconHover {
-          0% {
-            transform: translateY(0) scale(1);
-          }
-          48% {
-            transform: translateY(-2px) scale(1.13);
-            filter:
-              contrast(1.09)
-              brightness(1.15)
-              drop-shadow(0 1px 1px rgba(255,255,255,.96))
-              drop-shadow(0 6px 9px rgba(17,24,39,.55));
-          }
-          100% {
-            transform: translateY(-1px) scale(1.08);
-            filter:
-              contrast(1.08)
-              brightness(1.08)
-              drop-shadow(0 1px 1px rgba(255,255,255,.9))
-              drop-shadow(0 5px 7px rgba(17,24,39,.5));
-          }
+        .admin-nav-link:hover .admin-premium-nav-icon__glyph,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__glyph {
+          animation: adminCrystalGlyphHover .48s cubic-bezier(.2,.75,.25,1) both;
+        }
+
+        .admin-nav-link:hover .admin-premium-nav-icon__shine,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__shine {
+          animation: adminCrystalShineHover .52s cubic-bezier(.25,.7,.3,1) both;
+        }
+
+        @keyframes adminCrystalGlyphHover {
+          0% { transform: translateY(0) scale(1); }
+          48% { transform: translateY(-1px) scale(1.1); }
+          100% { transform: translateY(0) scale(1.04); }
+        }
+
+        @keyframes adminCrystalTintHover {
+          0% { opacity: .44; transform: scale(.86); }
+          52% { opacity: .86; transform: scale(1.14); }
+          100% { opacity: .68; transform: scale(1.02); }
         }
 
         @keyframes adminCrystalHaloHover {
-          0% { opacity: .2; transform: scale(.9); filter: blur(5px); }
-          52% { opacity: .96; transform: scale(1.16); filter: blur(10px); }
-          100% { opacity: .78; transform: scale(1.08); filter: blur(8px); }
+          0% { opacity: .34; transform: scale(.82); filter: blur(8px); }
+          52% { opacity: .9; transform: scale(1.15); filter: blur(9px); }
+          100% { opacity: .64; transform: scale(1.02); filter: blur(7px); }
+        }
+
+        @keyframes adminCrystalShineHover {
+          0% { opacity: 0; transform: translateX(-10px) rotate(18deg); }
+          22% { opacity: .76; }
+          100% { opacity: 0; transform: translateX(62px) rotate(18deg); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .admin-nav-link:hover .admin-premium-nav-icon__miniature,
-          .admin-nav-link-mobile:hover .admin-premium-nav-icon__miniature,
           .admin-nav-link:hover .admin-premium-nav-icon__halo,
-          .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo {
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo,
+          .admin-nav-link:hover .admin-premium-nav-icon__tint,
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__tint,
+          .admin-nav-link:hover .admin-premium-nav-icon__glyph,
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__glyph,
+          .admin-nav-link:hover .admin-premium-nav-icon__shine,
+          .admin-nav-link-mobile:hover .admin-premium-nav-icon__shine {
             animation: none;
           }
+        }
+
+        .admin-premium-nav-icon__miniature,
+        .admin-premium-nav-icon__fallback {
+          display: none;
         }
 
         .admin-nav-link:hover .admin-icon-wrap,
@@ -1513,7 +1586,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} />
+                          <PremiumAdminNavIcon icon={Icon} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1535,7 +1608,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} />
+                          <PremiumAdminNavIcon icon={Icon} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1554,7 +1627,7 @@ export default function AdminLayout() {
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
                     <span className="flex items-center admin-inline-gap-md">
-                      <PremiumAdminNavIcon icon={Settings} artwork="/admin-icons/crystal/settings.webp" />
+                      <PremiumAdminNavIcon icon={Settings} />
                       <span>Configuración</span>
                     </span>
                     <ChevronDown
@@ -1795,7 +1868,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} compact />
+                      <PremiumAdminNavIcon icon={Icon} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1810,7 +1883,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <PremiumAdminNavIcon icon={Icon} artwork={item.artwork} compact />
+                      <PremiumAdminNavIcon icon={Icon} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1823,7 +1896,7 @@ export default function AdminLayout() {
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
-                    <PremiumAdminNavIcon icon={Settings} artwork="/admin-icons/crystal/settings.webp" compact />
+                    <PremiumAdminNavIcon icon={Settings} compact />
                     Config
                   </button>
                 )}
