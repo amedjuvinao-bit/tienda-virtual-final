@@ -76,16 +76,17 @@ describe('menú lateral contraíble', () => {
     )?.[1] || '';
 
     expect(glassRule).toContain('rgba(255,255,255,.035)');
-    expect(glassRule).toContain('backdrop-filter: blur(2px)');
-    expect(glassRule).toContain('transparent 52%');
+    expect(glassRule).toContain('backdrop-filter: blur(4px)');
+    expect(glassRule).toContain('transparent 58%');
     expect(glassRule).not.toContain('var(--admin-card-bg)');
     expect(glassRule).not.toContain('rgba(15,23,42');
+    expect(glassRule).not.toContain('var(--admin-card-text)');
 
     const glyphRule = layoutSource.match(
       /\.admin-premium-nav-icon__glyph\s*\{([\s\S]*?)\n\s*\}/,
     )?.[1] || '';
 
-    expect(glyphRule).toContain('var(--admin-card-text) 88%');
-    expect(glyphRule).toContain('stroke-width: 2.15');
+    expect(glyphRule).toContain('var(--admin-primary) 76%');
+    expect(glyphRule).toContain('stroke-width: 1.85');
   });
 });
