@@ -38,3 +38,23 @@ describe('encabezado principal del panel administrativo', () => {
     );
   });
 });
+
+describe('menú lateral contraíble', () => {
+  it('oculta el logo y las etiquetas, pero conserva los iconos al contraerse', () => {
+    expect(layoutSource).toContain('data-collapsed={sidebarCollapsed}');
+    expect(layoutSource).toContain('aria-hidden={sidebarCollapsed}');
+    expect(layoutSource).toContain('compact={sidebarCollapsed}');
+    expect(layoutSource).toContain('className="admin-nav-label"');
+    expect(layoutSource).toMatch(
+      /\.admin-sidebar-panel\[data-collapsed="true"\] \.admin-brand-float\s*\{[^}]*max-height: 0;[^}]*opacity: 0;/s,
+    );
+  });
+
+  it('ofrece control accesible, tooltips y recuerda la preferencia', () => {
+    expect(layoutSource).toContain('ADMIN_SIDEBAR_COLLAPSED_KEY');
+    expect(layoutSource).toContain('onClick={handleSidebarToggle}');
+    expect(layoutSource).toContain('aria-expanded={!sidebarCollapsed}');
+    expect(layoutSource).toContain('data-tooltip={item.label}');
+    expect(layoutSource).toContain('data-sidebar-collapsed={sidebarCollapsed}');
+  });
+});

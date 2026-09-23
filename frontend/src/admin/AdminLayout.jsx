@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
   ChevronDown,
+  ChevronLeft,
   LayoutDashboard,
   Package,
   PackageSearch,
@@ -56,6 +57,7 @@ import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import './theme/adminModuleHero.css';
 
 const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
+const ADMIN_SIDEBAR_COLLAPSED_KEY = 'admin_sidebar_collapsed';
 
 const CONFIG_SUBLINKS = [
   { to: '/admin/configuracion/empresa', label: 'Tienda', icon: Store },
@@ -138,6 +140,13 @@ export default function AdminLayout() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [headerCondensed, setHeaderCondensed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(ADMIN_SIDEBAR_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const commandInputRef = useRef(null);
 
   useEffect(() => installAdminModalContract(), []);
@@ -196,6 +205,17 @@ export default function AdminLayout() {
     }
   }, [isConfigRoute]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        ADMIN_SIDEBAR_COLLAPSED_KEY,
+        String(sidebarCollapsed)
+      );
+    } catch {
+      // La navegación sigue funcionando aunque el navegador bloquee el almacenamiento.
+    }
+  }, [sidebarCollapsed]);
+
   const handleLogout = () => {
     void logout();
     navigate('/admin/login');
@@ -204,6 +224,14 @@ export default function AdminLayout() {
   const handleConfigMenuClick = () => {
     setConfigMenuOpen((prev) => !prev);
     navigate(getFirstAllowedConfigPath(adminUser));
+  };
+
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      setConfigMenuOpen(next ? false : isConfigRoute);
+      return next;
+    });
   };
 
   const getSeenReviewIds = () => {
@@ -433,6 +461,7 @@ export default function AdminLayout() {
 
         .admin-main-column {
           gap: var(--admin-gap);
+          transform-origin: center top;
         }
 
         .admin-sidebar-panel {
@@ -440,8 +469,76 @@ export default function AdminLayout() {
           top: var(--admin-padding);
           align-self: flex-start;
           z-index: 40;
+          width: var(--admin-sidebar-width);
           border-radius: var(--admin-radius);
           padding: calc(var(--admin-padding) * 0.75);
+          overflow: visible;
+          transition:
+            width .48s cubic-bezier(.22,.82,.24,1),
+            padding .48s cubic-bezier(.22,.82,.24,1),
+            border-radius .48s cubic-bezier(.22,.82,.24,1),
+            box-shadow .48s ease !important;
+        }
+
+        .admin-sidebar-toggle {
+          position: absolute;
+          top: 18px;
+          right: -18px;
+          z-index: 12;
+          display: grid;
+          width: 36px;
+          height: 36px;
+          place-items: center;
+          border: .5px solid color-mix(in srgb, var(--admin-primary-soft-border) 66%, transparent);
+          border-radius: 999px;
+          background:
+            linear-gradient(145deg, rgba(255,255,255,.54), color-mix(in srgb, var(--admin-primary-soft-bg) 68%, transparent));
+          color: var(--admin-primary-soft-text);
+          box-shadow:
+            inset 0 .5px 0 rgba(255,255,255,.82),
+            0 8px 22px color-mix(in srgb, var(--admin-primary) 16%, transparent);
+          backdrop-filter: blur(14px) saturate(1.22);
+          -webkit-backdrop-filter: blur(14px) saturate(1.22);
+          cursor: pointer;
+          transform: none !important;
+          transition:
+            right .48s cubic-bezier(.22,.82,.24,1),
+            background .2s ease,
+            border-color .2s ease,
+            box-shadow .2s ease !important;
+        }
+
+        .admin-sidebar-panel .admin-sidebar-toggle:hover {
+          border-color: color-mix(in srgb, var(--admin-primary) 34%, #fff 66%);
+          background:
+            linear-gradient(145deg, rgba(255,255,255,.66), color-mix(in srgb, var(--admin-primary-soft-hover) 72%, transparent));
+          box-shadow:
+            inset 0 .5px 0 rgba(255,255,255,.9),
+            0 10px 26px color-mix(in srgb, var(--admin-primary) 23%, transparent);
+          transform: translateX(1px) scale(1.04) !important;
+        }
+
+        .admin-sidebar-toggle__icon {
+          width: 17px;
+          height: 17px;
+          transition: transform .48s cubic-bezier(.22,.82,.24,1);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] {
+          width: 72px;
+          padding: 54px 7px 9px;
+          border-radius: calc(var(--admin-radius) * .82);
+          box-shadow:
+            0 20px 46px color-mix(in srgb, var(--admin-primary) 12%, transparent),
+            inset 0 .5px 0 rgba(255,255,255,.58);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-toggle {
+          right: -16px;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-toggle__icon {
+          transform: rotate(180deg);
         }
 
         .admin-content-card {
@@ -514,6 +611,27 @@ export default function AdminLayout() {
           outline: none !important;
           transform-style: preserve-3d;
           perspective: 900px;
+          max-height: 180px;
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          transform-origin: center top;
+          transition:
+            min-height .4s cubic-bezier(.22,.82,.24,1),
+            max-height .4s cubic-bezier(.22,.82,.24,1),
+            margin .4s cubic-bezier(.22,.82,.24,1),
+            padding .4s cubic-bezier(.22,.82,.24,1),
+            opacity .24s ease,
+            transform .4s cubic-bezier(.22,.82,.24,1);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-brand-float {
+          min-height: 0;
+          max-height: 0;
+          margin: 0;
+          padding: 0;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-18px) scale(.82);
         }
 
         .admin-logo-floating {
@@ -567,6 +685,7 @@ export default function AdminLayout() {
         .admin-sidebar-footer {
           margin-top: var(--admin-gap);
           padding-top: calc(var(--admin-padding) * 0.7);
+          transition: margin .38s ease, padding .38s ease, border-color .38s ease;
         }
 
         .admin-config-submenu {
@@ -652,7 +771,153 @@ export default function AdminLayout() {
 
         .admin-sidebar-panel .admin-nav-link,
         .admin-sidebar-panel button {
-          transition-property: background-color, color, border-color, box-shadow, filter !important;
+          transition-property: background-color, color, border-color, box-shadow, filter, padding, gap !important;
+        }
+
+        .admin-sidebar-panel .admin-sidebar-toggle {
+          transition-property: right, background, border-color, box-shadow, transform !important;
+        }
+
+        .admin-nav-label,
+        .admin-section-label,
+        .admin-config-chevron {
+          max-width: 220px;
+          opacity: 1;
+          transform: translateX(0);
+          transition:
+            max-width .4s cubic-bezier(.22,.82,.24,1),
+            opacity .2s ease,
+            transform .36s cubic-bezier(.22,.82,.24,1);
+        }
+
+        .admin-nav-label {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] nav {
+          display: grid;
+          align-content: start;
+          gap: 4px;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] nav > div {
+          margin: 0;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-section-label {
+          max-width: 0;
+          height: 0;
+          margin: 0;
+          opacity: 0;
+          overflow: hidden;
+          transform: translateX(-8px);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-nav-label,
+        .admin-sidebar-panel[data-collapsed="true"] .admin-config-chevron {
+          max-width: 0;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateX(-10px);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link {
+          position: relative;
+          min-height: 42px;
+          justify-content: center !important;
+          gap: 0 !important;
+          padding: 4px !important;
+          border-radius: calc(var(--admin-radius) * .56) !important;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link > .flex {
+          width: 100%;
+          justify-content: center;
+          gap: 0;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-config-submenu {
+          display: none;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-footer {
+          margin-top: 5px;
+          padding-top: 7px;
+          border-color: color-mix(in srgb, var(--admin-card-border) 58%, transparent) !important;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-logout-sidebar {
+          min-height: 42px;
+          justify-content: center;
+          gap: 0;
+          padding: 4px;
+          border-radius: calc(var(--admin-radius) * .56);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          top: 50%;
+          left: calc(100% + 11px);
+          z-index: 120;
+          width: max-content;
+          max-width: 190px;
+          border: .5px solid color-mix(in srgb, var(--admin-primary-soft-border) 62%, transparent);
+          border-radius: 10px;
+          padding: 7px 10px;
+          background: color-mix(in srgb, var(--admin-page-bg) 92%, var(--admin-primary) 8%);
+          color: var(--admin-card-text);
+          font-size: 11px;
+          font-weight: 800;
+          line-height: 1.2;
+          opacity: 0;
+          pointer-events: none;
+          box-shadow: 0 12px 30px rgba(22,18,28,.18), inset 0 .5px 0 rgba(255,255,255,.72);
+          transform: translate(5px, -50%) scale(.96);
+          transform-origin: left center;
+          transition: opacity .16s ease, transform .2s cubic-bezier(.22,.82,.24,1);
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]:hover::after,
+        .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]:focus-visible::after {
+          opacity: 1;
+          transform: translate(0, -50%) scale(1);
+        }
+
+        .admin-layout-shell[data-sidebar-collapsed="true"] .admin-main-column {
+          animation: adminMainSettleCollapsed .52s cubic-bezier(.22,.82,.24,1) both;
+        }
+
+        .admin-layout-shell[data-sidebar-collapsed="false"] .admin-main-column {
+          animation: adminMainSettleExpanded .52s cubic-bezier(.22,.82,.24,1) both;
+        }
+
+        @keyframes adminMainSettleCollapsed {
+          0% { opacity: .92; transform: scale(.994) translateX(4px); }
+          58% { opacity: 1; transform: scale(1.002) translateX(-2px); }
+          100% { opacity: 1; transform: scale(1) translateX(0); }
+        }
+
+        @keyframes adminMainSettleExpanded {
+          0% { opacity: .94; transform: scale(.996) translateX(-3px); }
+          62% { opacity: 1; transform: scale(1.001) translateX(1px); }
+          100% { opacity: 1; transform: scale(1) translateX(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .admin-sidebar-panel,
+          .admin-sidebar-toggle,
+          .admin-sidebar-toggle__icon,
+          .admin-brand-float,
+          .admin-nav-label,
+          .admin-section-label,
+          .admin-config-chevron,
+          .admin-main-column {
+            animation: none !important;
+            transition-duration: .01ms !important;
+          }
         }
 
         .admin-nav-link-mobile:hover {
@@ -1417,6 +1682,7 @@ export default function AdminLayout() {
 
         .admin-logout-sidebar {
           display: flex;
+          position: relative;
           align-items: center;
           justify-content: center;
           gap: calc(var(--admin-gap) * 0.45);
@@ -1564,12 +1830,29 @@ export default function AdminLayout() {
           }}
         />
 
-        <div className="admin-layout-shell relative z-10 flex min-h-screen">
+        <div
+          className="admin-layout-shell relative z-10 flex min-h-screen"
+          data-sidebar-collapsed={sidebarCollapsed}
+        >
           <aside
             className="admin-sidebar-glass admin-sidebar-panel hidden md:flex md:flex-col shrink-0"
-            style={{ width: 'var(--admin-sidebar-width)' }}
+            data-collapsed={sidebarCollapsed}
           >
-            <div className="admin-brand-float admin-logo-floating flex items-center justify-center">
+            <button
+              type="button"
+              className="admin-sidebar-toggle"
+              onClick={handleSidebarToggle}
+              aria-expanded={!sidebarCollapsed}
+              aria-label={sidebarCollapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'}
+              title={sidebarCollapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'}
+            >
+              <ChevronLeft className="admin-sidebar-toggle__icon" aria-hidden="true" />
+            </button>
+
+            <div
+              className="admin-brand-float admin-logo-floating flex items-center justify-center"
+              aria-hidden={sidebarCollapsed}
+            >
               {adminBrandLogo ? (
                 <img
                   src={adminBrandLogo}
@@ -1611,9 +1894,11 @@ export default function AdminLayout() {
                           to={item.to}
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          data-tooltip={item.label}
+                          aria-label={sidebarCollapsed ? item.label : undefined}
                         >
-                          <PremiumAdminNavIcon icon={Icon} />
-                          <span>{item.label}</span>
+                          <PremiumAdminNavIcon icon={Icon} compact={sidebarCollapsed} />
+                          <span className="admin-nav-label">{item.label}</span>
                         </NavLink>
                       );
                     })}
@@ -1633,9 +1918,11 @@ export default function AdminLayout() {
                           to={item.to}
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                          data-tooltip={item.label}
+                          aria-label={sidebarCollapsed ? item.label : undefined}
                         >
-                          <PremiumAdminNavIcon icon={Icon} />
-                          <span>{item.label}</span>
+                          <PremiumAdminNavIcon icon={Icon} compact={sidebarCollapsed} />
+                          <span className="admin-nav-label">{item.label}</span>
                         </NavLink>
                       );
                     })}
@@ -1651,13 +1938,15 @@ export default function AdminLayout() {
                     onClick={handleConfigMenuClick}
                     className={`${linkBase} admin-nav-link w-full justify-between`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
+                    data-tooltip="Configuración"
+                    aria-label={sidebarCollapsed ? 'Configuración' : undefined}
                   >
                     <span className="flex items-center admin-inline-gap-md">
-                      <PremiumAdminNavIcon icon={Settings} />
-                      <span>Configuración</span>
+                      <PremiumAdminNavIcon icon={Settings} compact={sidebarCollapsed} />
+                      <span className="admin-nav-label">Configuración</span>
                     </span>
                     <ChevronDown
-                      className="h-3.5 w-3.5 transition-transform duration-200"
+                      className="admin-config-chevron h-3.5 w-3.5 transition-transform duration-200"
                       style={{ transform: configMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
                     />
                   </button>
@@ -1677,7 +1966,7 @@ export default function AdminLayout() {
                             style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                           >
                             <Icon className="h-3.5 w-3.5 shrink-0" />
-                            <span>{item.label}</span>
+                            <span className="admin-nav-label">{item.label}</span>
                           </NavLink>
                         );
                       })}
@@ -1691,9 +1980,14 @@ export default function AdminLayout() {
               className="admin-sidebar-footer"
               style={{ borderTop: '1px solid var(--admin-card-border)' }}
             >
-              <button onClick={handleLogout} className="admin-logout-sidebar">
+              <button
+                onClick={handleLogout}
+                className="admin-logout-sidebar"
+                data-tooltip="Cerrar sesión"
+                aria-label={sidebarCollapsed ? 'Cerrar sesión' : undefined}
+              >
                 <LogOut className="h-4 w-4" />
-                Cerrar sesión
+                <span className="admin-nav-label">Cerrar sesión</span>
               </button>
             </div>
           </aside>
