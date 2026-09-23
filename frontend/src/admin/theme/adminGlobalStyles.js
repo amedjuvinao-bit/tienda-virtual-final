@@ -24,11 +24,12 @@ export function applyAdminGlobalStyles() {
       font-family: var(--admin-font-body, 'Inter', system-ui, sans-serif);
       background:
         var(--admin-page-glass-overlay),
+        var(--admin-theme-background-image, none),
         var(--admin-page-bg) !important;
-      background-attachment: fixed, fixed !important;
-      background-position: center, center !important;
-      background-repeat: no-repeat, no-repeat !important;
-      background-size: cover, cover !important;
+      background-attachment: fixed !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+      background-size: cover !important;
       color: var(--admin-page-text) !important;
     }
 
@@ -665,6 +666,68 @@ export function applyAdminGlobalStyles() {
         var(--admin-widget-surface-shadow) !important;
     }
 
+    /* Azure Horizon — luminous architectural glass with its own silhouette. */
+    html[data-admin-theme-style="azure"] .admin-area::before {
+      background:
+        radial-gradient(ellipse at 18% 8%, rgba(255,255,255,.32), transparent 34%),
+        linear-gradient(135deg, rgba(239,248,255,.18), rgba(219,234,254,.08));
+      opacity: .38;
+      backdrop-filter: blur(1.5px) saturate(1.18);
+      -webkit-backdrop-filter: blur(1.5px) saturate(1.18);
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area::after {
+      opacity: .34;
+      filter: blur(7px);
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface) {
+      border: 1px solid rgba(255,255,255,.84) !important;
+      border-radius: 28px 13px 28px 13px !important;
+      background:
+        linear-gradient(132deg, rgba(255,255,255,.54), rgba(255,255,255,.18) 46%, rgba(219,234,254,.22)) !important;
+      box-shadow:
+        0 24px 58px color-mix(in srgb, var(--admin-primary) 13%, transparent),
+        inset 1px 1px 0 rgba(255,255,255,.96),
+        inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 10%, transparent) !important;
+      backdrop-filter: blur(22px) saturate(1.34) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(1.34) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area .admin-header-panel {
+      border: 1px solid rgba(255,255,255,.88) !important;
+      border-radius: 14px 30px 14px 30px !important;
+      background: linear-gradient(112deg, rgba(255,255,255,.64), rgba(239,248,255,.28)) !important;
+      box-shadow:
+        0 18px 48px color-mix(in srgb, var(--admin-primary) 12%, transparent),
+        inset 0 1px 0 rgba(255,255,255,.98) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area .admin-sidebar-panel {
+      border: 1px solid rgba(255,255,255,.88) !important;
+      border-radius: 30px 14px 30px 14px !important;
+      background: linear-gradient(148deg, rgba(255,255,255,.58), rgba(239,248,255,.24)) !important;
+      box-shadow:
+        16px 0 46px color-mix(in srgb, var(--admin-primary) 10%, transparent),
+        inset 1px 0 0 rgba(255,255,255,.98) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area .admin-nav-link[aria-current="page"] {
+      background: linear-gradient(118deg, rgba(219,234,254,.84), rgba(255,255,255,.54)) !important;
+      box-shadow:
+        0 12px 28px color-mix(in srgb, var(--admin-primary) 14%, transparent),
+        inset 0 1px 0 rgba(255,255,255,.92) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area :is(.admin-card-glass,.admin-glass-card,.admin-widget-surface):hover {
+      transform: translateY(-2px) translateZ(0);
+      border-color: rgba(255,255,255,.98) !important;
+      box-shadow:
+        0 30px 68px color-mix(in srgb, var(--admin-primary) 17%, transparent),
+        inset 1px 1px 0 #ffffff,
+        inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 12%, transparent) !important;
+    }
+
     html[data-admin-theme-style="minimal"] .admin-area::after {
       opacity: .12;
       filter: none;
@@ -1272,6 +1335,8 @@ export function applyAdminGlobalStyles() {
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area {
       background:
+        linear-gradient(135deg, rgba(239,248,255,.14), rgba(219,234,254,.06)),
+        var(--admin-theme-background-image, none),
         linear-gradient(
           135deg,
           color-mix(in srgb, var(--admin-page-bg) 78%, var(--admin-primary) 22%) 0%,
@@ -1280,6 +1345,9 @@ export function applyAdminGlobalStyles() {
           color-mix(in srgb, var(--admin-page-bg) 92%, #ffffff 8%) 100%
         ) !important;
       background-attachment: fixed !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+      background-size: cover !important;
     }
 
     html[data-admin-widget-texture="liquidGlass"] .admin-area::before {
@@ -1532,6 +1600,33 @@ export function applyAdminGlobalStyles() {
     html[data-admin-widget-texture="minimal"] .admin-area::after {
       opacity: .06;
       filter: none;
+    }
+
+    /* Preserve Azure Horizon's architectural silhouette with every texture.
+       Texture controls the material; the theme controls the shape. */
+    html[data-admin-theme-style="azure"] .admin-area :is(
+      .admin-card-glass,
+      .admin-glass-card,
+      .admin-widget-surface,
+      :is(div, section, article, aside, form)[class$="-card"],
+      :is(div, section, article, aside, form)[class$="__card"],
+      :is(div, section, article, aside, form)[class$="-panel"],
+      :is(div, section, article, aside, form)[class$="__panel"]
+    ) {
+      border-radius: 28px 13px 28px 13px !important;
+      border-color: rgba(255,255,255,.86) !important;
+      box-shadow:
+        var(--admin-widget-surface-shadow),
+        inset 1px 1px 0 rgba(255,255,255,.96),
+        inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 11%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area .admin-header-panel {
+      border-radius: 14px 30px 14px 30px !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area .admin-sidebar-panel {
+      border-radius: 30px 14px 30px 14px !important;
     }
 
     .admin-area [class*="divide-"] > :not([hidden]) ~ :not([hidden]) {

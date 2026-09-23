@@ -5,8 +5,17 @@ import {
   DEFAULT_ADMIN_FONT_PRESET,
   normalizeAdminFontPreset,
 } from './adminTypography';
+import azureHorizonDashboard from '../../assets/admin/azure-horizon-dashboard.webp';
 
 const ADMIN_PANEL_RADIUS = 18;
+
+const ADMIN_THEME_BACKGROUNDS = Object.freeze({
+  azureHorizonLight: azureHorizonDashboard,
+});
+
+export function getAdminThemeBuiltInBackground(preset) {
+  return ADMIN_THEME_BACKGROUNDS[preset] || '';
+}
 
 const ADMIN_THEME_SIGNATURES = Object.freeze({
   systemDefault: {
@@ -71,6 +80,13 @@ const ADMIN_THEME_SIGNATURES = Object.freeze({
     headerSheen: 'linear-gradient(118deg, rgba(255,255,255,.07), transparent 38%, color-mix(in srgb, var(--admin-primary) 30%, transparent))',
     navMarker: '7px',
     headingSpacing: '-0.025em',
+  },
+  azureHorizonLight: {
+    style: 'azure',
+    pattern: 'radial-gradient(ellipse at 14% 8%, rgba(255,255,255,.62), transparent 31%), linear-gradient(126deg, transparent 0 58%, color-mix(in srgb, var(--admin-primary) 9%, transparent) 58% 60%, transparent 60%)',
+    headerSheen: 'linear-gradient(112deg, rgba(255,255,255,.78), transparent 36%, color-mix(in srgb, var(--admin-primary) 14%, transparent))',
+    navMarker: '5px',
+    headingSpacing: '-0.026em',
   },
 });
 
@@ -318,10 +334,12 @@ export function applyAdminTheme(theme) {
   const fontPreset = normalizeAdminFontPreset(t.fontPreset);
   const mode = detectAdminThemeMode(t);
   const isDark = mode === 'dark';
+  const themeBackground = getAdminThemeBuiltInBackground(preset);
 
   root.dataset.adminThemeMode = mode;
   root.dataset.adminThemePreset = preset;
   root.dataset.adminThemeStyle = signature.style;
+  root.dataset.adminThemeBackground = themeBackground ? 'image' : 'none';
   applyAdminTypography(fontPreset);
 
   if (mode === 'dark') {
@@ -341,6 +359,10 @@ export function applyAdminTheme(theme) {
   root.style.setProperty('--admin-theme-header-sheen', signature.headerSheen);
   root.style.setProperty('--admin-theme-nav-marker', signature.navMarker);
   root.style.setProperty('--admin-theme-heading-spacing', signature.headingSpacing);
+  root.style.setProperty(
+    '--admin-theme-background-image',
+    themeBackground ? `url("${themeBackground}")` : 'none'
+  );
 
   const pageTextAuto = getContrastText(t.pageBg);
   const pageMutedTextAuto = getMutedContrastText(t.pageBg);

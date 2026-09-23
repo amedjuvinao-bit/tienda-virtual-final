@@ -18,7 +18,11 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import api from '../../../lib/api';
-import { applyAdminTheme, ADMIN_THEME_DEFAULT } from '../../theme/adminTheme';
+import {
+  applyAdminTheme,
+  ADMIN_THEME_DEFAULT,
+  getAdminThemeBuiltInBackground,
+} from '../../theme/adminTheme';
 import { applyAdminLayoutStyles } from '../../theme/adminLayoutStyles';
 import {
   applyAdminPanelBackground,
@@ -462,6 +466,59 @@ const ADMIN_THEME_PRESETS = {
     warningSoftBg: '#fffbeb',
     warningText: '#92400e',
   },
+
+  azureHorizonLight: {
+    preset: 'azureHorizonLight',
+    layout: {
+      radius: 24,
+      blur: 26,
+      shadow: '0 24px 70px rgba(37,99,235,0.15)',
+      sidebarWidth: 278,
+      headerHeight: 76,
+      density: 'comfortable',
+    },
+    primary: '#2563eb',
+    primaryHover: '#1d4ed8',
+    primarySoftBg: '#eff6ff',
+    primarySoftHover: '#dbeafe',
+    primarySoftBorder: '#bfdbfe',
+    primarySoftText: '#1e40af',
+    activeNavBg: '#dbeafe',
+    activeNavText: '#1e3a8a',
+    sidebarBg: '#f7fbff',
+    headerBg: '#f8fbff',
+    pageBg: '#eaf5ff',
+    cardBg: '#f9fcff',
+    cardHeaderBg: '#eff6ff',
+    cardBorder: '#b9ddff',
+    cardText: '#0f2742',
+    cardMutedText: '#49677f',
+    tableHeadBg: '#eaf4ff',
+    tableBorder: '#b9ddff',
+    tableText: '#0f2742',
+    tableMutedText: '#49677f',
+    tableRowHover: '#e0efff',
+    buttonBg: '#2563eb',
+    buttonHover: '#1d4ed8',
+    buttonText: '#ffffff',
+    buttonSoftBg: '#eff6ff',
+    buttonSoftText: '#1e40af',
+    buttonSoftBorder: '#bfdbfe',
+    inputBg: '#fafdff',
+    inputBorder: '#b9ddff',
+    inputText: '#0f2742',
+    inputPlaceholder: '#66839c',
+    inputFocus: '#2563eb',
+    modalBg: '#f8fbff',
+    modalOverlay: 'rgba(15, 55, 95, 0.28)',
+    danger: '#e11d48',
+    dangerHover: '#be123c',
+    dangerSoftBg: '#fff1f2',
+    dangerText: '#9f1239',
+    warning: '#d97706',
+    warningSoftBg: '#fffbeb',
+    warningText: '#92400e',
+  },
 };
 
 const DEFAULT_PANEL_SELECTION = Object.freeze({
@@ -547,6 +604,11 @@ const ADMIN_THEME_OPTIONS = [
     value: 'darkCyber',
     label: 'Oscuro cyber',
     description: 'Trama escaneada, bordes laterales y capas violetas profundas.',
+  },
+  {
+    value: 'azureHorizonLight',
+    label: 'Horizonte azul',
+    description: 'Arquitectura cristalina, curvas fluidas y profundidad serena.',
   },
 ];
 
@@ -712,6 +774,10 @@ export default function PanelAdminSection() {
         draftSelection.fontPreset
       ),
     [draftSelection]
+  );
+
+  const selectedThemeBackground = getAdminThemeBuiltInBackground(
+    draftSelection.preset
   );
 
   const selectedTextureOption = useMemo(
@@ -1237,6 +1303,7 @@ export default function PanelAdminSection() {
           <div
             className="panel-admin-preview__canvas"
             data-widget-texture={draftSelection.widgetTexture}
+            data-theme-preset={draftSelection.preset}
             style={{
               '--preview-primary': selectedTheme.primary,
               '--preview-page': selectedTheme.pageBg,
@@ -1249,7 +1316,9 @@ export default function PanelAdminSection() {
               '--preview-font-heading': selectedFontOption.heading,
               '--preview-background-image': draftSelection.background.enabled
                 ? `url("${draftSelection.background.image}")`
-                : 'none',
+                : selectedThemeBackground
+                  ? `url("${selectedThemeBackground}")`
+                  : 'none',
             }}
           >
             <div className={`panel-admin-preview__sidebar is-${draftSelection.sidebar}`}>
@@ -1268,7 +1337,7 @@ export default function PanelAdminSection() {
             <li><PanelLeft size={16} /><span><strong>Navegación</strong>{SIDEBAR_OPTIONS.find((item) => item.value === draftSelection.sidebar)?.label}</span></li>
             <li><Gem size={16} /><span><strong>Textura</strong>{selectedTextureOption.label}</span></li>
             <li><Type size={16} /><span><strong>Tipografía</strong>{selectedFontOption.label}</span></li>
-            <li><ImageIcon size={16} /><span><strong>Fondo</strong>{draftSelection.background.enabled ? 'Imagen personalizada' : 'Color del tema'}</span></li>
+            <li><ImageIcon size={16} /><span><strong>Fondo</strong>{draftSelection.background.enabled ? 'Imagen personalizada' : selectedThemeBackground ? 'Horizonte cristalino' : 'Color del tema'}</span></li>
             <li><Check size={16} /><span><strong>Alcance</strong>Todo el panel administrativo</span></li>
           </ul>
         </aside>

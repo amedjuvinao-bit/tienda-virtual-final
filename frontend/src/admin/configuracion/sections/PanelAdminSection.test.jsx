@@ -235,6 +235,37 @@ describe('PanelAdminSection Nivel Plus', () => {
     });
   });
 
+  it('previsualiza y guarda Horizonte azul con su fondo integrado', async () => {
+    const user = userEvent.setup();
+    render(<PanelAdminSection />);
+    await screen.findByText('Configuración sincronizada');
+
+    await user.click(screen.getByRole('button', { name: /Horizonte azul/i }));
+
+    expect(screen.getByRole('button', { name: /Horizonte azul/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(document.documentElement.dataset.adminThemeMode).toBe('light');
+    expect(document.documentElement.dataset.adminThemeStyle).toBe('azure');
+    expect(
+      document.documentElement.style.getPropertyValue('--admin-theme-background-image')
+    ).toContain('azure-horizon-dashboard');
+    expect(screen.getByText('Horizonte cristalino')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    expect(api.put).toHaveBeenCalledWith('/api/site-settings', {
+      admin: expect.objectContaining({
+        theme: expect.objectContaining({
+          preset: 'azureHorizonLight',
+          primary: '#2563eb',
+        }),
+      }),
+    });
+  });
+
   it('cancela una vista previa y recupera la selección guardada', async () => {
     const user = userEvent.setup();
     render(<PanelAdminSection />);

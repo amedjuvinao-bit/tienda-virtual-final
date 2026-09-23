@@ -547,6 +547,25 @@
   --preview-widget-radius: 3px;
 }
 
+.panel-admin-preview__canvas[data-theme-preset='azureHorizonLight'] {
+  border-color: rgba(255,255,255,.9);
+  box-shadow:
+    0 20px 42px color-mix(in srgb, var(--preview-primary) 18%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.94);
+}
+
+.panel-admin-preview__canvas[data-theme-preset='azureHorizonLight'] :is(
+  .panel-admin-preview__topbar,
+  .panel-admin-preview__metrics i,
+  .panel-admin-preview__table
+) {
+  border-color: rgba(255,255,255,.9);
+  border-radius: 18px 7px 18px 7px;
+  box-shadow:
+    0 10px 22px color-mix(in srgb, var(--preview-primary) 13%, transparent),
+    inset 1px 1px 0 rgba(255,255,255,.96);
+}
+
 .panel-admin-preview__sidebar { width: 24%; min-width: 48px; display: grid; align-content: start; gap: 10px; padding: 17px 10px; background: var(--preview-sidebar); }
 .panel-admin-preview__sidebar.is-compact { width: 18%; }
 .panel-admin-preview__sidebar.is-expanded { width: 29%; }

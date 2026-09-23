@@ -14,6 +14,7 @@ describe('adminTheme Nivel Plus', () => {
     document.documentElement.removeAttribute('data-admin-theme-mode');
     document.documentElement.removeAttribute('data-admin-theme-preset');
     document.documentElement.removeAttribute('data-admin-theme-style');
+    document.documentElement.removeAttribute('data-admin-theme-background');
     document.documentElement.removeAttribute('data-admin-font-preset');
     document.documentElement.removeAttribute('style');
     document.getElementById('admin-global-glass-styles')?.remove();
@@ -92,6 +93,31 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-radius')).toBe('32px');
   });
 
+  it('aplica el fondo propio y la firma clara del tema Horizonte azul', () => {
+    applyAdminTheme({
+      preset: 'azureHorizonLight',
+      pageBg: '#eaf5ff',
+      sidebarBg: '#f7fbff',
+      headerBg: '#f8fbff',
+      cardBg: '#f9fcff',
+      cardHeaderBg: '#eff6ff',
+      inputBg: '#fafdff',
+      modalBg: '#f8fbff',
+      primary: '#2563eb',
+      layout: { radius: 24 },
+    });
+
+    const root = document.documentElement;
+    expect(root.dataset.adminThemeMode).toBe('light');
+    expect(root.dataset.adminThemeStyle).toBe('azure');
+    expect(root.dataset.adminThemeBackground).toBe('image');
+    expect(root.style.getPropertyValue('--admin-theme-background-image')).toContain(
+      'azure-horizon-dashboard'
+    );
+    expect(root.style.getPropertyValue('--admin-card-text')).toBe('#111827');
+    expect(root.style.getPropertyValue('--admin-radius')).toBe('24px');
+  });
+
   it('ofrece cinco voces tipográficas realmente diferentes', () => {
     const bodyFamilies = ADMIN_FONT_PRESETS.map((preset) => preset.body);
     const headingFamilies = ADMIN_FONT_PRESETS.map((preset) => preset.heading);
@@ -142,6 +168,7 @@ describe('adminTheme Nivel Plus', () => {
     );
     expect(css).toContain('background: var(--admin-widget-surface-bg) !important');
     expect(css).toContain('An explicitly white inline surface always needs dark ink');
+    expect(css).toContain('html[data-admin-theme-style="azure"]');
     expect(css).not.toContain('color: var(--admin-button-text) !important;\n    }\n\n    /* Disabled state */');
   });
 });
