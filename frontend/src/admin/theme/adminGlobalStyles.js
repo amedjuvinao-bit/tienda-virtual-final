@@ -1300,7 +1300,7 @@ export function applyAdminGlobalStyles() {
     html[data-admin-widget-texture="liquidGlass"] .admin-area .admin-widget-stage {
       background: transparent !important;
       border-color: rgba(255,255,255,.34) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 rgba(15,23,42,.08) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 8%, transparent) !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
       outline: none !important;
@@ -1413,11 +1413,11 @@ export function applyAdminGlobalStyles() {
       --cart-glass-subtle: var(--admin-widget-surface-soft-bg);
       --cart-glass-fallback: transparent;
       --cart-glass-border: var(--admin-widget-surface-border);
-      --cart-glass-line: rgba(255,255,255,.72);
+      --cart-glass-line: color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.72));
       --cart-glass-shadow: var(--admin-widget-surface-shadow);
-      --cart-glass-inset: inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 rgba(15,23,42,.10);
+      --cart-glass-inset: inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 14%, transparent);
       --cart-neutral-surface: var(--admin-widget-surface-soft-bg);
-      --cart-row-hover: rgba(255,255,255,.22);
+      --cart-row-hover: color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,.16));
       --cart-control-bg: var(--admin-widget-input-bg);
     }
 
@@ -1425,9 +1425,9 @@ export function applyAdminGlobalStyles() {
       --fav-glass: var(--admin-widget-surface-bg);
       --fav-glass-strong: var(--admin-widget-surface-strong-bg);
       --fav-glass-soft: var(--admin-widget-surface-soft-bg);
-      --fav-line: rgba(255,255,255,.72);
+      --fav-line: color-mix(in srgb, var(--admin-primary) 18%, rgba(255,255,255,.72));
       --fav-control: var(--admin-widget-input-bg);
-      --fav-hover: rgba(255,255,255,.22);
+      --fav-hover: color-mix(in srgb, var(--admin-primary) 8%, rgba(255,255,255,.16));
     }
 
     html[data-admin-widget-texture="liquidGlass"] .cart-admin-glass,
@@ -1451,7 +1451,7 @@ export function applyAdminGlobalStyles() {
     html[data-admin-widget-texture="liquidGlass"] .order-detail-professional-shell {
       background: var(--admin-modal-glass-bg) !important;
       border-color: rgba(255,255,255,.94) !important;
-      box-shadow: 0 34px 110px rgba(15,23,42,.42), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(15,23,42,.12) !important;
+      box-shadow: 0 34px 110px rgba(15,23,42,.42), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
       backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
       -webkit-backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
     }
@@ -1477,7 +1477,7 @@ export function applyAdminGlobalStyles() {
       box-shadow:
         0 34px 110px rgba(15,23,42,.44),
         inset 0 1px 0 rgba(255,255,255,.98),
-        inset 0 -1px 0 rgba(15,23,42,.12) !important;
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
       backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
       -webkit-backdrop-filter: blur(36px) saturate(1.18) contrast(1.04) !important;
       isolation: isolate;

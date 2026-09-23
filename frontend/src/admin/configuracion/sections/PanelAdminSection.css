@@ -192,23 +192,6 @@
   box-shadow: 0 8px 24px color-mix(in srgb, var(--admin-primary) 12%, transparent);
 }
 
-/* Vidrio líquido no adopta el color del tema. La selección permanece clara
-   mediante el check de acento, mientras la tarjeta conserva el espejo neutro. */
-html[data-admin-widget-texture='liquidGlass'] .panel-admin-level-plus :is(
-  .panel-admin-theme-card,
-  .panel-admin-sidebar-option,
-  .panel-admin-texture-option,
-  .panel-admin-font-option
-).is-selected {
-  background: var(--admin-widget-surface-soft-bg) !important;
-  border-color: var(--admin-widget-surface-border) !important;
-  box-shadow: var(--admin-widget-button-shadow) !important;
-}
-
-html[data-admin-widget-texture='liquidGlass'] .panel-admin-hero::after {
-  background: linear-gradient(122deg, rgba(255,255,255,.34), transparent 32%, rgba(15,23,42,.045) 58%, rgba(255,255,255,.18));
-}
-
 .panel-admin-theme-card__palette {
   display: flex;
   overflow: hidden;

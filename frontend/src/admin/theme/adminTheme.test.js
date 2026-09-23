@@ -125,52 +125,12 @@ describe('adminTheme Nivel Plus', () => {
 
     const root = document.documentElement;
     expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
-      'rgba(7,10,18,0.68)'
+      'rgba(8,13,27,0.64)'
     );
     expect(root.style.getPropertyValue('--admin-widget-button-bg')).toContain(
-      'rgba(7,10,18,0.62)'
-    );
-    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).not.toContain(
-      'var(--admin-primary)'
+      'rgba(8,13,27,0.58)'
     );
     expect(root.style.getPropertyValue('--admin-card-text')).toBe('#ffffff');
-  });
-
-  it('mantiene el vidrio líquido claro neutro e independiente del color del tema', () => {
-    applyAdminTheme({
-      preset: 'goldBoutiqueLight',
-      pageBg: '#fffbeb',
-      sidebarBg: '#fffdf5',
-      headerBg: '#ffffff',
-      cardBg: '#ffffff',
-      inputBg: '#ffffff',
-      modalBg: '#ffffff',
-      primary: '#d4af37',
-    });
-
-    applyAdminWidgetTexture('liquidGlass');
-
-    const root = document.documentElement;
-    const neutralSurfaces = [
-      '--admin-widget-surface-bg',
-      '--admin-widget-surface-strong-bg',
-      '--admin-widget-surface-soft-bg',
-      '--admin-widget-input-bg',
-      '--admin-widget-button-bg',
-      '--admin-widget-surface-shadow',
-    ];
-
-    neutralSurfaces.forEach((token) => {
-      expect(root.style.getPropertyValue(token)).not.toContain('var(--admin-primary)');
-    });
-    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
-      'rgba(255,255,255,0.44)'
-    );
-    expect(root.style.getPropertyValue('--admin-widget-surface-bg')).toContain(
-      'rgba(15,23,42,0.075)'
-    );
-    expect(root.style.getPropertyValue('--admin-widget-surface-contrast')).toBe('1.16');
-    expect(root.style.getPropertyValue('--admin-modal-bg')).toBe('rgba(255, 255, 255, 0.84)');
   });
 
   it('evita que una imagen clara atraviese el lienzo del vidrio oscuro', () => {

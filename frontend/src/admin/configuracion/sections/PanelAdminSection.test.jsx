@@ -171,10 +171,10 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('1px');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-bg')
-    ).toContain('rgba(255,255,255,0.44)');
+    ).toContain('rgba(255,255,255,0.34)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-widget-surface-contrast')
-    ).toBe('1.16');
+    ).toBe('1.06');
     expect(
       document.documentElement.style.getPropertyValue('--admin-card-bg')
     ).toBe('rgba(255, 255, 255, 0.46)');
@@ -183,10 +183,10 @@ describe('PanelAdminSection Nivel Plus', () => {
     ).toBe('rgba(255, 255, 255, 0.58)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-modal-bg')
-    ).toBe('rgba(255, 255, 255, 0.84)');
+    ).toBe('rgba(255, 247, 252, 0.82)');
     expect(
       document.documentElement.style.getPropertyValue('--admin-modal-glass-bg')
-    ).toContain('rgba(255,255,255,0.98)');
+    ).toContain('rgba(255,255,255,0.96)');
     expect(api.put).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));

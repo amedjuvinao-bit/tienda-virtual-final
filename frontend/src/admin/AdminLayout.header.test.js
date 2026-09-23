@@ -69,4 +69,15 @@ describe('menú lateral contraíble', () => {
       "{ to: '/admin/cupones', label: 'Cupones', icon: BadgePercent }",
     );
   });
+
+  it('limita el cristal transparente a los iconos sin rellenos grises', () => {
+    const glassRule = layoutSource.match(
+      /\.admin-premium-nav-icon__glass\s*\{([\s\S]*?)\n\s*\}/,
+    )?.[1] || '';
+
+    expect(glassRule).toContain('rgba(255,255,255,.035)');
+    expect(glassRule).toContain('backdrop-filter: blur(10px)');
+    expect(glassRule).not.toContain('var(--admin-card-bg)');
+    expect(glassRule).not.toContain('rgba(15,23,42');
+  });
 });

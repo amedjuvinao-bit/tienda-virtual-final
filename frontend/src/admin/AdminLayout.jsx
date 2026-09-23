@@ -1104,16 +1104,16 @@ export default function AdminLayout() {
           position: absolute;
           inset: 1px;
           z-index: 1;
-          border: .75px solid color-mix(in srgb, #fff 88%, var(--admin-primary) 12%);
+          border: .75px solid rgba(255,255,255,.84);
           border-radius: 12px;
           background:
-            linear-gradient(145deg, rgba(255,255,255,.58) 0%, rgba(255,255,255,.2) 40%, rgba(255,255,255,.06) 68%, color-mix(in srgb, var(--admin-primary) 7%, transparent) 100%),
-            color-mix(in srgb, var(--admin-card-bg) 58%, transparent);
+            linear-gradient(145deg, rgba(255,255,255,.48) 0%, rgba(255,255,255,.14) 38%, rgba(255,255,255,.035) 66%, rgba(255,255,255,.18) 100%);
           box-shadow:
-            inset .5px .5px 0 rgba(255,255,255,.74),
-            0 3px 8px color-mix(in srgb, var(--admin-card-text) 10%, transparent);
-          backdrop-filter: blur(9px) saturate(1.25);
-          -webkit-backdrop-filter: blur(9px) saturate(1.25);
+            inset .5px .5px 0 rgba(255,255,255,.86),
+            0 0 0 1px rgba(255,255,255,.10),
+            0 4px 12px color-mix(in srgb, var(--admin-primary) 8%, transparent);
+          backdrop-filter: blur(10px) saturate(1.12);
+          -webkit-backdrop-filter: blur(10px) saturate(1.12);
           transition: border-color .22s ease, box-shadow .22s ease, background .22s ease;
         }
 
@@ -1177,11 +1177,11 @@ export default function AdminLayout() {
         .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__glass {
           border-color: color-mix(in srgb, var(--admin-primary) 24%, #fff 76%);
           background:
-            linear-gradient(145deg, rgba(255,255,255,.66) 0%, color-mix(in srgb, var(--admin-primary) 10%, rgba(255,255,255,.18)) 52%, color-mix(in srgb, var(--admin-primary) 14%, transparent) 100%),
-            color-mix(in srgb, var(--admin-card-bg) 56%, transparent);
+            linear-gradient(145deg, rgba(255,255,255,.58) 0%, rgba(255,255,255,.17) 42%, rgba(255,255,255,.045) 68%, rgba(255,255,255,.22) 100%);
           box-shadow:
             inset .5px .5px 0 rgba(255,255,255,.8),
-            0 4px 10px color-mix(in srgb, var(--admin-primary) 16%, transparent);
+            0 0 0 1px rgba(255,255,255,.12),
+            0 4px 10px color-mix(in srgb, var(--admin-primary) 12%, transparent);
         }
 
         .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
