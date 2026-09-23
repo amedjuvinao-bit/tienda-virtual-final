@@ -9,7 +9,7 @@ export default function PremiumAdminNavIcon({ icon: Icon, compact = false }) {
       <span className="admin-premium-nav-icon__halo" />
       <span className="admin-premium-nav-icon__glass" />
       <span className="admin-premium-nav-icon__tint" />
-      <Icon className="admin-premium-nav-icon__glyph" strokeWidth={2.2} />
+      <Icon className="admin-premium-nav-icon__glyph" strokeWidth={1.65} />
       <span className="admin-premium-nav-icon__shine" />
     </span>
   );
