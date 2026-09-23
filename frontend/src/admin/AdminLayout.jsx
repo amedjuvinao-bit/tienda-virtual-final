@@ -483,7 +483,8 @@ export default function AdminLayout() {
         .admin-sidebar-toggle {
           position: absolute;
           top: 18px;
-          right: -18px;
+          right: auto;
+          left: calc(100% - 18px);
           z-index: 12;
           display: grid;
           width: 36px;
@@ -502,7 +503,8 @@ export default function AdminLayout() {
           cursor: pointer;
           transform: none !important;
           transition:
-            right .48s cubic-bezier(.22,.82,.24,1),
+            top .48s cubic-bezier(.22,.82,.24,1),
+            left .48s cubic-bezier(.22,.82,.24,1),
             background .2s ease,
             border-color .2s ease,
             box-shadow .2s ease !important;
@@ -525,16 +527,32 @@ export default function AdminLayout() {
         }
 
         .admin-sidebar-panel[data-collapsed="true"] {
-          width: 72px;
-          padding: 54px 7px 9px;
+          width: 68px;
+          min-width: 68px;
+          min-height: calc(100vh - (var(--admin-padding) * 2));
+          padding: 56px 7px 10px;
           border-radius: calc(var(--admin-radius) * .82);
+          background:
+            linear-gradient(180deg,
+              color-mix(in srgb, var(--admin-sidebar-bg) 94%, rgba(255,255,255,.12)),
+              color-mix(in srgb, var(--admin-sidebar-bg) 88%, var(--admin-primary) 12%));
           box-shadow:
-            0 20px 46px color-mix(in srgb, var(--admin-primary) 12%, transparent),
-            inset 0 .5px 0 rgba(255,255,255,.58);
+            0 18px 42px color-mix(in srgb, var(--admin-primary) 10%, transparent),
+            inset 0 .5px 0 rgba(255,255,255,.62),
+            inset 0 0 0 .5px color-mix(in srgb, var(--admin-primary-soft-border) 46%, transparent);
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-toggle {
-          right: -16px;
+          top: 10px;
+          left: calc(50% - 18px);
+          border-color: color-mix(in srgb, var(--admin-primary-soft-border) 72%, transparent);
+          background:
+            linear-gradient(145deg,
+              rgba(255,255,255,.62),
+              color-mix(in srgb, var(--admin-primary-soft-bg) 76%, transparent));
+          box-shadow:
+            inset 0 .5px 0 rgba(255,255,255,.88),
+            0 6px 16px color-mix(in srgb, var(--admin-primary) 14%, transparent);
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-toggle__icon {
@@ -775,7 +793,7 @@ export default function AdminLayout() {
         }
 
         .admin-sidebar-panel .admin-sidebar-toggle {
-          transition-property: right, background, border-color, box-shadow, transform !important;
+          transition-property: top, left, background, border-color, box-shadow, transform !important;
         }
 
         .admin-nav-label,
@@ -799,11 +817,38 @@ export default function AdminLayout() {
         .admin-sidebar-panel[data-collapsed="true"] nav {
           display: grid;
           align-content: start;
-          gap: 4px;
+          justify-items: center;
+          width: 100%;
+          gap: 8px;
         }
 
         .admin-sidebar-panel[data-collapsed="true"] nav > div {
+          position: relative;
+          display: grid;
+          justify-items: center;
+          width: 100%;
           margin: 0;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] nav > div + div {
+          padding-top: 9px;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] nav > div + div::before {
+          position: absolute;
+          top: 0;
+          left: 12px;
+          right: 12px;
+          height: 1px;
+          background: color-mix(in srgb, var(--admin-card-border) 62%, transparent);
+          content: "";
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] nav > div > div {
+          display: grid;
+          justify-items: center;
+          width: 100%;
+          gap: 4px;
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-section-label {
@@ -817,6 +862,7 @@ export default function AdminLayout() {
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-nav-label,
         .admin-sidebar-panel[data-collapsed="true"] .admin-config-chevron {
+          display: none !important;
           max-width: 0;
           opacity: 0;
           pointer-events: none;
@@ -825,15 +871,44 @@ export default function AdminLayout() {
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link {
           position: relative;
-          min-height: 42px;
+          width: 46px !important;
+          min-width: 46px !important;
+          max-width: 46px !important;
+          height: 46px;
+          min-height: 46px;
+          box-sizing: border-box;
           justify-content: center !important;
+          align-items: center !important;
           gap: 0 !important;
-          padding: 4px !important;
-          border-radius: calc(var(--admin-radius) * .56) !important;
+          margin: 0 !important;
+          padding: 5px !important;
+          overflow: visible !important;
+          border-radius: 15px !important;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link[aria-current="page"] {
+          background:
+            linear-gradient(145deg,
+              color-mix(in srgb, var(--admin-active-nav-bg) 90%, rgba(255,255,255,.18)),
+              color-mix(in srgb, var(--admin-active-nav-bg) 84%, transparent)) !important;
+          box-shadow:
+            inset 0 .5px 0 rgba(255,255,255,.72),
+            0 8px 18px color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
+        }
+
+        .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link[aria-current="page"]::before {
+          top: 50%;
+          bottom: auto;
+          left: -8px;
+          width: 3px;
+          height: 20px;
+          transform: translateY(-50%);
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-nav-link > .flex {
           width: 100%;
+          height: 100%;
+          align-items: center;
           justify-content: center;
           gap: 0;
         }
@@ -843,17 +918,27 @@ export default function AdminLayout() {
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-sidebar-footer {
-          margin-top: 5px;
-          padding-top: 7px;
+          display: grid;
+          justify-items: center;
+          width: 100%;
+          margin-top: 8px;
+          padding-top: 9px;
           border-color: color-mix(in srgb, var(--admin-card-border) 58%, transparent) !important;
         }
 
         .admin-sidebar-panel[data-collapsed="true"] .admin-logout-sidebar {
-          min-height: 42px;
+          width: 46px;
+          min-width: 46px;
+          max-width: 46px;
+          height: 46px;
+          min-height: 46px;
           justify-content: center;
           gap: 0;
-          padding: 4px;
-          border-radius: calc(var(--admin-radius) * .56);
+          padding: 5px;
+          border-radius: 15px;
+          background: color-mix(in srgb, var(--admin-primary-soft-bg) 76%, transparent);
+          color: var(--admin-primary-soft-text);
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.65);
         }
 
         .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]::after {
@@ -873,21 +958,31 @@ export default function AdminLayout() {
           font-weight: 800;
           line-height: 1.2;
           opacity: 0;
+          visibility: hidden;
           pointer-events: none;
           box-shadow: 0 12px 30px rgba(22,18,28,.18), inset 0 .5px 0 rgba(255,255,255,.72);
           transform: translate(5px, -50%) scale(.96);
           transform-origin: left center;
-          transition: opacity .16s ease, transform .2s cubic-bezier(.22,.82,.24,1);
+          transition:
+            opacity .16s ease,
+            visibility 0s linear .16s,
+            transform .2s cubic-bezier(.22,.82,.24,1);
         }
 
         .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]:hover::after,
         .admin-sidebar-panel[data-collapsed="true"] [data-tooltip]:focus-visible::after {
           opacity: 1;
+          visibility: visible;
           transform: translate(0, -50%) scale(1);
+          transition-delay: .12s, .12s, .12s;
         }
 
         .admin-layout-shell[data-sidebar-collapsed="true"] .admin-main-column {
           animation: adminMainSettleCollapsed .52s cubic-bezier(.22,.82,.24,1) both;
+        }
+
+        .admin-layout-shell[data-sidebar-collapsed="true"] {
+          column-gap: max(var(--admin-gap), 18px);
         }
 
         .admin-layout-shell[data-sidebar-collapsed="false"] .admin-main-column {
@@ -1853,28 +1948,30 @@ export default function AdminLayout() {
               className="admin-brand-float admin-logo-floating flex items-center justify-center"
               aria-hidden={sidebarCollapsed}
             >
-              {adminBrandLogo ? (
-                <img
-                  src={adminBrandLogo}
-                  alt=""
-                  aria-hidden="true"
-                  className="w-auto object-contain admin-logo-3d"
-                />
-              ) : (
-                <div className="flex items-center admin-inline-gap-sm">
-                  <span
-                    className="admin-logo-fallback-icon flex h-8 w-8 items-center justify-center"
-                    style={{ background: 'var(--admin-primary)', color: '#fff' }}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </span>
-                  <span
-                    className="text-base font-bold tracking-tight"
-                    style={{ color: 'var(--admin-card-text)' }}
-                  >
-                    Panel Admin
-                  </span>
-                </div>
+              {!sidebarCollapsed && (
+                adminBrandLogo ? (
+                  <img
+                    src={adminBrandLogo}
+                    alt=""
+                    aria-hidden="true"
+                    className="w-auto object-contain admin-logo-3d"
+                  />
+                ) : (
+                  <div className="flex items-center admin-inline-gap-sm">
+                    <span
+                      className="admin-logo-fallback-icon flex h-8 w-8 items-center justify-center"
+                      style={{ background: 'var(--admin-primary)', color: '#fff' }}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </span>
+                    <span
+                      className="text-base font-bold tracking-tight"
+                      style={{ color: 'var(--admin-card-text)' }}
+                    >
+                      Panel Admin
+                    </span>
+                  </div>
+                )
               )}
             </div>
 
@@ -1884,7 +1981,7 @@ export default function AdminLayout() {
             >
               {visibleMainLinks.length > 0 && (
                 <div>
-                  <p className="admin-section-label">Principal</p>
+                  {!sidebarCollapsed && <p className="admin-section-label">Principal</p>}
                   <div className="space-y-0.5">
                     {visibleMainLinks.map((item) => {
                       const Icon = item.icon;
@@ -1898,7 +1995,9 @@ export default function AdminLayout() {
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
                           <PremiumAdminNavIcon icon={Icon} compact={sidebarCollapsed} />
-                          <span className="admin-nav-label">{item.label}</span>
+                          {!sidebarCollapsed && (
+                            <span className="admin-nav-label">{item.label}</span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -1908,7 +2007,7 @@ export default function AdminLayout() {
 
               {visibleDesignLinks.length > 0 && (
                 <div>
-                  <p className="admin-section-label">Diseño</p>
+                  {!sidebarCollapsed && <p className="admin-section-label">Diseño</p>}
                   <div className="space-y-0.5">
                     {visibleDesignLinks.map((item) => {
                       const Icon = item.icon;
@@ -1922,7 +2021,9 @@ export default function AdminLayout() {
                           aria-label={sidebarCollapsed ? item.label : undefined}
                         >
                           <PremiumAdminNavIcon icon={Icon} compact={sidebarCollapsed} />
-                          <span className="admin-nav-label">{item.label}</span>
+                          {!sidebarCollapsed && (
+                            <span className="admin-nav-label">{item.label}</span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -1932,7 +2033,7 @@ export default function AdminLayout() {
 
               {hasVisibleConfigLinks && (
                 <div>
-                  <p className="admin-section-label">Sistema</p>
+                  {!sidebarCollapsed && <p className="admin-section-label">Sistema</p>}
                   <button
                     type="button"
                     onClick={handleConfigMenuClick}
@@ -1943,15 +2044,19 @@ export default function AdminLayout() {
                   >
                     <span className="flex items-center admin-inline-gap-md">
                       <PremiumAdminNavIcon icon={Settings} compact={sidebarCollapsed} />
-                      <span className="admin-nav-label">Configuración</span>
+                      {!sidebarCollapsed && (
+                        <span className="admin-nav-label">Configuración</span>
+                      )}
                     </span>
-                    <ChevronDown
-                      className="admin-config-chevron h-3.5 w-3.5 transition-transform duration-200"
-                      style={{ transform: configMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                    />
+                    {!sidebarCollapsed && (
+                      <ChevronDown
+                        className="admin-config-chevron h-3.5 w-3.5 transition-transform duration-200"
+                        style={{ transform: configMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                      />
+                    )}
                   </button>
 
-                  {configMenuOpen && (
+                  {configMenuOpen && !sidebarCollapsed && (
                     <div
                       className="admin-config-submenu space-y-0.5 border-l"
                       style={{ borderColor: 'var(--admin-card-border)' }}
@@ -1987,7 +2092,9 @@ export default function AdminLayout() {
                 aria-label={sidebarCollapsed ? 'Cerrar sesión' : undefined}
               >
                 <LogOut className="h-4 w-4" />
-                <span className="admin-nav-label">Cerrar sesión</span>
+                {!sidebarCollapsed && (
+                  <span className="admin-nav-label">Cerrar sesión</span>
+                )}
               </button>
             </div>
           </aside>

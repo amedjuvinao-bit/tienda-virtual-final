@@ -45,6 +45,9 @@ describe('menú lateral contraíble', () => {
     expect(layoutSource).toContain('aria-hidden={sidebarCollapsed}');
     expect(layoutSource).toContain('compact={sidebarCollapsed}');
     expect(layoutSource).toContain('className="admin-nav-label"');
+    expect(layoutSource).toContain('!sidebarCollapsed && (');
+    expect(layoutSource).toContain('width: 46px !important;');
+    expect(layoutSource).toContain('overflow: visible !important;');
     expect(layoutSource).toMatch(
       /\.admin-sidebar-panel\[data-collapsed="true"\] \.admin-brand-float\s*\{[^}]*max-height: 0;[^}]*opacity: 0;/s,
     );
