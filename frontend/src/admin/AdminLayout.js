@@ -6,6 +6,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { BadgePercent, ReceiptText, Store, UserRound, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OriginalAdminLayout from './AdminLayout.jsx';
+import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import { canAccessAdminPath } from './security/adminPermissions';
 
 const MAIN_MENU_ORDER = [
@@ -30,6 +31,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Facturación',
     mobileLabel: 'Facturación',
     icon: ReceiptText,
+    tone: 'magenta',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -38,6 +40,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Clientes',
     mobileLabel: 'Clientes',
     icon: UserRound,
+    tone: 'cyan',
     slotAfter: '/admin/ordenes',
   },
   {
@@ -46,6 +49,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'POS / Ventas físicas',
     mobileLabel: 'POS',
     icon: Store,
+    tone: 'coral',
     slotAfter: '/admin/clientes',
   },
   {
@@ -54,6 +58,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Caja',
     mobileLabel: 'Caja',
     icon: Wallet,
+    tone: 'emerald',
     slotAfter: '/admin/pos',
   },
   {
@@ -62,6 +67,7 @@ const EXTRA_MAIN_LINKS = [
     label: 'Cupones',
     mobileLabel: 'Cupones',
     icon: BadgePercent,
+    tone: 'ruby',
     slotAfter: '/admin/finanzas',
   },
 ];
@@ -155,14 +161,6 @@ function AdminExtraMenuLink({ menuLink, mobile = false }) {
     ? 'inline-flex items-center admin-mobile-nav-item-gap admin-nav-padding-mobile rounded-[calc(var(--admin-radius)*0.55)] text-sm font-medium whitespace-nowrap transition-all duration-200 admin-nav-link-mobile'
     : 'group flex items-center admin-nav-item-gap admin-nav-padding rounded-[calc(var(--admin-radius)*0.55)] transition-all duration-200 text-sm font-medium admin-nav-link';
 
-  const iconWrapStyle = mobile
-    ? {
-        width: 26,
-        height: 26,
-        borderRadius: 'calc(var(--admin-radius) * 0.38)',
-      }
-    : undefined;
-
   const Icon = menuLink.icon;
 
   return React.createElement(
@@ -172,11 +170,11 @@ function AdminExtraMenuLink({ menuLink, mobile = false }) {
       className,
       style: ({ isActive }) => (isActive ? activeNavStyle : normalNavStyle),
     },
-    React.createElement(
-      'span',
-      { className: 'admin-icon-wrap', style: iconWrapStyle },
-      React.createElement(Icon, { className: mobile ? 'h-3 w-3' : 'h-3.5 w-3.5' })
-    ),
+    React.createElement(PremiumAdminNavIcon, {
+      icon: Icon,
+      tone: menuLink.tone,
+      compact: mobile,
+    }),
     React.createElement('span', null, mobile ? menuLink.mobileLabel : menuLink.label)
   );
 }

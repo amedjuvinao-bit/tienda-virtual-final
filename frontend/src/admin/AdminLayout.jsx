@@ -52,6 +52,7 @@ import {
 } from './theme/adminPanelBackground';
 import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
+import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import './theme/adminModuleHero.css';
 
 const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
@@ -320,21 +321,21 @@ export default function AdminLayout() {
   };
 
   const mainLinks = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/admin/productos', label: 'Productos', icon: Package },
-    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList },
-    { to: '/admin/clientes', label: 'Clientes', icon: UserRound },
-    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store },
-    { to: '/admin/caja', label: 'Caja', icon: WalletCards },
-    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign },
-    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch },
-    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart },
-    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart },
+    { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, tone: 'violet' },
+    { to: '/admin/productos', label: 'Productos', icon: Package, tone: 'sapphire' },
+    { to: '/admin/ordenes', label: 'Órdenes', icon: ClipboardList, tone: 'amber' },
+    { to: '/admin/clientes', label: 'Clientes', icon: UserRound, tone: 'cyan' },
+    { to: '/admin/pos', label: 'POS / Ventas físicas', icon: Store, tone: 'coral' },
+    { to: '/admin/caja', label: 'Caja', icon: WalletCards, tone: 'emerald' },
+    { to: '/admin/finanzas', label: 'Finanzas', icon: CircleDollarSign, tone: 'gold' },
+    { to: '/admin/inventario', label: 'Inventario', icon: PackageSearch, tone: 'teal' },
+    { to: '/admin/carritos', label: 'Carritos', icon: ShoppingCart, tone: 'indigo' },
+    { to: '/admin/favoritos', label: 'Favoritos', icon: Heart, tone: 'rose' },
   ];
 
   const designLinks = [
-    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette },
-    { to: '/admin/paginas', label: 'Páginas', icon: FileText },
+    { to: '/admin/apariencia', label: 'Apariencia', icon: Palette, tone: 'prism' },
+    { to: '/admin/paginas', label: 'Páginas', icon: FileText, tone: 'sky' },
   ];
 
   const visibleMainLinks = filterLinksByPermission(adminUser, mainLinks);
@@ -709,6 +710,136 @@ export default function AdminLayout() {
           color: var(--admin-primary);
           flex-shrink: 0;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .admin-premium-nav-icon {
+          position: relative;
+          display: grid;
+          width: 32px;
+          height: 32px;
+          flex: 0 0 32px;
+          place-items: center;
+          isolation: isolate;
+        }
+
+        .admin-premium-nav-icon__halo {
+          position: absolute;
+          inset: 5px;
+          z-index: -1;
+          border-radius: 12px;
+          background: var(--nav-icon-glow);
+          filter: blur(7px);
+          opacity: .58;
+          transition: opacity .2s ease, filter .2s ease;
+        }
+
+        .admin-premium-nav-icon__gem {
+          position: relative;
+          display: grid;
+          width: 28px;
+          height: 28px;
+          overflow: hidden;
+          place-items: center;
+          border: 1px solid rgba(255,255,255,.64);
+          border-radius: 11px;
+          background:
+            radial-gradient(circle at 24% 18%, rgba(255,255,255,.62), transparent 29%),
+            linear-gradient(145deg, var(--nav-icon-a) 0%, var(--nav-icon-b) 78%);
+          color: #fff;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.76),
+            inset 0 -5px 10px rgba(15,23,42,.22),
+            0 5px 10px var(--nav-icon-glow),
+            0 2px 3px rgba(15,23,42,.18);
+          transition: box-shadow .2s ease, filter .2s ease;
+        }
+
+        .admin-premium-nav-icon__gem::before {
+          content: '';
+          position: absolute;
+          width: 24px;
+          height: 8px;
+          top: 0;
+          left: -5px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.34);
+          filter: blur(2px);
+          rotate: -24deg;
+        }
+
+        .admin-premium-nav-icon__gem::after {
+          content: '';
+          position: absolute;
+          right: 3px;
+          bottom: 2px;
+          width: 10px;
+          height: 4px;
+          border-radius: 50%;
+          background: rgba(255,255,255,.22);
+          filter: blur(2px);
+        }
+
+        .admin-premium-nav-icon__gem svg {
+          position: relative;
+          z-index: 1;
+          width: 15px;
+          height: 15px;
+          filter: drop-shadow(0 1px 1px rgba(15,23,42,.3));
+        }
+
+        .admin-premium-nav-icon__spark {
+          position: absolute;
+          top: 1px;
+          right: 1px;
+          z-index: 2;
+          width: 5px;
+          height: 5px;
+          border: 1px solid rgba(255,255,255,.94);
+          border-radius: 50%;
+          background: var(--nav-icon-a);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-sidebar-bg) 82%, transparent), 0 0 8px var(--nav-icon-glow);
+        }
+
+        .admin-premium-nav-icon--compact {
+          width: 26px;
+          height: 26px;
+          flex-basis: 26px;
+        }
+
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__gem {
+          width: 23px;
+          height: 23px;
+          border-radius: 9px;
+        }
+
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__gem svg {
+          width: 13px;
+          height: 13px;
+        }
+
+        .admin-premium-nav-icon--compact .admin-premium-nav-icon__spark {
+          width: 4px;
+          height: 4px;
+        }
+
+        .admin-nav-link:hover .admin-premium-nav-icon__halo,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__halo,
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__halo,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__halo {
+          opacity: .92;
+          filter: blur(9px);
+        }
+
+        .admin-nav-link:hover .admin-premium-nav-icon__gem,
+        .admin-nav-link-mobile:hover .admin-premium-nav-icon__gem,
+        .admin-nav-link[aria-current="page"] .admin-premium-nav-icon__gem,
+        .admin-nav-link-mobile[aria-current="page"] .admin-premium-nav-icon__gem {
+          filter: saturate(1.18) brightness(1.06);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.88),
+            inset 0 -5px 10px rgba(15,23,42,.18),
+            0 7px 16px var(--nav-icon-glow),
+            0 2px 4px rgba(15,23,42,.2);
         }
 
         .admin-nav-link:hover .admin-icon-wrap,
@@ -1383,9 +1514,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <span className="admin-icon-wrap">
-                            <Icon className="h-3.5 w-3.5" />
-                          </span>
+                          <PremiumAdminNavIcon icon={Icon} tone={item.tone} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1407,9 +1536,7 @@ export default function AdminLayout() {
                           className={`${linkBase} admin-nav-link`}
                           style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                         >
-                          <span className="admin-icon-wrap">
-                            <Icon className="h-3.5 w-3.5" />
-                          </span>
+                          <PremiumAdminNavIcon icon={Icon} tone={item.tone} />
                           <span>{item.label}</span>
                         </NavLink>
                       );
@@ -1428,9 +1555,7 @@ export default function AdminLayout() {
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
                     <span className="flex items-center admin-inline-gap-md">
-                      <span className="admin-icon-wrap">
-                        <Settings className="h-3.5 w-3.5" />
-                      </span>
+                      <PremiumAdminNavIcon icon={Settings} tone="graphite" />
                       <span>Configuración</span>
                     </span>
                     <ChevronDown
@@ -1671,16 +1796,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <span
-                        className="admin-icon-wrap"
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: 'calc(var(--admin-radius) * 0.38)',
-                        }}
-                      >
-                        <Icon className="h-3 w-3" />
-                      </span>
+                      <PremiumAdminNavIcon icon={Icon} tone={item.tone} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1695,16 +1811,7 @@ export default function AdminLayout() {
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
                     >
-                      <span
-                        className="admin-icon-wrap"
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: 'calc(var(--admin-radius) * 0.38)',
-                        }}
-                      >
-                        <Icon className="h-3 w-3" />
-                      </span>
+                      <PremiumAdminNavIcon icon={Icon} tone={item.tone} compact />
                       {item.label}
                     </NavLink>
                   );
@@ -1717,16 +1824,7 @@ export default function AdminLayout() {
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                   >
-                    <span
-                      className="admin-icon-wrap"
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 'calc(var(--admin-radius) * 0.38)',
-                      }}
-                    >
-                      <Settings className="h-3 w-3" />
-                    </span>
+                    <PremiumAdminNavIcon icon={Settings} tone="graphite" compact />
                     Config
                   </button>
                 )}
