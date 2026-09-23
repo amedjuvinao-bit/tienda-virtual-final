@@ -1055,6 +1055,17 @@ export function applyAdminGlobalStyles() {
       overflow: hidden;
     }
 
+    /* Scroll utilities must preserve their functional behavior. The generic
+       glass surface above may style these wrappers, but it must never clip
+       wide tables, horizontal tabs, logs or modal content. */
+    .admin-area .overflow-x-auto {
+      overflow-x: auto !important;
+    }
+
+    .admin-area .overflow-auto {
+      overflow: auto !important;
+    }
+
     .admin-area thead,
     .admin-area th {
       background: linear-gradient(

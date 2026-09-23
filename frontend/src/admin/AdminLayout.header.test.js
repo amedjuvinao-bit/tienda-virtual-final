@@ -90,3 +90,14 @@ describe('menú lateral contraíble', () => {
     expect(glyphRule).toContain('stroke-width: 1.85');
   });
 });
+
+describe('contenedores desplazables del panel', () => {
+  it('conserva el desplazamiento de tablas, pestañas, registros y modales', () => {
+    expect(globalStylesSource).toMatch(
+      /\.admin-area \.overflow-x-auto\s*\{[^}]*overflow-x: auto !important;/s,
+    );
+    expect(globalStylesSource).toMatch(
+      /\.admin-area \.overflow-auto\s*\{[^}]*overflow: auto !important;/s,
+    );
+  });
+});
