@@ -728,6 +728,56 @@ export function applyAdminGlobalStyles() {
         inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 12%, transparent) !important;
     }
 
+    /* Horizonte azul needs a visible glass rim over its ivory background.
+       A fine ice-blue outer line plus white inner reflections creates depth
+       without turning the surfaces into thick or metallic frames. */
+    html[data-admin-theme-style="azure"] .admin-area :is(
+      .admin-card-glass,
+      .admin-glass-card,
+      .admin-hero-glass,
+      .admin-section-bar,
+      .admin-form-glass,
+      .admin-widget-surface,
+      :is(div, section, article, aside, form)[class*="rounded"][class*="border"],
+      :is(div, section, article, aside, form)[style*="--admin-card-bg"][style*="border"]
+    ) {
+      border-color: rgba(255,255,255,.94) !important;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 22%, transparent),
+        0 18px 44px color-mix(in srgb, var(--admin-primary) 10%, transparent),
+        inset 0 1px 0 rgba(255,255,255,.98),
+        inset 1px 0 0 rgba(255,255,255,.70),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea) {
+      border: 1px solid rgba(255,255,255,.96) !important;
+      background-clip: padding-box !important;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 21%, transparent),
+        0 8px 20px color-mix(in srgb, var(--admin-primary) 7%, transparent),
+        inset 0 1px 0 rgba(255,255,255,1),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 14%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea):hover {
+      border-color: rgba(255,255,255,1) !important;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 29%, transparent),
+        0 10px 24px color-mix(in srgb, var(--admin-primary) 9%, transparent),
+        inset 0 1px 0 #ffffff,
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+    }
+
+    html[data-admin-theme-style="azure"] .admin-area :is(input, select, textarea):focus {
+      border-color: rgba(255,255,255,1) !important;
+      box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--admin-primary) 34%, transparent),
+        0 14px 30px color-mix(in srgb, var(--admin-primary) 13%, transparent),
+        inset 0 1px 0 #ffffff,
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 20%, transparent) !important;
+    }
+
     html[data-admin-theme-style="minimal"] .admin-area::after {
       opacity: .12;
       filter: none;
@@ -1614,11 +1664,13 @@ export function applyAdminGlobalStyles() {
       :is(div, section, article, aside, form)[class$="__panel"]
     ) {
       border-radius: 28px 13px 28px 13px !important;
-      border-color: rgba(255,255,255,.86) !important;
+      border-color: rgba(255,255,255,.94) !important;
       box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--admin-primary) 22%, transparent),
         var(--admin-widget-surface-shadow),
-        inset 1px 1px 0 rgba(255,255,255,.96),
-        inset -1px -1px 0 color-mix(in srgb, var(--admin-primary) 11%, transparent) !important;
+        inset 0 1px 0 rgba(255,255,255,.98),
+        inset 1px 0 0 rgba(255,255,255,.70),
+        inset 0 -1px 0 color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
     }
 
     html[data-admin-theme-style="azure"] .admin-area .admin-header-panel {
