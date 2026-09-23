@@ -450,9 +450,9 @@ export default function AdminLayout() {
         }
 
         .admin-area .admin-header-panel {
-          min-height: var(--admin-header-height);
-          border-radius: calc(var(--admin-radius) * 0.9) !important;
-          padding: calc(var(--admin-padding) * 0.75) calc(var(--admin-padding) * 1.2);
+          min-height: 64px;
+          border-radius: 0 !important;
+          padding: 8px 10px;
           gap: var(--admin-gap);
           transition:
             min-height 220ms ease,
@@ -970,7 +970,7 @@ export default function AdminLayout() {
         }
 
         .admin-area .admin-header-panel {
-          grid-template-columns: minmax(155px, 0.62fr) minmax(320px, 1.38fr) auto;
+          grid-template-columns: minmax(172px, .58fr) minmax(310px, 1.42fr) auto;
           align-items: center;
           overflow: visible;
           position: sticky;
@@ -978,27 +978,47 @@ export default function AdminLayout() {
           z-index: 70;
           isolation: isolate;
           background:
-            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--admin-primary) 22%, transparent), transparent 38%),
-            linear-gradient(118deg,
-              color-mix(in srgb, var(--admin-header-bg) 84%, rgba(255,255,255,.18)),
-              color-mix(in srgb, var(--admin-header-bg) 93%, var(--admin-primary) 7%) 58%,
-              color-mix(in srgb, var(--admin-header-bg) 88%, rgba(255,255,255,.14))) !important;
-          border-color: color-mix(in srgb, var(--admin-primary) 32%, var(--admin-card-border)) !important;
+            linear-gradient(90deg,
+              transparent 0%,
+              color-mix(in srgb, var(--admin-header-bg) 70%, transparent) 7%,
+              color-mix(in srgb, var(--admin-header-bg) 86%, rgba(255,255,255,.08)) 20%,
+              color-mix(in srgb, var(--admin-header-bg) 90%, var(--admin-primary) 4%) 78%,
+              color-mix(in srgb, var(--admin-header-bg) 68%, transparent) 94%,
+              transparent 100%) !important;
+          border: 0 !important;
           box-shadow:
-            0 20px 46px color-mix(in srgb, var(--admin-primary) 17%, transparent),
-            0 8px 22px rgba(30, 18, 28, .08),
-            inset 0 1px 0 rgba(255,255,255,.82) !important;
+            0 10px 28px color-mix(in srgb, var(--admin-primary) 7%, transparent) !important;
+          backdrop-filter: blur(18px) saturate(1.18);
+          -webkit-backdrop-filter: blur(18px) saturate(1.18);
         }
 
+        .admin-area .admin-header-panel::before,
+        .admin-area .admin-header-panel::after {
+          content: '';
+          position: absolute;
+          z-index: -1;
+          right: 4%;
+          left: 4%;
+          height: .5px;
+          pointer-events: none;
+          background: linear-gradient(90deg,
+            transparent,
+            color-mix(in srgb, #fff 74%, var(--admin-primary) 26%) 18%,
+            color-mix(in srgb, #fff 58%, var(--admin-primary) 42%) 50%,
+            color-mix(in srgb, #fff 74%, var(--admin-primary) 26%) 82%,
+            transparent);
+          opacity: .68;
+        }
+
+        .admin-area .admin-header-panel::before { top: 0; }
+        .admin-area .admin-header-panel::after { bottom: 0; opacity: .44; }
+
         .admin-area .admin-header-panel[data-condensed="true"] {
-          min-height: 56px;
+          min-height: 54px;
           gap: 9px;
-          border-radius: calc(var(--admin-radius) * .72) !important;
-          padding: 6px 10px;
-          box-shadow:
-            0 14px 34px color-mix(in srgb, var(--admin-primary) 20%, transparent),
-            0 6px 18px rgba(30, 18, 28, .10),
-            inset 0 1px 0 rgba(255,255,255,.84) !important;
+          border-radius: 0 !important;
+          padding: 5px 10px;
+          box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-primary) 8%, transparent) !important;
         }
 
         .admin-header-panel[data-condensed="true"] .admin-header-context {
@@ -1052,6 +1072,10 @@ export default function AdminLayout() {
           min-width: 0;
           display: grid;
           gap: 3px;
+          position: relative;
+          padding-left: 8px;
+          padding-right: 18px;
+          border-right: .5px solid color-mix(in srgb, var(--admin-card-border) 68%, transparent);
         }
 
         .admin-header-context__eyebrow {
@@ -1074,13 +1098,7 @@ export default function AdminLayout() {
         }
 
         .admin-header-context p {
-          margin: 0;
-          overflow: hidden;
-          color: var(--admin-card-muted-text);
-          font-size: 10px;
-          font-weight: 700;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          display: none;
         }
 
         .admin-command-center {
@@ -1092,11 +1110,15 @@ export default function AdminLayout() {
         .admin-command-center .admin-search-bar {
           width: 100%;
           max-width: none;
-          min-height: 42px;
+          min-height: 38px;
           margin: 0;
           padding-right: 8px;
-          background: color-mix(in srgb, var(--admin-page-bg) 88%, var(--admin-primary) 12%) !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 8px 22px rgba(72, 43, 62, .08);
+          border: .5px solid color-mix(in srgb, var(--admin-card-border) 78%, transparent);
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--admin-page-bg) 56%, transparent) !important;
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.66), 0 5px 16px color-mix(in srgb, var(--admin-primary) 6%, transparent);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
         }
 
         .admin-command-center kbd {
@@ -1104,13 +1126,13 @@ export default function AdminLayout() {
           align-items: center;
           gap: 3px;
           flex: 0 0 auto;
-          border: 1px solid var(--admin-card-border);
-          border-radius: 8px;
+          border: .5px solid color-mix(in srgb, var(--admin-card-border) 72%, transparent);
+          border-radius: 999px;
           padding: 4px 7px;
-          background: var(--admin-primary-soft-bg);
+          background: color-mix(in srgb, var(--admin-primary-soft-bg) 54%, transparent);
           color: var(--admin-card-muted-text);
           font: 800 9px/1 'DM Sans', sans-serif;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.62);
         }
 
         .admin-command-results {
@@ -1200,33 +1222,39 @@ export default function AdminLayout() {
         .admin-header-actions {
           display: flex;
           align-items: center;
-          gap: 7px;
+          gap: 8px;
+          padding-left: 2px;
         }
 
         .admin-header-status {
           display: grid;
-          grid-template-columns: 34px minmax(0, 1fr);
+          grid-template-columns: 38px;
           align-items: center;
           gap: 8px;
-          min-width: 132px;
-          min-height: 42px;
-          border: 1px solid var(--admin-card-border);
-          border-radius: calc(var(--admin-radius) * .6);
-          padding: 4px 9px 4px 5px;
-          background: color-mix(in srgb, var(--admin-page-bg) 88%, var(--admin-primary) 12%);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
+          min-width: 38px;
+          min-height: 38px;
+          border: 0;
+          border-radius: 999px;
+          padding: 0;
+          background: transparent;
+          box-shadow: none;
         }
 
         .admin-header-status__icon {
           display: grid;
-          width: 34px;
-          height: 34px;
+          width: 38px;
+          height: 38px;
           place-items: center;
-          border: 1px solid var(--admin-primary-soft-border);
-          border-radius: 12px;
-          background: var(--admin-page-bg);
+          border: .5px solid color-mix(in srgb, var(--admin-primary-soft-border) 64%, transparent);
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--admin-page-bg) 54%, transparent);
           color: var(--admin-primary);
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.68), 0 5px 14px color-mix(in srgb, var(--admin-primary) 7%, transparent);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
         }
+
+        .admin-header-status > div:last-child { display: none; }
 
         .admin-header-status strong,
         .admin-header-status small {
@@ -1253,29 +1281,27 @@ export default function AdminLayout() {
           grid-template-columns: 34px minmax(0, 1fr);
           align-items: center;
           gap: 8px;
-          width: clamp(200px, 17vw, 240px);
-          min-height: 42px;
-          border: 1px solid var(--admin-primary-soft-border);
-          border-radius: calc(var(--admin-radius) * .6);
-          padding: 4px 9px 4px 5px;
-          background:
-            linear-gradient(135deg,
-              color-mix(in srgb, var(--admin-primary-soft-bg) 82%, rgba(255,255,255,.18)),
-              color-mix(in srgb, var(--admin-primary-soft-bg) 92%, transparent));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 8px 20px color-mix(in srgb, var(--admin-primary) 12%, transparent);
+          width: clamp(176px, 15vw, 218px);
+          min-height: 38px;
+          border: 0;
+          border-radius: 0;
+          padding: 0 10px 0 0;
+          background: transparent;
+          box-shadow: none;
         }
 
         .admin-profile-compact__avatar {
           display: grid;
-          width: 34px;
-          height: 34px;
+          width: 38px;
+          height: 38px;
           place-items: center;
-          border: 1px solid var(--admin-primary-soft-border);
-          border-radius: 12px;
-          background: color-mix(in srgb, var(--admin-card-bg) 86%, transparent);
+          border: .5px solid color-mix(in srgb, var(--admin-primary-soft-border) 64%, transparent);
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--admin-card-bg) 54%, transparent);
           color: var(--admin-primary);
           font-size: 10px;
           font-weight: 950;
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.7), 0 5px 14px color-mix(in srgb, var(--admin-primary) 7%, transparent);
         }
 
         .admin-profile-compact__identity {
@@ -1300,27 +1326,30 @@ export default function AdminLayout() {
         .admin-header-icon-button {
           display: grid;
           position: relative;
-          width: 40px;
-          height: 40px;
+          width: 38px;
+          height: 38px;
           flex: 0 0 auto;
           place-items: center;
-          border: 1px solid var(--admin-primary-soft-border);
-          border-radius: calc(var(--admin-radius) * .55);
-          background: var(--admin-primary-soft-bg);
+          border: .5px solid color-mix(in srgb, var(--admin-primary-soft-border) 64%, transparent);
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--admin-primary-soft-bg) 48%, transparent);
           color: var(--admin-primary-soft-text);
           cursor: pointer;
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.68), 0 5px 14px color-mix(in srgb, var(--admin-primary) 7%, transparent);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
         }
 
         .admin-header-icon-button:hover {
           background: var(--admin-primary-soft-hover);
-          box-shadow: var(--admin-shadow-sm);
+          box-shadow: inset 0 .5px 0 rgba(255,255,255,.78), 0 7px 18px color-mix(in srgb, var(--admin-primary) 12%, transparent);
           transform: translateY(-1px);
         }
 
         .admin-header-icon-button--exit {
-          background: var(--admin-primary);
-          color: #fff;
+          background: color-mix(in srgb, var(--admin-primary-soft-bg) 52%, transparent);
+          color: var(--admin-primary-soft-text);
         }
 
         @media (max-width: 1380px) {
