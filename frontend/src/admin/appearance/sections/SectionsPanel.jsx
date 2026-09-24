@@ -837,6 +837,7 @@ function ImageTab({ section, onChange, uploadToCloudinary, uploading }) {
               </div>
 
               <div
+                data-admin-storefront-preview="true"
                 ref={previewBoxRef}
                 className="relative w-full max-w-[520px] h-[220px] rounded-xl border border-neutral-200 bg-white overflow-hidden touch-none"
                 onPointerDown={onPreviewPointerDown}
@@ -1678,7 +1679,11 @@ function PreviewTab({ section }) {
       <div className="text-sm font-semibold text-neutral-900">Vista previa (admin)</div>
       <div className="text-xs text-neutral-500 mb-2">Esta preview es solo del panel admin. ✅ Aquí ya debe verse el <b>descuento</b> si lo activas.</div>
 
-      <div className="rounded-2xl p-4" style={{ backgroundColor: st.bgColor, color: st.textColor }}>
+      <div
+        data-admin-storefront-preview="true"
+        className="rounded-2xl p-4"
+        style={{ backgroundColor: st.bgColor, color: st.textColor }}
+      >
         <div
           className="font-semibold tracking-wide mb-1"
           style={{

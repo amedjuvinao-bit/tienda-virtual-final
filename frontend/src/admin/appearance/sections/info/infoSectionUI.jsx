@@ -432,6 +432,7 @@ export default function InfoSectionUI({ theme, setPath, uploadToCloudinary, uplo
                 <div className="mt-5">
                   <div className="text-xs font-medium text-neutral-600 mb-2">Preview de fondo</div>
                   <div
+                    data-admin-storefront-preview="true"
                     className="h-20 rounded-2xl border border-neutral-200"
                     style={{
                       background:

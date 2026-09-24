@@ -511,6 +511,18 @@ export function applyAdminGlobalStyles() {
       border-color: color-mix(in srgb, var(--admin-primary) 22%, rgba(255,255,255,0.06));
     }
 
+    /* Storefront previews render inside the admin DOM, but must keep the
+       storefront palette and typography instead of inheriting the editor. */
+    .admin-area [data-admin-storefront-preview="true"] {
+      color: var(--color-text, #111827);
+      font-family: var(--font-base, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      font-size: var(--font-size-base, 16px);
+      line-height: var(--line-height-base, 1.6);
+    }
+
+    /* The scope limit is a hard visual boundary: generic admin selectors
+       never enter a storefront preview canvas. */
+    @scope (.admin-area) to ([data-admin-storefront-preview="true"]) {
 
     /* ============================================================
        LAYER 3 — TYPOGRAPHY INHERITING THEME COLORS
@@ -1585,6 +1597,8 @@ export function applyAdminGlobalStyles() {
       outline: none !important;
     }
 
+    }
+
     /* Modules with their own glass variables used opaque white fallbacks.
        Route those variables through the selected mirror material so their
        metrics, filters and tables visibly match the rest of the panel. */
@@ -1715,6 +1729,8 @@ export function applyAdminGlobalStyles() {
       filter: none;
     }
 
+    @scope (.admin-area) to ([data-admin-storefront-preview="true"]) {
+
     /* Preserve Azure Horizon's architectural silhouette with every texture.
        Texture controls the material; the theme controls the shape. */
     html[data-admin-theme-style="azure"] .admin-area :is(
@@ -1768,6 +1784,7 @@ export function applyAdminGlobalStyles() {
     .admin-area ::-webkit-scrollbar-thumb  { background: linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 68%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary-hover) 66%, var(--admin-card-bg))); border-radius: 999px; border: 3px solid color-mix(in srgb, var(--admin-card-bg) 72%, transparent); }
     .admin-area ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 82%, var(--admin-card-bg)), color-mix(in srgb, var(--admin-primary-hover) 82%, var(--admin-card-bg))); }
 
+    }
 
 
 
@@ -1799,18 +1816,20 @@ export function applyAdminGlobalStyles() {
        ============================================================ */
 
     @media (prefers-reduced-motion: reduce) {
-      .admin-area,
-      .admin-area *,
-      .admin-sidebar-glass,
-      .admin-header-glass,
-      .admin-card-glass,
-      .admin-glass-card,
-      .admin-hero-glass,
-      .admin-section-bar,
-      .admin-form-glass {
-        transition: none !important;
-        animation: none !important;
-        transform: none !important;
+      @scope (.admin-area) to ([data-admin-storefront-preview="true"]) {
+        .admin-area,
+        .admin-area *,
+        .admin-sidebar-glass,
+        .admin-header-glass,
+        .admin-card-glass,
+        .admin-glass-card,
+        .admin-hero-glass,
+        .admin-section-bar,
+        .admin-form-glass {
+          transition: none !important;
+          animation: none !important;
+          transform: none !important;
+        }
       }
     }
   `;

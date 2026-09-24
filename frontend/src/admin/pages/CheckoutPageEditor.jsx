@@ -1608,6 +1608,7 @@ export default function CheckoutPageEditor() {
             text="Vista guía aproximada de colores y estilos del checkout."
           >
             <div
+              data-admin-storefront-preview="true"
               className="rounded-3xl border p-5"
               style={{
                 backgroundColor: style.pageBg,

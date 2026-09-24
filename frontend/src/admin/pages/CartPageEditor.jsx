@@ -1393,6 +1393,7 @@ export default function CartPageEditor() {
             text="Vista guía aproximada de colores y estilos del carrito."
           >
             <div
+              data-admin-storefront-preview="true"
               className="rounded-3xl border p-5"
               style={{
                 backgroundColor: style.pageBg,
@@ -1830,7 +1831,10 @@ export default function CartPageEditor() {
             title="Vista previa rápida del modal"
             text="Vista guía aproximada del carrito lateral."
           >
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+            <div
+              data-admin-storefront-preview="true"
+              className="rounded-3xl border border-gray-200 bg-gray-50 p-4"
+            >
               <div className="relative mx-auto h-[620px] max-w-[520px] overflow-hidden rounded-3xl border border-gray-300 bg-white">
                 <div
                   className="absolute inset-0"

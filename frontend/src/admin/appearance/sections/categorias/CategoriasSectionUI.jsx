@@ -1319,6 +1319,7 @@ export default function CategoriasSectionUI({
           </div>
 
           <div
+            data-admin-storefront-preview="true"
             className="mx-auto"
             style={{
               maxWidth: style.sectionMaxWidthPx,

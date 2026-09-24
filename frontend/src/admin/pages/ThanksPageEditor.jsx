@@ -1546,6 +1546,7 @@ export default function ThanksPageEditor() {
             text="Aquí puedes ver cómo responden el espacio debajo del header, el ancho y el alto del slider y de la caja de texto."
           >
             <div
+              data-admin-storefront-preview="true"
               className="rounded-3xl border p-5"
               style={{
                 backgroundColor: style.pageBg,

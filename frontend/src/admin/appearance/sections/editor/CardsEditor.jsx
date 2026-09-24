@@ -124,6 +124,7 @@ function CardImageMover({ item, heightPx, radiusPx, onChange }) {
       </div>
 
       <div
+        data-admin-storefront-preview="true"
         ref={drag.ref}
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}

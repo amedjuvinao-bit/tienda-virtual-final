@@ -495,6 +495,7 @@ export default function FavoritesPageEditor() {
 
           <SectionCard title="Vista previa rápida">
             <div
+              data-admin-storefront-preview="true"
               className="overflow-hidden rounded-[28px] border"
               style={{
                 background: config.style.pageBg,

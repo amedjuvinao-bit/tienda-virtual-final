@@ -330,6 +330,7 @@ function UploadField({
         ].join(" ")}
       >
         <div
+          data-admin-storefront-preview="true"
           className={[
             "rounded-2xl border border-neutral-200 bg-white flex items-center justify-center overflow-hidden shrink-0",
             compact ? "h-20 w-[88px]" : `${previewSizeClass} w-full`,
@@ -403,7 +404,10 @@ function SocialCard({
         <div className="text-sm font-medium text-neutral-800 mb-3">{`Ícono ${title}`}</div>
 
         <div className="grid grid-cols-1 sm:grid-cols-[112px,minmax(0,1fr)] gap-4 items-start min-w-0">
-          <div className="h-24 rounded-2xl border border-neutral-200 bg-neutral-50 flex items-center justify-center overflow-hidden">
+          <div
+            data-admin-storefront-preview="true"
+            className="h-24 rounded-2xl border border-neutral-200 bg-neutral-50 flex items-center justify-center overflow-hidden"
+          >
             {iconValue ? (
               <img
                 src={iconValue}

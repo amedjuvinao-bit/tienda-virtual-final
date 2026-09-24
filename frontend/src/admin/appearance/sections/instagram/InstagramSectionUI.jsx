@@ -1141,6 +1141,7 @@ export default function InstagramSectionUI({
             <div className="text-sm font-semibold text-neutral-900">Vista previa</div>
 
             <div
+              data-admin-storefront-preview="true"
               className="relative rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 space-y-4 overflow-hidden"
               style={{ isolation: "isolate" }}
             >

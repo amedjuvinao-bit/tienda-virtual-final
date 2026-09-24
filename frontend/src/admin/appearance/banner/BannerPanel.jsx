@@ -95,6 +95,7 @@ const BannerDragPreview = ({ src, fit = "cover", posX = 50, posY = 50, height = 
   return (
     <div className="min-w-0">
       <div
+        data-admin-storefront-preview="true"
         className={"rounded-xl border bg-gray-50 overflow-hidden select-none " + (onChange ? "cursor-grab active:cursor-grabbing" : "")}
         style={{ height }}
         onPointerDown={onDown}

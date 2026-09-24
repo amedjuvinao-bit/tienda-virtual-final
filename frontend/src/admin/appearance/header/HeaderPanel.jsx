@@ -218,7 +218,10 @@ export default function HeaderPanel({
                   <PanelBlock title="Vista previa del logo">
                     <div className="rounded-2xl border bg-white p-3">
                       <div className="mb-2 text-xs text-gray-500">Vista previa (Light)</div>
-                      <div className="flex h-20 items-center justify-center rounded-xl border bg-gray-50">
+                      <div
+                        data-admin-storefront-preview="true"
+                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
+                      >
                         {theme.header?.logoLight ? (
                           <img
                             src={theme.header.logoLight}
@@ -233,7 +236,10 @@ export default function HeaderPanel({
 
                     <div className="rounded-2xl border bg-white p-3">
                       <div className="mb-2 text-xs text-gray-500">Vista previa (Dark)</div>
-                      <div className="flex h-20 items-center justify-center rounded-xl border bg-gray-50">
+                      <div
+                        data-admin-storefront-preview="true"
+                        className="flex h-20 items-center justify-center rounded-xl border bg-gray-50"
+                      >
                         {theme.header?.logoDark ? (
                           <img
                             src={theme.header.logoDark}

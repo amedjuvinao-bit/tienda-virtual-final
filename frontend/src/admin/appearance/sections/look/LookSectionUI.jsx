@@ -1027,6 +1027,7 @@ export default function LookSectionUI({
           <div className="text-base font-extrabold text-neutral-900 mb-3">Vista previa LOOK</div>
 
           <div
+            data-admin-storefront-preview="true"
             className="rounded-2xl border border-neutral-200 bg-white overflow-hidden"
             style={{
               paddingTop: style.sectionPaddingTopPx,

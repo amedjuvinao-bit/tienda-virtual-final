@@ -2476,6 +2476,7 @@ export default function ProductDetailPageEditor() {
                 </div>
 
                 <div
+                  data-admin-storefront-preview="true"
                   className="relative overflow-hidden rounded-2xl border border-dashed border-gray-300 min-h-[260px] p-4"
                   style={{
                     backgroundColor:

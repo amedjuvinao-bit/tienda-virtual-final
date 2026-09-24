@@ -1449,7 +1449,10 @@ export default function CatalogPageEditor() {
                 Vista previa de imagen
               </div>
 
-              <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+              <div
+                data-admin-storefront-preview="true"
+                className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4"
+              >
                 {titleImagePreview || form.catalogConfig.titleImage ? (
                   <img
                     src={titleImagePreview || form.catalogConfig.titleImage}

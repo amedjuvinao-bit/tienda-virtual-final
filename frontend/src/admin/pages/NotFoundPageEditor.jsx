@@ -974,6 +974,7 @@ export default function NotFoundPageEditor() {
               </div>
 
               <div
+                data-admin-storefront-preview="true"
                 className="overflow-hidden rounded-[28px] border border-gray-200"
                 style={{ backgroundColor: config.pageBg }}
               >

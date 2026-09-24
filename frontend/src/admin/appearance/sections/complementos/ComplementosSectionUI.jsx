@@ -730,6 +730,7 @@ export default function ComplementosSectionUI({
           </div>
 
           <div
+            data-admin-storefront-preview="true"
             className="mx-auto"
             style={{
               marginTop: style.sectionMarginTopPx,
