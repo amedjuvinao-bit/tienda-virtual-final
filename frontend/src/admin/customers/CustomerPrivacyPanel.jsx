@@ -145,7 +145,7 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-3xl border bg-white p-5 lg:flex-row lg:items-start lg:justify-between" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+      <div className="flex flex-col gap-3 rounded-3xl border bg-white p-5 lg:flex-row lg:items-start lg:justify-between" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
         <div>
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}><ShieldCheck className="h-4 w-4" /> Privacidad y conservación</p>
           <p className="mt-2 text-sm font-bold" style={{ color: 'var(--admin-card-text)' }}>Estado: {privacy.status || customer?.privacyStatus || 'active'} · Consentimiento: {currentConsent.status || 'unknown'}</p>
@@ -162,7 +162,7 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
       {loading && !privacyData ? <div className="rounded-3xl border p-8 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" /><p className="mt-2 text-sm font-black">Cargando trazabilidad...</p></div> : null}
 
       {access.consent ? (
-        <section className="rounded-3xl border bg-white p-5" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+        <section className="rounded-3xl border bg-white p-5" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
           <h3 className="text-lg font-black">Consentimiento comercial</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <select value={consent.status} onChange={(event) => setConsent((current) => ({ ...current, status: event.target.value }))} className="rounded-2xl border px-4 py-3 text-sm font-bold"><option value="granted">Otorgado</option><option value="withdrawn">Retirado</option></select>
@@ -182,10 +182,10 @@ export default function CustomerPrivacyPanel({ customer, access = {}, onUpdated 
         </section>
       ) : null}
 
-      <section className="rounded-3xl border bg-white p-5" style={{ borderColor: 'rgba(236,72,153,0.16)' }}>
+      <section className="rounded-3xl border bg-white p-5" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
         <div className="flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-lg font-black"><History className="h-5 w-5" /> Historial inmutable</h3><p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{auditData?.integrityVerified ? 'Cadena criptográfica verificada' : 'Cadena pendiente de verificación'} · {Number(auditData?.coverage?.total || events.length)} evento(s)</p></div></div>
         <div className="mt-4 space-y-3">
-          {!events.length ? <p className="rounded-2xl border p-4 text-sm font-bold">Sin eventos registrados.</p> : events.map((event) => <article key={event.id} className="rounded-2xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)' }}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-black">{event.action}</p><p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{event.actor?.name || 'Sistema'} · {formatDate(event.createdAt)}</p></div><span className="rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase">{event.eventType}</span></div>{event.changes?.length ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Campos: {event.changes.map((change) => change.path).join(', ')}</p> : null}</article>)}
+          {!events.length ? <p className="rounded-2xl border p-4 text-sm font-bold">Sin eventos registrados.</p> : events.map((event) => <article key={event.id} className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-widget-surface-border)' }}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-black">{event.action}</p><p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{event.actor?.name || 'Sistema'} · {formatDate(event.createdAt)}</p></div><span className="rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase">{event.eventType}</span></div>{event.changes?.length ? <p className="mt-2 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Campos: {event.changes.map((change) => change.path).join(', ')}</p> : null}</article>)}
         </div>
       </section>
     </div>

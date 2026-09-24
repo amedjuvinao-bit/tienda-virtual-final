@@ -224,7 +224,7 @@ describe('adminTheme Nivel Plus', () => {
       'html.admin-theme-dark[data-admin-widget-texture="liquidGlass"] .admin-area .admin-content-card'
     );
     expect(css).toContain('background: var(--admin-widget-surface-bg) !important');
-    expect(css).toContain('An explicitly white inline surface always needs dark ink');
+    expect(css).toContain('Explicitly white inline surfaces follow the active widget material');
     expect(css).toContain('html[data-admin-theme-style="azure"]');
     expect(css).toContain('Semantic buttons are deliberately independent from the selected theme');
     expect(css).toContain('background: var(--admin-success-soft-bg) !important');

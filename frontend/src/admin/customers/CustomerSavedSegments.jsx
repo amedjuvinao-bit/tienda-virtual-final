@@ -70,7 +70,7 @@ export default function CustomerSavedSegments({ filters, onApply }) {
   };
 
   return (
-    <section className="border-t bg-slate-50/50 pt-4" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+    <section className="border-t bg-slate-50/50 pt-4" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>Segmentos guardados</p>
@@ -82,7 +82,7 @@ export default function CustomerSavedSegments({ filters, onApply }) {
             onChange={(event) => setName(event.target.value)}
             placeholder="Ej: VIP asignados a mí"
             className="min-w-0 flex-1 rounded-lg border bg-white px-4 py-3 text-sm font-bold outline-none"
-            style={{ borderColor: 'rgba(148,163,184,0.24)' }}
+            style={{ borderColor: 'var(--admin-input-border)' }}
           />
           <button
             type="button"
@@ -102,9 +102,9 @@ export default function CustomerSavedSegments({ filters, onApply }) {
         {loading ? <span className="inline-flex items-center gap-2 text-xs font-bold"><Loader2 className="h-4 w-4 animate-spin" /> Cargando...</span> : null}
         {!loading && !segments.length ? <span className="text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Aún no has guardado segmentos.</span> : null}
         {!loading ? segments.map((segment) => (
-          <div key={segment.id} className="inline-flex items-center overflow-hidden rounded-lg border bg-white" style={{ borderColor: 'rgba(148,163,184,0.24)' }}>
+          <div key={segment.id} className="inline-flex items-center overflow-hidden rounded-lg border bg-white" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
             <button type="button" onClick={() => onApply?.(segment.filters || {})} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-black" style={{ color: 'var(--admin-primary)' }}><Play className="h-3.5 w-3.5" /> {segment.name}</button>
-            <button type="button" onClick={() => removeSegment(segment.id)} aria-label={`Eliminar segmento ${segment.name}`} className="border-l p-2 text-slate-500 hover:text-red-600" style={{ borderColor: 'rgba(236,72,153,0.16)' }}><Trash2 className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => removeSegment(segment.id)} aria-label={`Eliminar segmento ${segment.name}`} className="border-l p-2 text-slate-500 hover:text-red-600" style={{ borderColor: 'var(--admin-widget-surface-border)' }}><Trash2 className="h-3.5 w-3.5" /></button>
           </div>
         )) : null}
       </div>

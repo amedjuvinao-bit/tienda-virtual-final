@@ -185,16 +185,16 @@ function sourceLabel(value) {
 
 function sourceTone(value) {
   const source = cleanText(value).toLowerCase();
-  if (source === 'pos') return { text: '#be185d', bg: '#fdf2f8', border: '#f9a8d4' };
+  if (source === 'pos') return { text: 'var(--admin-primary-soft-text)', bg: 'var(--admin-primary-soft-bg)', border: 'var(--admin-primary-soft-border)' };
   if (source === 'web') return { text: '#0369a1', bg: '#f0f9ff', border: '#bae6fd' };
   return { text: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' };
 }
 
 function statusTone(value) {
   const status = cleanText(value).toLowerCase();
-  if (status === 'done' || status === 'paid' || status === 'active') return { text: '#047857', bg: '#ecfdf5', border: '#bbf7d0' };
-  if (status === 'cancelled') return { text: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
-  return { text: '#c2410c', bg: '#fff7ed', border: '#fed7aa' };
+  if (status === 'done' || status === 'paid' || status === 'active') return { text: 'var(--admin-success-text)', bg: 'var(--admin-success-soft-bg)', border: 'var(--admin-success-border)' };
+  if (status === 'cancelled') return { text: 'var(--admin-card-muted-text)', bg: 'var(--admin-widget-surface-soft-bg)', border: 'var(--admin-widget-surface-border)' };
+  return { text: 'var(--admin-warning-text)', bg: 'var(--admin-warning-soft-bg)', border: 'var(--admin-warning-border)' };
 }
 
 function toEditForm(customer = {}) {
@@ -275,10 +275,10 @@ function IconBox({ icon: Icon }) {
     <span
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border"
       style={{
-        borderColor: 'rgba(236, 72, 153, 0.22)',
+        borderColor: 'var(--admin-primary-soft-border)',
         background: 'var(--admin-widget-surface-soft-bg, var(--admin-primary-soft-bg))',
         color: 'var(--admin-primary)',
-        boxShadow: '0 6px 18px rgba(236, 72, 153, 0.08)',
+        boxShadow: '0 6px 18px color-mix(in srgb, var(--admin-primary) 8%, transparent)',
       }}
     >
       <Icon className="h-5 w-5" />
@@ -300,7 +300,7 @@ function TextInput(props) {
     <input
       {...props}
       className={`w-full rounded-2xl border px-4 py-3 text-sm font-bold outline-none ${props.className || ''}`}
-      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
+      style={{ borderColor: 'var(--admin-input-border)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
     />
   );
 }
@@ -310,19 +310,19 @@ function TextArea(props) {
     <textarea
       {...props}
       className={`min-h-[88px] w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none ${props.className || ''}`}
-      style={{ borderColor: 'rgba(236, 72, 153, 0.26)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
+      style={{ borderColor: 'var(--admin-input-border)', background: 'var(--admin-widget-input-bg, var(--admin-input-bg))', color: 'var(--admin-card-text)', ...(props.style || {}) }}
     />
   );
 }
 
 function Badge({ children, tone = 'default' }) {
   const styles = {
-    primary: { bg: '#fdf2f8', text: '#be185d', border: '#f9a8d4' },
-    success: { bg: '#ecfdf5', text: '#047857', border: '#bbf7d0' },
-    muted: { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0' },
-    warning: { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' },
-    default: { bg: '#fff', text: '#475569', border: '#fbcfe8' },
-  }[tone] || { bg: '#fff', text: '#475569', border: '#fbcfe8' };
+    primary: { bg: 'var(--admin-primary-soft-bg)', text: 'var(--admin-primary-soft-text)', border: 'var(--admin-primary-soft-border)' },
+    success: { bg: 'var(--admin-success-soft-bg)', text: 'var(--admin-success-text)', border: 'var(--admin-success-border)' },
+    muted: { bg: 'var(--admin-widget-surface-soft-bg)', text: 'var(--admin-card-muted-text)', border: 'var(--admin-widget-surface-border)' },
+    warning: { bg: 'var(--admin-warning-soft-bg)', text: 'var(--admin-warning-text)', border: 'var(--admin-warning-border)' },
+    default: { bg: 'var(--admin-widget-surface-soft-bg)', text: 'var(--admin-card-text)', border: 'var(--admin-widget-surface-border)' },
+  }[tone] || { bg: 'var(--admin-widget-surface-soft-bg)', text: 'var(--admin-card-text)', border: 'var(--admin-widget-surface-border)' };
 
   return <span className="inline-flex items-center rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em]" style={{ background: styles.bg, color: styles.text, borderColor: styles.border }}>{children}</span>;
 }
@@ -332,8 +332,8 @@ function MetricCard({ icon: Icon, label, value, helper, highlight = false }) {
     <div
       className="rounded-[24px] border p-4"
       style={{
-        borderColor: highlight ? 'rgba(236,72,153,0.32)' : 'rgba(236,72,153,0.18)',
-        background: highlight ? 'linear-gradient(135deg, rgba(236,72,153,0.12), var(--admin-widget-surface-soft-bg, var(--admin-card-bg)))' : 'var(--admin-widget-surface-soft-bg, var(--admin-card-bg))',
+        borderColor: highlight ? 'var(--admin-primary-soft-border)' : 'var(--admin-widget-surface-border)',
+        background: highlight ? 'linear-gradient(135deg, var(--admin-primary-soft-bg), var(--admin-widget-surface-soft-bg, var(--admin-card-bg)))' : 'var(--admin-widget-surface-soft-bg, var(--admin-card-bg))',
         boxShadow: 'var(--admin-widget-surface-shadow, 0 12px 28px rgba(15, 23, 42, 0.05))',
       }}
     >
@@ -357,10 +357,10 @@ function CustomerRow({ customer, onOpenDetail }) {
   const crmStage = CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo';
 
   return (
-    <article className="border-b transition-colors last:border-b-0 hover:bg-[#fff7fb]/70" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
+    <article className="border-b transition-colors last:border-b-0 hover:bg-pink-50/50" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
       <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff7fb', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
             <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.customerCode || 'Sin código'}{customer.documentNumber ? ` · ${customer.documentType || 'DOC'} ${customer.documentNumber}` : ''}</p>
@@ -391,7 +391,7 @@ function CustomerRow({ customer, onOpenDetail }) {
           <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmOwnerAdmin?.name || 'Sin responsable'}</p>
         </div>
 
-        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'rgba(236,72,153,0.24)', background: '#fff', color: 'var(--admin-primary)' }}>
+        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-widget-button-bg)', color: 'var(--admin-primary)' }}>
           <Eye className="h-4 w-4" /> Detalle
         </button>
       </div>
@@ -408,7 +408,7 @@ function TabButton({ active, icon: Icon, children, onClick }) {
       style={{
         borderColor: active ? 'var(--admin-primary)' : 'transparent',
         color: active ? 'var(--admin-primary)' : 'var(--admin-card-muted-text)',
-        background: active ? 'rgba(253,242,248,0.78)' : 'transparent',
+        background: active ? 'var(--admin-primary-soft-bg)' : 'transparent',
       }}
     >
       <Icon className="h-4 w-4" /> {children}
@@ -418,7 +418,7 @@ function TabButton({ active, icon: Icon, children, onClick }) {
 
 function InfoLine({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-2xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: '#fff' }}>
+    <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'var(--admin-widget-surface-soft-bg)' }}>
       <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: 'var(--admin-card-muted-text)' }}><Icon className="h-4 w-4" /> {label}</p>
       <p className="break-words text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{value || 'Sin registro'}</p>
     </div>
@@ -427,13 +427,13 @@ function InfoLine({ icon: Icon, label, value }) {
 
 function OrderList({ orders }) {
   if (!orders.length) {
-    return <p className="rounded-2xl border p-6 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)', background: '#fff' }}>No se encontraron compras asociadas a este cliente.</p>;
+    return <p className="rounded-2xl border p-6 text-sm font-bold" style={{ borderColor: 'var(--admin-widget-surface-border)', color: 'var(--admin-card-muted-text)', background: 'var(--admin-widget-surface-soft-bg)' }}>No se encontraron compras asociadas a este cliente.</p>;
   }
 
   return (
     <div className="space-y-3">
       {orders.map((order) => (
-        <article key={order.id} className="grid gap-3 rounded-2xl border p-4 lg:grid-cols-[170px_1fr_140px_120px] lg:items-center" style={{ borderColor: 'rgba(236,72,153,0.16)', background: '#fff' }}>
+        <article key={order.id} className="grid gap-3 rounded-2xl border p-4 lg:grid-cols-[170px_1fr_140px_120px] lg:items-center" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'var(--admin-widget-surface-soft-bg)' }}>
           <div>
             <p className="font-black" style={{ color: 'var(--admin-card-text)' }}>Orden {order.orderNumber}</p>
             <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(order.createdAt)} · {sourceLabel(order.source)}</p>
@@ -453,7 +453,7 @@ function OrderList({ orders }) {
 
 function FollowUpList({ followUps, onResolve, onDelete }) {
   if (!followUps.length) {
-    return <p className="rounded-2xl border p-5 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.16)', color: 'var(--admin-card-muted-text)', background: '#fff' }}>Sin gestiones registradas.</p>;
+    return <p className="rounded-2xl border p-5 text-sm font-bold" style={{ borderColor: 'var(--admin-widget-surface-border)', color: 'var(--admin-card-muted-text)', background: 'var(--admin-widget-surface-soft-bg)' }}>Sin gestiones registradas.</p>;
   }
 
   return (
@@ -461,11 +461,11 @@ function FollowUpList({ followUps, onResolve, onDelete }) {
       {followUps.map((item) => {
         const tone = statusTone(item.status);
         return (
-          <article key={item.id} className="rounded-2xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: '#fff' }}>
+          <article key={item.id} className="rounded-2xl border p-4" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'var(--admin-widget-surface-soft-bg)' }}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style={{ borderColor: '#f9a8d4', background: '#fdf2f8', color: '#be185d' }}>{item.typeLabel || item.type || 'Nota'}</span>
+                  <span className="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary-soft-text)' }}>{item.typeLabel || item.type || 'Nota'}</span>
                   <span className="rounded-xl border px-3 py-1 text-[11px] font-black uppercase" style={{ borderColor: tone.border, background: tone.bg, color: tone.text }}>{item.statusLabel || item.status || 'Pendiente'}</span>
                   <span className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-black uppercase text-orange-700">{item.priorityLabel || item.priority || 'Normal'}</span>
                 </div>
@@ -476,8 +476,8 @@ function FollowUpList({ followUps, onResolve, onDelete }) {
                 {item.outcomeLabel ? <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-[10px] font-black uppercase text-emerald-700">Resultado: {item.outcomeLabel}</p>{item.outcomeNote ? <p className="mt-1 text-xs font-bold text-emerald-900">{item.outcomeNote}</p> : null}{item.outcomeAt ? <p className="mt-1 text-[10px] font-bold text-emerald-700">{formatDate(item.outcomeAt)} · {item.outcomeByAdmin?.name || 'Administrador'}</p> : null}</div> : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {item.status === 'pending' ? <button type="button" onClick={() => onResolve(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#bbf7d0', background: '#ecfdf5', color: '#047857' }}>Registrar resultado</button> : null}
-                <button type="button" onClick={() => onDelete(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#b91c1c' }}>Eliminar</button>
+                {item.status === 'pending' ? <button type="button" onClick={() => onResolve(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: 'var(--admin-success-border)', background: 'var(--admin-success-soft-bg)', color: 'var(--admin-success-text)' }}>Registrar resultado</button> : null}
+                <button type="button" onClick={() => onDelete(item)} className="rounded-xl border px-3 py-2 text-[11px] font-black" style={{ borderColor: 'var(--admin-danger-border)', background: 'var(--admin-danger-soft-bg)', color: 'var(--admin-danger-text)' }}>Eliminar</button>
               </div>
             </div>
           </article>
@@ -692,8 +692,8 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
 
   const modal = (
     <div className="fixed left-0 top-0 z-[99999] flex h-screen w-screen items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm md:p-4" role="dialog" aria-modal="true" aria-labelledby="customer-detail-title">
-      <section className="relative flex h-[calc(100vh-16px)] w-[calc(100vw-16px)] max-w-[1480px] flex-col overflow-hidden rounded-[24px] border md:h-[calc(100vh-34px)] md:w-[calc(100vw-34px)] md:rounded-[30px]" style={{ borderColor: 'rgba(236,72,153,0.28)', background: '#fff', boxShadow: '0 34px 110px rgba(15,23,42,0.34)' }}>
-        <header className="shrink-0 border-b px-5 py-4" style={{ borderColor: 'rgba(236,72,153,0.16)', background: 'linear-gradient(135deg, #fff, #fff7fb)' }}>
+      <section className="relative flex h-[calc(100vh-16px)] w-[calc(100vw-16px)] max-w-[1480px] flex-col overflow-hidden rounded-[24px] border md:h-[calc(100vh-34px)] md:w-[calc(100vw-34px)] md:rounded-[30px]" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'var(--admin-modal-glass-bg, var(--admin-modal-bg))', boxShadow: 'var(--admin-widget-surface-shadow-hover)' }}>
+        <header className="shrink-0 border-b px-5 py-4" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'linear-gradient(135deg, var(--admin-widget-surface-strong-bg), var(--admin-primary-soft-bg))' }}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-4">
               <IconBox icon={UserRound} />
@@ -711,7 +711,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-3 lg:w-[230px] lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-4" style={{ borderColor: 'rgba(236,72,153,0.14)', background: 'linear-gradient(180deg, #fff, #fff7fb)' }}>
+        <nav aria-label="Secciones de la ficha del cliente" className="shrink-0 overflow-x-auto border-b px-3 lg:w-[230px] lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-4" style={{ borderColor: 'var(--admin-widget-surface-border)', background: 'linear-gradient(180deg, var(--admin-widget-surface-bg), var(--admin-primary-soft-bg))' }}>
           <div className="flex min-w-max gap-1 py-1 lg:min-w-0 lg:flex-col lg:py-0">
             <p className="hidden px-4 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] lg:block" style={{ color: 'var(--admin-card-muted-text)' }}>Ficha del cliente</p>
             <TabButton active={activeTab === 'summary'} icon={UsersRound} onClick={() => selectTab('summary')}>Resumen</TabButton>
@@ -731,7 +731,7 @@ function CustomerDetailModal({ data, loading, error, onClose, onRefresh, onUpdat
           </div>
         </nav>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#fff7fb]/40 p-4 lg:p-5">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-pink-50/40 p-4 lg:p-5">
           {loading ? <div className="flex h-full items-center justify-center rounded-3xl border bg-white" style={{ borderColor: 'rgba(236,72,153,0.18)' }}><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" style={{ color: 'var(--admin-primary)' }} /><p className="mt-3 font-black">Cargando detalle...</p></div></div> : null}
           {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div> : null}
 
@@ -1207,7 +1207,7 @@ export default function AdminCustomersPageTabbed() {
             </Card>
           ) : null}
 
-          <section className="customer-admin-surface overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', boxShadow: '0 10px 30px rgba(15,23,42,0.05)' }}>
+          <section className="customer-admin-surface overflow-hidden rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', boxShadow: 'var(--admin-widget-surface-shadow)' }}>
             <header className="grid gap-4 border-b p-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.65fr)] lg:items-center" style={{ borderColor: 'rgba(148,163,184,0.18)' }}>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Directorio comercial</p>

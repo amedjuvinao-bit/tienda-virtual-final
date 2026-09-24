@@ -109,14 +109,14 @@ export default function CustomerFollowUpResultModal({
 
   const modal = (
     <div className="fixed inset-0 z-[180] flex items-center justify-center bg-slate-950/65 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="follow-up-result-title">
-      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-[660px] overflow-y-auto rounded-[30px] border bg-white p-5 shadow-2xl sm:p-7" style={{ borderColor: 'rgba(236,72,153,0.28)' }}>
+      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-[660px] overflow-y-auto rounded-[30px] border bg-white p-5 shadow-2xl sm:p-7" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-primary)' }}>Cierre verificable</p>
             <h2 id="follow-up-result-title" className="mt-1 text-2xl font-black" style={{ color: 'var(--admin-card-text)' }}>Registrar resultado</h2>
             <p className="mt-2 text-sm font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customerName} · {item.typeLabel || item.type || 'Gestión CRM'}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Cerrar resultado" className="rounded-2xl border p-3 disabled:opacity-50" style={{ borderColor: 'rgba(236,72,153,0.20)' }}><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Cerrar resultado" className="rounded-2xl border p-3 disabled:opacity-50" style={{ borderColor: 'var(--admin-widget-surface-border)' }}><X className="h-4 w-4" /></button>
         </div>
 
         <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-relaxed text-amber-900">
@@ -127,7 +127,7 @@ export default function CustomerFollowUpResultModal({
 
         <label className="mt-5 block">
           <span className="text-xs font-black uppercase tracking-[0.13em]" style={{ color: 'var(--admin-card-muted-text)' }}>¿Qué ocurrió?</span>
-          <select aria-label="Resultado de la gestión" value={form.outcome} onChange={(event) => updateField('outcome', event.target.value)} className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.24)' }}>
+          <select aria-label="Resultado de la gestión" value={form.outcome} onChange={(event) => updateField('outcome', event.target.value)} className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-input-border)' }}>
             <option value="">Seleccionar resultado</option>
             {FOLLOW_UP_RESULT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -135,27 +135,27 @@ export default function CustomerFollowUpResultModal({
 
         <label className="mt-4 block">
           <span className="text-xs font-black uppercase tracking-[0.13em]" style={{ color: 'var(--admin-card-muted-text)' }}>Evidencia del resultado</span>
-          <textarea aria-label="Evidencia del resultado" value={form.outcomeNote} onChange={(event) => updateField('outcomeNote', event.target.value)} rows={4} placeholder="Ej: Se contactó por WhatsApp; el cliente confirmó que realizará el pago el viernes." className="mt-2 w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'rgba(236,72,153,0.24)' }} />
+          <textarea aria-label="Evidencia del resultado" value={form.outcomeNote} onChange={(event) => updateField('outcomeNote', event.target.value)} rows={4} placeholder="Ej: Se contactó por WhatsApp; el cliente confirmó que realizará el pago el viernes." className="mt-2 w-full resize-none rounded-2xl border px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-input-border)' }} />
         </label>
 
         {continuesPending ? (
-          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'rgba(236,72,153,0.18)', background: '#fff7fb' }}>
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)' }}>
             <p className="flex items-center gap-2 text-sm font-black" style={{ color: 'var(--admin-card-text)' }}><CalendarClock className="h-4 w-4" style={{ color: 'var(--admin-primary)' }} /> La gestión continuará pendiente</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label>
                 <span className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Siguiente acción</span>
-                <input aria-label="Siguiente acción" value={form.nextAction} onChange={(event) => updateField('nextAction', event.target.value)} placeholder="Ej: volver a llamar" className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.20)' }} />
+                <input aria-label="Siguiente acción" value={form.nextAction} onChange={(event) => updateField('nextAction', event.target.value)} placeholder="Ej: volver a llamar" className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-input-border)' }} />
               </label>
               <label>
                 <span className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>Nueva fecha</span>
-                <input aria-label="Nueva fecha" type="datetime-local" value={form.dueAt} onChange={(event) => updateField('dueAt', event.target.value)} className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'rgba(236,72,153,0.20)' }} />
+                <input aria-label="Nueva fecha" type="datetime-local" value={form.dueAt} onChange={(event) => updateField('dueAt', event.target.value)} className="mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold" style={{ borderColor: 'var(--admin-input-border)' }} />
               </label>
             </div>
           </div>
         ) : null}
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-2xl border px-5 py-3 text-sm font-black disabled:opacity-50" style={{ borderColor: 'rgba(236,72,153,0.22)', color: 'var(--admin-card-text)' }}>Cancelar</button>
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-2xl border px-5 py-3 text-sm font-black disabled:opacity-50" style={{ borderColor: 'var(--admin-widget-surface-border)', color: 'var(--admin-card-text)' }}>Cancelar</button>
           <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white disabled:opacity-50" style={{ background: 'var(--admin-primary)' }}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />} Guardar resultado</button>
         </div>
       </form>

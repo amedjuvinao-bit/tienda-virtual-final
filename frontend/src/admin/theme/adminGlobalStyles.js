@@ -1183,11 +1183,14 @@ export function applyAdminGlobalStyles() {
 
     .admin-area .bg-white,
     .admin-area [class*="bg-white"],
-    .admin-area .bg-gray-50,   .admin-area .bg-gray-100,
-    .admin-area .bg-slate-50,  .admin-area .bg-slate-100,
-    .admin-area .bg-zinc-50,   .admin-area .bg-zinc-100,
-    .admin-area .bg-neutral-50,.admin-area .bg-neutral-100,
-    .admin-area .bg-stone-50,  .admin-area .bg-stone-100,
+    .admin-area .bg-gray-50,   .admin-area .bg-gray-100,   .admin-area .bg-gray-200,
+    .admin-area .bg-slate-50,  .admin-area .bg-slate-100,  .admin-area .bg-slate-200,
+    .admin-area .bg-zinc-50,   .admin-area .bg-zinc-100,   .admin-area .bg-zinc-200,
+    .admin-area .bg-neutral-50,.admin-area .bg-neutral-100,.admin-area .bg-neutral-200,
+    .admin-area .bg-stone-50,  .admin-area .bg-stone-100,  .admin-area .bg-stone-200,
+    .admin-area [class~="bg-gray-50/50"],
+    .admin-area [class~="bg-slate-50/50"],
+    .admin-area [class~="bg-slate-50/60"],
     .admin-area .bg-pink-50,   .admin-area .bg-rose-50,
     .admin-area .bg-fuchsia-50,.admin-area .bg-purple-50,
     .admin-area .bg-blue-50,   .admin-area .bg-cyan-50 {
@@ -1197,6 +1200,95 @@ export function applyAdminGlobalStyles() {
       backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
       -webkit-backdrop-filter: blur(var(--admin-widget-surface-blur)) saturate(var(--admin-widget-surface-saturation));
       box-shadow: var(--admin-widget-surface-shadow);
+    }
+
+    /* Legacy neutral utilities must follow the active theme in every mode,
+       not only in dark mode. This prevents old gray labels and borders from
+       returning when a custom light palette is selected. */
+    .admin-area :is(
+      .text-gray-700,.text-gray-800,.text-gray-900,.text-gray-950,
+      .text-slate-700,.text-slate-800,.text-slate-900,.text-slate-950,
+      .text-zinc-700,.text-zinc-800,.text-zinc-900,.text-zinc-950,
+      .text-neutral-700,.text-neutral-800,.text-neutral-900,.text-neutral-950,
+      .text-stone-700,.text-stone-800,.text-stone-900,.text-stone-950,
+      .text-black
+    ) {
+      color: var(--admin-card-text) !important;
+    }
+
+    .admin-area :is(
+      [class*="border-gray-"],
+      [class*="border-slate-"],
+      [class*="border-zinc-"],
+      [class*="border-neutral-"],
+      [class*="border-stone-"]
+    ) {
+      border-color: var(--admin-widget-surface-border) !important;
+    }
+
+    /* Pink and fuchsia were the fixed brand colors of the legacy editors.
+       They now represent the selected primary color and its soft surface. */
+    .admin-area :is(
+      .text-pink-500,.text-pink-600,.text-pink-700,.text-pink-800,.text-pink-900,
+      .text-fuchsia-500,.text-fuchsia-600,.text-fuchsia-700,.text-fuchsia-800,.text-fuchsia-900,
+      .text-purple-500,.text-purple-600,.text-purple-700,.text-purple-800,.text-purple-900
+    ) {
+      color: var(--admin-primary-soft-text, var(--admin-primary)) !important;
+    }
+
+    .admin-area :is(
+      .bg-pink-50,.bg-pink-100,
+      .bg-fuchsia-50,.bg-fuchsia-100,
+      .bg-purple-50,.bg-purple-100,
+      [class~="bg-pink-50/30"],
+      [class~="bg-pink-50/40"],
+      [class~="bg-pink-50/50"]
+    ) {
+      background: var(--admin-primary-soft-bg) !important;
+      color: var(--admin-primary-soft-text, var(--admin-primary)) !important;
+      border-color: var(--admin-primary-soft-border) !important;
+    }
+
+    .admin-area :is(
+      .bg-pink-500,.bg-pink-600,.bg-pink-700,
+      .bg-fuchsia-500,.bg-fuchsia-600,.bg-fuchsia-700,
+      .bg-purple-500,.bg-purple-600,.bg-purple-700,
+      .bg-neutral-800,.bg-neutral-900,
+      [class~="bg-pink-500/80"]
+    ) {
+      background: var(--admin-primary) !important;
+      color: var(--admin-button-text) !important;
+      border-color: var(--admin-primary) !important;
+    }
+
+    .admin-area :is(
+      [class*="border-pink-"],
+      [class*="border-fuchsia-"],
+      [class*="border-purple-"]
+    ) {
+      border-color: var(--admin-primary-soft-border) !important;
+    }
+
+    .admin-area :is(.border-pink-500,.border-fuchsia-500,.border-purple-500,.border-neutral-900) {
+      border-color: var(--admin-primary) !important;
+    }
+
+    .admin-area :is([class*="ring-pink-"],[class*="ring-fuchsia-"],[class*="ring-purple-"],[class*="ring-neutral-900"]) {
+      --tw-ring-color: color-mix(in srgb, var(--admin-primary) 34%, transparent) !important;
+    }
+
+    .admin-area :is([class~="from-white"],[class~="via-white"]) {
+      --tw-gradient-from: var(--admin-widget-surface-soft-bg) var(--tw-gradient-from-position) !important;
+      --tw-gradient-to: color-mix(in srgb, var(--admin-widget-surface-soft-bg) 0%, transparent) var(--tw-gradient-to-position) !important;
+    }
+
+    .admin-area :is([class~="from-pink-50"],[class~="from-pink-100"],[class~="via-rose-50"]) {
+      --tw-gradient-from: var(--admin-primary-soft-bg) var(--tw-gradient-from-position) !important;
+      --tw-gradient-to: color-mix(in srgb, var(--admin-primary-soft-bg) 0%, transparent) var(--tw-gradient-to-position) !important;
+    }
+
+    .admin-area :is([class~="to-pink-50"],[class~="to-pink-50/60"],[class~="to-pink-200"],[class~="to-rose-50"],[class~="to-neutral-50"]) {
+      --tw-gradient-to: var(--admin-primary-soft-bg) var(--tw-gradient-to-position) !important;
     }
 
     /* A white utility surface is converted to the active widget material.
@@ -1253,23 +1345,33 @@ export function applyAdminGlobalStyles() {
       box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-warning) 10%, transparent) !important;
     }
 
-    .admin-area :is(.bg-red-50,.bg-red-100) {
+    .admin-area :is(.bg-red-50,.bg-red-100,.bg-rose-50,.bg-rose-100) {
       background: var(--admin-danger-soft-bg) !important;
       color: var(--admin-danger-text) !important;
       border-color: var(--admin-danger-border) !important;
       box-shadow: 0 8px 22px color-mix(in srgb, var(--admin-danger) 10%, transparent) !important;
     }
 
-    /* An explicitly white inline surface always needs dark ink, independent
-       of the active theme. This also covers legacy components that combine
-       a white background with a fixed white text utility. */
+    .admin-area :is(.text-red-500,.text-red-600,.text-red-700,.text-red-800,.text-red-900,.text-rose-500,.text-rose-600,.text-rose-700,.text-rose-800,.text-rose-900) {
+      color: var(--admin-danger-text) !important;
+    }
+
+    .admin-area :is([class*="border-red-"],[class*="border-rose-"]) {
+      border-color: var(--admin-danger-border) !important;
+    }
+
+    /* Explicitly white inline surfaces follow the active widget material.
+       This also covers legacy components that combine a white background
+       with a fixed white text utility. */
     .admin-area [style*="background-color: rgb(255"],
     .admin-area [style*="background-color:#fff"],
     .admin-area [style*="background-color: #fff"],
     .admin-area [style*="background: rgb(255"],
     .admin-area [style*="background:#fff"],
     .admin-area [style*="background: #fff"] {
-      color: #111827 !important;
+      background: var(--admin-widget-surface-soft-bg) !important;
+      border-color: var(--admin-widget-surface-border) !important;
+      color: var(--admin-card-text) !important;
     }
 
     .admin-area [style*="background-color: rgb(255"] .text-white,
@@ -1278,7 +1380,7 @@ export function applyAdminGlobalStyles() {
     .admin-area [style*="background: rgb(255"] .text-white,
     .admin-area [style*="background:#fff"] .text-white,
     .admin-area [style*="background: #fff"] .text-white {
-      color: #111827 !important;
+      color: var(--admin-card-text) !important;
     }
 
     /* React serializes many legacy inline dark colors as rgb(). These rules
