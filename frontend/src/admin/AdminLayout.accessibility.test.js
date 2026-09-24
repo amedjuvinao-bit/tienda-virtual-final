@@ -40,6 +40,13 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(layoutSource).toContain('role="alert"');
   });
 
+  it('sale del panel aunque el servidor rechace una cookie vencida', () => {
+    expect(layoutSource).toMatch(
+      /const handleLogout = \(\) => \{[\s\S]*?void logout\(\);[\s\S]*?window\.location\.replace\('\/admin\/login'\);[\s\S]*?\};/,
+    );
+    expect(layoutSource).not.toContain("navigate('/admin/login');");
+  });
+
   it('mantiene navegación y contenido utilizables en pantallas estrechas', () => {
     expect(layoutSource).toContain('scroll-snap-type: inline proximity');
     expect(layoutSource).toContain('@media (max-width: 480px)');

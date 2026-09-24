@@ -224,7 +224,11 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     void logout();
-    navigate('/admin/login');
+    // El cierre visual no puede depender de la respuesta del servidor: una
+    // cookie vencida puede hacer que /logout responda 400 aunque la sesión
+    // local ya deba terminar. La navegación completa también reinicia el
+    // estado en memoria del panel y evita que la vista protegida permanezca.
+    window.location.replace('/admin/login');
   };
 
   const handleConfigMenuClick = () => {
@@ -2279,6 +2283,7 @@ export default function AdminLayout() {
               style={{ borderTop: '1px solid var(--admin-card-border)' }}
             >
               <button
+                type="button"
                 onClick={handleLogout}
                 className="admin-logout-sidebar"
                 data-tooltip="Cerrar sesión"
@@ -2463,6 +2468,7 @@ export default function AdminLayout() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={handleLogout}
                     className="admin-btn-primary"
                   >
