@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import {
   ClipboardList,
@@ -43,17 +43,18 @@ describe('AdminMobileNavigation', () => {
     renderNavigation();
 
     const navigation = screen.getByRole('navigation', { name: 'Navegación móvil principal' });
-    expect(navigation).toHaveTextContent('Inicio');
-    expect(navigation).toHaveTextContent('Productos');
-    expect(navigation).toHaveTextContent('Órdenes');
-    expect(navigation).toHaveTextContent('Más');
+    expect(within(navigation).getByRole('link', { name: 'Inicio' })).toBeInTheDocument();
+    expect(within(navigation).getByRole('link', { name: 'Productos' })).toBeInTheDocument();
+    expect(within(navigation).getByRole('link', { name: 'Órdenes' })).toBeInTheDocument();
+    expect(within(navigation).getByRole('button', { name: 'Más módulos' })).toBeInTheDocument();
+    expect(navigation.textContent).toBe('');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('abre una bandeja accesible y permite filtrar módulos', () => {
     renderNavigation('/admin/clientes');
 
-    const moreButton = screen.getByRole('button', { name: 'Más' });
+    const moreButton = screen.getByRole('button', { name: 'Más módulos' });
     expect(moreButton).toHaveAttribute('data-active', 'true');
     fireEvent.click(moreButton);
 
@@ -67,7 +68,7 @@ describe('AdminMobileNavigation', () => {
 
   it('cierra la bandeja después de navegar a un módulo', async () => {
     renderNavigation();
-    fireEvent.click(screen.getByRole('button', { name: 'Más' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Más módulos' }));
     fireEvent.click(screen.getByRole('link', { name: 'Clientes' }));
 
     await waitFor(() => {

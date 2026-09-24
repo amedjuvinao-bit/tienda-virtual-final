@@ -20,7 +20,8 @@ describe('organización móvil escalable del Panel Admin', () => {
     expect(layoutSource).toContain("'/admin/ordenes'");
     expect(layoutSource).toContain('<AdminMobileNavigation');
     expect(mobileNavigationSource).toContain('<MoreHorizontal');
-    expect(mobileNavigationSource).toContain('<span>Más</span>');
+    expect(mobileNavigationSource).toContain('aria-label="Más módulos"');
+    expect(mobileNavigationSource).not.toContain('<span>{item.mobileLabel || item.label}</span>');
     expect(mobileSystemStyles).toContain('.admin-mobile-bottom-nav');
     expect(mobileSystemStyles).toContain('.admin-mobile-more-sheet');
   });

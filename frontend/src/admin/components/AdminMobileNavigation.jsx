@@ -182,9 +182,10 @@ export default function AdminMobileNavigation({ primaryLinks = [], groups = [] }
               to={item.to}
               className="admin-mobile-bottom-link"
               data-active={isCurrentPath(location.pathname, item.to) ? 'true' : 'false'}
+              aria-label={item.mobileLabel || item.label}
+              title={item.mobileLabel || item.label}
             >
               <Icon aria-hidden="true" />
-              <span>{item.mobileLabel || item.label}</span>
             </NavLink>
           );
         })}
@@ -195,10 +196,11 @@ export default function AdminMobileNavigation({ primaryLinks = [], groups = [] }
           data-active={moreIsActive || open ? 'true' : 'false'}
           aria-expanded={open}
           aria-controls="admin-mobile-more-sheet"
+          aria-label="Más módulos"
+          title="Más módulos"
           onClick={() => setOpen(true)}
         >
           <MoreHorizontal aria-hidden="true" />
-          <span>Más</span>
         </button>
       </nav>
     </div>,

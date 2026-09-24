@@ -6,6 +6,7 @@ function source(relativeUrl) {
 }
 
 const layoutSource = source('./AdminLayout.jsx');
+const layoutEntrySource = source('./AdminLayout.js');
 const mobileNavigationSource = source('./components/AdminMobileNavigation.jsx');
 const mobileStylesSource = source('./theme/adminMobileSystem.css');
 const globalStylesSource = source('./theme/adminGlobalStyles.js');
@@ -13,6 +14,13 @@ const panelStylesSource = source('./configuracion/sections/PanelAdminSection.css
 const panelSource = source('./configuracion/sections/PanelAdminSection.jsx');
 
 describe('accesibilidad y adaptación del Panel Admin', () => {
+  it('usa una sola fuente de navegación y no reinyecta enlaces heredados', () => {
+    expect(layoutEntrySource).toContain("export { default } from './AdminLayout.jsx';");
+    expect(layoutEntrySource).not.toContain('createPortal');
+    expect(layoutEntrySource).not.toContain('setInterval');
+    expect(layoutEntrySource).not.toContain('AdminExtraMenuPortal');
+  });
+
   it('permite saltar al contenido principal y muestra foco de teclado global', () => {
     expect(layoutSource).toContain('href="#admin-main-content"');
     expect(layoutSource).toContain('id="admin-main-content"');
@@ -53,6 +61,8 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
   it('mantiene navegación y contenido utilizables en pantallas estrechas', () => {
     expect(mobileStylesSource).toContain('.admin-mobile-bottom-nav');
     expect(mobileStylesSource).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))');
+    expect(mobileNavigationSource).toContain('aria-label={item.mobileLabel || item.label}');
+    expect(mobileNavigationSource).not.toContain('<span>{item.mobileLabel || item.label}</span>');
     expect(mobileStylesSource).toContain('.admin-mobile-more-sheet');
     expect(layoutSource).toContain('@media (max-width: 480px)');
     expect(layoutSource).toContain('max-height: calc(100dvh - 16px)');
