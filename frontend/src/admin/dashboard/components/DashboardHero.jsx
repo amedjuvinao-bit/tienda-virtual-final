@@ -4,7 +4,7 @@ import HeroLightRibbon from './HeroLightRibbon';
 
 function GlassTitle({ children }) {
   return (
-    <h1 className="relative inline-block leading-none tracking-tight">
+    <h1 className="dashboard-hero-title relative inline-block leading-none tracking-tight">
       <span
         className="absolute inset-0 block text-[30px] font-black md:text-[40px]"
         style={{
@@ -269,7 +269,7 @@ export default function DashboardHero({
           }}
         />
 
-        <div className="relative z-10 min-h-[122px]">
+        <div className="dashboard-hero-content relative z-10 min-h-[122px]">
           <div className="dashboard-hero-text relative z-30 max-w-[500px] pl-4 pt-3 md:pl-5 lg:pl-6">
             <GlassTitle>{title}</GlassTitle>
 

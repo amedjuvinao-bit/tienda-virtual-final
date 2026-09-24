@@ -201,7 +201,7 @@ export default function DashboardKpiCard({ item = {} }) {
         style={frameStyle}
       >
         <div
-          className="relative h-full overflow-hidden rounded-[17px] px-3 py-2.5"
+          className="dashboard-kpi-surface relative h-full overflow-hidden rounded-[17px] px-3 py-2.5"
           style={glassStyle}
         >
           <span
@@ -266,7 +266,7 @@ export default function DashboardKpiCard({ item = {} }) {
             }}
           />
 
-          <div className="relative z-10 flex h-full flex-col justify-between gap-1.5">
+          <div className="dashboard-kpi-content relative z-10 flex h-full flex-col justify-between gap-1.5">
             <div className="flex min-w-0 items-start gap-2">
               <span
                 className="dashboard-kpi-icon relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[12px]"
@@ -323,14 +323,14 @@ export default function DashboardKpiCard({ item = {} }) {
 
               <div className="min-w-0 flex-1 pt-[1px]">
                 <p
-                  className="text-[11.8px] font-bold leading-[14px] tracking-[-0.01em]"
+                  className="dashboard-kpi-title text-[11.8px] font-bold leading-[14px] tracking-[-0.01em]"
                   style={styles.kpiTitle}
                 >
                   {item?.title}
                 </p>
 
                 <p
-                  className="mt-0.5 whitespace-nowrap text-[18px] font-black leading-none tracking-[-0.04em]"
+                  className="dashboard-kpi-value mt-0.5 whitespace-nowrap text-[18px] font-black leading-none tracking-[-0.04em]"
                   style={styles.kpiValue}
                   title={item?.value}
                 >
@@ -339,7 +339,7 @@ export default function DashboardKpiCard({ item = {} }) {
               </div>
             </div>
 
-            <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[10.8px] font-bold leading-none tracking-[-0.01em]">
+            <div className="dashboard-kpi-meta flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[10.8px] font-bold leading-none tracking-[-0.01em]">
               {isWarning ? (
                 <>
                   <AlertTriangle size={11} strokeWidth={2.7} style={styles.kpiWarningMark} />

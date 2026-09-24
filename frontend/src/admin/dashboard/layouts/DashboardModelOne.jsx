@@ -166,7 +166,7 @@ export default function DashboardModelOne(props) {
   const showTopProductsEmptyState = !props.salesLoading && !hasTopProducts;
 
   return (
-    <div className="space-y-3 xl:space-y-3">
+    <div className="dashboard-layout space-y-3 xl:space-y-3">
       <style>
         {`
           @keyframes dashboardSalesLoadingSweep {
@@ -225,14 +225,14 @@ export default function DashboardModelOne(props) {
 
       <div
         className="
-          -mt-1 grid items-start gap-3
+          dashboard-primary-grid -mt-1 grid items-start gap-3
           xl:grid-cols-[minmax(0,1.5fr)_minmax(315px,0.5fr)]
           xl:[--dashboard-sales-zone-height:475px]
         "
       >
         <div
           className="
-            dashboard-sales-dynamic-title relative min-w-0 self-start
+            dashboard-sales-region dashboard-sales-dynamic-title relative min-w-0 self-start
             xl:h-[var(--dashboard-sales-zone-height)]
             xl:[&>section]:h-full
             xl:[&>section>div]:h-full
@@ -298,7 +298,7 @@ export default function DashboardModelOne(props) {
 
         <aside
           className="
-            grid min-w-0 self-start overflow-hidden
+            dashboard-side-stack grid min-w-0 self-start overflow-hidden
             gap-3
             xl:h-[var(--dashboard-sales-zone-height)]
             xl:grid-rows-[minmax(0,1fr)_minmax(0,0.72fr)]
@@ -341,7 +341,7 @@ export default function DashboardModelOne(props) {
         onViewCash={navigation.viewCash}
       />
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
+      <div className="dashboard-secondary-grid grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
         <div
           className="min-w-0"
           onClickCapture={(event) => runSectionButtonAction(event, navigation.viewInventory)}

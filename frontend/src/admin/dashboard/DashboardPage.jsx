@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { getDashboardSales, getDashboardSummary } from './api/dashboardApi';
 import DashboardModelOne from './layouts/DashboardModelOne';
+import './dashboardResponsive.css';
 
 const DASHBOARD_MODELS = {
   modelOne: DashboardModelOne,
@@ -235,7 +236,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <section className="space-y-4 text-slate-950">
+    <section className="dashboard-page text-slate-950">
       <SelectedDashboardModel
         quickActions={dashboardData.quickActions}
         kpis={dashboardData.kpis}

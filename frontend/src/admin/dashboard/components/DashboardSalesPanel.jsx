@@ -759,7 +759,7 @@ export default function DashboardSalesPanel({
         <div className="relative z-10 mt-3 overflow-visible rounded-[20px]">
           <svg
             viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-            className="h-[200px] w-full"
+            className="dashboard-sales-chart h-[200px] w-full"
             preserveAspectRatio="none"
             role="img"
             aria-label="Gráfico de ventas semanales"
@@ -990,7 +990,7 @@ export default function DashboardSalesPanel({
             }}
           >
             <div
-              className="grid grid-cols-[minmax(0,1fr)_70px_112px_92px] gap-2 px-3.5 py-1.5 text-[11px] font-black"
+              className="dashboard-products-grid grid grid-cols-[minmax(0,1fr)_70px_112px_92px] gap-2 px-3.5 py-1.5 text-[11px] font-black"
               style={{
                 color: 'var(--admin-card-muted-text)',
                 borderBottom:
@@ -1002,6 +1002,7 @@ export default function DashboardSalesPanel({
               <span>Ventas</span>
               <span>Ingresos</span>
               <span
+                className="dashboard-products-trend"
                 style={{
                   color:
                     'color-mix(in srgb, var(--admin-primary) 42%, var(--admin-card-text))',
@@ -1017,7 +1018,7 @@ export default function DashboardSalesPanel({
               {topProducts.slice(0, 3).map((product) => (
                 <article
                   key={product.id}
-                  className="grid grid-cols-[minmax(0,1fr)_70px_112px_92px] items-center gap-2 px-3.5 py-1"
+                  className="dashboard-products-grid grid grid-cols-[minmax(0,1fr)_70px_112px_92px] items-center gap-2 px-3.5 py-1"
                   style={{
                     borderBottom:
                       '1px solid color-mix(in srgb, var(--admin-primary) 7%, rgba(255,255,255,0.05))',
@@ -1040,7 +1041,7 @@ export default function DashboardSalesPanel({
                     {product.income}
                   </p>
 
-                  <svg viewBox="0 0 76 18" className="h-4.5 w-full">
+                  <svg viewBox="0 0 76 18" className="dashboard-products-trend h-4.5 w-full">
                     <defs>
                       <linearGradient id={`trend-line-${product.id}`} x1="0" x2="1" y1="0" y2="0">
                         <stop

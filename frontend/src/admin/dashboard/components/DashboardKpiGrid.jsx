@@ -11,7 +11,7 @@ export default function DashboardKpiGrid({ items = [] }) {
     >
       <span className="pointer-events-none absolute inset-0" style={styles.kpiRowBackdrop} />
 
-      <div className="relative z-10 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="dashboard-kpi-grid relative z-10 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
         {items.map((item) => (
           <DashboardKpiCard key={item.id} item={item} />
         ))}

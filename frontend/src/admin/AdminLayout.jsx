@@ -720,6 +720,10 @@ export default function AdminLayout() {
           scroll-snap-align: start;
         }
 
+        .admin-mobile-nav-label {
+          display: inline;
+        }
+
         .admin-brand-float {
           min-height: 132px;
           padding: calc(var(--admin-padding) * 0.35) 0 calc(var(--admin-padding) * 0.6);
@@ -1977,6 +1981,38 @@ export default function AdminLayout() {
             max-height: min(56vh, 360px);
           }
 
+          .admin-mobile-nav-panel {
+            gap: 6px;
+            padding: 6px;
+          }
+
+          .admin-mobile-nav-panel .admin-nav-link-mobile,
+          #admin-mobile-config-menu .admin-nav-link-mobile {
+            width: 44px;
+            min-width: 44px;
+            height: 44px;
+            min-height: 44px;
+            flex: 0 0 44px;
+            justify-content: center;
+            gap: 0 !important;
+            padding: 0 !important;
+          }
+
+          .admin-mobile-nav-label {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            clip-path: inset(50%);
+            white-space: nowrap;
+          }
+
+          #admin-mobile-config-menu {
+            gap: 6px !important;
+            padding-inline: 6px;
+          }
+
           .admin-modal-header,
           .admin-modal-body {
             padding: calc(var(--admin-padding) * 0.9);
@@ -2559,9 +2595,11 @@ export default function AdminLayout() {
                       to={item.to}
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                      aria-label={item.label}
+                      title={item.label}
                     >
                       <PremiumAdminNavIcon icon={Icon} compact />
-                      {item.label}
+                      <span className="admin-mobile-nav-label">{item.label}</span>
                     </NavLink>
                   );
                 })}
@@ -2574,9 +2612,11 @@ export default function AdminLayout() {
                       to={item.to}
                       className={`${mobileLinkBase} admin-nav-link-mobile`}
                       style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                      aria-label={item.label}
+                      title={item.label}
                     >
                       <PremiumAdminNavIcon icon={Icon} compact />
-                      {item.label}
+                      <span className="admin-mobile-nav-label">{item.label}</span>
                     </NavLink>
                   );
                 })}
@@ -2589,9 +2629,11 @@ export default function AdminLayout() {
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
                     aria-expanded={configMenuOpen}
                     aria-controls="admin-mobile-config-menu"
+                    aria-label="Configuración"
+                    title="Configuración"
                   >
                     <PremiumAdminNavIcon icon={Settings} compact />
-                    Config
+                    <span className="admin-mobile-nav-label">Configuración</span>
                   </button>
                 )}
               </nav>
@@ -2610,9 +2652,11 @@ export default function AdminLayout() {
                         to={item.to}
                         className={`${mobileLinkBase} admin-nav-link-mobile`}
                         style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
+                        aria-label={item.label}
+                        title={item.label}
                       >
                         <Icon className="h-3 w-3" />
-                        {item.label}
+                        <span className="admin-mobile-nav-label">{item.label}</span>
                       </NavLink>
                     );
                   })}

@@ -1,0 +1,173 @@
+/*
+ * Responsive contract for the administrative dashboard.
+ * Components expose semantic class names; density and layout decisions live
+ * here so new widgets can reuse the same mobile rhythm without inline forks.
+ */
+
+.dashboard-page {
+  --dashboard-mobile-gap: 0.625rem;
+}
+
+@media (max-width: 767px) {
+  .dashboard-page,
+  .dashboard-layout {
+    min-width: 0;
+  }
+
+  .dashboard-layout {
+    display: grid;
+    gap: var(--dashboard-mobile-gap);
+  }
+
+  .dashboard-layout > * {
+    min-width: 0;
+    margin-top: 0 !important;
+  }
+
+  .dashboard-hero-glass {
+    border-radius: 20px !important;
+    padding: 10px 12px !important;
+  }
+
+  .dashboard-hero-content {
+    min-height: 92px !important;
+  }
+
+  .dashboard-hero-text {
+    max-width: none !important;
+    padding: 5px 6px 3px !important;
+  }
+
+  .dashboard-hero-title > span {
+    font-size: 27px !important;
+  }
+
+  .dashboard-hero-text p {
+    max-width: 30rem !important;
+    margin-top: 8px !important;
+    font-size: 11.5px !important;
+    line-height: 1.45 !important;
+  }
+
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .dashboard-kpi-card {
+    height: 76px !important;
+    border-radius: 16px !important;
+  }
+
+  .dashboard-kpi-surface {
+    border-radius: 15px !important;
+    padding: 7px 8px !important;
+  }
+
+  .dashboard-kpi-content {
+    gap: 4px !important;
+  }
+
+  .dashboard-kpi-icon {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 10px !important;
+  }
+
+  .dashboard-kpi-card p {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dashboard-kpi-title {
+    font-size: 10px !important;
+    line-height: 12px !important;
+  }
+
+  .dashboard-kpi-value {
+    font-size: 15px !important;
+  }
+
+  .dashboard-kpi-meta {
+    font-size: 9px !important;
+  }
+
+  .dashboard-primary-grid,
+  .dashboard-secondary-grid,
+  .dashboard-side-stack {
+    gap: var(--dashboard-mobile-gap) !important;
+  }
+
+  .dashboard-sales-enter,
+  .alerts-pro-panel,
+  .goals-pro-panel,
+  .dashboard-pos-panel,
+  .inventory-panel-pro,
+  .dashboard-recent-orders-panel {
+    border-radius: 20px !important;
+  }
+
+  .dashboard-sales-enter > div,
+  .alerts-pro-panel > div,
+  .goals-pro-panel > div,
+  .dashboard-pos-panel > div,
+  .inventory-panel-pro > div,
+  .dashboard-recent-orders-panel > div {
+    border-radius: 19px !important;
+  }
+
+  .dashboard-sales-enter > div {
+    padding-inline: 12px !important;
+    padding-top: 12px !important;
+  }
+
+  .dashboard-sales-chart {
+    height: 168px !important;
+  }
+
+  .dashboard-products-grid {
+    grid-template-columns: minmax(0, 1fr) 54px 74px !important;
+  }
+
+  .dashboard-products-trend {
+    display: none;
+  }
+}
+
+@media (min-width: 430px) and (max-width: 767px) {
+  .dashboard-side-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 359px) {
+  .dashboard-page {
+    --dashboard-mobile-gap: 0.5rem;
+  }
+
+  .dashboard-hero-title > span {
+    font-size: 25px !important;
+  }
+
+  .dashboard-kpi-grid {
+    gap: 6px;
+  }
+
+  .dashboard-kpi-card {
+    height: 73px !important;
+  }
+
+  .dashboard-kpi-surface {
+    padding: 6px 7px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-layout *,
+  .dashboard-layout *::before,
+  .dashboard-layout *::after {
+    scroll-behavior: auto !important;
+  }
+}
