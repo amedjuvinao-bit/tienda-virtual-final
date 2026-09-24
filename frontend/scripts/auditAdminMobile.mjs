@@ -47,6 +47,32 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 const page = await context.newPage();
 const results = [];
 const discovered = new Set();
+let remainingRequests = Number.POSITIVE_INFINITY;
+let resetAt = 0;
+let rateLimited = false;
+
+page.on('response', (response) => {
+  const headers = response.headers();
+  const remaining = Number(headers['ratelimit-remaining']);
+  const resetSeconds = Number(headers['ratelimit-reset']);
+  if (headers['ratelimit-remaining'] !== undefined && Number.isFinite(remaining)) {
+    remainingRequests = remaining;
+  }
+  if (headers['ratelimit-reset'] !== undefined && Number.isFinite(resetSeconds)) {
+    resetAt = Date.now() + resetSeconds * 1000;
+  }
+  if (response.status() === 429) rateLimited = true;
+});
+
+async function respectBackendLimit() {
+  if (!rateLimited && remainingRequests > 60) return;
+  const delay = Math.max(1000, (resetAt || Date.now() + 15 * 60 * 1000) - Date.now() + 2000);
+  console.log(`Pausa preventiva de ${Math.ceil(delay / 1000)} segundos: el backend alcanzó su límite temporal de consultas.`);
+  await new Promise((done) => setTimeout(done, delay));
+  remainingRequests = Number.POSITIVE_INFINITY;
+  resetAt = 0;
+  rateLimited = false;
+}
 
 try {
   await page.goto(`${baseUrl}/admin/login`, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -61,22 +87,34 @@ try {
 
   for (let index = 0; index < routes.length; index += 1) {
     const name = routes[index];
+    await respectBackendLimit();
+    let failure = '';
+    try {
+      await page.goto(`${baseUrl}/admin/${name}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForTimeout(1000);
+      if (rateLimited) {
+        await respectBackendLimit();
+        await page.goto(`${baseUrl}/admin/${name}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForTimeout(1000);
+      }
+    } catch (error) {
+      failure = error.message;
+    }
+
+    const pathname = new URL(page.url()).pathname;
+    if (/\/admin\/(login|forgot-password|reset-password)/.test(pathname)) {
+      failure = 'Sesión cerrada o acceso no autorizado';
+    } else if (!pathname.startsWith(`/admin/${name}`)) {
+      failure = `Redirigido a ${pathname}`;
+    }
+    if (failure === 'Sesión cerrada o acceso no autorizado') {
+      console.log('Auditoría detenida: la sesión ya no está activa. No se enviarán más solicitudes.');
+      break;
+    }
+
     for (const width of widths) {
       await page.setViewportSize({ width, height: 800 });
-      let failure = '';
-      try {
-        await page.goto(`${baseUrl}/admin/${name}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await page.waitForTimeout(850);
-      } catch (error) {
-        failure = error.message;
-      }
-
-      const pathname = new URL(page.url()).pathname;
-      if (/\/admin\/(login|forgot-password|reset-password)/.test(pathname)) {
-        failure = 'Sesión cerrada o acceso no autorizado';
-      } else if (!pathname.startsWith(`/admin/${name}`)) {
-        failure = `Redirigido a ${pathname}`;
-      }
+      await page.waitForTimeout(180);
 
       let measure = { pageWidth: width, elements: [] };
       if (!failure) {
