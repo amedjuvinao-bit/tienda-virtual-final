@@ -56,7 +56,9 @@ import {
 import { installAdminModalContract } from './theme/adminModalContract';
 import { canAccessAdminPath } from './security/adminPermissions';
 import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
+import AdminMobileNavigation from './components/AdminMobileNavigation';
 import './theme/adminModuleHero.css';
+import './theme/adminMobileSystem.css';
 
 const ADMIN_REVIEW_SEEN_KEY = 'admin_seen_review_ids';
 const ADMIN_SIDEBAR_COLLAPSED_KEY = 'admin_sidebar_collapsed';
@@ -150,7 +152,6 @@ export default function AdminLayout() {
     }
   });
   const commandInputRef = useRef(null);
-  const mobileCommandInputRef = useRef(null);
   const reviewsModalRef = useRef(null);
   const reviewsCloseButtonRef = useRef(null);
   const reviewsTriggerRef = useRef(null);
@@ -440,6 +441,25 @@ export default function AdminLayout() {
   const visibleDesignLinks = filterLinksByPermission(adminUser, designLinks);
   const visibleConfigSublinks = filterLinksByPermission(adminUser, CONFIG_SUBLINKS);
   const hasVisibleConfigLinks = visibleConfigSublinks.length > 0;
+  const mobilePrimaryPaths = new Set([
+    '/admin/dashboard',
+    '/admin/productos',
+    '/admin/ordenes',
+  ]);
+  const mobilePrimaryLinks = visibleMainLinks
+    .filter((item) => mobilePrimaryPaths.has(item.to))
+    .map((item) => ({
+      ...item,
+      mobileLabel: item.to === '/admin/dashboard' ? 'Inicio' : item.label,
+    }));
+  const mobileNavigationGroups = [
+    {
+      label: 'Operación',
+      links: visibleMainLinks.filter((item) => !mobilePrimaryPaths.has(item.to)),
+    },
+    { label: 'Diseño', links: visibleDesignLinks },
+    { label: 'Configuración', links: visibleConfigSublinks },
+  ].filter((group) => group.links.length > 0);
 
   const commandItems = [
     ...visibleMainLinks.map((item) => ({ ...item, group: 'Operación' })),
@@ -482,11 +502,14 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const handleCommandShortcut = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if (
+        window.matchMedia('(min-width: 768px)').matches &&
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k'
+      ) {
         event.preventDefault();
         setCommandOpen(true);
-        const mobileViewport = window.matchMedia('(max-width: 767px)').matches;
-        (mobileViewport ? mobileCommandInputRef : commandInputRef).current?.focus();
+        commandInputRef.current?.focus();
       }
     };
 
@@ -511,9 +534,6 @@ export default function AdminLayout() {
 
   const linkBase =
     'group flex items-center admin-nav-item-gap admin-nav-padding rounded-[calc(var(--admin-radius)*0.55)] transition-all duration-200 text-sm font-medium';
-
-  const mobileLinkBase =
-    'inline-flex items-center admin-mobile-nav-item-gap admin-nav-padding-mobile rounded-[calc(var(--admin-radius)*0.55)] text-sm font-medium whitespace-nowrap transition-all duration-200';
 
   const subLinkBase =
     'group flex items-center admin-subnav-item-gap rounded-[calc(var(--admin-radius)*0.5)] admin-nav-padding-sub text-sm transition-all duration-200 font-medium';
@@ -2477,7 +2497,7 @@ export default function AdminLayout() {
               </div>
             </header>
 
-            <div className="md:hidden space-y-3">
+            <div className="md:hidden">
               <div className="admin-header-glass admin-mobile-header-panel flex items-center justify-between">
                 <div className="admin-mobile-header-copy">
                   <h1
@@ -2489,11 +2509,11 @@ export default function AdminLayout() {
                   <p>{activeAdminName} · <strong>{activeAdminRoleLabel}</strong></p>
                 </div>
 
-                <div className="flex items-center admin-inline-gap-sm">
+                <div className="admin-mobile-header-actions flex items-center">
                   <button
                     type="button"
                     onClick={handleOpenReviewsModal}
-                    className="admin-btn-ghost relative"
+                    className="admin-mobile-header-action"
                     aria-label="Ver reseñas"
                     aria-haspopup="dialog"
                   >
@@ -2506,163 +2526,20 @@ export default function AdminLayout() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="admin-btn-primary"
+                    className="admin-mobile-header-action admin-mobile-header-action--exit"
+                    aria-label="Cerrar sesión"
+                    title="Cerrar sesión"
                   >
                     <LogOut className="h-4 w-4" />
-                    Salir
                   </button>
                 </div>
               </div>
-
-              <div className="admin-command-center admin-command-center--mobile">
-                <div className="admin-search-bar">
-                  <Search
-                    className="h-4 w-4 shrink-0"
-                    style={{ color: 'var(--admin-card-muted-text)' }}
-                  />
-                  <input
-                    ref={mobileCommandInputRef}
-                    type="search"
-                    value={commandQuery}
-                    onChange={(event) => {
-                      setCommandQuery(event.target.value);
-                      setCommandOpen(Boolean(event.target.value.trim()));
-                    }}
-                    onFocus={() => setCommandOpen(Boolean(commandQuery.trim()))}
-                    onBlur={() => window.setTimeout(() => setCommandOpen(false), 120)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        setCommandOpen(false);
-                        event.currentTarget.blur();
-                      }
-                      if (event.key === 'Enter' && filteredCommandItems[0]) {
-                        event.preventDefault();
-                        handleCommandSelect(filteredCommandItems[0].to);
-                      }
-                    }}
-                    placeholder="Buscar en el panel..."
-                    aria-label="Buscar y abrir un módulo del panel"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="admin-command-results-mobile"
-                    aria-expanded={commandOpen && Boolean(normalizedCommandQuery)}
-                    className="w-full bg-transparent text-sm outline-none"
-                    style={{ color: 'var(--admin-card-text)' }}
-                  />
-                </div>
-
-                {commandOpen && Boolean(normalizedCommandQuery) && (
-                  <div id="admin-command-results-mobile" className="admin-command-results" role="listbox">
-                    <div className="admin-command-results__label">Resultados del panel</div>
-                    {filteredCommandItems.length > 0 ? (
-                      filteredCommandItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <NavLink
-                            key={item.to}
-                            to={item.to}
-                            role="option"
-                            aria-selected={item.to === activeCommandItem?.to}
-                            className="admin-command-result"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              setCommandQuery('');
-                              setCommandOpen(false);
-                            }}
-                          >
-                            <span className="admin-command-result__icon"><Icon className="h-4 w-4" /></span>
-                            <span><strong>{item.label}</strong><small>{item.group}</small></span>
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </NavLink>
-                        );
-                      })
-                    ) : (
-                      <div className="admin-command-empty">No hay módulos que coincidan.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <nav
-                className="admin-card-glass admin-mobile-nav-panel flex overflow-x-auto admin-no-scrollbar"
-                aria-label="Navegación principal del panel"
-              >
-                {visibleMainLinks.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={`${mobileLinkBase} admin-nav-link-mobile`}
-                      style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
-                      aria-label={item.label}
-                      title={item.label}
-                    >
-                      <PremiumAdminNavIcon icon={Icon} compact />
-                      <span className="admin-mobile-nav-label">{item.label}</span>
-                    </NavLink>
-                  );
-                })}
-
-                {visibleDesignLinks.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={`${mobileLinkBase} admin-nav-link-mobile`}
-                      style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
-                      aria-label={item.label}
-                      title={item.label}
-                    >
-                      <PremiumAdminNavIcon icon={Icon} compact />
-                      <span className="admin-mobile-nav-label">{item.label}</span>
-                    </NavLink>
-                  );
-                })}
-
-                {hasVisibleConfigLinks && (
-                  <button
-                    type="button"
-                    onClick={handleConfigMenuClick}
-                    className={`${mobileLinkBase} admin-nav-link-mobile`}
-                    style={isConfigRoute ? activeNavStyle : normalNavStyle}
-                    aria-expanded={configMenuOpen}
-                    aria-controls="admin-mobile-config-menu"
-                    aria-label="Configuración"
-                    title="Configuración"
-                  >
-                    <PremiumAdminNavIcon icon={Settings} compact />
-                    <span className="admin-mobile-nav-label">Configuración</span>
-                  </button>
-                )}
-              </nav>
-
-              {hasVisibleConfigLinks && configMenuOpen && (
-                <div
-                  id="admin-mobile-config-menu"
-                  className="flex flex-wrap px-1"
-                  style={{ gap: 'calc(var(--admin-gap) * 0.45)' }}
-                >
-                  {visibleConfigSublinks.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={`${mobileLinkBase} admin-nav-link-mobile`}
-                        style={({ isActive }) => (isActive ? activeNavStyle : normalNavStyle)}
-                        aria-label={item.label}
-                        title={item.label}
-                      >
-                        <Icon className="h-3 w-3" />
-                        <span className="admin-mobile-nav-label">{item.label}</span>
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              )}
             </div>
+
+            <AdminMobileNavigation
+              primaryLinks={mobilePrimaryLinks}
+              groups={mobileNavigationGroups}
+            />
 
             <section
               className="admin-card-glass admin-content-card flex-1"

@@ -357,9 +357,9 @@ function CustomerRow({ customer, onOpenDetail }) {
   const crmStage = CRM_STAGES.find(([key]) => key === customer.crmStage)?.[1] || 'Nuevo';
 
   return (
-    <article className="border-b transition-colors last:border-b-0 hover:bg-pink-50/50" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
-      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:items-center">
-        <div className="flex min-w-0 items-center gap-3">
+    <article className="customer-admin-row border-b transition-colors last:border-b-0 hover:bg-pink-50/50" style={{ borderColor: 'var(--admin-widget-surface-border)' }}>
+      <div className="customer-admin-row__layout grid gap-4 px-4 py-4 lg:grid-cols-[minmax(190px,1.25fr)_minmax(155px,1fr)_70px_110px_minmax(105px,.75fr)_96px] lg:items-center">
+        <div className="customer-admin-row__identity flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-primary-soft-bg)', color: 'var(--admin-primary)' }}><UserRound className="h-5 w-5" /></span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{customerName(customer)}</p>
@@ -368,30 +368,30 @@ function CustomerRow({ customer, onOpenDetail }) {
           </div>
         </div>
 
-        <div className="min-w-0 space-y-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+        <div className="customer-admin-row__contact min-w-0 space-y-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
           <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.phone || 'Sin celular'}</span></p>
           <p className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{customer.email || 'Sin correo'}</span></p>
         </div>
 
-        <div>
+        <div className="customer-admin-row__orders">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Compras</p>
           <p className="text-lg font-black" style={{ color: 'var(--admin-card-text)' }}>{ordersCount}</p>
           <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{stats.lastPurchaseAt ? formatDate(stats.lastPurchaseAt) : 'Sin compras'}</p>
         </div>
 
-        <div>
+        <div className="customer-admin-row__value">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] lg:hidden" style={{ color: 'var(--admin-card-muted-text)' }}>Venta neta</p>
           <p className="text-sm font-black" style={{ color: 'var(--admin-primary)' }}>{money(netSpent)}</p>
           <p className="text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{Number(stats.posOrdersCount || 0)} POS · {Number(stats.webOrdersCount || 0)} web</p>
         </div>
 
-        <div className="min-w-0">
+        <div className="customer-admin-row__crm min-w-0">
           <p className="truncate text-xs font-black" style={{ color: customer.crmStage === 'at_risk' ? '#c2410c' : 'var(--admin-card-text)' }}>{crmStage}</p>
           <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmPriority === 'vip' ? 'Prioridad VIP' : `Prioridad ${customer.crmPriority || 'normal'}`}</p>
           <p className="mt-1 truncate text-[11px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.crmOwnerAdmin?.name || 'Sin responsable'}</p>
         </div>
 
-        <button type="button" onClick={() => onOpenDetail(customer)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-widget-button-bg)', color: 'var(--admin-primary)' }}>
+        <button type="button" onClick={() => onOpenDetail(customer)} className="customer-admin-row__action inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition hover:bg-pink-50" style={{ borderColor: 'var(--admin-primary-soft-border)', background: 'var(--admin-widget-button-bg)', color: 'var(--admin-primary)' }}>
           <Eye className="h-4 w-4" /> Detalle
         </button>
       </div>

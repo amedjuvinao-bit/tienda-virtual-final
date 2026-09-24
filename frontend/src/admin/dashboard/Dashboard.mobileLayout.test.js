@@ -6,22 +6,23 @@ function source(relativeUrl) {
 }
 
 const layoutSource = source('../AdminLayout.jsx');
+const mobileNavigationSource = source('../components/AdminMobileNavigation.jsx');
+const mobileSystemStyles = source('../theme/adminMobileSystem.css');
 const dashboardPageSource = source('./DashboardPage.jsx');
 const dashboardLayoutSource = source('./layouts/DashboardModelOne.jsx');
 const kpiGridSource = source('./components/DashboardKpiGrid.jsx');
 const responsiveStyles = source('./dashboardResponsive.css');
 
 describe('organización móvil escalable del Panel Admin', () => {
-  it('reduce la navegación móvil a controles de icono accesibles', () => {
-    expect(layoutSource).toContain('className="admin-mobile-nav-label"');
-    expect(layoutSource).toContain('aria-label={item.label}');
-    expect(layoutSource).toContain('title={item.label}');
-    expect(layoutSource).toMatch(
-      /@media \(max-width: 767px\)[\s\S]*?\.admin-mobile-nav-label\s*\{[\s\S]*?clip-path: inset\(50%\);/,
-    );
-    expect(layoutSource).toMatch(
-      /\.admin-mobile-nav-panel \.admin-nav-link-mobile,[\s\S]*?width: 44px;[\s\S]*?justify-content: center;/,
-    );
+  it('reduce la navegación móvil a tres destinos principales y un menú Más', () => {
+    expect(layoutSource).toContain("'/admin/dashboard'");
+    expect(layoutSource).toContain("'/admin/productos'");
+    expect(layoutSource).toContain("'/admin/ordenes'");
+    expect(layoutSource).toContain('<AdminMobileNavigation');
+    expect(mobileNavigationSource).toContain('<MoreHorizontal');
+    expect(mobileNavigationSource).toContain('<span>Más</span>');
+    expect(mobileSystemStyles).toContain('.admin-mobile-bottom-nav');
+    expect(mobileSystemStyles).toContain('.admin-mobile-more-sheet');
   });
 
   it('centraliza la densidad móvil del dashboard en una hoja dedicada', () => {
@@ -53,5 +54,16 @@ describe('organización móvil escalable del Panel Admin', () => {
 
     expect(responsiveStyles).toContain('.dashboard-products-grid');
     expect(responsiveStyles).toContain('.dashboard-sales-chart');
+  });
+
+  it('elimina el contenedor exterior gigante y compacta métricas compartidas', () => {
+    expect(mobileSystemStyles).toMatch(
+      /\.admin-content-card\s*\{[\s\S]*?padding: 0 !important;[\s\S]*?background: transparent !important;/,
+    );
+    expect(mobileSystemStyles).toContain('.orders-admin-metrics');
+    expect(mobileSystemStyles).toContain('.cart-admin-metrics');
+    expect(mobileSystemStyles).toContain('.favorites-admin-metrics');
+    expect(mobileSystemStyles).toContain('.finance-summary-grid');
+    expect(mobileSystemStyles).toContain('.customer-admin-row__layout');
   });
 });

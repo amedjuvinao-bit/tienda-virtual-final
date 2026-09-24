@@ -125,7 +125,7 @@ export default function ConfiguracionPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl p-3 md:p-5">
+    <div className="configuration-admin-page mx-auto max-w-7xl p-3 md:p-5">
       <section className="configuration-module-content">{renderContent()}</section>
     </div>
   );

@@ -6,6 +6,8 @@ function source(relativeUrl) {
 }
 
 const layoutSource = source('./AdminLayout.jsx');
+const mobileNavigationSource = source('./components/AdminMobileNavigation.jsx');
+const mobileStylesSource = source('./theme/adminMobileSystem.css');
 const globalStylesSource = source('./theme/adminGlobalStyles.js');
 const panelStylesSource = source('./configuracion/sections/PanelAdminSection.css');
 const panelSource = source('./configuracion/sections/PanelAdminSection.jsx');
@@ -21,13 +23,14 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(globalStylesSource).toContain('outline-offset: 2px !important');
   });
 
-  it('convierte el buscador móvil en una navegación funcional y accesible', () => {
-    expect(layoutSource).toContain('ref={mobileCommandInputRef}');
-    expect(layoutSource).toContain('value={commandQuery}');
-    expect(layoutSource).toContain('id="admin-command-results-mobile"');
-    expect(layoutSource).toContain('aria-controls="admin-command-results-mobile"');
-    expect(layoutSource).toContain('aria-autocomplete="list"');
-    expect(layoutSource).toContain('aria-label="Navegación principal del panel"');
+  it('concentra la navegación móvil en una barra inferior y una bandeja accesible', () => {
+    expect(layoutSource).toContain('<AdminMobileNavigation');
+    expect(mobileNavigationSource).toContain('aria-label="Navegación móvil principal"');
+    expect(mobileNavigationSource).toContain('role="dialog"');
+    expect(mobileNavigationSource).toContain('aria-modal="true"');
+    expect(mobileNavigationSource).toContain('aria-label="Buscar un módulo del panel"');
+    expect(mobileNavigationSource).toContain("if (event.key === 'Escape')");
+    expect(mobileNavigationSource).toContain("if (event.key !== 'Tab') return");
   });
 
   it('protege el foco y el cierre por teclado en el modal de reseñas', () => {
@@ -48,7 +51,9 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
   });
 
   it('mantiene navegación y contenido utilizables en pantallas estrechas', () => {
-    expect(layoutSource).toContain('scroll-snap-type: inline proximity');
+    expect(mobileStylesSource).toContain('.admin-mobile-bottom-nav');
+    expect(mobileStylesSource).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))');
+    expect(mobileStylesSource).toContain('.admin-mobile-more-sheet');
     expect(layoutSource).toContain('@media (max-width: 480px)');
     expect(layoutSource).toContain('max-height: calc(100dvh - 16px)');
     expect(globalStylesSource).toContain('overscroll-behavior-inline: contain');

@@ -635,8 +635,8 @@ export default function ProductosAdmin() {
   };
 
   return (
-    <div style={styles.page}>
-      <div className="admin-widget-stage" style={styles.shell}>
+    <div className="products-admin-page" style={styles.page}>
+      <div className="products-admin-shell admin-widget-stage" style={styles.shell}>
         <div className="admin-module-hero products-admin-header px-5 py-5 md:px-7 md:py-6" style={styles.header}>
           <PackageSearch className="admin-module-hero__watermark" aria-hidden="true" />
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -665,7 +665,7 @@ export default function ProductosAdmin() {
             </Can>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="products-admin-metrics mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               { label: 'Productos', value: formatNumber(summary.total), sub: `${formatNumber(summary.active)} activos`, icon: PackageSearch },
               { label: 'Stock real', value: formatNumber(summary.stock), sub: `${formatNumber(summary.reserved)} reservado`, icon: Boxes },
@@ -675,7 +675,7 @@ export default function ProductosAdmin() {
               const Icon = item.icon;
 
               return (
-                <div key={item.label} className="admin-widget-surface p-4" style={styles.kpi}>
+                <div key={item.label} className="products-admin-metric admin-widget-surface p-4" style={styles.kpi}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={styles.muted}>
