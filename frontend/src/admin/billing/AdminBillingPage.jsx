@@ -66,11 +66,11 @@ export default function AdminBillingPage() {
       <section className="billing-admin-shell overflow-hidden rounded-[32px] border shadow-sm" style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)' }}>
         <div className="admin-module-hero flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between md:p-6" style={{ borderColor: 'var(--admin-card-border)' }}>
           <ActiveIcon className="admin-module-hero__watermark" aria-hidden="true" />
-          <div className="flex items-start gap-4">
+          <div className="billing-admin-hero-identity flex min-w-0 items-start gap-4">
             <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border" style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-soft-bg)' }}>
               <ActiveIcon className="h-6 w-6" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>Facturación</p>
               <h1 className="mt-1 text-3xl font-black">{activeData.label}</h1>
               <p className="mt-1 max-w-3xl text-sm font-semibold leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>{activeData.description}</p>
@@ -78,15 +78,15 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto border-b px-4 py-3 md:px-5" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <nav className="flex min-w-max items-center gap-1.5" aria-label="Secciones de facturación">
+        <div className="billing-admin-tabs-wrap overflow-x-auto border-b px-4 py-3 md:px-5" style={{ borderColor: 'var(--admin-card-border)' }}>
+          <nav className="billing-admin-tabs flex min-w-max items-center gap-1.5" aria-label="Secciones de facturación">
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <NavLink
                   key={tab.id}
                   to={`${BASE_PATH}/${tab.id}`}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black transition"
+                  className="billing-admin-tab inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black transition"
                   style={({ isActive }) => ({
                     borderColor: isActive ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
                     background: isActive ? 'var(--admin-active-nav-bg)' : 'var(--admin-soft-bg)',
@@ -94,7 +94,8 @@ export default function AdminBillingPage() {
                   })}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span>{tab.label}</span>
+                  <span className="billing-admin-tab-label billing-admin-tab-label--desktop">{tab.label}</span>
+                  <span className="billing-admin-tab-label billing-admin-tab-label--mobile">{tab.mobileLabel || tab.label}</span>
                 </NavLink>
               );
             })}

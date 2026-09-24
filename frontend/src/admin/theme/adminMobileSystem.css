@@ -8,6 +8,10 @@
   --admin-mobile-safe-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
+.billing-admin-tab-label--mobile {
+  display: none;
+}
+
 @media (min-width: 768px) {
   .admin-mobile-navigation {
     display: none !important;
@@ -21,8 +25,39 @@
   }
 
   .admin-main-column {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     gap: 8px !important;
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  /* Contrato base: ninguna ruta ni hijo flex/grid puede imponer un ancho
+     mayor al espacio disponible. Los desbordamientos funcionales (tablas,
+     registros y pestañas) conservan su propio contenedor de desplazamiento. */
+  .admin-content-card,
+  .admin-content-card > *,
+  .admin-content-card :where(.grid, .flex) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admin-content-card > * {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .admin-content-card :where(.grid, .flex) > * {
+    min-width: 0;
+  }
+
+  .admin-content-card :where(h1, h2, h3, h4, p) {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-content-card :where(input, select, textarea) {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-area .admin-mobile-header-panel {
@@ -118,11 +153,263 @@
   }
 
   .billing-admin-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     margin-top: 8px;
     padding: 10px !important;
     border: 1px solid var(--admin-card-border);
     border-radius: 16px;
     background: var(--admin-widget-surface-bg, var(--admin-card-bg));
+  }
+
+  /* Facturación: navegación visible, contenido compacto y tablas convertidas
+     en fichas. En móvil no se exige descubrir un scroll horizontal oculto. */
+  .billing-admin-page,
+  .billing-admin-shell,
+  .billing-admin-content > *,
+  .billing-workspace-panel,
+  .billing-summary-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .billing-admin-hero-identity {
+    width: 100%;
+    gap: 10px !important;
+  }
+
+  .billing-admin-hero-identity > span {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 13px !important;
+  }
+
+  .billing-admin-hero-identity h1 {
+    overflow: hidden;
+    font-size: 23px !important;
+    line-height: 1.05 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .billing-admin-tabs-wrap {
+    overflow: visible !important;
+  }
+
+  .billing-admin-tabs {
+    display: grid !important;
+    width: 100%;
+    min-width: 0 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px !important;
+  }
+
+  .billing-admin-tab {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    gap: 5px !important;
+    padding: 6px 5px !important;
+    border-radius: 12px !important;
+    font-size: 10px !important;
+  }
+
+  .billing-admin-tab svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .billing-admin-tab-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .billing-admin-tab-label--desktop {
+    display: none;
+  }
+
+  .billing-admin-tab-label--mobile {
+    display: inline;
+  }
+
+  .billing-summary-panel,
+  .billing-workspace-panel {
+    gap: 8px !important;
+  }
+
+  .billing-panel-header,
+  .billing-summary-card {
+    padding: 10px !important;
+    border-radius: 15px !important;
+  }
+
+  .billing-panel-header > div {
+    gap: 9px !important;
+  }
+
+  .billing-panel-header h3 {
+    margin-top: 3px !important;
+    font-size: 19px !important;
+    line-height: 1.12 !important;
+  }
+
+  .billing-panel-header p:not(:first-child) {
+    margin-top: 5px !important;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  .billing-summary-actions,
+  .billing-panel-controls,
+  .billing-report-actions {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px !important;
+  }
+
+  .billing-summary-actions > *,
+  .billing-panel-controls > *,
+  .billing-report-actions > * {
+    width: 100%;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+  }
+
+  .billing-summary-actions > :last-child,
+  .billing-panel-controls > label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .billing-summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .billing-metric-card {
+    min-height: 78px;
+    padding: 9px 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .billing-metric-card > div {
+    gap: 6px !important;
+  }
+
+  .billing-metric-card > div > span {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 10px !important;
+  }
+
+  .billing-metric-card > div > span svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .billing-metric-card p:nth-child(2) {
+    overflow: hidden;
+    margin-top: 4px !important;
+    font-size: 15px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .billing-metric-card p:nth-child(3) {
+    overflow: hidden;
+    margin-top: 3px !important;
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .billing-summary-detail-grid {
+    gap: 8px !important;
+  }
+
+  .billing-summary-card h3 {
+    font-size: 16px !important;
+  }
+
+  .billing-responsive-table,
+  .billing-responsive-table tbody {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .billing-responsive-table thead {
+    display: none;
+  }
+
+  .billing-responsive-table tbody {
+    display: grid;
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .billing-responsive-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--admin-card-border) !important;
+    border-radius: 14px;
+    background: var(--admin-widget-surface-bg, var(--admin-card-bg)) !important;
+  }
+
+  .billing-responsive-table tbody td {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 9px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .billing-responsive-table tbody td::before {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--admin-card-muted-text);
+    content: attr(data-label);
+    font-size: 8px;
+    font-weight: 950;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+  }
+
+  .billing-responsive-table tbody td > :where(p, div, span) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .billing-documents-table tbody td:nth-child(2),
+  .billing-documents-table tbody td:last-child,
+  .billing-credit-notes-table tbody td:last-child,
+  .billing-pending-orders-table tbody td:nth-child(2),
+  .billing-pending-orders-table tbody td:last-child,
+  .billing-report-table tbody td:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .billing-responsive-table tbody td:last-child > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .billing-responsive-table tbody td:last-child button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
   }
 
   .admin-content-card :is(.orders-admin-shell, .cart-admin-page, .favorites-admin-page) {
@@ -1382,6 +1669,14 @@
 @media (max-width: 359px) {
   .admin-mobile-more-grid {
     grid-template-columns: 1fr;
+  }
+
+  .billing-responsive-table tbody tr {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-responsive-table tbody td {
+    grid-column: 1 !important;
   }
 }
 

@@ -28,7 +28,7 @@ export function BillingMetricCard({
 }) {
   return (
     <article
-      className={`relative min-w-0 overflow-hidden rounded-[26px] border p-5 shadow-sm ${className}`}
+      className={`billing-metric-card relative min-w-0 overflow-hidden rounded-[26px] border p-5 shadow-sm ${className}`}
       style={{
         background: featured
           ? 'linear-gradient(135deg, var(--admin-active-nav-bg), var(--admin-card-bg) 72%)'
@@ -152,7 +152,7 @@ export function DocumentActionButton({
 export function PanelHeader({ eyebrow, title, text, children }) {
   return (
     <div
-      className="rounded-[28px] border p-4 shadow-sm"
+      className="billing-panel-header min-w-0 rounded-[28px] border p-4 shadow-sm"
       style={{
         background: 'var(--admin-card-bg)',
         borderColor: 'var(--admin-card-border)',
@@ -164,7 +164,7 @@ export function PanelHeader({ eyebrow, title, text, children }) {
           <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
             {eyebrow}
           </p>
-          <h3 className="mt-1 text-2xl font-black">{title}</h3>
+          <h3 className="mt-1 break-words text-2xl font-black [overflow-wrap:anywhere]">{title}</h3>
           <p className="mt-1 max-w-3xl break-words text-sm font-semibold leading-6" style={{ color: 'var(--admin-card-muted-text)' }}>
             {text}
           </p>
@@ -178,7 +178,7 @@ export function PanelHeader({ eyebrow, title, text, children }) {
 export function SummaryPanelCard({ title, eyebrow, children, footer }) {
   return (
     <section
-      className="rounded-[28px] border p-4 shadow-sm"
+      className="billing-summary-card min-w-0 rounded-[28px] border p-4 shadow-sm"
       style={{
         background: 'var(--admin-card-bg)',
         borderColor: 'var(--admin-card-border)',

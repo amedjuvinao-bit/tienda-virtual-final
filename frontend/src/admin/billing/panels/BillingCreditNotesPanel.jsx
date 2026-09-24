@@ -164,13 +164,13 @@ export default function BillingCreditNotesPanel() {
   };
 
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="billing-workspace-panel grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Bandeja fiscal"
         title="Notas crédito"
         text="Administración central de notas crédito guardadas dentro de ElectronicInvoice.creditNotes."
       >
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+        <div className="billing-panel-controls flex flex-col gap-2 xl:flex-row xl:items-center">
           <label
             className="flex min-w-[260px] items-center gap-2 rounded-2xl border px-3 py-2"
             style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
@@ -227,7 +227,7 @@ export default function BillingCreditNotesPanel() {
           <EmptyWorkBlock icon={RotateCcw} title="Sin notas crédito registradas" text="Cuando una factura tenga nota crédito total o parcial, aparecerá aquí sin salir del módulo de Facturación." />
         ) : (
           <div className="w-full min-w-0 overflow-hidden">
-            <table className="w-full table-fixed text-left text-sm">
+            <table className="billing-responsive-table billing-credit-notes-table w-full table-fixed text-left text-sm">
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="w-[16%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Nota crédito</th>
@@ -250,22 +250,22 @@ export default function BillingCreditNotesPanel() {
 
                   return (
                     <tr key={note.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Nota crédito" className="px-3 py-4 align-top">
                         <p className="truncate font-black">{note.noteNumber || note.referenceCode || 'Sin número'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Ref. {note.referenceCode || '—'}</p>
                         <p className="mt-1 truncate text-[11px] font-semibold" title={note.provider?.cude || note.provider?.cufe || ''} style={{ color: 'var(--admin-card-muted-text)' }}>CUDE {note.provider?.cude || note.provider?.cufe || '—'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatDate(note.createdAt)}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Factura" className="px-3 py-4 align-top">
                         <p className="truncate font-black">{note.invoiceNumber || note.billNumber || 'Sin factura'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{note.orderNumber || '—'}</p>
                         <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {note.invoiceCufe || '—'}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Cliente" className="px-3 py-4 align-top">
                         <p className="truncate font-black">{customerName}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || customer.email || 'Sin identificación'}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Estado / tipo" className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={getStatusStyle(note.status)}>
                           <span className="truncate">{getStatusLabel(note.status)}</span>
                         </span>
@@ -277,11 +277,11 @@ export default function BillingCreditNotesPanel() {
                             : 'Sin sincronizar'}
                         </p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Valor" className="px-3 py-4 align-top">
                         <p className="font-black">{formatCurrency(note.totalAmount)}</p>
                         <p className="mt-1 text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(note.itemsCount || 0)} ítem(s)</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Acciones" className="px-3 py-4 align-top">
                         <div className="grid grid-cols-2 gap-1.5">
                           <DocumentActionButton icon={ExternalLink} onClick={() => openCreditNoteInvoice(note)} disabled={isOpening}>{isOpening ? '...' : 'Factura'}</DocumentActionButton>
                           <DocumentActionButton icon={RefreshCw} onClick={() => syncCreditNote(note)} disabled={!canSync || isSyncing}>{isSyncing ? '...' : 'Sincronizar'}</DocumentActionButton>

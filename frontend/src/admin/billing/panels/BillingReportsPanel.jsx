@@ -114,13 +114,13 @@ export default function BillingReportsPanel() {
   const dailyMaximum = Math.max(1, ...daily.map((row) => Math.abs(Number(row.net) || 0)));
 
   return (
-    <section className="grid min-w-0 gap-5">
+    <section className="billing-workspace-panel grid min-w-0 gap-5">
       <PanelHeader
         eyebrow="Control financiero y fiscal"
         title="Reportes de facturación"
         text="Una vista clara de ventas, impuestos y devoluciones, con cada nota crédito aplicada en su fecha real de emisión."
       >
-        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
+        <div className="billing-report-actions grid w-full grid-cols-2 gap-2 sm:w-auto">
           <ActionButton className="min-h-10 whitespace-nowrap px-4" icon={RefreshCw} onClick={loadReport} disabled={loading}>Actualizar</ActionButton>
           <ActionButton className="min-h-10 whitespace-nowrap px-4" icon={FileSpreadsheet} onClick={exportReport} disabled={!canDownload || exporting || loading} variant="primary">
             {exporting ? 'Exportando...' : 'Exportar CSV'}
@@ -319,7 +319,7 @@ export default function BillingReportsPanel() {
       >
         {rows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="billing-responsive-table billing-report-table w-full min-w-[760px] text-left text-sm">
               <thead style={{ color: 'var(--admin-card-muted-text)' }}>
                 <tr>
                   <th className="w-[12%] px-3 py-2 text-[10px] font-black uppercase">Fecha</th>
@@ -333,18 +333,18 @@ export default function BillingReportsPanel() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={`${row.documentType}-${row.id}`} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                    <td className="px-3 py-3 align-top font-bold">{formatReportDate(row.dateKey)}</td>
-                    <td className="px-3 py-3 align-top">
+                    <td data-label="Fecha" className="px-3 py-3 align-top font-bold">{formatReportDate(row.dateKey)}</td>
+                    <td data-label="Documento" className="px-3 py-3 align-top">
                       <p className="break-words font-black [overflow-wrap:anywhere]">{row.number}</p>
                       <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{row.documentTypeLabel}{row.referenceNumber ? ` · Factura ${row.referenceNumber}` : ''}</p>
                     </td>
-                    <td className="px-3 py-3 align-top">
+                    <td data-label="Cliente" className="px-3 py-3 align-top">
                       <p className="break-words font-black [overflow-wrap:anywhere]">{row.customerName}</p>
                       <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{row.orderNumber || '—'} · {row.channel} · {row.paymentMethod}</p>
                     </td>
-                    <td className="px-3 py-3 align-top"><span className="inline-flex max-w-full break-words rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.status)}>{row.statusLabel}</span></td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{formatCurrency(row.total)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{row.validated ? formatCurrency(row.fiscalImpact) : 'Sin impacto'}</td>
+                    <td data-label="Estado" className="px-3 py-3 align-top"><span className="inline-flex max-w-full break-words rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase" style={getStatusStyle(row.status)}>{row.statusLabel}</span></td>
+                    <td data-label="Total" className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{formatCurrency(row.total)}</td>
+                    <td data-label="Impacto fiscal" className="whitespace-nowrap px-3 py-3 text-right align-top font-black">{row.validated ? formatCurrency(row.fiscalImpact) : 'Sin impacto'}</td>
                   </tr>
                 ))}
               </tbody>

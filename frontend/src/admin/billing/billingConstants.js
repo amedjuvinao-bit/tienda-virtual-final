@@ -13,6 +13,7 @@ export const BILLING_TABS = [
   {
     id: 'resumen',
     label: 'Resumen',
+    mobileLabel: 'Resumen',
     icon: ReceiptText,
     permission: 'billing:view',
     description: 'Estado general de facturación, pendientes y alertas.',
@@ -20,6 +21,7 @@ export const BILLING_TABS = [
   {
     id: 'documentos',
     label: 'Documentos',
+    mobileLabel: 'Documentos',
     icon: FileText,
     permission: 'billing:view',
     description: 'Facturas, comprobantes y soportes generados.',
@@ -27,6 +29,7 @@ export const BILLING_TABS = [
   {
     id: 'notas-credito',
     label: 'Notas crédito',
+    mobileLabel: 'Notas',
     icon: RotateCcw,
     permission: 'billing:view',
     description: 'Bandeja de notas crédito asociadas a facturas electrónicas.',
@@ -34,6 +37,7 @@ export const BILLING_TABS = [
   {
     id: 'ordenes',
     label: 'Órdenes por facturar',
+    mobileLabel: 'Pendientes',
     icon: ClipboardList,
     permission: 'billing:view',
     description: 'Ventas pagadas que aún requieren comprobante.',
@@ -41,6 +45,7 @@ export const BILLING_TABS = [
   {
     id: 'reportes',
     label: 'Reportes',
+    mobileLabel: 'Reportes',
     icon: BarChart3,
     permission: 'billing:view',
     description: 'Ventas, impuestos, notas crédito, estados y exportación por período.',
@@ -48,6 +53,7 @@ export const BILLING_TABS = [
   {
     id: 'configuracion',
     label: 'Configuración',
+    mobileLabel: 'Ajustes',
     icon: Settings2,
     permission: 'billing:settings',
     description: 'Datos fiscales, proveedor, resolución, impuestos y textos legales.',

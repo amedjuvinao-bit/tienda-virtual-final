@@ -88,13 +88,13 @@ export default function BillingSummaryPanel() {
     : null;
 
   return (
-    <div className="grid gap-5">
+    <div className="billing-summary-panel grid min-w-0 gap-5">
       <PanelHeader
         eyebrow="Control general"
         title="Módulo unificado de facturación"
         text="Indicadores reales tomados de ElectronicInvoice, notas crédito, órdenes pendientes y configuración actual."
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="billing-summary-actions flex flex-wrap gap-2">
           <SummaryQuickLink to={`${BASE_PATH}/documentos`} icon={FileText}>Ver documentos</SummaryQuickLink>
           <SummaryQuickLink to={`${BASE_PATH}/notas-credito`} icon={RotateCcw}>Notas crédito</SummaryQuickLink>
           <SummaryQuickLink to={`${BASE_PATH}/ordenes`} icon={ClipboardList}>Órdenes pendientes</SummaryQuickLink>
@@ -105,7 +105,7 @@ export default function BillingSummaryPanel() {
 
       {error ? <MessageBox>{error}</MessageBox> : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <div className="billing-summary-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <BillingMetricCard icon={FileText} label="Emitidas" value={loading ? '...' : formatNumber(summary?.emitted || 0)} helper={`${formatNumber(summary?.validated || 0)} validadas`} />
         <BillingMetricCard icon={ClipboardList} label="Pendientes" value={loading ? '...' : formatNumber(summary?.pending || 0)} helper="Órdenes por facturar" />
         <BillingMetricCard icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatNumber(summary?.creditNotes || 0)} helper="Devoluciones y ajustes" />
@@ -113,7 +113,7 @@ export default function BillingSummaryPanel() {
         <BillingMetricCard icon={Send} label="Proveedor" value={normalizeProviderLabel(summary?.provider)} helper={normalizeModeLabel(summary?.mode)} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="billing-summary-detail-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <SummaryPanelCard
           eyebrow="Última emisión"
           title="Último documento generado"
@@ -161,7 +161,7 @@ export default function BillingSummaryPanel() {
         </SummaryPanelCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="billing-summary-detail-grid grid gap-4 xl:grid-cols-2">
         <SummaryPanelCard
           eyebrow="Pendientes"
           title="Órdenes próximas por facturar"

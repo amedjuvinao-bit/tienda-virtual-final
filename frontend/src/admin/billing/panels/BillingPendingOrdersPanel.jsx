@@ -250,13 +250,13 @@ export default function BillingPendingOrdersPanel() {
   };
 
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="billing-workspace-panel grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Pendientes de emisión"
         title="Órdenes por facturar"
         text="Ventas pagadas sin factura validada o con una emisión que requiere corrección."
       >
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="billing-panel-controls flex flex-col gap-2 md:flex-row md:items-center">
           <label
             className="flex min-w-[280px] items-center gap-2 rounded-2xl border px-3 py-2"
             style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
@@ -287,7 +287,7 @@ export default function BillingPendingOrdersPanel() {
           <EmptyWorkBlock icon={ClipboardList} title="Sin órdenes pendientes" text="Cuando una orden pagada no tenga ElectronicInvoice, aparecerá aquí para generar la factura." />
         ) : (
           <div className="w-full min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+            <table className="billing-responsive-table billing-pending-orders-table w-full min-w-[760px] table-fixed text-left text-sm">
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="w-[13%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Orden</th>
@@ -305,11 +305,11 @@ export default function BillingPendingOrdersPanel() {
 
                   return (
                     <tr key={order.id} style={{ borderTop: '1px solid var(--admin-card-border)' }}>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Orden" className="px-3 py-4 align-top">
                         <p className="break-words font-black">#{order.orderNumber || '—'}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Creada: {formatDate(order.createdAt)}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Cliente" className="px-3 py-4 align-top">
                         <p className="break-words font-black leading-5">{order.customerName || 'Cliente'}</p>
                         <p className="mt-1 break-words text-xs font-bold leading-5 [overflow-wrap:anywhere]" style={{ color: 'var(--admin-card-muted-text)' }}>{order.customerEmail || 'Sin correo'}</p>
                         {issueMessage ? (
@@ -319,21 +319,21 @@ export default function BillingPendingOrdersPanel() {
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Canal" className="px-3 py-4 align-top">
                         <p className="font-black">{normalizeChannelLabel(order.source)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{formatNumber(order.itemsCount || 0)} producto(s)</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Pago" className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.06em]" style={{ borderColor: 'rgba(16, 185, 129, 0.36)', background: 'rgba(16, 185, 129, 0.12)', color: '#047857' }}>
                           {normalizePaymentStatus(order.paymentStatus)}
                         </span>
                         <p className="mt-1 break-words text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>{order.paymentProvider || 'Sin proveedor'}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Total" className="px-3 py-4 align-top">
                         <p className="whitespace-nowrap font-black">{formatCurrency(order.total)}</p>
                         <p className="mt-1 whitespace-nowrap text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Envío {formatCurrency(order.shipping)}</p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Acciones" className="px-3 py-4 align-top">
                         <div className="grid gap-1.5">
                           <ActionButton className="w-full whitespace-nowrap rounded-xl" icon={ExternalLink} onClick={() => window.open(`/admin/ordenes?order=${order.id}`, '_blank', 'noopener,noreferrer')}>Ver orden</ActionButton>
                           {canGenerate ? (

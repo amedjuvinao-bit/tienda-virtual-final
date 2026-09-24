@@ -221,13 +221,13 @@ export default function BillingDocumentsPanel() {
   };
 
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="billing-workspace-panel grid min-w-0 gap-4">
       <PanelHeader
         eyebrow="Documentos reales"
         title="Facturas y comprobantes emitidos"
         text="Información tomada de ElectronicInvoice, la misma usada por Órdenes."
       >
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="billing-panel-controls flex flex-col gap-2 md:flex-row md:items-center">
           <label
             className="flex min-w-[260px] items-center gap-2 rounded-2xl border px-3 py-2"
             style={{ borderColor: 'var(--admin-card-border)', background: 'var(--admin-input-bg, var(--admin-card-bg))' }}
@@ -276,7 +276,7 @@ export default function BillingDocumentsPanel() {
           <EmptyWorkBlock icon={FileText} title="Sin documentos generados" text="Cuando una orden tenga factura electrónica o comprobante registrado en ElectronicInvoice, aparecerá en esta lista." />
         ) : (
           <div className="w-full min-w-0 overflow-hidden">
-            <table className="w-full table-fixed text-left text-sm">
+            <table className="billing-responsive-table billing-documents-table w-full table-fixed text-left text-sm">
               <thead style={{ background: 'var(--admin-soft-bg)' }}>
                 <tr style={{ color: 'var(--admin-card-muted-text)' }}>
                   <th className="w-[24%] px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em]">Documento</th>
@@ -307,12 +307,12 @@ export default function BillingDocumentsPanel() {
 
                   return (
                     <tr key={document.id} style={{ borderTop: '1px solid var(--admin-card-border)', background: 'var(--admin-card-bg)' }}>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Documento" className="px-3 py-4 align-top">
                         <p className="truncate font-black">{document.invoiceNumber || document.provider?.number || 'Sin número'}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>Orden #{document.orderNumber || '—'}</p>
                         {document.cufe ? <p className="mt-1 truncate text-[11px] font-semibold" style={{ color: 'var(--admin-card-muted-text)' }}>CUFE {document.cufe}</p> : null}
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Cliente / correo" className="px-3 py-4 align-top">
                         <p className="truncate font-black">{customerName}</p>
                         <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{customer.documentNumber || 'Sin identificación'}</p>
                         <p className="mt-1 truncate text-xs font-bold" title={emailRecipient} style={{ color: 'var(--admin-card-muted-text)' }}>{emailRecipient || 'Sin correo fiscal'}</p>
@@ -330,7 +330,7 @@ export default function BillingDocumentsPanel() {
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Estado / proveedor" className="px-3 py-4 align-top">
                         <span className="inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]" style={statusStyle}>
                           <span className="truncate">{getStatusLabel(document.status)}</span>
                         </span>
@@ -342,14 +342,14 @@ export default function BillingDocumentsPanel() {
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Fechas" className="px-3 py-4 align-top">
                         <p className="font-bold leading-5">Creado: {formatDate(document.createdAt || document.generatedAt)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>Validado: {formatDate(document.acceptedAt || document.provider?.validatedAt)}</p>
                         <p className="mt-1 text-xs font-bold leading-5" style={{ color: 'var(--admin-card-muted-text)' }}>
                           {document.sync?.status === 'failed' ? 'Último intento' : 'Sincronizado'}: {formatDateTime(document.sync?.lastSuccessAt || document.sync?.lastAttemptAt)}
                         </p>
                       </td>
-                      <td className="px-3 py-4 align-top">
+                      <td data-label="Acciones" className="px-3 py-4 align-top">
                         <div className="grid grid-cols-2 gap-1.5">
                           <DocumentActionButton icon={Download} onClick={() => openDocumentPdf(document)} disabled={!canDownload || !canOpenPdf || isPdfLoading} variant="primary">{isPdfLoading ? '...' : 'PDF'}</DocumentActionButton>
                           <DocumentActionButton icon={FileText} onClick={() => openDocumentXml(document)} disabled={!canDownload || !canOpenXml || isXmlLoading}>{isXmlLoading ? '...' : 'XML'}</DocumentActionButton>

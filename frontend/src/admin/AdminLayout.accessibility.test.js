@@ -70,6 +70,16 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(globalStylesSource).toContain('-webkit-overflow-scrolling: touch');
   });
 
+  it('impide que las rutas y sus hijos flex o grid desborden el ancho móvil', () => {
+    expect(mobileStylesSource).toMatch(
+      /\.admin-main-column\s*\{[^}]*width: 100%;[^}]*min-width: 0;[^}]*max-width: 100%;/s,
+    );
+    expect(mobileStylesSource).toContain('.admin-content-card > *');
+    expect(mobileStylesSource).toContain('.admin-content-card :where(.grid, .flex)');
+    expect(mobileStylesSource).toContain('.admin-content-card :where(.grid, .flex) > *');
+    expect(mobileStylesSource).toContain('overflow-wrap: anywhere');
+  });
+
   it('deja el cargador de fondo disponible por teclado y conserva estados semánticos', () => {
     expect(panelStylesSource).toMatch(
       /\.panel-admin-upload-button input\s*\{[^}]*inset: 0;[^}]*width: 100%;[^}]*height: 100%;/s
