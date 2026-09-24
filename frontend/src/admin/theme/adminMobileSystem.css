@@ -12,6 +12,10 @@
   display: none;
 }
 
+.billing-wizard-progress__label--mobile {
+  display: none;
+}
+
 @media (min-width: 768px) {
   .admin-mobile-navigation {
     display: none !important;
@@ -410,6 +414,177 @@
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
+  }
+
+  /* Facturación / Reportes: las seis métricas conservan lectura comparativa
+     en dos columnas y evitan una secuencia vertical innecesariamente larga. */
+  .billing-report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  /* Facturación / Configuración: el asistente mantiene toda su funcionalidad,
+     pero usa una jerarquía móvil propia y controles previsibles. */
+  .billing-config-panel,
+  .billing-config-card,
+  .billing-config-flow,
+  .billing-wizard-step,
+  .billing-config-summary {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .billing-config-panel,
+  .billing-config-flow {
+    gap: 8px !important;
+  }
+
+  .billing-config-card,
+  .billing-config-readiness-hint {
+    padding: 10px !important;
+    border-radius: 15px !important;
+  }
+
+  .billing-config-card > div > h3 {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  .billing-config-card > div > h3 + p,
+  .billing-config-readiness-hint p {
+    margin-top: 4px !important;
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+  }
+
+  .billing-config-card > div > div {
+    margin-top: 8px !important;
+  }
+
+  .billing-wizard-progress {
+    padding: 8px !important;
+    border-radius: 14px !important;
+  }
+
+  .billing-wizard-progress__steps {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .billing-wizard-progress__step {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 6px !important;
+    border-radius: 11px !important;
+    font-size: 11px !important;
+  }
+
+  .billing-wizard-progress__label--desktop {
+    display: none;
+  }
+
+  .billing-wizard-progress__label--mobile {
+    display: inline;
+  }
+
+  .billing-wizard-progress__bar {
+    height: 5px !important;
+  }
+
+  .billing-wizard-step {
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .billing-wizard-step__heading {
+    margin-bottom: 10px !important;
+  }
+
+  .billing-wizard-step__heading h3 {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  .billing-wizard-step :where(.grid, .flex) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .billing-wizard-step :where(.gap-4, .gap-5) {
+    gap: 10px !important;
+  }
+
+  .billing-wizard-step :where(.p-4, .p-5),
+  .billing-config-summary :where(.p-4, .p-5) {
+    padding: 10px !important;
+  }
+
+  .billing-wizard-step :where(.px-4),
+  .billing-config-summary :where(.px-4),
+  .billing-config-feedback {
+    padding-inline: 10px !important;
+  }
+
+  .billing-wizard-step :where(.py-3),
+  .billing-config-summary :where(.py-3),
+  .billing-config-feedback {
+    padding-block: 8px !important;
+  }
+
+  .billing-wizard-step :where(input, select, textarea),
+  .billing-wizard-step button {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .billing-wizard-step :where(input, select) {
+    min-height: 40px;
+  }
+
+  .billing-wizard-navigation {
+    display: grid !important;
+    grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+    gap: 6px !important;
+    padding-top: 0 !important;
+  }
+
+  .billing-wizard-navigation > button,
+  .billing-wizard-navigation__primary,
+  .billing-wizard-navigation__primary > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .billing-wizard-navigation__primary {
+    display: grid !important;
+    gap: 6px !important;
+  }
+
+  .billing-wizard-navigation button {
+    min-height: 40px;
+    padding: 7px 9px !important;
+    font-size: 11px !important;
+  }
+
+  .billing-wizard-navigation__primary [role='status'] {
+    width: 100%;
+    max-width: none !important;
+    padding: 8px 10px !important;
+    font-size: 10px !important;
+  }
+
+  .billing-config-summary > div {
+    min-width: 0;
+    padding: 9px 10px !important;
+  }
+
+  .billing-config-summary button {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-content-card :is(.orders-admin-shell, .cart-admin-page, .favorites-admin-page) {
@@ -1677,6 +1852,14 @@
 
   .billing-responsive-table tbody td {
     grid-column: 1 !important;
+  }
+
+  .billing-wizard-progress__steps {
+    gap: 4px !important;
+  }
+
+  .billing-wizard-navigation {
+    grid-template-columns: minmax(0, .68fr) minmax(0, 1.32fr);
   }
 }
 

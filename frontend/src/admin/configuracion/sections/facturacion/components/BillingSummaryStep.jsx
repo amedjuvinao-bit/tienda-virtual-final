@@ -27,7 +27,7 @@ export default function BillingSummaryStep({ controller }) {
 
   return (
     <div
-      className="grid gap-3 text-sm"
+      className="billing-config-summary grid min-w-0 gap-3 text-sm"
       style={{ color: 'var(--admin-card-text)' }}
     >
       <div className="rounded-xl border p-4" style={billingSoftPanelStyle}>

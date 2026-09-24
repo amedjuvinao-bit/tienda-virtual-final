@@ -18,7 +18,7 @@ export default function BillingWizardNavigation({ controller }) {
   } = controller;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+    <div className="billing-wizard-navigation flex flex-wrap items-center justify-between gap-3 pt-2">
       <button
         type="button"
         onClick={goPrev}
@@ -28,7 +28,7 @@ export default function BillingWizardNavigation({ controller }) {
       >
         Anterior
       </button>
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="billing-wizard-navigation__primary flex flex-wrap items-center justify-end gap-3">
         {currentStep < BILLING_STEPS.length - 1 ? (
           <button
             type="button"

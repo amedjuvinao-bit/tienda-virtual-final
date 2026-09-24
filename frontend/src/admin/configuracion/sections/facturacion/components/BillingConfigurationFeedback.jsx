@@ -6,7 +6,7 @@ export function BillingSaveFeedback({ feedback }) {
 
   return (
     <div
-      className="rounded-xl border px-4 py-3 text-sm"
+      className="billing-config-feedback rounded-xl border px-4 py-3 text-sm"
       style={billingMessageStyle(feedback.type)}
     >
       <strong className="block">
@@ -31,7 +31,7 @@ export function BillingUnsavedChanges({ visible }) {
 
   return (
     <div
-      className="rounded-xl border px-4 py-3 text-sm"
+      className="billing-config-feedback rounded-xl border px-4 py-3 text-sm"
       style={billingMessageStyle('warning')}
     >
       Tienes cambios sin guardar.

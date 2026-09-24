@@ -5,6 +5,7 @@ export default function InfoCard({
   description,
   children,
   variant = 'default',
+  className = '',
 }) {
   const isHero = variant === 'hero';
   const isFlat = variant === 'flat';
@@ -13,7 +14,7 @@ export default function InfoCard({
     <div
       className={`border backdrop-blur-xl ${
         isHero ? 'admin-info-card-hero' : ''
-      } ${isFlat ? 'admin-info-card-flat' : ''}`}
+      } ${isFlat ? 'admin-info-card-flat' : ''} ${className}`}
       style={{
         position: 'relative',
         overflow: 'hidden',

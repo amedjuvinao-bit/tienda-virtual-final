@@ -66,12 +66,13 @@ export default function FacturacionSection() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="billing-config-panel grid min-w-0 gap-4">
       <InfoCard
+        className="billing-config-card"
         title="Asistente de facturación"
         description="Configura la facturación paso a paso para evitar mezclar datos fiscales, proveedor electrónico, DIAN, impuestos y textos legales."
       >
-        <div className="grid gap-6">
+        <div className="billing-config-flow grid min-w-0 gap-6">
           <BillingSaveFeedback feedback={saveFeedback} />
           <BillingWizardProgress
             currentStep={currentStep}
@@ -84,6 +85,7 @@ export default function FacturacionSection() {
       </InfoCard>
 
       <EmptyHint
+        className="billing-config-readiness-hint"
         title={
           readiness?.readyForProduction
             ? 'Configuración verificada'

@@ -42,8 +42,11 @@ export default function BillingWizardStep({ controller }) {
   } = controller;
 
   return (
-    <section className="rounded-2xl border p-5" style={billingPanelStyle}>
-      <div className="mb-5">
+    <section
+      className="billing-wizard-step rounded-2xl border p-5"
+      style={billingPanelStyle}
+    >
+      <div className="billing-wizard-step__heading mb-5">
         <p
           className="text-xs font-semibold uppercase tracking-wide"
           style={{ color: 'var(--admin-primary)' }}

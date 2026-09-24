@@ -1,9 +1,9 @@
 import React from 'react';
 
-export default function EmptyHint({ title, text }) {
+export default function EmptyHint({ title, text, className = '' }) {
   return (
     <div
-      className="border backdrop-blur-xl"
+      className={`border backdrop-blur-xl ${className}`}
       style={{
         backgroundColor: 'var(--admin-primary-soft-bg)',
         borderColor: 'var(--admin-primary-soft-border)',

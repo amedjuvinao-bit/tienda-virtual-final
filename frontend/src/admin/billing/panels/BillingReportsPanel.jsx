@@ -212,7 +212,7 @@ export default function BillingReportsPanel() {
         </div>
       ) : null}
 
-      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-12">
+      <div className="billing-report-metrics grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-12">
         <BillingMetricCard className="xl:col-span-6" featured icon={BarChart3} label="Facturación neta" value={loading ? '...' : formatCurrency(metrics.net)} helper="Facturas validadas menos notas crédito validadas" />
         <BillingMetricCard className="xl:col-span-3" icon={CircleDollarSign} label="Total facturado" value={loading ? '...' : formatCurrency(metrics.invoiced)} helper={`${formatNumber(metrics.validatedInvoices)} factura(s) validada(s)`} />
         <BillingMetricCard className="xl:col-span-3" icon={RotateCcw} label="Notas crédito" value={loading ? '...' : formatCurrency(metrics.credited)} helper={`${formatNumber(metrics.validatedCreditNotes)} nota(s) validada(s)`} />

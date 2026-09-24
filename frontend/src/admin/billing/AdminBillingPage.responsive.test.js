@@ -9,6 +9,10 @@ const pageSource = source('./AdminBillingPage.jsx');
 const constantsSource = source('./billingConstants.js');
 const mobileStylesSource = source('../theme/adminMobileSystem.css');
 const summarySource = source('./panels/BillingSummaryPanel.jsx');
+const reportsSource = source('./panels/BillingReportsPanel.jsx');
+const configurationSource = source('../configuracion/sections/FacturacionSection.jsx');
+const wizardProgressSource = source('../configuracion/sections/facturacion/components/BillingWizardProgress.jsx');
+const wizardNavigationSource = source('../configuracion/sections/facturacion/components/BillingWizardNavigation.jsx');
 
 const responsiveTables = [
   {
@@ -66,5 +70,27 @@ describe('contrato responsive de Facturación', () => {
     );
     expect(mobileStylesSource).toContain('.billing-responsive-table thead');
     expect(mobileStylesSource).toContain('content: attr(data-label)');
+  });
+
+  it('mantiene las métricas de Reportes en una cuadrícula móvil compacta', () => {
+    expect(reportsSource).toContain('billing-report-metrics');
+    expect(mobileStylesSource).toMatch(
+      /\.billing-report-metrics\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important;/s,
+    );
+  });
+
+  it('aplica un contrato móvil semántico al asistente de Configuración', () => {
+    expect(configurationSource).toContain('billing-config-panel');
+    expect(configurationSource).toContain('billing-config-card');
+    expect(wizardProgressSource).toContain('billing-wizard-progress__steps');
+    expect(wizardProgressSource).toContain('billing-wizard-progress__label--mobile');
+    expect(wizardProgressSource).toContain("aria-current={index === currentStep ? 'step' : undefined}");
+    expect(wizardNavigationSource).toContain('billing-wizard-navigation__primary');
+    expect(mobileStylesSource).toMatch(
+      /\.billing-wizard-progress__steps\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/s,
+    );
+    expect(mobileStylesSource).toMatch(
+      /\.billing-wizard-navigation\s*\{[^}]*grid-template-columns:/s,
+    );
   });
 });
