@@ -104,6 +104,7 @@ export default function OrdersFilters({
         tagsMode={tagsMode}
         tagsStr={tagsStr}
         typingQ={typingQ}
+        resultsCount={total}
       >
         {children}
       </OrdersFiltersControlPanel>

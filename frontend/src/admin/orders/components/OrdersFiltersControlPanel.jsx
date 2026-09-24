@@ -23,6 +23,7 @@ export default function OrdersFiltersControlPanel({
   onCloseControls,
   onStatusChange,
   populate,
+  resultsCount = 0,
   setDateFrom,
   setDateTo,
   setPage,
@@ -55,9 +56,13 @@ export default function OrdersFiltersControlPanel({
         className={`orders-control-panel ${controlsOpen ? 'is-open' : 'is-closed'}`}
       >
         <div className="orders-control-mobile-heading">
-          <div>
+          <div className="orders-control-heading-desktop-copy">
             <p>Panel de control</p>
             <span>Filtros, operación y facturación</span>
+          </div>
+          <div className="orders-control-heading-mobile-copy">
+            <p>Buscar y filtrar</p>
+            <span>Encuentra rápidamente una orden</span>
           </div>
           <button
             type="button"
@@ -138,6 +143,16 @@ export default function OrdersFiltersControlPanel({
         </div>
 
         {children}
+
+        <div className="orders-control-mobile-footer">
+          <span>
+            <strong>{Number(resultsCount || 0).toLocaleString('es-CO')}</strong>
+            {' '}órdenes encontradas
+          </span>
+          <button type="button" onClick={onCloseControls}>
+            Ver resultados
+          </button>
+        </div>
       </aside>
     </>
   );

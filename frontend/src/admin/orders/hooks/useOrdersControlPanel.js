@@ -70,6 +70,24 @@ export default function useOrdersControlPanel() {
   const controlToggleDragRef = useRef(null);
   const lastControlToggleDragAtRef = useRef(0);
 
+  useEffect(() => {
+    if (!controlsOpen || typeof window === 'undefined') return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setControlsOpen(false);
+    };
+    const mobileViewport = window.matchMedia?.('(max-width: 767px)').matches;
+    const previousOverflow = document.body.style.overflow;
+
+    document.addEventListener('keydown', handleEscape);
+    if (mobileViewport) document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      if (mobileViewport) document.body.style.overflow = previousOverflow;
+    };
+  }, [controlsOpen]);
+
   useLayoutEffect(() => {
     const shell = ordersShellRef.current;
     const panel = controlPanelRef.current;

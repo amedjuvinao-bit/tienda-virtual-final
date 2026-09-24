@@ -9,9 +9,11 @@ import OrdersBulkActions from './orders/components/OrdersBulkActions';
 import OrdersControlToggle from './orders/components/OrdersControlToggle';
 import OrdersFilters from './orders/components/OrdersFilters';
 import OrdersInvoiceFilters from './orders/components/OrdersInvoiceFilters';
+import OrdersMobileFilterButton from './orders/components/OrdersMobileFilterButton';
 import OrdersPagination from './orders/components/OrdersPagination';
 import OrdersQuickViews from './orders/components/OrdersQuickViews';
 import OrdersTable from './orders/components/OrdersTable';
+import { countOrdersActiveFilters } from './orders/components/ordersFiltersModel';
 import useOrdersAdminCapabilities from './orders/hooks/useOrdersAdminCapabilities';
 import useOrdersAdminDetail from './orders/hooks/useOrdersAdminDetail';
 import useOrdersAdminFilters from './orders/hooks/useOrdersAdminFilters';
@@ -116,6 +118,18 @@ export default function OrdersAdmin() {
     ? 0
     : (query.page - 1) * filters.limit + 1;
   const to = Math.min(query.total, query.page * filters.limit);
+  const activeFilterCount = countOrdersActiveFilters({
+    archivedFilter: filters.quickViews.archivedFilter,
+    branchId: filters.branchId,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    invoiceFilter: filters.invoiceFilters.invoiceFilter,
+    operationalView: filters.quickViews.operationalView,
+    printedFilter: filters.quickViews.printedFilter,
+    statusFilter: filters.statusFilter,
+    tagsInput: filters.tagsInput,
+    typingQuery: filters.typingQuery,
+  });
 
   return (
     <div ref={controls.ordersShellRef} className={`orders-admin-shell p-4 ${controls.controlsOpen ? 'controls-open' : 'controls-closed'}`}>
@@ -246,6 +260,13 @@ export default function OrdersAdmin() {
           toCOP={toCOP}
           statusBadgeClasses={statusBadgeClasses}
           openOrderDetail={detail.openOrderDetail}
+          mobileFilterAction={(
+            <OrdersMobileFilterButton
+              activeFilterCount={activeFilterCount}
+              controlsOpen={controls.controlsOpen}
+              onClick={() => controls.setControlsOpen((open) => !open)}
+            />
+          )}
         />
 
         <OrdersPagination

@@ -33,6 +33,32 @@ export function mergeStatusFilters(filters) {
   });
 }
 
+export function countOrdersActiveFilters({
+  archivedFilter,
+  branchId,
+  dateFrom,
+  dateTo,
+  invoiceFilter,
+  operationalView,
+  printedFilter,
+  statusFilter,
+  tagsInput,
+  typingQuery,
+} = {}) {
+  return [
+    Boolean(String(typingQuery || '').trim()),
+    Boolean(dateFrom),
+    Boolean(dateTo),
+    Array.isArray(statusFilter) && statusFilter.length > 0,
+    Boolean(String(tagsInput || '').trim()),
+    Boolean(branchId),
+    printedFilter && printedFilter !== 'all',
+    archivedFilter === 'archived',
+    invoiceFilter && invoiceFilter !== 'all',
+    operationalView && operationalView !== 'all',
+  ].filter(Boolean).length;
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat('es-CO').format(Number(value || 0));
 }

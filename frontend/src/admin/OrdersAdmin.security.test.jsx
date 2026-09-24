@@ -48,8 +48,9 @@ vi.mock('./orders/components/OrdersFilters', () => ({
 }));
 
 vi.mock('./orders/components/OrdersTable', () => ({
-  default: ({ data, selectionEnabled, openOrderDetail }) => (
+  default: ({ data, selectionEnabled, openOrderDetail, mobileFilterAction }) => (
     <section>
+      {mobileFilterAction}
       {selectionEnabled ? <button type="button">Seleccionar</button> : null}
       {data.map((order) => (
         <button

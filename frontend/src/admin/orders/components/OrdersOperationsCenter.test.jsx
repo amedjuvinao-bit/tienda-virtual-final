@@ -3,10 +3,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import OrdersFilters from './OrdersFilters';
+import OrdersMobileFilterButton from './OrdersMobileFilterButton';
 import OrdersQuickViews from './OrdersQuickViews';
 import OrdersTable from './OrdersTable';
 import {
   buildOrdersFilterMetrics,
+  countOrdersActiveFilters,
   mergeStatusFilters,
 } from './ordersFiltersModel';
 
@@ -234,6 +236,34 @@ describe('centro operativo avanzado de órdenes', () => {
       screen.getByText('Cambia la vista operativa o restablece los filtros.')
     ).toBeInTheDocument();
   });
+
+  it('integra en el encabezado el acceso móvil compacto a búsqueda y filtros', () => {
+    const onClick = vi.fn();
+    render(
+      <OrdersTable
+        {...tableProps}
+        data={[ORDER]}
+        openOrderDetail={vi.fn()}
+        mobileFilterAction={(
+          <OrdersMobileFilterButton
+            activeFilterCount={3}
+            controlsOpen={false}
+            onClick={onClick}
+          />
+        )}
+      />
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: 'Abrir búsqueda y filtros, 3 activos',
+    });
+    expect(trigger).toHaveAttribute('aria-controls', 'orders-control-panel');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveTextContent('3');
+
+    fireEvent.click(trigger);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('composición profesional de filtros de órdenes', () => {
@@ -253,6 +283,7 @@ describe('composición profesional de filtros de órdenes', () => {
     expect(screen.getByText('Reembolsadas')).toBeInTheDocument();
     expect(screen.getByText('Sede Principal (BOG)')).toBeInTheDocument();
     expect(screen.getByTestId('orders-filter-child')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver resultados' })).toBeInTheDocument();
 
     const labels = Array.from(
       container.querySelectorAll('.orf-filters > div > label')
@@ -335,5 +366,18 @@ describe('composición profesional de filtros de órdenes', () => {
     ]);
     expect(metrics.find(({ key }) => key === 'noinv')?.value).toBe('3');
     expect(metrics.find(({ key }) => key === 'dian')?.value).toBe('7');
+
+    expect(countOrdersActiveFilters({
+      archivedFilter: 'active',
+      branchId: 'branch-main',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-31',
+      invoiceFilter: 'without_invoice',
+      operationalView: 'all',
+      printedFilter: 'all',
+      statusFilter: ['paid', 'processing'],
+      tagsInput: 'vip',
+      typingQuery: 'ana',
+    })).toBe(7);
   });
 });

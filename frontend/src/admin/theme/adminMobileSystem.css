@@ -540,14 +540,7 @@
   }
 
   .orders-control-toggle {
-    right: 12px !important;
-    bottom: calc(76px + env(safe-area-inset-bottom)) !important;
-    height: 40px !important;
-  }
-
-  .orders-control-toggle-action {
-    min-width: 0 !important;
-    padding-inline: 11px !important;
+    display: none !important;
   }
 
   .orders-control-panel {

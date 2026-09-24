@@ -107,6 +107,7 @@ export default function OrdersTable({
   toCOP,
   statusBadgeClasses,
   openOrderDetail,
+  mobileFilterAction = null,
 }) {
   const [density, setDensity] = useState('comfortable');
   const compact = density === 'compact';
@@ -125,16 +126,19 @@ export default function OrdersTable({
         className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
         style={{ borderColor: ADMIN_BORDER, background: 'var(--admin-card-bg)' }}
       >
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-base font-black">Listado de órdenes</h2>
-            <span className="text-[10px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
-              {loading ? 'Cargando…' : `${total} total · ${from}–${to}`}
-            </span>
+        <div className="orders-table-heading-row">
+          <div className="orders-table-heading-copy min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-base font-black">Listado de órdenes</h2>
+              <span className="text-[10px] font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>
+                {loading ? 'Cargando…' : `${total} total · ${from}–${to}`}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[10px]" style={{ color: 'var(--admin-card-muted-text)' }}>
+              La prioridad y la siguiente acción aparecen dentro de cada fila.
+            </p>
           </div>
-          <p className="mt-0.5 text-[10px]" style={{ color: 'var(--admin-card-muted-text)' }}>
-            La prioridad y la siguiente acción aparecen dentro de cada fila.
-          </p>
+          {mobileFilterAction}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
