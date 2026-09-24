@@ -304,7 +304,7 @@ export default function UsersTable({
                 </div>
               </div>
 
-              <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(270px,1.45fr)_minmax(160px,0.75fr)]">
+              <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,0.75fr)]">
                 <div
                   className="flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5"
                   style={getInfoBoxStyle()}

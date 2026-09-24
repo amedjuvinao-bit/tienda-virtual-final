@@ -379,7 +379,7 @@ function StockAlertCard({ item }) {
           </p>
         </div>
 
-        <div className="grid min-w-[280px] grid-cols-3 gap-2">
+        <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto lg:min-w-[280px]">
           <MiniStock label="Físico" value={item?.stock?.physicalStock} />
           <MiniStock label="Reservado" value={item?.stock?.reservedStock} />
           <MiniStock label="Disponible" value={item?.stock?.availableStock} highlight />
@@ -429,7 +429,7 @@ function ReservationAlertCard({ item }) {
           </p>
         </div>
 
-        <div className="grid min-w-[300px] gap-2">
+        <div className="grid w-full min-w-0 gap-2 lg:w-auto lg:min-w-[300px]">
           <MiniReservation
             label={isExpired ? 'Venció' : 'Vence'}
             value={formatDate(item?.expiresAt)}
@@ -454,7 +454,7 @@ function ReservationAlertCard({ item }) {
 function MiniStock({ label, value, highlight = false }) {
   return (
     <div
-      className="px-3 py-3"
+      className={`${highlight ? 'col-span-2 sm:col-span-1' : ''} min-w-0 px-3 py-3`}
       style={{
         borderRadius: 'var(--admin-radius)',
         border: highlight
@@ -751,7 +751,7 @@ function StuckReservationCard({ item }) {
           </p>
         </div>
 
-        <div className="grid min-w-[310px] grid-cols-2 gap-2">
+        <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:w-auto lg:min-w-[310px]">
           <MiniReservation label="Tiempo pendiente" value={`${formatNumber(item?.ageMinutes)} min`} />
           <MiniReservation label="Vencimiento" value={formatDate(item?.expiresAt)} />
         </div>

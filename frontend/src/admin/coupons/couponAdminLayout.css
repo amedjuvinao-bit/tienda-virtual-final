@@ -683,6 +683,19 @@
   .coupon-admin-actions { justify-content: flex-start; }
 }
 
+@container (max-width: 420px) {
+  .coupon-admin-row { grid-template-columns: minmax(0, 1fr); }
+  .coupon-admin-row > td:nth-child(n) {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-card-border);
+  }
+  .coupon-admin-row > td:last-child { border-bottom: 0; }
+}
+
 /* Asistente: conserva el flujo de cuatro pasos y mejora su lectura visual. */
 .coupon-form-dialog { border-radius: 22px; }
 .coupon-form-header {
@@ -743,7 +756,6 @@
   .coupon-admin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .coupon-stat:nth-child(2) { border-right: 0; }
   .coupon-stat:nth-child(-n + 2) { border-bottom: 1px solid var(--admin-card-border); }
-  .coupon-admin-table { min-width: 930px; }
 }
 
 @media (max-width: 900px) {
@@ -769,7 +781,6 @@
   .coupon-admin-workspace__hint { max-width: none; }
   .coupon-admin-filter-controls { display: grid; grid-template-columns: 1fr; }
   .coupon-admin-filter-controls select { width: 100% !important; }
-  .coupon-admin-table { min-width: 860px; }
   .coupon-admin-actions { justify-content: flex-start; }
   .coupon-form-overlay { padding: 0; }
   .coupon-form-dialog { max-height: 100vh; min-height: 100vh; border-radius: 0; }
