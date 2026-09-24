@@ -150,6 +150,10 @@ export default function AdminLayout() {
     }
   });
   const commandInputRef = useRef(null);
+  const mobileCommandInputRef = useRef(null);
+  const reviewsModalRef = useRef(null);
+  const reviewsCloseButtonRef = useRef(null);
+  const reviewsTriggerRef = useRef(null);
 
   useEffect(() => installAdminModalContract(), []);
 
@@ -286,7 +290,12 @@ export default function AdminLayout() {
     return reviews.filter((review) => !seen.has(String(review.reviewId || ''))).length;
   }, [reviews]);
 
-  const handleOpenReviewsModal = async () => {
+  const closeReviewsModal = () => {
+    setReviewsModalOpen(false);
+  };
+
+  const handleOpenReviewsModal = async (event) => {
+    reviewsTriggerRef.current = event?.currentTarget || document.activeElement;
     setReviewsModalOpen(true);
     await fetchAdminReviews();
     const ids = reviews
@@ -302,6 +311,59 @@ export default function AdminLayout() {
       .filter(Boolean);
     if (ids.length) saveSeenReviewIds(ids);
   }, [reviewsModalOpen, reviews]);
+
+  useEffect(() => {
+    if (!reviewsModalOpen) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusTimer = window.setTimeout(() => {
+      reviewsCloseButtonRef.current?.focus();
+    }, 0);
+
+    const handleModalKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setReviewsModalOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = Array.from(
+        reviewsModalRef.current?.querySelectorAll(
+          'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+        ) || []
+      ).filter((element) => !element.hasAttribute('hidden'));
+
+      if (!focusableElements.length) {
+        event.preventDefault();
+        reviewsModalRef.current?.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleModalKeyDown);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleModalKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      reviewsTriggerRef.current?.focus?.();
+    };
+  }, [reviewsModalOpen]);
 
   const handleDeleteReview = async (productId, reviewId) => {
     if (!productId || !reviewId) return;
@@ -419,7 +481,8 @@ export default function AdminLayout() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandOpen(true);
-        commandInputRef.current?.focus();
+        const mobileViewport = window.matchMedia('(max-width: 767px)').matches;
+        (mobileViewport ? mobileCommandInputRef : commandInputRef).current?.focus();
       }
     };
 
@@ -456,6 +519,32 @@ export default function AdminLayout() {
       <style>{`
         .admin-area {
           font-family: var(--admin-font-body, 'Inter', system-ui, sans-serif);
+        }
+
+        .admin-skip-link {
+          position: fixed;
+          top: 10px;
+          left: 12px;
+          z-index: 9999;
+          padding: 10px 14px;
+          border: 2px solid var(--admin-primary);
+          border-radius: 12px;
+          background: var(--admin-page-bg);
+          color: var(--admin-card-text);
+          font-size: 13px;
+          font-weight: 900;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-160%);
+          transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .admin-skip-link:focus-visible {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(0);
+          outline: 3px solid color-mix(in srgb, var(--admin-primary) 35%, transparent);
+          outline-offset: 2px;
         }
 
         .admin-layout-shell {
@@ -617,6 +706,14 @@ export default function AdminLayout() {
           border-radius: calc(var(--admin-radius) * 0.85);
           padding: calc(var(--admin-padding) * 0.55);
           gap: calc(var(--admin-gap) * 0.45);
+          overscroll-behavior-inline: contain;
+          scroll-snap-type: inline proximity;
+          touch-action: pan-x;
+        }
+
+        .admin-mobile-nav-panel .admin-nav-link-mobile {
+          min-height: 44px;
+          scroll-snap-align: start;
         }
 
         .admin-brand-float {
@@ -1845,6 +1942,10 @@ export default function AdminLayout() {
           border-radius: calc(var(--admin-radius) * 1.1);
         }
 
+        .admin-modal-card:focus {
+          outline: none;
+        }
+
         @media (max-width: 767px) {
           .admin-layout-shell {
             padding: calc(var(--admin-padding) * 0.75);
@@ -1859,6 +1960,19 @@ export default function AdminLayout() {
             padding: calc(var(--admin-padding) * 0.9);
           }
 
+          .admin-command-center--mobile {
+            z-index: 75;
+          }
+
+          .admin-command-center--mobile .admin-search-bar {
+            min-height: 44px;
+          }
+
+          .admin-command-center--mobile .admin-command-results {
+            top: calc(100% + 7px);
+            max-height: min(56vh, 360px);
+          }
+
           .admin-modal-header,
           .admin-modal-body {
             padding: calc(var(--admin-padding) * 0.9);
@@ -1866,6 +1980,39 @@ export default function AdminLayout() {
 
           .admin-review-actions {
             padding-left: 0;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .admin-layout-shell {
+            padding: max(8px, calc(var(--admin-padding) * 0.5));
+          }
+
+          .admin-mobile-header-panel,
+          .admin-mobile-nav-panel,
+          .admin-content-card {
+            border-radius: min(18px, calc(var(--admin-radius) * 0.72));
+          }
+
+          .admin-content-card {
+            padding: max(10px, calc(var(--admin-padding) * 0.65));
+          }
+
+          .admin-mobile-header-copy p {
+            max-width: 42vw;
+          }
+
+          .admin-modal-overlay {
+            padding: 8px;
+          }
+
+          .admin-modal-card {
+            max-height: calc(100dvh - 16px);
+            border-radius: 16px;
+          }
+
+          .admin-review-meta-grid {
+            grid-template-columns: 1fr;
           }
         }
 
@@ -1923,6 +2070,10 @@ export default function AdminLayout() {
           `,
         }}
       >
+        <a className="admin-skip-link" href="#admin-main-content">
+          Saltar al contenido principal
+        </a>
+
         <div
           className="admin-panel-custom-background"
           aria-hidden="true"
@@ -2141,7 +2292,12 @@ export default function AdminLayout() {
             </div>
           </aside>
 
-          <main className="admin-main-column flex-1 min-w-0 flex flex-col">
+          <main
+            id="admin-main-content"
+            tabIndex={-1}
+            aria-label="Contenido principal del panel"
+            className="admin-main-column flex-1 min-w-0 flex flex-col"
+          >
             <header
               className="admin-header-glass admin-header-panel hidden md:grid"
               data-condensed={headerCondensed}
@@ -2182,6 +2338,9 @@ export default function AdminLayout() {
                     }}
                     placeholder="Ir a productos, órdenes, caja, configuración..."
                     aria-label="Buscar y abrir un módulo del panel"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="admin-command-results-desktop"
                     aria-expanded={commandOpen && Boolean(normalizedCommandQuery)}
                     className="w-full bg-transparent text-sm outline-none"
                     style={{
@@ -2193,7 +2352,7 @@ export default function AdminLayout() {
                 </div>
 
                 {commandOpen && Boolean(normalizedCommandQuery) && (
-                  <div className="admin-command-results" role="listbox">
+                  <div id="admin-command-results-desktop" className="admin-command-results" role="listbox">
                     <div className="admin-command-results__label">Resultados del panel</div>
                     {filteredCommandItems.length > 0 ? (
                       filteredCommandItems.map((item) => {
@@ -2257,6 +2416,7 @@ export default function AdminLayout() {
                   onClick={handleOpenReviewsModal}
                   className="admin-header-icon-button"
                   aria-label="Abrir reseñas"
+                  aria-haspopup="dialog"
                   title="Reseñas y alertas"
                 >
                   <Bell className="h-4 w-4" />
@@ -2294,6 +2454,7 @@ export default function AdminLayout() {
                     onClick={handleOpenReviewsModal}
                     className="admin-btn-ghost relative"
                     aria-label="Ver reseñas"
+                    aria-haspopup="dialog"
                   >
                     <Bell className="h-4 w-4" />
                     {unseenCount > 0 && (
@@ -2311,22 +2472,78 @@ export default function AdminLayout() {
                 </div>
               </div>
 
-              <div className="admin-search-bar">
-                <Search
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: 'var(--admin-card-muted-text)' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar en el panel..."
-                  className="w-full bg-transparent text-sm outline-none"
-                  style={{ color: 'var(--admin-card-text)' }}
-                />
+              <div className="admin-command-center admin-command-center--mobile">
+                <div className="admin-search-bar">
+                  <Search
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: 'var(--admin-card-muted-text)' }}
+                  />
+                  <input
+                    ref={mobileCommandInputRef}
+                    type="search"
+                    value={commandQuery}
+                    onChange={(event) => {
+                      setCommandQuery(event.target.value);
+                      setCommandOpen(Boolean(event.target.value.trim()));
+                    }}
+                    onFocus={() => setCommandOpen(Boolean(commandQuery.trim()))}
+                    onBlur={() => window.setTimeout(() => setCommandOpen(false), 120)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setCommandOpen(false);
+                        event.currentTarget.blur();
+                      }
+                      if (event.key === 'Enter' && filteredCommandItems[0]) {
+                        event.preventDefault();
+                        handleCommandSelect(filteredCommandItems[0].to);
+                      }
+                    }}
+                    placeholder="Buscar en el panel..."
+                    aria-label="Buscar y abrir un módulo del panel"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="admin-command-results-mobile"
+                    aria-expanded={commandOpen && Boolean(normalizedCommandQuery)}
+                    className="w-full bg-transparent text-sm outline-none"
+                    style={{ color: 'var(--admin-card-text)' }}
+                  />
+                </div>
+
+                {commandOpen && Boolean(normalizedCommandQuery) && (
+                  <div id="admin-command-results-mobile" className="admin-command-results" role="listbox">
+                    <div className="admin-command-results__label">Resultados del panel</div>
+                    {filteredCommandItems.length > 0 ? (
+                      filteredCommandItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <NavLink
+                            key={item.to}
+                            to={item.to}
+                            role="option"
+                            aria-selected={item.to === activeCommandItem?.to}
+                            className="admin-command-result"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setCommandQuery('');
+                              setCommandOpen(false);
+                            }}
+                          >
+                            <span className="admin-command-result__icon"><Icon className="h-4 w-4" /></span>
+                            <span><strong>{item.label}</strong><small>{item.group}</small></span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </NavLink>
+                        );
+                      })
+                    ) : (
+                      <div className="admin-command-empty">No hay módulos que coincidan.</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <nav
                 className="admin-card-glass admin-mobile-nav-panel flex overflow-x-auto admin-no-scrollbar"
-                aria-label="Tabs admin"
+                aria-label="Navegación principal del panel"
               >
                 {visibleMainLinks.map((item) => {
                   const Icon = item.icon;
@@ -2364,6 +2581,8 @@ export default function AdminLayout() {
                     onClick={handleConfigMenuClick}
                     className={`${mobileLinkBase} admin-nav-link-mobile`}
                     style={isConfigRoute ? activeNavStyle : normalNavStyle}
+                    aria-expanded={configMenuOpen}
+                    aria-controls="admin-mobile-config-menu"
                   >
                     <PremiumAdminNavIcon icon={Settings} compact />
                     Config
@@ -2373,6 +2592,7 @@ export default function AdminLayout() {
 
               {hasVisibleConfigLinks && configMenuOpen && (
                 <div
+                  id="admin-mobile-config-menu"
                   className="flex flex-wrap px-1"
                   style={{ gap: 'calc(var(--admin-gap) * 0.45)' }}
                 >
@@ -2409,6 +2629,12 @@ export default function AdminLayout() {
         {reviewsModalOpen && (
           <div className="admin-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div
+              ref={reviewsModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="admin-reviews-modal-title"
+              aria-describedby="admin-reviews-modal-description"
+              tabIndex={-1}
               className="admin-card-glass admin-modal-card w-full max-w-5xl max-h-[88vh] overflow-hidden"
               style={{ boxShadow: 'var(--admin-shadow-modal, 0 32px 80px rgba(0,0,0,0.18))' }}
             >
@@ -2420,12 +2646,14 @@ export default function AdminLayout() {
               >
                 <div>
                   <h2
+                    id="admin-reviews-modal-title"
                     className="text-xl font-bold"
                     style={{ color: 'var(--admin-card-text)' }}
                   >
                     Reseñas de productos
                   </h2>
                   <p
+                    id="admin-reviews-modal-description"
                     className="text-sm mt-0.5"
                     style={{ color: 'var(--admin-card-muted-text)' }}
                   >
@@ -2434,8 +2662,9 @@ export default function AdminLayout() {
                 </div>
 
                 <button
+                  ref={reviewsCloseButtonRef}
                   type="button"
-                  onClick={() => setReviewsModalOpen(false)}
+                  onClick={closeReviewsModal}
                   aria-label="Cerrar modal"
                   style={{
                     display: 'flex',
@@ -2458,7 +2687,7 @@ export default function AdminLayout() {
 
               <div className="admin-modal-body">
                 {reviewsError ? (
-                  <div className="admin-modal-error border border-red-200 bg-red-50 text-sm text-red-700">
+                  <div className="admin-modal-error border border-red-200 bg-red-50 text-sm text-red-700" role="alert">
                     {reviewsError}
                   </div>
                 ) : null}
@@ -2466,6 +2695,8 @@ export default function AdminLayout() {
                 {reviewsLoading ? (
                   <div
                     className="py-12 text-center text-sm"
+                    role="status"
+                    aria-live="polite"
                     style={{ color: 'var(--admin-card-muted-text)' }}
                   >
                     Cargando reseñas...

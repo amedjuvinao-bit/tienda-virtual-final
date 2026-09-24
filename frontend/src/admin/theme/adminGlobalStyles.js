@@ -957,6 +957,18 @@ export function applyAdminGlobalStyles() {
         0 10px 24px color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
     }
 
+    /* Keyboard focus must remain visible on navigation and form controls,
+       including legacy modules that remove the browser outline. */
+    .admin-area :is(a[href], input, select, textarea, [role="button"]):focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--admin-primary) 42%, transparent) !important;
+      outline-offset: 2px !important;
+    }
+
+    .admin-area :is(input, select, textarea):focus-visible {
+      border-color: var(--admin-primary) !important;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-primary) 18%, transparent) !important;
+    }
+
     .admin-area button:not(.no-glass):not([class*="bg-"]):not([style*="background"]):not([style*="background-color"]):not(:disabled):hover {
       border-color: color-mix(in srgb, var(--admin-primary) 52%, rgba(255,255,255,0.55)) !important;
       box-shadow:
@@ -1111,10 +1123,16 @@ export function applyAdminGlobalStyles() {
        wide tables, horizontal tabs, logs or modal content. */
     .admin-area .overflow-x-auto {
       overflow-x: auto !important;
+      max-width: 100%;
+      overscroll-behavior-inline: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .admin-area .overflow-auto {
       overflow: auto !important;
+      max-width: 100%;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .admin-area thead,
@@ -1931,6 +1949,7 @@ export function applyAdminGlobalStyles() {
           transition: none !important;
           animation: none !important;
           transform: none !important;
+          scroll-behavior: auto !important;
         }
       }
     }

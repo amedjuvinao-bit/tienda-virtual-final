@@ -88,9 +88,9 @@
 }
 
 .panel-admin-sync--saved {
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  color: var(--admin-success-text);
+  background: var(--admin-success-soft-bg);
+  border: 1px solid var(--admin-success-border);
 }
 
 .panel-admin-sync--dirty {
@@ -106,7 +106,7 @@
   font-weight: 650;
 }
 
-.panel-admin-feedback--success { color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; }
+.panel-admin-feedback--success { color: var(--admin-success-text); background: var(--admin-success-soft-bg); border: 1px solid var(--admin-success-border); }
 .panel-admin-feedback--error { color: var(--admin-danger-text); background: var(--admin-danger-soft-bg); border: 1px solid color-mix(in srgb, var(--admin-danger) 35%, transparent); }
 .panel-admin-feedback--info { color: var(--admin-primary-soft-text); background: var(--admin-primary-soft-bg); border: 1px solid var(--admin-primary-soft-border); }
 
@@ -416,8 +416,10 @@
 .panel-admin-background-guide li b { color: var(--admin-card-text); }
 .panel-admin-background-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .panel-admin-upload-button { position: relative; overflow: hidden; }
-.panel-admin-upload-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.panel-admin-upload-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.panel-admin-upload-button:focus-within { outline: 3px solid color-mix(in srgb, var(--admin-primary) 35%, transparent); outline-offset: 2px; }
 .panel-admin-upload-button.is-disabled { cursor: not-allowed; opacity: .55; }
+.panel-admin-upload-button.is-disabled input { cursor: not-allowed; }
 .panel-admin-button--danger-soft { color: var(--admin-danger-text); background: var(--admin-danger-soft-bg); border-color: color-mix(in srgb, var(--admin-danger) 32%, transparent); }
 
 .panel-admin-texture-option[data-texture='liquidGlass'] .panel-admin-texture-option__sample {
@@ -589,7 +591,7 @@
 
 .panel-admin-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-radius: var(--admin-widget-surface-radius, 18px); }
 .panel-admin-actions__note { display: flex; align-items: center; gap: 8px; color: var(--admin-card-muted-text); font-size: 12px; }
-.panel-admin-actions__note svg { color: #059669; flex: 0 0 auto; }
+.panel-admin-actions__note svg { color: var(--admin-success); flex: 0 0 auto; }
 .panel-admin-actions__buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .panel-admin-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 9px 13px; border-radius: var(--admin-widget-control-radius, 12px); border: var(--admin-widget-surface-border-width, 1px) solid transparent; font-size: 12px; font-weight: 750; cursor: pointer; transition: transform .16s ease, opacity .16s ease; }
 .panel-admin-button:hover:not(:disabled) { transform: translateY(-1px); }
@@ -613,7 +615,25 @@
   .panel-admin-theme-grid, .panel-admin-sidebar-grid, .panel-admin-texture-grid, .panel-admin-font-grid { grid-template-columns: 1fr; }
   .panel-admin-actions { align-items: stretch; flex-direction: column; }
   .panel-admin-actions__buttons { display: grid; grid-template-columns: 1fr; }
-  .panel-admin-button { width: 100%; }
+  .panel-admin-button { width: 100%; min-height: 44px; }
+}
+
+@media (max-width: 480px) {
+  .panel-admin-hero,
+  .panel-admin-workspace,
+  .panel-admin-actions { padding: 14px; }
+  .panel-admin-hero { gap: 11px; }
+  .panel-admin-hero__icon { width: 44px; height: 44px; border-radius: 14px; }
+  .panel-admin-section-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .panel-admin-theme-card,
+  .panel-admin-sidebar-option,
+  .panel-admin-texture-option,
+  .panel-admin-font-option { min-height: 76px; }
+  .panel-admin-background-editor { padding: 10px; }
+  .panel-admin-background-preview { min-height: 180px; }
+  .panel-admin-preview { padding: 12px; }
+  .panel-admin-preview__heading { align-items: flex-start; flex-direction: column; }
+  .panel-admin-preview__canvas { min-height: 210px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

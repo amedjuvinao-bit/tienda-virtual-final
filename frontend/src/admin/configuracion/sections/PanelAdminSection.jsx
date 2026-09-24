@@ -995,7 +995,11 @@ export default function PanelAdminSection() {
             antes de guardar. Estos cambios solo afectan el panel administrativo.
           </p>
         </div>
-        <div className={`panel-admin-sync panel-admin-sync--${dirty ? 'dirty' : 'saved'}`}>
+        <div
+          className={`panel-admin-sync panel-admin-sync--${dirty ? 'dirty' : 'saved'}`}
+          role="status"
+          aria-live="polite"
+        >
           {loading ? (
             <><LoaderCircle className="panel-admin-spin" size={16} /> Cargando</>
           ) : dirty ? (
