@@ -341,6 +341,47 @@ describe('composición profesional de filtros de órdenes', () => {
     expect(props.setPage).toHaveBeenCalledWith(1);
   });
 
+  it('monta la bandeja móvil fuera de contenedores que puedan recortarla', () => {
+    const originalMatchMedia = window.matchMedia;
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 312 });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: query === '(max-width: 767px)',
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+
+    try {
+      const props = buildFiltersProps({ controlsOpen: true });
+      const view = render(<OrdersFilters {...props} />);
+      const panel = screen.getByRole('complementary', {
+        name: 'Filtros y estados de órdenes',
+      });
+      const backdrop = screen.getAllByRole('button', {
+        name: 'Cerrar panel de filtros',
+      }).find((button) => button.classList.contains('orders-control-backdrop'));
+
+      expect(panel.parentElement).toBe(document.body);
+      expect(backdrop?.parentElement).toBe(document.body);
+      fireEvent.click(screen.getByRole('button', { name: 'Ver resultados' }));
+      expect(props.onCloseControls).toHaveBeenCalledTimes(1);
+      view.unmount();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      });
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
   it('preserva el contrato de orden, extensibilidad y fallbacks del modelo', () => {
     expect(mergeStatusFilters([
       { key: 'custom', label: 'Personalizado' },

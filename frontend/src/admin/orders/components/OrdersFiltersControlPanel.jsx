@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import OrdersSearchDateFields from './OrdersSearchDateFields';
@@ -7,6 +9,12 @@ import {
   OrdersTagsFields,
 } from './OrdersStatusTagsFields';
 import OrdersViewOptionsFields from './OrdersViewOptionsFields';
+
+function getMobileViewport() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(max-width: 767px)')?.matches
+    ?? window.innerWidth <= 767;
+}
 
 export default function OrdersFiltersControlPanel({
   ADMIN_BORDER,
@@ -37,7 +45,25 @@ export default function OrdersFiltersControlPanel({
   tagsStr,
   typingQ,
 }) {
-  return (
+  const [mobileViewport, setMobileViewport] = useState(getMobileViewport);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia?.('(max-width: 767px)');
+    const updateViewport = () => setMobileViewport(getMobileViewport());
+
+    updateViewport();
+    mediaQuery?.addEventListener?.('change', updateViewport);
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      mediaQuery?.removeEventListener?.('change', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
+  const content = (
     <>
       {controlsOpen ? (
         <button
@@ -156,4 +182,10 @@ export default function OrdersFiltersControlPanel({
       </aside>
     </>
   );
+
+  if (mobileViewport && typeof document !== 'undefined') {
+    return createPortal(content, document.body);
+  }
+
+  return content;
 }
