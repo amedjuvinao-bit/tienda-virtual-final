@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "audit:admin-mobile": "node scripts/auditAdminMobile.mjs",
     "preview": "vite preview",
     "test:e2e:orders-billing-phase1": "node e2e/ordersBillingPreflight.e2e.js",
     "test:e2e:orders-stage1": "node e2e/ordersOperationalConsole.e2e.js",

@@ -10,6 +10,8 @@ node_modules/
 # Artefactos reproducibles de ejecución y compilación.
 backend-runtime*.log
 frontend/dist/
+frontend/responsive-audit/
+frontend/responsive-audit.zip
 backend/backups/
 backend/reports/qa50-catalog-v1/
 backend/reports/security-stage5-e2e/

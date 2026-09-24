@@ -1394,7 +1394,7 @@ export default function CartPageEditor() {
           >
             <div
               data-admin-storefront-preview="true"
-              className="rounded-3xl border p-5"
+              className="min-w-0 rounded-3xl border p-3 sm:p-5"
               style={{
                 backgroundColor: style.pageBg,
                 borderColor: style.cardBorderColor,
@@ -1454,7 +1454,7 @@ export default function CartPageEditor() {
 
                 <div className="overflow-hidden rounded-2xl border" style={{ borderColor: style.cardBorderColor }}>
                   <div
-                    className="grid grid-cols-4 px-4 py-3 text-sm font-bold"
+                    className="hidden grid-cols-4 px-4 py-3 text-sm font-bold lg:grid"
                     style={{
                       color: style.tableHeaderTextColor,
                       borderBottom: `1px solid ${style.tableLineColor}`,
@@ -1466,9 +1466,10 @@ export default function CartPageEditor() {
                     <div>{form.cartPageConfig.tableTotalText}</div>
                   </div>
 
-                  <div className="grid grid-cols-4 items-center px-4 py-4 text-sm">
-                    <div className="flex items-center gap-3">
+                  <div className="grid min-w-0 grid-cols-2 items-center gap-3 px-3 py-4 text-sm lg:grid-cols-4 lg:gap-0 lg:px-4">
+                    <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
                       <div
+                        className="min-w-0 shrink"
                         style={{
                           width: `${style.imageWidthPx}px`,
                           height: `${style.imageHeightPx}px`,
@@ -1476,29 +1477,30 @@ export default function CartPageEditor() {
                           backgroundColor: "#f3f4f6",
                         }}
                       />
-                      <div style={{ color: style.textPrimaryColor }}>
+                      <div className="min-w-0 break-words" style={{ color: style.textPrimaryColor }}>
                         Vestido ejemplo
                       </div>
                     </div>
 
-                    <div style={{ color: style.accentColor }}>$120.000</div>
+                    <div className="min-w-0" style={{ color: style.accentColor }}><span className="block text-xs lg:hidden">{form.cartPageConfig.tablePriceText}</span>$120.000</div>
 
-                    <div>
+                    <div className="min-w-0">
+                      <span className="block text-xs lg:hidden" style={{ color: style.textSecondaryColor }}>{form.cartPageConfig.tableQuantityText}</span>
                       <div
-                        className="inline-grid grid-cols-3 overflow-hidden border"
+                        className="inline-grid max-w-full grid-cols-3 overflow-hidden border"
                         style={{
                           borderColor: style.quantityBorderColor,
                           borderRadius: `${style.quantityRadiusPx}px`,
                           color: style.quantityTextColor,
                         }}
                       >
-                        <span className="px-3 py-1">-</span>
-                        <span className="px-3 py-1 text-center">1</span>
-                        <span className="px-3 py-1">+</span>
+                        <span className="px-2 py-1 lg:px-3">-</span>
+                        <span className="px-2 py-1 text-center lg:px-3">1</span>
+                        <span className="px-2 py-1 lg:px-3">+</span>
                       </div>
                     </div>
 
-                    <div style={{ color: style.accentColor }}>$120.000</div>
+                    <div className="col-span-2 min-w-0 lg:col-span-1" style={{ color: style.accentColor }}><span className="mr-2 text-xs lg:hidden">{form.cartPageConfig.tableTotalText}</span>$120.000</div>
                   </div>
                 </div>
 
