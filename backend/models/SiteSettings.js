@@ -342,6 +342,10 @@ const AdminAppearanceSchema = new Schema(
       default: "expanded",
     },
 
+    loader: {
+      model: { type: String, enum: ["halo", "pulse", "orbit", "wave", "linear"], default: "halo" },
+    },
+
     background: {
       enabled: { type: Boolean, default: false },
       image: { type: String, default: "" },

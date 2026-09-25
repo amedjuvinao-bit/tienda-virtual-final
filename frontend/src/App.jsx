@@ -21,6 +21,8 @@ import PrivateRoute from './components/PrivateRoute';
 import { CartProvider } from './context/CartContext.jsx';
 import { FavoritesProvider } from './context/FavoritesContext.jsx';
 import { loadCashSessionsPage, loadOrdersAdmin, loadPosSalesPage, loadProductsAdmin } from './admin/adminRoutePreload';
+import AdminLoadingScreen from './admin/loading/AdminLoadingScreen';
+import { getRememberedAdminLoader, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from './admin/loading/adminLoaderConfig';
 
 const ApiProbe = lazy(() => import('./admin/ApiProbe'));
 const Header = lazy(() => import('./components/Header'));
@@ -88,6 +90,22 @@ function ScrollToHash() {
   return null;
 }
 
+function AdminDocumentRoute() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (pathname.startsWith('/admin')) {
+      document.documentElement.dataset.adminEntry = 'true';
+      document.documentElement.dataset.adminContext = pathname.startsWith('/admin/login') ? 'login' : 'admin';
+    } else {
+      delete document.documentElement.dataset.adminEntry;
+      delete document.documentElement.dataset.adminContext;
+    }
+  }, [pathname]);
+
+  return null;
+}
+
 function GlobalFloatingButtons({ theme }) {
   const location = useLocation();
   const pathname = location.pathname || '';
@@ -128,11 +146,18 @@ export default function App() {
   const [themeFromServer, setThemeFromServer] = useState(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
+  const [adminLoader, setAdminLoader] = useState(getRememberedAdminLoader);
+  const [siteSettingsFromServer, setSiteSettingsFromServer] = useState(null);
 
   const reloadTheme = async () => {
     try {
       if (!window.location.pathname.startsWith('/admin')) setLoadingPage(true);
       const data = await fetchSiteSettings();
+      const nextLoader = normalizeAdminLoader(data?.admin?.loader);
+      setAdminLoader(nextLoader);
+      rememberAdminLoader(nextLoader);
+      rememberAdminLoadingColors(data);
+      setSiteSettingsFromServer(data);
 
       if (data?.theme) {
         const normalizedTheme = {
@@ -155,6 +180,17 @@ export default function App() {
       else setTimeout(finish, 400);
     }
   };
+
+  useEffect(() => {
+    const onLoaderUpdated = (event) => setAdminLoader(normalizeAdminLoader(event.detail));
+    const onLoginSettingsUpdated = (event) => rememberAdminLoadingColors({ loginAdmin: event.detail });
+    window.addEventListener('admin-loader-updated', onLoaderUpdated);
+    window.addEventListener('admin-login-settings-updated', onLoginSettingsUpdated);
+    return () => {
+      window.removeEventListener('admin-loader-updated', onLoaderUpdated);
+      window.removeEventListener('admin-login-settings-updated', onLoginSettingsUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     reloadTheme();
@@ -180,19 +216,20 @@ export default function App() {
       <FavoritesProvider>
         <CartProvider>
           <BrowserRouter>
+            <AdminDocumentRoute />
             <AppConfirmProvider>
-              <Suspense fallback={null}>
+              <Suspense fallback={window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : null}>
                 <ScrollToHash />
                 <RouteLoaderEffect setLoadingPage={setLoadingPage} readyForRouteLoader={themeReady} />
                 <GlobalFloatingButtons theme={themeFromServer} />
                 {themeReady && <GlobalPageLoader config={themeFromServer?.global?.loader} visible={loadingPage} />}
 
-                <Routes>
+                {!themeReady && window.location.pathname.startsWith('/admin') ? <AdminLoadingScreen context={window.location.pathname.startsWith('/admin/login') ? 'login' : 'admin'} model={adminLoader} /> : <Routes>
                   <Route path="/" element={<Home theme={themeFromServer} />} />
                   <Route path="/pagina/:slug" element={<DynamicPage theme={themeFromServer} />} />
                   <Route path="/producto/:id" element={<ProductDetail />} />
                   <Route path="/p/:id" element={<ProductDetail />} />
-                  <Route path="/admin/login" element={<Login />} />
+                  <Route path="/admin/login" element={<Login initialSettings={siteSettingsFromServer} loaderModel={adminLoader} />} />
                   <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
                   <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/carrito" element={<Carrito />} />
@@ -205,8 +242,8 @@ export default function App() {
                   <Route
                     path="/admin"
                     element={
-                      <PrivateRoute>
-                        <AdminLayout />
+                      <PrivateRoute loaderModel={adminLoader}>
+                        <AdminLayout initialSettings={siteSettingsFromServer} />
                       </PrivateRoute>
                     }
                   >
@@ -251,7 +288,7 @@ export default function App() {
                   </Route>
 
                   <Route path="*" element={<NotFound />} />
-                </Routes>
+                </Routes>}
 
                 <AppToastContainer />
               </Suspense>

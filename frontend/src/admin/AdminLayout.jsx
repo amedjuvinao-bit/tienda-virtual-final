@@ -58,6 +58,8 @@ import { canAccessAdminPath } from './security/adminPermissions';
 import PremiumAdminNavIcon from './components/PremiumAdminNavIcon';
 import AdminMobileNavigation from './components/AdminMobileNavigation';
 import { preloadAdminRoute } from './adminRoutePreload';
+import AdminLoadingScreen from './loading/AdminLoadingScreen';
+import { getRememberedAdminLoader, normalizeAdminLoader } from './loading/adminLoaderConfig';
 import './theme/adminModuleHero.css';
 import './theme/adminMobileSystem.css';
 
@@ -100,7 +102,7 @@ function getFirstAllowedConfigPath(adminUser) {
   return firstAllowedConfigLink?.to || '/admin/dashboard';
 }
 
-export default function AdminLayout() {
+export default function AdminLayout({ initialSettings }) {
   const { logout, adminUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -141,6 +143,8 @@ export default function AdminLayout() {
   const [reviews, setReviews] = useState([]);
   const [deletingReviewId, setDeletingReviewId] = useState('');
   const [adminBrandLogo, setAdminBrandLogo] = useState('');
+  const [appearanceReady, setAppearanceReady] = useState(false);
+  const [loaderModel, setLoaderModel] = useState(getRememberedAdminLoader);
   const [commandQuery, setCommandQuery] = useState('');
   const [commandOpen, setCommandOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -160,6 +164,12 @@ export default function AdminLayout() {
   useEffect(() => installAdminModalContract(), []);
 
   useEffect(() => {
+    const onLoaderUpdated = (event) => setLoaderModel(normalizeAdminLoader(event.detail));
+    window.addEventListener('admin-loader-updated', onLoaderUpdated);
+    return () => window.removeEventListener('admin-loader-updated', onLoaderUpdated);
+  }, []);
+
+  useEffect(() => {
     if (
       twoFactorSetupRequired &&
       location.pathname !== '/admin/configuracion/seguridad'
@@ -173,12 +183,12 @@ export default function AdminLayout() {
 
     async function loadAdminAppearanceFromApi() {
       try {
-        const res = await api.get('/api/site-settings');
-        const theme = res?.data?.admin?.theme || {};
+        const settings = initialSettings || (await api.get('/api/site-settings'))?.data;
+        const theme = settings?.admin?.theme || {};
         const headerLogo =
-          res?.data?.theme?.header?.logoLight ||
-          res?.data?.theme?.header?.logoDark ||
-          res?.data?.theme?.logo ||
+          settings?.theme?.header?.logoLight ||
+          settings?.theme?.header?.logoDark ||
+          settings?.theme?.logo ||
           '';
 
         if (!alive) return;
@@ -186,9 +196,10 @@ export default function AdminLayout() {
         applyAdminLayoutStyles(theme);
         applyAdminGlobalStyles();
         applyAdminPanelBackground(
-          res?.data?.admin?.background || DEFAULT_ADMIN_PANEL_BACKGROUND
+          settings?.admin?.background || DEFAULT_ADMIN_PANEL_BACKGROUND
         );
         setAdminBrandLogo(headerLogo);
+        setLoaderModel(normalizeAdminLoader(settings?.admin?.loader));
       } catch (error) {
         console.error('❌ Error al cargar apariencia del panel admin:', error);
         if (!alive) return;
@@ -197,6 +208,8 @@ export default function AdminLayout() {
         applyAdminGlobalStyles();
         applyAdminPanelBackground(DEFAULT_ADMIN_PANEL_BACKGROUND);
         setAdminBrandLogo('');
+      } finally {
+        if (alive) setAppearanceReady(true);
       }
     }
 
@@ -539,6 +552,8 @@ export default function AdminLayout() {
 
   const subLinkBase =
     'group flex items-center admin-subnav-item-gap rounded-[calc(var(--admin-radius)*0.5)] admin-nav-padding-sub text-sm transition-all duration-200 font-medium';
+
+  if (!appearanceReady) return <AdminLoadingScreen model={loaderModel} message="Preparando tu panel…" />;
 
   return (
     <>
@@ -2555,9 +2570,7 @@ export default function AdminLayout() {
               }}
             >
               <Suspense fallback={
-                <div className="flex min-h-52 items-center justify-center p-6 text-sm font-semibold" role="status">
-                  Abriendo módulo…
-                </div>
+                <AdminLoadingScreen compact model={loaderModel} message="Abriendo módulo…" />
               }>
                 <Outlet />
               </Suspense>

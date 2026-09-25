@@ -131,6 +131,7 @@ function buildDefaultSettings() {
       theme: {},
       layout: "default",
       sidebar: "expanded",
+      loader: { model: "halo" },
       background: {
         enabled: false,
         image: "",
@@ -317,6 +318,16 @@ function validateAdminBackground(admin) {
     return "La URL del fondo del panel no es válida";
   }
 
+  return null;
+}
+
+function validateAdminLoader(admin) {
+  if (!admin || !Object.prototype.hasOwnProperty.call(admin, 'loader')) return null;
+  const loader = admin.loader;
+  if (!loader || typeof loader !== 'object' || Array.isArray(loader) ||
+    !['halo', 'pulse', 'orbit', 'wave', 'linear'].includes(loader.model)) {
+    return 'Selecciona uno de los cinco modelos de carga disponibles';
+  }
   return null;
 }
 
@@ -591,6 +602,10 @@ router.put("/", requireAdmin, requireSensitiveSettingsPermissions, async (req, r
         error: "INVALID_ADMIN_BACKGROUND",
         message: adminBackgroundError,
       });
+    }
+    const adminLoaderError = validateAdminLoader(admin);
+    if (adminLoaderError) {
+      return res.status(400).json({ ok: false, error: 'INVALID_ADMIN_LOADER', message: adminLoaderError });
     }
     if (isInvalidSettingsSection(billing)) {
       return res.status(400).json({ error: "billing debe ser un objeto" });

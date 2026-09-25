@@ -25,6 +25,7 @@ import TwoFactorChallengeModal from "./login/TwoFactorChallengeModal";
 import RosaCoutureMark from "./login/RosaCoutureMark";
 import "./login/LoginFlagship.css";
 import "./login/LoginCuratedThemes.css";
+import AdminLoadingScreen from './loading/AdminLoadingScreen';
 import {
   LOGIN_THEMES,
   LOGIN_LAYOUTS,
@@ -904,7 +905,7 @@ function CuratedCredentialsForm({
   );
 }
 
-export default function Login() {
+export default function Login({ initialSettings, loaderModel }) {
   const rememberedLogin = useMemo(() => getRememberedLogin(), []);
 
   const [username, setUsername] = useState(rememberedLogin.username);
@@ -981,7 +982,13 @@ export default function Login() {
       else loadSettings();
     };
 
-    loadSettings();
+    if (initialSettings) {
+      applySettings(initialSettings.loginAdmin, {
+        ...initialSettings.store,
+        logo: initialSettings.theme?.header?.logoLight || initialSettings.theme?.logo?.light || initialSettings.theme?.header?.logoDark || '',
+      });
+      setLoginSettingsReady(true);
+    } else loadSettings();
     window.addEventListener("admin-login-settings-updated", syncLoginConfig);
 
     return () => {
@@ -1008,12 +1015,7 @@ export default function Login() {
   }, []);
 
   if (!loginSettingsReady) {
-    return (
-      <main className="rb-login-bootstrap" aria-busy="true" aria-label="Preparando acceso administrativo">
-        <Loader2 className="rb-login-bootstrap__spinner" aria-hidden="true" />
-        <span>Preparando acceso seguro…</span>
-      </main>
-    );
+    return <AdminLoadingScreen context="login" model={loaderModel} message="Preparando acceso seguro…" />;
   }
 
   const registerFailedAttempt = () => {

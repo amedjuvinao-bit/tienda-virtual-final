@@ -41,6 +41,8 @@ import {
   normalizeAdminFontPreset,
 } from '../../theme/adminTypography';
 import './PanelAdminSection.css';
+import AdminLoadingScreen from '../../loading/AdminLoadingScreen';
+import { ADMIN_LOADER_MODELS, DEFAULT_ADMIN_LOADER, normalizeAdminLoader, rememberAdminLoader, rememberAdminLoadingColors } from '../../loading/adminLoaderConfig';
 
 const ADMIN_THEME_PRESETS = {
   electricNeon: {
@@ -527,6 +529,7 @@ const DEFAULT_PANEL_SELECTION = Object.freeze({
   widgetTexture: DEFAULT_ADMIN_WIDGET_TEXTURE,
   fontPreset: DEFAULT_ADMIN_FONT_PRESET,
   background: DEFAULT_ADMIN_PANEL_BACKGROUND,
+  loader: DEFAULT_ADMIN_LOADER,
 });
 
 const ADMIN_BACKGROUND_MAX_BYTES = 8 * 1024 * 1024;
@@ -719,8 +722,9 @@ function selectionFromAdmin(admin = {}) {
   const widgetTexture = normalizeAdminWidgetTexture(admin?.theme?.widgetTexture);
   const fontPreset = normalizeAdminFontPreset(admin?.theme?.fontPreset);
   const background = normalizeAdminPanelBackground(admin?.background);
+  const loader = normalizeAdminLoader(admin?.loader);
 
-  return { preset, sidebar, widgetTexture, fontPreset, background };
+  return { preset, sidebar, widgetTexture, fontPreset, background, loader };
 }
 
 function getErrorMessage(error) {
@@ -755,6 +759,7 @@ export default function PanelAdminSection() {
     draftSelection.sidebar !== savedSelection.sidebar ||
     draftSelection.widgetTexture !== savedSelection.widgetTexture ||
     draftSelection.fontPreset !== savedSelection.fontPreset ||
+    draftSelection.loader !== savedSelection.loader ||
     draftSelection.background.enabled !== savedSelection.background.enabled ||
     draftSelection.background.image !== savedSelection.background.image;
 
@@ -935,6 +940,7 @@ export default function PanelAdminSection() {
           theme: requestedTheme,
           sidebar: draftSelection.sidebar,
           background: draftSelection.background,
+          loader: { model: draftSelection.loader },
         },
       });
 
@@ -944,6 +950,7 @@ export default function PanelAdminSection() {
         theme: confirmedTheme,
         sidebar: confirmedAdmin.sidebar || draftSelection.sidebar,
         background: confirmedAdmin.background || draftSelection.background,
+        loader: confirmedAdmin.loader || { model: draftSelection.loader },
       });
 
       setSavedSelection(confirmedSelection);
@@ -951,6 +958,8 @@ export default function PanelAdminSection() {
       savedSelectionRef.current = confirmedSelection;
       savedThemeRef.current = confirmedTheme;
       applyThemeObject(confirmedTheme, confirmedSelection.background);
+      rememberAdminLoadingColors({ admin: { theme: confirmedTheme } });
+      rememberAdminLoader(confirmedSelection.loader);
       setFeedback({
         type: 'success',
         text: 'Apariencia guardada y aplicada en todo el panel.',
@@ -1290,6 +1299,30 @@ export default function PanelAdminSection() {
                 contraste para que menús y textos sigan siendo legibles.
               </small>
             </div>
+          </div>
+          <div className="panel-admin-section-heading panel-admin-section-heading--loading">
+            <div>
+              <span>06 · Pantalla de carga</span>
+              <h3>Elige el indicador de carga</h3>
+            </div>
+            <p>Sin pantallas de fondo; el mismo indicador en acceso y módulos</p>
+          </div>
+          <div className="panel-admin-loader-grid" role="group" aria-label="Modelos de loading del panel">
+            {ADMIN_LOADER_MODELS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`panel-admin-loader-option${draftSelection.loader === option.id ? ' is-selected' : ''}`}
+                aria-label={option.label}
+                aria-pressed={draftSelection.loader === option.id}
+                disabled={loading || saving}
+                onClick={() => previewSelection({ ...draftSelection, loader: option.id })}
+              >
+                <AdminLoadingScreen compact preview model={option.id} message="Preparando tu panel…" />
+                <strong>{option.label}</strong>
+                <small>{option.description}</small>
+              </button>
+            ))}
           </div>
         </div>
 

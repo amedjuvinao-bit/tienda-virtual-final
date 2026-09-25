@@ -34,7 +34,7 @@ describe('Login durante la carga inicial', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByLabelText('Preparando acceso administrativo')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Preparando acceso seguro…' })).toBeInTheDocument();
     expect(container.querySelector('[data-login-theme]')).not.toBeInTheDocument();
     expect(screen.queryByText('Hola de nuevo')).not.toBeInTheDocument();
 
@@ -48,7 +48,21 @@ describe('Login durante la carga inicial', () => {
     await waitFor(() => {
       expect(container.querySelector('[data-login-theme="smokeGlass"]')).toBeInTheDocument();
     });
-    expect(screen.queryByLabelText('Preparando acceso administrativo')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Preparando acceso seguro…' })).not.toBeInTheDocument();
+  });
+
+  it('usa los ajustes que ya cargó la aplicación sin hacer otra petición', async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Login initialSettings={{
+          loginAdmin: { theme: 'smokeGlass', layout: 'centeredCard' },
+          store: { name: 'Rosa Boutique' },
+        }} loaderModel="orbit" />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(container.querySelector('[data-login-theme="smokeGlass"]')).toBeInTheDocument());
+    expect(fetchSiteSettings).not.toHaveBeenCalled();
   });
 
   it('muestra y comunica el estado del control Recordar usuario', async () => {

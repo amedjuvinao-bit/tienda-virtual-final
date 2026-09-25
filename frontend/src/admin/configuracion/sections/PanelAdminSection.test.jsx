@@ -49,6 +49,7 @@ describe('PanelAdminSection Nivel Plus', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     api.get.mockResolvedValue(settingsResponse());
     api.put.mockImplementation(async (_url, body) => ({
       data: { admin: body.admin },
@@ -58,6 +59,27 @@ describe('PanelAdminSection Nivel Plus', () => {
         url: 'https://res.cloudinary.com/demo/image/upload/admin/panel.webp',
       },
     });
+  });
+
+  it('muestra cinco modelos y aplica la elección solo después de guardarla', async () => {
+    const user = userEvent.setup();
+    render(<PanelAdminSection />);
+    await screen.findByText('Configuración sincronizada');
+
+    const choices = screen.getByRole('group', { name: 'Modelos de loading del panel' });
+    expect(within(choices).getAllByRole('button')).toHaveLength(5);
+    expect(within(choices).getByRole('button', { name: 'Halo' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(within(choices).getByRole('button', { name: 'Órbita' }));
+    expect(within(choices).getByRole('button', { name: 'Órbita' })).toHaveAttribute('aria-pressed', 'true');
+    expect(window.localStorage.getItem('rb_admin_loader_model')).toBeNull();
+    expect(screen.getByText('Vista previa sin guardar')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Guardar apariencia/i }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/site-settings', {
+      admin: expect.objectContaining({ loader: { model: 'orbit' } }),
+    }));
+    expect(window.localStorage.getItem('rb_admin_loader_model')).toBe('orbit');
   });
 
   it('carga la configuración protegida y presenta controles claros sin guardar', async () => {
