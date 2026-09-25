@@ -10,6 +10,17 @@ vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn() }));
 afterEach(cleanup);
 
 describe('pantalla de revocación administrativa', () => {
+  it('usa el indicador y el color del panel mientras confirma el cierre', () => {
+    useAuth.mockReturnValue({ logoutPending: true, logoutInFlight: true });
+    render(<MemoryRouter initialEntries={['/admin/logout-pending']}>
+      <AdminLogoutGate><div>Panel</div></AdminLogoutGate>
+    </MemoryRouter>);
+
+    const indicator = screen.getByRole('status', { name: 'Confirmando cierre seguro…' });
+    expect(indicator).toHaveClass('admin-loading--admin');
+    expect(indicator).not.toHaveClass('admin-loading--login');
+  });
+
   it('oculta el login, explica el fallo y permite reintentar', () => {
     const retryPendingLogout = vi.fn();
     useAuth.mockReturnValue({

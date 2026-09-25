@@ -26,7 +26,7 @@ function AdminLogoutPending() {
     <main className="admin-logout-pending">
       <section className="admin-logout-pending__content" aria-label="Cierre de sesión administrativa">
         {logoutInFlight || !logoutPending ? (
-          <AdminLoadingScreen compact context="login" model={getRememberedAdminLoader()}
+          <AdminLoadingScreen compact context="admin" model={getRememberedAdminLoader()}
             message="Confirmando cierre seguro…" />
         ) : (
           <>

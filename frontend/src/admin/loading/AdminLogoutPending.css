@@ -31,4 +31,8 @@
   cursor: pointer;
 }
 .admin-logout-pending button:focus-visible { outline: 3px solid #305d88; outline-offset: 3px; }
-.admin-logout-pending .admin-loading { min-height: 0; padding: 0; }
+.admin-logout-pending .admin-loading {
+  --admin-loading-color: var(--rb-loader-panel-color, var(--admin-primary, #506477));
+  min-height: 0;
+  padding: 0;
+}
