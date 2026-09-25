@@ -2385,14 +2385,13 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     await revokeRequestSession(req, 'logout');
-  } catch (error) {
-    console.error('❌ Error revocando sesión admin:', error.message);
-  } finally {
     clearSessionCookies(res);
     clearTwoFactorChallengeCookie(res);
+    return res.json({ ok: true, message: 'Sesión cerrada correctamente.' });
+  } catch (error) {
+    console.error('❌ Error revocando sesión admin:', error.message);
+    return res.status(503).json({ ok: false, message: 'No se pudo confirmar el cierre de sesión. Intenta nuevamente.' });
   }
-
-  return res.json({ ok: true, message: 'Sesión cerrada correctamente.' });
 });
 
 router.post('/logout-all', requireAdmin, async (req, res) => {

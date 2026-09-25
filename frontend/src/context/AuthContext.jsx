@@ -163,12 +163,8 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    await logoutAdminSession();
     clearClientSession();
-    try {
-      await logoutAdminSession();
-    } catch {
-      // El servidor expirará la cookie si momentáneamente no hay conexión.
-    }
   };
 
   const refreshAdminUser = async () => {

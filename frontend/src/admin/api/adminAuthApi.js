@@ -211,7 +211,11 @@ export async function logoutAdminSession() {
   try {
     const response = await api.post(`${BASE_URL}/logout`, null, {
       skipAdminRefresh: true,
+      timeout: 8000,
     });
+    if (response.data?.ok !== true) {
+      throw new Error('El servidor no confirmó el cierre de sesión.');
+    }
     return response.data;
   } catch (error) {
     throw normalizeApiError(
