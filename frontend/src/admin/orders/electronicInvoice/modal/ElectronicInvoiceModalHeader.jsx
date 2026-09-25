@@ -189,6 +189,7 @@ export default function ElectronicInvoiceModalHeader({
 
         <button
           type="button"
+          aria-label="Cerrar factura electrónica"
           onClick={onClose}
           className="rounded-full border p-2 transition"
           style={{

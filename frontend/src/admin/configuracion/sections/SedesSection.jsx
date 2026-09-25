@@ -816,6 +816,7 @@ export default function SedesSection() {
 
                 <button
                   type="button"
+                  aria-label="Cerrar formulario de sede"
                   onClick={resetForm}
                   className="shrink-0 rounded-2xl border p-2"
                   style={borderOnlyButtonStyle}

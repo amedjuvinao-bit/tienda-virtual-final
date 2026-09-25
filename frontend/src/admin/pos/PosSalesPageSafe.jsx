@@ -279,6 +279,7 @@ function CartRow({ item, disabled, onAdd, onSub, onRemove }) {
         </div>
         <button
           type="button"
+          aria-label={`Quitar ${item.title || 'producto'} del carrito`}
           onClick={() => onRemove(item.cartKey)}
           disabled={disabled}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border disabled:cursor-not-allowed disabled:opacity-40"
@@ -290,9 +291,9 @@ function CartRow({ item, disabled, onAdd, onSub, onRemove }) {
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="inline-flex items-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)' }}>
-          <button type="button" onClick={() => onSub(item.cartKey)} disabled={disabled} className="flex h-9 w-9 items-center justify-center disabled:opacity-40"><Minus className="h-4 w-4" /></button>
+          <button type="button" aria-label={`Restar una unidad de ${item.title || 'producto'}`} onClick={() => onSub(item.cartKey)} disabled={disabled} className="flex h-9 w-9 items-center justify-center disabled:opacity-40"><Minus className="h-4 w-4" /></button>
           <span className="min-w-10 px-2 text-center text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{item.quantity}</span>
-          <button type="button" onClick={() => onAdd(item)} disabled={!canAdd} className="flex h-9 w-9 items-center justify-center disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+          <button type="button" aria-label={`Agregar una unidad de ${item.title || 'producto'}`} onClick={() => onAdd(item)} disabled={!canAdd} className="flex h-9 w-9 items-center justify-center disabled:opacity-40"><Plus className="h-4 w-4" /></button>
         </div>
         <strong className="text-sm" style={{ color: 'var(--admin-primary)' }}>{money(Number(item.price || 0) * Number(item.quantity || 1))}</strong>
       </div>

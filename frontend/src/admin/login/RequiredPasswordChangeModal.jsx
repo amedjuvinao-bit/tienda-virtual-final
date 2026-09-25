@@ -176,6 +176,7 @@ export default function RequiredPasswordChangeModal({
 
             <button
               type="button"
+              aria-label="Cerrar cambio de contraseña"
               onClick={onCancel}
               disabled={saving}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
@@ -194,6 +195,7 @@ export default function RequiredPasswordChangeModal({
           <div className="grid gap-4 px-5 py-5 md:px-6">
             {error && (
               <div
+                role="alert"
                 className="rounded-2xl border px-4 py-3 text-sm font-semibold"
                 style={{
                   borderColor: 'var(--admin-danger)',

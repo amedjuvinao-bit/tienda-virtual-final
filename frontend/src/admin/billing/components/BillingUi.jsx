@@ -44,7 +44,7 @@ export function BillingMetricCard({
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-card-muted-text)' }}>
+          <p className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>
             {label}
           </p>
           <p className={`${featured ? 'text-3xl' : 'text-2xl'} mt-2 break-words font-black leading-tight`}>{value}</p>
@@ -136,11 +136,11 @@ export function DocumentActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border px-2 text-[11px] font-black transition hover:-translate-y-px hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 rounded-[10px] border px-2 py-1 text-center text-xs font-black leading-tight transition hover:-translate-y-px hover:shadow-sm disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       style={{
         borderColor: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-card-border)',
         background: isPrimary ? 'var(--admin-accent, #ec4899)' : 'var(--admin-soft-bg)',
-        color: isPrimary ? '#fff' : 'var(--admin-card-text)',
+        color: isPrimary ? 'var(--admin-accent-text, #fff)' : 'var(--admin-card-text)',
       }}
     >
       {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
@@ -161,7 +161,7 @@ export function PanelHeader({ eyebrow, title, text, children }) {
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: 'var(--admin-accent, #ec4899)' }}>
+          <p className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>
             {eyebrow}
           </p>
           <h3 className="mt-1 break-words text-2xl font-black [overflow-wrap:anywhere]">{title}</h3>
@@ -185,7 +185,7 @@ export function SummaryPanelCard({ title, eyebrow, children, footer }) {
         color: 'var(--admin-card-text)',
       }}
     >
-      <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'var(--admin-card-muted-text)' }}>
+      <p className="text-xs font-black uppercase tracking-[0.12em]" style={{ color: 'var(--admin-card-muted-text)' }}>
         {eyebrow}
       </p>
       <h3 className="mt-1 text-lg font-black">{title}</h3>

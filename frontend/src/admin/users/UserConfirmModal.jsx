@@ -122,6 +122,7 @@ export default function UserConfirmModal({
 
             <button
               type="button"
+              aria-label="Cerrar confirmación de usuario"
               onClick={onClose}
               disabled={loading}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"

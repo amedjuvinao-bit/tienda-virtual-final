@@ -266,7 +266,7 @@ function PosCustomerSelectorContent() {
       </div>
 
       {validationError ? (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div role="alert" className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-black">Revisa los datos del cliente</p>
@@ -283,7 +283,7 @@ function PosCustomerSelectorContent() {
                 <p className="truncate text-sm font-black" style={{ color: 'var(--admin-card-text)' }}>{selectedCustomer.fullName || selectedCustomer.displayName}</p>
                 <p className="mt-1 truncate text-xs font-bold" style={{ color: 'var(--admin-card-muted-text)' }}>{[selectedCustomer.phone, selectedCustomer.email, selectedCustomer.documentNumber].filter(Boolean).join(' · ') || 'Cliente seleccionado'}</p>
               </div>
-              <button type="button" onClick={() => { setSelectedCustomer(null); setSearchTerm(''); setValidationError(''); }} className="flex h-9 w-9 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
+              <button type="button" aria-label="Quitar cliente seleccionado" onClick={() => { setSelectedCustomer(null); setSearchTerm(''); setValidationError(''); }} className="flex h-9 w-9 items-center justify-center rounded-xl border" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}>
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -293,6 +293,7 @@ function PosCustomerSelectorContent() {
             <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--admin-card-muted-text)' }} />
             <input
               type="text"
+              aria-label="Buscar cliente"
               value={searchTerm}
               onChange={(event) => { setSelectedCustomer(null); setValidationError(''); setSearchTerm(event.target.value); }}
               placeholder="Buscar cliente por nombre, celular, correo o documento"
@@ -303,7 +304,7 @@ function PosCustomerSelectorContent() {
           </div>
 
           {error ? (
-            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-black">No se pudo buscar clientes</p>
@@ -326,10 +327,10 @@ function PosCustomerSelectorContent() {
 
       {mode === 'quick' ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input value={quickCustomer.fullName} onChange={(event) => updateQuickCustomer('fullName', event.target.value)} placeholder="Nombre completo" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
-          <input value={quickCustomer.phone} onChange={(event) => updateQuickCustomer('phone', event.target.value)} placeholder="Celular" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
+          <input aria-label="Nombre completo del cliente" value={quickCustomer.fullName} onChange={(event) => updateQuickCustomer('fullName', event.target.value)} placeholder="Nombre completo" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
+          <input aria-label="Celular del cliente" value={quickCustomer.phone} onChange={(event) => updateQuickCustomer('phone', event.target.value)} placeholder="Celular" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
           <div className="grid gap-3 sm:grid-cols-[110px_minmax(0,1fr)]">
-            <select value={quickCustomer.documentType} onChange={(event) => updateQuickCustomer('documentType', event.target.value)} className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }}>
+            <select aria-label="Tipo de documento del cliente" value={quickCustomer.documentType} onChange={(event) => updateQuickCustomer('documentType', event.target.value)} className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }}>
               <option value="CC">CC</option>
               <option value="CE">CE</option>
               <option value="TI">TI</option>
@@ -337,9 +338,9 @@ function PosCustomerSelectorContent() {
               <option value="PP">PP</option>
               <option value="OTHER">Otro</option>
             </select>
-            <input value={quickCustomer.documentNumber} onChange={(event) => updateQuickCustomer('documentNumber', event.target.value)} placeholder="Documento" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
+            <input aria-label="Número de documento del cliente" value={quickCustomer.documentNumber} onChange={(event) => updateQuickCustomer('documentNumber', event.target.value)} placeholder="Documento" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
           </div>
-          <input value={quickCustomer.email} onChange={(event) => updateQuickCustomer('email', event.target.value)} placeholder="Correo opcional" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: validationError.toLowerCase().includes('correo') ? '#fecaca' : 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
+          <input aria-label="Correo electrónico del cliente (opcional)" value={quickCustomer.email} onChange={(event) => updateQuickCustomer('email', event.target.value)} placeholder="Correo opcional" className="rounded-xl border bg-transparent px-4 py-3 text-sm font-bold outline-none" style={{ borderColor: validationError.toLowerCase().includes('correo') ? '#fecaca' : 'var(--admin-card-border)', color: 'var(--admin-card-text)', background: 'var(--admin-card-bg)' }} />
         </div>
       ) : null}
     </section>

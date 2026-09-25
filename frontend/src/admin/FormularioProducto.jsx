@@ -3027,7 +3027,7 @@ export default function FormularioProducto() {
                   {tags.map((tag) => (
                     <span key={tag} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
                       {tag}
-                      <button type="button" onClick={() => setTags((previous) => previous.filter((item) => item !== tag))}>×</button>
+                       <button type="button" aria-label={`Quitar etiqueta ${tag}`} onClick={() => setTags((previous) => previous.filter((item) => item !== tag))}>×</button>
                     </span>
                   ))}
                 </div>
@@ -3041,7 +3041,7 @@ export default function FormularioProducto() {
                   {categoriesExtra.map((cat) => (
                     <span key={cat} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black" style={pillStyle}>
                       {cat}
-                      <button type="button" onClick={() => removeCatChip(cat)}>×</button>
+                      <button type="button" aria-label={`Quitar categoría ${cat}`} onClick={() => removeCatChip(cat)}>×</button>
                     </span>
                   ))}
                 </div>
@@ -3083,7 +3083,7 @@ export default function FormularioProducto() {
                   }} className="flex-1 px-3 py-2" style={inputStyle} placeholder="separadas por coma" />
                   <button type="button" onClick={() => { addTokens(seoKeywordsInput, seoKeywords, setSeoKeywords, 15); setSeoKeywordsInput(''); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={actionButtonStyle('soft')}>Añadir</button>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">{seoKeywords.map((keyword) => <span key={keyword} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={pillStyle}>{keyword}<button type="button" onClick={() => setSeoKeywords((previous) => previous.filter((item) => item !== keyword))}>×</button></span>)}</div>
+                <div className="mt-2 flex flex-wrap gap-2">{seoKeywords.map((keyword) => <span key={keyword} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={pillStyle}>{keyword}<button type="button" aria-label={`Quitar palabra clave ${keyword}`} onClick={() => setSeoKeywords((previous) => previous.filter((item) => item !== keyword))}>×</button></span>)}</div>
               </div>
               <div><FieldLabel>Imagen social</FieldLabel><input value={seoImage} onChange={(e) => setSeoImage(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la portada del producto" /></div>
               <div><FieldLabel>URL canónica</FieldLabel><input type="url" value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} className="w-full px-3 py-2" style={inputStyle} placeholder="Vacío: usa la URL actual" /></div>

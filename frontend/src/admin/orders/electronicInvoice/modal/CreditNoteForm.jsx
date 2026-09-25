@@ -52,6 +52,7 @@ export default function CreditNoteForm({ controller }) {
 
         <button
           type="button"
+          aria-label="Cerrar formulario de nota crédito"
           onClick={closeCreditNoteForm}
           className="rounded-full border p-2"
           style={{

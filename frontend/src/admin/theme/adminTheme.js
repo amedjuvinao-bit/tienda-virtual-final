@@ -314,6 +314,7 @@ function getContrastText(bgColor) {
   const darkRatio = getContrastRatio(bgColor, darkText);
   const lightRatio = getContrastRatio(bgColor, lightText);
 
+  if (Math.max(darkRatio, lightRatio) < 4.5) return '#000000';
   return darkRatio >= lightRatio ? darkText : lightText;
 }
 
@@ -330,7 +331,11 @@ function getPreferredContrastText(bgColor, preferredText, minimumRatio = 4.5) {
 
 function getMutedContrastText(bgColor) {
   const baseText = getContrastText(bgColor);
-  return baseText === '#ffffff' ? '#cbd5e1' : '#6b7280';
+  const candidates = baseText === '#ffffff'
+    ? ['#cbd5e1', '#e2e8f0']
+    : ['#6b7280', '#4b5563'];
+
+  return candidates.find((color) => getContrastRatio(bgColor, color) >= 4.5) || baseText;
 }
 
 function getPlaceholderContrastText(bgColor) {

@@ -848,9 +848,9 @@ export default function InventoryAdmin() {
             <div className="inventory-pagination">
               <p>Mostrando {formatNumber((currentPage - 1) * ROWS_PER_PAGE + 1)}–{formatNumber(Math.min(currentPage * ROWS_PER_PAGE, filteredStockRows.length))} de {formatNumber(filteredStockRows.length)}</p>
               <div className="inventory-pagination__controls">
-                <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}><ChevronLeft size={17} /></button>
+                <button type="button" aria-label="Página anterior de inventario" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}><ChevronLeft size={17} /></button>
                 <strong>{currentPage} / {totalPages}</strong>
-                <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}><ChevronRight size={17} /></button>
+                <button type="button" aria-label="Página siguiente de inventario" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}><ChevronRight size={17} /></button>
               </div>
             </div>
           )}

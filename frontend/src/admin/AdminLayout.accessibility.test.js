@@ -28,6 +28,9 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(globalStylesSource).toContain(
       '.admin-area :is(a[href], input, select, textarea, [role="button"]):focus-visible'
     );
+    expect(globalStylesSource).toMatch(
+      /\.admin-area button:not\(:disabled\)[^}]*:focus-visible\s*\{\s*outline: 3px solid var\(--admin-primary\) !important;/s,
+    );
     expect(globalStylesSource).toContain('outline-offset: 2px !important');
   });
 

@@ -1394,6 +1394,8 @@ export default function CartPageEditor() {
           >
             <div
               data-admin-storefront-preview="true"
+              aria-hidden="true"
+              inert=""
               className="min-w-0 rounded-3xl border p-3 sm:p-5"
               style={{
                 backgroundColor: style.pageBg,
@@ -1835,6 +1837,8 @@ export default function CartPageEditor() {
           >
             <div
               data-admin-storefront-preview="true"
+              aria-hidden="true"
+              inert=""
               className="rounded-3xl border border-gray-200 bg-gray-50 p-4"
             >
               <div className="relative mx-auto h-[620px] max-w-[520px] overflow-hidden rounded-3xl border border-gray-300 bg-white">

@@ -93,6 +93,15 @@ describe('adminTheme Nivel Plus', () => {
     expect(root.style.getPropertyValue('--admin-radius')).toBe('32px');
   });
 
+  it('mantiene legible el texto principal y secundario en fondos de contraste intermedio', () => {
+    applyAdminTheme({ cardBg: '#e5e7eb', modalBg: '#777777' });
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--admin-card-muted-text')).toBe('#4b5563');
+    expect(root.style.getPropertyValue('--admin-modal-text')).toBe('#000000');
+    expect(root.style.getPropertyValue('--admin-modal-muted-text')).toBe('#000000');
+  });
+
   it('mantiene éxito, advertencia y error independientes del color del tema', () => {
     applyAdminTheme({
       preset: 'goldBoutiqueLight',

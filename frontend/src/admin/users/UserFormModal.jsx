@@ -149,6 +149,7 @@ export default function UserFormModal({
 
             <button
               type="button"
+              aria-label="Cerrar formulario de usuario"
               onClick={onClose}
               disabled={saving}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-xl font-black transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
@@ -166,6 +167,7 @@ export default function UserFormModal({
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
           {error && (
             <div
+              role="alert"
               className="mb-5 rounded-2xl border px-4 py-3 text-sm font-semibold"
               style={{
                 borderColor: 'var(--admin-danger)',

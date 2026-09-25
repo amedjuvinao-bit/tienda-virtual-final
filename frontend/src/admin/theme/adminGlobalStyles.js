@@ -951,7 +951,8 @@ export function applyAdminGlobalStyles() {
     }
 
     .admin-area button:not(:disabled):not([disabled]):not([aria-disabled="true"]):focus-visible {
-      outline: none !important;
+      outline: 3px solid var(--admin-primary) !important;
+      outline-offset: 2px !important;
       box-shadow:
         0 0 0 3px color-mix(in srgb, var(--admin-primary) 24%, transparent),
         0 10px 24px color-mix(in srgb, var(--admin-primary) 16%, transparent) !important;
@@ -960,7 +961,7 @@ export function applyAdminGlobalStyles() {
     /* Keyboard focus must remain visible on navigation and form controls,
        including legacy modules that remove the browser outline. */
     .admin-area :is(a[href], input, select, textarea, [role="button"]):focus-visible {
-      outline: 3px solid color-mix(in srgb, var(--admin-primary) 42%, transparent) !important;
+      outline: 3px solid var(--admin-primary) !important;
       outline-offset: 2px !important;
     }
 

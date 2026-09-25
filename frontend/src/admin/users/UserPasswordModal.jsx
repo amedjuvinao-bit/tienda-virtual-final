@@ -97,6 +97,7 @@ export default function UserPasswordModal({
 
             <button
               type="button"
+              aria-label="Cerrar cambio de contraseña del usuario"
               onClick={onClose}
               disabled={saving}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-xl font-black transition hover:scale-105 disabled:opacity-60"
@@ -113,7 +114,7 @@ export default function UserPasswordModal({
 
         <div className="grid gap-4 p-5 md:p-6">
           {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {error}
             </div>
           )}

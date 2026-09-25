@@ -113,6 +113,7 @@ function ReceiptModal({ receipt, onClose, onPrint, onSendEmail, loadingPrint, lo
           </div>
           <button
             type="button"
+            aria-label="Cerrar comprobante de venta"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-xl border"
             style={{ borderColor: 'var(--admin-card-border)', color: 'var(--admin-card-muted-text)' }}
@@ -369,7 +370,7 @@ export default function PosReceiptActions({ sale, onClose, compact = false }) {
             <p className="text-sm font-black">Venta POS confirmada</p>
             <p className="mt-1 text-sm font-bold">Orden {number} creada correctamente.</p>
           </div>
-          <button type="button" onClick={onClose} className="self-start font-black lg:self-auto" style={{ color: '#047857' }}>×</button>
+          <button type="button" aria-label="Cerrar confirmación de venta" onClick={onClose} className="self-start font-black lg:self-auto" style={{ color: '#047857' }}>×</button>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
