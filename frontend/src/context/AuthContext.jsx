@@ -5,7 +5,12 @@ import api, {
   clearLegacyAdminToken,
   setAdminSessionActive,
 } from '../lib/api';
-import { logoutAdminSession } from '../admin/api/adminAuthApi';
+import {
+  finishPendingAdminLogout,
+  isAdminLogoutPending,
+  markAdminLogoutPending,
+  PENDING_LOGOUT_KEY,
+} from '../admin/api/adminAuthApi';
 
 const AuthContext = createContext();
 let initialSessionVerificationPromise = null;
@@ -96,13 +101,23 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let alive = true;
+    let logoutObserved = false;
 
     const verifyStoredSession = async () => {
       removeLegacySessionStorage();
 
       try {
+        if (isAdminLogoutPending()) {
+          if (alive) clearClientSession();
+          void finishPendingAdminLogout().catch(() => {});
+          return;
+        }
         const response = await verifyInitialAdminSession();
         if (!alive) return;
+        if (logoutObserved || isAdminLogoutPending()) {
+          clearClientSession();
+          return;
+        }
         const verifiedUser = normalizeAdminUser(response?.data?.user);
         if (response?.data?.authenticated === false || !verifiedUser) {
           clearClientSession();
@@ -122,10 +137,21 @@ export function AuthProvider({ children }) {
       if (alive) clearClientSession();
     };
 
+    const handlePendingLogout = (event) => {
+      if (!alive) return;
+      if (event.type === 'storage' &&
+        (event.key !== PENDING_LOGOUT_KEY || event.newValue !== '1')) return;
+      if (isAdminLogoutPending() || event.type === 'storage') {
+        logoutObserved = true;
+        clearClientSession();
+        void finishPendingAdminLogout().catch(() => {});
+      }
+    };
+
     const handleTwoFactorPolicyUpdated = async () => {
       try {
         const response = await requestAdminSessionVerification();
-        if (!alive) return;
+        if (!alive || logoutObserved || isAdminLogoutPending()) return;
         const verifiedUser = normalizeAdminUser(response?.data?.user);
         if (response?.data?.authenticated === false || !verifiedUser) {
           clearClientSession();
@@ -138,6 +164,8 @@ export function AuthProvider({ children }) {
     };
 
     window.addEventListener('admin-session-expired', handleSessionExpired);
+    window.addEventListener('online', handlePendingLogout);
+    window.addEventListener('storage', handlePendingLogout);
     window.addEventListener(
       'admin-two-factor-policy-updated',
       handleTwoFactorPolicyUpdated
@@ -147,6 +175,8 @@ export function AuthProvider({ children }) {
     return () => {
       alive = false;
       window.removeEventListener('admin-session-expired', handleSessionExpired);
+      window.removeEventListener('online', handlePendingLogout);
+      window.removeEventListener('storage', handlePendingLogout);
       window.removeEventListener(
         'admin-two-factor-policy-updated',
         handleTwoFactorPolicyUpdated
@@ -162,9 +192,11 @@ export function AuthProvider({ children }) {
     removeLegacySessionStorage();
   };
 
-  const logout = async () => {
-    await logoutAdminSession();
+  const logout = () => {
+    markAdminLogoutPending();
     clearClientSession();
+    // La salida visual no depende de la red; el cierre pendiente impide restaurar la sesión.
+    void finishPendingAdminLogout().catch(() => {});
   };
 
   const refreshAdminUser = async () => {

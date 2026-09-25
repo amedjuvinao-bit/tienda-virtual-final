@@ -40,7 +40,8 @@ async function main() {
     const failed = await logout();
     assert.equal(failed.status, 503);
     assert.equal((await failed.json()).ok, false);
-    assert.equal(failed.headers.get('set-cookie'), null, 'must leave cookie for a retry');
+    assert.match(failed.headers.get('set-cookie') || '', /rb_admin_access=.*Expires=/,
+      'must remove browser credentials even when database revocation fails');
 
     shouldFail = false;
     const success = await logout();

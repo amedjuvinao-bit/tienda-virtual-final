@@ -54,12 +54,11 @@ describe('accesibilidad y adaptación del Panel Admin', () => {
     expect(layoutSource).toContain('role="alert"');
   });
 
-  it('espera la confirmación del cierre y permite reintentar sin habilitar el panel', () => {
+  it('sale del panel inmediatamente y no queda bloqueado por la red', () => {
     expect(layoutSource).toMatch(
-      /const handleLogout = async \(\) => \{[\s\S]*?await logout\(\);[\s\S]*?navigate\('\/admin\/login', \{ replace: true \}\);[\s\S]*?catch \{[\s\S]*?setLogoutError/,
+      /const handleLogout = \(\) => \{[\s\S]*?logout\(\);[\s\S]*?navigate\('\/admin\/login', \{ replace: true \}\);/,
     );
-    expect(layoutSource).toContain('inert={loggingOut || logoutError ?');
-    expect(layoutSource).toContain('onClick={handleLogout}>Reintentar');
+    expect(layoutSource).not.toContain('admin-logout-error');
     expect(layoutSource).not.toContain("window.location.replace('/admin/login')");
   });
 

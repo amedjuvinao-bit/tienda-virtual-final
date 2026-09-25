@@ -9,6 +9,37 @@ import api from '../../lib/api';
  * ============================================================ */
 
 const BASE_URL = '/api/admin/auth';
+export const PENDING_LOGOUT_KEY = 'rb_admin_logout_pending';
+let pendingLogoutInMemory = false;
+let pendingLogoutRequest = null;
+
+export function isAdminLogoutPending() {
+  try {
+    return pendingLogoutInMemory || localStorage.getItem(PENDING_LOGOUT_KEY) === '1';
+  } catch {
+    return pendingLogoutInMemory;
+  }
+}
+
+export function markAdminLogoutPending() {
+  pendingLogoutInMemory = true;
+  try { localStorage.setItem(PENDING_LOGOUT_KEY, '1'); } catch { /* Sin almacenamiento, protege esta pestaña. */ }
+}
+
+function clearAdminLogoutPending() {
+  pendingLogoutInMemory = false;
+  try { localStorage.removeItem(PENDING_LOGOUT_KEY); } catch { /* La sesión ya se revocó. */ }
+}
+
+export function finishPendingAdminLogout() {
+  if (!isAdminLogoutPending()) return;
+  if (!pendingLogoutRequest) {
+    pendingLogoutRequest = logoutAdminSession()
+      .then(clearAdminLogoutPending)
+      .finally(() => { pendingLogoutRequest = null; });
+  }
+  return pendingLogoutRequest;
+}
 
 function getErrorMessage(error, fallbackMessage) {
   return (
@@ -29,6 +60,7 @@ function normalizeApiError(error, fallbackMessage) {
 
 export async function loginAdmin(credentials) {
   try {
+    await finishPendingAdminLogout();
     const response = await api.post(`${BASE_URL}/login`, {
       username: credentials?.username || '',
       password: credentials?.password || '',
@@ -211,7 +243,6 @@ export async function logoutAdminSession() {
   try {
     const response = await api.post(`${BASE_URL}/logout`, null, {
       skipAdminRefresh: true,
-      timeout: 8000,
     });
     if (response.data?.ok !== true) {
       throw new Error('El servidor no confirmó el cierre de sesión.');

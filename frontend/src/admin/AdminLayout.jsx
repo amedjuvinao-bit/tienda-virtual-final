@@ -147,8 +147,6 @@ export default function AdminLayout({ initialSettings }) {
   const [adminBrandLogo, setAdminBrandLogo] = useState('');
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [loaderModel, setLoaderModel] = useState(getRememberedAdminLoader);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState('');
   const logoutInFlight = useRef(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -242,20 +240,11 @@ export default function AdminLayout({ initialSettings }) {
     }
   }, [sidebarCollapsed]);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (logoutInFlight.current) return;
     logoutInFlight.current = true;
-    setLoggingOut(true);
-    setLogoutError('');
-    try {
-      await logout();
-      navigate('/admin/login', { replace: true });
-    } catch {
-      setLogoutError('No se pudo confirmar el cierre de sesión. Intenta nuevamente.');
-    } finally {
-      logoutInFlight.current = false;
-      setLoggingOut(false);
-    }
+    logout();
+    navigate('/admin/login', { replace: true });
   };
 
   const handleConfigMenuClick = () => {
@@ -725,51 +714,6 @@ export default function AdminLayout({ initialSettings }) {
           width: 40px;
           height: 30px;
           transform: scale(.7);
-        }
-
-        .admin-logout-status {
-          position: fixed;
-          z-index: 110;
-          top: 10px;
-          left: 50%;
-          max-width: calc(100vw - 20px);
-          transform: translateX(-50%);
-          color: var(--admin-primary);
-        }
-
-        .admin-logout-status .admin-loading { min-height: 0; padding: 0; }
-        .admin-logout-status .admin-loading__content { display: flex; align-items: center; gap: 4px; }
-        .admin-logout-status .admin-loading__visual { width: 40px; height: 30px; transform: scale(.7); }
-
-        .admin-logout-error {
-          position: fixed;
-          z-index: 110;
-          top: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          max-width: calc(100vw - 20px);
-          padding: 10px 14px;
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          color: var(--admin-card-text);
-        }
-
-        .admin-logout-error button {
-          border: 1px solid var(--admin-primary);
-          border-radius: 8px;
-          padding: 6px 12px;
-          background: var(--admin-primary);
-          color: var(--admin-primary-text, #fff);
-          font: inherit;
-          cursor: pointer;
-        }
-
-        .admin-logout-error button:focus-visible {
-          outline: 2px solid var(--admin-primary);
-          outline-offset: 2px;
         }
 
         .admin-area .admin-header-panel {
@@ -2221,17 +2165,6 @@ export default function AdminLayout({ initialSettings }) {
           `,
         }}
       >
-        {loggingOut && (
-          <div className="admin-logout-status">
-            <AdminLoadingScreen compact model={loaderModel} message="Cerrando sesión…" />
-          </div>
-        )}
-        {logoutError && (
-          <div className="admin-card-glass admin-logout-error" role="alert">
-            <span>{logoutError}</span>
-            <button type="button" onClick={handleLogout}>Reintentar</button>
-          </div>
-        )}
         <a className="admin-skip-link" href="#admin-main-content">
           Saltar al contenido principal
         </a>
@@ -2283,7 +2216,6 @@ export default function AdminLayout({ initialSettings }) {
         <div
           className="admin-layout-shell relative z-10 flex min-h-screen"
           data-sidebar-collapsed={sidebarCollapsed}
-          inert={loggingOut || logoutError ? '' : undefined}
         >
           <aside
             className="admin-sidebar-glass admin-sidebar-panel hidden md:flex md:flex-col shrink-0"
